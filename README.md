@@ -94,7 +94,7 @@ for details.
 
 ## 🔗 Resources
 
-- [Full Manifesto](https://github.com/CivicPress/civicpress/blob/main/records/manifesto.md)
+- [Full Manifesto](https://github.com/CivicPress/manifesto/blob/master/manifesto.md)
 - [Community Guidelines](CODE_OF_CONDUCT.md)
 
 ## 🙏 Acknowledgments

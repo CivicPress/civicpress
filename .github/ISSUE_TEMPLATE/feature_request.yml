@@ -11,7 +11,7 @@ body:
 
         Before submitting, please:
         - Check existing issues to avoid duplicates
-        - Review our [manifesto](https://github.com/CivicPress/civicpress/blob/main/records/manifesto.md) to ensure alignment
+        - Review our [manifesto](https://github.com/CivicPress/manifesto/blob/master/manifesto.md) to ensure alignment
         - Consider the civic impact and accessibility implications
 
   - type: input

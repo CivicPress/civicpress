@@ -53,4 +53,4 @@ automation or cleverness.
 
 This is only a condensed summary.  
 For the full CivicPress manifesto, visit:  
-📖 https://github.com/CivicPress/civicpress/blob/main/records/manifesto.md
+📖 https://github.com/CivicPress/manifesto/blob/master/manifesto.md

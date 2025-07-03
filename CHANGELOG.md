@@ -63,7 +63,7 @@ and this project adheres to
 
 - [Contributing Guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Full Manifesto](https://github.com/CivicPress/civicpress/blob/main/records/manifesto.md)
+- [Full Manifesto](https://github.com/CivicPress/manifesto/blob/master/manifesto.md)
 
 ---
 

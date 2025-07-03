@@ -12,7 +12,7 @@ accessible, auditable, and human-centered.
 ## 📋 Before You Start
 
 - Familiarize yourself with our
-  [manifesto](https://github.com/CivicPress/civicpress/blob/main/records/manifesto.md)
+  [manifesto](https://github.com/CivicPress/manifesto/blob/master/manifesto.md)
 - Check existing issues and discussions before creating new ones
 
 ## 🚀 Development Setup
