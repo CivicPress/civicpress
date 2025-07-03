@@ -1,0 +1,15 @@
+{
+  "name": "civicpress",
+  "version": "1.0.0",
+  "description": "CivicPress project",
+  "scripts": {
+    "format": "prettier --write \"**/*.{md,json,js,ts,jsx,tsx}\"",
+    "format:check": "prettier --check \"**/*.{md,json,js,ts,jsx,tsx}\"",
+    "dev": "pnpm -r run dev",
+    "build": "pnpm -r run build"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  }
+}

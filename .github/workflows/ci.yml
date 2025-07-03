@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.1'
+          cache: 'npm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.12.4
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Verify workspace structure
+        run: |
+          echo "Verifying project structure..."
+          test -f README.md || exit 1
+          test -f LICENSE || exit 1
+          test -f CONTRIBUTING.md || exit 1
+          test -f CODE_OF_CONDUCT.md || exit 1
+          test -f CHANGELOG.md || exit 1
+          test -f .prettierrc || exit 1
+          test -f pnpm-workspace.yaml || exit 1
+          echo "✅ All required files present"

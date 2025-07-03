@@ -1,0 +1,153 @@
+name: 🚀 Feature Request
+description: Suggest a new idea or enhancement for CivicPress
+labels: [enhancement, needs-triage]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your interest in improving CivicPress! 
+
+        Before submitting, please:
+        - Check existing issues to avoid duplicates
+        - Review our [manifesto](https://github.com/CivicPress/civicpress/blob/main/records/manifesto.md) to ensure alignment
+        - Consider the civic impact and accessibility implications
+
+  - type: input
+    id: summary
+    attributes:
+      label: 🎯 Feature Summary
+      description: A clear, concise title for this feature
+      placeholder: 'e.g., Git commit audit UI for transparency'
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 🐛 Problem Statement
+      description: What civic problem does this solve? Who is affected?
+      placeholder: |
+        Currently, citizens cannot easily track changes to public records...
+        This affects municipal clerks, transparency advocates, and citizens who...
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 💡 Proposed Solution
+      description: How should this feature work? What would it look like?
+      placeholder: |
+        A web interface that shows:
+        - Commit history for public records
+        - Diff views for changes
+        - Search and filtering capabilities
+        - Export functionality for transparency reports
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefit
+    attributes:
+      label: 🌟 Civic Impact
+      description: Who benefits and how? What's the public value?
+      placeholder: |
+        **Direct Benefits:**
+        - Municipal clerks can track record changes
+        - Citizens can audit government transparency
+        - Journalists can investigate public records
+
+        **Indirect Benefits:**
+        - Increased trust in government systems
+        - Better accountability mechanisms
+        - Reduced FOIA request burden
+      render: markdown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 🎯 Priority Level
+      description: How urgent is this feature?
+      options:
+        - '🔴 Critical - Blocks core functionality'
+        - '🟡 High - Important for user experience'
+        - '🟢 Medium - Nice to have'
+        - '🔵 Low - Future enhancement'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 📏 Scope
+      description: What's the estimated complexity?
+      options:
+        - '🟢 Small - Simple UI change or configuration'
+        - '🟡 Medium - New module or significant feature'
+        - '🔴 Large - Major architectural change'
+        - '🟣 Epic - Multi-module system change'
+
+  - type: textarea
+    id: accessibility
+    attributes:
+      label: ♿ Accessibility Considerations
+      description: How will this feature work for users with disabilities?
+      placeholder: |
+        - Screen reader compatibility
+        - Keyboard navigation support
+        - Color contrast requirements
+        - Alternative input methods
+        - Mobile accessibility
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 Alternatives Considered
+      description: What other approaches did you consider?
+      placeholder: |
+        - Manual audit processes
+        - Third-party transparency tools
+        - Different UI approaches
+        - Alternative data formats
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 📋 Additional Context
+      description: Any other relevant information, screenshots, or examples
+      placeholder: |
+        - Links to similar features in other civic software
+        - Screenshots or mockups
+        - User research or feedback
+        - Technical constraints or requirements
+      render: markdown
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✅ Submission Checklist
+      description: Please confirm you've completed these steps
+      options:
+        - label: I've searched existing issues to avoid duplicates
+        - label:
+            This aligns with CivicPress's transparency and accessibility
+            principles
+        - label: I've considered the civic impact and public value
+        - label: I'm willing to help implement or test this feature
+        - label: I understand this may take time to implement based on priority
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        **Thank you for contributing to better civic technology!** 🌱
+
+        Our team will review this request and respond within 1-2 weeks. 
+        For urgent matters, please tag maintainers or use the discussion forum.

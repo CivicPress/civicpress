@@ -1,0 +1,36 @@
+# Node
+node_modules/
+.pnpm/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/*
+!.vscode/settings.json
+
+# Runtime
+.env
+dist/
+build/
+.cache/
+.nyc_output/
+
+# CivicPress
+.civic/state/
+.civic/hooks.log.jsonl
+records/**/*.bak
+records/**/*.tmp
+
+# pnpm
+# Note: pnpm-lock.yaml should be committed for reproducible builds
+
+# Mac system files
+Icon?
+._*
+
+# backup exports
+.civic/backup/
+*.zip
