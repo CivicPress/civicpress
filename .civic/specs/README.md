@@ -1,7 +1,8 @@
 # 📘 CivicPress Specs
 
 This folder contains formal **specifications** for the CivicPress platform.  
-Each file defines the architecture, responsibilities, and constraints of a core system or module.
+Each file defines the architecture, responsibilities, and constraints of a core
+system or module.
 
 These specs are meant to serve as:
 
@@ -15,17 +16,17 @@ These specs are meant to serve as:
 
 Each spec typically includes:
 
-| Section               | Purpose                                               |
-|------------------------|-------------------------------------------------------|
-| 📛 Name               | Short system identifier or filename                   |
-| 🎯 Purpose            | Why this module/system exists                         |
-| 🧩 Scope              | What it does and does not do                          |
-| 🔗 Inputs & Outputs   | API, CLI, file-based, or event-based data              |
-| 📂 Folder Location    | Where the code or records are expected to live        |
-| 🔐 Security Notes     | Permissions, roles, isolation                         |
-| 🧪 Testing Plan       | How this part is verified                             |
-| 🛠️ Enhancements       | Ideas for future evolution                            |
-| 📅 History            | Draft date and update log                            |
+| Section             | Purpose                                        |
+| ------------------- | ---------------------------------------------- |
+| 📛 Name             | Short system identifier or filename            |
+| 🎯 Purpose          | Why this module/system exists                  |
+| 🧩 Scope            | What it does and does not do                   |
+| 🔗 Inputs & Outputs | API, CLI, file-based, or event-based data      |
+| 📂 Folder Location  | Where the code or records are expected to live |
+| 🔐 Security Notes   | Permissions, roles, isolation                  |
+| 🧪 Testing Plan     | How this part is verified                      |
+| 🛠️ Enhancements     | Ideas for future evolution                     |
+| 📅 History          | Draft date and update log                      |
 
 ---
 
