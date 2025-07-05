@@ -52,6 +52,145 @@ traceability and thematic organization.
 
 ---
 
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| Civic records            | Markdown files with YAML frontmatter |
+| Record metadata          | Title, status, authors, dates, tags |
+| File system structure    | Directory organization and naming |
+| Git commits              | Version history and change tracking |
+| Record relationships      | Links between related records |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Structured records       | Organized civic documents in folders |
+| Timeline entries         | Chronological civic activity records |
+| Record indexes           | Searchable indexes of civic records |
+| Archive entries          | Finalized records moved to archive |
+| Relationship maps        | Links and references between records |
+
+---
+
+## 📂 File/Folder Location
+
+```
+records/
+├── timeline/              # Chronological civic activity
+│   ├── 2025-07-03/
+│   │   ├── bylaw-curfew.md
+│   │   └── motion-budget.md
+│   └── 2025-07-12/
+│       └── bylaw-curfew.md
+├── bylaws/               # Finalized bylaws by section
+│   ├── section-01/
+│   │   └── bylaw-curfew.md
+│   └── section-02/
+│       └── bylaw-noise-restrictions.md
+├── minutes/              # Meeting minutes
+│   ├── regular/
+│   │   └── meeting-2025-07-03.md
+│   └── emergency/
+│       └── meeting-2025-07-15.md
+├── resolutions/          # Council resolutions
+│   └── 2025-06-10/
+│       └── resolution-road-repair.md
+└── feedback/            # Public feedback
+    └── 2025-07-03/
+        └── noise-complaint.md
+
+.civic/
+├── data-structure.yml    # Data structure configuration
+├── naming-conventions.yml # File naming rules
+└── frontmatter-schemas/  # Frontmatter templates
+    ├── bylaw.yml
+    ├── motion.yml
+    └── resolution.yml
+
+core/
+├── data-structure.ts     # Data structure logic
+├── record-organizer.ts   # Record organization utilities
+├── timeline-manager.ts   # Timeline management
+└── archive-manager.ts    # Archive management
+
+modules/
+├── data-structure/
+│   ├── components/
+│   │   ├── RecordViewer.tsx # Record display component
+│   │   ├── TimelineViewer.tsx # Timeline display
+│   │   └── ArchiveViewer.tsx # Archive display
+│   ├── hooks/
+│   │   └── useDataStructure.ts # Data structure hook
+│   └── utils/
+│       ├── record-parser.ts # Record parsing utilities
+│       └── structure-validator.ts # Structure validation
+└── ui/
+    └── components/
+        └── DataStructureProvider.tsx # Data structure context
+
+tests/
+├── data-structure/
+│   ├── record-organization.test.ts
+│   ├── timeline-management.test.ts
+│   └── archive-management.test.ts
+└── integration/
+    └── data-structure-integration.test.ts
+```
+
+---
+
+## 🔐 Security & Trust Considerations
+
+### Data Integrity & Authenticity
+
+- All civic records cryptographically signed with GPG keys
+- Digital signatures required for all record publications and amendments
+- Immutable audit trail for all record changes and movements
+- Version control with tamper-evident history for all civic records
+- Automated detection of unauthorized modifications to civic records
+
+### Access Control & Permissions
+
+- Role-based access control for record creation and modification
+- Granular permissions per record type and status
+- Approval workflow for record publication and archival
+- Emergency record lockdown capability during security incidents
+- Audit logging of all record-related activities and access attempts
+
+### Compliance & Legal Requirements
+
+- Compliance with municipal record-keeping requirements
+- Legal review process for record structure and organization
+- Support for public records laws and transparency requirements
+- Compliance with data retention policies for civic records
+- Regular legal audits of record organization practices
+
+### Data Protection & Privacy
+
+- Encryption of sensitive record data in transit and at rest
+- GDPR-compliant data handling for record metadata
+- Anonymization of personal data in public records
+- User consent management for record-related data processing
+- Data sovereignty compliance for cross-border record storage
+
+### Audit & Transparency
+
+- Public transparency logs for all record operations
+- Cryptographic verification of record authenticity
+- Immutable audit trails for all data structure activities
+- Support for public records requests and legal discovery
+- Regular transparency reports and compliance audits
+
+### Abuse Prevention & Monitoring
+
+- Rate limiting and abuse detection for record operations
+- Machine learning detection of coordinated record manipulation
+- Real-time monitoring of record access patterns and volume
+- Automated alerts for unusual record activity or potential abuse
+- Blacklist/whitelist management for record content and metadata
+
+---
+
 ## 📂 Hybrid Folder Structure
 
 CivicPress separates civic record **evolution** from **organization**:
@@ -134,19 +273,6 @@ module: 'legal-register'
 source: 'timeline/2025-07-03/bylaw-park.md'
 ---
 ```
-
----
-
-## 🔐 Security & Trust Considerations
-
-- All civic records must live in Git for traceability
-- Record moves from `timeline/` to structured folders must be done via commits
-- No file should be silently overwritten — changes must be transparent
-- Sensitive data (e.g., internal notes or drafts not meant for public view)
-  should live in a separate `/internal/` folder or module-specific `.meta.yml`
-  sidecars
-
----
 
 ## 🧪 Testing & Validation
 

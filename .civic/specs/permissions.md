@@ -1,12 +1,13 @@
 # 🔐 CivicPress Spec: `permissions.md`
 
 ---
-version: 1.1.0
+version: 1.0.0
 status: stable
 created: '2025-07-03'
 updated: '2025-07-15'
 deprecated: false
 sunset_date: null
+breaking_changes: []
 additions:
 
 - comprehensive testing examples
@@ -15,14 +16,16 @@ additions:
 - compliance testing
 - CLI testing
 - detailed YAML field definitions
+fixes: []
+migration_guide: null
 compatibility:
   min_civicpress: 1.0.0
   max_civicpress: 'null'
   dependencies:
-  - 'auth.md: >=1.2.0'
+  - 'auth.md: >=1.0.0'
   - 'roles.yml.md: >=1.0.0'
-  - 'workflows.md: >=1.3.0'
-  - 'git-policy.md: >=1.1.0'
+  - 'workflows.md: >=1.0.0'
+  - 'git-policy.md: >=1.0.0'
 authors:
 - Sophie Germain <sophie@civic-press.org>
 reviewers:
@@ -56,6 +59,118 @@ approvals.
 
 - Login and authentication (see future `auth.md`)
 - GitHub/Gitea team management (external)
+
+---
+
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| User identities          | Git commit authors and role assignments |
+| Role definitions         | Role permissions from `.civic/roles.yml` |
+| Permission requests      | User actions requiring authorization |
+| Approval workflows       | Multi-role approval processes |
+| Role assignments         | User-to-role mappings and changes |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Authorization decisions  | Allow/deny responses for user actions |
+| Role validations         | Role verification and permission checks |
+| Approval status          | Multi-role approval workflow status |
+| Audit logs              | Permission checks and role changes |
+| Access control lists     | Computed permissions for users and resources |
+
+---
+
+## 📂 File/Folder Location
+
+```
+.civic/
+├── roles.yml              # User roles and permissions
+├── permissions.yml        # Permission definitions and policies
+└── approval-workflows.yml # Approval workflow configurations
+
+core/
+├── permissions.ts         # Permission checking logic
+├── roles.ts              # Role management and validation
+├── approval.ts           # Approval workflow processing
+└── audit.ts              # Permission audit logging
+
+modules/
+├── permissions/
+│   ├── components/
+│   │   ├── RoleManager.tsx # Role management UI
+│   │   ├── PermissionViewer.tsx # Permission display
+│   │   └── ApprovalWorkflow.tsx # Approval workflow UI
+│   ├── hooks/
+│   │   └── usePermissions.ts # Permission data hook
+│   └── utils/
+│       ├── permission-checker.ts # Permission validation
+│       └── role-validator.ts # Role validation utilities
+└── ui/
+    └── components/
+        └── PermissionProvider.tsx # Permission context provider
+
+tests/
+├── permissions/
+│   ├── permission-checking.test.ts
+│   ├── role-validation.test.ts
+│   └── approval-workflow.test.ts
+└── integration/
+    └── permissions-integration.test.ts
+```
+
+---
+
+## 🔐 Security & Trust Considerations
+
+### Permission Security
+
+- All permission checks must be validated server-side
+- Role assignments require administrative approval
+- Permission inheritance must be explicitly defined
+- Audit logging for all permission changes and checks
+- Cryptographic verification of role assignments
+
+### Access Control & Authorization
+
+- Role-based access control (RBAC) implementation
+- Principle of least privilege for all roles
+- Time-based permission expiration and renewal
+- Emergency access procedures for critical situations
+- Multi-factor authentication for administrative roles
+
+### Compliance & Legal Requirements
+
+- Compliance with municipal access control requirements
+- Support for public records laws and transparency
+- Legal review process for permission policies
+- Compliance with data protection regulations
+- Regular security audits of permission systems
+
+### Data Protection & Privacy
+
+- Encryption of sensitive permission data
+- GDPR-compliant permission data handling
+- User consent for permission assignments
+- Data retention policies for permission logs
+- Anonymization of permission audit trails
+
+### Audit & Transparency
+
+- Immutable audit trails for all permission changes
+- Public transparency logs for role assignments
+- Cryptographic verification of permission integrity
+- Support for compliance audits and legal discovery
+- Regular permission system health checks
+
+### Abuse Prevention & Monitoring
+
+- Rate limiting for permission check requests
+- Automated detection of permission abuse patterns
+- Real-time monitoring of permission usage
+- Alert systems for unusual permission activity
+- Blacklist/whitelist management for permissions
 
 ---
 

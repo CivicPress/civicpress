@@ -7,11 +7,14 @@ created: '2025-07-03'
 updated: '2025-07-15'
 deprecated: false
 sunset_date: null
+breaking_changes: []
 additions:
 
 - comprehensive branding documentation
 - brand compliance
 - security considerations
+fixes: []
+migration_guide: null
 compatibility:
   min_civicpress: 1.0.0
   max_civicpress: 'null'
@@ -67,16 +70,55 @@ This supports civic trust, consistency, and optional white-label deployments.
 
 ---
 
-## 📁 File/Folder Location
+## 📂 File/Folder Location
 
 ```
-public/logo.svg
-public/favicon.ico
-public/manifest.webmanifest
-public/splash.png
+public/
+├── logo.svg              # Main organization logo
+├── favicon.ico           # Browser favicon
+├── manifest.webmanifest  # PWA manifest
+├── splash.png            # App splash screen
+├── og-image.png          # OpenGraph default image
+└── brand-assets/
+    ├── logo-dark.svg     # Dark theme logo variant
+    ├── logo-light.svg    # Light theme logo variant
+    └── icons/
+        ├── app-icon-192.png
+        └── app-icon-512.png
 
-.civic/branding.yml
-core/branding.ts
+.civic/
+├── branding.yml          # Brand configuration
+└── brand-assets/
+    ├── custom-logo.svg   # Custom logo if different from public/
+    └── brand-guidelines.md
+
+core/
+├── branding.ts           # Brand logic and configuration
+├── brand-assets.ts       # Asset management utilities
+└── brand-validation.ts   # Brand configuration validation
+
+modules/
+├── branding/
+│   ├── components/
+│   │   ├── Logo.tsx      # Logo component
+│   │   ├── BrandHeader.tsx # Brand header component
+│   │   └── BrandFooter.tsx # Brand footer component
+│   ├── hooks/
+│   │   └── useBranding.ts # Brand data hook
+│   └── utils/
+│       ├── brand-config.ts # Brand configuration utilities
+│       └── asset-loader.ts # Asset loading utilities
+└── ui/
+    └── components/
+        └── BrandProvider.tsx # Brand context provider
+
+tests/
+├── branding/
+│   ├── brand-config.test.ts
+│   ├── asset-loading.test.ts
+│   └── brand-components.test.ts
+└── integration/
+    └── branding-integration.test.ts
 ```
 
 ---

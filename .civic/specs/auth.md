@@ -1,7 +1,7 @@
 # 🔐 CivicPress Spec: `auth.md`
 
 ---
-version: 1.2.0
+version: 1.0.0
 status: stable
 created: '2025-07-04'
 updated: '2025-07-15'
@@ -25,10 +25,10 @@ compatibility:
   min_civicpress: 1.0.0
   max_civicpress: null
   dependencies:
-  - 'permissions.md: >=1.1.0'
+  - 'permissions.md: >=1.0.0'
   - 'roles.yml.md: >=1.0.0'
   - 'signatures.md: >=1.0.0'
-  - 'git-policy.md: >=1.1.0'
+  - 'git-policy.md: >=1.0.0'
 authors:
 - Sophie Germain <sophie@civic-press.org>
 reviewers:

@@ -53,6 +53,77 @@ full database.
 
 ---
 
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| Civic records            | Markdown files from `records/` directory |
+| Frontmatter metadata     | YAML metadata from civic record headers |
+| File system structure    | Directory organization and file paths |
+| Index configuration      | Index generation rules and schemas |
+| Search queries           | User search requests and filters |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Index files              | YAML index files for record discovery |
+| Search results           | Filtered and sorted record listings |
+| Module indexes           | Module-specific index files |
+| Index metadata           | Index generation timestamps and stats |
+| Cache files              | Pre-computed search indexes |
+
+---
+
+## 📂 File/Folder Location
+
+```
+core/
+├── indexing.ts            # Main indexing logic
+├── index-generator.ts     # Index file generation
+├── index-validator.ts     # Index validation utilities
+└── index-cache.ts         # Index caching system
+
+modules/
+├── indexing/
+│   ├── components/
+│   │   ├── IndexViewer.tsx # Index display component
+│   │   └── IndexBuilder.tsx # Index generation UI
+│   ├── hooks/
+│   │   └── useIndex.ts     # Index data hook
+│   └── utils/
+│       ├── index-parser.ts # Index file parsing
+│       └── index-schema.ts # Index schema validation
+└── search/
+    └── components/
+        └── SearchProvider.tsx # Search context provider
+
+records/
+├── index.yml              # Global civic record index
+├── bylaws/
+│   └── index.yml          # Bylaws-specific index
+├── feedback/
+│   └── index.yml          # Feedback-specific index
+└── timeline/
+    └── 2025-07-03/
+        └── index.yml      # Daily timeline index
+
+.civic/
+├── indexing.yml           # Index configuration
+└── index-schemas/
+    ├── global.yml         # Global index schema
+    ├── bylaws.yml         # Bylaws index schema
+    └── feedback.yml       # Feedback index schema
+
+tests/
+├── indexing/
+│   ├── index-generation.test.ts
+│   ├── index-validation.test.ts
+│   └── index-caching.test.ts
+└── integration/
+    └── indexing-integration.test.ts
+```
+
+---
+
 ## 🗃️ Index File Examples
 
 ### 🌍 Global Civic Record Index

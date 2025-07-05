@@ -56,6 +56,26 @@ MVP.
 
 ---
 
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| User credentials         | GitHub OAuth tokens or local credentials |
+| User profile data        | Name, email, roles, and preferences |
+| Authentication requests   | Login and session management requests |
+| Role assignments         | User role and permission assignments |
+| Session data             | User session and activity tracking |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Authenticated users      | Validated user accounts with roles |
+| User sessions            | Active user sessions and tokens |
+| Permission checks        | Role-based access control decisions |
+| User activity logs       | Audit trails of user actions |
+| Profile data             | User information for UI display |
+
+---
+
 ## 👤 User Object
 
 ```json

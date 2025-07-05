@@ -57,6 +57,121 @@ using static HTML or local Nuxt rendering.
 
 ---
 
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| Civic records            | Markdown files from `records/` directory |
+| Git repository           | Local Git repo with civic history |
+| Configuration files      | `.civic/index.yml` and theme settings |
+| HTTP requests            | Browser requests for civic content |
+| Authentication data      | Optional user authentication info |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Rendered HTML            | Civic records rendered as web pages |
+| API responses            | JSON data for civic records and metadata |
+| Static assets            | CSS, JavaScript, and theme files |
+| Navigation data          | Index and search results |
+| Audit logs              | Server access and request logs |
+
+---
+
+## 📂 File/Folder Location
+
+```
+serve/
+├── server.ts              # Main server entry point
+├── routes/
+│   ├── index.ts           # Main route handlers
+│   ├── records.ts         # Record serving routes
+│   ├── api.ts            # API endpoint routes
+│   └── assets.ts         # Static asset routes
+├── lib/
+│   ├── render.ts          # Markdown rendering utilities
+│   ├── git.ts            # Git integration utilities
+│   ├── auth.ts           # Authentication utilities
+│   └── cache.ts          # Caching utilities
+├── views/
+│   ├── layout.html        # Base HTML template
+│   ├── record.html        # Record display template
+│   ├── index.html         # Index page template
+│   └── error.html         # Error page template
+├── themes/
+│   ├── default.css        # Default theme styles
+│   ├── classic.css        # Classic theme styles
+│   └── modern.css         # Modern theme styles
+├── middleware/
+│   ├── auth.ts           # Authentication middleware
+│   ├── cors.ts           # CORS configuration
+│   └── logging.ts        # Request logging middleware
+└── config/
+    ├── serve.yml          # Server configuration
+    └── themes.yml         # Theme configuration
+
+tests/
+├── serve/
+│   ├── server.test.ts
+│   ├── rendering.test.ts
+│   └── routing.test.ts
+└── integration/
+    └── serve-integration.test.ts
+```
+
+---
+
+## 🔐 Security & Trust Considerations
+
+### Server Security
+
+- All server endpoints must validate input and sanitize output
+- Rate limiting to prevent abuse and denial of service attacks
+- Request size limits to prevent memory exhaustion
+- Secure headers and CORS configuration for web security
+- Regular security audits of server code and dependencies
+
+### Access Control & Authentication
+
+- Read-only access to civic records by default
+- Optional authentication for sensitive or internal records
+- Role-based access control for different record types
+- Session management and timeout for authenticated users
+- Audit logging of all server access and requests
+
+### Data Protection & Privacy
+
+- No personal data collection or storage in server logs
+- GDPR-compliant request handling and data processing
+- Secure transmission of civic data over HTTPS
+- User privacy protection in access logs and analytics
+- Data retention policies for server logs and cache
+
+### Content Integrity & Trust
+
+- Cryptographic verification of served civic record authenticity
+- Tamper-evident display of record metadata and sources
+- Protection against content manipulation and spoofing
+- Transparent display of record sources and verification status
+- Immutable audit trails for all served content
+
+### Performance & Reliability
+
+- Graceful degradation when Git or file system is unavailable
+- Efficient caching strategies for frequently accessed content
+- Resource usage monitoring and limits
+- Error handling and user-friendly error messages
+- Backup and disaster recovery for server configuration
+
+### Compliance & Legal Requirements
+
+- Compliance with municipal web serving requirements
+- Support for public records laws and access requirements
+- Legal review process for server configuration and policies
+- Compliance with web accessibility standards (WCAG)
+- Regular legal audits of server practices and policies
+
+---
+
 ## 🏗️ Architecture
 
 - Lightweight Express or Hono server
@@ -138,3 +253,7 @@ Options:
 ## 📅 History
 
 - Drafted: 2025-07-03
+
+breaking_changes: []
+fixes: []
+migration_guide: null

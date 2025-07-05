@@ -7,11 +7,14 @@ created: '2025-07-03'
 updated: '2025-07-15'
 deprecated: false
 sunset_date: null
+breaking_changes: []
 additions:
 
 - comprehensive backup documentation
 - disaster recovery
 - security considerations
+fixes: []
+migration_guide: null
 compatibility:
   min_civicpress: 1.0.0
   max_civicpress: 'null'

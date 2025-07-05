@@ -7,11 +7,14 @@ created: '2025-07-03'
 updated: '2025-07-15'
 deprecated: false
 sunset_date: null
+breaking_changes: []
 additions:
 
 - comprehensive legal register documentation
 - document integrity
 - security considerations
+fixes: []
+migration_guide: null
 compatibility:
   min_civicpress: 1.0.0
   max_civicpress: 'null'
@@ -51,6 +54,96 @@ ordinances, and resolutions in a structured, Markdown-native format.
 
 - PDF management or media hosting
 - Legal advice or interpretation
+
+---
+
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| Legal documents          | Markdown files for bylaws, motions, resolutions |
+| Document metadata        | Title, number, status, authors, approval info |
+| Approval workflows       | Multi-role approval processes and signatures |
+| Legal templates          | Pre-defined templates for different document types |
+| Version history          | Document versioning and change tracking |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Legal records            | Structured legal documents in `records/` |
+| Legal indexes            | Searchable indexes of legal documents |
+| Approval logs            | Audit trails of document approvals |
+| Version snapshots        | Immutable versions of legal documents |
+| Publication notices      | Notifications of legal document changes |
+
+---
+
+## 📂 File/Folder Location
+
+```
+records/
+├── bylaws/
+│   ├── section-01/
+│   │   ├── bylaw-tree-cutting.md
+│   │   └── index.yml
+│   ├── section-02/
+│   │   ├── bylaw-noise-restrictions.md
+│   │   └── index.yml
+│   └── repealed/
+│       └── bylaw-old-curfew-1998.md
+├── motions/
+│   ├── 2025-07-01/
+│   │   ├── motion-curfew-extension.md
+│   │   └── index.yml
+│   └── pending/
+│       └── motion-budget-increase.md
+└── resolutions/
+    ├── 2025-06-10/
+    │   ├── resolution-road-repair.md
+    │   └── index.yml
+    └── adopted/
+        └── resolution-emergency-funding.md
+
+.civic/
+├── legal-register.yml     # Legal register configuration
+├── legal-templates/
+│   ├── bylaw-template.md
+│   ├── motion-template.md
+│   └── resolution-template.md
+└── legal-schemas/
+    ├── bylaw-schema.yml
+    ├── motion-schema.yml
+    └── resolution-schema.yml
+
+core/
+├── legal-register.ts      # Legal register logic
+├── legal-validation.ts    # Legal document validation
+├── legal-workflow.ts      # Legal approval workflows
+└── legal-indexing.ts      # Legal document indexing
+
+modules/
+├── legal-register/
+│   ├── components/
+│   │   ├── LegalDocumentViewer.tsx
+│   │   ├── LegalDocumentEditor.tsx
+│   │   └── LegalApprovalWorkflow.tsx
+│   ├── hooks/
+│   │   └── useLegalRegister.ts
+│   └── utils/
+│       ├── legal-parser.ts
+│       ├── legal-validator.ts
+│       └── legal-indexer.ts
+└── ui/
+    └── components/
+        └── LegalProvider.tsx
+
+tests/
+├── legal-register/
+│   ├── legal-creation.test.ts
+│   ├── legal-approval.test.ts
+│   └── legal-indexing.test.ts
+└── integration/
+    └── legal-register-integration.test.ts
+```
 
 ---
 

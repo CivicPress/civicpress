@@ -7,239 +7,168 @@ created: '2025-07-03'
 updated: '2025-07-15'
 deprecated: false
 sunset_date: null
-authors:
+additions:
 
-- 'Sophie Germain <sophie@civic-press.org>'
+- comprehensive version header documentation
+- maintenance guidelines
+- validation standards
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'spec-versioning.md: >=1.0.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
 reviewers:
-- 'Ada Lovelace'
-- 'Irène Joliot-Curie'
+- Ada Lovelace
+- Irène Joliot-Curie
 
 ---
 
 ## 📛 Name
 
-Version Header Standardization Guide
+Version Header Maintenance & Standards
 
 ## 🎯 Purpose
 
-Provide a systematic approach to add version headers to all CivicPress
-specifications that currently lack them, ensuring consistency across the entire
+Define standards and guidelines for maintaining version headers across all CivicPress
+specifications, ensuring consistency and proper version tracking throughout the
 specification ecosystem.
 
 ## 🧩 Scope & Responsibilities
 
 ✅ Responsibilities:
 
-- Guide maintainers in standardizing spec headers
-- Define required sections and fields for all specs
-- Provide implementation plan and validation checklist
+- Define YAML frontmatter standards for all specs
+- Provide guidelines for version updates and changes
+- Establish validation and maintenance procedures
+- Document dependency management practices
 
 ❌ Out of Scope:
 
-- Automated script implementation (see tools folder)
-- Spec content review (handled by individual spec files)
+- Automated version management (handled by spec-versioning.md)
+- Content review of individual specs
+- Implementation of version tracking tools
 
 ---
 
 ## 📊 Current Status
 
-### ✅ Specs WITH Version Headers (8/50)
+### ✅ All Specs Have Version Headers (60/60)
 
-| Spec                    | Version | Status   | Last Updated |
-| ----------------------- | ------- | -------- | ------------ |
-| `manifest.md`           | `1.0.0` | `stable` | `2025-07-15` |
-| `auth.md`               | `1.2.0` | `stable` | `2025-07-15` |
-| `permissions.md`        | `1.1.0` | `stable` | `2025-07-15` |
-| `git-policy.md`         | `1.1.0` | `stable` | `2025-07-15` |
-| `workflows.md`          | `1.3.0` | `stable` | `2025-07-15` |
-| `hooks.md`              | `1.2.0` | `stable` | `2025-07-15` |
-| `plugins.md`            | `1.5.0` | `stable` | `2025-07-15` |
-| `plugin-api.md`         | `1.0.0` | `stable` | `2025-07-15` |
-| `plugin-development.md` | `1.0.0` | `stable` | `2025-07-15` |
-| `testing-framework.md`  | `1.0.0` | `stable` | `2025-07-15` |
-| `spec-versioning.md`    | `1.0.0` | `stable` | `2025-07-15` |
-| `version-tracker.md`    | `1.0.0` | `stable` | `2025-07-15` |
+All CivicPress specifications now use standardized YAML frontmatter with:
 
-### ❌ Specs WITHOUT Version Headers (38/50)
+- **Version tracking** (semantic versioning)
+- **Status management** (stable, draft, deprecated)
+- **Change documentation** (additions, fixes, breaking changes)
+- **Dependency tracking** (compatibility and requirements)
+- **Author attribution** (unified identity system)
 
-#### Core System (Remaining)
+### 📈 Version Distribution
 
-- `api.md`
-- `cli.md`
-- `ui.md`
-- `deployment.md`
-- `scheduler.md`
-- `roles.yml.md`
-- `module-api.md`
-- `frontend.md`
-- `editor-layer.md`
-
-#### Security & Compliance
-
-- `security.md`
-- `backup.md`
-- `storage.md`
-- `database.md`
-- `users.md`
-- `moderation.md`
-
-#### User Experience
-
-- `accessibility.md`
-- `themes.md`
-- `translations.md`
-- `notifications.md`
-
-#### Data & Records
-
-- `public-data-structure.md`
-- `records-validation.md`
-- `indexing.md`
-- `search.md`
-- `data-integrity.md`
-
-#### System & Infrastructure
-
-- `observability.md`
-- `maintenance.md`
-- `onboarding.md`
-- `lifecycle.md`
-- `branding.md`
-- `static-export.md`
-- `printable.md`
-- `audit.md`
-- `metrics.md`
-- `activity-log.md`
-- `signatures.md`
-- `votes.md`
-- `review-policy.md`
-- `timeline.md`
-- `versioning.md`
-- `serve.md`
-- `feedback.md`
+| Version | Count | Status |
+|---------|-------|--------|
+| 1.5.0   | 1     | plugins.md |
+| 1.3.0   | 1     | workflows.md |
+| 1.2.0   | 3     | auth.md, hooks.md, spec-versioning.md |
+| 1.1.0   | 2     | permissions.md, git-policy.md |
+| 1.0.0   | 53    | All other specs |
 
 ---
 
-## 🔧 Standard Version Header Template
+## 🔧 YAML Frontmatter Standards
 
-### For Core System Specs (v1.0.0)
+### Required Fields
 
-```markdown
-# [EMOJI] CivicPress Spec: `[filename].md`
-
-
-**Breaking Changes:** `[]`
-**Additions:** `[comprehensive documentation, security considerations, testing patterns]`
-**Fixes:**
-`[documentation, code examples, validation patterns]`
-**Migration Guide:** `null`
-
-**Compatibility:**
-
-- **Min CivicPress:** `1.0.0`
-- **Max CivicPress:** `null`
-- **Dependencies:** `[list of dependencies]`
-
-**Authors:** Sophie Germain <sophie@civic-press.org>
-**Reviewers:** Ada Lovelace, Irène Joliot-Curie
+```yaml
+---
+version: 1.0.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+- list of new features or content
+fixes:
+- list of corrections or improvements
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'dependency.md: >=1.0.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+---
 ```
 
-### For Enhanced Specs (v1.1.0+)
+### Version Guidelines
 
-```markdown
-# [EMOJI] CivicPress Spec: `[filename].md`
+- **MAJOR.MINOR.PATCH** format (semantic versioning)
+- **1.0.0** for initial stable releases
+- **Increment MINOR** for new features (1.1.0, 1.2.0)
+- **Increment MAJOR** for breaking changes (2.0.0)
+- **PATCH** for bug fixes and minor corrections
 
+### Status Values
 
-**Breaking Changes:** `[]`
-**Additions:** `[detailed YAML examples, comprehensive field definitions, security considerations]`
-**Fixes:**
-`[field documentation, validation rules, schema documentation]`
-**Migration Guide:** `null`
-
-**Compatibility:**
-
-- **Min CivicPress:** `1.0.0`
-- **Max CivicPress:** `null`
-- **Dependencies:** `[list of dependencies]`
-
-**Authors:** Sophie Germain <sophie@civic-press.org>
-**Reviewers:** Ada Lovelace, Irène Joliot-Curie
-```
+- **`stable`** - Production ready, no breaking changes expected
+- **`draft`** - Under development, may change significantly
+- **`deprecated`** - Being phased out, migration guide required
 
 ---
 
-## 📋 Implementation Plan
+## 🔍 Validation & Maintenance
 
-### Phase 1: Core System Specs (Priority 1)
+### Automated Validation
 
-- [ ] `api.md` → v1.0.0
-- [ ] `cli.md` → v1.0.0
-- [ ] `ui.md` → v1.0.0
-- [ ] `deployment.md` → v1.0.0
-- [ ] `scheduler.md` → v1.0.0
+The `.civic/tools/validate-specs.js` script checks:
 
-### Phase 2: Security & Compliance (Priority 2)
+- ✅ YAML frontmatter presence and format
+- ✅ Required fields (version, status, authors, etc.)
+- ✅ Section structure and formatting
+- ✅ Cross-reference consistency
 
-- [ ] `security.md` → v1.0.0
-- [ ] `backup.md` → v1.0.0
-- [ ] `storage.md` → v1.0.0
-- [ ] `database.md` → v1.0.0
-- [ ] `users.md` → v1.0.0
-- [ ] `moderation.md` → v1.0.0
+### Manual Review Checklist
 
-### Phase 3: User Experience (Priority 3)
+When updating specs, verify:
 
-- [ ] `accessibility.md` → v1.0.0
-- [ ] `themes.md` → v1.0.0
-- [ ] `translations.md` → v1.0.0
-- [ ] `notifications.md` → v1.0.0
-
-### Phase 4: Data & Records (Priority 4)
-
-- [ ] `public-data-structure.md` → v1.0.0
-- [ ] `records-validation.md` → v1.0.0
-- [ ] `indexing.md` → v1.0.0
-- [ ] `search.md` → v1.0.0
-- [ ] `data-integrity.md` → v1.0.0
-
-### Phase 5: System & Infrastructure (Priority 5)
-
-- [ ] `observability.md` → v1.0.0
-- [ ] `maintenance.md` → v1.0.0
-- [ ] `onboarding.md` → v1.0.0
-- [ ] `lifecycle.md` → v1.0.0
-- [ ] `branding.md` → v1.0.0
-- [ ] `static-export.md` → v1.0.0
-- [ ] `printable.md` → v1.0.0
-- [ ] `audit.md` → v1.0.0
-- [ ] `metrics.md` → v1.0.0
-- [ ] `activity-log.md` → v1.0.0
-- [ ] `signatures.md` → v1.0.0
-- [ ] `votes.md` → v1.0.0
-- [ ] `review-policy.md` → v1.0.0
-- [ ] `timeline.md` → v1.0.0
-- [ ] `versioning.md` → v1.0.0
-- [ ] `serve.md` → v1.0.0
-- [ ] `feedback.md` → v1.0.0
-- [ ] `roles.yml.md` → v1.0.0
-- [ ] `module-api.md` → v1.0.0
-- [ ] `frontend.md` → v1.0.0
-- [ ] `editor-layer.md` → v1.0.0
-
----
-
-## 🔍 Validation Checklist
-
-After adding version headers, verify:
-
-- [ ] **Version format** follows semantic versioning (MAJOR.MINOR.PATCH)
-- [ ] **Status** is appropriate (`stable`, `draft`, `deprecated`)
-- [ ] **Dates** are consistent and accurate
-- [ ] **Dependencies** are correctly listed with version constraints
-- [ ] **Breaking changes** are accurately documented
-- [ ] **Migration guides** are provided if needed
-- [ ] **Authors and reviewers** are properly credited
+- [ ] **Version increment** follows semantic versioning
+- [ ] **Status** reflects current development state
+- [ ] **Dates** are accurate and updated
+- [ ] **Dependencies** are correctly listed
+- [ ] **Breaking changes** are documented
+- [ ] **Migration guides** provided if needed
+- [ ] **Authors and reviewers** are current
 - [ ] **Compatibility** information is complete
+
+### Update Workflow
+
+1. **Identify changes** - What was added, fixed, or changed?
+2. **Determine version** - Does this require MAJOR, MINOR, or PATCH increment?
+3. **Update frontmatter** - Modify YAML with new version and changes
+4. **Update dates** - Set `updated` to current date
+5. **Validate** - Run `pnpm run spec:validate`
+6. **Test dependencies** - Ensure cross-references still work
+
+---
+
+## 🔗 Integration with Other Specs
+
+### Related Specifications
+
+- **`spec-versioning.md`** - Overall versioning strategy and policies
+- **`version-tracker.md`** - Dependency tracking and compatibility matrices
+- **`testing-framework.md`** - Validation and testing procedures
+
+### Tooling Integration
+
+- **Validation scripts** - Automated checking of frontmatter
+- **CI/CD pipeline** - GitHub Actions validation
+- **Documentation generation** - Version-aware documentation
 
 ---
 
@@ -247,19 +176,19 @@ After adding version headers, verify:
 
 ### Consistency
 
-- All specs follow the same versioning format
-- Clear dependency relationships
-- Standardized change tracking
+- All specs follow identical YAML frontmatter format
+- Clear dependency relationships and constraints
+- Standardized change tracking and documentation
 
 ### Maintainability
 
-- Easy to track changes across specs
-- Automated validation possible
-- Clear migration paths
+- Easy to track changes across all specifications
+- Automated validation prevents formatting errors
+- Clear migration paths for breaking changes
 
 ### Collaboration
 
-- Developers understand spec versions
+- Developers understand version expectations
 - Clear ownership and review process
 - Standardized contribution workflow
 

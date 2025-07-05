@@ -7,17 +7,20 @@ created: '2025-07-03'
 updated: '2025-07-15'
 deprecated: false
 sunset_date: null
+breaking_changes: []
 additions:
 
 - comprehensive UI documentation
 - accessibility considerations
 - testing patterns
+fixes: []
+migration_guide: null
 compatibility:
   min_civicpress: 1.0.0
   max_civicpress: 'null'
   dependencies:
-  - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0'
+  - 'auth.md: >=1.0.0'
+  - 'permissions.md: >=1.0.0'
 authors:
 - Sophie Germain <sophie@civic-press.org>
 reviewers:
@@ -48,6 +51,155 @@ CivicPress's public-facing UI and admin/editor tools.
 
 - Implementation-specific UI code
 - Third-party UI libraries
+
+---
+
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| CivicPress data          | Records, bylaws, feedback, and civic data |
+| User authentication       | GitHub OAuth and role-based access |
+| UI components            | Reusable Vue components and layouts |
+| Design system            | Tailwind CSS and design tokens |
+| Accessibility requirements | WCAG compliance and responsive design |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Public UI                | Static-exportable civic portal |
+| Admin interface          | Authenticated management tools |
+| Responsive layouts       | Mobile and desktop optimized views |
+| Accessible components    | WCAG compliant UI elements |
+| Static exports           | Deployable public-facing sites |
+
+---
+
+## 📂 File/Folder Location
+
+```
+ui/
+├── public/                # Public-facing UI
+│   ├── components/
+│   │   ├── BylawViewer.vue
+│   │   ├── TimelineNavigator.vue
+│   │   ├── FeedbackExplorer.vue
+│   │   └── SessionViewer.vue
+│   ├── layouts/
+│   │   ├── DefaultLayout.vue
+│   │   └── PublicLayout.vue
+│   ├── pages/
+│   │   ├── index.vue
+│   │   ├── bylaws/
+│   │   ├── timeline/
+│   │   ├── feedback/
+│   │   └── sessions/
+│   └── assets/
+│       ├── styles/
+│       └── images/
+├── admin/                 # Admin interface
+│   ├── components/
+│   │   ├── MarkdownEditor.vue
+│   │   ├── FeedbackInbox.vue
+│   │   ├── SubmissionReview.vue
+│   │   └── RoleSettings.vue
+│   ├── layouts/
+│   │   └── AdminLayout.vue
+│   ├── pages/
+│   │   ├── index.vue
+│   │   ├── editor/
+│   │   ├── feedback/
+│   │   └── settings/
+│   └── composables/
+│       ├── useAuth.ts
+│       └── usePermissions.ts
+├── shared/                # Shared components
+│   ├── components/
+│   │   ├── CivicHeader.vue
+│   │   ├── CivicFooter.vue
+│   │   └── SearchBar.vue
+│   ├── composables/
+│   │   ├── useCivicData.ts
+│   │   └── useNavigation.ts
+│   └── utils/
+│       ├── formatters.ts
+│       └── validators.ts
+└── tests/                 # UI tests
+    ├── public/
+    │   ├── BylawViewer.test.ts
+    │   └── TimelineNavigator.test.ts
+    ├── admin/
+    │   ├── MarkdownEditor.test.ts
+    │   └── FeedbackInbox.test.ts
+    └── e2e/
+        ├── public-journey.test.ts
+        └── admin-workflow.test.ts
+
+core/
+├── ui.ts                  # UI framework integration
+├── auth-provider.ts       # Authentication provider
+├── permission-checker.ts  # Permission validation
+└── static-exporter.ts     # Static site generation
+
+modules/
+├── ui/
+│   ├── components/
+│   │   ├── UIManager.tsx # UI management
+│   │   ├── ThemeProvider.tsx # Theme management
+│   │   └── LayoutManager.tsx # Layout management
+│   ├── hooks/
+│   │   └── useUI.ts # UI state management
+│   └── utils/
+│       ├── responsive-utils.ts # Responsive design utilities
+│       └── accessibility-utils.ts # Accessibility helpers
+└── auth/
+    └── components/
+        └── AuthProvider.tsx # Authentication context
+
+.civic/
+├── ui.yml                 # UI configuration
+├── themes/                # Theme definitions
+│   ├── default.yml
+│   └── civic.yml
+└── layouts/               # Layout templates
+    ├── public.yml
+    └── admin.yml
+```
+
+---
+
+## 🔐 Security & Trust Considerations
+
+### Public UI Security
+
+- All public content must be sanitized and validated
+- No sensitive data should be exposed in public UI
+- Static exports must be thoroughly reviewed
+- Public UI must be accessible without authentication
+- Content must be properly escaped to prevent XSS
+
+### Admin UI Security
+
+- All admin routes must require authentication
+- Role-based access control must be enforced
+- Admin actions must be logged and audited
+- Session management must be secure
+- Input validation must prevent injection attacks
+
+### Accessibility Compliance
+
+- All UI components must meet WCAG 2.1 AA standards
+- Keyboard navigation must be fully supported
+- Screen reader compatibility must be verified
+- Color contrast ratios must meet accessibility guidelines
+- Responsive design must work across all devices
+
+### Data Protection
+
+- User data must be properly anonymized in public views
+- Admin interfaces must respect data privacy requirements
+- Audit logs must be maintained for all admin actions
+- Session data must be securely managed
+- Cross-site scripting protection must be implemented
 
 ---
 
@@ -146,10 +298,22 @@ civic serve      # Public-only viewer
 
 ## 🛠️ Future Enhancements
 
-- `admin/analytics.vue`: civic activity graphs
-- `admin/audit.vue`: view hooks + PR logs
-- `admin/compare.vue`: show record diffs
-- `public/search.vue`: fuzzy search on title + tags
+- Advanced search functionality with fuzzy matching
+- Real-time collaboration features for admin editing
+- Analytics dashboard for civic engagement metrics
+- Mobile-optimized admin interface
+- Dark mode and theme customization
+- Progressive Web App (PWA) capabilities
+- Offline support for public content viewing
+- Advanced accessibility features and tools
+
+## 🔗 Related Specs
+
+- [`auth.md`](./auth.md) — Authentication and authorization
+- [`permissions.md`](./permissions.md) — Role-based access control
+- [`frontend.md`](./frontend.md) — Frontend architecture and patterns
+- [`accessibility.md`](./accessibility.md) — Accessibility requirements
+- [`testing-framework.md`](./testing-framework.md) — UI testing strategies
 
 ---
 
@@ -157,3 +321,4 @@ civic serve      # Public-only viewer
 
 - Drafted: 2025-07-03
 - Updated: Renamed `frontend/` → `public/`
+- Updated: Added comprehensive UI documentation and accessibility considerations

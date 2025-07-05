@@ -1,24 +1,27 @@
 # 🔄 CivicPress Spec: `workflows.md`
 
 ---
-version: 1.3.0
+version: 1.0.0
 status: stable
 created: '2025-07-03'
 updated: '2025-07-15'
 deprecated: false
 sunset_date: null
+breaking_changes: []
 additions:
 
 - comprehensive security considerations
 - detailed workflow examples
 - enhanced testing patterns
+fixes: []
+migration_guide: null
 compatibility:
   min_civicpress: 1.0.0
   max_civicpress: 'null'
   dependencies:
-  - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0'
-  - 'hooks.md: >=1.2.0'
+  - 'auth.md: >=1.0.0'
+  - 'permissions.md: >=1.0.0'
+  - 'hooks.md: >=1.0.0'
 authors:
 - Sophie Germain <sophie@civic-press.org>
 reviewers:
@@ -67,29 +70,101 @@ Output: Actions taken, logs recorded
 
 ---
 
-## 📂 File/Folder Layout
+## 📂 File/Folder Location
 
 ```
 .civic/
-├── workflows/
+├── workflows/              # Workflow files
 │   ├── onRecordSubmit.js
 │   ├── onFeedback.js
-│   └── onApproval.js
-├── workflow.policy.yml
-└── hooks.log.jsonl
+│   ├── onApproval.js
+│   ├── onBylawPublish.js
+│   └── onUserRegistration.js
+├── workflow.policy.yml     # Workflow security policy
+├── workflow.config.yml     # Workflow configuration
+├── hooks.log.jsonl        # Workflow execution logs
+└── workflow-cache/         # Workflow execution cache
+    ├── compiled/
+    └── metadata/
+
 core/
-└── workflow-engine.ts
+├── workflow-engine.ts      # Main workflow execution engine
+├── workflow-sandbox.ts     # Secure sandbox environment
+├── workflow-policy.ts      # Policy enforcement logic
+├── workflow-logger.ts      # Workflow logging system
+└── workflow-cache.ts       # Workflow caching system
+
+modules/
+├── workflows/
+│   ├── components/
+│   │   ├── WorkflowEditor.tsx # Workflow editing UI
+│   │   ├── PolicyManager.tsx # Policy management UI
+│   │   └── ExecutionMonitor.tsx # Execution monitoring
+│   ├── hooks/
+│   │   └── useWorkflows.ts # Workflow data hook
+│   └── utils/
+│       ├── workflow-parser.ts # Workflow parsing utilities
+│       └── policy-validator.ts # Policy validation
+└── ui/
+    └── components/
+        └── WorkflowProvider.tsx # Workflow context provider
+
+tests/
+├── workflows/
+│   ├── workflow-execution.test.ts
+│   ├── policy-enforcement.test.ts
+│   ├── sandbox-security.test.ts
+│   └── workflow-validation.test.ts
+├── integration/
+│   ├── workflow-hooks.test.ts
+│   └── workflow-api.test.ts
+└── e2e/
+    └── workflow-journey.test.ts
 ```
 
 ---
 
 ## 🔐 Security & Trust Considerations
 
-- Files must be signed or approved based on `workflow.policy.yml`
-- Must run in a secure sandbox (e.g., `vm2`)
-- Cannot access `fs` or `net` unless explicitly permitted
-- Only run by authorized roles defined in policy
-- Logs are kept in `.civic/hooks.log.jsonl`
+### Workflow Security
+
+- All workflow files must be cryptographically signed or approved based on `workflow.policy.yml`
+- Workflows must run in a secure sandbox environment (e.g., `vm2`)
+- File system and network access must be explicitly permitted in policy
+- Only authorized roles defined in policy can execute workflows
+- All workflow executions must be logged for audit purposes
+
+### Sandbox Security
+
+- Workflow execution must be isolated from core system
+- Memory and CPU limits must be enforced during execution
+- Timeout limits must prevent infinite loops or hanging workflows
+- Resource usage must be monitored and logged
+- Sandbox permissions must be validated before execution
+
+### Data Protection
+
+- Workflow input data must be sanitized and validated
+- Sensitive data must not be exposed to untrusted workflows
+- Workflow output must be validated before applying changes
+- Audit logs must capture all data access and modifications
+- Data retention policies must be enforced for workflow logs
+
+### Policy Enforcement
+
+- Workflow policies must be validated before execution
+- Role-based access control must be strictly enforced
+- Policy changes must be reviewed and approved
+- Policy violations must be logged and reported
+- Default security policies must be applied to all workflows
+
+### Compliance & Audit
+
+- All workflow executions must be traceable and auditable
+- Workflow logs must be immutable and tamper-evident
+- Compliance with local regulations must be verified
+- Regular security audits of workflow policies must be performed
+- Workflow performance and security metrics must be monitored
 
 ---
 

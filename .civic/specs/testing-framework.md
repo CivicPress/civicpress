@@ -63,6 +63,410 @@ CivicPress modules.
 
 ---
 
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| Source code              | CivicPress modules and components to test |
+| Test configurations       | Testing framework settings and rules |
+| Test data                | Mock data and test fixtures |
+| Test scenarios           | User workflows and edge cases |
+| Performance requirements  | Load and stress testing parameters |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Test results             | Pass/fail status and detailed reports |
+| Coverage reports         | Code coverage metrics and analysis |
+| Performance metrics      | Response times and throughput data |
+| Security assessments     | Vulnerability and compliance reports |
+| Quality metrics          | Code quality and reliability scores |
+
+---
+
+## 📂 File/Folder Location
+
+```
+tests/
+├── unit/                  # Unit tests
+│   ├── auth/
+│   ├── permissions/
+│   ├── plugins/
+│   └── utils/
+├── integration/           # Integration tests
+│   ├── api/
+│   ├── database/
+│   ├── workflows/
+│   └── modules/
+├── e2e/                  # End-to-end tests
+│   ├── user-journeys/
+│   ├── accessibility/
+│   └── cross-browser/
+├── security/             # Security tests
+│   ├── authentication/
+│   ├── authorization/
+│   ├── input-validation/
+│   └── data-protection/
+├── performance/          # Performance tests
+│   ├── load-tests/
+│   ├── stress-tests/
+│   └── benchmark-tests/
+├── accessibility/        # Accessibility tests
+│   ├── wcag-compliance/
+│   ├── screen-reader/
+│   └── keyboard-navigation/
+├── utils/                # Testing utilities
+│   ├── civicpress-test-utils.ts
+│   ├── mock-apis.ts
+│   └── test-data-generators.ts
+├── mocks/                # Mock objects
+│   ├── civicpress-api.mock.ts
+│   ├── database.mock.ts
+│   └── external-services.mock.ts
+└── fixtures/             # Test data fixtures
+    ├── users.json
+    ├── records.json
+    └── workflows.json
+
+core/
+├── testing.ts            # Main testing framework
+├── test-runner.ts        # Test execution engine
+├── coverage-reporter.ts  # Coverage reporting
+└── performance-monitor.ts # Performance monitoring
+
+modules/
+├── testing/
+│   ├── components/
+│   │   ├── TestRunner.tsx # Test execution UI
+│   │   ├── CoverageViewer.tsx # Coverage display
+│   │   └── PerformanceMonitor.tsx # Performance monitoring
+│   ├── hooks/
+│   │   └── useTesting.ts # Testing data hook
+│   └── utils/
+│       ├── test-validator.ts # Test validation
+│       └── report-generator.ts # Report generation
+└── ui/
+    └── components/
+        └── TestingProvider.tsx # Testing context provider
+
+.civic/
+├── testing.yml           # Testing configuration
+├── test-schemas/         # Test schema definitions
+│   ├── unit-tests.yml
+│   ├── integration-tests.yml
+│   └── e2e-tests.yml
+└── test-policies/        # Testing policies
+    ├── security-testing.yml
+    ├── performance-testing.yml
+    └── accessibility-testing.yml
+```
+
+---
+
+## 🧪 Testing & Validation
+
+### Framework Self-Testing
+
+```typescript
+// Test the testing framework itself
+export class TestingFrameworkTests {
+  async testFrameworkReliability(): Promise<TestResult[]> {
+    return [
+      await this.testTestExecution(),
+      await this.testResultAccuracy(),
+      await this.testFrameworkPerformance(),
+      await this.testIntegrationCapabilities(),
+    ];
+  }
+
+  private async testTestExecution(): Promise<TestResult> {
+    const testCases = [
+      { name: 'Simple Test', code: 'expect(1 + 1).toBe(2)', expected: true },
+      { name: 'Failing Test', code: 'expect(1 + 1).toBe(3)', expected: false },
+      { name: 'Async Test', code: 'await expect(Promise.resolve(1)).resolves.toBe(1)', expected: true },
+    ];
+
+    const results = await Promise.all(
+      testCases.map(tc => this.executeTest(tc.code))
+    );
+
+    const passed = results.every((r, i) => r.passed === testCases[i].expected);
+    
+    return {
+      test: 'Test Execution',
+      passed,
+      details: { testCases, results },
+    };
+  }
+
+  private async testResultAccuracy(): Promise<TestResult> {
+    const knownPassingTest = 'expect(true).toBe(true)';
+    const knownFailingTest = 'expect(true).toBe(false)';
+    
+    const passingResult = await this.executeTest(knownPassingTest);
+    const failingResult = await this.executeTest(knownFailingTest);
+
+    return {
+      test: 'Result Accuracy',
+      passed: passingResult.passed && !failingResult.passed,
+      details: { passingResult, failingResult },
+    };
+  }
+
+  private async testFrameworkPerformance(): Promise<TestResult> {
+    const startTime = performance.now();
+    await this.executeTestSuite(1000); // 1000 simple tests
+    const duration = performance.now() - startTime;
+
+    return {
+      test: 'Framework Performance',
+      passed: duration < 10000, // Should complete within 10 seconds
+      details: { duration, testCount: 1000 },
+    };
+  }
+}
+```
+
+### Coverage Validation Testing
+
+```typescript
+// Test coverage reporting accuracy
+export class CoverageValidationTests {
+  async testCoverageAccuracy(): Promise<TestResult[]> {
+    return [
+      await this.testCoverageCalculation(),
+      await this.testCoverageReporting(),
+      await this.testCoverageThresholds(),
+      await this.testCoverageIntegration(),
+    ];
+  }
+
+  private async testCoverageCalculation(): Promise<TestResult> {
+    const testFile = `
+      function add(a, b) { return a + b; }
+      function subtract(a, b) { return a - b; }
+      function multiply(a, b) { return a * b; }
+    `;
+
+    const testCode = `
+      test('add', () => expect(add(1, 2)).toBe(3));
+      test('subtract', () => expect(subtract(3, 1)).toBe(2));
+    `;
+
+    const coverage = await this.calculateCoverage(testFile, testCode);
+    const expectedCoverage = 66.67; // 2 out of 3 functions tested
+
+    return {
+      test: 'Coverage Calculation',
+      passed: Math.abs(coverage - expectedCoverage) < 1,
+      details: { coverage, expectedCoverage },
+    };
+  }
+
+  private async testCoverageThresholds(): Promise<TestResult> {
+    const thresholds = { statements: 80, branches: 70, functions: 80, lines: 80 };
+    const coverage = { statements: 85, branches: 75, functions: 90, lines: 85 };
+
+    const passed = Object.entries(thresholds).every(([key, threshold]) => 
+      coverage[key] >= threshold
+    );
+
+    return {
+      test: 'Coverage Thresholds',
+      passed,
+      details: { thresholds, coverage },
+    };
+  }
+}
+```
+
+### Mock System Testing
+
+```typescript
+// Test mock system reliability
+export class MockSystemTests {
+  async testMockReliability(): Promise<TestResult[]> {
+    return [
+      await this.testMockCreation(),
+      await this.testMockBehavior(),
+      await this.testMockCleanup(),
+      await this.testMockIntegration(),
+    ];
+  }
+
+  private async testMockCreation(): Promise<TestResult> {
+    const mockAPI = this.createMockAPI();
+    const mockDB = this.createMockDatabase();
+    const mockAuth = this.createMockAuth();
+
+    const allMocksCreated = mockAPI && mockDB && mockAuth;
+
+    return {
+      test: 'Mock Creation',
+      passed: allMocksCreated,
+      details: { mockAPI, mockDB, mockAuth },
+    };
+  }
+
+  private async testMockBehavior(): Promise<TestResult> {
+    const mockAPI = this.createMockAPI();
+    
+    // Test mock behavior
+    const result = await mockAPI.users.find({ id: 'test-user' });
+    const expectedBehavior = result && result.id === 'test-user';
+
+    return {
+      test: 'Mock Behavior',
+      passed: expectedBehavior,
+      details: { result, expectedBehavior },
+    };
+  }
+}
+```
+
+### Performance Testing Framework Testing
+
+```typescript
+// Test performance testing capabilities
+export class PerformanceFrameworkTests {
+  async testPerformanceFramework(): Promise<TestResult[]> {
+    return [
+      await this.testLoadTestExecution(),
+      await this.testStressTestExecution(),
+      await this.testBenchmarkExecution(),
+      await this.testPerformanceMetrics(),
+    ];
+  }
+
+  private async testLoadTestExecution(): Promise<TestResult> {
+    const loadTest = {
+      virtualUsers: 10,
+      duration: 30,
+      target: 'http://localhost:3000/api/test',
+    };
+
+    const results = await this.executeLoadTest(loadTest);
+    const passed = results.success && results.responseTime < 1000;
+
+    return {
+      test: 'Load Test Execution',
+      passed,
+      details: { loadTest, results },
+    };
+  }
+
+  private async testPerformanceMetrics(): Promise<TestResult> {
+    const metrics = await this.collectPerformanceMetrics();
+    const requiredMetrics = ['responseTime', 'throughput', 'errorRate', 'cpuUsage'];
+
+    const allMetricsPresent = requiredMetrics.every(metric => 
+      metrics.hasOwnProperty(metric)
+    );
+
+    return {
+      test: 'Performance Metrics',
+      passed: allMetricsPresent,
+      details: { metrics, requiredMetrics },
+    };
+  }
+}
+```
+
+### Security Testing Framework Testing
+
+```typescript
+// Test security testing capabilities
+export class SecurityFrameworkTests {
+  async testSecurityFramework(): Promise<TestResult[]> {
+    return [
+      await this.testVulnerabilityScanning(),
+      await this.testPenetrationTesting(),
+      await this.testSecurityCompliance(),
+      await this.testSecurityReporting(),
+    ];
+  }
+
+  private async testVulnerabilityScanning(): Promise<TestResult> {
+    const vulnerabilities = await this.scanForVulnerabilities();
+    const criticalVulnerabilities = vulnerabilities.filter(v => v.severity === 'critical');
+
+    return {
+      test: 'Vulnerability Scanning',
+      passed: criticalVulnerabilities.length === 0,
+      details: { vulnerabilities, criticalVulnerabilities },
+    };
+  }
+
+  private async testSecurityCompliance(): Promise<TestResult> {
+    const complianceChecks = [
+      'OWASP Top 10',
+      'CWE/SANS Top 25',
+      'Security Headers',
+      'SSL/TLS Configuration',
+    ];
+
+    const results = await Promise.all(
+      complianceChecks.map(check => this.runComplianceCheck(check))
+    );
+
+    const allCompliant = results.every(r => r.compliant);
+
+    return {
+      test: 'Security Compliance',
+      passed: allCompliant,
+      details: { complianceChecks, results },
+    };
+  }
+}
+```
+
+### Integration Testing Framework Testing
+
+```typescript
+// Test integration testing capabilities
+export class IntegrationFrameworkTests {
+  async testIntegrationFramework(): Promise<TestResult[]> {
+    return [
+      await this.testModuleIntegration(),
+      await this.testAPIIntegration(),
+      await this.testDatabaseIntegration(),
+      await this.testExternalServiceIntegration(),
+    ];
+  }
+
+  private async testModuleIntegration(): Promise<TestResult> {
+    const modules = ['auth', 'permissions', 'plugins', 'workflows'];
+    const integrationResults = await Promise.all(
+      modules.map(module => this.testModuleIntegration(module))
+    );
+
+    const allIntegrated = integrationResults.every(r => r.success);
+
+    return {
+      test: 'Module Integration',
+      passed: allIntegrated,
+      details: { modules, integrationResults },
+    };
+  }
+
+  private async testAPIIntegration(): Promise<TestResult> {
+    const endpoints = ['/api/auth', '/api/records', '/api/workflows'];
+    const apiResults = await Promise.all(
+      endpoints.map(endpoint => this.testAPIEndpoint(endpoint))
+    );
+
+    const allEndpointsWorking = apiResults.every(r => r.status === 200);
+
+    return {
+      test: 'API Integration',
+      passed: allEndpointsWorking,
+      details: { endpoints, apiResults },
+    };
+  }
+}
+```
+
+---
+
 ## 🏗️ Testing Architecture
 
 ### Testing Pyramid
@@ -1219,32 +1623,6 @@ export interface E2ETestResult {
 
 ---
 
-## 🔐 Security & Trust Considerations
-
-### Testing Security
-
-- All test data must be isolated and cleaned up after tests
-- No production data should be used in testing
-- Test credentials and secrets must be properly managed
-- Security testing must not compromise system integrity
-- Test results must be logged for audit purposes
-
-### Performance Testing Security
-
-- Load testing must not impact production systems
-- Performance test data must be anonymized
-- Test environments must be isolated from production
-- Resource limits must be enforced during testing
-
-### Accessibility Testing Compliance
-
-- WCAG 2.1 AA compliance must be verified
-- Accessibility testing must include assistive technologies
-- Test results must be documented for compliance
-- Regular accessibility audits must be performed
-
----
-
 ## 🛠️ Future Enhancements
 
 - Continuous testing integration with CI/CD pipelines
@@ -1265,3 +1643,7 @@ export interface E2ETestResult {
 ## 📅 History
 
 - Drafted: 2025-07-04
+
+breaking_changes: []
+fixes: []
+migration_guide: null

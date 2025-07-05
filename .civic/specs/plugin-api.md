@@ -62,6 +62,66 @@ practices.
 
 ---
 
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| Plugin code              | JavaScript/TypeScript plugin source files |
+| Plugin manifests         | Plugin configuration and metadata |
+| API requests             | Plugin API calls and method invocations |
+| Hook events              | System events and plugin-triggered hooks |
+| Plugin configuration      | User settings and plugin options |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| API responses            | Data returned from plugin API calls |
+| Hook handlers            | Event handlers registered by plugins |
+| UI components            | Vue components and widgets rendered |
+| CLI commands             | Command-line tools registered by plugins |
+| Route handlers           | HTTP endpoints and middleware |
+
+---
+
+## 📂 File/Folder Location
+
+```
+core/
+├── plugin-api.ts          # Main plugin API interface
+├── plugin-loader.ts       # Plugin loading and initialization
+├── plugin-sandbox.ts      # Plugin security sandboxing
+└── plugin-manager.ts      # Plugin lifecycle management
+
+modules/
+├── plugin-api/
+│   ├── components/
+│   │   ├── PluginAPIDocs.tsx # API documentation component
+│   │   └── PluginDebugger.tsx # Plugin debugging interface
+│   ├── hooks/
+│   │   └── usePluginAPI.ts    # Plugin API data hook
+│   └── utils/
+│       ├── api-validator.ts    # API request validation
+│       └── plugin-testing.ts   # Plugin testing utilities
+└── ui/
+    └── components/
+        └── PluginAPIProvider.tsx # Plugin API context provider
+
+types/
+├── plugin-api.d.ts        # TypeScript definitions
+├── plugin-hooks.d.ts      # Hook system types
+├── plugin-widgets.d.ts    # Widget API types
+└── plugin-routes.d.ts     # Route API types
+
+tests/
+├── plugin-api/
+│   ├── api-interfaces.test.ts
+│   ├── plugin-sandbox.test.ts
+│   └── api-security.test.ts
+└── integration/
+    └── plugin-api-integration.test.ts
+```
+
+---
+
 ## 🔧 Core API Interfaces
 
 ### Plugin Base Class

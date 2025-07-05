@@ -1,7 +1,7 @@
 # 📋 CivicPress Spec: `spec-versioning.md`
 
 ---
-version: 1.5.0
+version: 1.0.0
 status: stable
 created: '2025-07-04'
 updated: '2025-07-15'
@@ -42,6 +42,338 @@ of updates across the development team and community.
 
 - Implementation versioning (handled by semantic versioning)
 - Third-party dependency versioning
+
+---
+
+## 🔗 Inputs & Outputs
+
+| Input                    | Description                           |
+| ------------------------ | ------------------------------------- |
+| Spec files               | Markdown specification files to version |
+| Version metadata         | Version numbers, status, and dates |
+| Change requests          | Proposed changes and modifications |
+| Dependency updates       | Changes to spec dependencies |
+| Migration requirements   | Breaking change migration needs |
+
+| Output                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| Versioned specs          | Updated specification files with new versions |
+| Changelog entries        | Documented changes and classifications |
+| Migration guides         | Step-by-step migration instructions |
+| Version matrices         | Compatibility and dependency matrices |
+| Release notifications    | Notifications of spec updates |
+
+---
+
+## 📂 File/Folder Location
+
+```
+.civic/
+├── spec-versioning.yml    # Versioning configuration
+├── changelog/             # Changelog files
+│   ├── auth.md.changelog
+│   ├── permissions.md.changelog
+│   └── plugins.md.changelog
+├── migration-guides/      # Migration documentation
+│   ├── v1.4.0-to-v2.0.0.md
+│   └── v1.5.0-to-v2.0.0.md
+└── version-matrices/      # Version compatibility data
+    ├── compatibility.yml
+    └── dependencies.yml
+
+core/
+├── spec-versioning.ts     # Versioning logic
+├── changelog-generator.ts # Changelog generation
+├── migration-validator.ts # Migration validation
+└── version-resolver.ts    # Version dependency resolution
+
+modules/
+├── spec-versioning/
+│   ├── components/
+│   │   ├── VersionManager.tsx # Version management UI
+│   │   ├── ChangelogViewer.tsx # Changelog display
+│   │   └── MigrationGuide.tsx # Migration guide display
+│   ├── hooks/
+│   │   └── useSpecVersioning.ts # Versioning data hook
+│   └── utils/
+│       ├── version-parser.ts # Version parsing utilities
+│       └── migration-checker.ts # Migration validation
+└── ui/
+    └── components/
+        └── SpecVersioningProvider.tsx # Versioning context provider
+
+tests/
+├── spec-versioning/
+│   ├── version-validation.test.ts
+│   ├── changelog-generation.test.ts
+│   └── migration-validation.test.ts
+└── integration/
+    └── spec-versioning-integration.test.ts
+```
+
+---
+
+## 🧪 Testing & Validation
+
+### Version Validation Testing
+
+```typescript
+// Test version validation and parsing
+export class VersionValidationTests {
+  async testVersionValidation(): Promise<TestResult[]> {
+    return [
+      await this.testSemanticVersioning(),
+      await this.testVersionComparison(),
+      await this.testBreakingChangeDetection(),
+      await this.testDependencyValidation(),
+    ];
+  }
+
+  private async testSemanticVersioning(): Promise<TestResult> {
+    const versionTests = [
+      { version: '1.0.0', expected: true },
+      { version: '1.5.0-alpha.1', expected: true },
+      { version: '2.0.0+2025.07.04', expected: true },
+      { version: 'invalid-version', expected: false },
+      { version: '1.0', expected: false },
+    ];
+
+    const results = await Promise.all(
+      versionTests.map(test => this.validateSemanticVersion(test.version))
+    );
+
+    const passed = results.every((r, i) => r.valid === versionTests[i].expected);
+
+    return {
+      test: 'Semantic Versioning',
+      passed,
+      details: { versionTests, results },
+    };
+  }
+
+  private async testBreakingChangeDetection(): Promise<TestResult> {
+    const changeTests = [
+      { from: '1.0.0', to: '2.0.0', breaking: true },
+      { from: '1.0.0', to: '1.1.0', breaking: false },
+      { from: '1.0.0', to: '1.0.1', breaking: false },
+    ];
+
+    const results = await Promise.all(
+      changeTests.map(test => this.detectBreakingChanges(test.from, test.to))
+    );
+
+    const passed = results.every((r, i) => r.hasBreakingChanges === changeTests[i].breaking);
+
+    return {
+      test: 'Breaking Change Detection',
+      passed,
+      details: { changeTests, results },
+    };
+  }
+}
+```
+
+### Migration Path Testing
+
+```typescript
+// Test migration path generation and validation
+export class MigrationPathTests {
+  async testMigrationPaths(): Promise<TestResult[]> {
+    return [
+      await this.testMigrationPathGeneration(),
+      await this.testMigrationPathValidation(),
+      await this.testAutomatedMigration(),
+      await this.testMigrationRollback(),
+    ];
+  }
+
+  private async testMigrationPathGeneration(): Promise<TestResult> {
+    const migrationTests = [
+      { from: '1.0.0', to: '2.0.0', expectedSteps: 3 },
+      { from: '1.5.0', to: '1.6.0', expectedSteps: 1 },
+      { from: '1.0.0', to: '1.0.1', expectedSteps: 0 },
+    ];
+
+    const results = await Promise.all(
+      migrationTests.map(test => this.generateMigrationPath(test.from, test.to))
+    );
+
+    const passed = results.every((r, i) => 
+      r.steps.length === migrationTests[i].expectedSteps
+    );
+
+    return {
+      test: 'Migration Path Generation',
+      passed,
+      details: { migrationTests, results },
+    };
+  }
+
+  private async testAutomatedMigration(): Promise<TestResult> {
+    const migration = await this.performAutomatedMigration(
+      'test-spec.md',
+      '1.0.0',
+      '2.0.0'
+    );
+
+    return {
+      test: 'Automated Migration',
+      passed: migration.success && migration.changesApplied > 0,
+      details: { migration },
+    };
+  }
+}
+```
+
+### Dependency Resolution Testing
+
+```typescript
+// Test dependency resolution and conflict detection
+export class DependencyResolutionTests {
+  async testDependencyResolution(): Promise<TestResult[]> {
+    return [
+      await this.testDependencyValidation(),
+      await this.testConflictDetection(),
+      await this.testCircularDependencyDetection(),
+      await this.testDependencyGraphValidation(),
+    ];
+  }
+
+  private async testDependencyValidation(): Promise<TestResult> {
+    const dependencyTests = [
+      { spec: 'auth.md', version: '1.2.0', dependencies: ['permissions.md >=1.1.0'], expected: true },
+      { spec: 'plugins.md', version: '1.5.0', dependencies: ['auth.md >=1.2.0'], expected: true },
+      { spec: 'invalid.md', version: '1.0.0', dependencies: ['nonexistent.md'], expected: false },
+    ];
+
+    const results = await Promise.all(
+      dependencyTests.map(test => this.validateDependencies(test.spec, test.version, test.dependencies))
+    );
+
+    const passed = results.every((r, i) => r.valid === dependencyTests[i].expected);
+
+    return {
+      test: 'Dependency Validation',
+      passed,
+      details: { dependencyTests, results },
+    };
+  }
+
+  private async testCircularDependencyDetection(): Promise<TestResult> {
+    const circularDeps = await this.detectCircularDependencies();
+    const hasCircularDeps = circularDeps.length > 0;
+
+    return {
+      test: 'Circular Dependency Detection',
+      passed: !hasCircularDeps,
+      details: { circularDependencies: circularDeps },
+    };
+  }
+}
+```
+
+### Changelog Generation Testing
+
+```typescript
+// Test changelog generation and validation
+export class ChangelogGenerationTests {
+  async testChangelogGeneration(): Promise<TestResult[]> {
+    return [
+      await this.testChangelogFormat(),
+      await this.testChangelogContent(),
+      await this.testChangelogValidation(),
+      await this.testChangelogIntegration(),
+    ];
+  }
+
+  private async testChangelogFormat(): Promise<TestResult> {
+    const changelog = await this.generateChangelog('test-spec.md', '1.0.0', '2.0.0');
+    const requiredSections = ['Breaking Changes', 'Additions', 'Fixes'];
+
+    const hasRequiredSections = requiredSections.every(section => 
+      changelog.content.includes(section)
+    );
+
+    return {
+      test: 'Changelog Format',
+      passed: hasRequiredSections && changelog.valid,
+      details: { changelog, requiredSections },
+    };
+  }
+
+  private async testChangelogContent(): Promise<TestResult> {
+    const changes = [
+      { type: 'breaking', description: 'Removed deprecated field' },
+      { type: 'addition', description: 'Added new feature' },
+      { type: 'fix', description: 'Fixed typo in documentation' },
+    ];
+
+    const changelog = await this.generateChangelogFromChanges(changes);
+    const allChangesIncluded = changes.every(change => 
+      changelog.content.includes(change.description)
+    );
+
+    return {
+      test: 'Changelog Content',
+      passed: allChangesIncluded,
+      details: { changes, changelog },
+    };
+  }
+}
+```
+
+### Integration Testing
+
+```typescript
+// Test integration with other systems
+export class IntegrationTests {
+  async testSystemIntegration(): Promise<TestResult[]> {
+    return [
+      await this.testCLIIntegration(),
+      await this.testAPIIntegration(),
+      await this.testGitIntegration(),
+      await this.testUIIntegration(),
+    ];
+  }
+
+  private async testCLIIntegration(): Promise<TestResult> {
+    const cliCommands = [
+      'civic spec validate-versions',
+      'civic spec check-breaking-changes',
+      'civic spec generate-migration',
+      'civic spec update-version',
+    ];
+
+    const results = await Promise.all(
+      cliCommands.map(cmd => this.executeCLICommand(cmd))
+    );
+
+    return {
+      test: 'CLI Integration',
+      passed: results.every(r => r.success),
+      details: { cliCommands, results },
+    };
+  }
+
+  private async testGitIntegration(): Promise<TestResult> {
+    const gitHooks = [
+      'pre-commit',
+      'pre-push',
+      'post-merge',
+    ];
+
+    const results = await Promise.all(
+      gitHooks.map(hook => this.testVersioningGitHook(hook))
+    );
+
+    return {
+      test: 'Git Integration',
+      passed: results.every(r => r.working),
+      details: { gitHooks, results },
+    };
+  }
+}
+```
 
 ---
 
@@ -92,7 +424,7 @@ MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]
 
 ```yaml
 ---
-version: '1.5.0'
+version: '1.0.0'
 status: 'stable'
 created: '2025-07-04'
 updated: '2025-07-15'
@@ -498,31 +830,6 @@ graph TD
 - [ ] **Validation Passed** - Run all validation checks
 - [ ] **Documentation Updated** - Update related documentation
 - [ ] **Team Notified** - Inform stakeholders of changes
-
----
-
-## 🔐 Security & Trust Considerations
-
-### Version Security
-
-- All spec versions must be cryptographically signed
-- Version history must be immutable and tamper-evident
-- Breaking changes require explicit approval and migration planning
-- Deprecation notices must be provided well in advance
-
-### Change Management
-
-- All changes must be reviewed by multiple team members
-- Breaking changes require community consultation
-- Version compatibility must be thoroughly tested
-- Migration tools must be provided for breaking changes
-
-### Audit Trail
-
-- Complete change history must be maintained
-- All version updates must be logged with timestamps
-- Dependency changes must be tracked and validated
-- Breaking change impact must be assessed and documented
 
 ---
 
