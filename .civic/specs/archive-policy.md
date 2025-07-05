@@ -1,4 +1,30 @@
-# 🗃️ CivicPress Spec: `archive-policy.md`
+# 📦 CivicPress Spec: `archive-policy.md`
+
+---
+version: 1.0.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+
+- comprehensive archive policy documentation
+- data retention
+- authenticity preservation
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'public-data-structure.md: >=1.0.0'
+  - 'storage.md: >=1.0.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+
+---
 
 ## 📛 Name
 
@@ -60,20 +86,55 @@ accordingly.
 
 ---
 
-## 🔐 Trust & Transparency Rules
+## 🔐 Security & Trust Considerations
 
-- Archive folder **must remain public**
-- YAML frontmatter must include:
+### Archive Integrity & Authenticity
 
-```yaml
-archived: true
-archived_at: '2025-07-03'
-archived_by: 'Albert Michelson'
-reason: 'Repealed by BL-2025-018'
-```
+- All archive operations cryptographically signed with GPG keys
+- Digital signatures required for all archive actions and metadata changes
+- Immutable audit trail for all archive operations and access attempts
+- Version control with tamper-evident history for all archived records
+- Automated detection of unauthorized access or modification to archived records
 
-- Repealed or expired items may be linked in timeline or index, but are clearly
-  marked.
+### Access Control & Permissions
+
+- Multi-factor authentication required for all archive operations
+- Role-based access control with granular permissions per archive type
+- Approval workflow for all archive actions and metadata changes
+- Emergency archive lockdown capability during security incidents
+- Audit logging of all archive-related activities and access attempts
+
+### Compliance & Legal Requirements
+
+- Compliance with municipal record-keeping requirements and regulations
+- Legal review process for archive policies and retention schedules
+- Support for public records laws and transparency requirements
+- Compliance with data retention policies for archive metadata
+- Regular legal audits of archive practices and procedures
+
+### Data Protection & Privacy
+
+- Encryption of sensitive archive data in transit and at rest
+- GDPR-compliant data retention policies for archive metadata
+- Anonymization of personal data in public archive records
+- User consent management for archive-related data processing
+- Data sovereignty compliance for cross-border archive storage
+
+### Audit & Transparency
+
+- Public transparency logs for all archive operations
+- Cryptographic verification of archive action authenticity
+- Immutable audit trails for all archive activities
+- Support for public records requests and legal discovery
+- Regular transparency reports and compliance audits
+
+### Abuse Prevention & Monitoring
+
+- Rate limiting and abuse detection for archive operations
+- Machine learning detection of coordinated archive manipulation
+- Real-time monitoring of archive access patterns and volume
+- Automated alerts for unusual archive activity or potential abuse
+- Blacklist/whitelist management for archive content and metadata
 
 ---
 

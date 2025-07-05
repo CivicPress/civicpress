@@ -1,4 +1,29 @@
-# 🧭 CivicPress Spec: `indexing.md`
+# 🔍 CivicPress Spec: `indexing.md`
+
+---
+version: 1.0.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+
+- comprehensive indexing documentation
+- search optimization
+- security considerations
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'public-data-structure.md: >=1.0.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+
+---
 
 ## 📛 Name
 

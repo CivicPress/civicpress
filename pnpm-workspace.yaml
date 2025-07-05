@@ -1,5 +1,23 @@
+# CivicPress pnpm Workspace Configuration
+#
+# This file defines the workspace structure for CivicPress.
+# As the project grows, we can add packages here.
+
 packages:
-  - core
-  - modules/*
-  - agent
-  - .civic
+  # Core packages
+  - 'packages/*'
+
+  # Apps (when we add them)
+  - 'apps/*'
+
+  # Tools and utilities
+  - 'tools/*'
+
+  # Documentation
+  - 'docs/*'
+
+  # Examples
+  - 'examples/*'
+
+  # Root package (this directory)
+  - '.'

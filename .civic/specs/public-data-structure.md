@@ -1,4 +1,29 @@
-# 🗂️ CivicPress Spec: `public-data-structure.md`
+# 📊 CivicPress Spec: `public-data-structure.md`
+
+---
+version: 1.0.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+
+- comprehensive data structure documentation
+- organization patterns
+- security considerations
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'manifest.md: >=1.0.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+
+---
 
 ## 📛 Name
 

@@ -1,5 +1,36 @@
 # 🔐 CivicPress Spec: `permissions.md`
 
+---
+version: 1.1.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+
+- comprehensive testing examples
+- security testing patterns
+- performance testing
+- compliance testing
+- CLI testing
+- detailed YAML field definitions
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'auth.md: >=1.2.0'
+  - 'roles.yml.md: >=1.0.0'
+  - 'workflows.md: >=1.3.0'
+  - 'git-policy.md: >=1.1.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+
+---
+
 ## 📛 Name
 
 `permissions` — CivicPress Permissions & Role Model
@@ -553,11 +584,711 @@ triggered.
 
 ## 🧪 Testing & Validation
 
-- Test role-based access controls
-- Verify permission enforcement in CLI commands
-- Ensure proper role validation in workflows
-- Test approval quorum requirements
-- Validate Git commit authorship checks
+### Permission Testing
+
+#### Unit Tests
+
+```typescript
+// tests/unit/permissions/permission-system.test.ts
+describe('Permission System', () => {
+  let permissionService: PermissionService;
+  let mockAPI: MockCivicPressAPI;
+
+  beforeEach(() => {
+    mockAPI = new MockCivicPressAPI();
+    permissionService = new PermissionService(mockAPI);
+  });
+
+  describe('Role-Based Access Control', () => {
+    it('should allow admin to perform all actions', async () => {
+      // Arrange
+      const adminUser = { id: '1', role: 'admin' };
+      const actions = [
+        'read:records',
+        'write:records',
+        'delete:records',
+        'approve:records',
+      ];
+
+      // Act
+      const results = await Promise.all(
+        actions.map((action) =>
+          permissionService.checkPermission(adminUser, action, 'records')
+        )
+      );
+
+      // Assert
+      results.forEach((result) => {
+        expect(result.allowed).toBe(true);
+      });
+    });
+
+    it('should restrict contributor to limited actions', async () => {
+      // Arrange
+      const contributorUser = { id: '2', role: 'contributor' };
+      const allowedActions = ['read:public', 'write:drafts'];
+      const restrictedActions = ['delete:records', 'approve:records'];
+
+      // Act
+      const allowedResults = await Promise.all(
+        allowedActions.map((action) =>
+          permissionService.checkPermission(contributorUser, action, 'records')
+        )
+      );
+      const restrictedResults = await Promise.all(
+        restrictedActions.map((action) =>
+          permissionService.checkPermission(contributorUser, action, 'records')
+        )
+      );
+
+      // Assert
+      allowedResults.forEach((result) => {
+        expect(result.allowed).toBe(true);
+      });
+      restrictedResults.forEach((result) => {
+        expect(result.allowed).toBe(false);
+      });
+    });
+
+    it('should handle role inheritance correctly', async () => {
+      // Arrange
+      const mayorUser = { id: '3', role: 'mayor' };
+      const clerkUser = { id: '4', role: 'clerk' };
+
+      // Act
+      const mayorPermissions =
+        await permissionService.getUserPermissions(mayorUser);
+      const clerkPermissions =
+        await permissionService.getUserPermissions(clerkUser);
+
+      // Assert
+      expect(mayorPermissions).toContain('approve:records');
+      expect(mayorPermissions).toContain('read:records');
+      expect(clerkPermissions).toContain('read:records');
+      expect(clerkPermissions).not.toContain('approve:records');
+    });
+  });
+
+  describe('Permission Validation', () => {
+    it('should validate permission format', async () => {
+      // Arrange
+      const validPermissions = [
+        'read:records',
+        'write:records',
+        'delete:records',
+      ];
+      const invalidPermissions = ['read', 'write', 'invalid:permission:format'];
+
+      // Act
+      const validResults = await Promise.all(
+        validPermissions.map((permission) =>
+          permissionService.validatePermission(permission)
+        )
+      );
+      const invalidResults = await Promise.all(
+        invalidPermissions.map((permission) =>
+          permissionService.validatePermission(permission)
+        )
+      );
+
+      // Assert
+      validResults.forEach((result) => {
+        expect(result.valid).toBe(true);
+      });
+      invalidResults.forEach((result) => {
+        expect(result.valid).toBe(false);
+      });
+    });
+
+    it('should enforce permission hierarchy', async () => {
+      // Arrange
+      const user = { id: '5', role: 'clerk' };
+      const hierarchicalPermissions = [
+        { action: 'read:records', resource: 'public', expected: true },
+        { action: 'read:records', resource: 'internal', expected: false },
+        { action: 'write:records', resource: 'drafts', expected: true },
+        { action: 'write:records', resource: 'published', expected: false },
+      ];
+
+      // Act
+      const results = await Promise.all(
+        hierarchicalPermissions.map(async ({ action, resource, expected }) => {
+          const result = await permissionService.checkPermission(
+            user,
+            action,
+            resource
+          );
+          return { action, resource, expected, actual: result.allowed };
+        })
+      );
+
+      // Assert
+      results.forEach((result) => {
+        expect(result.actual).toBe(result.expected);
+      });
+    });
+  });
+
+  describe('Approval Workflow Testing', () => {
+    it('should require quorum for approval', async () => {
+      // Arrange
+      const record = { id: 'record-1', type: 'bylaw', status: 'proposed' };
+      const approvers = [
+        { id: '1', role: 'council-member' },
+        { id: '2', role: 'council-member' },
+        { id: '3', role: 'mayor' },
+      ];
+      const requiredApprovals = 2;
+
+      // Act
+      const approvalResult = await permissionService.processApprovalWorkflow(
+        record,
+        approvers,
+        requiredApprovals
+      );
+
+      // Assert
+      expect(approvalResult.approved).toBe(true);
+      expect(approvalResult.approvalCount).toBeGreaterThanOrEqual(
+        requiredApprovals
+      );
+      expect(approvalResult.approvers).toHaveLength(
+        approvalResult.approvalCount
+      );
+    });
+
+    it('should reject insufficient approvals', async () => {
+      // Arrange
+      const record = { id: 'record-2', type: 'bylaw', status: 'proposed' };
+      const approvers = [{ id: '1', role: 'council-member' }];
+      const requiredApprovals = 3;
+
+      // Act
+      const approvalResult = await permissionService.processApprovalWorkflow(
+        record,
+        approvers,
+        requiredApprovals
+      );
+
+      // Assert
+      expect(approvalResult.approved).toBe(false);
+      expect(approvalResult.approvalCount).toBeLessThan(requiredApprovals);
+    });
+  });
+});
+```
+
+#### Integration Tests
+
+```typescript
+// tests/integration/permissions/permission-integration.test.ts
+describe('Permission Integration', () => {
+  let testUtils: CivicPressTestUtils;
+  let api: CivicPressAPI;
+  let permissionService: PermissionService;
+
+  beforeEach(async () => {
+    testUtils = new CivicPressTestUtils();
+    api = await testUtils.initializeTestAPI();
+    permissionService = new PermissionService(api);
+  });
+
+  afterEach(async () => {
+    await testUtils.cleanup();
+  });
+
+  describe('End-to-End Permission Workflow', () => {
+    it('should complete full permission workflow', async () => {
+      // Arrange
+      const user = await testUtils.createTestUser('clerk');
+      const record = await testUtils.createTestRecord({
+        type: 'bylaw',
+        status: 'draft',
+      });
+
+      // Act
+      const canRead = await permissionService.checkPermission(
+        user,
+        'read:records',
+        record.id
+      );
+      const canWrite = await permissionService.checkPermission(
+        user,
+        'write:records',
+        record.id
+      );
+      const canApprove = await permissionService.checkPermission(
+        user,
+        'approve:records',
+        record.id
+      );
+
+      // Assert
+      expect(canRead.allowed).toBe(true);
+      expect(canWrite.allowed).toBe(true);
+      expect(canApprove.allowed).toBe(false);
+    });
+
+    it('should handle role escalation correctly', async () => {
+      // Arrange
+      const clerkUser = await testUtils.createTestUser('clerk');
+      const mayorUser = await testUtils.createTestUser('mayor');
+      const record = await testUtils.createTestRecord({
+        type: 'bylaw',
+        status: 'proposed',
+      });
+
+      // Act
+      const clerkPermissions =
+        await permissionService.getUserPermissions(clerkUser);
+      const mayorPermissions =
+        await permissionService.getUserPermissions(mayorUser);
+
+      // Assert
+      expect(clerkPermissions).toContain('read:records');
+      expect(clerkPermissions).toContain('write:records');
+      expect(clerkPermissions).not.toContain('approve:records');
+
+      expect(mayorPermissions).toContain('read:records');
+      expect(mayorPermissions).toContain('write:records');
+      expect(mayorPermissions).toContain('approve:records');
+    });
+  });
+
+  describe('Multi-User Permission Testing', () => {
+    it('should handle concurrent permission checks', async () => {
+      // Arrange
+      const users = await Promise.all([
+        testUtils.createTestUser('contributor'),
+        testUtils.createTestUser('clerk'),
+        testUtils.createTestUser('council-member'),
+        testUtils.createTestUser('mayor'),
+      ]);
+      const record = await testUtils.createTestRecord({
+        type: 'bylaw',
+        status: 'draft',
+      });
+
+      // Act
+      const permissionChecks = await Promise.all(
+        users.map((user) =>
+          permissionService.checkPermission(user, 'read:records', record.id)
+        )
+      );
+
+      // Assert
+      permissionChecks.forEach((check) => {
+        expect(check.allowed).toBe(true);
+      });
+    });
+
+    it('should handle role conflicts correctly', async () => {
+      // Arrange
+      const user = await testUtils.createTestUser('clerk');
+      const conflictingPermissions = [
+        { action: 'read:records', resource: 'public', expected: true },
+        { action: 'read:records', resource: 'confidential', expected: false },
+        { action: 'write:records', resource: 'drafts', expected: true },
+        { action: 'write:records', resource: 'published', expected: false },
+      ];
+
+      // Act
+      const results = await Promise.all(
+        conflictingPermissions.map(async ({ action, resource, expected }) => {
+          const result = await permissionService.checkPermission(
+            user,
+            action,
+            resource
+          );
+          return { action, resource, expected, actual: result.allowed };
+        })
+      );
+
+      // Assert
+      results.forEach((result) => {
+        expect(result.actual).toBe(result.expected);
+      });
+    });
+  });
+});
+```
+
+### Security Testing
+
+#### Permission Security Testing
+
+```typescript
+// tests/security/permissions/permission-security.test.ts
+describe('Permission Security', () => {
+  let securityTestSuite: SecurityTestSuite;
+  let permissionService: PermissionService;
+
+  beforeEach(() => {
+    securityTestSuite = new SecurityTestSuite();
+    permissionService = new PermissionService();
+  });
+
+  describe('Permission Bypass Testing', () => {
+    it('should prevent privilege escalation', async () => {
+      // Arrange
+      const lowPrivilegeUser = { id: '1', role: 'contributor' };
+      const highPrivilegeActions = [
+        'approve:records',
+        'delete:records',
+        'admin:system',
+      ];
+
+      // Act
+      const results = await Promise.all(
+        highPrivilegeActions.map((action) =>
+          securityTestSuite.testPrivilegeEscalation(lowPrivilegeUser, action)
+        )
+      );
+
+      // Assert
+      results.forEach((result) => {
+        expect(result.passed).toBe(true);
+        expect(result.escalationAttempts).toBe(0);
+      });
+    });
+
+    it('should prevent role manipulation', async () => {
+      // Arrange
+      const maliciousPayloads = [
+        { role: "admin' OR '1'='1" },
+        { role: 'admin; DROP TABLE users; --' },
+        { role: '<script>alert("xss")</script>' },
+      ];
+
+      // Act
+      const results = await Promise.all(
+        maliciousPayloads.map((payload) =>
+          securityTestSuite.testRoleManipulation(payload)
+        )
+      );
+
+      // Assert
+      results.forEach((result) => {
+        expect(result.passed).toBe(true);
+        expect(result.injectionDetected).toBe(true);
+      });
+    });
+
+    it('should validate permission tokens', async () => {
+      // Arrange
+      const validToken = createValidPermissionToken();
+      const tamperedToken = tamperWithToken(validToken);
+
+      // Act
+      const validResult =
+        await securityTestSuite.testPermissionToken(validToken);
+      const tamperedResult =
+        await securityTestSuite.testPermissionToken(tamperedToken);
+
+      // Assert
+      expect(validResult.passed).toBe(true);
+      expect(tamperedResult.passed).toBe(false);
+      expect(tamperedResult.tamperDetected).toBe(true);
+    });
+  });
+
+  describe('Input Validation Testing', () => {
+    it('should prevent SQL injection in permission queries', async () => {
+      // Arrange
+      const maliciousInputs = [
+        "'; DROP TABLE permissions; --",
+        "' OR '1'='1",
+        "'; INSERT INTO permissions VALUES ('hacker', 'admin'); --",
+      ];
+
+      // Act
+      const results = await Promise.all(
+        maliciousInputs.map((input) =>
+          securityTestSuite.testPermissionSQLInjection(input)
+        )
+      );
+
+      // Assert
+      results.forEach((result) => {
+        expect(result.passed).toBe(true);
+        expect(result.vulnerabilities).toHaveLength(0);
+      });
+    });
+
+    it('should prevent XSS in permission interfaces', async () => {
+      // Arrange
+      const maliciousInputs = [
+        "<script>alert('xss')</script>",
+        "javascript:alert('xss')",
+        "<img src=x onerror=alert('xss')>",
+      ];
+
+      // Act
+      const results = await Promise.all(
+        maliciousInputs.map((input) =>
+          securityTestSuite.testPermissionXSS(input)
+        )
+      );
+
+      // Assert
+      results.forEach((result) => {
+        expect(result.passed).toBe(true);
+        expect(result.sanitized).toBe(true);
+      });
+    });
+  });
+});
+```
+
+### Performance Testing
+
+#### Permission Performance Testing
+
+```typescript
+// tests/performance/permissions/permission-performance.test.ts
+describe('Permission Performance', () => {
+  let performanceTestSuite: PerformanceTestSuite;
+
+  beforeEach(() => {
+    performanceTestSuite = new PerformanceTestSuite();
+  });
+
+  describe('Permission Check Performance', () => {
+    it('should check permissions within acceptable time', async () => {
+      // Arrange
+      const concurrentChecks = 1000;
+      const users = await createTestUsers(100);
+      const resources = await createTestResources(50);
+
+      // Act
+      const result = await performanceTestSuite.testPermissionChecks(
+        users,
+        resources,
+        concurrentChecks
+      );
+
+      // Assert
+      expect(result.averageResponseTime).toBeLessThan(100); // < 100ms
+      expect(result.p95ResponseTime).toBeLessThan(200); // < 200ms
+      expect(result.successRate).toBeGreaterThan(0.99); // > 99% success
+    });
+
+    it('should handle permission cache efficiently', async () => {
+      // Arrange
+      const user = await createTestUser('clerk');
+      const repeatedChecks = 1000;
+
+      // Act
+      const result = await performanceTestSuite.testPermissionCache(
+        user,
+        repeatedChecks
+      );
+
+      // Assert
+      expect(result.cacheHitRate).toBeGreaterThan(0.8); // > 80% cache hit
+      expect(result.averageCacheTime).toBeLessThan(10); // < 10ms
+    });
+  });
+
+  describe('Role Resolution Performance', () => {
+    it('should resolve roles efficiently', async () => {
+      // Arrange
+      const users = await createTestUsers(1000);
+      const roles = [
+        'contributor',
+        'clerk',
+        'council-member',
+        'mayor',
+        'admin',
+      ];
+
+      // Act
+      const result = await performanceTestSuite.testRoleResolution(
+        users,
+        roles
+      );
+
+      // Assert
+      expect(result.averageResolutionTime).toBeLessThan(50); // < 50ms
+      expect(result.successRate).toBeGreaterThan(0.99); // > 99% success
+    });
+  });
+});
+```
+
+### Compliance Testing
+
+#### Permission Compliance Testing
+
+```typescript
+// tests/compliance/permissions/permission-compliance.test.ts
+describe('Permission Compliance', () => {
+  let complianceTestSuite: ComplianceTestSuite;
+
+  beforeEach(() => {
+    complianceTestSuite = new ComplianceTestSuite();
+  });
+
+  describe('Audit Trail Compliance', () => {
+    it('should log all permission changes', async () => {
+      // Arrange
+      const permissionChanges = [
+        { user: 'user1', action: 'grant', permission: 'read:records' },
+        { user: 'user2', action: 'revoke', permission: 'write:records' },
+        { user: 'user3', action: 'modify', permission: 'approve:records' },
+      ];
+
+      // Act
+      const auditLogs = await Promise.all(
+        permissionChanges.map((change) =>
+          complianceTestSuite.testPermissionAuditLogging(change)
+        )
+      );
+
+      // Assert
+      auditLogs.forEach((log) => {
+        expect(log.timestamp).toBeDefined();
+        expect(log.user).toBeDefined();
+        expect(log.action).toBeDefined();
+        expect(log.permission).toBeDefined();
+        expect(log.reason).toBeDefined();
+      });
+    });
+
+    it('should maintain audit log integrity', async () => {
+      // Arrange
+      const auditLogs = await createTestPermissionAuditLogs(100);
+
+      // Act
+      const result =
+        await complianceTestSuite.testPermissionAuditIntegrity(auditLogs);
+
+      // Assert
+      expect(result.passed).toBe(true);
+      expect(result.tamperDetected).toBe(false);
+      expect(result.hashValid).toBe(true);
+    });
+  });
+
+  describe('Data Retention Compliance', () => {
+    it('should comply with permission data retention policies', async () => {
+      // Arrange
+      const retentionPolicy = {
+        permissionLogs: '7 years',
+        roleAssignments: '3 years',
+        approvalHistory: '5 years',
+      };
+
+      // Act
+      const result =
+        await complianceTestSuite.testPermissionDataRetention(retentionPolicy);
+
+      // Assert
+      expect(result.passed).toBe(true);
+      expect(result.permissionLogsRetention).toBe(true);
+      expect(result.roleAssignmentsRetention).toBe(true);
+      expect(result.approvalHistoryRetention).toBe(true);
+    });
+  });
+});
+```
+
+### CLI Testing
+
+#### Permission CLI Testing
+
+```typescript
+// tests/cli/permissions/permission-cli.test.ts
+describe('Permission CLI', () => {
+  let cliTestSuite: CLITestSuite;
+
+  beforeEach(() => {
+    cliTestSuite = new CLITestSuite();
+  });
+
+  describe('Permission Management Commands', () => {
+    it('should grant permissions via CLI', async () => {
+      // Arrange
+      const permissionData = {
+        user: 'test-user',
+        permission: 'read:records',
+        resource: 'public',
+      };
+
+      // Act
+      const result = await cliTestSuite.testGrantPermission(permissionData);
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.permissionGranted).toBe(true);
+      expect(result.auditLogged).toBe(true);
+    });
+
+    it('should revoke permissions via CLI', async () => {
+      // Arrange
+      const permissionData = {
+        user: 'test-user',
+        permission: 'write:records',
+        resource: 'drafts',
+      };
+
+      // Act
+      const result = await cliTestSuite.testRevokePermission(permissionData);
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.permissionRevoked).toBe(true);
+      expect(result.auditLogged).toBe(true);
+    });
+
+    it('should list user permissions via CLI', async () => {
+      // Arrange
+      const user = 'test-user';
+
+      // Act
+      const result = await cliTestSuite.testListPermissions(user);
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.permissions).toBeDefined();
+      expect(result.permissions.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Role Management Commands', () => {
+    it('should assign roles via CLI', async () => {
+      // Arrange
+      const roleData = {
+        user: 'test-user',
+        role: 'clerk',
+      };
+
+      // Act
+      const result = await cliTestSuite.testAssignRole(roleData);
+
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.roleAssigned).toBe(true);
+      expect(result.permissionsUpdated).toBe(true);
+    });
+
+    it('should validate role assignments', async () => {
+      // Arrange
+      const invalidRoleData = {
+        user: 'test-user',
+        role: 'invalid-role',
+      };
+
+      // Act
+      const result = await cliTestSuite.testAssignRole(invalidRoleData);
+
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid role');
+    });
+  });
+});
+```
 
 ---
 

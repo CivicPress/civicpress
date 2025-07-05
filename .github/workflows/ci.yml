@@ -30,6 +30,9 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
+      - name: Validate CivicPress specs
+        run: pnpm run spec:validate
+
       - name: Verify workspace structure
         run: |
           echo "Verifying project structure..."

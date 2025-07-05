@@ -1,4 +1,30 @@
-# 🔗 CivicPress Spec: `hooks.md`
+# 🪝 CivicPress Spec: `hooks.md`
+
+---
+version: 1.2.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+
+- detailed YAML examples
+- comprehensive hook configurations
+- security considerations
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'workflows.md: >=1.3.0'
+  - 'plugins.md: >=1.5.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+
+---
 
 ## 📛 Name
 

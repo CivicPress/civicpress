@@ -1,5 +1,31 @@
 # 💻 CivicPress Spec: `cli.md`
 
+---
+version: 1.0.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+
+- comprehensive CLI documentation
+- security considerations
+- testing patterns
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'auth.md: >=1.2.0'
+  - 'permissions.md: >=1.1.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+
+---
+
 ## 📛 Name
 
 `cli` — CivicPress Command Line Interface (`civic`)

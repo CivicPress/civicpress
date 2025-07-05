@@ -1,0 +1,25 @@
+# Ignore YAML frontmatter in markdown files
+# This prevents Prettier from reformatting YAML metadata blocks
+
+# Ignore CivicPress spec files (they use YAML frontmatter)
+.civic/specs/*.md
+
+# Ignore package lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Ignore generated files
+.civic/tools/*.js
+
+# Ignore node modules
+node_modules/
+
+# Ignore build outputs
+dist/
+build/
+.cache/
+
+# Ignore environment files
+.env*
+!.env.example 

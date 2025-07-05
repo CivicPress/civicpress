@@ -1,60 +1,141 @@
-# 📘 CivicPress Specs
+# 📚 CivicPress Spec: `README.md`
 
-This folder contains formal **specifications** for the CivicPress platform.  
-Each file defines the architecture, responsibilities, and constraints of a core
-system or module.
+---
+version: 1.0.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
 
-These specs are meant to serve as:
-
-- 📐 **Blueprints** for implementation
-- 📖 **Documentation** for contributors
-- 🔍 **References** for towns evaluating the platform
+- comprehensive spec documentation
+- organization structure
+- cross-references
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies: []
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
 
 ---
 
-## 🧩 Spec Structure
+## 📛 Name
 
-Each spec typically includes:
+CivicPress Specifications Index
 
-| Section             | Purpose                                        |
-| ------------------- | ---------------------------------------------- |
-| 📛 Name             | Short system identifier or filename            |
-| 🎯 Purpose          | Why this module/system exists                  |
-| 🧩 Scope            | What it does and does not do                   |
-| 🔗 Inputs & Outputs | API, CLI, file-based, or event-based data      |
-| 📂 Folder Location  | Where the code or records are expected to live |
-| 🔐 Security Notes   | Permissions, roles, isolation                  |
-| 🧪 Testing Plan     | How this part is verified                      |
-| 🛠️ Enhancements     | Ideas for future evolution                     |
-| 📅 History          | Draft date and update log                      |
+## 🎯 Purpose
 
----
+Provide an organized index and overview of all CivicPress specifications,
+enabling developers, contributors, and stakeholders to quickly find and
+understand the relevant documentation for their needs.
 
-## 📁 Specs Included
+## 🧩 Scope & Responsibilities
 
-- `api.md` — REST API for civic records and workflows
-- `cli.md` — CivicPress command-line interface
-- `hooks.md` — Core event system for lifecycle events
-- `workflows.md` — JavaScript-based civic automation
-- `git-policy.md` — Git branching, approval, and publishing rules
-- `manifest.md` — Metadata format for civic records
-- `indexing.md` — How files are indexed, searched, and presented
-- `permissions.md` — Role and permission architecture
-- `roles.md` — Default civic roles and responsibilities
-- `editor-layer.md` — Editing interface strategies
-- `frontend.md` — Nuxt-based public-facing civic site
-- `public.md` — Public UI layer (non-admin)
-- `feedback.md` — Git-native civic comment & reaction system
-- `legal-register.md` — Module spec for by-laws and legal records
-- `archive-policy.md` — Retention, archival, and expiration logic
-- `deployment.md` — How CivicPress is deployed across scales
-- `serve.md` — Static preview server for civic records
+✅ Responsibilities:
+
+- Organize specs by category and priority
+- Provide clear navigation and cross-references
+- Maintain consistent structure and formatting
+- Enable quick discovery of relevant documentation
+
+❌ Out of Scope:
+
+- Detailed spec content (handled by individual spec files)
+- Implementation details (handled by code documentation)
 
 ---
 
-## 👥 Contributors Welcome
+## 📋 Specifications
 
-This folder is the foundation of CivicPress governance and implementation.  
-If you're contributing to the project, start here.
+CivicPress specifications are organized into the following categories:
 
-To propose a change or new spec, open a Pull Request or Discussion on GitHub.
+### 🔐 Core System
+
+- [`manifest.md`](./manifest.md) — CivicPress manifest and configuration
+- [`auth.md`](./auth.md) — Authentication and identity management
+- [`permissions.md`](./permissions.md) — User roles and permissions
+- [`git-policy.md`](./git-policy.md) — Git-based governance and policies
+- [`workflows.md`](./workflows.md) — Civic workflow management
+- [`hooks.md`](./hooks.md) — Event hooks and automation
+
+### 📊 Version Management
+
+- [`spec-versioning.md`](./spec-versioning.md) — Specification versioning and
+  change management
+- [`version-tracker.md`](./version-tracker.md) — Version tracking and dependency
+  management
+
+### 🧩 Plugin System
+
+- [`plugins.md`](./plugins.md) — Plugin architecture and capabilities
+- [`plugin-api.md`](./plugin-api.md) — Plugin API interfaces and lifecycle
+- [`plugin-development.md`](./plugin-development.md) — Plugin development
+  workflow and best practices
+
+### 🧪 Testing & Quality
+
+- [`testing-framework.md`](./testing-framework.md) — Comprehensive testing
+  standards and tools
+
+### 🔒 Security & Compliance
+
+- [`security.md`](./security.md) — Security architecture and best practices
+- [`backup.md`](./backup.md) — Backup and disaster recovery
+- [`storage.md`](./storage.md) — Data storage and management
+
+### 🎨 User Experience
+
+- [`ui.md`](./ui.md) — User interface and interaction design
+- [`accessibility.md`](./accessibility.md) — Accessibility standards and
+  guidelines
+- [`themes.md`](./themes.md) — Theme system and customization
+- [`translations.md`](./translations.md) — Internationalization and localization
+
+### 📊 Data & Records
+
+- [`public-data-structure.md`](./public-data-structure.md) — Public data
+  organization and structure
+- [`records-validation.md`](./records-validation.md) — Record validation and
+  integrity
+- [`indexing.md`](./indexing.md) — Data indexing and search optimization
+- [`search.md`](./search.md) — Search functionality and algorithms
+
+### ⚙️ System & Infrastructure
+
+- [`api.md`](./api.md) — API design and endpoints
+- [`cli.md`](./cli.md) — Command-line interface and tools
+- [`deployment.md`](./deployment.md) — Deployment and infrastructure
+- [`scheduler.md`](./scheduler.md) — Task scheduling and automation
+
+### 📚 Additional Resources
+
+- [`glossary.md`](./glossary.md) — Key terms and definitions
+- [`legal-register.md`](./legal-register.md) — Legal document management
+- [`archive-policy.md`](./archive-policy.md) — Data archiving and retention
+- [`status-tags.md`](./status-tags.md) — Status tracking and workflow states
+- [`notifications.md`](./notifications.md) — Notification system and channels
+- [`observability.md`](./observability.md) — Monitoring and observability
+- [`database.md`](./database.md) — Database design and management
+- [`users.md`](./users.md) — User management and profiles
+- [`moderation.md`](./moderation.md) — Content moderation and governance
+- [`scheduler.md`](./scheduler.md) — Task scheduling and automation
+
+---
+
+## 🔗 Related Specs
+
+- [`spec-versioning.md`](./spec-versioning.md) — Version management system
+- [`version-tracker.md`](./version-tracker.md) — Version tracking and
+  dependencies
+
+---
+
+## 📅 History
+
+- Drafted: 2025-07-03
+- Last updated: 2025-07-15

@@ -1,4 +1,30 @@
-# 🛰️ CivicPress Spec: `serve.md`
+# 🌐 CivicPress Spec: `serve.md`
+
+---
+version: 1.0.0
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+deprecated: false
+sunset_date: null
+additions:
+
+- comprehensive serve documentation
+- hosting patterns
+- security considerations
+compatibility:
+  min_civicpress: 1.0.0
+  max_civicpress: 'null'
+  dependencies:
+  - 'deployment.md: >=1.0.0'
+  - 'static-export.md: >=1.0.0'
+authors:
+- Sophie Germain <sophie@civic-press.org>
+reviewers:
+- Ada Lovelace
+- Irène Joliot-Curie
+
+---
 
 ## 📛 Name
 
