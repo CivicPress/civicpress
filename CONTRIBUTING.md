@@ -86,7 +86,45 @@ pnpm run format:check
 pnpm test
 ```
 
-### 5. Submit a Pull Request
+### 5. Specification Management
+
+CivicPress uses a comprehensive specification system. These scripts help manage
+and validate specs:
+
+```bash
+# Format specification files
+pnpm run spec:format
+
+# Check specification formatting
+pnpm run spec:format:check
+
+# Validate all specifications
+pnpm run spec:validate
+
+# Check specification dependencies
+pnpm run spec:check-deps
+
+# List all specifications
+pnpm run spec:list
+
+# Run all specification checks
+pnpm run spec:check
+
+# Run complete specification workflow
+pnpm run spec:all
+```
+
+### 6. Development Workflow
+
+```bash
+# Development mode (runs dev across all packages)
+pnpm run dev
+
+# Build all packages
+pnpm run build
+```
+
+### 7. Submit a Pull Request
 
 - Create a clear, descriptive title
 - Include a detailed description of changes
