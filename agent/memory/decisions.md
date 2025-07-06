@@ -1,7 +1,7 @@
 # 📋 CivicPress Key Decisions
 
 **Last Updated**: 2025-01-27  
-**Total Decisions**: 8
+**Total Decisions**: 9
 
 ## 🎯 **Recent Decisions**
 
@@ -134,6 +134,27 @@
   - Enables seamless handoffs
 - **Impact**: Establishes robust memory system for AI agents
 
+### **2025-01-27: Architecture Documentation Decisions**
+
+#### **Decision**: Use Mermaid for architecture diagrams
+
+- **Context**: Need visual architecture documentation for CivicPress
+- **Options Considered**:
+  - PlantUML (detailed UML diagrams)
+  - ASCII art (simple but limited)
+  - Text-based flowcharts (easy to maintain)
+  - Mermaid (GitHub-compatible markdown diagrams)
+- **Chosen Option**: Mermaid diagrams
+- **Rationale**:
+  - GitHub renders Mermaid automatically
+  - Markdown-based, easy to maintain
+  - Supports complex diagrams (flowcharts, sequence, state)
+  - Version control friendly
+  - No external dependencies
+  - Works well with existing documentation
+- **Impact**: Provides visual architecture documentation that's easy to maintain
+  and share
+
 ## 📊 **Decision Categories**
 
 ### **Architecture Decisions**
@@ -155,6 +176,11 @@
 - Agent folder structure
 - Memory system implementation
 
+### **Documentation Decisions**
+
+- Mermaid diagram adoption
+- Architecture visualization approach
+
 ## 🔄 **Decision Impact Analysis**
 
 ### **High Impact Decisions**
@@ -173,6 +199,7 @@
 
 1. **Link Updates**: Maintains functionality without changing behavior
 2. **File Organization**: Improves structure without affecting functionality
+3. **Mermaid Diagrams**: Improves documentation without affecting functionality
 
 ## 📝 **Decision Documentation Protocol**
 
