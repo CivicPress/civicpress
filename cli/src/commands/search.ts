@@ -3,7 +3,11 @@ import { readdir, readFile, stat } from 'fs/promises';
 import { join, extname } from 'path';
 import { glob } from 'glob';
 import { simpleGit, SimpleGit } from 'simple-git';
-import { loadConfig } from '@civicpress/core';
+import { loadConfig, getLogger } from '@civicpress/core';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 interface SearchOptions {
   content?: string;
@@ -58,17 +62,14 @@ export function registerSearchCommand(cli: CAC) {
     .option('-f, --format <format>', 'Output format', { default: 'table' })
     .action(async (query: string, options: SearchOptions) => {
       try {
-        // Quick fix: Suppress console output for JSON format
-        // TODO: Implement proper silent mode in CivicPress core and hook system
-        let originalConsoleLog: typeof console.log | undefined;
-        if (options.format === 'json') {
-          originalConsoleLog = console.log;
-          console.log = () => {};
-        }
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
 
         const config = await loadConfig();
         if (!config) {
-          console.error(
+          logger.error(
             '❌ No CivicPress configuration found. Run "civic init" first.'
           );
           process.exit(1);
@@ -89,19 +90,15 @@ export function registerSearchCommand(cli: CAC) {
 
         const results = await searchRecords(config.dataDir, searchOptions);
 
-        if (options.format === 'json' && originalConsoleLog) {
-          console.log = originalConsoleLog;
-          console.log(JSON.stringify(results, null, 2));
+        if (options.format === 'json') {
+          logger.output(JSON.stringify(results, null, 2));
           return;
-        }
-
-        if (originalConsoleLog) {
-          console.log = originalConsoleLog;
         }
 
         displayResults(results, searchOptions);
       } catch (error) {
-        console.error('❌ Search failed:', error);
+        const logger = getLogger();
+        logger.error('❌ Search failed:', error);
         process.exit(1);
       }
     });
@@ -501,7 +498,8 @@ async function searchGitHistory(
       }
     }
   } catch (error) {
-    console.warn('Git history search failed:', error);
+    const logger = getLogger();
+    logger.warn('Git history search failed:', error);
   }
 
   return results;
@@ -520,44 +518,46 @@ function removeDuplicates(results: SearchResult[]): SearchResult[] {
 }
 
 function displayResults(results: SearchResult[], options: SearchOptions) {
+  const logger = getLogger();
+
   if (results.length === 0) {
-    console.log('🔍 No records found matching your search criteria.');
+    logger.warn('🔍 No records found matching your search criteria.');
     return;
   }
 
-  console.log(`🔍 Found ${results.length} record(s):\n`);
+  logger.info(`🔍 Found ${results.length} record(s):\n`);
 
   switch (options.format) {
     case 'json':
-      console.log(JSON.stringify(results, null, 2));
+      logger.output(JSON.stringify(results, null, 2));
       break;
 
     case 'list':
       for (const result of results) {
-        console.log(`📄 ${result.path}`);
-        console.log(`   Type: ${result.type}`);
-        console.log(`   Title: ${result.title}`);
-        console.log(`   Status: ${result.status}`);
+        logger.info(`📄 ${result.path}`);
+        logger.debug(`   Type: ${result.type}`);
+        logger.debug(`   Title: ${result.title}`);
+        logger.debug(`   Status: ${result.status}`);
         if (result.matches.length > 0) {
-          console.log(
+          logger.debug(
             `   Matches: ${result.matches.map((m) => `${m.field}: "${m.value}"`).join(', ')}`
           );
         }
-        console.log('');
+        logger.debug('');
       }
       break;
 
     case 'table':
     default:
       // Simple table format
-      console.log(
+      logger.output(
         'Path'.padEnd(40) +
           'Type'.padEnd(15) +
           'Title'.padEnd(30) +
           'Status'.padEnd(10) +
           'Matches'
       );
-      console.log('-'.repeat(100));
+      logger.output('-'.repeat(100));
 
       for (const result of results) {
         const path =
@@ -574,7 +574,9 @@ function displayResults(results: SearchResult[], options: SearchOptions) {
         const matchCount =
           result.matches.length > 0 ? `${result.matches.length} match(es)` : '';
 
-        console.log(`${path.padEnd(40)}${type}${title}${status}${matchCount}`);
+        logger.output(
+          `${path.padEnd(40)}${type}${title}${status}${matchCount}`
+        );
       }
       break;
   }

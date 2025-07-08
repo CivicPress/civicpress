@@ -2,10 +2,14 @@ import { CAC } from 'cac';
 import { readFile, stat } from 'fs/promises';
 import { join, extname } from 'path';
 import { simpleGit, SimpleGit } from 'simple-git';
-import { loadConfig } from '@civicpress/core';
+import { loadConfig, getLogger } from '@civicpress/core';
 import chalk from 'chalk';
 import * as diff from 'diff';
 import * as readline from 'readline';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 interface DiffOptions {
   record?: string;
@@ -67,9 +71,14 @@ export function registerDiffCommand(cli: CAC) {
     )
     .action(async (record: string, options: DiffOptions) => {
       try {
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
         const config = await loadConfig();
         if (!config) {
-          console.error(
+          logger.error(
             '❌ No CivicPress configuration found. Run "civic init" first.'
           );
           process.exit(1);
@@ -108,13 +117,15 @@ export function registerDiffCommand(cli: CAC) {
           displayDiffResults(results, diffOptions);
         }
       } catch (error) {
-        console.error('❌ Diff failed:', error);
+        const logger = getLogger();
+        logger.error('❌ Diff failed:', error);
         process.exit(1);
       }
     });
 }
 
 async function handleInteractiveDiff(dataDir: string, options: DiffOptions) {
+  const logger = getLogger();
   const git = simpleGit(dataDir);
   const recordPath = options.record!.endsWith('.md')
     ? options.record!
@@ -125,14 +136,12 @@ async function handleInteractiveDiff(dataDir: string, options: DiffOptions) {
     const commits = await getFileCommitHistory(git, recordPath);
 
     if (commits.length === 0) {
-      console.log('📄 No commit history found for this record.');
+      logger.warn('📄 No commit history found for this record.');
       return;
     }
 
-    console.log(chalk.cyan(`📄 Record: ${recordPath}`));
-    console.log(
-      chalk.gray(`📜 Found ${commits.length} commits with changes:\n`)
-    );
+    logger.info(`📄 Record: ${recordPath}`);
+    logger.info(`📜 Found ${commits.length} commits with changes:\n`);
 
     // Display commit history
     for (let i = 0; i < commits.length; i++) {
@@ -140,34 +149,27 @@ async function handleInteractiveDiff(dataDir: string, options: DiffOptions) {
       const date = new Date(commit.date).toLocaleDateString();
       const time = new Date(commit.date).toLocaleTimeString();
 
-      console.log(
-        chalk.blue(`${i + 1}.`),
-        chalk.cyan(commit.hash.substring(0, 8))
-      );
-      console.log(chalk.gray(`   📅 ${date} ${time}`));
-      console.log(chalk.gray(`   👤 ${commit.author}`));
-      console.log(chalk.white(`   💬 ${commit.message}`));
+      logger.info(`${i + 1}. ${commit.hash.substring(0, 8)}`);
+      logger.info(`   📅 ${date} ${time}`);
+      logger.info(`   👤 ${commit.author}`);
+      logger.info(`   💬 ${commit.message}`);
 
       if (commit.changes.length > 0) {
-        console.log(
-          chalk.yellow(`   📝 Changes: ${commit.changes.join(', ')}`)
-        );
+        logger.info(`   📝 Changes: ${commit.changes.join(', ')}`);
       }
-      console.log('');
+      logger.info('');
     }
 
     // Get user selection
     const selectedCommit = await promptForCommitSelection(commits.length);
     if (selectedCommit === null) {
-      console.log('❌ No selection made.');
+      logger.error('❌ No selection made.');
       return;
     }
 
     const selectedCommitInfo = commits[selectedCommit - 1];
-    console.log(
-      chalk.green(
-        `\n🔍 Comparing current version with commit ${selectedCommitInfo.hash.substring(0, 8)}...\n`
-      )
+    logger.info(
+      `\n🔍 Comparing current version with commit ${selectedCommitInfo.hash.substring(0, 8)}...\n`
     );
 
     // Compare with current version
@@ -182,10 +184,10 @@ async function handleInteractiveDiff(dataDir: string, options: DiffOptions) {
     if (result) {
       displayDiffResults([result], options);
     } else {
-      console.log('🔍 No differences found.');
+      logger.info('🔍 No differences found.');
     }
   } catch (error) {
-    console.error('Error in interactive diff:', error);
+    logger.error('Error in interactive diff:', error);
   }
 }
 
@@ -428,7 +430,8 @@ async function compareSingleRecord(
         changes.length > 0 ? formatMetadataDiff(changes) : undefined,
     };
   } catch (error) {
-    console.warn(`Error comparing ${recordPath}:`, error);
+    const logger = getLogger();
+    logger.warn(`Error comparing ${recordPath}:`, error);
     return null;
   }
 }
@@ -456,7 +459,8 @@ async function getChangedFiles(
     const diff = await git.diff([`${commit1}..${commit2}`, '--name-only']);
     return diff.split('\n').filter((file) => file.trim());
   } catch (error) {
-    console.warn('Error getting changed files:', error);
+    const logger = getLogger();
+    logger.warn('Error getting changed files:', error);
     return [];
   }
 }
@@ -504,48 +508,41 @@ function formatMetadataDiff(changes: DiffResult['changes']): string {
 }
 
 function displayDiffResults(results: DiffResult[], options: DiffOptions) {
+  const logger = getLogger();
   if (results.length === 0) {
-    console.log('🔍 No differences found.');
+    logger.info('🔍 No differences found.');
     return;
   }
 
-  console.log(`🔍 Found ${results.length} record(s) with changes:\n`);
+  logger.info(`🔍 Found ${results.length} record(s) with changes:\n`);
 
   for (const result of results) {
-    console.log(chalk.cyan(`📄 ${result.record}`));
-    console.log(chalk.gray(`   Type: ${result.type}`));
+    logger.info(`📄 ${result.record}`);
+    logger.info(`   Type: ${result.type}`);
 
     if (result.changes.length > 0) {
-      console.log(chalk.yellow('\n   📋 Metadata Changes:'));
+      logger.info('\n   📋 Metadata Changes:');
       for (const change of result.changes) {
         switch (change.type) {
           case 'added':
-            console.log(
-              chalk.green(`     + ${change.field}: ${change.newValue}`)
-            );
+            logger.info(`     + ${change.field}: ${change.newValue}`);
             break;
           case 'removed':
-            console.log(
-              chalk.red(`     - ${change.field}: ${change.oldValue}`)
-            );
+            logger.error(`     - ${change.field}: ${change.oldValue}`);
             break;
           case 'modified':
-            console.log(
-              chalk.red(`     - ${change.field}: ${change.oldValue}`)
-            );
-            console.log(
-              chalk.green(`     + ${change.field}: ${change.newValue}`)
-            );
+            logger.error(`     - ${change.field}: ${change.oldValue}`);
+            logger.info(`     + ${change.field}: ${change.newValue}`);
             break;
         }
       }
     }
 
     if (result.contentDiff) {
-      console.log(chalk.yellow('\n   📝 Content Changes:'));
+      logger.info('\n   📝 Content Changes:');
 
       if (options.format === 'json') {
-        console.log(
+        logger.info(
           JSON.stringify(
             {
               record: result.record,
@@ -562,19 +559,19 @@ function displayDiffResults(results: DiffResult[], options: DiffOptions) {
         const lines = result.contentDiff.split('\n');
         for (const line of lines) {
           if (line.startsWith('+') && !line.startsWith('+++')) {
-            console.log(chalk.green(`     ${line}`));
+            logger.info(`     ${line}`);
           } else if (line.startsWith('-') && !line.startsWith('---')) {
-            console.log(chalk.red(`     ${line}`));
+            logger.error(`     ${line}`);
           } else if (line.startsWith('@')) {
-            console.log(chalk.blue(`     ${line}`));
+            logger.info(`     ${line}`);
           } else {
-            console.log(chalk.gray(`     ${line}`));
+            logger.info(`     ${line}`);
           }
         }
       }
     }
 
-    console.log('\n' + chalk.gray('─'.repeat(60)) + '\n');
+    logger.info('\n' + '─'.repeat(60) + '\n');
   }
 }
 

@@ -2,11 +2,15 @@ import { CAC } from 'cac';
 import { readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { loadConfig } from '@civicpress/core';
+import { loadConfig, getLogger } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as yaml from 'yaml';
 import { HookSystem } from '@civicpress/core';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export function registerHookCommand(cli: CAC) {
   cli
@@ -21,9 +25,14 @@ export function registerHookCommand(cli: CAC) {
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (action: string, options: any) => {
       try {
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
         const config = await loadConfig();
         if (!config) {
-          console.error(
+          logger.error(
             '❌ No CivicPress configuration found. Run "civic init" first.'
           );
           process.exit(1);
@@ -50,18 +59,20 @@ export function registerHookCommand(cli: CAC) {
           showHelp();
         }
       } catch (error) {
-        console.error('❌ Hook management failed:', error);
+        const logger = getLogger();
+        logger.error('❌ Hook management failed:', error);
         process.exit(1);
       }
     });
 }
 
 async function listHooks(hookSystem: HookSystem, options: any) {
+  const logger = getLogger();
   const config = hookSystem.getConfiguration();
   const registeredHooks = hookSystem.getRegisteredHooks();
 
   if (options.format === 'json') {
-    console.log(
+    logger.info(
       JSON.stringify(
         {
           registered: registeredHooks,
@@ -74,24 +85,22 @@ async function listHooks(hookSystem: HookSystem, options: any) {
     return;
   }
 
-  console.log(chalk.blue('🪝 CivicPress Hooks'));
-  console.log(chalk.gray('─'.repeat(50)));
+  logger.info('🪝 CivicPress Hooks');
+  logger.info('─'.repeat(50));
 
   // Show registered hooks
-  console.log(chalk.cyan('\n📋 Registered Hooks:'));
+  logger.info('\n📋 Registered Hooks:');
   for (const hook of registeredHooks) {
     const hookConfig = config?.hooks[hook];
-    const status = hookConfig?.enabled
-      ? chalk.green('✅ Enabled')
-      : chalk.red('❌ Disabled');
+    const status = hookConfig?.enabled ? '✅ Enabled' : '❌ Disabled';
     const workflows = hookConfig?.workflows?.length
-      ? chalk.gray(`(${hookConfig.workflows.join(', ')})`)
-      : chalk.gray('(no workflows)');
+      ? `(${hookConfig.workflows.join(', ')})`
+      : '(no workflows)';
 
-    console.log(`  ${chalk.white(hook)} ${status} ${workflows}`);
+    logger.info(`  ${hook} ${status} ${workflows}`);
 
     if (hookConfig?.description) {
-      console.log(`    ${chalk.gray(hookConfig.description)}`);
+      logger.info(`    ${hookConfig.description}`);
     }
   }
 
@@ -103,52 +112,51 @@ async function listHooks(hookSystem: HookSystem, options: any) {
     );
 
     if (unregisteredHooks.length > 0) {
-      console.log(chalk.cyan('\n⚙️  Configured (Not Registered):'));
+      logger.info('\n⚙️  Configured (Not Registered):');
       for (const hook of unregisteredHooks) {
         const hookConfig = config.hooks[hook];
-        const status = hookConfig.enabled
-          ? chalk.green('✅ Enabled')
-          : chalk.red('❌ Disabled');
-        console.log(`  ${chalk.white(hook)} ${status}`);
+        const status = hookConfig.enabled ? '✅ Enabled' : '❌ Disabled';
+        logger.info(`  ${hook} ${status}`);
       }
     }
   }
 }
 
 async function showConfig(hookSystem: HookSystem, options: any) {
+  const logger = getLogger();
   const config = hookSystem.getConfiguration();
 
   if (options.format === 'json') {
-    console.log(JSON.stringify(config, null, 2));
+    logger.info(JSON.stringify(config, null, 2));
     return;
   }
 
-  console.log(chalk.blue('⚙️  Hook Configuration'));
-  console.log(chalk.gray('─'.repeat(50)));
+  logger.info('⚙️  Hook Configuration');
+  logger.info('─'.repeat(50));
 
   if (!config) {
-    console.log(chalk.yellow('⚠️  No hook configuration found'));
+    logger.warn('⚠️  No hook configuration found');
     return;
   }
 
   // Show settings
-  console.log(chalk.cyan('\n🔧 Settings:'));
-  console.log(`  Max Concurrent: ${config.settings.maxConcurrent}`);
-  console.log(`  Timeout: ${config.settings.timeout}ms`);
-  console.log(`  Retry Attempts: ${config.settings.retryAttempts}`);
-  console.log(`  Default Mode: ${config.settings.defaultMode}`);
+  logger.info('\n🔧 Settings:');
+  logger.info(`  Max Concurrent: ${config.settings.maxConcurrent}`);
+  logger.info(`  Timeout: ${config.settings.timeout}ms`);
+  logger.info(`  Retry Attempts: ${config.settings.retryAttempts}`);
+  logger.info(`  Default Mode: ${config.settings.defaultMode}`);
 
   // Show hooks
-  console.log(chalk.cyan('\n🪝 Hooks:'));
+  logger.info('\n🪝 Hooks:');
   for (const [hookName, hookConfig] of Object.entries(config.hooks)) {
-    const status = hookConfig.enabled ? chalk.green('✅') : chalk.red('❌');
-    console.log(`  ${status} ${chalk.white(hookName)}`);
-    console.log(`    Workflows: ${hookConfig.workflows.join(', ') || 'none'}`);
-    console.log(`    Audit: ${hookConfig.audit ? 'yes' : 'no'}`);
+    const status = hookConfig.enabled ? '✅' : '❌';
+    logger.info(`  ${status} ${hookName}`);
+    logger.info(`    Workflows: ${hookConfig.workflows.join(', ') || 'none'}`);
+    logger.info(`    Audit: ${hookConfig.audit ? 'yes' : 'no'}`);
     if (hookConfig.description) {
-      console.log(`    Description: ${hookConfig.description}`);
+      logger.info(`    Description: ${hookConfig.description}`);
     }
-    console.log('');
+    logger.info('');
   }
 }
 
@@ -157,12 +165,13 @@ async function testHook(
   hookName: string,
   options: any
 ) {
+  const logger = getLogger();
   if (!hookName) {
-    console.error('❌ Hook name required for testing');
+    logger.error('❌ Hook name required for testing');
     return;
   }
 
-  console.log(chalk.blue(`🧪 Testing hook: ${hookName}`));
+  logger.info(`🧪 Testing hook: ${hookName}`);
 
   const testData = {
     record: {
@@ -183,9 +192,9 @@ async function testHook(
 
   try {
     await hookSystem.emit(hookName, testData, testContext);
-    console.log(chalk.green('✅ Hook test completed successfully'));
+    logger.info('✅ Hook test completed successfully');
   } catch (error) {
-    console.error(chalk.red('❌ Hook test failed:'), error);
+    logger.error('❌ Hook test failed:', error);
   }
 }
 
@@ -194,18 +203,19 @@ async function enableHook(
   hookName: string,
   options: any
 ) {
+  const logger = getLogger();
   if (!hookName) {
-    console.error('❌ Hook name required for enabling');
+    logger.error('❌ Hook name required for enabling');
     return;
   }
 
-  console.log(chalk.blue(`✅ Enabling hook: ${hookName}`));
+  logger.info(`✅ Enabling hook: ${hookName}`);
 
   const config = hookSystem.getConfiguration();
   if (config?.hooks[hookName]) {
     config.hooks[hookName].enabled = true;
     await hookSystem.updateConfiguration(config);
-    console.log(chalk.green(`✅ Hook '${hookName}' enabled`));
+    logger.info(`✅ Hook '${hookName}' enabled`);
 
     // Auto-commit the configuration change
     try {
@@ -217,17 +227,13 @@ async function enableHook(
         const commitHash = await git.commit(`feat(hooks): enable ${hookName}`, [
           '.civic/hooks.yml',
         ]);
-        console.log(chalk.green(`💾 Configuration committed: ${commitHash}`));
+        logger.info(`💾 Configuration committed: ${commitHash}`);
       }
     } catch (error) {
-      console.warn(
-        chalk.yellow('⚠️  Failed to auto-commit configuration change')
-      );
+      logger.warn('⚠️  Failed to auto-commit configuration change');
     }
   } else {
-    console.error(
-      chalk.red(`❌ Hook '${hookName}' not found in configuration`)
-    );
+    logger.error(`❌ Hook '${hookName}' not found in configuration`);
   }
 }
 
@@ -236,18 +242,19 @@ async function disableHook(
   hookName: string,
   options: any
 ) {
+  const logger = getLogger();
   if (!hookName) {
-    console.error('❌ Hook name required for disabling');
+    logger.error('❌ Hook name required for disabling');
     return;
   }
 
-  console.log(chalk.blue(`❌ Disabling hook: ${hookName}`));
+  logger.info(`❌ Disabling hook: ${hookName}`);
 
   const config = hookSystem.getConfiguration();
   if (config?.hooks[hookName]) {
     config.hooks[hookName].enabled = false;
     await hookSystem.updateConfiguration(config);
-    console.log(chalk.green(`✅ Hook '${hookName}' disabled`));
+    logger.info(`✅ Hook '${hookName}' disabled`);
 
     // Auto-commit the configuration change
     try {
@@ -260,21 +267,18 @@ async function disableHook(
           `feat(hooks): disable ${hookName}`,
           ['.civic/hooks.yml']
         );
-        console.log(chalk.green(`💾 Configuration committed: ${commitHash}`));
+        logger.info(`💾 Configuration committed: ${commitHash}`);
       }
     } catch (error) {
-      console.warn(
-        chalk.yellow('⚠️  Failed to auto-commit configuration change')
-      );
+      logger.warn('⚠️  Failed to auto-commit configuration change');
     }
   } else {
-    console.error(
-      chalk.red(`❌ Hook '${hookName}' not found in configuration`)
-    );
+    logger.error(`❌ Hook '${hookName}' not found in configuration`);
   }
 }
 
 async function listWorkflows(hookSystem: HookSystem, options: any) {
+  const logger = getLogger();
   const config = hookSystem.getConfiguration();
   const workflows = new Set<string>();
 
@@ -286,37 +290,34 @@ async function listWorkflows(hookSystem: HookSystem, options: any) {
   }
 
   if (options.format === 'json') {
-    console.log(JSON.stringify(Array.from(workflows), null, 2));
+    logger.info(JSON.stringify(Array.from(workflows), null, 2));
     return;
   }
 
-  console.log(chalk.blue('⚙️  Available Workflows'));
-  console.log(chalk.gray('─'.repeat(50)));
+  logger.info('⚙️  Available Workflows');
+  logger.info('─'.repeat(50));
 
   if (workflows.size === 0) {
-    console.log(chalk.yellow('⚠️  No workflows configured'));
+    logger.warn('⚠️  No workflows configured');
     return;
   }
 
   for (const workflow of Array.from(workflows).sort()) {
-    console.log(`  📋 ${chalk.white(workflow)}`);
+    logger.info(`  📋 ${workflow}`);
   }
 
-  console.log(
-    chalk.gray(
-      '\n💡 Workflows are executed automatically when their associated hooks are triggered.'
-    )
+  logger.info(
+    '\n💡 Workflows are executed automatically when their associated hooks are triggered.'
   );
-  console.log(
-    chalk.gray('   To add custom workflows, create files in .civic/workflows/')
-  );
+  logger.info('   To add custom workflows, create files in .civic/workflows/');
 }
 
 async function showLogs(dataDir: string, options: any) {
+  const logger = getLogger();
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 
   if (!existsSync(logPath)) {
-    console.log(chalk.yellow('⚠️  No hook logs found'));
+    logger.warn('⚠️  No hook logs found');
     return;
   }
 
@@ -328,7 +329,7 @@ async function showLogs(dataDir: string, options: any) {
       .filter((line) => line.trim());
 
     if (options.format === 'json') {
-      console.log(
+      logger.info(
         JSON.stringify(
           lines.map((line) => JSON.parse(line)),
           null,
@@ -338,11 +339,11 @@ async function showLogs(dataDir: string, options: any) {
       return;
     }
 
-    console.log(chalk.blue('📋 Hook Execution Logs'));
-    console.log(chalk.gray('─'.repeat(50)));
+    logger.info('📋 Hook Execution Logs');
+    logger.info('─'.repeat(50));
 
     if (lines.length === 0) {
-      console.log(chalk.yellow('⚠️  No log entries found'));
+      logger.warn('⚠️  No log entries found');
       return;
     }
 
@@ -359,46 +360,33 @@ async function showLogs(dataDir: string, options: any) {
               ? '⚙️'
               : '❌';
 
-        console.log(
-          `${type} ${chalk.gray(timestamp)} ${chalk.white(entry.name)}`
-        );
+        logger.info(`${type} ${timestamp} ${entry.name}`);
         if (entry.type === 'error') {
-          console.log(`    ${chalk.red(entry.data.error)}`);
+          logger.error(`    ${entry.data.error}`);
         }
       } catch (error) {
-        console.log(chalk.gray(`  Invalid log entry: ${line}`));
+        logger.warn(`  Invalid log entry: ${line}`);
       }
     }
 
     if (lines.length > 10) {
-      console.log(chalk.gray(`\n... and ${lines.length - 10} more entries`));
+      logger.info(`\n... and ${lines.length - 10} more entries`);
     }
   } catch (error) {
-    console.error(chalk.red('❌ Failed to read logs:'), error);
+    logger.error('❌ Failed to read logs:', error);
   }
 }
 
 function showHelp() {
-  console.log(chalk.blue('🪝 CivicPress Hook Management'));
-  console.log(chalk.gray('─'.repeat(50)));
-  console.log(
-    chalk.gray('  civic hook list                    # List all hooks')
-  );
-  console.log(
-    chalk.gray('  civic hook config                  # Show configuration')
-  );
-  console.log(chalk.gray('  civic hook test <hook>             # Test a hook'));
-  console.log(
-    chalk.gray('  civic hook enable <hook>           # Enable a hook')
-  );
-  console.log(
-    chalk.gray('  civic hook disable <hook>          # Disable a hook')
-  );
-  console.log(
-    chalk.gray('  civic hook workflows               # List workflows')
-  );
-  console.log(
-    chalk.gray('  civic hook logs                    # Show execution logs')
-  );
-  console.log(chalk.gray('  civic hook --format json           # JSON output'));
+  const logger = getLogger();
+  logger.info('🪝 CivicPress Hook Management');
+  logger.info('─'.repeat(50));
+  logger.info('  civic hook list                    # List all hooks');
+  logger.info('  civic hook config                  # Show configuration');
+  logger.info('  civic hook test <hook>             # Test a hook');
+  logger.info('  civic hook enable <hook>           # Enable a hook');
+  logger.info('  civic hook disable <hook>          # Disable a hook');
+  logger.info('  civic hook workflows               # List workflows');
+  logger.info('  civic hook logs                    # Show execution logs');
+  logger.info('  civic hook --format json           # JSON output');
 }

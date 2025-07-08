@@ -1,10 +1,14 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
 import * as yaml from 'yaml';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const initCommand = (cli: CAC) => {
   cli
@@ -15,12 +19,17 @@ export const initCommand = (cli: CAC) => {
     )
     .action(async (options: any) => {
       try {
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
         // If --help is present, let CAC handle it and exit 0
         if (options.help) {
           process.stdout.write('', () => process.exit(0));
         }
 
-        console.log(chalk.blue('🚀 Initializing CivicPress repository...'));
+        logger.info('🚀 Initializing CivicPress repository...');
 
         let config: any;
         let dataDir = 'data';
@@ -38,7 +47,7 @@ export const initCommand = (cli: CAC) => {
 
           const configContent = fs.readFileSync(configPath, 'utf8');
           config = yaml.parse(configContent);
-          console.log(chalk.blue(`📁 Using config from: ${configPath}`));
+          logger.info(`📁 Using config from: ${configPath}`);
 
           // Use data directory from config if specified, otherwise default
           dataDir = config.dataDir || 'data';
@@ -63,12 +72,12 @@ export const initCommand = (cli: CAC) => {
         }
 
         const fullDataDir = path.resolve(dataDir);
-        console.log(chalk.blue(`📁 Using data directory: ${fullDataDir}`));
+        logger.info(`📁 Using data directory: ${fullDataDir}`);
 
         // Create data directory if it doesn't exist
         if (!fs.existsSync(fullDataDir)) {
           fs.mkdirSync(fullDataDir, { recursive: true });
-          console.log(chalk.green('📁 Created data directory'));
+          logger.success('📁 Created data directory');
         }
 
         // Check if Git repo exists in data directory
@@ -94,7 +103,7 @@ export const initCommand = (cli: CAC) => {
             const { GitEngine } = await import('@civicpress/core');
             const git = new GitEngine(fullDataDir);
             await git.init();
-            console.log(chalk.green('📦 Initialized Git repository'));
+            logger.success('📦 Initialized Git repository');
           }
         }
 
@@ -102,7 +111,7 @@ export const initCommand = (cli: CAC) => {
         const civicDir = path.join(fullDataDir, '.civic');
         if (!fs.existsSync(civicDir)) {
           fs.mkdirSync(civicDir, { recursive: true });
-          console.log(chalk.green('📁 Created .civic directory'));
+          logger.success('📁 Created .civic directory');
         }
 
         // Check if config already exists
@@ -120,7 +129,7 @@ export const initCommand = (cli: CAC) => {
           ]);
 
           if (!overwrite) {
-            console.log(chalk.yellow('⏭️  Skipping configuration setup'));
+            logger.warn('⏭️  Skipping configuration setup');
           } else {
             await setupConfiguration(configPath);
           }
@@ -135,37 +144,26 @@ export const initCommand = (cli: CAC) => {
 
         // Initialize CivicPress core with data directory
         const civic = new CivicPress({ repoPath: fullDataDir });
-        console.log(chalk.green('🔧 Initialized CivicPress core'));
+        logger.success('🔧 Initialized CivicPress core');
 
-        console.log(
-          chalk.green('✅ CivicPress repository initialized successfully!')
+        logger.success('✅ CivicPress repository initialized successfully!');
+        logger.info('📖 Next steps:');
+        logger.info(`   cd ${dataDir}`);
+        logger.info(
+          '   civic create <type> <title> - Create a new civic record'
         );
-        console.log(chalk.blue('📖 Next steps:'));
-        console.log(chalk.blue(`   cd ${dataDir}`));
-        console.log(
-          chalk.blue(
-            '   civic create <type> <title> - Create a new civic record'
-          )
-        );
-        console.log(
-          chalk.blue('   civic commit -m "message" -r <role> - Commit changes')
-        );
-        console.log(chalk.blue('   civic history - View record history'));
-        console.log(chalk.blue(''));
-        console.log(
-          chalk.yellow(
-            "💡 Don't forget to commit your config and records to version control!"
-          )
+        logger.info('   civic commit -m "message" -r <role> - Commit changes');
+        logger.info('   civic history - View record history');
+        logger.info('');
+        logger.warn(
+          "💡 Don't forget to commit your config and records to version control!"
         );
         // Explicitly flush stdout before exit (for test environments)
         process.stdout.write('', () => process.exit(0));
       } catch (error) {
-        process.stderr.write(
-          chalk.red('❌ Failed to initialize repository: ') +
-            String(error) +
-            '\n',
-          () => process.exit(1)
-        );
+        const logger = getLogger();
+        logger.error('❌ Failed to initialize repository:', error);
+        process.exit(1);
       }
     });
 };
@@ -174,9 +172,8 @@ async function setupConfigurationFromFile(
   configPath: string,
   config: any
 ): Promise<void> {
-  console.log(
-    chalk.blue('⚙️  Setting up CivicPress configuration from file...')
-  );
+  const logger = getLogger();
+  logger.info('⚙️  Setting up CivicPress configuration from file...');
 
   // Ensure required fields are present
   const requiredFields = ['name', 'city', 'state', 'country', 'timezone'];
@@ -213,11 +210,12 @@ async function setupConfigurationFromFile(
   // Write configuration file
   const yamlContent = yaml.stringify(finalConfig);
   fs.writeFileSync(configPath, yamlContent);
-  console.log(chalk.green('⚙️  Configuration saved to .civic/config.yml'));
+  logger.success('⚙️  Configuration saved to .civic/config.yml');
 }
 
 async function setupConfiguration(configPath: string): Promise<void> {
-  console.log(chalk.blue('⚙️  Setting up CivicPress configuration...'));
+  const logger = getLogger();
+  logger.info('⚙️  Setting up CivicPress configuration...');
 
   const answers = await inquirer.prompt([
     {
@@ -346,5 +344,5 @@ async function setupConfiguration(configPath: string): Promise<void> {
   // Write configuration file
   const yamlContent = yaml.stringify(config);
   fs.writeFileSync(configPath, yamlContent);
-  console.log(chalk.green('⚙️  Configuration saved to .civic/config.yml'));
+  logger.success('⚙️  Configuration saved to .civic/config.yml');
 }

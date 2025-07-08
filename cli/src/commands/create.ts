@@ -1,9 +1,13 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const createCommand = (cli: CAC) => {
   cli
@@ -15,13 +19,18 @@ export const createCommand = (cli: CAC) => {
     )
     .action(async (type: string, title: string, options: any) => {
       try {
-        console.log(chalk.blue(`📝 Creating ${type}: ${title}`));
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
+        logger.info(`📝 Creating ${type}: ${title}`);
 
         // Validate record type
         const validTypes = ['bylaw', 'policy', 'proposal', 'resolution'];
         if (!validTypes.includes(type)) {
-          console.error(chalk.red(`❌ Invalid record type: ${type}`));
-          console.log(chalk.blue('Valid types:'), validTypes.join(', '));
+          logger.error(`❌ Invalid record type: ${type}`);
+          logger.info('Valid types: ' + validTypes.join(', '));
           process.exit(1);
         }
 
@@ -88,20 +97,20 @@ export const createCommand = (cli: CAC) => {
           : [];
 
         if (isCompleteDryRun) {
-          console.log(chalk.yellow(`📋 Would create: ${filePath}`));
-          console.log(chalk.yellow(`📋 Would write content: ${title}`));
+          logger.warn(`📋 Would create: ${filePath}`);
+          logger.warn(`📋 Would write content: ${title}`);
         } else {
           // Write the file
           fs.writeFileSync(filePath, fullContent);
-          console.log(chalk.green(`📄 Created record: ${filePath}`));
+          logger.success(`📄 Created record: ${filePath}`);
         }
 
         // Emit record created hook
         const hooks = civic.getHookSystem();
 
         if (isCompleteDryRun || dryRunHooks.includes('record:created')) {
-          console.log(chalk.yellow(`📋 Would fire hook: record:created`));
-          console.log(chalk.gray(`   Record: ${title} (${type})`));
+          logger.warn(`📋 Would fire hook: record:created`);
+          logger.debug(`   Record: ${title} (${type})`);
         } else {
           await hooks.emit('record:created', {
             record: {
@@ -116,24 +125,22 @@ export const createCommand = (cli: CAC) => {
 
         // Stage in Git
         if (isCompleteDryRun) {
-          console.log(
-            chalk.yellow(
-              `📋 Would commit: "feat(record): create ${type} "${title}""`
-            )
+          logger.warn(
+            `📋 Would commit: "feat(record): create ${type} "${title}""`
           );
-          console.log(chalk.yellow(`📋 Would stage: ${filePath}`));
+          logger.warn(`📋 Would stage: ${filePath}`);
         } else {
           const git = new (await import('@civicpress/core')).GitEngine(dataDir);
           await git.commit(`feat(record): create ${type} "${title}"`, [
             filePath,
           ]);
-          console.log(chalk.green(`💾 Committed to Git`));
+          logger.success(`💾 Committed to Git`);
         }
 
         // Emit record committed hook
         if (isCompleteDryRun || dryRunHooks.includes('record:committed')) {
-          console.log(chalk.yellow(`📋 Would fire hook: record:committed`));
-          console.log(chalk.gray(`   Record: ${title} (${type})`));
+          logger.warn(`📋 Would fire hook: record:committed`);
+          logger.debug(`   Record: ${title} (${type})`);
         } else {
           await hooks.emit('record:committed', {
             record: {
@@ -146,10 +153,11 @@ export const createCommand = (cli: CAC) => {
           });
         }
 
-        console.log(chalk.green(`✅ Created ${type}: ${title}`));
-        console.log(chalk.blue(`📁 Location: ${filePath}`));
+        logger.success(`✅ Created ${type}: ${title}`);
+        logger.info(`📁 Location: ${filePath}`);
       } catch (error) {
-        console.error(chalk.red('❌ Failed to create record:'), error);
+        const logger = getLogger();
+        logger.error('❌ Failed to create record:', error);
         process.exit(1);
       }
     });

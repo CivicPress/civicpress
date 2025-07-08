@@ -94,6 +94,49 @@ it('should create a new resolution record (manual test)', async () => {
 - **Failing**: 0
 - **Test Files**: 16
 
+## 🔇 Silent Mode Implementation
+
+### Features
+
+- **`--silent`**: Suppresses all output (except errors)
+- **`--quiet`**: Shows only errors and warnings
+- **`--verbose`**: Shows debug messages and detailed output
+- **`--json`**: Outputs structured JSON format
+- **`--no-color`**: Disables colored output
+
+### Implementation
+
+- Centralized logging system in `core/src/utils/logger.ts`
+- Global CLI options available on all commands
+- Automatic logger initialization based on global options
+- Backward compatible with existing console.log usage
+
+### Updated Commands
+
+The following commands have been updated to use the new logging system:
+
+- ✅ `init` - Repository initialization
+- ✅ `create` - Record creation with dry-run support
+- ✅ `commit` - Role-based commits with status tracking
+- ✅ `list` - Record listing with filtering
+- ✅ `view` - Record viewing with formatting
+- ✅ `edit` - Record editing with editor integration
+- ✅ `status` - Status changes with validation
+
+### Use Cases
+
+- **Automation**: Non-interactive scripts and CI/CD pipelines
+- **Integration**: Better integration with other tools and workflows
+- **Debugging**: Focus on actual functionality without noise
+- **Testing**: Cleaner test output and easier assertions
+
+### Testing Status
+
+- **All tests passing**: 88 tests passing, 8 skipped, 0 failing
+- **Silent mode verified**: Commands work correctly with `--silent`, `--quiet`,
+  `--verbose` flags
+- **Backward compatibility**: Existing functionality preserved
+
 ### Test Categories
 
 1. **Core CLI Commands**: create, commit, edit, history, list, view

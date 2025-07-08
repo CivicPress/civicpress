@@ -1,9 +1,13 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const viewCommand = (cli: CAC) => {
   cli
@@ -11,7 +15,12 @@ export const viewCommand = (cli: CAC) => {
     .option('-r, --raw', 'Show raw markdown content')
     .action(async (recordName: string, options: any) => {
       try {
-        console.log(chalk.blue(`📖 Viewing record: ${recordName}`));
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
+        logger.info(`📖 Viewing record: ${recordName}`);
 
         // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
@@ -24,10 +33,8 @@ export const viewCommand = (cli: CAC) => {
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          console.log(
-            chalk.yellow(
-              '📁 No records directory found. Create some records first!'
-            )
+          logger.warn(
+            '📁 No records directory found. Create some records first!'
           );
           return;
         }
@@ -61,8 +68,8 @@ export const viewCommand = (cli: CAC) => {
         }
 
         if (!recordPath) {
-          console.log(chalk.red(`❌ Record "${recordName}" not found.`));
-          console.log(chalk.blue('Available records:'));
+          logger.error(`❌ Record "${recordName}" not found.`);
+          logger.info('Available records:');
 
           // List available records
           for (const type of recordTypes) {
@@ -73,9 +80,9 @@ export const viewCommand = (cli: CAC) => {
               .map((file) => path.basename(file, '.md'));
 
             if (files.length > 0) {
-              console.log(chalk.cyan(`  ${type}:`));
+              logger.info(`  ${type}:`);
               for (const file of files) {
-                console.log(chalk.gray(`    ${file}`));
+                logger.debug(`    ${file}`);
               }
             }
           }
@@ -87,17 +94,15 @@ export const viewCommand = (cli: CAC) => {
         const { data: frontmatter, content: markdownContent } = matter(content);
 
         // Display record information
-        console.log(chalk.cyan('\n' + '='.repeat(60)));
-        console.log(
-          chalk.white.bold(
-            `📄 ${frontmatter.title || path.basename(recordPath, '.md')}`
-          )
+        logger.info('\n' + '='.repeat(60));
+        logger.info(
+          `📄 ${frontmatter.title || path.basename(recordPath, '.md')}`
         );
-        console.log(chalk.cyan('='.repeat(60)));
+        logger.info('='.repeat(60));
 
         // Metadata section
-        console.log(chalk.blue('\n📋 Metadata:'));
-        console.log(chalk.gray('─'.repeat(40)));
+        logger.info('\n📋 Metadata:');
+        logger.debug('─'.repeat(40));
 
         const statusColors: Record<string, any> = {
           draft: chalk.yellow,
@@ -108,61 +113,50 @@ export const viewCommand = (cli: CAC) => {
         };
         const statusColor = statusColors[frontmatter.status] || chalk.white;
 
-        console.log(chalk.white(`  Type: ${chalk.cyan(recordType)}`));
-        console.log(
-          chalk.white(`  Status: ${statusColor(frontmatter.status || 'draft')}`)
+        logger.info(`  Type: ${recordType}`);
+        logger.info(`  Status: ${statusColor(frontmatter.status || 'draft')}`);
+        logger.info(
+          `  Created: ${frontmatter.created ? new Date(frontmatter.created).toLocaleString() : 'unknown'}`
         );
-        console.log(
-          chalk.white(
-            `  Created: ${frontmatter.created ? new Date(frontmatter.created).toLocaleString() : 'unknown'}`
-          )
+        logger.info(
+          `  Updated: ${frontmatter.updated ? new Date(frontmatter.updated).toLocaleString() : 'unknown'}`
         );
-        console.log(
-          chalk.white(
-            `  Updated: ${frontmatter.updated ? new Date(frontmatter.updated).toLocaleString() : 'unknown'}`
-          )
-        );
-        console.log(
-          chalk.white(`  Author: ${frontmatter.author || 'unknown'}`)
-        );
-        console.log(
-          chalk.white(`  Version: ${frontmatter.version || '1.0.0'}`)
-        );
-        console.log(
-          chalk.white(`  File: ${path.relative(dataDir, recordPath)}`)
-        );
+        logger.info(`  Author: ${frontmatter.author || 'unknown'}`);
+        logger.info(`  Version: ${frontmatter.version || '1.0.0'}`);
+        logger.info(`  File: ${path.relative(dataDir, recordPath)}`);
 
         // Content section
-        console.log(chalk.blue('\n📝 Content:'));
-        console.log(chalk.gray('─'.repeat(40)));
+        logger.info('\n📝 Content:');
+        logger.debug('─'.repeat(40));
 
         if (options.raw) {
           // Show raw markdown
-          console.log(chalk.gray(markdownContent));
+          logger.output(markdownContent);
         } else {
           // Show formatted content (basic markdown rendering)
           const lines = markdownContent.split('\n');
           for (const line of lines) {
             if (line.startsWith('# ')) {
-              console.log(chalk.white.bold(line.substring(2)));
+              logger.output(line.substring(2));
             } else if (line.startsWith('## ')) {
-              console.log(chalk.cyan.bold(line.substring(3)));
+              logger.output(line.substring(3));
             } else if (line.startsWith('### ')) {
-              console.log(chalk.blue.bold(line.substring(4)));
+              logger.output(line.substring(4));
             } else if (line.startsWith('- ') || line.startsWith('* ')) {
-              console.log(chalk.gray(`  ${line}`));
+              logger.output(`  ${line}`);
             } else if (line.trim() === '') {
-              console.log('');
+              logger.output('');
             } else {
-              console.log(chalk.white(line));
+              logger.output(line);
             }
           }
         }
 
-        console.log(chalk.cyan('\n' + '='.repeat(60)));
-        console.log(chalk.green('✅ Record displayed successfully!'));
+        logger.info('\n' + '='.repeat(60));
+        logger.success('✅ Record displayed successfully!');
       } catch (error) {
-        console.error(chalk.red('❌ Failed to view record:'), error);
+        const logger = getLogger();
+        logger.error('❌ Failed to view record:', error);
         process.exit(1);
       }
     });

@@ -1,8 +1,12 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const commitCommand = (cli: CAC) => {
   cli
@@ -12,13 +16,16 @@ export const commitCommand = (cli: CAC) => {
     .option('-a, --all', 'Commit all changes (not just specific files)')
     .action(async (recordName: string, options: any) => {
       try {
-        console.log(chalk.blue('💾 Committing civic records...'));
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
+        logger.info('💾 Committing civic records...');
 
         // Validate required options
         if (!options.message) {
-          console.error(
-            chalk.red('❌ Commit message is required. Use -m or --message')
-          );
+          logger.error('❌ Commit message is required. Use -m or --message');
           process.exit(1);
         }
 
@@ -37,7 +44,7 @@ export const commitCommand = (cli: CAC) => {
         // Set role if provided
         if (options.role) {
           git.setRole(options.role);
-          console.log(chalk.blue(`👤 Using role: ${options.role}`));
+          logger.info(`👤 Using role: ${options.role}`);
         }
 
         // Determine which files to commit
@@ -81,8 +88,8 @@ export const commitCommand = (cli: CAC) => {
           }
 
           if (!recordPath) {
-            console.log(chalk.red(`❌ Record "${recordName}" not found.`));
-            console.log(chalk.blue('Available records:'));
+            logger.error(`❌ Record "${recordName}" not found.`);
+            logger.info('Available records:');
 
             // List available records
             for (const type of recordTypes) {
@@ -93,9 +100,9 @@ export const commitCommand = (cli: CAC) => {
                 .map((file) => path.basename(file, '.md'));
 
               if (files.length > 0) {
-                console.log(chalk.cyan(`  ${type}:`));
+                logger.info(`  ${type}:`);
                 for (const file of files) {
-                  console.log(chalk.gray(`    ${file}`));
+                  logger.debug(`    ${file}`);
                 }
               }
             }
@@ -115,11 +122,7 @@ export const commitCommand = (cli: CAC) => {
           if (allChangedFiles.includes(relativeRecordPath)) {
             filesToCommit = [relativeRecordPath];
           } else {
-            console.log(
-              chalk.yellow(
-                `⚠️  Record "${recordName}" has no changes to commit.`
-              )
-            );
+            logger.warn(`⚠️  Record "${recordName}" has no changes to commit.`);
             return;
           }
         } else {
@@ -134,10 +137,8 @@ export const commitCommand = (cli: CAC) => {
         }
 
         if (filesToCommit.length === 0) {
-          console.log(
-            chalk.yellow(
-              '⚠️  No files to commit. All changes are already committed.'
-            )
+          logger.warn(
+            '⚠️  No files to commit. All changes are already committed.'
           );
           return;
         }
@@ -145,20 +146,20 @@ export const commitCommand = (cli: CAC) => {
         let commitHash: string;
 
         if (options.all) {
-          console.log(chalk.blue('📁 Committing all changes...'));
+          logger.info('📁 Committing all changes...');
           commitHash = await git.commit(options.message);
         } else {
-          console.log(chalk.blue('📁 Files to commit:'));
+          logger.info('📁 Files to commit:');
           filesToCommit.forEach((file) => {
-            console.log(chalk.gray(`  ${file}`));
+            logger.debug(`  ${file}`);
           });
 
           // Create role-based commit with specific files
           commitHash = await git.commit(options.message, filesToCommit);
         }
 
-        console.log(chalk.green(`✅ Committed successfully!`));
-        console.log(chalk.blue(`🔗 Commit hash: ${commitHash}`));
+        logger.success(`✅ Committed successfully!`);
+        logger.info(`🔗 Commit hash: ${commitHash}`);
 
         // Emit hook for audit trail
         const hooks = civic.getHookSystem();
@@ -169,7 +170,8 @@ export const commitCommand = (cli: CAC) => {
           timestamp: new Date().toISOString(),
         });
       } catch (error) {
-        console.error(chalk.red('❌ Failed to commit records:'), error);
+        const logger = getLogger();
+        logger.error('❌ Failed to commit records:', error);
         process.exit(1);
       }
     });

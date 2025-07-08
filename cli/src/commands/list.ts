@@ -1,9 +1,13 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const listCommand = (cli: CAC) => {
   cli
@@ -15,7 +19,12 @@ export const listCommand = (cli: CAC) => {
     .option('-a, --all', 'Show all details')
     .action(async (type: string, options: any) => {
       try {
-        console.log(chalk.blue('📋 Listing civic records...'));
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
+        logger.info('📋 Listing civic records...');
 
         // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
@@ -28,10 +37,8 @@ export const listCommand = (cli: CAC) => {
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          console.log(
-            chalk.yellow(
-              '📁 No records directory found. Create some records first!'
-            )
+          logger.warn(
+            '📁 No records directory found. Create some records first!'
           );
           return;
         }
@@ -43,9 +50,7 @@ export const listCommand = (cli: CAC) => {
           .map((dirent) => dirent.name);
 
         if (recordTypes.length === 0) {
-          console.log(
-            chalk.yellow('📁 No record types found. Create some records first!')
-          );
+          logger.warn('📁 No record types found. Create some records first!');
           return;
         }
 
@@ -71,12 +76,10 @@ export const listCommand = (cli: CAC) => {
             continue;
           }
 
-          console.log(
-            chalk.cyan(
-              `\n📁 ${recordType.toUpperCase()} (${files.length} records):`
-            )
+          logger.info(
+            `\n📁 ${recordType.toUpperCase()} (${files.length} records):`
           );
-          console.log(chalk.gray('─'.repeat(50)));
+          logger.debug('─'.repeat(50));
 
           for (const filePath of files) {
             try {
@@ -117,35 +120,31 @@ export const listCommand = (cli: CAC) => {
               };
               const statusColor = statusColors[status] || chalk.white;
 
-              console.log(chalk.white(`  📄 ${title}`));
-              console.log(chalk.gray(`     Status: ${statusColor(status)}`));
+              logger.info(`  📄 ${title}`);
+              logger.debug(`     Status: ${statusColor(status)}`);
 
               if (options.all) {
-                console.log(chalk.gray(`     Created: ${created}`));
-                console.log(chalk.gray(`     Updated: ${updated}`));
-                console.log(chalk.gray(`     Author: ${author}`));
-                console.log(
-                  chalk.gray(`     File: ${path.relative(dataDir, filePath)}`)
-                );
+                logger.debug(`     Created: ${created}`);
+                logger.debug(`     Updated: ${updated}`);
+                logger.debug(`     Author: ${author}`);
+                logger.debug(`     File: ${path.relative(dataDir, filePath)}`);
               }
 
-              console.log('');
+              logger.debug('');
             } catch (error) {
-              console.log(
-                chalk.red(
-                  `  ❌ Error reading ${path.basename(filePath)}: ${error}`
-                )
+              logger.error(
+                `  ❌ Error reading ${path.basename(filePath)}: ${error}`
               );
             }
           }
         }
 
         // Summary
-        console.log(chalk.blue(`\n📊 Summary:`));
-        console.log(chalk.white(`  Total records: ${totalRecords}`));
+        logger.info(`\n📊 Summary:`);
+        logger.info(`  Total records: ${totalRecords}`);
 
         if (Object.keys(statusCounts).length > 0) {
-          console.log(chalk.white(`  By status:`));
+          logger.info(`  By status:`);
           for (const [status, count] of Object.entries(statusCounts)) {
             const statusColor =
               {
@@ -156,13 +155,14 @@ export const listCommand = (cli: CAC) => {
                 archived: chalk.gray,
               }[status] || chalk.white;
 
-            console.log(chalk.gray(`    ${statusColor(status)}: ${count}`));
+            logger.debug(`    ${statusColor(status)}: ${count}`);
           }
         }
 
-        console.log(chalk.green('\n✅ Records listed successfully!'));
+        logger.success('\n✅ Records listed successfully!');
       } catch (error) {
-        console.error(chalk.red('❌ Failed to list records:'), error);
+        const logger = getLogger();
+        logger.error('❌ Failed to list records:', error);
         process.exit(1);
       }
     });

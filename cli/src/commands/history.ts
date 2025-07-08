@@ -1,6 +1,10 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const historyCommand = (cli: CAC) => {
   cli
@@ -11,13 +15,10 @@ export const historyCommand = (cli: CAC) => {
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (record: string, options: any) => {
       try {
-        // Quick fix: Suppress console output for JSON format
-        // TODO: Implement proper silent mode in CivicPress core and hook system
-        let originalConsoleLog: typeof console.log | undefined;
-        if (options.format === 'json') {
-          originalConsoleLog = console.log;
-          console.log = () => {}; // Suppress all console.log output
-        }
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
 
         // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
@@ -36,27 +37,19 @@ export const historyCommand = (cli: CAC) => {
         const history = await git.getHistory(limit);
 
         if (options.format === 'json') {
-          if (originalConsoleLog) {
-            console.log = originalConsoleLog; // Restore console.log
-          }
-          console.log(JSON.stringify(history, null, 2));
+          logger.output(JSON.stringify(history, null, 2));
           return;
         }
 
-        // Restore console.log if it was overridden
-        if (originalConsoleLog) {
-          console.log = originalConsoleLog;
-        }
-
-        console.log(chalk.blue('📜 Viewing civic record history...'));
+        logger.info('📜 Viewing civic record history...');
 
         if (history.length === 0) {
-          console.log(chalk.yellow('📜 No commits found'));
+          logger.warn('📜 No commits found');
           return;
         }
 
-        console.log(chalk.blue(`📜 Showing last ${history.length} commits:`));
-        console.log('');
+        logger.info(`📜 Showing last ${history.length} commits:`);
+        logger.debug('');
 
         // Display commit history
         for (const commit of history) {
@@ -65,16 +58,17 @@ export const historyCommand = (cli: CAC) => {
           const role =
             commit.message.match(/feat\(([^)]+)\):/)?.[1] || 'unknown';
 
-          console.log(chalk.cyan(`🔗 ${commit.hash.substring(0, 8)}`));
-          console.log(chalk.gray(`   📅 ${date} ${time}`));
-          console.log(chalk.gray(`   👤 ${role}`));
-          console.log(chalk.white(`   💬 ${commit.message}`));
-          console.log('');
+          logger.info(`🔗 ${commit.hash.substring(0, 8)}`);
+          logger.debug(`   📅 ${date} ${time}`);
+          logger.debug(`   👤 ${role}`);
+          logger.output(`   💬 ${commit.message}`);
+          logger.debug('');
         }
 
-        console.log(chalk.green('✅ History displayed successfully!'));
+        logger.success('✅ History displayed successfully!');
       } catch (error) {
-        console.error(chalk.red('❌ Failed to view history:'), error);
+        const logger = getLogger();
+        logger.error('❌ Failed to view history:', error);
         process.exit(1);
       }
     });

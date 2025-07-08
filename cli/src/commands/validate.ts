@@ -1,12 +1,16 @@
 import { CAC } from 'cac';
 import { readFile, readdir } from 'fs/promises';
 import { join, extname } from 'path';
-import { loadConfig } from '@civicpress/core';
+import { loadConfig, getLogger } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import matter from 'gray-matter';
 import { glob } from 'glob';
 import * as yaml from 'yaml';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 interface ValidationResult {
   record: string;
@@ -57,9 +61,14 @@ export function registerValidateCommand(cli: CAC) {
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (record: string, options: any) => {
       try {
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
         const config = await loadConfig();
         if (!config) {
-          console.error(
+          logger.error(
             '❌ No CivicPress configuration found. Run "civic init" first.'
           );
           process.exit(1);
@@ -76,33 +85,24 @@ export function registerValidateCommand(cli: CAC) {
         } else if (record) {
           await validateSingleRecord(config.dataDir, record, validateOptions);
         } else {
-          console.log(chalk.blue('📋 Validation Commands:'));
-          console.log(
-            chalk.gray(
-              '  civic validate <record>              # Validate a single record'
-            )
+          logger.info('📋 Validation Commands:');
+          logger.info(
+            '  civic validate <record>              # Validate a single record'
           );
-          console.log(
-            chalk.gray(
-              '  civic validate --all                 # Validate all records'
-            )
+          logger.info(
+            '  civic validate --all                 # Validate all records'
           );
-          console.log(
-            chalk.gray(
-              '  civic validate --all --fix           # Auto-fix validation issues'
-            )
+          logger.info(
+            '  civic validate --all --fix           # Auto-fix validation issues'
           );
-          console.log(
-            chalk.gray(
-              '  civic validate --all --strict        # Treat warnings as errors'
-            )
+          logger.info(
+            '  civic validate --all --strict        # Treat warnings as errors'
           );
-          console.log(
-            chalk.gray('  civic validate --all --format json   # JSON output')
-          );
+          logger.info('  civic validate --all --format json   # JSON output');
         }
       } catch (error) {
-        console.error('❌ Validation failed:', error);
+        const logger = getLogger();
+        logger.error('❌ Validation failed:', error);
         process.exit(1);
       }
     });
@@ -113,16 +113,16 @@ async function validateAllRecords(dataDir: string, options: any) {
 
   try {
     if (!fs.existsSync(recordsDir)) {
-      console.log('📁 No records directory found.');
+      const logger = getLogger();
+      logger.warn('📁 No records directory found.');
       return;
     }
 
     const recordFiles = await glob('**/*.md', { cwd: recordsDir });
     const results: ValidationResult[] = [];
 
-    console.log(
-      chalk.blue(`🔍 Validating ${recordFiles.length} record(s)...\n`)
-    );
+    const logger = getLogger();
+    logger.info(`🔍 Validating ${recordFiles.length} record(s)...\n`);
 
     for (const file of recordFiles) {
       const result = await validateRecord(dataDir, file, options);
@@ -131,7 +131,8 @@ async function validateAllRecords(dataDir: string, options: any) {
 
     displayValidationResults(results, options);
   } catch (error) {
-    console.error('❌ Error validating records:', error);
+    const logger = getLogger();
+    logger.error('❌ Error validating records:', error);
   }
 }
 
@@ -146,7 +147,8 @@ async function validateSingleRecord(
     const result = await validateRecord(dataDir, fullPath, options);
     displayValidationResults([result], options);
   } catch (error) {
-    console.error(`❌ Error validating ${recordPath}:`, error);
+    const logger = getLogger();
+    logger.error(`❌ Error validating ${recordPath}:`, error);
   }
 }
 
@@ -514,6 +516,7 @@ function extractSectionContent(
 }
 
 function displayValidationResults(results: ValidationResult[], options: any) {
+  const logger = getLogger();
   const totalRecords = results.length;
   const validRecords = results.filter((r) => r.isValid).length;
   const invalidRecords = totalRecords - validRecords;
@@ -522,15 +525,15 @@ function displayValidationResults(results: ValidationResult[], options: any) {
   let totalWarnings = 0;
 
   if (options.format === 'json') {
-    console.log(JSON.stringify(results, null, 2));
+    logger.info(JSON.stringify(results, null, 2));
     return;
   }
 
   // Summary
-  console.log(chalk.blue(`📊 Validation Summary:`));
-  console.log(chalk.white(`  Total records: ${totalRecords}`));
-  console.log(chalk.green(`  Valid records: ${validRecords}`));
-  console.log(chalk.red(`  Invalid records: ${invalidRecords}`));
+  logger.info('📊 Validation Summary:');
+  logger.info(`  Total records: ${totalRecords}`);
+  logger.info(`  Valid records: ${validRecords}`);
+  logger.info(`  Invalid records: ${invalidRecords}`);
 
   // Detailed results
   for (const result of results) {
@@ -539,56 +542,50 @@ function displayValidationResults(results: ValidationResult[], options: any) {
       result.errors.length > 0 ||
       result.warnings.length > 0
     ) {
-      console.log(chalk.cyan(`\n📄 ${result.record}`));
+      logger.info(`\n📄 ${result.record}`);
 
       if (result.isValid) {
-        console.log(chalk.green('  ✅ Valid'));
+        logger.info('  ✅ Valid');
       } else {
-        console.log(chalk.red('  ❌ Invalid'));
+        logger.error('  ❌ Invalid');
       }
 
       // Show errors
       for (const error of result.errors) {
-        console.log(chalk.red(`    ❌ ${error.field}: ${error.message}`));
+        logger.error(`    ❌ ${error.field}: ${error.message}`);
         totalErrors++;
       }
 
       // Show warnings
       for (const warning of result.warnings) {
-        console.log(
-          chalk.yellow(`    ⚠️  ${warning.field}: ${warning.message}`)
-        );
+        logger.warn(`    ⚠️  ${warning.field}: ${warning.message}`);
         if (warning.suggestion) {
-          console.log(chalk.gray(`       💡 ${warning.suggestion}`));
+          logger.info(`       💡 ${warning.suggestion}`);
         }
         totalWarnings++;
       }
 
       // Show suggestions
       for (const suggestion of result.suggestions) {
-        console.log(chalk.blue(`    💡 ${suggestion}`));
+        logger.info(`    💡 ${suggestion}`);
       }
     }
   }
 
   // Final summary
-  console.log(chalk.blue(`\n📊 Final Summary:`));
-  console.log(chalk.white(`  Total errors: ${totalErrors}`));
-  console.log(chalk.white(`  Total warnings: ${totalWarnings}`));
+  logger.info('\n📊 Final Summary:');
+  logger.info(`  Total errors: ${totalErrors}`);
+  logger.info(`  Total warnings: ${totalWarnings}`);
 
   if (totalErrors === 0 && totalWarnings === 0) {
-    console.log(chalk.green('\n🎉 All records are valid!'));
+    logger.info('\n🎉 All records are valid!');
   } else if (totalErrors === 0) {
-    console.log(
-      chalk.yellow(
-        '\n⚠️  All records are valid, but there are warnings to address.'
-      )
+    logger.warn(
+      '\n⚠️  All records are valid, but there are warnings to address.'
     );
   } else {
-    console.log(
-      chalk.red(
-        '\n❌ Some records have validation errors that need to be fixed.'
-      )
+    logger.error(
+      '\n❌ Some records have validation errors that need to be fixed.'
     );
   }
 }

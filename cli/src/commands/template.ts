@@ -1,10 +1,14 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir, readdir } from 'fs/promises';
 import { join, extname } from 'path';
-import { loadConfig } from '@civicpress/core';
+import { loadConfig, getLogger } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as yaml from 'yaml';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 interface Template {
   name: string;
@@ -37,9 +41,14 @@ export function registerTemplateCommand(cli: CAC) {
     .option('--init', 'Initialize default templates')
     .action(async (options: any) => {
       try {
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
         const config = await loadConfig();
         if (!config) {
-          console.error(
+          logger.error(
             '❌ No CivicPress configuration found. Run "civic init" first.'
           );
           process.exit(1);
@@ -56,35 +65,26 @@ export function registerTemplateCommand(cli: CAC) {
         } else if (options.validate) {
           await validateTemplate(config.dataDir, options.validate);
         } else {
-          console.log(chalk.blue('📋 Template Management Commands:'));
-          console.log(
-            chalk.gray(
-              '  civic template --list                    # List all templates'
-            )
+          logger.info('📋 Template Management Commands:');
+          logger.info(
+            '  civic template --list                    # List all templates'
           );
-          console.log(
-            chalk.gray(
-              '  civic template --show <template>         # Show template details'
-            )
+          logger.info(
+            '  civic template --show <template>         # Show template details'
           );
-          console.log(
-            chalk.gray(
-              '  civic template --create <name> --type <type>  # Create new template'
-            )
+          logger.info(
+            '  civic template --create <name> --type <type>  # Create new template'
           );
-          console.log(
-            chalk.gray(
-              '  civic template --validate <template>     # Validate template'
-            )
+          logger.info(
+            '  civic template --validate <template>     # Validate template'
           );
-          console.log(
-            chalk.gray(
-              '  civic template --init                    # Initialize default templates'
-            )
+          logger.info(
+            '  civic template --init                    # Initialize default templates'
           );
         }
       } catch (error) {
-        console.error('❌ Template command failed:', error);
+        const logger = getLogger();
+        logger.error('❌ Template command failed:', error);
         process.exit(1);
       }
     });
@@ -104,14 +104,15 @@ async function initializeDefaultTemplates(dataDir: string) {
       const templatePath = join(templatesDir, `${template.name}.yml`);
       const templateContent = yaml.stringify(template);
       await writeFile(templatePath, templateContent);
-      console.log(chalk.green(`✅ Created template: ${template.name}`));
+      const logger = getLogger();
+      logger.info(`✅ Created template: ${template.name}`);
     }
 
-    console.log(
-      chalk.green('\n🎉 Default templates initialized successfully!')
-    );
+    const logger = getLogger();
+    logger.info('\n🎉 Default templates initialized successfully!');
   } catch (error) {
-    console.error('❌ Error initializing templates:', error);
+    const logger = getLogger();
+    logger.error('❌ Error initializing templates:', error);
   }
 }
 
@@ -378,14 +379,13 @@ function getDefaultTemplates(): Template[] {
 }
 
 async function listTemplates(dataDir: string) {
+  const logger = getLogger();
   const templatesDir = join(dataDir, '.civic', 'templates');
 
   try {
     if (!fs.existsSync(templatesDir)) {
-      console.log(
-        chalk.yellow(
-          '📁 No templates directory found. Run "civic template --init" to create default templates.'
-        )
+      logger.warn(
+        '📁 No templates directory found. Run "civic template --init" to create default templates.'
       );
       return;
     }
@@ -396,15 +396,13 @@ async function listTemplates(dataDir: string) {
     );
 
     if (templateFiles.length === 0) {
-      console.log(
-        chalk.yellow(
-          '📁 No templates found. Run "civic template --init" to create default templates.'
-        )
+      logger.warn(
+        '📁 No templates found. Run "civic template --init" to create default templates.'
       );
       return;
     }
 
-    console.log(chalk.blue('📋 Available Templates:\n'));
+    logger.info('📋 Available Templates:\n');
 
     for (const file of templateFiles) {
       const templateName = file.replace(/\.(yml|yaml)$/, '');
@@ -412,17 +410,18 @@ async function listTemplates(dataDir: string) {
       const templateContent = await readFile(templatePath, 'utf-8');
       const template = yaml.parse(templateContent) as Template;
 
-      console.log(chalk.cyan(`  ${templateName}`));
-      console.log(chalk.gray(`    Type: ${template.type}`));
-      console.log(chalk.gray(`    Description: ${template.description}`));
-      console.log('');
+      logger.info(`  ${templateName}`);
+      logger.info(`    Type: ${template.type}`);
+      logger.info(`    Description: ${template.description}`);
+      logger.info('');
     }
   } catch (error) {
-    console.error('❌ Error listing templates:', error);
+    logger.error('❌ Error listing templates:', error);
   }
 }
 
 async function showTemplate(dataDir: string, templateName: string) {
+  const logger = getLogger();
   const templatePath = join(
     dataDir,
     '.civic',
@@ -432,34 +431,34 @@ async function showTemplate(dataDir: string, templateName: string) {
 
   try {
     if (!fs.existsSync(templatePath)) {
-      console.error(chalk.red(`❌ Template not found: ${templateName}`));
+      logger.error(`❌ Template not found: ${templateName}`);
       return;
     }
 
     const templateContent = await readFile(templatePath, 'utf-8');
     const template = yaml.parse(templateContent) as Template;
 
-    console.log(chalk.blue(`📋 Template: ${template.name}`));
-    console.log(chalk.gray(`Type: ${template.type}`));
-    console.log(chalk.gray(`Description: ${template.description}`));
+    logger.info(`📋 Template: ${template.name}`);
+    logger.info(`Type: ${template.type}`);
+    logger.info(`Description: ${template.description}`);
 
-    console.log(chalk.yellow('\n📋 Metadata:'));
-    console.log(JSON.stringify(template.metadata, null, 2));
+    logger.info('\n📋 Metadata:');
+    logger.info(JSON.stringify(template.metadata, null, 2));
 
-    console.log(chalk.yellow('\n📝 Content Template:'));
-    console.log(template.content);
+    logger.info('\n📝 Content Template:');
+    logger.info(template.content);
 
-    console.log(chalk.yellow('\n✅ Validation Rules:'));
-    console.log(`Required fields: ${template.validation.required.join(', ')}`);
-    console.log(`Optional fields: ${template.validation.optional.join(', ')}`);
+    logger.info('\n✅ Validation Rules:');
+    logger.info(`Required fields: ${template.validation.required.join(', ')}`);
+    logger.info(`Optional fields: ${template.validation.optional.join(', ')}`);
 
     if (template.validation.content?.sections) {
-      console.log(
+      logger.info(
         `Content sections: ${template.validation.content.sections.join(', ')}`
       );
     }
   } catch (error) {
-    console.error('❌ Error showing template:', error);
+    logger.error('❌ Error showing template:', error);
   }
 }
 
@@ -468,6 +467,7 @@ async function createTemplate(
   templateName: string,
   recordType?: string
 ) {
+  const logger = getLogger();
   const templatesDir = join(dataDir, '.civic', 'templates');
   const templatePath = join(templatesDir, `${templateName}.yml`);
 
@@ -476,7 +476,7 @@ async function createTemplate(
     await mkdir(templatesDir, { recursive: true });
 
     if (fs.existsSync(templatePath)) {
-      console.error(chalk.red(`❌ Template already exists: ${templateName}`));
+      logger.error(`❌ Template already exists: ${templateName}`);
       return;
     }
 
@@ -513,16 +513,15 @@ async function createTemplate(
     const templateContent = yaml.stringify(template);
     await writeFile(templatePath, templateContent);
 
-    console.log(chalk.green(`✅ Created template: ${templateName}`));
-    console.log(
-      chalk.gray(`   Edit ${templatePath} to customize the template`)
-    );
+    logger.info(`✅ Created template: ${templateName}`);
+    logger.info(`   Edit ${templatePath} to customize the template`);
   } catch (error) {
-    console.error('❌ Error creating template:', error);
+    logger.error('❌ Error creating template:', error);
   }
 }
 
 async function validateTemplate(dataDir: string, templateName: string) {
+  const logger = getLogger();
   const templatePath = join(
     dataDir,
     '.civic',
@@ -532,14 +531,14 @@ async function validateTemplate(dataDir: string, templateName: string) {
 
   try {
     if (!fs.existsSync(templatePath)) {
-      console.error(chalk.red(`❌ Template not found: ${templateName}`));
+      logger.error(`❌ Template not found: ${templateName}`);
       return;
     }
 
     const templateContent = await readFile(templatePath, 'utf-8');
     const template = yaml.parse(templateContent) as Template;
 
-    console.log(chalk.blue(`🔍 Validating template: ${template.name}`));
+    logger.info(`🔍 Validating template: ${template.name}`);
 
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -579,21 +578,19 @@ async function validateTemplate(dataDir: string, templateName: string) {
 
     // Report results
     if (errors.length === 0 && warnings.length === 0) {
-      console.log(chalk.green('✅ Template is valid!'));
+      logger.info('✅ Template is valid!');
     } else {
       if (errors.length > 0) {
-        console.log(chalk.red('❌ Validation errors:'));
-        errors.forEach((error) => console.log(chalk.red(`  - ${error}`)));
+        logger.error('❌ Validation errors:');
+        errors.forEach((error) => logger.error(`  - ${error}`));
       }
       if (warnings.length > 0) {
-        console.log(chalk.yellow('⚠️  Validation warnings:'));
-        warnings.forEach((warning) =>
-          console.log(chalk.yellow(`  - ${warning}`))
-        );
+        logger.warn('⚠️  Validation warnings:');
+        warnings.forEach((warning) => logger.warn(`  - ${warning}`));
       }
     }
   } catch (error) {
-    console.error('❌ Error validating template:', error);
+    logger.error('❌ Error validating template:', error);
   }
 }
 

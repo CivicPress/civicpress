@@ -2,6 +2,13 @@ import { CivicCore } from './civic-core.js';
 import { GitEngine } from './git/git-engine.js';
 import { HookSystem } from './hooks/hook-system.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
+import {
+  Logger,
+  getLogger,
+  setLogger,
+  createLogger,
+  LogLevel,
+} from './utils/logger.js';
 
 /**
  * CivicPress Core Platform
@@ -83,6 +90,13 @@ export { GitEngine } from './git/git-engine.js';
 export { HookSystem } from './hooks/hook-system.js';
 export { WorkflowEngine } from './workflows/workflow-engine.js';
 export { ConfigDiscovery } from './config/config-discovery.js';
+export {
+  Logger,
+  getLogger,
+  setLogger,
+  createLogger,
+  LogLevel,
+} from './utils/logger.js';
 
 // Export utility functions for CLI use
 export async function loadConfig() {

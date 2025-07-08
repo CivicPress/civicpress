@@ -1,9 +1,13 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const statusCommand = (cli: CAC) => {
   cli
@@ -23,9 +27,12 @@ export const statusCommand = (cli: CAC) => {
     )
     .action(async (recordName: string, newStatus: string, options: any) => {
       try {
-        console.log(
-          chalk.blue(`🔄 Changing status of ${recordName} to ${newStatus}...`)
-        );
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
+        logger.info(`🔄 Changing status of ${recordName} to ${newStatus}...`);
 
         // Validate status
         const validStatuses = [
@@ -37,8 +44,8 @@ export const statusCommand = (cli: CAC) => {
           'rejected',
         ];
         if (!validStatuses.includes(newStatus)) {
-          console.error(chalk.red(`❌ Invalid status: ${newStatus}`));
-          console.log(chalk.blue('Valid statuses:'), validStatuses.join(', '));
+          logger.error(`❌ Invalid status: ${newStatus}`);
+          logger.info('Valid statuses: ' + validStatuses.join(', '));
           process.exit(1);
         }
 
@@ -53,10 +60,8 @@ export const statusCommand = (cli: CAC) => {
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          console.log(
-            chalk.yellow(
-              '📁 No records directory found. Create some records first!'
-            )
+          logger.warn(
+            '📁 No records directory found. Create some records first!'
           );
           return;
         }
@@ -90,8 +95,8 @@ export const statusCommand = (cli: CAC) => {
         }
 
         if (!recordPath) {
-          console.log(chalk.red(`❌ Record "${recordName}" not found.`));
-          console.log(chalk.blue('Available records:'));
+          logger.error(`❌ Record "${recordName}" not found.`);
+          logger.info('Available records:');
 
           // List available records
           for (const type of recordTypes) {
@@ -102,9 +107,9 @@ export const statusCommand = (cli: CAC) => {
               .map((file) => path.basename(file, '.md'));
 
             if (files.length > 0) {
-              console.log(chalk.cyan(`  ${type}:`));
+              logger.info(`  ${type}:`);
               for (const file of files) {
-                console.log(chalk.gray(`    ${file}`));
+                logger.debug(`    ${file}`);
               }
             }
           }
@@ -119,9 +124,7 @@ export const statusCommand = (cli: CAC) => {
         const currentStatus = frontmatter.status || 'draft';
 
         if (currentStatus === newStatus) {
-          console.log(
-            chalk.yellow(`⚠️  Record "${recordName}" is already ${newStatus}.`)
-          );
+          logger.warn(`⚠️  Record "${recordName}" is already ${newStatus}.`);
           return;
         }
 
@@ -154,22 +157,18 @@ export const statusCommand = (cli: CAC) => {
         const currentStatusColor = statusColors[currentStatus] || chalk.white;
 
         // Display status change
-        console.log(
-          chalk.cyan(`📄 Record: ${frontmatter.title || recordName}`)
-        );
-        console.log(chalk.gray(`📁 Type: ${recordType}`));
-        console.log(
-          chalk.white(
-            `🔄 Status: ${currentStatusColor(currentStatus)} → ${statusColor(newStatus)}`
-          )
+        logger.info(`📄 Record: ${frontmatter.title || recordName}`);
+        logger.debug(`📁 Type: ${recordType}`);
+        logger.info(
+          `🔄 Status: ${currentStatusColor(currentStatus)} → ${statusColor(newStatus)}`
         );
 
         if (options.role) {
-          console.log(chalk.gray(`👤 Changed by: ${options.role}`));
+          logger.debug(`👤 Changed by: ${options.role}`);
         }
 
         if (options.message) {
-          console.log(chalk.gray(`💬 Message: ${options.message}`));
+          logger.debug(`💬 Message: ${options.message}`);
         }
 
         // Handle dry-run modes
@@ -185,15 +184,13 @@ export const statusCommand = (cli: CAC) => {
         );
 
         if (isCompleteDryRun) {
-          console.log(chalk.yellow(`📋 Would update: ${recordPath}`));
-          console.log(
-            chalk.yellow(
-              `📋 Would change status: ${currentStatus} → ${newStatus}`
-            )
+          logger.warn(`📋 Would update: ${recordPath}`);
+          logger.warn(
+            `📋 Would change status: ${currentStatus} → ${newStatus}`
           );
         } else {
           fs.writeFileSync(recordPath, updatedContent);
-          console.log(chalk.green(`✅ Status updated successfully!`));
+          logger.success(`✅ Status updated successfully!`);
         }
 
         // Commit the change
@@ -203,12 +200,8 @@ export const statusCommand = (cli: CAC) => {
           const commitMessage = options.message
             ? `Change status to ${newStatus}: ${options.message}`
             : `Change status from ${currentStatus} to ${newStatus}`;
-          console.log(chalk.yellow(`📋 Would commit: "${commitMessage}"`));
-          console.log(
-            chalk.yellow(
-              `📋 Would stage: ${path.relative(dataDir, recordPath)}`
-            )
-          );
+          logger.warn(`📋 Would commit: "${commitMessage}"`);
+          logger.warn(`📋 Would stage: ${path.relative(dataDir, recordPath)}`);
         } else {
           const git = new (await import('@civicpress/core')).GitEngine(dataDir);
 
@@ -225,21 +218,19 @@ export const statusCommand = (cli: CAC) => {
           commitHash = await git.commit(commitMessage, [
             path.relative(dataDir, recordPath),
           ]);
-          console.log(chalk.green(`💾 Committed status change`));
-          console.log(chalk.blue(`🔗 Commit hash: ${commitHash}`));
+          logger.success(`💾 Committed status change`);
+          logger.info(`🔗 Commit hash: ${commitHash}`);
         }
 
         // Emit hook for audit trail
         const hooks = civic.getHookSystem();
 
         if (isCompleteDryRun || dryRunHooks.includes('status:changed')) {
-          console.log(chalk.yellow(`📋 Would fire hook: status:changed`));
-          console.log(
-            chalk.gray(
-              `   Record: ${frontmatter.title || recordName} (${recordType})`
-            )
+          logger.warn(`📋 Would fire hook: status:changed`);
+          logger.debug(
+            `   Record: ${frontmatter.title || recordName} (${recordType})`
           );
-          console.log(chalk.gray(`   Status: ${currentStatus} → ${newStatus}`));
+          logger.debug(`   Status: ${currentStatus} → ${newStatus}`);
         } else {
           await hooks.emit('status:changed', {
             record: {
@@ -256,7 +247,8 @@ export const statusCommand = (cli: CAC) => {
           });
         }
       } catch (error) {
-        console.error(chalk.red('❌ Failed to change status:'), error);
+        const logger = getLogger();
+        logger.error('❌ Failed to change status:', error);
         process.exit(1);
       }
     });

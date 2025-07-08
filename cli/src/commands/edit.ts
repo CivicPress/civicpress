@@ -1,10 +1,14 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn, execSync } from 'child_process';
 import matter from 'gray-matter';
+import {
+  initializeLogger,
+  getGlobalOptionsFromArgs,
+} from '../utils/global-options.js';
 
 export const editCommand = (cli: CAC) => {
   cli
@@ -13,9 +17,12 @@ export const editCommand = (cli: CAC) => {
     .option('--dry-run', 'Show what would be done without opening the editor')
     .action(async (recordName: string, options: any) => {
       try {
-        console.log(
-          chalk.blue(`✏️  Opening record for editing: ${recordName}`)
-        );
+        // Initialize logger with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeLogger(globalOptions);
+        const logger = getLogger();
+
+        logger.info(`✏️  Opening record for editing: ${recordName}`);
 
         // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
@@ -28,10 +35,8 @@ export const editCommand = (cli: CAC) => {
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          console.log(
-            chalk.yellow(
-              '📁 No records directory found. Create some records first!'
-            )
+          logger.warn(
+            '📁 No records directory found. Create some records first!'
           );
           return;
         }
@@ -65,8 +70,8 @@ export const editCommand = (cli: CAC) => {
         }
 
         if (!recordPath) {
-          console.log(chalk.red(`❌ Record "${recordName}" not found.`));
-          console.log(chalk.blue('Available records:'));
+          logger.error(`❌ Record "${recordName}" not found.`);
+          logger.info('Available records:');
 
           // List available records
           for (const type of recordTypes) {
@@ -77,9 +82,9 @@ export const editCommand = (cli: CAC) => {
               .map((file) => path.basename(file, '.md'));
 
             if (files.length > 0) {
-              console.log(chalk.cyan(`  ${type}:`));
+              logger.info(`  ${type}:`);
               for (const file of files) {
-                console.log(chalk.gray(`    ${file}`));
+                logger.debug(`    ${file}`);
               }
             }
           }
@@ -87,11 +92,9 @@ export const editCommand = (cli: CAC) => {
         }
 
         // Display record info before editing
-        console.log(chalk.cyan(`📄 Opening: ${path.basename(recordPath)}`));
-        console.log(chalk.gray(`📁 Type: ${recordType}`));
-        console.log(
-          chalk.gray(`📂 Path: ${path.relative(dataDir, recordPath)}`)
-        );
+        logger.info(`📄 Opening: ${path.basename(recordPath)}`);
+        logger.debug(`📁 Type: ${recordType}`);
+        logger.debug(`📂 Path: ${path.relative(dataDir, recordPath)}`);
 
         // Determine editor to use
         let editor: string | undefined = undefined;
@@ -116,34 +119,24 @@ export const editCommand = (cli: CAC) => {
         }
 
         if (!editor) {
-          console.log(
-            chalk.yellow(
-              '⚠️  No editor found. Please specify one with --editor'
-            )
-          );
-          console.log(chalk.blue('Example: civic edit <record> --editor code'));
-          console.log(chalk.blue('Available editors: code, vim, nano, etc.'));
+          logger.warn('⚠️  No editor found. Please specify one with --editor');
+          logger.info('Example: civic edit <record> --editor code');
+          logger.info('Available editors: code, vim, nano, etc.');
           return;
         }
 
         // Dry-run: just print what would be done
         if (options.dryRun) {
-          console.log(
-            chalk.blue(`✏️  Opening record for editing: ${recordName}`)
-          );
-          console.log(chalk.cyan(`📄 Opening: ${path.basename(recordPath)}`));
-          console.log(chalk.gray(`📁 Type: ${recordType}`));
-          console.log(
-            chalk.gray(`📂 Path: ${path.relative(dataDir, recordPath)}`)
-          );
-          console.log(
-            chalk.yellow(`Would open editor: ${editor} ${recordPath}`)
-          );
+          logger.info(`✏️  Opening record for editing: ${recordName}`);
+          logger.info(`📄 Opening: ${path.basename(recordPath)}`);
+          logger.debug(`📁 Type: ${recordType}`);
+          logger.debug(`📂 Path: ${path.relative(dataDir, recordPath)}`);
+          logger.warn(`Would open editor: ${editor} ${recordPath}`);
           return;
         }
 
         // Open the file in the editor
-        console.log(chalk.blue(`🚀 Opening in ${editor}...`));
+        logger.info(`🚀 Opening in ${editor}...`);
 
         const child = spawn(editor, [recordPath], {
           stdio: 'inherit',
@@ -151,31 +144,26 @@ export const editCommand = (cli: CAC) => {
         });
 
         child.on('error', (error) => {
-          console.error(
-            chalk.red(`❌ Failed to open editor: ${error.message}`)
-          );
-          console.log(
-            chalk.blue('Try specifying a different editor with --editor')
-          );
+          logger.error(`❌ Failed to open editor: ${error.message}`);
+          logger.info('Try specifying a different editor with --editor');
         });
 
         child.on('exit', (code) => {
           if (code === 0) {
-            console.log(chalk.green('✅ Editor closed successfully'));
-            console.log(
-              chalk.blue(
-                '💡 Remember to commit your changes with: civic commit -m "message" -r <role>'
-              )
+            logger.success('✅ Editor closed successfully');
+            logger.info(
+              '💡 Remember to commit your changes with: civic commit -m "message" -r <role>'
             );
           } else {
-            console.log(chalk.yellow(`⚠️  Editor exited with code ${code}`));
+            logger.warn(`⚠️  Editor exited with code ${code}`);
           }
         });
 
         // Don't wait for the editor to close
         child.unref();
       } catch (error) {
-        console.error(chalk.red('❌ Failed to edit record:'), error);
+        const logger = getLogger();
+        logger.error('❌ Failed to edit record:', error);
         process.exit(1);
       }
     });
