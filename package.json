@@ -14,12 +14,20 @@
     "spec:check-deps": "node .civic/tools/check-deps.js",
     "spec:list": "node .civic/tools/list-specs.js",
     "spec:check": "pnpm run spec:validate && pnpm run spec:check-deps",
-    "spec:all": "pnpm run spec:format && pnpm run spec:validate && pnpm run spec:check-deps && pnpm run spec:list"
+    "spec:all": "pnpm run spec:format && pnpm run spec:validate && pnpm run spec:check-deps && pnpm run spec:list",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch"
   },
   "license": "MIT",
   "devDependencies": {
+    "@vitest/coverage-v8": "3.2.4",
+    "@vitest/ui": "3.2.4",
     "js-yaml": "4.1.0",
     "markdownlint-cli": "^0.37.0",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "vitest": "3.2.4"
   }
 }

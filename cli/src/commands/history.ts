@@ -8,9 +8,16 @@ export const historyCommand = (cli: CAC) => {
     .option('-l, --limit <number>', 'Limit number of entries', {
       default: '10',
     })
+    .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (record: string, options: any) => {
       try {
-        console.log(chalk.blue('📜 Viewing civic record history...'));
+        // Quick fix: Suppress console output for JSON format
+        // TODO: Implement proper silent mode in CivicPress core and hook system
+        let originalConsoleLog: typeof console.log | undefined;
+        if (options.format === 'json') {
+          originalConsoleLog = console.log;
+          console.log = () => {}; // Suppress all console.log output
+        }
 
         // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
@@ -27,6 +34,21 @@ export const historyCommand = (cli: CAC) => {
         // Get commit history
         const limit = parseInt(options.limit) || 10;
         const history = await git.getHistory(limit);
+
+        if (options.format === 'json') {
+          if (originalConsoleLog) {
+            console.log = originalConsoleLog; // Restore console.log
+          }
+          console.log(JSON.stringify(history, null, 2));
+          return;
+        }
+
+        // Restore console.log if it was overridden
+        if (originalConsoleLog) {
+          console.log = originalConsoleLog;
+        }
+
+        console.log(chalk.blue('📜 Viewing civic record history...'));
 
         if (history.length === 0) {
           console.log(chalk.yellow('📜 No commits found'));

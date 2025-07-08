@@ -2,6 +2,7 @@
   "name": "@civicpress/cli",
   "version": "1.0.0",
   "description": "CivicPress Command Line Interface",
+  "type": "module",
   "main": "dist/index.js",
   "bin": {
     "civic": "dist/index.js"

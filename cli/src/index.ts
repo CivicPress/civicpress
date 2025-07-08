@@ -2,20 +2,20 @@
 
 import { cac } from 'cac';
 import chalk from 'chalk';
-import { initCommand } from './commands/init';
-import { createCommand } from './commands/create';
-import { commitCommand } from './commands/commit';
-import { historyCommand } from './commands/history';
-import { listCommand } from './commands/list';
-import { viewCommand } from './commands/view';
-import { editCommand } from './commands/edit';
-import { statusCommand } from './commands/status';
-import { registerSearchCommand } from './commands/search';
-import { registerDiffCommand } from './commands/diff';
-import { registerExportCommand } from './commands/export';
-import { registerTemplateCommand } from './commands/template';
-import { registerValidateCommand } from './commands/validate';
-import { registerHookCommand } from './commands/hook';
+import { initCommand } from './commands/init.js';
+import { createCommand } from './commands/create.js';
+import { commitCommand } from './commands/commit.js';
+import { historyCommand } from './commands/history.js';
+import { listCommand } from './commands/list.js';
+import { viewCommand } from './commands/view.js';
+import { editCommand } from './commands/edit.js';
+import { statusCommand } from './commands/status.js';
+import { registerSearchCommand } from './commands/search.js';
+import { registerDiffCommand } from './commands/diff.js';
+import { registerExportCommand } from './commands/export.js';
+import { registerTemplateCommand } from './commands/template.js';
+import { registerValidateCommand } from './commands/validate.js';
+import { registerHookCommand } from './commands/hook.js';
 
 const cli = cac('civic');
 

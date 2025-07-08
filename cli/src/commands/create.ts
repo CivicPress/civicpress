@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as matter from 'gray-matter';
+import * as yaml from 'yaml';
 
 export const createCommand = (cli: CAC) => {
   cli
@@ -78,8 +78,8 @@ export const createCommand = (cli: CAC) => {
 [Add references here]
 `;
 
-        // Combine frontmatter and content
-        const fullContent = matter.stringify(content, frontmatter);
+        // Combine frontmatter and content using yaml
+        const fullContent = `---\n${yaml.stringify(frontmatter)}---\n${content}`;
 
         // Handle dry-run modes
         const isCompleteDryRun = options.dryRun;

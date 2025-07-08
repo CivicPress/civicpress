@@ -1,4 +1,4 @@
-import { ConfigDiscovery } from './config/config-discovery';
+import { ConfigDiscovery } from './config/config-discovery.js';
 import * as fs from 'fs';
 import * as yaml from 'yaml';
 

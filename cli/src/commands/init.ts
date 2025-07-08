@@ -9,26 +9,58 @@ import * as yaml from 'yaml';
 export const initCommand = (cli: CAC) => {
   cli
     .command('init', 'Initialize a new CivicPress repository')
-    .action(async () => {
+    .option(
+      '--config <path>',
+      'Path to configuration file to use instead of prompts'
+    )
+    .action(async (options: any) => {
       try {
+        // If --help is present, let CAC handle it and exit 0
+        if (options.help) {
+          process.stdout.write('', () => process.exit(0));
+        }
+
         console.log(chalk.blue('🚀 Initializing CivicPress repository...'));
 
-        // Prompt for data directory location
-        const { dataDir } = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'dataDir',
-            message: 'Where should your civic data directory be?',
-            default: 'data',
-            validate: (input: string) => {
-              const trimmed = input.trim();
-              if (trimmed.length === 0) return 'Data directory is required';
-              if (trimmed.includes('..'))
-                return 'Data directory cannot contain ".."';
-              return true;
+        let config: any;
+        let dataDir = 'data';
+
+        if (options.config) {
+          // Load config from file
+          const configPath = path.resolve(options.config);
+          if (!fs.existsSync(configPath)) {
+            process.stderr.write(
+              chalk.red(`❌ Config file not found: ${configPath}\n`),
+              () => process.exit(1)
+            );
+            return;
+          }
+
+          const configContent = fs.readFileSync(configPath, 'utf8');
+          config = yaml.parse(configContent);
+          console.log(chalk.blue(`📁 Using config from: ${configPath}`));
+
+          // Use data directory from config if specified, otherwise default
+          dataDir = config.dataDir || 'data';
+        } else {
+          // Interactive prompts for data directory
+          const { dataDirPrompt } = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'dataDirPrompt',
+              message: 'Where should your civic data directory be?',
+              default: 'data',
+              validate: (input: string) => {
+                const trimmed = input.trim();
+                if (trimmed.length === 0) return 'Data directory is required';
+                if (trimmed.includes('..'))
+                  return 'Data directory cannot contain ".."';
+                return true;
+              },
             },
-          },
-        ]);
+          ]);
+          dataDir = dataDirPrompt;
+        }
 
         const fullDataDir = path.resolve(dataDir);
         console.log(chalk.blue(`📁 Using data directory: ${fullDataDir}`));
@@ -42,14 +74,20 @@ export const initCommand = (cli: CAC) => {
         // Check if Git repo exists in data directory
         const gitExists = fs.existsSync(path.join(fullDataDir, '.git'));
         if (!gitExists) {
-          const { initGit } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'initGit',
-              message: `No Git repository found in ${dataDir}. Initialize a new Git repo here?`,
-              default: true,
-            },
-          ]);
+          let initGit = true;
+
+          if (!options.config) {
+            // Interactive prompt for git initialization
+            const { initGitPrompt } = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'initGitPrompt',
+                message: `No Git repository found in ${dataDir}. Initialize a new Git repo here?`,
+                default: true,
+              },
+            ]);
+            initGit = initGitPrompt;
+          }
 
           if (initGit) {
             // Initialize Git repository in data directory
@@ -71,7 +109,7 @@ export const initCommand = (cli: CAC) => {
         const configPath = path.join(civicDir, 'config.yml');
         const configExists = fs.existsSync(configPath);
 
-        if (configExists) {
+        if (configExists && !options.config) {
           const { overwrite } = await inquirer.prompt([
             {
               type: 'confirm',
@@ -86,8 +124,13 @@ export const initCommand = (cli: CAC) => {
           } else {
             await setupConfiguration(configPath);
           }
-        } else {
-          await setupConfiguration(configPath);
+        } else if (!configExists || options.config) {
+          if (options.config) {
+            // Use the provided config file
+            await setupConfigurationFromFile(configPath, config);
+          } else {
+            await setupConfiguration(configPath);
+          }
         }
 
         // Initialize CivicPress core with data directory
@@ -114,12 +157,64 @@ export const initCommand = (cli: CAC) => {
             "💡 Don't forget to commit your config and records to version control!"
           )
         );
+        // Explicitly flush stdout before exit (for test environments)
+        process.stdout.write('', () => process.exit(0));
       } catch (error) {
-        console.error(chalk.red('❌ Failed to initialize repository:'), error);
-        process.exit(1);
+        process.stderr.write(
+          chalk.red('❌ Failed to initialize repository: ') +
+            String(error) +
+            '\n',
+          () => process.exit(1)
+        );
       }
     });
 };
+
+async function setupConfigurationFromFile(
+  configPath: string,
+  config: any
+): Promise<void> {
+  console.log(
+    chalk.blue('⚙️  Setting up CivicPress configuration from file...')
+  );
+
+  // Ensure required fields are present
+  const requiredFields = ['name', 'city', 'state', 'country', 'timezone'];
+  for (const field of requiredFields) {
+    if (!config[field]) {
+      throw new Error(`Missing required field in config: ${field}`);
+    }
+  }
+
+  // Set defaults for optional fields
+  const finalConfig = {
+    version: '1.0.0',
+    name: config.name,
+    city: config.city,
+    state: config.state,
+    country: config.country,
+    timezone: config.timezone,
+    repo_url: config.repo_url || null,
+    modules: config.modules || ['legal-register'],
+    record_types: config.record_types || ['bylaw', 'policy'],
+    default_role: config.default_role || 'clerk',
+    hooks: {
+      enabled: config.hooks?.enabled ?? true,
+    },
+    workflows: {
+      enabled: config.workflows?.enabled ?? true,
+    },
+    audit: {
+      enabled: config.audit?.enabled ?? true,
+    },
+    created: new Date().toISOString(),
+  };
+
+  // Write configuration file
+  const yamlContent = yaml.stringify(finalConfig);
+  fs.writeFileSync(configPath, yamlContent);
+  console.log(chalk.green('⚙️  Configuration saved to .civic/config.yml'));
+}
 
 async function setupConfiguration(configPath: string): Promise<void> {
   console.log(chalk.blue('⚙️  Setting up CivicPress configuration...'));

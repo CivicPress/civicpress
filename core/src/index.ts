@@ -1,7 +1,7 @@
-import { CivicCore } from './civic-core';
-import { GitEngine } from './git/git-engine';
-import { HookSystem } from './hooks/hook-system';
-import { WorkflowEngine } from './workflows/workflow-engine';
+import { CivicCore } from './civic-core.js';
+import { GitEngine } from './git/git-engine.js';
+import { HookSystem } from './hooks/hook-system.js';
+import { WorkflowEngine } from './workflows/workflow-engine.js';
 
 /**
  * CivicPress Core Platform
@@ -78,15 +78,15 @@ export class CivicPress {
 }
 
 // Export main classes for external use
-export { CivicCore } from './civic-core';
-export { GitEngine } from './git/git-engine';
-export { HookSystem } from './hooks/hook-system';
-export { WorkflowEngine } from './workflows/workflow-engine';
-export { ConfigDiscovery } from './config/config-discovery';
+export { CivicCore } from './civic-core.js';
+export { GitEngine } from './git/git-engine.js';
+export { HookSystem } from './hooks/hook-system.js';
+export { WorkflowEngine } from './workflows/workflow-engine.js';
+export { ConfigDiscovery } from './config/config-discovery.js';
 
 // Export utility functions for CLI use
 export async function loadConfig() {
-  const { ConfigDiscovery } = await import('./config/config-discovery');
+  const { ConfigDiscovery } = await import('./config/config-discovery.js');
   const configPath = ConfigDiscovery.findConfig();
   if (!configPath) {
     return null;

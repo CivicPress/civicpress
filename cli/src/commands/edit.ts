@@ -3,13 +3,14 @@ import chalk from 'chalk';
 import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import matter from 'gray-matter';
 
 export const editCommand = (cli: CAC) => {
   cli
     .command('edit <record>', 'Edit a specific civic record')
     .option('-e, --editor <editor>', 'Specify editor (code, vim, nano, etc.)')
+    .option('--dry-run', 'Show what would be done without opening the editor')
     .action(async (recordName: string, options: any) => {
       try {
         console.log(
@@ -105,7 +106,6 @@ export const editCommand = (cli: CAC) => {
           const commonEditors = ['code', 'vim', 'nano', 'notepad++', 'subl'];
           for (const ed of commonEditors) {
             try {
-              const { execSync } = require('child_process');
               execSync(`which ${ed}`, { stdio: 'ignore' });
               editor = ed;
               break;
@@ -123,6 +123,22 @@ export const editCommand = (cli: CAC) => {
           );
           console.log(chalk.blue('Example: civic edit <record> --editor code'));
           console.log(chalk.blue('Available editors: code, vim, nano, etc.'));
+          return;
+        }
+
+        // Dry-run: just print what would be done
+        if (options.dryRun) {
+          console.log(
+            chalk.blue(`✏️  Opening record for editing: ${recordName}`)
+          );
+          console.log(chalk.cyan(`📄 Opening: ${path.basename(recordPath)}`));
+          console.log(chalk.gray(`📁 Type: ${recordType}`));
+          console.log(
+            chalk.gray(`📂 Path: ${path.relative(dataDir, recordPath)}`)
+          );
+          console.log(
+            chalk.yellow(`Would open editor: ${editor} ${recordPath}`)
+          );
           return;
         }
 

@@ -58,6 +58,14 @@ export function registerSearchCommand(cli: CAC) {
     .option('-f, --format <format>', 'Output format', { default: 'table' })
     .action(async (query: string, options: SearchOptions) => {
       try {
+        // Quick fix: Suppress console output for JSON format
+        // TODO: Implement proper silent mode in CivicPress core and hook system
+        let originalConsoleLog: typeof console.log | undefined;
+        if (options.format === 'json') {
+          originalConsoleLog = console.log;
+          console.log = () => {};
+        }
+
         const config = await loadConfig();
         if (!config) {
           console.error(
@@ -80,6 +88,17 @@ export function registerSearchCommand(cli: CAC) {
         }
 
         const results = await searchRecords(config.dataDir, searchOptions);
+
+        if (options.format === 'json' && originalConsoleLog) {
+          console.log = originalConsoleLog;
+          console.log(JSON.stringify(results, null, 2));
+          return;
+        }
+
+        if (originalConsoleLog) {
+          console.log = originalConsoleLog;
+        }
+
         displayResults(results, searchOptions);
       } catch (error) {
         console.error('❌ Search failed:', error);
