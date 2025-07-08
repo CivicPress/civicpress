@@ -26,13 +26,18 @@ export const statusCommand = (cli: CAC) => {
       'Dry-run specific hooks (comma-separated)'
     )
     .action(async (recordName: string, newStatus: string, options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeLogger(globalOptions);
+      const logger = getLogger();
 
-        logger.info(`🔄 Changing status of ${recordName} to ${newStatus}...`);
+      // Check if we should output JSON
+      const shouldOutputJson = globalOptions.json;
+
+      try {
+        if (!shouldOutputJson) {
+          logger.info(`🔄 Changing status of ${recordName} to ${newStatus}...`);
+        }
 
         // Validate status
         const validStatuses = [
@@ -44,8 +49,23 @@ export const statusCommand = (cli: CAC) => {
           'rejected',
         ];
         if (!validStatuses.includes(newStatus)) {
-          logger.error(`❌ Invalid status: ${newStatus}`);
-          logger.info('Valid statuses: ' + validStatuses.join(', '));
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Invalid status',
+                  details: `Invalid status: ${newStatus}`,
+                  validStatuses: validStatuses,
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error(`❌ Invalid status: ${newStatus}`);
+            logger.info('Valid statuses: ' + validStatuses.join(', '));
+          }
           process.exit(1);
         }
 
@@ -55,15 +75,46 @@ export const statusCommand = (cli: CAC) => {
         const dataDir = core.getDataDir();
 
         if (!dataDir) {
-          throw new Error('Data directory not found. Run "civic init" first.');
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Data directory not found',
+                  details: 'Run "civic init" first',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            throw new Error(
+              'Data directory not found. Run "civic init" first.'
+            );
+          }
+          process.exit(1);
         }
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          logger.warn(
-            '📁 No records directory found. Create some records first!'
-          );
-          return;
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'No records directory found',
+                  details: 'Create some records first',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.warn(
+              '📁 No records directory found. Create some records first!'
+            );
+          }
+          process.exit(1);
         }
 
         // Find the record file
@@ -95,25 +146,53 @@ export const statusCommand = (cli: CAC) => {
         }
 
         if (!recordPath) {
-          logger.error(`❌ Record "${recordName}" not found.`);
-          logger.info('Available records:');
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Record not found',
+                  details: `Record "${recordName}" not found`,
+                  availableRecords: recordTypes.reduce(
+                    (acc, type) => {
+                      const typeDir = path.join(recordsDir, type);
+                      const files = fs
+                        .readdirSync(typeDir)
+                        .filter((file) => file.endsWith('.md'))
+                        .map((file) => path.basename(file, '.md'));
+                      if (files.length > 0) {
+                        acc[type] = files;
+                      }
+                      return acc;
+                    },
+                    {} as Record<string, string[]>
+                  ),
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error(`❌ Record "${recordName}" not found.`);
+            logger.info('Available records:');
 
-          // List available records
-          for (const type of recordTypes) {
-            const typeDir = path.join(recordsDir, type);
-            const files = fs
-              .readdirSync(typeDir)
-              .filter((file) => file.endsWith('.md'))
-              .map((file) => path.basename(file, '.md'));
+            // List available records
+            for (const type of recordTypes) {
+              const typeDir = path.join(recordsDir, type);
+              const files = fs
+                .readdirSync(typeDir)
+                .filter((file) => file.endsWith('.md'))
+                .map((file) => path.basename(file, '.md'));
 
-            if (files.length > 0) {
-              logger.info(`  ${type}:`);
-              for (const file of files) {
-                logger.debug(`    ${file}`);
+              if (files.length > 0) {
+                logger.info(`  ${type}:`);
+                for (const file of files) {
+                  logger.debug(`    ${file}`);
+                }
               }
             }
           }
-          return;
+          process.exit(1);
         }
 
         // Read current record
@@ -124,8 +203,24 @@ export const statusCommand = (cli: CAC) => {
         const currentStatus = frontmatter.status || 'draft';
 
         if (currentStatus === newStatus) {
-          logger.warn(`⚠️  Record "${recordName}" is already ${newStatus}.`);
-          return;
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Status already set',
+                  details: `Record "${recordName}" is already ${newStatus}`,
+                  currentStatus: currentStatus,
+                  requestedStatus: newStatus,
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.warn(`⚠️  Record "${recordName}" is already ${newStatus}.`);
+          }
+          process.exit(1);
         }
 
         // Update frontmatter
@@ -157,18 +252,20 @@ export const statusCommand = (cli: CAC) => {
         const currentStatusColor = statusColors[currentStatus] || chalk.white;
 
         // Display status change
-        logger.info(`📄 Record: ${frontmatter.title || recordName}`);
-        logger.debug(`📁 Type: ${recordType}`);
-        logger.info(
-          `🔄 Status: ${currentStatusColor(currentStatus)} → ${statusColor(newStatus)}`
-        );
+        if (!shouldOutputJson) {
+          logger.info(`📄 Record: ${frontmatter.title || recordName}`);
+          logger.debug(`📁 Type: ${recordType}`);
+          logger.info(
+            `🔄 Status: ${currentStatusColor(currentStatus)} → ${statusColor(newStatus)}`
+          );
 
-        if (options.role) {
-          logger.debug(`👤 Changed by: ${options.role}`);
-        }
+          if (options.role) {
+            logger.debug(`👤 Changed by: ${options.role}`);
+          }
 
-        if (options.message) {
-          logger.debug(`💬 Message: ${options.message}`);
+          if (options.message) {
+            logger.debug(`💬 Message: ${options.message}`);
+          }
         }
 
         // Handle dry-run modes
@@ -184,13 +281,17 @@ export const statusCommand = (cli: CAC) => {
         );
 
         if (isCompleteDryRun) {
-          logger.warn(`📋 Would update: ${recordPath}`);
-          logger.warn(
-            `📋 Would change status: ${currentStatus} → ${newStatus}`
-          );
+          if (!shouldOutputJson) {
+            logger.warn(`📋 Would update: ${recordPath}`);
+            logger.warn(
+              `📋 Would change status: ${currentStatus} → ${newStatus}`
+            );
+          }
         } else {
           fs.writeFileSync(recordPath, updatedContent);
-          logger.success(`✅ Status updated successfully!`);
+          if (!shouldOutputJson) {
+            logger.success(`✅ Status updated successfully!`);
+          }
         }
 
         // Commit the change
@@ -200,8 +301,12 @@ export const statusCommand = (cli: CAC) => {
           const commitMessage = options.message
             ? `Change status to ${newStatus}: ${options.message}`
             : `Change status from ${currentStatus} to ${newStatus}`;
-          logger.warn(`📋 Would commit: "${commitMessage}"`);
-          logger.warn(`📋 Would stage: ${path.relative(dataDir, recordPath)}`);
+          if (!shouldOutputJson) {
+            logger.warn(`📋 Would commit: "${commitMessage}"`);
+            logger.warn(
+              `📋 Would stage: ${path.relative(dataDir, recordPath)}`
+            );
+          }
         } else {
           const git = new (await import('@civicpress/core')).GitEngine(dataDir);
 
@@ -218,19 +323,23 @@ export const statusCommand = (cli: CAC) => {
           commitHash = await git.commit(commitMessage, [
             path.relative(dataDir, recordPath),
           ]);
-          logger.success(`💾 Committed status change`);
-          logger.info(`🔗 Commit hash: ${commitHash}`);
+          if (!shouldOutputJson) {
+            logger.success(`💾 Committed status change`);
+            logger.info(`🔗 Commit hash: ${commitHash}`);
+          }
         }
 
         // Emit hook for audit trail
         const hooks = civic.getHookSystem();
 
         if (isCompleteDryRun || dryRunHooks.includes('status:changed')) {
-          logger.warn(`📋 Would fire hook: status:changed`);
-          logger.debug(
-            `   Record: ${frontmatter.title || recordName} (${recordType})`
-          );
-          logger.debug(`   Status: ${currentStatus} → ${newStatus}`);
+          if (!shouldOutputJson) {
+            logger.warn(`📋 Would fire hook: status:changed`);
+            logger.debug(
+              `   Record: ${frontmatter.title || recordName} (${recordType})`
+            );
+            logger.debug(`   Status: ${currentStatus} → ${newStatus}`);
+          }
         } else {
           await hooks.emit('status:changed', {
             record: {
@@ -246,9 +355,48 @@ export const statusCommand = (cli: CAC) => {
             commitHash: commitHash || 'unknown',
           });
         }
+
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                message: 'Status changed successfully',
+                data: {
+                  recordName: recordName,
+                  recordTitle: frontmatter.title || recordName,
+                  recordType: recordType,
+                  recordPath: recordPath,
+                  previousStatus: currentStatus,
+                  newStatus: newStatus,
+                  role: options.role || 'unknown',
+                  message: options.message,
+                  commitHash: commitHash,
+                  dryRun: isCompleteDryRun,
+                },
+              },
+              null,
+              2
+            )
+          );
+        }
       } catch (error) {
-        const logger = getLogger();
-        logger.error('❌ Failed to change status:', error);
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Failed to change status',
+                details: error instanceof Error ? error.message : String(error),
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          const logger = getLogger();
+          logger.error('❌ Failed to change status:', error);
+        }
         process.exit(1);
       }
     });

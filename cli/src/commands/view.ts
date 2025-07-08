@@ -27,16 +27,26 @@ export const viewCommand = (cli: CAC) => {
         const core = civic.getCore();
         const dataDir = core.getDataDir();
 
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
         if (!dataDir) {
           throw new Error('Data directory not found. Run "civic init" first.');
         }
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          logger.warn(
-            '📁 No records directory found. Create some records first!'
-          );
-          return;
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify({ error: 'No records directory found' }, null, 2)
+            );
+            return;
+          } else {
+            logger.warn(
+              '📁 No records directory found. Create some records first!'
+            );
+            return;
+          }
         }
 
         // Find the record file
@@ -68,30 +78,91 @@ export const viewCommand = (cli: CAC) => {
         }
 
         if (!recordPath) {
-          logger.error(`❌ Record "${recordName}" not found.`);
-          logger.info('Available records:');
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  error: `Record "${recordName}" not found`,
+                  availableRecords: recordTypes.reduce(
+                    (acc, type) => {
+                      const typeDir = path.join(recordsDir, type);
+                      const files = fs
+                        .readdirSync(typeDir)
+                        .filter((file) => file.endsWith('.md'))
+                        .map((file) => path.basename(file, '.md'));
+                      if (files.length > 0) {
+                        acc[type] = files;
+                      }
+                      return acc;
+                    },
+                    {} as Record<string, string[]>
+                  ),
+                },
+                null,
+                2
+              )
+            );
+            return;
+          } else {
+            logger.error(`❌ Record "${recordName}" not found.`);
+            logger.info('Available records:');
 
-          // List available records
-          for (const type of recordTypes) {
-            const typeDir = path.join(recordsDir, type);
-            const files = fs
-              .readdirSync(typeDir)
-              .filter((file) => file.endsWith('.md'))
-              .map((file) => path.basename(file, '.md'));
+            // List available records
+            for (const type of recordTypes) {
+              const typeDir = path.join(recordsDir, type);
+              const files = fs
+                .readdirSync(typeDir)
+                .filter((file) => file.endsWith('.md'))
+                .map((file) => path.basename(file, '.md'));
 
-            if (files.length > 0) {
-              logger.info(`  ${type}:`);
-              for (const file of files) {
-                logger.debug(`    ${file}`);
+              if (files.length > 0) {
+                logger.info(`  ${type}:`);
+                for (const file of files) {
+                  logger.debug(`    ${file}`);
+                }
               }
             }
+            return;
           }
-          return;
         }
 
         // Read and parse the record
         const content = fs.readFileSync(recordPath, 'utf8');
         const { data: frontmatter, content: markdownContent } = matter(content);
+
+        // Create record object for JSON output
+        const record = {
+          title: frontmatter.title || path.basename(recordPath, '.md'),
+          type: recordType,
+          status: frontmatter.status || 'draft',
+          author: frontmatter.author || 'unknown',
+          version: frontmatter.version || '1.0.0',
+          path: path.relative(dataDir, recordPath),
+          relativePath: path.relative(
+            path.join(dataDir, 'records'),
+            recordPath
+          ),
+          createdAt: frontmatter.created
+            ? new Date(frontmatter.created).toISOString()
+            : null,
+          updatedAt: frontmatter.updated
+            ? new Date(frontmatter.updated).toISOString()
+            : null,
+          created: frontmatter.created
+            ? new Date(frontmatter.created).toLocaleString()
+            : 'unknown',
+          updated: frontmatter.updated
+            ? new Date(frontmatter.updated).toLocaleString()
+            : 'unknown',
+          metadata: frontmatter,
+          content: markdownContent,
+          rawContent: content,
+        };
+
+        if (shouldOutputJson) {
+          console.log(JSON.stringify({ record }, null, 2));
+          return;
+        }
 
         // Display record information
         logger.info('\n' + '='.repeat(60));

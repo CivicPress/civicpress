@@ -31,16 +31,33 @@ export const listCommand = (cli: CAC) => {
         const core = civic.getCore();
         const dataDir = core.getDataDir();
 
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
         if (!dataDir) {
           throw new Error('Data directory not found. Run "civic init" first.');
         }
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          logger.warn(
-            '📁 No records directory found. Create some records first!'
-          );
-          return;
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  records: [],
+                  summary: { totalRecords: 0, byStatus: {}, byType: {} },
+                },
+                null,
+                2
+              )
+            );
+            return;
+          } else {
+            logger.warn(
+              '📁 No records directory found. Create some records first!'
+            );
+            return;
+          }
         }
 
         // Get all record types
@@ -50,8 +67,22 @@ export const listCommand = (cli: CAC) => {
           .map((dirent) => dirent.name);
 
         if (recordTypes.length === 0) {
-          logger.warn('📁 No record types found. Create some records first!');
-          return;
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  records: [],
+                  summary: { totalRecords: 0, byStatus: {}, byType: {} },
+                },
+                null,
+                2
+              )
+            );
+            return;
+          } else {
+            logger.warn('📁 No record types found. Create some records first!');
+            return;
+          }
         }
 
         // Filter by type if specified
@@ -59,6 +90,8 @@ export const listCommand = (cli: CAC) => {
 
         let totalRecords = 0;
         const statusCounts: Record<string, number> = {};
+        const typeCounts: Record<string, number> = {};
+        const records: any[] = [];
 
         for (const recordType of typesToShow) {
           const typeDir = path.join(recordsDir, recordType);
@@ -76,10 +109,12 @@ export const listCommand = (cli: CAC) => {
             continue;
           }
 
-          logger.info(
-            `\n📁 ${recordType.toUpperCase()} (${files.length} records):`
-          );
-          logger.debug('─'.repeat(50));
+          if (!shouldOutputJson) {
+            logger.info(
+              `\n📁 ${recordType.toUpperCase()} (${files.length} records):`
+            );
+            logger.debug('─'.repeat(50));
+          }
 
           for (const filePath of files) {
             try {
@@ -88,12 +123,8 @@ export const listCommand = (cli: CAC) => {
 
               const title = frontmatter.title || path.basename(filePath, '.md');
               const status = frontmatter.status || 'draft';
-              const created = frontmatter.created
-                ? new Date(frontmatter.created).toLocaleDateString()
-                : 'unknown';
-              const updated = frontmatter.updated
-                ? new Date(frontmatter.updated).toLocaleDateString()
-                : 'unknown';
+              const createdAt = frontmatter.created || null;
+              const updatedAt = frontmatter.updated || null;
               const author = frontmatter.author || 'unknown';
 
               // Apply status filter if specified
@@ -106,31 +137,58 @@ export const listCommand = (cli: CAC) => {
                 }
               }
 
-              // Count status
+              // Count status and type
               statusCounts[status] = (statusCounts[status] || 0) + 1;
+              typeCounts[recordType] = (typeCounts[recordType] || 0) + 1;
               totalRecords++;
 
-              // Status color
-              const statusColors: Record<string, any> = {
-                draft: chalk.yellow,
-                proposed: chalk.blue,
-                approved: chalk.green,
-                active: chalk.green,
-                archived: chalk.gray,
+              // Create record object for JSON output
+              const record = {
+                title,
+                type: recordType,
+                status,
+                author,
+                path: path.relative(dataDir, filePath),
+                relativePath: path.relative(
+                  path.join(dataDir, 'records'),
+                  filePath
+                ),
+                createdAt: createdAt ? new Date(createdAt).toISOString() : null,
+                updatedAt: updatedAt ? new Date(updatedAt).toISOString() : null,
+                created: createdAt
+                  ? new Date(createdAt).toLocaleDateString()
+                  : 'unknown',
+                updated: updatedAt
+                  ? new Date(updatedAt).toLocaleDateString()
+                  : 'unknown',
               };
-              const statusColor = statusColors[status] || chalk.white;
 
-              logger.info(`  📄 ${title}`);
-              logger.debug(`     Status: ${statusColor(status)}`);
+              records.push(record);
 
-              if (options.all) {
-                logger.debug(`     Created: ${created}`);
-                logger.debug(`     Updated: ${updated}`);
-                logger.debug(`     Author: ${author}`);
-                logger.debug(`     File: ${path.relative(dataDir, filePath)}`);
+              // Human-readable output
+              if (!shouldOutputJson) {
+                // Status color
+                const statusColors: Record<string, any> = {
+                  draft: chalk.yellow,
+                  proposed: chalk.blue,
+                  approved: chalk.green,
+                  active: chalk.green,
+                  archived: chalk.gray,
+                };
+                const statusColor = statusColors[status] || chalk.white;
+
+                logger.info(`  📄 ${title}`);
+                logger.debug(`     Status: ${statusColor(status)}`);
+
+                if (options.all) {
+                  logger.debug(`     Created: ${record.created}`);
+                  logger.debug(`     Updated: ${record.updated}`);
+                  logger.debug(`     Author: ${author}`);
+                  logger.debug(`     File: ${record.path}`);
+                }
+
+                logger.debug('');
               }
-
-              logger.debug('');
             } catch (error) {
               logger.error(
                 `  ❌ Error reading ${path.basename(filePath)}: ${error}`
@@ -139,27 +197,40 @@ export const listCommand = (cli: CAC) => {
           }
         }
 
-        // Summary
-        logger.info(`\n📊 Summary:`);
-        logger.info(`  Total records: ${totalRecords}`);
+        // Output JSON or human-readable summary
+        if (shouldOutputJson) {
+          const jsonOutput = {
+            records,
+            summary: {
+              totalRecords,
+              byStatus: statusCounts,
+              byType: typeCounts,
+            },
+          };
+          console.log(JSON.stringify(jsonOutput, null, 2));
+        } else {
+          // Human-readable summary
+          logger.info(`\n📊 Summary:`);
+          logger.info(`  Total records: ${totalRecords}`);
 
-        if (Object.keys(statusCounts).length > 0) {
-          logger.info(`  By status:`);
-          for (const [status, count] of Object.entries(statusCounts)) {
-            const statusColor =
-              {
-                draft: chalk.yellow,
-                proposed: chalk.blue,
-                approved: chalk.green,
-                active: chalk.green,
-                archived: chalk.gray,
-              }[status] || chalk.white;
+          if (Object.keys(statusCounts).length > 0) {
+            logger.info(`  By status:`);
+            for (const [status, count] of Object.entries(statusCounts)) {
+              const statusColor =
+                {
+                  draft: chalk.yellow,
+                  proposed: chalk.blue,
+                  approved: chalk.green,
+                  active: chalk.green,
+                  archived: chalk.gray,
+                }[status] || chalk.white;
 
-            logger.debug(`    ${statusColor(status)}: ${count}`);
+              logger.debug(`    ${statusColor(status)}: ${count}`);
+            }
           }
-        }
 
-        logger.success('\n✅ Records listed successfully!');
+          logger.success('\n✅ Records listed successfully!');
+        }
       } catch (error) {
         const logger = getLogger();
         logger.error('❌ Failed to list records:', error);

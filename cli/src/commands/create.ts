@@ -18,19 +18,39 @@ export const createCommand = (cli: CAC) => {
       'Dry-run specific hooks (comma-separated)'
     )
     .action(async (type: string, title: string, options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeLogger(globalOptions);
+      const logger = getLogger();
 
-        logger.info(`📝 Creating ${type}: ${title}`);
+      // Check if we should output JSON
+      const shouldOutputJson = globalOptions.json;
+
+      try {
+        if (!shouldOutputJson) {
+          logger.info(`📝 Creating ${type}: ${title}`);
+        }
 
         // Validate record type
         const validTypes = ['bylaw', 'policy', 'proposal', 'resolution'];
         if (!validTypes.includes(type)) {
-          logger.error(`❌ Invalid record type: ${type}`);
-          logger.info('Valid types: ' + validTypes.join(', '));
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Invalid record type',
+                  details: `Invalid type: ${type}`,
+                  validTypes: validTypes,
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error(`❌ Invalid record type: ${type}`);
+            logger.info('Valid types: ' + validTypes.join(', '));
+          }
           process.exit(1);
         }
 
@@ -48,7 +68,24 @@ export const createCommand = (cli: CAC) => {
         // Get data directory from core
         const dataDir = civic.getCore().getDataDir();
         if (!dataDir) {
-          throw new Error('Data directory not found. Run "civic init" first.');
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Data directory not found',
+                  details: 'Run "civic init" first',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            throw new Error(
+              'Data directory not found. Run "civic init" first.'
+            );
+          }
+          process.exit(1);
         }
 
         // Create directory structure
@@ -97,20 +134,26 @@ export const createCommand = (cli: CAC) => {
           : [];
 
         if (isCompleteDryRun) {
-          logger.warn(`📋 Would create: ${filePath}`);
-          logger.warn(`📋 Would write content: ${title}`);
+          if (!shouldOutputJson) {
+            logger.warn(`📋 Would create: ${filePath}`);
+            logger.warn(`📋 Would write content: ${title}`);
+          }
         } else {
           // Write the file
           fs.writeFileSync(filePath, fullContent);
-          logger.success(`📄 Created record: ${filePath}`);
+          if (!shouldOutputJson) {
+            logger.success(`📄 Created record: ${filePath}`);
+          }
         }
 
         // Emit record created hook
         const hooks = civic.getHookSystem();
 
         if (isCompleteDryRun || dryRunHooks.includes('record:created')) {
-          logger.warn(`📋 Would fire hook: record:created`);
-          logger.debug(`   Record: ${title} (${type})`);
+          if (!shouldOutputJson) {
+            logger.warn(`📋 Would fire hook: record:created`);
+            logger.debug(`   Record: ${title} (${type})`);
+          }
         } else {
           await hooks.emit('record:created', {
             record: {
@@ -125,22 +168,28 @@ export const createCommand = (cli: CAC) => {
 
         // Stage in Git
         if (isCompleteDryRun) {
-          logger.warn(
-            `📋 Would commit: "feat(record): create ${type} "${title}""`
-          );
-          logger.warn(`📋 Would stage: ${filePath}`);
+          if (!shouldOutputJson) {
+            logger.warn(
+              `📋 Would commit: "feat(record): create ${type} "${title}""`
+            );
+            logger.warn(`📋 Would stage: ${filePath}`);
+          }
         } else {
           const git = new (await import('@civicpress/core')).GitEngine(dataDir);
           await git.commit(`feat(record): create ${type} "${title}"`, [
             filePath,
           ]);
-          logger.success(`💾 Committed to Git`);
+          if (!shouldOutputJson) {
+            logger.success(`💾 Committed to Git`);
+          }
         }
 
         // Emit record committed hook
         if (isCompleteDryRun || dryRunHooks.includes('record:committed')) {
-          logger.warn(`📋 Would fire hook: record:committed`);
-          logger.debug(`   Record: ${title} (${type})`);
+          if (!shouldOutputJson) {
+            logger.warn(`📋 Would fire hook: record:committed`);
+            logger.debug(`   Record: ${title} (${type})`);
+          }
         } else {
           await hooks.emit('record:committed', {
             record: {
@@ -153,11 +202,47 @@ export const createCommand = (cli: CAC) => {
           });
         }
 
-        logger.success(`✅ Created ${type}: ${title}`);
-        logger.info(`📁 Location: ${filePath}`);
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                message: `Created ${type}: ${title}`,
+                data: {
+                  type: type,
+                  title: title,
+                  filename: filename,
+                  filePath: filePath,
+                  status: 'draft',
+                  dryRun: isCompleteDryRun,
+                  hooksFired: !isCompleteDryRun && dryRunHooks.length === 0,
+                },
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.success(`✅ Created ${type}: ${title}`);
+          logger.info(`📁 Location: ${filePath}`);
+        }
       } catch (error) {
-        const logger = getLogger();
-        logger.error('❌ Failed to create record:', error);
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Failed to create record',
+                details: error instanceof Error ? error.message : String(error),
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          const logger = getLogger();
+          logger.error('❌ Failed to create record:', error);
+        }
         process.exit(1);
       }
     });

@@ -67,6 +67,9 @@ export function registerExportCommand(cli: CAC) {
           process.exit(1);
         }
 
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
         const exportOptions: ExportOptions = {
           ...options,
           format: options.format || 'json',
@@ -78,10 +81,15 @@ export function registerExportCommand(cli: CAC) {
         // If specific record is provided, export just that record
         if (record) {
           const recordPath = record.endsWith('.md') ? record : `${record}.md`;
-          await exportSingleRecord(config.dataDir, recordPath, exportOptions);
+          await exportSingleRecord(
+            config.dataDir,
+            recordPath,
+            exportOptions,
+            shouldOutputJson
+          );
         } else {
           // Export filtered records
-          await exportRecords(config.dataDir, exportOptions);
+          await exportRecords(config.dataDir, exportOptions, shouldOutputJson);
         }
       } catch (error) {
         const logger = getLogger();
@@ -94,15 +102,29 @@ export function registerExportCommand(cli: CAC) {
 async function exportSingleRecord(
   dataDir: string,
   recordPath: string,
-  options: ExportOptions
+  options: ExportOptions,
+  shouldOutputJson?: boolean
 ) {
   const fullPath = join(dataDir, 'records', recordPath);
 
   try {
     if (!fs.existsSync(fullPath)) {
-      const logger = getLogger();
-      logger.error(`❌ Record not found: ${recordPath}`);
-      process.exit(1);
+      if (shouldOutputJson) {
+        console.log(
+          JSON.stringify(
+            {
+              error: `Record not found: ${recordPath}`,
+            },
+            null,
+            2
+          )
+        );
+        return;
+      } else {
+        const logger = getLogger();
+        logger.error(`❌ Record not found: ${recordPath}`);
+        process.exit(1);
+      }
     }
 
     const content = await readFile(fullPath, 'utf-8');
@@ -120,23 +142,72 @@ async function exportSingleRecord(
       metadata: options.includeMetadata ? metadata : {},
     };
 
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            record: exportRecord,
+            summary: {
+              totalRecords: 1,
+              format: options.format,
+              includeContent: options.includeContent,
+              includeMetadata: options.includeMetadata,
+            },
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
+
     const output = await formatExport([exportRecord], options);
     await writeExport(output, options);
   } catch (error) {
-    const logger = getLogger();
-    logger.error(`❌ Error exporting ${recordPath}:`, error);
-    process.exit(1);
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: `Error exporting ${recordPath}`,
+            details: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      const logger = getLogger();
+      logger.error(`❌ Error exporting ${recordPath}:`, error);
+      process.exit(1);
+    }
   }
 }
 
-async function exportRecords(dataDir: string, options: ExportOptions) {
+async function exportRecords(
+  dataDir: string,
+  options: ExportOptions,
+  shouldOutputJson?: boolean
+) {
   const recordsDir = join(dataDir, 'records');
 
   try {
     if (!fs.existsSync(recordsDir)) {
-      const logger = getLogger();
-      logger.warn('📁 No records directory found.');
-      return;
+      if (shouldOutputJson) {
+        console.log(
+          JSON.stringify(
+            {
+              error: 'No records directory found',
+            },
+            null,
+            2
+          )
+        );
+        return;
+      } else {
+        const logger = getLogger();
+        logger.warn('📁 No records directory found.');
+        return;
+      }
     }
 
     // Get all record files
@@ -172,8 +243,46 @@ async function exportRecords(dataDir: string, options: ExportOptions) {
     }
 
     if (records.length === 0) {
-      const logger = getLogger();
-      logger.warn('🔍 No records found matching your criteria.');
+      if (shouldOutputJson) {
+        console.log(
+          JSON.stringify(
+            {
+              error: 'No records found matching your criteria',
+            },
+            null,
+            2
+          )
+        );
+        return;
+      } else {
+        const logger = getLogger();
+        logger.warn('🔍 No records found matching your criteria.');
+        return;
+      }
+    }
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            records,
+            summary: {
+              totalRecords: records.length,
+              format: options.format,
+              includeContent: options.includeContent,
+              includeMetadata: options.includeMetadata,
+              filters: {
+                type: options.type,
+                status: options.status,
+                author: options.author,
+                date: options.date,
+              },
+            },
+          },
+          null,
+          2
+        )
+      );
       return;
     }
 
@@ -183,9 +292,22 @@ async function exportRecords(dataDir: string, options: ExportOptions) {
     const output = await formatExport(records, options);
     await writeExport(output, options);
   } catch (error) {
-    const logger = getLogger();
-    logger.error('❌ Error exporting records:', error);
-    process.exit(1);
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Error exporting records',
+            details: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      const logger = getLogger();
+      logger.error('❌ Error exporting records:', error);
+      process.exit(1);
+    }
   }
 }
 

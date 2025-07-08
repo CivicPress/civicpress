@@ -96,6 +96,9 @@ export function registerDiffCommand(cli: CAC) {
           interactive: options.interactive || false,
         };
 
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
         // Handle content-only and metadata-only flags
         if (options.content) {
           diffOptions.showMetadata = false;
@@ -114,7 +117,7 @@ export function registerDiffCommand(cli: CAC) {
           await handleInteractiveDiff(config.dataDir, diffOptions);
         } else {
           const results = await compareRecords(config.dataDir, diffOptions);
-          displayDiffResults(results, diffOptions);
+          displayDiffResults(results, diffOptions, shouldOutputJson);
         }
       } catch (error) {
         const logger = getLogger();
@@ -507,8 +510,36 @@ function formatMetadataDiff(changes: DiffResult['changes']): string {
   return lines.join('\n');
 }
 
-function displayDiffResults(results: DiffResult[], options: DiffOptions) {
+function displayDiffResults(
+  results: DiffResult[],
+  options: DiffOptions,
+  shouldOutputJson?: boolean
+) {
   const logger = getLogger();
+
+  if (shouldOutputJson) {
+    console.log(
+      JSON.stringify(
+        {
+          results,
+          summary: {
+            totalRecords: results.length,
+            options: {
+              commit1: options.commit1 || 'HEAD~1',
+              commit2: options.commit2 || 'HEAD',
+              record: options.record,
+              showMetadata: options.showMetadata,
+              showContent: options.showContent,
+            },
+          },
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
   if (results.length === 0) {
     logger.info('🔍 No differences found.');
     return;

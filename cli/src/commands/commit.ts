@@ -15,17 +15,36 @@ export const commitCommand = (cli: CAC) => {
     .option('-r, --role <role>', 'Role for commit (clerk, council, etc.)')
     .option('-a, --all', 'Commit all changes (not just specific files)')
     .action(async (recordName: string, options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeLogger(globalOptions);
+      const logger = getLogger();
 
-        logger.info('💾 Committing civic records...');
+      // Check if we should output JSON
+      const shouldOutputJson = globalOptions.json;
+
+      try {
+        if (!shouldOutputJson) {
+          logger.info('💾 Committing civic records...');
+        }
 
         // Validate required options
         if (!options.message) {
-          logger.error('❌ Commit message is required. Use -m or --message');
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Commit message is required',
+                  details: 'Use -m or --message',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error('❌ Commit message is required. Use -m or --message');
+          }
           process.exit(1);
         }
 
@@ -35,7 +54,24 @@ export const commitCommand = (cli: CAC) => {
         const dataDir = core.getDataDir();
 
         if (!dataDir) {
-          throw new Error('Data directory not found. Run "civic init" first.');
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Data directory not found',
+                  details: 'Run "civic init" first',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            throw new Error(
+              'Data directory not found. Run "civic init" first.'
+            );
+          }
+          process.exit(1);
         }
 
         // Create GitEngine with the data directory
@@ -44,7 +80,9 @@ export const commitCommand = (cli: CAC) => {
         // Set role if provided
         if (options.role) {
           git.setRole(options.role);
-          logger.info(`👤 Using role: ${options.role}`);
+          if (!shouldOutputJson) {
+            logger.info(`👤 Using role: ${options.role}`);
+          }
         }
 
         // Determine which files to commit
@@ -88,25 +126,53 @@ export const commitCommand = (cli: CAC) => {
           }
 
           if (!recordPath) {
-            logger.error(`❌ Record "${recordName}" not found.`);
-            logger.info('Available records:');
+            if (shouldOutputJson) {
+              console.log(
+                JSON.stringify(
+                  {
+                    success: false,
+                    error: 'Record not found',
+                    details: `Record "${recordName}" not found`,
+                    availableRecords: recordTypes.reduce(
+                      (acc, type) => {
+                        const typeDir = path.join(recordsDir, type);
+                        const files = fs
+                          .readdirSync(typeDir)
+                          .filter((file) => file.endsWith('.md'))
+                          .map((file) => path.basename(file, '.md'));
+                        if (files.length > 0) {
+                          acc[type] = files;
+                        }
+                        return acc;
+                      },
+                      {} as Record<string, string[]>
+                    ),
+                  },
+                  null,
+                  2
+                )
+              );
+            } else {
+              logger.error(`❌ Record "${recordName}" not found.`);
+              logger.info('Available records:');
 
-            // List available records
-            for (const type of recordTypes) {
-              const typeDir = path.join(recordsDir, type);
-              const files = fs
-                .readdirSync(typeDir)
-                .filter((file) => file.endsWith('.md'))
-                .map((file) => path.basename(file, '.md'));
+              // List available records
+              for (const type of recordTypes) {
+                const typeDir = path.join(recordsDir, type);
+                const files = fs
+                  .readdirSync(typeDir)
+                  .filter((file) => file.endsWith('.md'))
+                  .map((file) => path.basename(file, '.md'));
 
-              if (files.length > 0) {
-                logger.info(`  ${type}:`);
-                for (const file of files) {
-                  logger.debug(`    ${file}`);
+                if (files.length > 0) {
+                  logger.info(`  ${type}:`);
+                  for (const file of files) {
+                    logger.debug(`    ${file}`);
+                  }
                 }
               }
             }
-            return;
+            process.exit(1);
           }
 
           // Check if the specific file has changes
@@ -122,8 +188,24 @@ export const commitCommand = (cli: CAC) => {
           if (allChangedFiles.includes(relativeRecordPath)) {
             filesToCommit = [relativeRecordPath];
           } else {
-            logger.warn(`⚠️  Record "${recordName}" has no changes to commit.`);
-            return;
+            if (shouldOutputJson) {
+              console.log(
+                JSON.stringify(
+                  {
+                    success: false,
+                    error: 'No changes to commit',
+                    details: `Record "${recordName}" has no changes to commit`,
+                  },
+                  null,
+                  2
+                )
+              );
+            } else {
+              logger.warn(
+                `⚠️  Record "${recordName}" has no changes to commit.`
+              );
+            }
+            process.exit(1);
           }
         } else {
           // Default: commit all changed files
@@ -137,29 +219,67 @@ export const commitCommand = (cli: CAC) => {
         }
 
         if (filesToCommit.length === 0) {
-          logger.warn(
-            '⚠️  No files to commit. All changes are already committed.'
-          );
-          return;
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'No files to commit',
+                  details: 'All changes are already committed',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.warn(
+              '⚠️  No files to commit. All changes are already committed.'
+            );
+          }
+          process.exit(1);
         }
 
         let commitHash: string;
 
         if (options.all) {
-          logger.info('📁 Committing all changes...');
+          if (!shouldOutputJson) {
+            logger.info('📁 Committing all changes...');
+          }
           commitHash = await git.commit(options.message);
         } else {
-          logger.info('📁 Files to commit:');
-          filesToCommit.forEach((file) => {
-            logger.debug(`  ${file}`);
-          });
+          if (!shouldOutputJson) {
+            logger.info('📁 Files to commit:');
+            filesToCommit.forEach((file) => {
+              logger.debug(`  ${file}`);
+            });
+          }
 
           // Create role-based commit with specific files
           commitHash = await git.commit(options.message, filesToCommit);
         }
 
-        logger.success(`✅ Committed successfully!`);
-        logger.info(`🔗 Commit hash: ${commitHash}`);
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                message: 'Committed successfully',
+                data: {
+                  commitHash: commitHash,
+                  message: options.message,
+                  role: options.role || 'unknown',
+                  filesCommitted: filesToCommit,
+                  commitAll: options.all || false,
+                },
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.success(`✅ Committed successfully!`);
+          logger.info(`🔗 Commit hash: ${commitHash}`);
+        }
 
         // Emit hook for audit trail
         const hooks = civic.getHookSystem();
@@ -170,8 +290,22 @@ export const commitCommand = (cli: CAC) => {
           timestamp: new Date().toISOString(),
         });
       } catch (error) {
-        const logger = getLogger();
-        logger.error('❌ Failed to commit records:', error);
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Failed to commit records',
+                details: error instanceof Error ? error.message : String(error),
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          const logger = getLogger();
+          logger.error('❌ Failed to commit records:', error);
+        }
         process.exit(1);
       }
     });

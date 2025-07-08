@@ -80,10 +80,22 @@ export function registerValidateCommand(cli: CAC) {
           format: options.format || 'human',
         };
 
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
         if (options.all) {
-          await validateAllRecords(config.dataDir, validateOptions);
+          await validateAllRecords(
+            config.dataDir,
+            validateOptions,
+            shouldOutputJson
+          );
         } else if (record) {
-          await validateSingleRecord(config.dataDir, record, validateOptions);
+          await validateSingleRecord(
+            config.dataDir,
+            record,
+            validateOptions,
+            shouldOutputJson
+          );
         } else {
           logger.info('📋 Validation Commands:');
           logger.info(
@@ -98,7 +110,7 @@ export function registerValidateCommand(cli: CAC) {
           logger.info(
             '  civic validate --all --strict        # Treat warnings as errors'
           );
-          logger.info('  civic validate --all --format json   # JSON output');
+          logger.info('  civic validate --all --json          # JSON output');
         }
       } catch (error) {
         const logger = getLogger();
@@ -108,28 +120,41 @@ export function registerValidateCommand(cli: CAC) {
     });
 }
 
-async function validateAllRecords(dataDir: string, options: any) {
+async function validateAllRecords(
+  dataDir: string,
+  options: any,
+  shouldOutputJson?: boolean
+) {
   const recordsDir = join(dataDir, 'records');
 
   try {
     if (!fs.existsSync(recordsDir)) {
       const logger = getLogger();
-      logger.warn('📁 No records directory found.');
-      return;
+      if (shouldOutputJson) {
+        console.log(
+          JSON.stringify({ error: 'No records directory found' }, null, 2)
+        );
+        return;
+      } else {
+        logger.warn('📁 No records directory found.');
+        return;
+      }
     }
 
     const recordFiles = await glob('**/*.md', { cwd: recordsDir });
     const results: ValidationResult[] = [];
 
     const logger = getLogger();
-    logger.info(`🔍 Validating ${recordFiles.length} record(s)...\n`);
+    if (!shouldOutputJson) {
+      logger.info(`🔍 Validating ${recordFiles.length} record(s)...\n`);
+    }
 
     for (const file of recordFiles) {
       const result = await validateRecord(dataDir, file, options);
       results.push(result);
     }
 
-    displayValidationResults(results, options);
+    displayValidationResults(results, options, shouldOutputJson);
   } catch (error) {
     const logger = getLogger();
     logger.error('❌ Error validating records:', error);
@@ -139,13 +164,14 @@ async function validateAllRecords(dataDir: string, options: any) {
 async function validateSingleRecord(
   dataDir: string,
   recordPath: string,
-  options: any
+  options: any,
+  shouldOutputJson?: boolean
 ) {
   const fullPath = recordPath.endsWith('.md') ? recordPath : `${recordPath}.md`;
 
   try {
     const result = await validateRecord(dataDir, fullPath, options);
-    displayValidationResults([result], options);
+    displayValidationResults([result], options, shouldOutputJson);
   } catch (error) {
     const logger = getLogger();
     logger.error(`❌ Error validating ${recordPath}:`, error);
@@ -515,7 +541,11 @@ function extractSectionContent(
   return match ? match[1] : null;
 }
 
-function displayValidationResults(results: ValidationResult[], options: any) {
+function displayValidationResults(
+  results: ValidationResult[],
+  options: any,
+  shouldOutputJson?: boolean
+) {
   const logger = getLogger();
   const totalRecords = results.length;
   const validRecords = results.filter((r) => r.isValid).length;
@@ -524,8 +554,26 @@ function displayValidationResults(results: ValidationResult[], options: any) {
   let totalErrors = 0;
   let totalWarnings = 0;
 
-  if (options.format === 'json') {
-    logger.info(JSON.stringify(results, null, 2));
+  if (shouldOutputJson) {
+    console.log(
+      JSON.stringify(
+        {
+          results,
+          summary: {
+            totalRecords,
+            validRecords,
+            invalidRecords,
+            totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
+            totalWarnings: results.reduce(
+              (sum, r) => sum + r.warnings.length,
+              0
+            ),
+          },
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 

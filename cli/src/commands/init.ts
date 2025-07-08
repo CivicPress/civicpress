@@ -18,18 +18,23 @@ export const initCommand = (cli: CAC) => {
       'Path to configuration file to use instead of prompts'
     )
     .action(async (options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeLogger(globalOptions);
+      const logger = getLogger();
 
+      // Check if we should output JSON
+      const shouldOutputJson = globalOptions.json;
+
+      try {
         // If --help is present, let CAC handle it and exit 0
         if (options.help) {
           process.stdout.write('', () => process.exit(0));
         }
 
-        logger.info('🚀 Initializing CivicPress repository...');
+        if (!shouldOutputJson) {
+          logger.info('🚀 Initializing CivicPress repository...');
+        }
 
         let config: any;
         let dataDir = 'data';
@@ -72,18 +77,24 @@ export const initCommand = (cli: CAC) => {
         }
 
         const fullDataDir = path.resolve(dataDir);
-        logger.info(`📁 Using data directory: ${fullDataDir}`);
+        if (!shouldOutputJson) {
+          logger.info(`📁 Using data directory: ${fullDataDir}`);
+        }
 
         // Create data directory if it doesn't exist
         if (!fs.existsSync(fullDataDir)) {
           fs.mkdirSync(fullDataDir, { recursive: true });
-          logger.success('📁 Created data directory');
+          if (!shouldOutputJson) {
+            logger.success('📁 Created data directory');
+          }
         }
 
         // Check if Git repo exists in data directory
         const gitExists = fs.existsSync(path.join(fullDataDir, '.git'));
+        let initGit = false;
+
         if (!gitExists) {
-          let initGit = true;
+          initGit = true;
 
           if (!options.config) {
             // Interactive prompt for git initialization
@@ -103,7 +114,9 @@ export const initCommand = (cli: CAC) => {
             const { GitEngine } = await import('@civicpress/core');
             const git = new GitEngine(fullDataDir);
             await git.init();
-            logger.success('📦 Initialized Git repository');
+            if (!shouldOutputJson) {
+              logger.success('📦 Initialized Git repository');
+            }
           }
         }
 
@@ -111,7 +124,9 @@ export const initCommand = (cli: CAC) => {
         const civicDir = path.join(fullDataDir, '.civic');
         if (!fs.existsSync(civicDir)) {
           fs.mkdirSync(civicDir, { recursive: true });
-          logger.success('📁 Created .civic directory');
+          if (!shouldOutputJson) {
+            logger.success('📁 Created .civic directory');
+          }
         }
 
         // Check if config already exists
@@ -144,25 +159,68 @@ export const initCommand = (cli: CAC) => {
 
         // Initialize CivicPress core with data directory
         const civic = new CivicPress({ repoPath: fullDataDir });
-        logger.success('🔧 Initialized CivicPress core');
+        if (!shouldOutputJson) {
+          logger.success('🔧 Initialized CivicPress core');
+        }
 
-        logger.success('✅ CivicPress repository initialized successfully!');
-        logger.info('📖 Next steps:');
-        logger.info(`   cd ${dataDir}`);
-        logger.info(
-          '   civic create <type> <title> - Create a new civic record'
-        );
-        logger.info('   civic commit -m "message" -r <role> - Commit changes');
-        logger.info('   civic history - View record history');
-        logger.info('');
-        logger.warn(
-          "💡 Don't forget to commit your config and records to version control!"
-        );
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                message: 'CivicPress repository initialized successfully',
+                data: {
+                  dataDir: fullDataDir,
+                  civicDir: civicDir,
+                  gitInitialized: initGit || gitExists,
+                  configPath: path.join(civicDir, 'config.yml'),
+                },
+                nextSteps: [
+                  `cd ${dataDir}`,
+                  'civic create <type> <title> - Create a new civic record',
+                  'civic commit -m "message" -r <role> - Commit changes',
+                  'civic history - View record history',
+                ],
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.success('✅ CivicPress repository initialized successfully!');
+          logger.info('📖 Next steps:');
+          logger.info(`   cd ${dataDir}`);
+          logger.info(
+            '   civic create <type> <title> - Create a new civic record'
+          );
+          logger.info(
+            '   civic commit -m "message" -r <role> - Commit changes'
+          );
+          logger.info('   civic history - View record history');
+          logger.info('');
+          logger.warn(
+            "💡 Don't forget to commit your config and records to version control!"
+          );
+        }
         // Explicitly flush stdout before exit (for test environments)
         process.stdout.write('', () => process.exit(0));
       } catch (error) {
-        const logger = getLogger();
-        logger.error('❌ Failed to initialize repository:', error);
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Failed to initialize repository',
+                details: error instanceof Error ? error.message : String(error),
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          const logger = getLogger();
+          logger.error('❌ Failed to initialize repository:', error);
+        }
         process.exit(1);
       }
     });

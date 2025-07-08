@@ -38,23 +38,41 @@ export function registerHookCommand(cli: CAC) {
           process.exit(1);
         }
 
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
         const hookSystem = new HookSystem(config.dataDir);
         await hookSystem.initialize();
 
         if (options.list || action === 'list') {
-          await listHooks(hookSystem, options);
+          await listHooks(hookSystem, options, shouldOutputJson);
         } else if (options.config || action === 'config') {
-          await showConfig(hookSystem, options);
+          await showConfig(hookSystem, options, shouldOutputJson);
         } else if (options.test || action === 'test') {
-          await testHook(hookSystem, options.test || action, options);
+          await testHook(
+            hookSystem,
+            options.test || action,
+            options,
+            shouldOutputJson
+          );
         } else if (options.enable || action === 'enable') {
-          await enableHook(hookSystem, options.enable || action, options);
+          await enableHook(
+            hookSystem,
+            options.enable || action,
+            options,
+            shouldOutputJson
+          );
         } else if (options.disable || action === 'disable') {
-          await disableHook(hookSystem, options.disable || action, options);
+          await disableHook(
+            hookSystem,
+            options.disable || action,
+            options,
+            shouldOutputJson
+          );
         } else if (options.workflows || action === 'workflows') {
-          await listWorkflows(hookSystem, options);
+          await listWorkflows(hookSystem, options, shouldOutputJson);
         } else if (options.logs || action === 'logs') {
-          await showLogs(config.dataDir, options);
+          await showLogs(config.dataDir, options, shouldOutputJson);
         } else {
           showHelp();
         }
@@ -66,17 +84,25 @@ export function registerHookCommand(cli: CAC) {
     });
 }
 
-async function listHooks(hookSystem: HookSystem, options: any) {
+async function listHooks(
+  hookSystem: HookSystem,
+  options: any,
+  shouldOutputJson?: boolean
+) {
   const logger = getLogger();
   const config = hookSystem.getConfiguration();
   const registeredHooks = hookSystem.getRegisteredHooks();
 
-  if (options.format === 'json') {
-    logger.info(
+  if (shouldOutputJson) {
+    console.log(
       JSON.stringify(
         {
           registered: registeredHooks,
           configured: config?.hooks || {},
+          summary: {
+            totalRegistered: registeredHooks.length,
+            totalConfigured: Object.keys(config?.hooks || {}).length,
+          },
         },
         null,
         2
@@ -122,12 +148,16 @@ async function listHooks(hookSystem: HookSystem, options: any) {
   }
 }
 
-async function showConfig(hookSystem: HookSystem, options: any) {
+async function showConfig(
+  hookSystem: HookSystem,
+  options: any,
+  shouldOutputJson?: boolean
+) {
   const logger = getLogger();
   const config = hookSystem.getConfiguration();
 
-  if (options.format === 'json') {
-    logger.info(JSON.stringify(config, null, 2));
+  if (shouldOutputJson) {
+    console.log(JSON.stringify(config, null, 2));
     return;
   }
 
@@ -163,15 +193,31 @@ async function showConfig(hookSystem: HookSystem, options: any) {
 async function testHook(
   hookSystem: HookSystem,
   hookName: string,
-  options: any
+  options: any,
+  shouldOutputJson?: boolean
 ) {
   const logger = getLogger();
   if (!hookName) {
-    logger.error('❌ Hook name required for testing');
-    return;
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Hook name required for testing',
+          },
+          null,
+          2
+        )
+      );
+      return;
+    } else {
+      logger.error('❌ Hook name required for testing');
+      return;
+    }
   }
 
-  logger.info(`🧪 Testing hook: ${hookName}`);
+  if (!shouldOutputJson) {
+    logger.info(`🧪 Testing hook: ${hookName}`);
+  }
 
   const testData = {
     record: {
@@ -192,30 +238,92 @@ async function testHook(
 
   try {
     await hookSystem.emit(hookName, testData, testContext);
-    logger.info('✅ Hook test completed successfully');
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            success: true,
+            message: 'Hook test completed successfully',
+            hook: hookName,
+            testData,
+            testContext,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.info('✅ Hook test completed successfully');
+    }
   } catch (error) {
-    logger.error('❌ Hook test failed:', error);
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            success: false,
+            error: 'Hook test failed',
+            details: error instanceof Error ? error.message : String(error),
+            hook: hookName,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error('❌ Hook test failed:', error);
+    }
   }
 }
 
 async function enableHook(
   hookSystem: HookSystem,
   hookName: string,
-  options: any
+  options: any,
+  shouldOutputJson?: boolean
 ) {
   const logger = getLogger();
   if (!hookName) {
-    logger.error('❌ Hook name required for enabling');
-    return;
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Hook name required for enabling',
+          },
+          null,
+          2
+        )
+      );
+      return;
+    } else {
+      logger.error('❌ Hook name required for enabling');
+      return;
+    }
   }
 
-  logger.info(`✅ Enabling hook: ${hookName}`);
+  if (!shouldOutputJson) {
+    logger.info(`✅ Enabling hook: ${hookName}`);
+  }
 
   const config = hookSystem.getConfiguration();
   if (config?.hooks[hookName]) {
     config.hooks[hookName].enabled = true;
     await hookSystem.updateConfiguration(config);
-    logger.info(`✅ Hook '${hookName}' enabled`);
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            success: true,
+            message: `Hook '${hookName}' enabled`,
+            hook: hookName,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.info(`✅ Hook '${hookName}' enabled`);
+    }
 
     // Auto-commit the configuration change
     try {
@@ -227,34 +335,81 @@ async function enableHook(
         const commitHash = await git.commit(`feat(hooks): enable ${hookName}`, [
           '.civic/hooks.yml',
         ]);
-        logger.info(`💾 Configuration committed: ${commitHash}`);
+        if (!shouldOutputJson) {
+          logger.info(`💾 Configuration committed: ${commitHash}`);
+        }
       }
     } catch (error) {
-      logger.warn('⚠️  Failed to auto-commit configuration change');
+      if (!shouldOutputJson) {
+        logger.warn('⚠️  Failed to auto-commit configuration change');
+      }
     }
   } else {
-    logger.error(`❌ Hook '${hookName}' not found in configuration`);
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: `Hook '${hookName}' not found in configuration`,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error(`❌ Hook '${hookName}' not found in configuration`);
+    }
   }
 }
 
 async function disableHook(
   hookSystem: HookSystem,
   hookName: string,
-  options: any
+  options: any,
+  shouldOutputJson?: boolean
 ) {
   const logger = getLogger();
   if (!hookName) {
-    logger.error('❌ Hook name required for disabling');
-    return;
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Hook name required for disabling',
+          },
+          null,
+          2
+        )
+      );
+      return;
+    } else {
+      logger.error('❌ Hook name required for disabling');
+      return;
+    }
   }
 
-  logger.info(`❌ Disabling hook: ${hookName}`);
+  if (!shouldOutputJson) {
+    logger.info(`❌ Disabling hook: ${hookName}`);
+  }
 
   const config = hookSystem.getConfiguration();
   if (config?.hooks[hookName]) {
     config.hooks[hookName].enabled = false;
     await hookSystem.updateConfiguration(config);
-    logger.info(`✅ Hook '${hookName}' disabled`);
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            success: true,
+            message: `Hook '${hookName}' disabled`,
+            hook: hookName,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.info(`✅ Hook '${hookName}' disabled`);
+    }
 
     // Auto-commit the configuration change
     try {
@@ -267,17 +422,37 @@ async function disableHook(
           `feat(hooks): disable ${hookName}`,
           ['.civic/hooks.yml']
         );
-        logger.info(`💾 Configuration committed: ${commitHash}`);
+        if (!shouldOutputJson) {
+          logger.info(`💾 Configuration committed: ${commitHash}`);
+        }
       }
     } catch (error) {
-      logger.warn('⚠️  Failed to auto-commit configuration change');
+      if (!shouldOutputJson) {
+        logger.warn('⚠️  Failed to auto-commit configuration change');
+      }
     }
   } else {
-    logger.error(`❌ Hook '${hookName}' not found in configuration`);
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: `Hook '${hookName}' not found in configuration`,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error(`❌ Hook '${hookName}' not found in configuration`);
+    }
   }
 }
 
-async function listWorkflows(hookSystem: HookSystem, options: any) {
+async function listWorkflows(
+  hookSystem: HookSystem,
+  options: any,
+  shouldOutputJson?: boolean
+) {
   const logger = getLogger();
   const config = hookSystem.getConfiguration();
   const workflows = new Set<string>();
@@ -289,8 +464,19 @@ async function listWorkflows(hookSystem: HookSystem, options: any) {
     }
   }
 
-  if (options.format === 'json') {
-    logger.info(JSON.stringify(Array.from(workflows), null, 2));
+  if (shouldOutputJson) {
+    console.log(
+      JSON.stringify(
+        {
+          workflows: Array.from(workflows).sort(),
+          summary: {
+            totalWorkflows: workflows.size,
+          },
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 
@@ -312,13 +498,30 @@ async function listWorkflows(hookSystem: HookSystem, options: any) {
   logger.info('   To add custom workflows, create files in .civic/workflows/');
 }
 
-async function showLogs(dataDir: string, options: any) {
+async function showLogs(
+  dataDir: string,
+  options: any,
+  shouldOutputJson?: boolean
+) {
   const logger = getLogger();
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 
   if (!existsSync(logPath)) {
-    logger.warn('⚠️  No hook logs found');
-    return;
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'No hook logs found',
+          },
+          null,
+          2
+        )
+      );
+      return;
+    } else {
+      logger.warn('⚠️  No hook logs found');
+      return;
+    }
   }
 
   try {

@@ -83,6 +83,9 @@ export function registerSearchCommand(cli: CAC) {
           format: options.format || 'table',
         };
 
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
         // If query is provided as first argument, use it as content search
         if (query && !options.content) {
           searchOptions.content = query;
@@ -90,8 +93,27 @@ export function registerSearchCommand(cli: CAC) {
 
         const results = await searchRecords(config.dataDir, searchOptions);
 
-        if (options.format === 'json') {
-          logger.output(JSON.stringify(results, null, 2));
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                results,
+                summary: {
+                  totalResults: results.length,
+                  searchOptions: {
+                    content: searchOptions.content,
+                    title: searchOptions.title,
+                    status: searchOptions.status,
+                    type: searchOptions.type,
+                    author: searchOptions.author,
+                    limit: searchOptions.limit,
+                  },
+                },
+              },
+              null,
+              2
+            )
+          );
           return;
         }
 

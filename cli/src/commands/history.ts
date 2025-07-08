@@ -36,8 +36,24 @@ export const historyCommand = (cli: CAC) => {
         const limit = parseInt(options.limit) || 10;
         const history = await git.getHistory(limit);
 
-        if (options.format === 'json') {
-          logger.output(JSON.stringify(history, null, 2));
+        // Check if we should output JSON
+        const shouldOutputJson = globalOptions.json;
+
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                history,
+                summary: {
+                  totalCommits: history.length,
+                  limit,
+                  record: record || 'all',
+                },
+              },
+              null,
+              2
+            )
+          );
           return;
         }
 
