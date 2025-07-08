@@ -26,6 +26,9 @@ export class CivicPress {
 
   private async initialize(): Promise<void> {
     try {
+      // Initialize core first (loads config)
+      await this.core.initialize();
+
       // Initialize Git engine
       await this.git.initialize();
 
@@ -79,3 +82,16 @@ export { CivicCore } from './civic-core';
 export { GitEngine } from './git/git-engine';
 export { HookSystem } from './hooks/hook-system';
 export { WorkflowEngine } from './workflows/workflow-engine';
+export { ConfigDiscovery } from './config/config-discovery';
+
+// Export utility functions for CLI use
+export async function loadConfig() {
+  const { ConfigDiscovery } = await import('./config/config-discovery');
+  const configPath = ConfigDiscovery.findConfig();
+  if (!configPath) {
+    return null;
+  }
+
+  const dataDir = ConfigDiscovery.getDataDirFromConfig(configPath);
+  return { configPath, dataDir };
+}

@@ -13,29 +13,58 @@ export const initCommand = (cli: CAC) => {
       try {
         console.log(chalk.blue('🚀 Initializing CivicPress repository...'));
 
-        // Check if we're in a Git repository
-        const gitExists = fs.existsSync('.git');
-        if (!gitExists) {
-          console.log(
-            chalk.yellow('⚠️  No Git repository found. Initializing Git...')
-          );
-          // TODO: Initialize Git repository
+        // Prompt for data directory location
+        const { dataDir } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'dataDir',
+            message: 'Where should your civic data directory be?',
+            default: 'data',
+            validate: (input: string) => {
+              const trimmed = input.trim();
+              if (trimmed.length === 0) return 'Data directory is required';
+              if (trimmed.includes('..'))
+                return 'Data directory cannot contain ".."';
+              return true;
+            },
+          },
+        ]);
+
+        const fullDataDir = path.resolve(dataDir);
+        console.log(chalk.blue(`📁 Using data directory: ${fullDataDir}`));
+
+        // Create data directory if it doesn't exist
+        if (!fs.existsSync(fullDataDir)) {
+          fs.mkdirSync(fullDataDir, { recursive: true });
+          console.log(chalk.green('📁 Created data directory'));
         }
 
-        // Create .civic directory structure
-        const civicDir = '.civic';
+        // Check if Git repo exists in data directory
+        const gitExists = fs.existsSync(path.join(fullDataDir, '.git'));
+        if (!gitExists) {
+          const { initGit } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'initGit',
+              message: `No Git repository found in ${dataDir}. Initialize a new Git repo here?`,
+              default: true,
+            },
+          ]);
+
+          if (initGit) {
+            // Initialize Git repository in data directory
+            const { GitEngine } = await import('@civicpress/core');
+            const git = new GitEngine(fullDataDir);
+            await git.init();
+            console.log(chalk.green('📦 Initialized Git repository'));
+          }
+        }
+
+        // Create .civic directory inside data (only for config)
+        const civicDir = path.join(fullDataDir, '.civic');
         if (!fs.existsSync(civicDir)) {
           fs.mkdirSync(civicDir, { recursive: true });
           console.log(chalk.green('📁 Created .civic directory'));
-        }
-
-        // Create basic directory structure
-        const dirs = ['specs', 'diagrams', 'tools'];
-        for (const dir of dirs) {
-          const dirPath = path.join(civicDir, dir);
-          if (!fs.existsSync(dirPath)) {
-            fs.mkdirSync(dirPath, { recursive: true });
-          }
         }
 
         // Check if config already exists
@@ -61,14 +90,15 @@ export const initCommand = (cli: CAC) => {
           await setupConfiguration(configPath);
         }
 
-        // Initialize CivicPress core
-        const civic = new CivicPress();
+        // Initialize CivicPress core with data directory
+        const civic = new CivicPress({ repoPath: fullDataDir });
         console.log(chalk.green('🔧 Initialized CivicPress core'));
 
         console.log(
           chalk.green('✅ CivicPress repository initialized successfully!')
         );
         console.log(chalk.blue('📖 Next steps:'));
+        console.log(chalk.blue(`   cd ${dataDir}`));
         console.log(
           chalk.blue(
             '   civic create <type> <title> - Create a new civic record'
@@ -78,6 +108,12 @@ export const initCommand = (cli: CAC) => {
           chalk.blue('   civic commit -m "message" -r <role> - Commit changes')
         );
         console.log(chalk.blue('   civic history - View record history'));
+        console.log(chalk.blue(''));
+        console.log(
+          chalk.yellow(
+            "💡 Don't forget to commit your config and records to version control!"
+          )
+        );
       } catch (error) {
         console.error(chalk.red('❌ Failed to initialize repository:'), error);
         process.exit(1);

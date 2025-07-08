@@ -70,6 +70,10 @@ pnpm run spec:list
 pnpm run spec:check
 ```
 
+## 📖 Documentation
+
+- [CLI Usage Guide](docs/cli.md)
+
 ## 📁 Project Structure
 
 ```

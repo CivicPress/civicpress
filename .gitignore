@@ -24,8 +24,12 @@ build/
 records/**/*.bak
 records/**/*.tmp
 
+# CivicPress Data (separate Git repo)
+data/
+
 # pnpm
 # Note: pnpm-lock.yaml should be committed for reproducible builds
+.pnpm-store/
 
 # Mac system files
 Icon?

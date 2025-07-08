@@ -20,7 +20,7 @@ export const createCommand = (cli: CAC) => {
           process.exit(1);
         }
 
-        // Initialize CivicPress
+        // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
 
         // Create filename from title
@@ -31,8 +31,14 @@ export const createCommand = (cli: CAC) => {
           .replace(/-+/g, '-')
           .trim();
 
+        // Get data directory from core
+        const dataDir = civic.getCore().getDataDir();
+        if (!dataDir) {
+          throw new Error('Data directory not found. Run "civic init" first.');
+        }
+
         // Create directory structure
-        const recordsDir = path.join('.civic', 'records', type);
+        const recordsDir = path.join(dataDir, 'records', type);
         if (!fs.existsSync(recordsDir)) {
           fs.mkdirSync(recordsDir, { recursive: true });
         }
@@ -75,7 +81,7 @@ export const createCommand = (cli: CAC) => {
         console.log(chalk.green(`📄 Created record: ${filePath}`));
 
         // Stage in Git
-        const git = civic.getGitEngine();
+        const git = new (await import('@civicpress/core')).GitEngine(dataDir);
         await git.commit(`feat(record): create ${type} "${title}"`, [filePath]);
         console.log(chalk.green(`💾 Committed to Git`));
 

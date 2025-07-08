@@ -12,9 +12,17 @@ export const historyCommand = (cli: CAC) => {
       try {
         console.log(chalk.blue('📜 Viewing civic record history...'));
 
-        // Initialize CivicPress
+        // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
-        const git = civic.getGitEngine();
+        const core = civic.getCore();
+        const dataDir = core.getDataDir();
+
+        if (!dataDir) {
+          throw new Error('Data directory not found. Run "civic init" first.');
+        }
+
+        // Create GitEngine with the data directory
+        const git = new (await import('@civicpress/core')).GitEngine(dataDir);
 
         // Get commit history
         const limit = parseInt(options.limit) || 10;

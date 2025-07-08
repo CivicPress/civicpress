@@ -1,3 +1,7 @@
+import { ConfigDiscovery } from './config/config-discovery';
+import * as fs from 'fs';
+import * as yaml from 'yaml';
+
 /**
  * CivicCore - Main Platform Manager
  *
@@ -7,6 +11,8 @@
 export class CivicCore {
   private config: any;
   private modules: Map<string, any>;
+  private configPath: string | null = null;
+  private dataDir: string | null = null;
 
   constructor() {
     this.config = {};
@@ -28,17 +34,21 @@ export class CivicCore {
    * Load platform configuration
    */
   private async loadConfig(): Promise<void> {
-    // TODO: Load configuration from .civic/config.yml
-    this.config = {
-      version: '1.0.0',
-      modules: ['legal-register'],
-      hooks: {
-        enabled: true,
-      },
-      workflows: {
-        enabled: true,
-      },
-    };
+    // Find config file using discovery
+    this.configPath = ConfigDiscovery.findConfig();
+
+    if (!this.configPath) {
+      throw new Error(
+        'CivicPress config not found. Run "civic init" to initialize.'
+      );
+    }
+
+    // Get data directory from config path
+    this.dataDir = ConfigDiscovery.getDataDirFromConfig(this.configPath);
+
+    // Load and parse config file
+    const configContent = fs.readFileSync(this.configPath, 'utf8');
+    this.config = yaml.parse(configContent);
   }
 
   /**
@@ -54,6 +64,20 @@ export class CivicCore {
    */
   getConfig(): any {
     return this.config;
+  }
+
+  /**
+   * Get the data directory path
+   */
+  getDataDir(): string | null {
+    return this.dataDir;
+  }
+
+  /**
+   * Get the config file path
+   */
+  getConfigPath(): string | null {
+    return this.configPath;
   }
 
   /**
