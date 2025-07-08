@@ -1,7 +1,7 @@
 import { CAC } from 'cac';
 import { readFile, readdir } from 'fs/promises';
 import { join, extname } from 'path';
-import { loadConfig, getLogger } from '@civicpress/core';
+import { loadConfig, getLogger, TemplateEngine } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import matter from 'gray-matter';
@@ -30,26 +30,6 @@ interface ValidationWarning {
   field: string;
   message: string;
   suggestion?: string;
-}
-
-interface Template {
-  name: string;
-  type: string;
-  description: string;
-  metadata: Record<string, any>;
-  content: string;
-  validation: ValidationRules;
-}
-
-interface ValidationRules {
-  required: string[];
-  optional: string[];
-  formats?: Record<string, string>;
-  content?: {
-    minLength?: number;
-    maxLength?: number;
-    sections?: string[];
-  };
 }
 
 export function registerValidateCommand(cli: CAC) {
@@ -201,22 +181,54 @@ async function validateRecord(
     };
   }
 
+  // Load template engine
+  const templateEngine = new TemplateEngine(dataDir);
+
   const content = await readFile(fullPath, 'utf-8');
   const { data: metadata, content: markdownContent } = matter(content);
 
   const recordType = metadata.type || recordPath.split('/')[0];
-  const template = await loadTemplate(dataDir, recordType);
+
+  // Try to load the template using the template engine
+  let template: any | null = null;
+  try {
+    // First try to load the specific template if specified in metadata
+    const templateName = metadata.template || 'default';
+    template = await templateEngine.loadTemplate(recordType, templateName);
+  } catch (error) {
+    // Fall back to default template
+    try {
+      template = await templateEngine.loadTemplate(recordType, 'default');
+    } catch (fallbackError) {
+      // No template found, will do basic validation
+    }
+  }
 
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
   const suggestions: string[] = [];
 
-  // Validate metadata against template
+  // Use template engine's advanced validation if template is available
   if (template) {
-    validateMetadata(metadata, template, errors, warnings, suggestions);
-    validateContent(markdownContent, template, errors, warnings, suggestions);
+    const validationResult = templateEngine.validateRecord(fullPath, template);
+
+    // Convert template engine validation results to CLI format
+    for (const error of validationResult.errors) {
+      errors.push({
+        field: 'validation',
+        message: String(error),
+        severity: 'error',
+      });
+    }
+
+    for (const warning of validationResult.warnings) {
+      warnings.push({
+        field: 'validation',
+        message: String(warning),
+      });
+    }
   } else {
-    // No template found, do basic validation
+    // Fall back to basic validation
     validateBasicMetadata(metadata, errors, warnings);
   }
 
@@ -253,17 +265,34 @@ async function validateRecord(
 async function loadTemplate(
   dataDir: string,
   recordType: string
-): Promise<Template | null> {
-  const templatesDir = join(dataDir, '.civic', 'templates');
-  const templatePath = join(templatesDir, `${recordType}.yml`);
-
+): Promise<any | null> {
   try {
-    if (!fs.existsSync(templatePath)) {
+    const templateEngine = new TemplateEngine(dataDir);
+    const template = await templateEngine.loadTemplate(recordType, 'default');
+
+    if (!template) {
       return null;
     }
 
-    const templateContent = await readFile(templatePath, 'utf-8');
-    return yaml.parse(templateContent) as Template;
+    return {
+      name: template.name,
+      type: template.type,
+      description: '',
+      metadata: template.validation || {},
+      content: template.content,
+      validation: {
+        required: template.validation?.required_fields || [],
+        optional: [],
+        formats: {},
+        content: {
+          minLength: template.validation?.sections?.find(
+            (s) => s.name === 'content'
+          )?.min_length,
+          maxLength: undefined,
+          sections: template.validation?.sections?.map((s) => s.name) || [],
+        },
+      },
+    };
   } catch (error) {
     return null;
   }
@@ -271,7 +300,7 @@ async function loadTemplate(
 
 function validateMetadata(
   metadata: Record<string, any>,
-  template: Template,
+  template: any,
   errors: ValidationError[],
   warnings: ValidationWarning[],
   suggestions: string[]
@@ -301,8 +330,15 @@ function validateMetadata(
   // Check field formats
   if (template.validation.formats) {
     for (const [field, format] of Object.entries(template.validation.formats)) {
-      if (metadata[field]) {
-        validateFieldFormat(metadata[field], format, field, errors, warnings);
+      const value = (metadata as any)[field];
+      if (value !== undefined && value !== null) {
+        validateFieldFormat(
+          String(value),
+          String(format),
+          field,
+          errors,
+          warnings
+        );
       }
     }
   }
@@ -350,7 +386,7 @@ function validateMetadata(
 
 function validateContent(
   content: string,
-  template: Template,
+  template: any,
   errors: ValidationError[],
   warnings: ValidationWarning[],
   suggestions: string[]
@@ -481,7 +517,7 @@ function validateFieldFormat(
 ) {
   switch (format) {
     case 'email':
-      if (!isValidEmail(value)) {
+      if (!isValidEmail(String(value))) {
         errors.push({
           field,
           message: 'Invalid email format',
@@ -490,7 +526,7 @@ function validateFieldFormat(
       }
       break;
     case 'date':
-      if (!isValidDate(value)) {
+      if (!isValidDate(String(value))) {
         errors.push({
           field,
           message: 'Invalid date format',
@@ -499,7 +535,7 @@ function validateFieldFormat(
       }
       break;
     case 'url':
-      if (!isValidUrl(value)) {
+      if (!isValidUrl(String(value))) {
         warnings.push({
           field,
           message: 'Invalid URL format',

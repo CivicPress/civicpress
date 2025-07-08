@@ -1,7 +1,7 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir, readdir } from 'fs/promises';
 import { join, extname } from 'path';
-import { loadConfig, getLogger } from '@civicpress/core';
+import { loadConfig, getLogger, TemplateEngine } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as yaml from 'yaml';
@@ -10,7 +10,7 @@ import {
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 
-interface Template {
+interface LegacyTemplate {
   name: string;
   type: string;
   description: string;
@@ -163,7 +163,7 @@ async function initializeDefaultTemplates(
   }
 }
 
-function getDefaultTemplates(): Template[] {
+function getDefaultTemplates(): LegacyTemplate[] {
   return [
     {
       name: 'policy',
@@ -427,76 +427,53 @@ function getDefaultTemplates(): Template[] {
 
 async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
   const logger = getLogger();
-  const templatesDir = join(dataDir, '.civic', 'templates');
+  const templateEngine = new TemplateEngine(dataDir);
 
   try {
-    if (!fs.existsSync(templatesDir)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: 'No templates directory found',
-              suggestion:
-                'Run "civic template --init" to create default templates',
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.warn(
-          '📁 No templates directory found. Run "civic template --init" to create default templates.'
-        );
-        return;
-      }
-    }
+    const recordTypes = ['bylaw', 'policy', 'proposal', 'resolution'];
+    const allTemplates: any[] = [];
 
-    const files = await readdir(templatesDir);
-    const templateFiles = files.filter(
-      (file) => file.endsWith('.yml') || file.endsWith('.yaml')
-    );
+    for (const type of recordTypes) {
+      const templates = templateEngine.listTemplates(type);
 
-    if (templateFiles.length === 0) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: 'No templates found',
-              suggestion:
-                'Run "civic template --init" to create default templates',
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.warn(
-          '📁 No templates found. Run "civic template --init" to create default templates.'
-        );
-        return;
-      }
-    }
-
-    const templates: any[] = [];
-    for (const file of templateFiles) {
-      const templateName = file.replace(/\.(yml|yaml)$/, '');
-      const templatePath = join(templatesDir, file);
-      const templateContent = await readFile(templatePath, 'utf-8');
-      const template = yaml.parse(templateContent) as Template;
-
-      if (shouldOutputJson) {
-        templates.push({
-          name: templateName,
-          type: template.type,
-          description: template.description,
-        });
-      } else {
-        logger.info(`  ${templateName}`);
-        logger.info(`    Type: ${template.type}`);
-        logger.info(`    Description: ${template.description}`);
-        logger.info('');
+      for (const templateName of templates) {
+        try {
+          const template = await templateEngine.loadTemplate(
+            type,
+            templateName
+          );
+          if (template) {
+            if (shouldOutputJson) {
+              allTemplates.push({
+                name: templateName,
+                type: type,
+                extends: (template as any).extends,
+                hasParent: !!(template as any).parentTemplate,
+                sections: template.sections?.length || 0,
+                requiredFields:
+                  template.validation?.required_fields?.length || 0,
+              });
+            } else {
+              logger.info(`  ${type}/${templateName}`);
+              if ((template as any).extends) {
+                logger.info(`    Extends: ${(template as any).extends}`);
+              }
+              if ((template as any).parentTemplate) {
+                logger.info(
+                  `    Inherits from: ${(template as any).parentTemplate.name}`
+                );
+              }
+              logger.info(`    Sections: ${template.sections?.length || 0}`);
+              logger.info(
+                `    Required fields: ${template.validation?.required_fields?.length || 0}`
+              );
+              logger.info('');
+            }
+          }
+        } catch (error) {
+          // Skip templates that can't be loaded
+          continue;
+        }
       }
     }
 
@@ -504,14 +481,19 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
       console.log(
         JSON.stringify(
           {
-            templates,
+            templates: allTemplates,
             summary: {
-              totalTemplates: templates.length,
+              totalTemplates: allTemplates.length,
+              types: recordTypes,
             },
           },
           null,
           2
         )
+      );
+    } else if (allTemplates.length === 0) {
+      logger.warn(
+        '📁 No templates found. Run "civic template --init" to create default templates.'
       );
     }
   } catch (error) {
@@ -565,7 +547,7 @@ async function showTemplate(
     }
 
     const templateContent = await readFile(templatePath, 'utf-8');
-    const template = yaml.parse(templateContent) as Template;
+    const template = yaml.parse(templateContent) as LegacyTemplate;
 
     if (shouldOutputJson) {
       console.log(
@@ -659,7 +641,7 @@ async function createTemplate(
       }
     }
 
-    const template: Template = {
+    const template: LegacyTemplate = {
       name: templateName,
       type: recordType || 'custom',
       description: `Custom template for ${templateName}`,
@@ -763,7 +745,7 @@ async function validateTemplate(
     }
 
     const templateContent = await readFile(templatePath, 'utf-8');
-    const template = yaml.parse(templateContent) as Template;
+    const template = yaml.parse(templateContent) as LegacyTemplate;
 
     if (!shouldOutputJson) {
       logger.info(`🔍 Validating template: ${template.name}`);

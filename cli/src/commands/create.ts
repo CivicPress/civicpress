@@ -17,6 +17,10 @@ export const createCommand = (cli: CAC) => {
       '--dry-run-hooks <hooks>',
       'Dry-run specific hooks (comma-separated)'
     )
+    .option(
+      '--template <template>',
+      'Template to use for creation (defaults to type/default)'
+    )
     .action(async (type: string, title: string, options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -57,6 +61,58 @@ export const createCommand = (cli: CAC) => {
         // Initialize CivicPress (will auto-discover config)
         const civic = new CivicPress();
 
+        // Get data directory from core
+        const dataDir = civic.getCore().getDataDir();
+        if (!dataDir) {
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Data directory not found',
+                  details: 'Run "civic init" first',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            throw new Error(
+              'Data directory not found. Run "civic init" first.'
+            );
+          }
+          process.exit(1);
+        }
+
+        // Load template
+        const coreModule = await import('@civicpress/core');
+        const templateEngine = new coreModule.TemplateEngine(dataDir);
+        const templateName = options.template || 'default';
+        const template = await templateEngine.loadTemplate(type, templateName);
+
+        if (!template) {
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Template not found',
+                  details: `Template ${type}/${templateName} not found`,
+                  availableTemplates: templateEngine.listTemplates(type),
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error(`❌ Template ${type}/${templateName} not found`);
+            logger.info('Available templates:');
+            const templates = templateEngine.listTemplates(type);
+            templates.forEach((t: string) => logger.info(`  ${t}`));
+          }
+          process.exit(1);
+        }
+
         // Create filename from title
         const filename = title
           .toLowerCase()
@@ -64,9 +120,6 @@ export const createCommand = (cli: CAC) => {
           .replace(/\s+/g, '-')
           .replace(/-+/g, '-')
           .trim();
-
-        // Get data directory from core
-        const dataDir = civic.getCore().getDataDir();
         if (!dataDir) {
           if (shouldOutputJson) {
             console.log(
@@ -97,6 +150,23 @@ export const createCommand = (cli: CAC) => {
         // Create the record file
         const filePath = path.join(recordsDir, `${filename}.md`);
 
+        // Create template context
+        const context = {
+          title: title,
+          type: type,
+          status: 'draft',
+          author: 'system', // TODO: Get from user context
+          version: '1.0.0',
+          created: new Date().toISOString(),
+          updated: new Date().toISOString(),
+        };
+
+        // Process template with context
+        const processedContent = templateEngine.processTemplate(
+          template,
+          context
+        );
+
         // Create YAML frontmatter
         const frontmatter = {
           title: title,
@@ -108,24 +178,8 @@ export const createCommand = (cli: CAC) => {
           version: '1.0.0',
         };
 
-        // Create markdown content
-        const content = `# ${title}
-
-## Description
-
-[Add description here]
-
-## Content
-
-[Add content here]
-
-## References
-
-[Add references here]
-`;
-
-        // Combine frontmatter and content using yaml
-        const fullContent = `---\n${yaml.stringify(frontmatter)}---\n${content}`;
+        // Combine frontmatter and processed content
+        const fullContent = `---\n${yaml.stringify(frontmatter)}---\n${processedContent}`;
 
         // Handle dry-run modes
         const isCompleteDryRun = options.dryRun;
@@ -214,6 +268,8 @@ export const createCommand = (cli: CAC) => {
                   filename: filename,
                   filePath: filePath,
                   status: 'draft',
+                  template: templateName,
+                  templatePath: `${type}/${templateName}`,
                   dryRun: isCompleteDryRun,
                   hooksFired: !isCompleteDryRun && dryRunHooks.length === 0,
                 },
@@ -225,6 +281,7 @@ export const createCommand = (cli: CAC) => {
         } else {
           logger.success(`✅ Created ${type}: ${title}`);
           logger.info(`📁 Location: ${filePath}`);
+          logger.info(`📋 Template: ${type}/${templateName}`);
         }
       } catch (error) {
         if (shouldOutputJson) {

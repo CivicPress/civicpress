@@ -51,6 +51,9 @@ pnpm install
 # Install dependencies (if not already done)
 pnpm install
 
+# Start the development environment
+pnpm run dev
+
 # Format code
 pnpm run format
 
@@ -73,12 +76,143 @@ pnpm run spec:check
 ## 📖 Documentation
 
 - [CLI Usage Guide](docs/cli.md)
+- [Template System Guide](docs/templates.md)
+- [Validation System Guide](docs/validation.md)
+
+## 🎛️ CLI Features
+
+CivicPress provides a powerful command-line interface for managing civic
+records:
+
+### Record Management
+
+```bash
+# Create records with templates
+civic create bylaw "Public Meeting Procedures" --template advanced
+civic create policy "Data Privacy Policy" --template default
+civic create resolution "Budget Approval 2024" --template standard
+
+# View and edit records
+civic view "public-meeting-procedures"
+civic edit "data-privacy-policy"
+
+# List and search records
+civic list --type bylaw --status draft
+civic search "privacy" --type policy
+```
+
+### Advanced Template System
+
+```bash
+# List available templates
+civic template --list
+
+# Show template details
+civic template --show bylaw/advanced
+
+# Create custom templates
+civic template --create "custom-bylaw" --type bylaw
+```
+
+### Validation & Quality
+
+```bash
+# Validate records
+civic validate bylaw/public-meeting-procedures
+civic validate --all --json
+
+# Export records
+civic export --format json --output reports/
+civic export --format html --template custom-template.html
+```
+
+### Git Integration
+
+```bash
+# View history
+civic history "public-meeting-procedures"
+
+# Compare versions
+civic diff "data-privacy-policy" --from v1.0.0 --to v1.1.0
+
+# Status and workflow
+civic status "budget-approval" approved
+```
+
+## 🎨 Advanced Template System
+
+CivicPress features a sophisticated template system with inheritance,
+validation, and customization:
+
+### Template Inheritance
+
+```yaml
+# .civic/templates/bylaw/advanced.md
+---
+template: bylaw/advanced
+extends: bylaw/base
+validation:
+  required_fields: [bylaw_number, fiscal_year]
+  advanced_rules:
+    - name: "approval_workflow"
+      condition: "status == 'approved'"
+      fields: [approval_date, approved_by]
+      rule: "approved_by_authority"
+      severity: "error"
+---
+```
+
+### Advanced Validation
+
+- **Conditional Rules** - Validation that applies based on record status
+- **Field Relationships** - Required together, mutually exclusive fields
+- **Custom Validators** - Email, phone, date, semantic version validation
+- **Business Rules** - Complex approval workflows and compliance checks
+
+### Template Features
+
+- **Multi-level Inheritance** - Templates can extend and override parent
+  templates
+- **Variable Substitution** - Dynamic content with context-aware variables
+- **Conditional Blocks** - Content that shows/hides based on record data
+- **Section Validation** - Required sections with minimum length requirements
+
+## 📊 Validation System
+
+Comprehensive validation ensures data quality and compliance:
+
+### Validation Types
+
+- **Basic Validation** - Required fields, data types, format checking
+- **Advanced Validation** - Business rules, field relationships, custom
+  validators
+- **Content Validation** - Section requirements, placeholder detection
+- **Template Validation** - Template structure and inheritance validation
+
+### Validation Commands
+
+```bash
+# Validate single record
+civic validate bylaw/public-meeting-procedures
+
+# Validate all records
+civic validate --all --json
+
+# Validate with auto-fix
+civic validate --all --fix
+
+# Strict validation (warnings as errors)
+civic validate --all --strict
+```
 
 ## 📁 Project Structure
 
 ```
 civicpress/
 ├── .civic/          # CivicPress platform configuration
+│   ├── templates/   # Template system (inheritance, validation)
+│   ├── specs/       # System specifications
+│   └── config.yml   # Platform configuration
 ├── agent/           # Local AI memory used for dev context only — not deployed with the app
 ├── core/            # Core platform modules
 ├── modules/         # Civic modules (legal-register, etc.)
@@ -92,6 +226,8 @@ CivicPress is built as a modular monorepo using pnpm workspaces:
 
 - **Core Platform**: Foundational services and utilities
 - **Civic Modules**: Specialized modules for different civic functions
+- **Template Engine**: Advanced template system with inheritance and validation
+- **CLI Interface**: Comprehensive command-line tools for record management
 - **Agent Context**: AI development memory and context (not deployed)
 
 ## 🤝 Contributing

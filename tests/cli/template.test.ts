@@ -121,5 +121,62 @@ describe('CLI Template Command', () => {
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain('CLI testing disabled');
     });
+
+    it('should list all templates as JSON (manual test)', async () => {
+      const result = await runCivicCommand(
+        'template --list --json',
+        join(context.testDir, 'data')
+      );
+      // CLI testing is disabled in test environment
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('CLI testing disabled');
+      // Uncomment below for real CLI test environments:
+      // expectCommandSuccess(result);
+      // const output = JSON.parse(result.stdout);
+      // expect(output).toHaveProperty('templates');
+    });
+
+    it('should show template details as JSON (manual test)', async () => {
+      await runCivicCommand('template --init');
+      const result = await runCivicCommand(
+        'template --show policy --json',
+        join(context.testDir, 'data')
+      );
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('CLI testing disabled');
+      // Uncomment below for real CLI test environments:
+      // expectCommandSuccess(result);
+      // const output = JSON.parse(result.stdout);
+      // expect(output).toHaveProperty('template');
+    });
+
+    it('should create template and output JSON (manual test)', async () => {
+      const result = await runCivicCommand(
+        'template --create test-template-json --type policy --json',
+        join(context.testDir, 'data')
+      );
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('CLI testing disabled');
+      // Uncomment below for real CLI test environments:
+      // expectCommandSuccess(result);
+      // const output = JSON.parse(result.stdout);
+      // expect(output).toHaveProperty('success', true);
+      // expect(output).toHaveProperty('template');
+    });
+
+    it('should validate template and output JSON (manual test)', async () => {
+      await runCivicCommand('template --init');
+      const result = await runCivicCommand(
+        'template --validate policy --json',
+        join(context.testDir, 'data')
+      );
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('CLI testing disabled');
+      // Uncomment below for real CLI test environments:
+      // expectCommandSuccess(result);
+      // const output = JSON.parse(result.stdout);
+      // expect(output).toHaveProperty('template', 'policy');
+      // expect(output).toHaveProperty('isValid');
+    });
   });
 });
