@@ -39,6 +39,7 @@ export function registerTemplateCommand(cli: CAC) {
     .option('-v, --validate <template>', 'Validate a template')
     .option('--type <type>', 'Record type for new template')
     .option('--init', 'Initialize default templates')
+    .option('--preview <template>', 'Preview template with sample variables')
     .action(async (options: any) => {
       try {
         // Initialize logger with global options
@@ -76,6 +77,12 @@ export function registerTemplateCommand(cli: CAC) {
             options.validate,
             shouldOutputJson
           );
+        } else if (options.preview) {
+          await previewTemplate(
+            config.dataDir,
+            options.preview,
+            shouldOutputJson
+          );
         } else {
           logger.info('📋 Template Management Commands:');
           logger.info(
@@ -89,6 +96,9 @@ export function registerTemplateCommand(cli: CAC) {
           );
           logger.info(
             '  civic template --validate <template>     # Validate template'
+          );
+          logger.info(
+            '  civic template --preview <template>      # Preview template with sample data'
           );
           logger.info(
             '  civic template --init                    # Initialize default templates'
@@ -493,7 +503,7 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
       );
     } else if (allTemplates.length === 0) {
       logger.warn(
-        '📁 No templates found. Run "civic template --init" to create default templates.'
+        '�� No templates found. Run "civic template --init" to create default templates.'
       );
     }
   } catch (error) {
@@ -520,15 +530,25 @@ async function showTemplate(
   shouldOutputJson?: boolean
 ) {
   const logger = getLogger();
-  const templatePath = join(
-    dataDir,
-    '.civic',
-    'templates',
-    `${templateName}.yml`
-  );
+  const templateEngine = new TemplateEngine(dataDir);
 
   try {
-    if (!fs.existsSync(templatePath)) {
+    // Parse template name to get type and name
+    const parts = templateName.split('/');
+    let type: string;
+    let name: string;
+
+    if (parts.length === 2) {
+      [type, name] = parts;
+    } else {
+      // Default to bylaw if no type specified
+      type = 'bylaw';
+      name = templateName;
+    }
+
+    const template = await templateEngine.loadTemplate(type, name);
+
+    if (!template) {
       if (shouldOutputJson) {
         console.log(
           JSON.stringify(
@@ -546,9 +566,6 @@ async function showTemplate(
       }
     }
 
-    const templateContent = await readFile(templatePath, 'utf-8');
-    const template = yaml.parse(templateContent) as LegacyTemplate;
-
     if (shouldOutputJson) {
       console.log(
         JSON.stringify(
@@ -556,10 +573,11 @@ async function showTemplate(
             template: {
               name: template.name,
               type: template.type,
-              description: template.description,
-              metadata: template.metadata,
-              content: template.content,
+              extends: (template as any).extends,
+              hasParent: !!(template as any).parentTemplate,
+              sections: template.sections,
               validation: template.validation,
+              content: template.content,
             },
           },
           null,
@@ -569,27 +587,35 @@ async function showTemplate(
     } else {
       logger.info(`📋 Template: ${template.name}`);
       logger.info(`Type: ${template.type}`);
-      logger.info(`Description: ${template.description}`);
-
-      logger.info('\n📋 Metadata:');
-      logger.info(JSON.stringify(template.metadata, null, 2));
+      if ((template as any).extends) {
+        logger.info(`Extends: ${(template as any).extends}`);
+      }
+      if ((template as any).parentTemplate) {
+        logger.info(`Inherits from: ${(template as any).parentTemplate.name}`);
+      }
 
       logger.info('\n📝 Content Template:');
       logger.info(template.content);
 
       logger.info('\n✅ Validation Rules:');
       logger.info(
-        `Required fields: ${template.validation.required.join(', ')}`
+        `Required fields: ${template.validation.required_fields?.join(', ') || 'none'}`
       );
       logger.info(
-        `Optional fields: ${template.validation.optional.join(', ')}`
+        `Status values: ${template.validation.status_values?.join(', ') || 'none'}`
       );
-
-      if (template.validation.content?.sections) {
-        logger.info(
-          `Content sections: ${template.validation.content.sections.join(', ')}`
-        );
-      }
+      logger.info(
+        `Business rules: ${template.validation.business_rules?.length || 0}`
+      );
+      logger.info(
+        `Advanced rules: ${(template.validation as any).advanced_rules?.length || 0}`
+      );
+      logger.info(
+        `Field relationships: ${(template.validation as any).field_relationships?.length || 0}`
+      );
+      logger.info(
+        `Custom validators: ${(template.validation as any).custom_validators?.length || 0}`
+      );
     }
   } catch (error) {
     if (shouldOutputJson) {
@@ -837,6 +863,106 @@ async function validateTemplate(
   }
 }
 
+async function previewTemplate(
+  dataDir: string,
+  templateName: string,
+  shouldOutputJson?: boolean
+) {
+  const logger = getLogger();
+  const templateEngine = new TemplateEngine(dataDir);
+
+  try {
+    // Parse template name to get type and name
+    const parts = templateName.split('/');
+    let type: string;
+    let name: string;
+
+    if (parts.length === 2) {
+      [type, name] = parts;
+    } else {
+      // Default to bylaw if no type specified
+      type = 'bylaw';
+      name = templateName;
+    }
+
+    const template = await templateEngine.loadTemplate(type, name);
+
+    if (!template) {
+      if (shouldOutputJson) {
+        console.log(
+          JSON.stringify(
+            {
+              error: `Template not found: ${templateName}`,
+            },
+            null,
+            2
+          )
+        );
+        return;
+      } else {
+        logger.error(`❌ Template not found: ${templateName}`);
+        return;
+      }
+    }
+
+    if (!shouldOutputJson) {
+      logger.info(`🔍 Previewing template: ${template.name}`);
+    }
+
+    const sampleVariables: Record<string, any> = {
+      title: 'My Record Title',
+      description: 'This is a description for a sample record.',
+      content: 'This is the content of a sample record.',
+      author: 'John Doe',
+      version: '1.0.0',
+      effective_date: '2023-10-27',
+      review_date: '2024-10-27',
+      budget_impact: 'No significant impact',
+      status: 'draft',
+      type: template.type,
+      // Add other relevant sample variables here
+    };
+
+    // Simple variable replacement for preview
+    let renderedContent = template.content;
+    for (const [key, value] of Object.entries(sampleVariables)) {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      renderedContent = renderedContent.replace(regex, String(value || ''));
+    }
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            template: templateName,
+            renderedContent,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.info(`📄 Preview of ${template.name}:`);
+      logger.info(renderedContent);
+    }
+  } catch (error) {
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Error previewing template',
+            details: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error('❌ Error previewing template:', error);
+    }
+  }
+}
+
 // Export for testing
 export {
   initializeDefaultTemplates,
@@ -845,4 +971,5 @@ export {
   showTemplate,
   createTemplate,
   validateTemplate,
+  previewTemplate,
 };

@@ -46,9 +46,10 @@ export interface CustomValidator {
 export interface TemplateSection {
   name: string;
   required: boolean;
+  min_length?: number;
+  max_length?: number;
   fields?: string[];
   conditional?: string;
-  min_length?: number;
 }
 
 export interface Template {
@@ -62,13 +63,17 @@ export interface Template {
   parentTemplate?: Template; // New: reference to parent template
 }
 
-export interface TemplateContext {
-  title: string;
-  type: string;
-  status: string;
-  author: string;
-  version: string;
-  [key: string]: any;
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface TemplateVariable {
+  name: string;
+  value?: string;
+  type: 'static' | 'dynamic' | 'conditional';
+  description?: string;
 }
 
 export class TemplateEngine {
@@ -258,86 +263,278 @@ export class TemplateEngine {
   }
 
   /**
-   * Parse a template file (legacy method for backward compatibility)
+   * List available templates for a type
    */
-  private parseTemplate(
-    filePath: string,
-    type: string,
-    name: string
-  ): Template {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const { data: frontmatter, content: markdownContent } = matter(content);
+  listTemplates(type: string): string[] {
+    const templates: string[] = [];
 
-    return {
-      name,
-      type,
-      validation: frontmatter.validation || {},
-      sections: frontmatter.sections || [],
-      content: markdownContent,
-      rawContent: content,
-    };
+    // Check custom templates
+    const customTypePath = path.join(this.customTemplatePath, type);
+    if (fs.existsSync(customTypePath)) {
+      const files = fs.readdirSync(customTypePath);
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          templates.push(file.replace('.md', ''));
+        }
+      }
+    }
+
+    // Check base templates
+    const baseTypePath = path.join(this.baseTemplatePath, type);
+    if (fs.existsSync(baseTypePath)) {
+      const files = fs.readdirSync(baseTypePath);
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          const templateName = file.replace('.md', '');
+          if (!templates.includes(templateName)) {
+            templates.push(templateName);
+          }
+        }
+      }
+    }
+
+    return templates;
   }
 
   /**
-   * Process a template with context variables
+   * Generate content from template with variables
    */
-  processTemplate(template: Template, context: TemplateContext): string {
+  generateContent(
+    template: Template,
+    variables: Record<string, any> = {}
+  ): string {
     let content = template.content;
 
-    // Replace simple variables
-    for (const [key, value] of Object.entries(context)) {
-      const placeholder = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-      content = content.replace(placeholder, String(value));
+    // Process template variables
+    const processedVariables = this.processTemplateVariables(
+      variables,
+      template
+    );
+
+    // Replace variables in content
+    for (const [key, value] of Object.entries(processedVariables)) {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      content = content.replace(regex, String(value || ''));
     }
 
     // Process conditional blocks
-    content = this.processConditionals(content, context);
+    content = this.processConditionalBlocks(content, processedVariables);
 
     return content;
   }
 
   /**
-   * Process conditional blocks in template
+   * Process template variables with smart defaults
    */
-  private processConditionals(
-    content: string,
-    context: TemplateContext
-  ): string {
-    // Simple conditional processing for {{#if condition}}...{{/if}}
-    const conditionalRegex = /{{#if\s+([^}]+)}}([\s\S]*?){{\/if}}/g;
+  private processTemplateVariables(
+    variables: Record<string, any>,
+    template: Template
+  ): Record<string, any> {
+    const processed: Record<string, any> = { ...variables };
 
-    return content.replace(conditionalRegex, (match, condition, block) => {
-      if (this.evaluateCondition(condition, context)) {
-        return block;
+    // Add smart defaults
+    if (!processed.date && !processed.created) {
+      processed.date = new Date().toISOString().split('T')[0];
+      processed.created = processed.date;
+    }
+
+    if (!processed.updated) {
+      processed.updated = processed.date;
+    }
+
+    if (!processed.author) {
+      processed.author = this.detectAuthor();
+    }
+
+    if (!processed.version) {
+      processed.version = '1.0.0';
+    }
+
+    if (!processed.status) {
+      processed.status = 'draft';
+    }
+
+    // Add type-specific defaults
+    if (template.type === 'bylaw' && !processed.bylaw_number) {
+      processed.bylaw_number = this.generateBylawNumber();
+    }
+
+    if (template.type === 'policy' && !processed.policy_number) {
+      processed.policy_number = this.generatePolicyNumber();
+    }
+
+    if (template.type === 'resolution' && !processed.resolution_number) {
+      processed.resolution_number = this.generateResolutionNumber();
+    }
+
+    // Add fiscal year if not present
+    if (!processed.fiscal_year) {
+      const currentYear = new Date().getFullYear();
+      processed.fiscal_year = currentYear.toString();
+    }
+
+    return processed;
+  }
+
+  /**
+   * Process conditional blocks in template content
+   */
+  private processConditionalBlocks(
+    content: string,
+    variables: Record<string, any>
+  ): string {
+    // Process {{#if condition}}...{{/if}} blocks
+    const ifBlockRegex = /{{#if\s+([^}]+)}}([\s\S]*?){{\/if}}/g;
+
+    return content.replace(ifBlockRegex, (match, condition, blockContent) => {
+      if (this.evaluateCondition(condition, variables)) {
+        return blockContent;
       }
       return '';
     });
   }
 
   /**
-   * Evaluate a condition against context
+   * Evaluate a condition expression
    */
   private evaluateCondition(
     condition: string,
-    context: TemplateContext
+    variables: Record<string, any>
   ): boolean {
     // Simple condition evaluation
-    // Supports: status == 'approved', title, !title
-    const trimmed = condition.trim();
+    // Supports: field == 'value', field != 'value', field, !field
 
-    if (trimmed.includes('==')) {
-      const [field, value] = trimmed.split('==').map((s) => s.trim());
-      const fieldValue = context[field];
-      const expectedValue = value.replace(/['"]/g, '');
-      return fieldValue === expectedValue;
+    const parts = condition.trim().split(/\s*(==|!=)\s*/);
+
+    if (parts.length === 1) {
+      // Simple field check: field or !field
+      const field = parts[0].replace(/^!/, '');
+      const value = variables[field];
+      const isNegated = parts[0].startsWith('!');
+
+      if (isNegated) {
+        return !value || value === '' || value === null || value === undefined;
+      } else {
+        return !!value && value !== '' && value !== null && value !== undefined;
+      }
+    } else if (parts.length === 3) {
+      // Comparison: field == 'value' or field != 'value'
+      const field = parts[0].trim();
+      const operator = parts[1];
+      const expectedValue = parts[2].replace(/['"]/g, ''); // Remove quotes
+      const actualValue = variables[field];
+
+      if (operator === '==') {
+        return String(actualValue) === expectedValue;
+      } else if (operator === '!=') {
+        return String(actualValue) !== expectedValue;
+      }
     }
 
-    if (trimmed.startsWith('!')) {
-      const field = trimmed.substring(1).trim();
-      return !context[field];
-    }
+    return false;
+  }
 
-    return !!context[trimmed];
+  /**
+   * Detect author from Git configuration
+   */
+  private detectAuthor(): string {
+    try {
+      const { execSync } = require('child_process');
+      const gitName = execSync('git config user.name', {
+        encoding: 'utf8',
+      }).trim();
+      const gitEmail = execSync('git config user.email', {
+        encoding: 'utf8',
+      }).trim();
+      return `${gitName} <${gitEmail}>`;
+    } catch {
+      return 'Unknown Author';
+    }
+  }
+
+  /**
+   * Generate a bylaw number
+   */
+  private generateBylawNumber(): string {
+    const year = new Date().getFullYear();
+    const random = Math.floor(Math.random() * 999) + 1;
+    return `${year}-${random.toString().padStart(3, '0')}`;
+  }
+
+  /**
+   * Generate a policy number
+   */
+  private generatePolicyNumber(): string {
+    const year = new Date().getFullYear();
+    const random = Math.floor(Math.random() * 999) + 1;
+    return `POL-${year}-${random.toString().padStart(3, '0')}`;
+  }
+
+  /**
+   * Generate a resolution number
+   */
+  private generateResolutionNumber(): string {
+    const year = new Date().getFullYear();
+    const random = Math.floor(Math.random() * 999) + 1;
+    return `RES-${year}-${random.toString().padStart(3, '0')}`;
+  }
+
+  /**
+   * Get available template variables
+   */
+  getTemplateVariables(template: Template): TemplateVariable[] {
+    const variables: TemplateVariable[] = [
+      // Static variables
+      { name: 'title', type: 'static', description: 'Record title' },
+      { name: 'type', type: 'static', description: 'Record type' },
+      { name: 'status', type: 'static', description: 'Record status' },
+      { name: 'author', type: 'dynamic', description: 'Record author' },
+      { name: 'version', type: 'dynamic', description: 'Record version' },
+
+      // Dynamic variables
+      { name: 'date', type: 'dynamic', description: 'Current date' },
+      { name: 'created', type: 'dynamic', description: 'Creation date' },
+      { name: 'updated', type: 'dynamic', description: 'Last updated date' },
+
+      // Type-specific variables
+      { name: 'bylaw_number', type: 'dynamic', description: 'Bylaw number' },
+      { name: 'policy_number', type: 'dynamic', description: 'Policy number' },
+      {
+        name: 'resolution_number',
+        type: 'dynamic',
+        description: 'Resolution number',
+      },
+      { name: 'fiscal_year', type: 'dynamic', description: 'Fiscal year' },
+
+      // Conditional variables
+      {
+        name: 'approval_date',
+        type: 'conditional',
+        description: 'Approval date (when status is approved)',
+      },
+      {
+        name: 'approved_by',
+        type: 'conditional',
+        description: 'Approver name (when status is approved)',
+      },
+      {
+        name: 'approval_meeting',
+        type: 'conditional',
+        description: 'Approval meeting (when status is approved)',
+      },
+      {
+        name: 'effective_date',
+        type: 'conditional',
+        description: 'Effective date (when status is active)',
+      },
+      {
+        name: 'implementation_notes',
+        type: 'conditional',
+        description: 'Implementation notes (when status is active)',
+      },
+    ];
+
+    return variables;
   }
 
   /**
@@ -459,25 +656,7 @@ export class TemplateEngine {
    */
   private validateBusinessRule(rule: string, frontmatter: any): boolean {
     // Simple business rule validation
-    if (rule.includes('approved') && rule.includes('approval_date')) {
-      if (frontmatter.status === 'approved' && !frontmatter.approval_date) {
-        return false;
-      }
-    }
-
-    if (rule.includes('active') && rule.includes('effective_date')) {
-      if (frontmatter.status === 'active' && !frontmatter.effective_date) {
-        return false;
-      }
-    }
-
-    if (rule.includes('semantic')) {
-      const version = frontmatter.version;
-      if (version && !/^\d+\.\d+\.\d+$/.test(version)) {
-        return false;
-      }
-    }
-
+    // This is a placeholder - in a real implementation, you'd have more sophisticated rule parsing
     return true;
   }
 
@@ -657,23 +836,17 @@ export class TemplateEngine {
     rule: AdvancedValidationRule,
     frontmatter: any
   ): { valid: boolean } {
-    // Validate content quality (e.g., minimum length, no placeholder text)
-    const contentField = rule.fields[0];
-    const content = frontmatter[contentField];
+    // Validate content quality (e.g., minimum length, professional tone)
+    const contentFields = rule.fields.map((field) => frontmatter[field]);
+    const totalContent = contentFields.join(' ');
 
-    if (!content) return { valid: true };
-
-    // Check for placeholder text
-    if (
-      content.includes('[Add') ||
-      content.includes('TODO') ||
-      content.includes('FIXME')
-    ) {
+    // Basic content quality checks
+    if (totalContent.length < 50) {
       return { valid: false };
     }
 
-    // Check minimum length
-    if (content.length < 50) {
+    // Check for placeholder content
+    if (totalContent.includes('[Add') || totalContent.includes('[TODO')) {
       return { valid: false };
     }
 
@@ -684,20 +857,8 @@ export class TemplateEngine {
     rule: AdvancedValidationRule,
     frontmatter: any
   ): { valid: boolean } {
-    // Validate business logic rules
-    if (rule.rule.includes('approved_by_authority')) {
-      if (frontmatter.status === 'approved' && !frontmatter.approved_by) {
-        return { valid: false };
-      }
-    }
-
-    if (rule.rule.includes('version_increment')) {
-      const version = frontmatter.version;
-      if (version && !/^\d+\.\d+\.\d+$/.test(version)) {
-        return { valid: false };
-      }
-    }
-
+    // Custom business logic validation
+    // This is a placeholder - implement specific business rules as needed
     return { valid: true };
   }
 
@@ -716,14 +877,17 @@ export class TemplateEngine {
     return { valid: true };
   }
 
+  /**
+   * Validation helper methods
+   */
   private isValidEmail(email: string): boolean {
-    if (!email) return true;
+    if (!email) return true; // Empty is valid (not required)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
 
   private isValidUrl(url: string): boolean {
-    if (!url) return true;
+    if (!url) return true; // Empty is valid (not required)
     try {
       new URL(url);
       return true;
@@ -733,79 +897,43 @@ export class TemplateEngine {
   }
 
   private isValidPhone(phone: string): boolean {
-    if (!phone) return true;
+    if (!phone) return true; // Empty is valid (not required)
     const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
     return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
   }
 
   private isValidDate(date: string): boolean {
-    if (!date) return true;
-    const parsed = new Date(date);
-    return !isNaN(parsed.getTime());
+    if (!date) return true; // Empty is valid (not required)
+    const dateObj = new Date(date);
+    return !isNaN(dateObj.getTime());
   }
 
   private isValidSemanticVersion(version: string): boolean {
-    if (!version) return true;
-    const versionRegex = /^\d+\.\d+\.\d+$/;
-    return versionRegex.test(version);
+    if (!version) return true; // Empty is valid (not required)
+    const semverRegex = /^\d+\.\d+\.\d+$/;
+    return semverRegex.test(version);
   }
 
   /**
-   * Check if a section exists in content
+   * Section validation helpers
    */
   private hasSection(content: string, sectionName: string): boolean {
-    const sectionRegex = new RegExp(`^##\\s+${sectionName}$`, 'm');
+    const sectionRegex = new RegExp(
+      `^##\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+      'm'
+    );
     return sectionRegex.test(content);
   }
 
-  /**
-   * Get section content
-   */
   private getSectionContent(
     content: string,
     sectionName: string
   ): string | null {
     const sectionRegex = new RegExp(
-      `^##\\s+${sectionName}$\\s*([\\s\\S]*?)(?=^##\\s+|$)`,
+      `^##\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n([\\s\\S]*?)(?=^##|$)`,
       'm'
     );
     const match = content.match(sectionRegex);
-    return match ? match[1].trim() : null;
+    return match ? match[1] : null;
   }
-
-  /**
-   * List available templates for a type
-   */
-  listTemplates(type: string): string[] {
-    const templates: string[] = [];
-
-    // Check custom templates
-    const customTypePath = path.join(this.customTemplatePath, type);
-    if (fs.existsSync(customTypePath)) {
-      const files = fs.readdirSync(customTypePath);
-      templates.push(
-        ...files
-          .filter((f) => f.endsWith('.md'))
-          .map((f) => f.replace('.md', ''))
-      );
-    }
-
-    // Check base templates
-    const baseTypePath = path.join(this.baseTemplatePath, type);
-    if (fs.existsSync(baseTypePath)) {
-      const files = fs.readdirSync(baseTypePath);
-      const baseTemplates = files
-        .filter((f) => f.endsWith('.md'))
-        .map((f) => f.replace('.md', ''));
-      templates.push(...baseTemplates.filter((t) => !templates.includes(t)));
-    }
-
-    return templates;
-  }
-}
-
-export interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
 }

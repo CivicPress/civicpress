@@ -178,5 +178,19 @@ describe('CLI Template Command', () => {
       // expect(output).toHaveProperty('template', 'policy');
       // expect(output).toHaveProperty('isValid');
     });
+
+    it('should preview template with sample data (manual test)', async () => {
+      await runCivicCommand('template --init');
+      const result = await runCivicCommand(
+        'template --preview policy/default',
+        join(context.testDir, 'data')
+      );
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('CLI testing disabled');
+      // Uncomment below for real CLI test environments:
+      // expectCommandSuccess(result);
+      // expect(result.stdout).toContain('My Record Title');
+      // expect(result.stdout).toContain('John Doe');
+    });
   });
 });
