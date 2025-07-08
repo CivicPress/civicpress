@@ -15,6 +15,7 @@ import { registerDiffCommand } from './commands/diff';
 import { registerExportCommand } from './commands/export';
 import { registerTemplateCommand } from './commands/template';
 import { registerValidateCommand } from './commands/validate';
+import { registerHookCommand } from './commands/hook';
 
 const cli = cac('civic');
 
@@ -34,6 +35,7 @@ registerDiffCommand(cli);
 registerExportCommand(cli);
 registerTemplateCommand(cli);
 registerValidateCommand(cli);
+registerHookCommand(cli);
 
 // Parse and run
 cli.parse();

@@ -20,6 +20,7 @@ options, and usage examples for managing civic records with CivicPress.
   - [export](#export)
   - [template](#template)
   - [validate](#validate)
+  - [hook](#hook)
 
 ---
 
@@ -54,6 +55,9 @@ civic create <type> <name>
 
 - Example: `civic create policy "Public Records Policy"`
 - Prompts for metadata and opens your editor for content.
+- Complete dry-run: `civic create policy "Test" --dry-run`
+- Hook dry-run:
+  `civic create policy "Test" --dry-run-hooks record:created,record:committed`
 
 ---
 
@@ -131,6 +135,9 @@ civic status <record> <new-status> [--message <msg>]
 
 - Example:
   `civic status policy/public-records-policy approved --message "Policy approved by council"`
+- Complete dry-run: `civic status policy/test approved --dry-run`
+- Hook dry-run:
+  `civic status policy/test approved --dry-run-hooks status:changed`
 
 ---
 
@@ -218,6 +225,25 @@ The validation checks:
 - Field format validation (email, date, URL)
 - Common issues like placeholders and empty sections
 - Template compliance
+
+---
+
+### `hook`
+
+Manage CivicPress hooks and workflows for automation.
+
+```sh
+civic hook [command] [options]
+```
+
+- List hooks: `civic hook list`
+- Show configuration: `civic hook config`
+- Test a hook: `civic hook test <hook>`
+- Enable hook: `civic hook --enable <hook>`
+- Disable hook: `civic hook --disable <hook>`
+- List workflows: `civic hook workflows`
+- Show logs: `civic hook logs`
+- JSON output: `civic hook --format json`
 
 ---
 

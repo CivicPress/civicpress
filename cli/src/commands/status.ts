@@ -16,6 +16,11 @@ export const statusCommand = (cli: CAC) => {
       '-r, --role <role>',
       'Role for the status change (clerk, council, etc.)'
     )
+    .option('--dry-run', 'Complete dry-run (no files modified, no commits)')
+    .option(
+      '--dry-run-hooks <hooks>',
+      'Dry-run specific hooks (comma-separated)'
+    )
     .action(async (recordName: string, newStatus: string, options: any) => {
       try {
         console.log(
@@ -167,46 +172,89 @@ export const statusCommand = (cli: CAC) => {
           console.log(chalk.gray(`💬 Message: ${options.message}`));
         }
 
+        // Handle dry-run modes
+        const isCompleteDryRun = options.dryRun;
+        const dryRunHooks = options.dryRunHooks
+          ? options.dryRunHooks.split(',').map((h: string) => h.trim())
+          : [];
+
         // Write updated record
         const updatedContent = matter.stringify(
           markdownContent,
           updatedFrontmatter
         );
-        fs.writeFileSync(recordPath, updatedContent);
 
-        console.log(chalk.green(`✅ Status updated successfully!`));
-
-        // Commit the change
-        const git = new (await import('@civicpress/core')).GitEngine(dataDir);
-
-        // Set role if provided
-        if (options.role) {
-          git.setRole(options.role);
+        if (isCompleteDryRun) {
+          console.log(chalk.yellow(`📋 Would update: ${recordPath}`));
+          console.log(
+            chalk.yellow(
+              `📋 Would change status: ${currentStatus} → ${newStatus}`
+            )
+          );
+        } else {
+          fs.writeFileSync(recordPath, updatedContent);
+          console.log(chalk.green(`✅ Status updated successfully!`));
         }
 
-        // Create commit message
-        const commitMessage = options.message
-          ? `Change status to ${newStatus}: ${options.message}`
-          : `Change status from ${currentStatus} to ${newStatus}`;
+        // Commit the change
+        let commitHash: string | undefined;
 
-        const commitHash = await git.commit(commitMessage, [
-          path.relative(dataDir, recordPath),
-        ]);
-        console.log(chalk.green(`💾 Committed status change`));
-        console.log(chalk.blue(`🔗 Commit hash: ${commitHash}`));
+        if (isCompleteDryRun) {
+          const commitMessage = options.message
+            ? `Change status to ${newStatus}: ${options.message}`
+            : `Change status from ${currentStatus} to ${newStatus}`;
+          console.log(chalk.yellow(`📋 Would commit: "${commitMessage}"`));
+          console.log(
+            chalk.yellow(
+              `📋 Would stage: ${path.relative(dataDir, recordPath)}`
+            )
+          );
+        } else {
+          const git = new (await import('@civicpress/core')).GitEngine(dataDir);
+
+          // Set role if provided
+          if (options.role) {
+            git.setRole(options.role);
+          }
+
+          // Create commit message
+          const commitMessage = options.message
+            ? `Change status to ${newStatus}: ${options.message}`
+            : `Change status from ${currentStatus} to ${newStatus}`;
+
+          commitHash = await git.commit(commitMessage, [
+            path.relative(dataDir, recordPath),
+          ]);
+          console.log(chalk.green(`💾 Committed status change`));
+          console.log(chalk.blue(`🔗 Commit hash: ${commitHash}`));
+        }
 
         // Emit hook for audit trail
         const hooks = civic.getHookSystem();
-        await hooks.emit('record:status_changed', {
-          recordName,
-          recordType,
-          previousStatus: currentStatus,
-          newStatus,
-          role: options.role || 'unknown',
-          message: options.message,
-          commitHash,
-          timestamp: new Date().toISOString(),
-        });
+
+        if (isCompleteDryRun || dryRunHooks.includes('status:changed')) {
+          console.log(chalk.yellow(`📋 Would fire hook: status:changed`));
+          console.log(
+            chalk.gray(
+              `   Record: ${frontmatter.title || recordName} (${recordType})`
+            )
+          );
+          console.log(chalk.gray(`   Status: ${currentStatus} → ${newStatus}`));
+        } else {
+          await hooks.emit('status:changed', {
+            record: {
+              title: frontmatter.title || recordName,
+              type: recordType,
+              status: newStatus,
+              path: recordPath,
+            },
+            previousStatus: currentStatus,
+            newStatus,
+            role: options.role || 'unknown',
+            message: options.message,
+            commitHash: commitHash || 'unknown',
+          });
+        }
       } catch (error) {
         console.error(chalk.red('❌ Failed to change status:'), error);
         process.exit(1);
