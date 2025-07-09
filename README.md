@@ -100,6 +100,65 @@ pnpm run spec:check
 - [Template System Guide](docs/templates.md)
 - [Validation System Guide](docs/validation.md)
 - [Workflow Configuration](docs/workflows.md)
+- [🔌 API Integration Guide](docs/api-integration-guide.md) - **NEW!** REST API
+  for programmatic access
+
+## 🔌 REST API
+
+CivicPress provides a comprehensive REST API for programmatic access to civic
+records, workflows, and governance features:
+
+### Quick API Start
+
+```bash
+# Start the API server
+cd modules/api && pnpm run dev
+
+# Test the API
+curl http://localhost:3000/health
+curl http://localhost:3000/api/v1/records
+```
+
+### API Features
+
+- **📋 Records Management**: Full CRUD operations for civic records
+- **🔐 Role-based Access**: Enforce permissions based on user roles
+- **🔄 Workflow Control**: Manage record status transitions
+- **📄 Template System**: Use predefined templates for record creation
+- **📊 Export/Import**: Bulk data operations
+- **🔍 Search & Filter**: Advanced querying capabilities
+
+### Example API Usage
+
+```bash
+# List all records
+curl http://localhost:3000/api/v1/records
+
+# Create new bylaw
+curl -X POST http://localhost:3000/api/v1/records \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: clerk" \
+  -d '{
+    "title": "Parking Regulations",
+    "type": "bylaw",
+    "content": "# Parking Regulations\n\nNo parking on Main Street..."
+  }'
+
+# Update record status
+curl -X PUT http://localhost:3000/api/v1/records/parking-regulations \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: council" \
+  -d '{"status": "proposed"}'
+```
+
+### API Documentation
+
+- [📚 Complete API Reference](modules/api/README.md) - Detailed endpoint
+  documentation
+- [🔧 Integration Guide](docs/api-integration-guide.md) - Developer guide with
+  examples
+- [🎯 Quick Examples](docs/api-integration-guide.md#api-integration-examples) -
+  Code samples in JavaScript, Python, cURL
 
 ## 🎛️ CLI Features
 

@@ -1,254 +1,176 @@
-# 📋 CivicPress Key Decisions
+# CivicPress Development Decisions
 
-**Last Updated**: 2025-01-27  
-**Total Decisions**: 9
+## Architecture & Technology Stack
 
-## 🎯 **Recent Decisions**
+### CLI Framework
 
-### **2025-01-27: APM Memory System Implementation**
+- **Decision**: Using CAC (Command And Conquer) instead of Commander
+- **Reason**: Better TypeScript support and more modern API
+- **Status**: ✅ Implemented
 
-#### **Decision**: Adopt APM-inspired memory system for agent folder
+### Testing Framework
 
-- **Context**: Need for common base memory across AI agents
-- **Options Considered**:
-  - LangGraph workflow-based approach
-  - AutoGen conversational approach
-  - CrewAI team-based approach
-  - Custom hybrid approach
-- **Chosen Option**: APM-inspired framework with CivicPress customization
-- **Rationale**:
-  - APM provides proven structure for AI agent coordination
-  - Can be customized for CivicPress's specific needs
-  - Addresses context window limitations effectively
-  - Provides clear handover protocols
-- **Impact**: Establishes structured memory system for AI agent continuity
+- **Decision**: Using Vitest for testing
+- **Reason**: Better performance and modern features compared to Jest
+- **Status**: ✅ Implemented
 
-#### **Decision**: Comprehensive memory categories structure
+### Package Manager
 
-- **Context**: Need to organize different types of project information
-- **Options Considered**:
-  - Single large memory file
-  - Multiple small files
-  - Categorized directory structure
-- **Chosen Option**: Categorized directory structure (memory/, context/,
-  knowledge/, sessions/, tools/)
-- **Rationale**:
-  - Clear separation of concerns
-  - Easy for AI agents to navigate
-  - Scalable as project grows
-  - Maintains logical organization
-- **Impact**: Provides clear structure for different types of information
+- **Decision**: Using pnpm for monorepo management
+- **Reason**: Better performance and disk space efficiency
+- **Status**: ✅ Implemented
 
-#### **Decision**: AI agent-focused design
+### CLI Output Format
 
-- **Context**: Memory system needs to work with various AI tools
-- **Options Considered**:
-  - Developer-focused documentation
-  - AI agent-focused documentation
-  - Hybrid approach
-- **Chosen Option**: AI agent-focused design with developer guidance
-- **Rationale**:
-  - Primary users are AI agents (Cursor, Copilot, etc.)
-  - Need clear protocols for AI agent usage
-  - Must support handover between different AI tools
-  - Focus on continuity and shared understanding
-- **Impact**: Optimizes memory system for AI agent usage
+- **Decision**: All CLI commands support `--json` and `--silent` flags
+- **Reason**: Machine-readable output for automation and testing
+- **Status**: ✅ Implemented
 
-#### **Decision**: Specification-driven integration
+### Exit Codes
 
-- **Context**: CivicPress has comprehensive specification system
-- **Options Considered**:
-  - Independent memory system
-  - Integration with existing specs
-  - Reference-based approach
-- **Chosen Option**: Integration with existing specification system
-- **Rationale**:
-  - Leverages existing comprehensive spec system
-  - Maintains consistency with project approach
-  - Provides technical depth when needed
-  - Avoids duplication of information
-- **Impact**: Memory system complements existing documentation
+- **Decision**: CLI returns exit code 0 when no records found (not an error)
+- **Reason**: Consistent with Unix philosophy - no results is not an error
+- **Status**: ✅ Implemented
 
-### **2025-01-27: Project Structure Decisions**
+### Configuration Management
 
-#### **Decision**: Move specs-index.md to .civic/specs-index.md
+- **Decision**: Configuration files stored in `data/.civic/` directory
+- **Reason**: Centralized configuration management
+- **Status**: ✅ Implemented
 
-- **Context**: specs-index.md serves as meta-index for all specifications
-- **Options Considered**:
-  - Keep in .civic/specs/specs-index.md
-  - Move to .civic/specs-index.md
-  - Create separate index directory
-- **Chosen Option**: Move to .civic/specs-index.md
-- **Rationale**:
-  - Meta-index should be easily discoverable
-  - Logical hierarchy (index at same level as specs/)
-  - Consistent with README.md location
-  - Better navigation and discovery
-- **Impact**: Improved discoverability of specification index
+### Template Storage
 
-#### **Decision**: Update all relative links in specs-index.md
+- **Decision**: Templates stored in `.civic` folder with basic defaults
+- **Reason**: Easy access and version control
+- **Status**: ✅ Implemented
 
-- **Context**: File moved, links need updating
-- **Options Considered**:
-  - Manual link updates
-  - Automated link updates
-  - Relative path updates
-- **Chosen Option**: Manual relative path updates to ./specs/filename.md
-- **Rationale**:
-  - Ensures all links work correctly
-  - Maintains navigation functionality
-  - Preserves cross-references
-  - Simple and reliable approach
-- **Impact**: All specification links work correctly
+### Hook System
 
-### **2025-01-27: Documentation Decisions**
+- **Decision**: `civic hook --disable record:updated` auto-commits changes
+- **Reason**: Better UX - no manual commit step required
+- **Status**: ✅ Implemented
 
-#### **Decision**: Update CONTRIBUTING.md with all available scripts
+### Dry Run Options
 
-- **Context**: CONTRIBUTING.md only listed basic scripts, missing spec-related
-  scripts
-- **Options Considered**:
-  - Keep minimal script documentation
-  - Add all available scripts
-  - Create separate script documentation
-- **Chosen Option**: Add all available scripts to CONTRIBUTING.md
-- **Rationale**:
-  - Comprehensive documentation for contributors
-  - Includes important spec management scripts
-  - Provides complete development workflow
-  - Helps new contributors understand available tools
-- **Impact**: Contributors have complete script reference
+- **Decision**:
+  - `--dry-run`: Complete dry-run
+  - `--dry-run-hooks`: Dry-run only hooks while executing main actions
+  - Combined flags result in complete dry-run with hooks activated
+- **Reason**: Granular control over what gets executed
+- **Status**: ✅ Implemented
 
-#### **Decision**: Establish comprehensive agent folder structure
+### Documentation
 
-- **Context**: Agent folder was slim, needed comprehensive memory system
-- **Options Considered**:
-  - Minimal agent folder
-  - Comprehensive APM-inspired structure
-  - Custom memory system
-- **Chosen Option**: Comprehensive APM-inspired structure
-- **Rationale**:
-  - Addresses need for AI agent continuity
-  - Provides structured memory system
-  - Supports multiple AI tools
-  - Enables seamless handoffs
-- **Impact**: Establishes robust memory system for AI agents
+- **Decision**: Using Mermaid for all architecture diagrams
+- **Reason**: Standard format, good tooling support
+- **Status**: ✅ Implemented
 
-### **2025-01-27: Architecture Documentation Decisions**
+### Commit Message Style
 
-#### **Decision**: Use Mermaid for architecture diagrams
+- **Decision**: Toned-down, non-pretentious commit messages
+- **Reason**: Professional but approachable communication
+- **Status**: ✅ Implemented
 
-- **Context**: Need visual architecture documentation for CivicPress
-- **Options Considered**:
-  - PlantUML (detailed UML diagrams)
-  - ASCII art (simple but limited)
-  - Text-based flowcharts (easy to maintain)
-  - Mermaid (GitHub-compatible markdown diagrams)
-- **Chosen Option**: Mermaid diagrams
-- **Rationale**:
-  - GitHub renders Mermaid automatically
-  - Markdown-based, easy to maintain
-  - Supports complex diagrams (flowcharts, sequence, state)
-  - Version control friendly
-  - No external dependencies
-  - Works well with existing documentation
-- **Impact**: Provides visual architecture documentation that's easy to maintain
-  and share
+## API Development
 
-## 📊 **Decision Categories**
+### REST API Framework
 
-### **Architecture Decisions**
+- **Decision**: Express.js with TypeScript
+- **Reason**: Mature, well-supported, excellent TypeScript integration
+- **Status**: ✅ Implemented
 
-- APM memory system adoption
-- Memory categories structure
-- AI agent-focused design
-- Specification-driven integration
+### API Documentation
 
-### **Project Structure Decisions**
+- **Decision**: Swagger UI with OpenAPI 3.0 specification
+- **Reason**: Industry standard, interactive documentation
+- **Status**: ✅ Implemented (with SSL issues in development)
 
-- specs-index.md location
-- Link updates for moved files
-- Documentation organization
+### HTTPS Strategy for Development
 
-### **Development Process Decisions**
+- **Decision**: Keep HTTP for local development, add HTTPS later
+- **Reason**:
+  - Reduces initial setup complexity
+  - Browser SSL issues can be worked around with desktop tools
+  - HTTPS can be added when closer to production
+- **Status**: ✅ Current approach
 
-- CONTRIBUTING.md updates
-- Agent folder structure
-- Memory system implementation
+### API Testing Tools
 
-### **Documentation Decisions**
+- **Decision**: Hybrid approach - Swagger UI for docs, Hoppscotch/Postman for
+  testing
+- **Reason**:
+  - Desktop apps don't have browser SSL restrictions
+  - Swagger UI provides good documentation
+  - Best of both worlds
+- **Status**: ✅ Current approach
 
-- Mermaid diagram adoption
-- Architecture visualization approach
+### API Authentication
 
-## 🔄 **Decision Impact Analysis**
+- **Decision**: API key authentication with role-based access (clerk, council,
+  public)
+- **Reason**: Simple but effective for civic governance use case
+- **Status**: ✅ Placeholder implemented
 
-### **High Impact Decisions**
+### Error Handling
 
-1. **APM Memory System**: Establishes foundation for AI agent continuity
-2. **Memory Categories**: Provides organized structure for project information
-3. **AI Agent Focus**: Optimizes system for primary users
+- **Decision**: Consistent error response format with timestamps and context
+- **Reason**: Better debugging and monitoring
+- **Status**: ✅ Implemented
 
-### **Medium Impact Decisions**
+### Rate Limiting
 
-1. **Specification Integration**: Leverages existing comprehensive documentation
-2. **Project Structure**: Improves navigation and discoverability
-3. **Documentation Updates**: Provides complete development guidance
+- **Decision**: Implement rate limiting for API endpoints
+- **Reason**: Security and resource protection
+- **Status**: ✅ Implemented
 
-### **Low Impact Decisions**
+### CORS Configuration
 
-1. **Link Updates**: Maintains functionality without changing behavior
-2. **File Organization**: Improves structure without affecting functionality
-3. **Mermaid Diagrams**: Improves documentation without affecting functionality
+- **Decision**: Configured CORS for development and production
+- **Reason**: Enable cross-origin requests when needed
+- **Status**: ✅ Implemented
 
-## 📝 **Decision Documentation Protocol**
+## Development Workflow
 
-### **When Documenting Decisions**
+### Code Quality
 
-- **Date**: When decision was made
-- **Context**: What led to the decision
-- **Options**: What alternatives were considered
-- **Rationale**: Why this option was chosen
-- **Impact**: What this decision affects
+- **Decision**: ESLint with TypeScript support in all packages
+- **Reason**: Consistent code quality across monorepo
+- **Status**: ✅ Implemented
 
-### **Decision Update Process**
+### Build Process
 
-1. **Identify Need**: Recognize when decision is needed
-2. **Research Options**: Explore available alternatives
-3. **Evaluate Impact**: Consider consequences of each option
-4. **Make Decision**: Choose best option based on criteria
-5. **Document Decision**: Record decision with rationale
-6. **Communicate**: Share decision with relevant parties
-7. **Implement**: Execute the decision
-8. **Review**: Periodically review decision effectiveness
+- **Decision**: Separate build processes for CLI and API
+- **Reason**: Independent deployment and testing
+- **Status**: ✅ Implemented
 
-## 🎯 **Future Decision Areas**
+### Development Server
 
-### **Implementation Decisions**
+- **Decision**: `pnpm run dev` starts entire solution (core, CLI, API)
+- **Reason**: Single command for full development environment
+- **Status**: ✅ Implemented
 
-- Core platform implementation approach
-- Module development priorities
-- Testing framework selection
-- UI framework choice
+## Future Considerations
 
-### **Architecture Decisions**
+### HTTPS for Development
 
-- Database integration approach
-- Plugin system implementation
-- Security framework details
-- Deployment strategy
+- **Decision**: Add mkcert for local HTTPS when closer to production
+- **Reason**: Better matches production environment
+- **Status**: 🔄 Planned for later
 
-### **Process Decisions**
+### OpenAPI Spec Generation
 
-- Development workflow optimization
-- Documentation standards
-- Code review processes
-- Release management
+- **Decision**: Generate real OpenAPI specs from actual endpoint implementations
+- **Reason**: Accurate and up-to-date documentation
+- **Status**: 🔄 Planned for later
 
-## 🔗 **Related Resources**
+### API Integration Tests
 
-- **Project State**: `agent/memory/project-state.md`
-- **Architecture**: `agent/memory/architecture.md`
-- **Goals**: `agent/context/goals.md`
-- **Blockers**: `agent/context/blockers.md`
-- **Lessons**: `agent/memory/lessons.md`
+- **Decision**: Add comprehensive API integration tests
+- **Reason**: Ensure API reliability
+- **Status**: 🔄 Planned for later
+
+### Deployment Strategy
+
+- **Decision**: TBD - likely containerized deployment
+- **Reason**: Consistent environments
+- **Status**: 🔄 To be decided
