@@ -61,6 +61,7 @@ export interface Template {
   content: string;
   rawContent: string;
   parentTemplate?: Template; // New: reference to parent template
+  partials?: string[]; // New: list of partials to include
 }
 
 export interface ValidationResult {
@@ -76,13 +77,23 @@ export interface TemplateVariable {
   description?: string;
 }
 
+// New: Partial interface
+export interface Partial {
+  name: string;
+  content: string;
+  parameters?: string[];
+  description?: string;
+}
+
 export class TemplateEngine {
   private baseTemplatePath: string;
   private customTemplatePath: string;
+  private partialsPath: string; // New: path to partials directory
 
   constructor(dataDir: string) {
     this.baseTemplatePath = path.join(process.cwd(), '.civic', 'templates');
     this.customTemplatePath = path.join(dataDir, '.civic', 'templates');
+    this.partialsPath = path.join(dataDir, '.civic', 'partials'); // New: partials directory
   }
 
   /**
@@ -311,6 +322,9 @@ export class TemplateEngine {
       template
     );
 
+    // Process partials first
+    content = this.processPartials(content, processedVariables);
+
     // Replace variables in content
     for (const [key, value] of Object.entries(processedVariables)) {
       const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
@@ -321,6 +335,166 @@ export class TemplateEngine {
     content = this.processConditionalBlocks(content, processedVariables);
 
     return content;
+  }
+
+  /**
+   * Process partials in template content
+   */
+  private processPartials(
+    content: string,
+    variables: Record<string, any>
+  ): string {
+    // Process {{> partial-name param1=value1 param2=value2}} syntax
+    const partialRegex = /{{>\s*([a-zA-Z0-9_-]+)(?:\s+([^}]+))?}}/g;
+
+    return content.replace(partialRegex, (match, partialName, params) => {
+      const partial = this.loadPartial(partialName);
+      if (!partial) {
+        return `<!-- Partial not found: ${partialName} -->`;
+      }
+
+      // Parse parameters
+      const partialVariables = this.parsePartialParameters(params, variables);
+
+      // Process the partial content with its own variables
+      let partialContent = partial.content;
+
+      // Replace variables in partial
+      for (const [key, value] of Object.entries(partialVariables)) {
+        const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+        partialContent = partialContent.replace(regex, String(value || ''));
+      }
+
+      // Process conditional blocks in partial
+      partialContent = this.processConditionalBlocks(
+        partialContent,
+        partialVariables
+      );
+
+      return partialContent;
+    });
+  }
+
+  /**
+   * Load a partial by name
+   */
+  private loadPartial(partialName: string): Partial | null {
+    try {
+      // Try custom partials first
+      const customPartialPath = path.join(
+        this.partialsPath,
+        `${partialName}.md`
+      );
+      if (fs.existsSync(customPartialPath)) {
+        const content = fs.readFileSync(customPartialPath, 'utf8');
+        const { data: frontmatter, content: markdownContent } = matter(content);
+
+        return {
+          name: partialName,
+          content: markdownContent,
+          parameters: frontmatter.parameters || [],
+          description: frontmatter.description || '',
+        };
+      }
+
+      // Try base partials (in templates directory)
+      const basePartialPath = path.join(
+        this.baseTemplatePath,
+        'partials',
+        `${partialName}.md`
+      );
+      if (fs.existsSync(basePartialPath)) {
+        const content = fs.readFileSync(basePartialPath, 'utf8');
+        const { data: frontmatter, content: markdownContent } = matter(content);
+
+        return {
+          name: partialName,
+          content: markdownContent,
+          parameters: frontmatter.parameters || [],
+          description: frontmatter.description || '',
+        };
+      }
+
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Parse partial parameters from string
+   */
+  private parsePartialParameters(
+    paramsString: string | undefined,
+    globalVariables: Record<string, any>
+  ): Record<string, any> {
+    const partialVariables: Record<string, any> = {};
+
+    if (!paramsString) {
+      return partialVariables;
+    }
+
+    // Parse parameters like "param1=value1 param2=value2"
+    const paramRegex = /(\w+)=([^\s]+)/g;
+    let match;
+
+    while ((match = paramRegex.exec(paramsString)) !== null) {
+      const [, paramName, paramValue] = match;
+
+      // Check if the value is a variable reference (no quotes)
+      if (globalVariables[paramValue]) {
+        partialVariables[paramName] = globalVariables[paramValue];
+      } else {
+        // Remove quotes if present
+        partialVariables[paramName] = paramValue.replace(/['"]/g, '');
+      }
+    }
+
+    return partialVariables;
+  }
+
+  /**
+   * List available partials
+   */
+  listPartials(): string[] {
+    const partials: string[] = [];
+
+    try {
+      // Check custom partials
+      if (fs.existsSync(this.partialsPath)) {
+        const files = fs.readdirSync(this.partialsPath);
+        for (const file of files) {
+          if (file.endsWith('.md')) {
+            partials.push(file.replace('.md', ''));
+          }
+        }
+      }
+
+      // Check base partials
+      const basePartialsPath = path.join(this.baseTemplatePath, 'partials');
+      if (fs.existsSync(basePartialsPath)) {
+        const files = fs.readdirSync(basePartialsPath);
+        for (const file of files) {
+          if (file.endsWith('.md')) {
+            const partialName = file.replace('.md', '');
+            if (!partials.includes(partialName)) {
+              partials.push(partialName);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore errors if directories don't exist
+    }
+
+    return partials;
+  }
+
+  /**
+   * Get partial details
+   */
+  getPartialDetails(partialName: string): Partial | null {
+    return this.loadPartial(partialName);
   }
 
   /**

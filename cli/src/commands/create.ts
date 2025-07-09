@@ -1,6 +1,6 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress, getLogger } from '@civicpress/core';
+import { CivicPress, getLogger, WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
@@ -21,6 +21,7 @@ export const createCommand = (cli: CAC) => {
       '--template <template>',
       'Template to use for creation (defaults to type/default)'
     )
+    .option('-r, --role <role>', 'Role for the action (clerk, council, etc.)')
     .action(async (type: string, title: string, options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -79,6 +80,44 @@ export const createCommand = (cli: CAC) => {
           } else {
             throw new Error(
               'Data directory not found. Run "civic init" first.'
+            );
+          }
+          process.exit(1);
+        }
+
+        // Validate role permissions for creating this record type
+        const workflowManager = new WorkflowConfigManager(dataDir);
+        const role = options.role || 'unknown';
+        const actionValidation = await workflowManager.validateAction(
+          'create',
+          type,
+          role
+        );
+
+        if (!actionValidation.valid) {
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Insufficient permissions',
+                  details: actionValidation.reason,
+                  data: {
+                    action: 'create',
+                    recordType: type,
+                    role: role,
+                  },
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error(
+              `❌ Insufficient permissions: ${actionValidation.reason}`
+            );
+            logger.info(
+              `Role '${role}' cannot create records of type '${type}'`
             );
           }
           process.exit(1);
@@ -162,7 +201,7 @@ export const createCommand = (cli: CAC) => {
         };
 
         // Process template with context
-        const processedContent = templateEngine.processTemplate(
+        const processedContent = templateEngine.generateContent(
           template,
           context
         );

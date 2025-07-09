@@ -90,6 +90,7 @@ export { GitEngine } from './git/git-engine.js';
 export { HookSystem } from './hooks/hook-system.js';
 export { WorkflowEngine } from './workflows/workflow-engine.js';
 export { ConfigDiscovery } from './config/config-discovery.js';
+export { WorkflowConfigManager } from './config/workflow-config.js';
 export { TemplateEngine } from './utils/template-engine.js';
 export type { Template } from './utils/template-engine.js';
 export {

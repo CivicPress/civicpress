@@ -1,6 +1,7 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
 import { CivicPress, getLogger } from '@civicpress/core';
+import { WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
@@ -219,6 +220,61 @@ export const statusCommand = (cli: CAC) => {
             );
           } else {
             logger.warn(`⚠️  Record "${recordName}" is already ${newStatus}.`);
+          }
+          process.exit(1);
+        }
+
+        // Validate workflow transition
+        const workflowManager = new WorkflowConfigManager(dataDir);
+        const transitionValidation = await workflowManager.validateTransition(
+          currentStatus,
+          newStatus,
+          options.role
+        );
+
+        if (!transitionValidation.valid) {
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Invalid workflow transition',
+                  details: transitionValidation.reason,
+                  data: {
+                    currentStatus,
+                    requestedStatus: newStatus,
+                    role: options.role || 'none',
+                    availableTransitions:
+                      await workflowManager.getAvailableTransitions(
+                        currentStatus,
+                        options.role
+                      ),
+                  },
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error(
+              `❌ Invalid workflow transition: ${transitionValidation.reason}`
+            );
+
+            // Show available transitions for the current status
+            const availableTransitions =
+              await workflowManager.getAvailableTransitions(
+                currentStatus,
+                options.role
+              );
+            if (availableTransitions.length > 0) {
+              logger.info(
+                `Available transitions from '${currentStatus}': ${availableTransitions.join(', ')}`
+              );
+            } else {
+              logger.info(
+                `No transitions available from '${currentStatus}' for role '${options.role || 'none'}'`
+              );
+            }
           }
           process.exit(1);
         }

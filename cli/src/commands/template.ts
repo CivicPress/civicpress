@@ -40,6 +40,9 @@ export function registerTemplateCommand(cli: CAC) {
     .option('--type <type>', 'Record type for new template')
     .option('--init', 'Initialize default templates')
     .option('--preview <template>', 'Preview template with sample variables')
+    .option('--partials', 'List available partials')
+    .option('--partial <name>', 'Show partial details')
+    .option('--create-partial <name>', 'Create a new partial')
     .action(async (options: any) => {
       try {
         // Initialize logger with global options
@@ -83,6 +86,16 @@ export function registerTemplateCommand(cli: CAC) {
             options.preview,
             shouldOutputJson
           );
+        } else if (options.partials) {
+          await listPartials(config.dataDir, shouldOutputJson);
+        } else if (options.partial) {
+          await showPartial(config.dataDir, options.partial, shouldOutputJson);
+        } else if (options.createPartial) {
+          await createPartial(
+            config.dataDir,
+            options.createPartial,
+            shouldOutputJson
+          );
         } else {
           logger.info('📋 Template Management Commands:');
           logger.info(
@@ -102,6 +115,17 @@ export function registerTemplateCommand(cli: CAC) {
           );
           logger.info(
             '  civic template --init                    # Initialize default templates'
+          );
+          logger.info('');
+          logger.info('📋 Partial Management Commands:');
+          logger.info(
+            '  civic template --partials               # List available partials'
+          );
+          logger.info(
+            '  civic template --partial <name>         # Show partial details'
+          );
+          logger.info(
+            '  civic template --create-partial <name>  # Create new partial'
           );
         }
       } catch (error) {
@@ -923,12 +947,11 @@ async function previewTemplate(
       // Add other relevant sample variables here
     };
 
-    // Simple variable replacement for preview
-    let renderedContent = template.content;
-    for (const [key, value] of Object.entries(sampleVariables)) {
-      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-      renderedContent = renderedContent.replace(regex, String(value || ''));
-    }
+    // Use TemplateEngine to process template with partials
+    const renderedContent = templateEngine.generateContent(
+      template,
+      sampleVariables
+    );
 
     if (shouldOutputJson) {
       console.log(
@@ -972,4 +995,224 @@ export {
   createTemplate,
   validateTemplate,
   previewTemplate,
+  listPartials,
+  showPartial,
+  createPartial,
 };
+
+async function listPartials(dataDir: string, shouldOutputJson?: boolean) {
+  const logger = getLogger();
+  const templateEngine = new TemplateEngine(dataDir);
+
+  try {
+    const partials = templateEngine.listPartials();
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            partials,
+            count: partials.length,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      if (partials.length === 0) {
+        logger.info('📋 No partials found.');
+        logger.info(
+          '💡 Create your first partial with: civic template --create-partial <name>'
+        );
+      } else {
+        logger.info(`📋 Available partials (${partials.length}):`);
+        partials.forEach((partial: string) => {
+          logger.info(`  - ${partial}`);
+        });
+      }
+    }
+  } catch (error) {
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Error listing partials',
+            details: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error('❌ Error listing partials:', error);
+    }
+  }
+}
+
+async function showPartial(
+  dataDir: string,
+  partialName: string,
+  shouldOutputJson?: boolean
+) {
+  const logger = getLogger();
+  const templateEngine = new TemplateEngine(dataDir);
+
+  try {
+    const partial = templateEngine.getPartialDetails(partialName);
+
+    if (!partial) {
+      if (shouldOutputJson) {
+        console.log(
+          JSON.stringify(
+            {
+              error: `Partial not found: ${partialName}`,
+            },
+            null,
+            2
+          )
+        );
+        return;
+      } else {
+        logger.error(`❌ Partial not found: ${partialName}`);
+        return;
+      }
+    }
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            partial: partialName,
+            details: partial,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.info(`📋 Partial: ${partial.name}`);
+      if (partial.description) {
+        logger.info(`📝 Description: ${partial.description}`);
+      }
+      if (partial.parameters && partial.parameters.length > 0) {
+        logger.info(`🔧 Parameters: ${partial.parameters.join(', ')}`);
+      }
+      logger.info(`📄 Content:`);
+      logger.info(partial.content);
+    }
+  } catch (error) {
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Error showing partial',
+            details: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error('❌ Error showing partial:', error);
+    }
+  }
+}
+
+async function createPartial(
+  dataDir: string,
+  partialName: string,
+  shouldOutputJson?: boolean
+) {
+  const logger = getLogger();
+
+  try {
+    const partialsDir = join(dataDir, '.civic', 'partials');
+    await mkdir(partialsDir, { recursive: true });
+
+    const partialPath = join(partialsDir, `${partialName}.md`);
+
+    if (fs.existsSync(partialPath)) {
+      if (shouldOutputJson) {
+        console.log(
+          JSON.stringify(
+            {
+              error: `Partial already exists: ${partialName}`,
+            },
+            null,
+            2
+          )
+        );
+        return;
+      } else {
+        logger.error(`❌ Partial already exists: ${partialName}`);
+        return;
+      }
+    }
+
+    // Create a default partial template
+    const defaultPartial = `---
+description: "${partialName} partial"
+parameters: []
+---
+
+# {{title}}
+
+[Add your partial content here]
+
+## Usage
+
+Use this partial in templates with:
+\`\`\`
+{{> ${partialName} title=document_title}}
+\`\`\`
+
+## Parameters
+
+- \`title\`: The title of the document
+- Add more parameters as needed
+
+## Example
+
+\`\`\`
+{{> ${partialName} title="My Document" author="John Doe"}}
+\`\`\`
+`;
+
+    await writeFile(partialPath, defaultPartial);
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            success: true,
+            message: `Partial created: ${partialName}`,
+            path: partialPath,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.info(`✅ Created partial: ${partialName}`);
+      logger.info(`📁 Location: ${partialPath}`);
+      logger.info(
+        '💡 Edit the partial to customize its content and parameters.'
+      );
+    }
+  } catch (error) {
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: 'Error creating partial',
+            details: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error('❌ Error creating partial:', error);
+    }
+  }
+}
