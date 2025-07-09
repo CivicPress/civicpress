@@ -43,6 +43,22 @@ cd civicpress
 
 # Or manually install dependencies
 pnpm install
+
+# Build the CLI
+cd cli && pnpm run build && cd ..
+```
+
+### First Steps
+
+```bash
+# Initialize your CivicPress repository
+node cli/dist/index.js init
+
+# Create your first record
+node cli/dist/index.js create bylaw "Public Meeting Procedures"
+
+# View your records
+node cli/dist/index.js list
 ```
 
 ### Development
@@ -53,6 +69,9 @@ pnpm install
 
 # Start the development environment
 pnpm run dev
+
+# Run tests
+pnpm run test:run
 
 # Format code
 pnpm run format
@@ -75,68 +94,107 @@ pnpm run spec:check
 
 ## 📖 Documentation
 
+- [🚀 Bootstrap Guide](docs/bootstrap-guide.md) - **Start here!** Complete
+  step-by-step setup guide
 - [CLI Usage Guide](docs/cli.md)
 - [Template System Guide](docs/templates.md)
 - [Validation System Guide](docs/validation.md)
+- [Workflow Configuration](docs/workflows.md)
 
 ## 🎛️ CLI Features
 
-CivicPress provides a powerful command-line interface for managing civic
-records:
+CivicPress provides a comprehensive command-line interface for managing civic
+records with governance workflows, role-based permissions, and advanced
+features:
 
 ### Record Management
 
 ```bash
 # Create records with templates
-civic create bylaw "Public Meeting Procedures" --template advanced
-civic create policy "Data Privacy Policy" --template default
-civic create resolution "Budget Approval 2024" --template standard
+node cli/dist/index.js create bylaw "Public Meeting Procedures" --template advanced
+node cli/dist/index.js create policy "Data Privacy Policy" --template default
+node cli/dist/index.js create resolution "Budget Approval 2024" --template standard
 
 # View and edit records
-civic view "public-meeting-procedures"
-civic edit "data-privacy-policy"
+node cli/dist/index.js view "public-meeting-procedures"
+node cli/dist/index.js edit "data-privacy-policy"
 
 # List and search records
-civic list --type bylaw --status draft
-civic search "privacy" --type policy
+node cli/dist/index.js list --type bylaw --status draft
+node cli/dist/index.js search "privacy" --type policy
+```
+
+### Governance Workflows
+
+```bash
+# Change record status with role-based permissions
+node cli/dist/index.js status "public-meeting-procedures" proposed --role clerk
+node cli/dist/index.js status "budget-approval" approved --role council
+
+# View available status transitions
+node cli/dist/index.js status "public-meeting-procedures"
+
+# Commit changes with role-based messages
+node cli/dist/index.js commit "public-meeting-procedures" --role clerk
+```
+
+### Import & Export
+
+```bash
+# Export records in multiple formats
+node cli/dist/index.js export --format json --output reports/
+node cli/dist/index.js export --format csv
+node cli/dist/index.js export --format markdown
+
+# Import records from various sources
+node cli/dist/index.js import path/to/records/ --overwrite
+node cli/dist/index.js import path/to/record.json --dry-run
 ```
 
 ### Advanced Template System
 
 ```bash
 # List available templates
-civic template --list
+node cli/dist/index.js template --list
 
 # Show template details
-civic template --show bylaw/advanced
+node cli/dist/index.js template --show bylaw/advanced
 
 # Create custom templates
-civic template --create "custom-bylaw" --type bylaw
+node cli/dist/index.js template --create "custom-bylaw" --type bylaw
 ```
 
 ### Validation & Quality
 
 ```bash
 # Validate records
-civic validate bylaw/public-meeting-procedures
-civic validate --all --json
+node cli/dist/index.js validate bylaw/public-meeting-procedures
+node cli/dist/index.js validate --all --json
 
-# Export records
-civic export --format json --output reports/
-civic export --format html --template custom-template.html
+# Validate templates
+node cli/dist/index.js template --validate bylaw/default
 ```
 
 ### Git Integration
 
 ```bash
 # View history
-civic history "public-meeting-procedures"
+node cli/dist/index.js history "public-meeting-procedures"
 
 # Compare versions
-civic diff "data-privacy-policy" --from v1.0.0 --to v1.1.0
+node cli/dist/index.js diff "data-privacy-policy" --from v1.0.0 --to v1.1.0
 
-# Status and workflow
-civic status "budget-approval" approved
+# View recent changes
+node cli/dist/index.js diff "public-meeting-procedures"
+```
+
+### Hooks & Automation
+
+```bash
+# Manage hooks
+node cli/dist/index.js hook --list
+node cli/dist/index.js hook --enable "record:created"
+node cli/dist/index.js hook --disable "record:updated"
 ```
 
 ## 🎨 Advanced Template System
@@ -177,6 +235,47 @@ validation:
 - **Conditional Blocks** - Content that shows/hides based on record data
 - **Section Validation** - Required sections with minimum length requirements
 
+## 🔄 Governance Workflows
+
+CivicPress supports configurable governance workflows with role-based
+permissions:
+
+### Workflow Configuration
+
+```yaml
+# .civic/workflows.yml
+statuses:
+  - draft
+  - proposed
+  - approved
+  - archived
+
+transitions:
+  draft: [proposed]
+  proposed: [approved, archived]
+  approved: [archived]
+  archived: []
+
+roles:
+  clerk:
+    can_transition:
+      draft: [proposed]
+      proposed: [approved]
+  council:
+    can_transition:
+      approved: [archived]
+      any: [archived]
+  public:
+    can_view: [bylaw, policy, resolution]
+```
+
+### Role-Based Permissions
+
+- **Status Transitions** - Control who can change record status
+- **Record Operations** - Create, edit, view, delete permissions
+- **Workflow Enforcement** - Automatic validation of all actions
+- **Audit Trail** - Complete history of all changes
+
 ## 📊 Validation System
 
 Comprehensive validation ensures data quality and compliance:
@@ -188,21 +287,22 @@ Comprehensive validation ensures data quality and compliance:
   validators
 - **Content Validation** - Section requirements, placeholder detection
 - **Template Validation** - Template structure and inheritance validation
+- **Workflow Validation** - Status transitions and role permissions
 
 ### Validation Commands
 
 ```bash
 # Validate single record
-civic validate bylaw/public-meeting-procedures
+node cli/dist/index.js validate bylaw/public-meeting-procedures
 
 # Validate all records
-civic validate --all --json
+node cli/dist/index.js validate --all --json
 
 # Validate with auto-fix
-civic validate --all --fix
+node cli/dist/index.js validate --all --fix
 
 # Strict validation (warnings as errors)
-civic validate --all --strict
+node cli/dist/index.js validate --all --strict
 ```
 
 ## 📁 Project Structure
@@ -211,12 +311,15 @@ civic validate --all --strict
 civicpress/
 ├── .civic/          # CivicPress platform configuration
 │   ├── templates/   # Template system (inheritance, validation)
-│   ├── specs/       # System specifications
+│   ├── workflows.yml # Governance workflow configuration
 │   └── config.yml   # Platform configuration
 ├── agent/           # Local AI memory used for dev context only — not deployed with the app
+├── cli/             # Command-line interface
 ├── core/            # Core platform modules
 ├── modules/         # Civic modules (legal-register, etc.)
-├── .vscode/         # Editor configuration
+├── data/            # Civic records and data
+├── tests/           # Comprehensive test suite
+├── docs/            # Documentation
 └── setup.sh         # Development environment setup
 ```
 
@@ -225,10 +328,55 @@ civicpress/
 CivicPress is built as a modular monorepo using pnpm workspaces:
 
 - **Core Platform**: Foundational services and utilities
-- **Civic Modules**: Specialized modules for different civic functions
-- **Template Engine**: Advanced template system with inheritance and validation
 - **CLI Interface**: Comprehensive command-line tools for record management
+- **Template Engine**: Advanced template system with inheritance and validation
+- **Workflow Engine**: Governance workflows with role-based permissions
+- **Civic Modules**: Specialized modules for different civic functions
 - **Agent Context**: AI development memory and context (not deployed)
+
+## 🎯 Key Features
+
+### ✅ **Complete Record Lifecycle**
+
+- Create, edit, view, list, delete records
+- Version control with Git integration
+- History tracking and diff comparison
+- Status management with workflow validation
+
+### ✅ **Advanced Template System**
+
+- Multi-level template inheritance
+- Conditional content and validation
+- Custom template creation
+- Template validation and testing
+
+### ✅ **Governance Workflows**
+
+- Configurable status transitions
+- Role-based permissions
+- Workflow validation
+- Audit trail and compliance
+
+### ✅ **Import/Export Capabilities**
+
+- Multiple formats: JSON, CSV, Markdown
+- Bulk import from directories
+- Export with custom templates
+- Data portability and backup
+
+### ✅ **Comprehensive Validation**
+
+- Field-level validation
+- Business rule validation
+- Template structure validation
+- Workflow compliance checking
+
+### ✅ **CLI Excellence**
+
+- All commands support `--json` and `--silent` flags
+- Comprehensive help and documentation
+- Error handling and user feedback
+- Scripting-friendly output formats
 
 ## 🤝 Contributing
 
@@ -241,6 +389,7 @@ for details.
 - Use conventional commits
 - Ensure all code is formatted with Prettier
 - Write clear, accessible documentation
+- Maintain comprehensive test coverage
 
 ## 📄 License
 
