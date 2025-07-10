@@ -11,6 +11,8 @@
 - ✅ **Database Integration**: SQLite with adapter pattern
 - ✅ **Authentication System**: JWT-based with OAuth providers (GitHub)
 - ✅ **Session Management**: Token-based authentication with 24h expiry
+- ✅ **Role-Based Authorization**: Complete permission system with role
+  hierarchy
 - ✅ **Git Integration**: Full git operations with role-based commits
 - ✅ **Hook System**: Event-driven architecture with workflow integration
 - ✅ **Workflow Engine**: Configurable workflows with auto-indexing
@@ -26,6 +28,8 @@
 - ✅ **Data Operations**: `import`, `export`, `validate`
 - ✅ **System Management**: `init`, `hook`, `template`, `auto-index`
 - ✅ **Global Authentication Utility**: `AuthUtils` class for centralized auth
+- ✅ **Role-Based Authorization**: All commands now check appropriate
+  permissions
 
 #### **API Endpoints**
 
@@ -43,32 +47,48 @@
 - ✅ **API Tests**: Authentication and record endpoints
 - ✅ **Integration Tests**: End-to-end system testing
 
-### 🔄 **In Progress**
+### ✅ **Recently Completed**
 
-#### **Authentication Expansion**
+#### **Role-Based Authorization System (2024-07-09)**
 
-- 🔄 **CLI Commands**: Adding `--token` authentication to remaining commands
-- 🔄 **Role-Based Permissions**: Implementing granular access control
-- 🔄 **Session Persistence**: Optional session storage for convenience
+- ✅ **Complete Authorization Implementation**: All CLI commands now check
+  permissions
+- ✅ **Permission Matrix**: Granular permissions for each command type
+- ✅ **Role Hierarchy**: Admin > Mayor > Council > Clerk > Editor > Viewer >
+  Public
+- ✅ **Default Roles**: Comprehensive role configuration with inheritance
+- ✅ **Non-Interactive Init**: `--data-dir` support with automatic role setup
+- ✅ **Authorization Tests**: Comprehensive test coverage for all scenarios
 
 ### 📋 **Next Priorities**
 
 #### **MVP Completion**
 
 1. **Minimal PWA Frontend**: Basic web interface for record viewing
-2. **Enhanced Authentication**: Role-based permissions and session management
-3. **Documentation**: User guides and API documentation
-4. **Deployment**: Production-ready configuration and deployment guides
+2. **Enhanced Documentation**: Updated user guides with authorization info
+3. **Deployment**: Production-ready configuration and deployment guides
+4. **API Authorization**: Extend role-based auth to API endpoints
 
-#### **Authentication Commands to Update**
+#### **Authorization Status**
 
-- `import` - Data import operations
-- `export` - Data export operations
-- `hook` - Hook management
-- `template` - Template management
-- `auto-index` - Indexing operations
+- ✅ **CLI Authorization**: All commands implemented with permission checks
+- ✅ **Role Management**: Complete role hierarchy with inheritance
+- ✅ **Default Configuration**: Automatic role setup during initialization
+- 🔄 **API Authorization**: Next phase - extend to API endpoints
 
 ### 🎯 **Recent Achievements**
+
+#### **Role-Based Authorization System (2024-07-09)**
+
+- ✅ **Complete CLI Authorization**: All commands now check appropriate
+  permissions
+- ✅ **Permission Matrix**: Granular permissions for each command type
+- ✅ **Role Hierarchy**: Admin > Mayor > Council > Clerk > Editor > Viewer >
+  Public
+- ✅ **Default Roles**: Comprehensive role configuration with inheritance
+- ✅ **Non-Interactive Init**: `--data-dir` support with automatic role setup
+- ✅ **Authorization Tests**: Comprehensive test coverage for all scenarios
+- ✅ **272 tests passing** with 25 skipped (297 total)
 
 #### **Global Authentication Utility (2024-07-10)**
 

@@ -1,5 +1,5 @@
 import { CAC } from 'cac';
-import { WorkflowConfigManager } from '@civicpress/core';
+import { WorkflowConfigManager, userCan } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
@@ -32,12 +32,36 @@ export const createCommand = (cli: CAC) => {
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication
-      const { civic } = await AuthUtils.requireAuthWithCivic(
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
         shouldOutputJson
       );
       // Get data directory from civic instance
       const dataDir = civic.getDataDir();
+
+      // Check create permissions
+      const canCreate = await userCan(user, 'records:create');
+      if (!canCreate) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to create records',
+                requiredPermission: 'records:create',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to create records');
+          logger.info(`Role '${user.role}' cannot create records`);
+        }
+        process.exit(1);
+      }
 
       try {
         if (!shouldOutputJson) {

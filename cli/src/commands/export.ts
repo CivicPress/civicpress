@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import * as fs from 'fs';
 import matter = require('gray-matter');
 import { glob } from 'glob';
+import { userCan } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -60,11 +61,35 @@ export function registerExportCommand(cli: CAC) {
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication and get civic instance
-      const { civic } = await AuthUtils.requireAuthWithCivic(
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
         shouldOutputJson
       );
       const dataDir = civic.getDataDir();
+
+      // Check export permissions
+      const canExport = await userCan(user, 'records:export');
+      if (!canExport) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to export records',
+                requiredPermission: 'records:export',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to export records');
+          logger.info(`Role '${user.role}' cannot export records`);
+        }
+        process.exit(1);
+      }
 
       try {
         const exportOptions: ExportOptions = {

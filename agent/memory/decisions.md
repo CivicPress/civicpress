@@ -201,6 +201,77 @@ Test Coverage
 
 ---
 
+## Role-Based Authorization Decision (2024-07-09)
+
+### **Decision**: Comprehensive Role-Based Authorization for All CLI Commands
+
+**Context**: Need granular access control across all CLI commands to ensure
+security and proper permission management in civic government workflows.
+
+**Decision**: Implement comprehensive role-based authorization system with
+granular permissions for all CLI commands, including role hierarchy and
+automatic permission inheritance.
+
+### **Architecture**:
+
+```
+Authorization System
+├── RoleManager: Centralized role and permission management
+├── Permission Matrix: Granular permissions for each command type
+├── Role Hierarchy: Admin > Mayor > Council > Clerk > Editor > Viewer > Public
+├── userCan(): Core permission checking function
+└── CLI Integration: All commands check appropriate permissions
+```
+
+### **Key Principles**:
+
+1. **Granular Permissions**: Specific permissions for each command type
+2. **Role Hierarchy**: Permissions inherit from parent roles
+3. **Security First**: All commands require authentication and authorization
+4. **Consistent UX**: Same error messages and JSON output across commands
+5. **Default Roles**: Comprehensive role configuration with inheritance
+6. **Non-Interactive Setup**: `--data-dir` support with automatic role setup
+
+### **Permission Matrix**:
+
+| Command          | Permission Required | Description           |
+| ---------------- | ------------------- | --------------------- |
+| `civic create`   | `records:create`    | Create new records    |
+| `civic edit`     | `records:edit`      | Edit existing records |
+| `civic commit`   | `records:edit`      | Commit changes        |
+| `civic hook`     | `hooks:manage`      | Manage hooks          |
+| `civic template` | `templates:manage`  | Manage templates      |
+| `civic import`   | `records:import`    | Import records        |
+| `civic export`   | `records:export`    | Export records        |
+| `civic list`     | `records:view`      | List records          |
+| `civic view`     | `records:view`      | View specific records |
+| `civic search`   | `records:view`      | Search records        |
+| `civic status`   | `records:view`      | Check status          |
+| `civic history`  | `records:view`      | View history          |
+| `civic diff`     | `records:view`      | Show differences      |
+
+### **Implementation**:
+
+- **RoleManager Class**: `core/src/auth/role-manager.ts`
+- **userCan Function**: `core/src/auth/role-utils.ts`
+- **Default Roles**: `.system-data/roles.default.yml`
+- **CLI Integration**: All commands use `userCan()` for permission checks
+- **Non-Interactive Init**: `--data-dir` support with automatic role setup
+- **Comprehensive Testing**: 272 tests passing with authorization coverage
+
+### **Benefits**:
+
+- **Security**: Granular access control for all operations
+- **Scalability**: Role hierarchy supports complex permission scenarios
+- **Usability**: Consistent error messages and JSON output
+- **Maintainability**: Centralized authorization logic
+- **Testability**: Comprehensive test coverage for all scenarios
+- **Flexibility**: Easy to add new roles and permissions
+
+### **Status**: ✅ Implemented and tested (272 tests passing)
+
+---
+
 ## Database Architecture Decision (2025-07-09)
 
 ### **Decision**: Database as Performance Layer, File System as Source of Truth

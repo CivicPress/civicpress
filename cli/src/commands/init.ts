@@ -9,6 +9,7 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { fileURLToPath } from 'url';
 
 export const initCommand = (cli: CAC) => {
   cli
@@ -17,6 +18,7 @@ export const initCommand = (cli: CAC) => {
       '--config <path>',
       'Path to configuration file to use instead of prompts'
     )
+    .option('--data-dir <path>', 'Specify the data directory for CivicPress')
     .action(async (options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -38,7 +40,11 @@ export const initCommand = (cli: CAC) => {
         let config: any;
         let dataDir = 'data';
 
-        if (options.config) {
+        if (options.dataDir) {
+          dataDir = options.dataDir;
+          // Skip interactive prompts when --data-dir is provided
+          config = { dataDir }; // Create minimal config to skip prompts
+        } else if (options.config) {
           // Load config from file
           const configPath = path.resolve(options.config);
           if (!fs.existsSync(configPath)) {
@@ -88,6 +94,28 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
+        // Ensure .civic directory exists inside data directory
+        const civicDir = path.join(fullDataDir, '.civic');
+        if (!fs.existsSync(civicDir)) {
+          fs.mkdirSync(civicDir, { recursive: true });
+        }
+
+        // Copy default roles.yml if it doesn't exist
+        const __filename = fileURLToPath(import.meta.url);
+        const projectRoot = path.resolve(path.dirname(__filename), '../../../');
+        const rolesSrc = path.join(
+          projectRoot,
+          '.system-data',
+          'roles.default.yml'
+        );
+        const rolesDest = path.join(civicDir, 'roles.yml');
+        if (!fs.existsSync(rolesDest) && fs.existsSync(rolesSrc)) {
+          fs.copyFileSync(rolesSrc, rolesDest);
+          if (!shouldOutputJson) {
+            logger.success('👥 Default roles.yml created');
+          }
+        }
+
         // Check if Git repo exists in data directory
         const gitExists = fs.existsSync(path.join(fullDataDir, '.git'));
         let initGit = false;
@@ -95,7 +123,7 @@ export const initCommand = (cli: CAC) => {
         if (!gitExists) {
           initGit = true;
 
-          if (!options.config) {
+          if (!options.config && !options.dataDir) {
             // Interactive prompt for git initialization
             const { initGitPrompt } = await inquirer.prompt([
               {
@@ -132,7 +160,7 @@ export const initCommand = (cli: CAC) => {
         const civicrcPath = path.join(process.cwd(), '.civicrc');
         const civicrcExists = fs.existsSync(civicrcPath);
 
-        if (civicrcExists && !options.config) {
+        if (civicrcExists && !options.config && !options.dataDir) {
           const { overwrite } = await inquirer.prompt([
             {
               type: 'confirm',
@@ -147,10 +175,13 @@ export const initCommand = (cli: CAC) => {
           } else {
             await setupCivicrc(civicrcPath, dataDir, logger);
           }
-        } else if (!civicrcExists || options.config) {
+        } else if (!civicrcExists || options.config || options.dataDir) {
           if (options.config) {
             // Use the provided config file
             await setupCivicrcFromFile(civicrcPath, config, dataDir, logger);
+          } else if (options.dataDir) {
+            // Use non-interactive setup when --data-dir is provided
+            await setupCivicrcNonInteractive(civicrcPath, dataDir, logger);
           } else {
             await setupCivicrc(civicrcPath, dataDir, logger);
           }
@@ -204,21 +235,25 @@ export const initCommand = (cli: CAC) => {
         }
         // Explicitly flush stdout before exit (for test environments)
         process.stdout.write('', () => process.exit(0));
-      } catch (error) {
+      } catch (err: any) {
         if (shouldOutputJson) {
-          console.log(
+          console.error(
             JSON.stringify(
               {
                 success: false,
-                error: 'Failed to initialize repository',
-                details: error instanceof Error ? error.message : String(error),
+                error: err?.message || err,
+                stack: err?.stack || undefined,
               },
               null,
               2
             )
           );
         } else {
-          logger.error('❌ Failed to initialize repository:', error);
+          logger.error('❌ Failed to initialize repository:');
+          logger.error(err?.message || err);
+          if (err?.stack) {
+            logger.error(err.stack);
+          }
         }
         process.exit(1);
       }
@@ -452,6 +487,30 @@ async function setupCivicrcFromFile(
 
   // Write .civicrc file
   const yamlContent = yaml.stringify(finalCivicrc);
+  fs.writeFileSync(civicrcPath, yamlContent);
+  logger.success('⚙️  .civicrc saved to .civicrc');
+}
+
+async function setupCivicrcNonInteractive(
+  civicrcPath: string,
+  dataDir: string,
+  logger: any
+): Promise<void> {
+  logger.info('⚙️  Setting up .civicrc (non-interactive)...');
+
+  // Create .civicrc object with default values
+  const civicrc = {
+    dataDir: dataDir,
+    database: {
+      type: 'sqlite',
+      sqlite: {
+        file: path.join(process.cwd(), '.system-data/civic.db'),
+      },
+    },
+  };
+
+  // Write .civicrc file
+  const yamlContent = yaml.stringify(civicrc);
   fs.writeFileSync(civicrcPath, yamlContent);
   logger.success('⚙️  .civicrc saved to .civicrc');
 }

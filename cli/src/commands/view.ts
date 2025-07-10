@@ -3,33 +3,57 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter = require('gray-matter');
+import { userCan } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { AuthUtils } from '../utils/auth-utils.js';
 
 export const viewCommand = (cli: CAC) => {
   cli
     .command('view <record>', 'View a specific civic record')
+    .option('--token <token>', 'Session token for authentication')
     .option('-r, --raw', 'Show raw markdown content')
     .action(async (recordName: string, options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
       const logger = initializeLogger();
+      const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication and get civic instance
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      const dataDir = civic.getDataDir();
+
+      // Check view permissions
+      const canView = await userCan(user, 'records:view');
+      if (!canView) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to view records',
+                requiredPermission: 'records:view',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to view records');
+          logger.info(`Role '${user.role}' cannot view records`);
+        }
+        process.exit(1);
+      }
 
       try {
         logger.info(`📖 Viewing record: ${recordName}`);
-
-        // Initialize CivicPress (will auto-discover config)
-        // Get data directory from config discovery
-        const { loadConfig } = await import('@civicpress/core');
-        const config = await loadConfig();
-        if (!config) {
-          throw new Error(
-            'CivicPress not initialized. Run "civic init" first.'
-          );
-        }
-        const dataDir = config.dataDir;
 
         // Check if we should output JSON
         const shouldOutputJson = globalOptions.json;

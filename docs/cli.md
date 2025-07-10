@@ -27,11 +27,41 @@ options, and usage examples for managing civic records with CivicPress.
 ## Overview
 
 CivicPress CLI lets you manage civic records, policies, bylaws, and more using a
-Git-backed, file-based workflow. All records and configuration live in a
-dedicated data directory (e.g., `data/`).
+Git-backed, file-based workflow with comprehensive role-based authorization. All
+records and configuration live in a dedicated data directory (e.g., `data/`).
 
 The CLI features advanced template system with inheritance, comprehensive
-validation, and powerful record management capabilities.
+validation, powerful record management capabilities, and granular role-based
+permissions.
+
+### Authentication & Authorization
+
+All CLI commands require authentication and check appropriate permissions:
+
+- **Authentication**: Use `--token <token>` to provide session token
+- **Authorization**: Commands check role-based permissions before execution
+- **JSON Output**: Use `--json` for machine-readable error messages
+- **Silent Mode**: Use `--silent` to suppress output
+
+**Default Roles:**
+
+- `admin` - Full system access
+- `mayor` - High-level management
+- `council` - Legislative oversight
+- `clerk` - Administrative support
+- `editor` - Content editing
+- `viewer` - Read-only access
+- `public` - Minimal access (fallback)
+
+**Permission Examples:**
+
+- `records:create` - Create new records
+- `records:edit` - Edit existing records
+- `records:view` - View records
+- `records:export` - Export records
+- `records:import` - Import records
+- `templates:manage` - Manage templates
+- `hooks:manage` - Manage hooks
 
 ## Command Reference
 
@@ -40,13 +70,23 @@ validation, and powerful record management capabilities.
 Initialize a new CivicPress data directory and configuration.
 
 ```sh
-civic init
+civic init [options]
 ```
+
+**Options:**
+
+- `--config <path>` - Path to configuration file to use instead of prompts
+- `--data-dir <path>` - Specify the data directory for CivicPress
+- `--token <token>` - Session token for authentication (optional for init)
+
+**Features:**
 
 - Prompts for setup options and creates `.civicrc` at the project root.
 - Asks for database type (SQLite or PostgreSQL) and location/connection info.
 - Initializes a Git repo if needed.
 - Sets up default templates and validation rules.
+- **Automatically copies default roles configuration** to `.civic/roles.yml`
+- **Non-interactive mode** when `--data-dir` is provided
 
 **Interactive Prompts:**
 
@@ -91,6 +131,10 @@ Create a new record (policy, bylaw, resolution, etc.) with template support.
 civic create <type> <name> [options]
 ```
 
+**Required Permission:** `records:create`
+
+**Authentication:** Requires valid session token
+
 **Basic Usage:**
 
 ```sh
@@ -131,6 +175,10 @@ Commit changes to records in the data directory.
 ```sh
 civic commit [record] [--all]
 ```
+
+**Required Permission:** `records:edit`
+
+**Authentication:** Requires valid session token
 
 - Commit a specific record: `civic commit policy/public-records-policy`
 - Commit all changes: `civic commit --all`
@@ -174,6 +222,10 @@ List records by type and status with advanced filtering.
 civic list [type] [options]
 ```
 
+**Required Permission:** `records:view`
+
+**Authentication:** Requires valid session token
+
 **Options:**
 
 - `--status <status>` - Filter by status (comma-separated)
@@ -214,6 +266,10 @@ View a specific record's content and metadata.
 civic view <record> [options]
 ```
 
+**Required Permission:** `records:view`
+
+**Authentication:** Requires valid session token
+
 **Options:**
 
 - `--raw` - Show raw markdown
@@ -246,6 +302,10 @@ Edit a record in your preferred editor.
 ```sh
 civic edit <record> [options]
 ```
+
+**Required Permission:** `records:edit`
+
+**Authentication:** Requires valid session token
 
 **Options:**
 
@@ -409,6 +469,10 @@ Export records in various formats (JSON, CSV, HTML, PDF).
 civic export [options]
 ```
 
+**Required Permission:** `records:export`
+
+**Authentication:** Requires valid session token
+
 **Options:**
 
 - `--type <type>` - Export specific types (comma-separated)
@@ -451,6 +515,54 @@ civic export --format json --pretty
 
 ---
 
+### `import`
+
+Import records from various formats (JSON, CSV, Markdown).
+
+```sh
+civic import [file] [options]
+```
+
+**Required Permission:** `records:import`
+
+**Authentication:** Requires valid session token
+
+**Options:**
+
+- `--format <format>` - Import format (json, csv, markdown)
+- `--input <path>` - Input file or directory path
+- `--type <type>` - Default record type for imported records
+- `--status <status>` - Default status for imported records
+- `--author <author>` - Default author for imported records
+- `--overwrite` - Overwrite existing records
+- `--dry-run` - Show what would be imported without importing
+- `--validate` - Validate imported records
+- `--template <template>` - Default template for imported records
+
+**Examples:**
+
+```sh
+# Import from JSON file
+civic import records.json
+
+# Import from CSV
+civic import --format csv --input data.csv
+
+# Import with defaults
+civic import records.json --type policy --status draft --author "City Clerk"
+
+# Dry-run import
+civic import records.json --dry-run
+
+# Validate imported records
+civic import records.json --validate
+
+# Overwrite existing records
+civic import records.json --overwrite
+```
+
+---
+
 ### `template`
 
 Manage record templates with advanced inheritance and validation.
@@ -458,6 +570,10 @@ Manage record templates with advanced inheritance and validation.
 ```sh
 civic template [command] [options]
 ```
+
+**Required Permission:** `templates:manage`
+
+**Authentication:** Requires valid session token
 
 **Commands:**
 
@@ -683,6 +799,10 @@ Manage event hooks and automation workflows.
 ```sh
 civic hook [command] [options]
 ```
+
+**Required Permission:** `hooks:manage`
+
+**Authentication:** Requires valid session token
 
 **Commands:**
 

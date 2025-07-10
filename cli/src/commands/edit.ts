@@ -7,8 +7,7 @@ import {
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
-// TODO: Import userCan from @civicpress/core once exports are updated
-// import { userCan } from '@civicpress/core';
+import { userCan } from '@civicpress/core';
 
 export const editCommand = (cli: CAC) => {
   cli
@@ -23,36 +22,35 @@ export const editCommand = (cli: CAC) => {
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication and get civic instance
-      const { civic } = await AuthUtils.requireAuthWithCivic(
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
         shouldOutputJson
       );
       const dataDir = civic.getDataDir();
 
-      // TODO: Add role-based authorization check
       // Check edit permissions
-      // const canEdit = await userCan(user, 'records:edit');
-      // if (!canEdit) {
-      //   if (shouldOutputJson) {
-      //     console.log(
-      //       JSON.stringify(
-      //       {
-      //         success: false,
-      //         error: 'Insufficient permissions',
-      //         details: 'You do not have permission to edit records',
-      //         requiredPermission: 'records:edit',
-      //         userRole: user.role,
-      //       },
-      //       null,
-      //       2
-      //     )
-      //   );
-      // } else {
-      //   logger.error('❌ Insufficient permissions to edit records');
-      //   logger.info(`Role '${user.role}' cannot edit records`);
-      // }
-      // process.exit(1);
-      // }
+      const canEdit = await userCan(user, 'records:edit');
+      if (!canEdit) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to edit records',
+                requiredPermission: 'records:edit',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to edit records');
+          logger.info(`Role '${user.role}' cannot edit records`);
+        }
+        process.exit(1);
+      }
 
       try {
         if (!shouldOutputJson) {

@@ -6,8 +6,7 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
-// TODO: Import userCan from @civicpress/core once exports are updated
-// import { userCan } from '@civicpress/core';
+import { userCan } from '@civicpress/core';
 
 export const commitCommand = (cli: CAC) => {
   cli
@@ -23,36 +22,35 @@ export const commitCommand = (cli: CAC) => {
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication and get civic instance
-      const { civic } = await AuthUtils.requireAuthWithCivic(
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
         shouldOutputJson
       );
       const dataDir = civic.getDataDir();
 
-      // TODO: Add role-based authorization check
       // Check commit permissions
-      // const canCommit = await userCan(user, 'records:edit');
-      // if (!canCommit) {
-      //   if (shouldOutputJson) {
-      //     console.log(
-      //       JSON.stringify(
-      //       {
-      //         success: false,
-      //         error: 'Insufficient permissions',
-      //         details: 'You do not have permission to commit records',
-      //         requiredPermission: 'records:edit',
-      //         userRole: user.role,
-      //       },
-      //       null,
-      //       2
-      //     )
-      //   );
-      // } else {
-      //   logger.error('❌ Insufficient permissions to commit records');
-      //   logger.info(`Role '${user.role}' cannot commit records`);
-      // }
-      // process.exit(1);
-      // }
+      const canCommit = await userCan(user, 'records:edit');
+      if (!canCommit) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to commit records',
+                requiredPermission: 'records:edit',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to commit records');
+          logger.info(`Role '${user.role}' cannot commit records`);
+        }
+        process.exit(1);
+      }
 
       try {
         if (!shouldOutputJson) {

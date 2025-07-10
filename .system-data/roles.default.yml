@@ -148,6 +148,55 @@ roles:
     status_transitions:
       draft: ['proposed']
 
+  editor:
+    name: 'Editor'
+    description: 'Content editor with create and edit permissions'
+    permissions:
+      - 'records:create'
+      - 'records:edit'
+      - 'records:view'
+      - 'templates:view'
+    record_types:
+      can_create:
+        - 'bylaw'
+        - 'policy'
+        - 'resolution'
+        - 'proclamation'
+        - 'ordinance'
+        - 'minutes'
+      can_edit:
+        - 'bylaw'
+        - 'policy'
+        - 'resolution'
+        - 'proclamation'
+        - 'ordinance'
+        - 'minutes'
+      can_view:
+        - 'bylaw'
+        - 'policy'
+        - 'resolution'
+        - 'proclamation'
+        - 'ordinance'
+        - 'minutes'
+    status_transitions:
+      draft: ['proposed']
+
+  viewer:
+    name: 'Viewer'
+    description: 'Read-only access to all records'
+    permissions:
+      - 'records:view'
+      - 'templates:view'
+    record_types:
+      can_view:
+        - 'bylaw'
+        - 'policy'
+        - 'resolution'
+        - 'proclamation'
+        - 'ordinance'
+        - 'minutes'
+    status_transitions: {}
+
   legal_dept:
     name: 'Legal Department'
     description: 'Legal review and compliance'
@@ -252,7 +301,9 @@ role_hierarchy:
   admin: []
   mayor: ['council']
   council: ['clerk']
-  clerk: ['public']
+  clerk: ['editor']
+  editor: ['viewer']
+  viewer: ['public']
   legal_dept: ['public']
   citizen: ['public']
   public: []

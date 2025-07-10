@@ -8,8 +8,7 @@ import {
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
-// TODO: Import userCan from @civicpress/core once exports are updated
-// import { userCan } from '@civicpress/core';
+import { userCan } from '@civicpress/core';
 
 export function registerHookCommand(cli: CAC) {
   cli
@@ -30,36 +29,35 @@ export function registerHookCommand(cli: CAC) {
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication and get civic instance
-      const { civic } = await AuthUtils.requireAuthWithCivic(
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
         shouldOutputJson
       );
       const dataDir = civic.getDataDir();
 
-      // TODO: Add role-based authorization check
       // Check hook management permissions
-      // const canManageHooks = await userCan(user, 'hooks:manage');
-      // if (!canManageHooks) {
-      //   if (shouldOutputJson) {
-      //     console.log(
-      //       JSON.stringify(
-      //       {
-      //         success: false,
-      //         error: 'Insufficient permissions',
-      //         details: 'You do not have permission to manage hooks',
-      //         requiredPermission: 'hooks:manage',
-      //         userRole: user.role,
-      //       },
-      //       null,
-      //       2
-      //     )
-      //   );
-      // } else {
-      //   logger.error('❌ Insufficient permissions to manage hooks');
-      //   logger.info(`Role '${user.role}' cannot manage hooks`);
-      // }
-      // process.exit(1);
-      // }
+      const canManageHooks = await userCan(user, 'hooks:manage');
+      if (!canManageHooks) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to manage hooks',
+                requiredPermission: 'hooks:manage',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to manage hooks');
+          logger.info(`Role '${user.role}' cannot manage hooks`);
+        }
+        process.exit(1);
+      }
 
       try {
         const hookSystem = new HookSystem(dataDir);

@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import * as fs from 'fs';
 import matter = require('gray-matter');
 import { glob } from 'glob';
+import { userCan } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -55,11 +56,35 @@ export function registerImportCommand(cli: CAC) {
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication and get civic instance
-      const { civic } = await AuthUtils.requireAuthWithCivic(
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
         shouldOutputJson
       );
       const dataDir = civic.getDataDir();
+
+      // Check import permissions
+      const canImport = await userCan(user, 'records:import');
+      if (!canImport) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to import records',
+                requiredPermission: 'records:import',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to import records');
+          logger.info(`Role '${user.role}' cannot import records`);
+        }
+        process.exit(1);
+      }
 
       try {
         const importOptions: ImportOptions = {

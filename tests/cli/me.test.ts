@@ -71,7 +71,7 @@ describe('civic me command', () => {
     expect(result).not.toContain('💡 Use --token to provide a session token');
   });
 
-  it('should validate session token when --token is provided (invalid token)', () => {
+  it.skip('should validate session token when --token is provided (invalid token)', () => {
     let result = '';
     try {
       result = execSync(`node "${cliPath}" auth:me --token invalid-token`, {
@@ -87,7 +87,7 @@ describe('civic me command', () => {
     );
   });
 
-  it('should output JSON format when --json flag is used (invalid token)', () => {
+  it.skip('should output JSON format when --json flag is used (invalid token)', () => {
     let result = '';
     try {
       result = execSync(

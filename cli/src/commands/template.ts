@@ -1,7 +1,7 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { Logger, TemplateEngine } from '@civicpress/core';
+import { Logger, TemplateEngine, userCan } from '@civicpress/core';
 import * as yaml from 'yaml';
 import * as fs from 'fs';
 import {
@@ -51,11 +51,35 @@ export function registerTemplateCommand(cli: CAC) {
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication and get civic instance
-      const { civic } = await AuthUtils.requireAuthWithCivic(
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
         shouldOutputJson
       );
       const dataDir = civic.getDataDir();
+
+      // Check template management permissions
+      const canManageTemplates = await userCan(user, 'templates:manage');
+      if (!canManageTemplates) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to manage templates',
+                requiredPermission: 'templates:manage',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to manage templates');
+          logger.info(`Role '${user.role}' cannot manage templates`);
+        }
+        process.exit(1);
+      }
 
       try {
         if (options.init) {
