@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { CivicPress } from '@civicpress/core';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -57,7 +56,7 @@ export function jwtAuth(
     // Validate session (async)
     authService
       .validateSession(token)
-      .then((user) => {
+      .then((user: any) => {
         if (!user) {
           res.status(401).json({
             error: {
@@ -72,7 +71,7 @@ export function jwtAuth(
         req.user = user;
         next();
       })
-      .catch((error) => {
+      .catch((error: any) => {
         console.error('JWT auth error:', error);
         res.status(500).json({
           error: {
@@ -203,14 +202,14 @@ export function optionalAuth(
     // Validate session (async)
     authService
       .validateSession(token)
-      .then((user) => {
+      .then((user: any) => {
         if (user) {
           // Attach user to request if valid
           req.user = user;
         }
         next();
       })
-      .catch((error) => {
+      .catch((error: any) => {
         // Log error but continue without user
         console.error('Optional auth error:', error);
         next();

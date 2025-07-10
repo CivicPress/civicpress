@@ -6,6 +6,7 @@ import { DatabaseService } from './database/database-service.js';
 import { AuthService } from './auth/auth-service.js';
 import { RecordManager } from './records/record-manager.js';
 import { TemplateEngine } from './utils/template-engine.js';
+import { IndexingService } from './indexing/indexing-service.js';
 import { Logger } from './utils/logger.js';
 
 const logger = new Logger();
@@ -48,6 +49,7 @@ export class CivicPress {
   private authService: AuthService;
   private recordManager: RecordManager;
   private templateEngine: TemplateEngine;
+  private indexingService: IndexingService;
 
   constructor(config: CivicPressConfig) {
     this.config = config;
@@ -69,6 +71,11 @@ export class CivicPress {
     this.gitEngine = new GitEngine(config.dataDir);
     this.hookSystem = new HookSystem(config.dataDir);
     this.templateEngine = new TemplateEngine(config.dataDir);
+
+    // Initialize indexing service and integrate with workflow engine
+    this.indexingService = new IndexingService(this, config.dataDir);
+    this.workflowEngine.setIndexingService(this.indexingService);
+
     this.recordManager = new RecordManager(
       this.databaseService,
       this.gitEngine,
@@ -124,6 +131,10 @@ export class CivicPress {
 
   getRecordManager(): RecordManager {
     return this.recordManager;
+  }
+
+  getIndexingService(): IndexingService {
+    return this.indexingService;
   }
 
   // Existing services

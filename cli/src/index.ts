@@ -17,6 +17,8 @@ import { registerTemplateCommand } from './commands/template.js';
 import { registerValidateCommand } from './commands/validate.js';
 import { registerHookCommand } from './commands/hook.js';
 import { loginCommand } from './commands/login.js';
+import { indexCommand } from './commands/index.js';
+import { autoIndexCommand } from './commands/auto-index.js';
 
 const cli = cac('civic');
 
@@ -46,6 +48,8 @@ registerTemplateCommand(cli);
 registerValidateCommand(cli);
 registerHookCommand(cli);
 loginCommand(cli);
+indexCommand(cli);
+autoIndexCommand(cli);
 
 // Parse and run
 cli.parse();

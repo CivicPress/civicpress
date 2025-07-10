@@ -40,3 +40,11 @@ export async function loadConfig() {
 // Export central configuration
 export { CentralConfigManager } from './config/central-config.js';
 export type { CentralConfig } from './config/central-config.js';
+
+// Export indexing services
+export { IndexingService } from './indexing/indexing-service.js';
+export type {
+  CivicIndex,
+  CivicIndexEntry,
+  IndexingOptions,
+} from './indexing/indexing-service.js';

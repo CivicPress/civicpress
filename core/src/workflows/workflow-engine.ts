@@ -4,9 +4,14 @@
  * Handles civic process workflows and automation.
  * Manages approval processes, lifecycle transitions, and business rules.
  */
+import { IndexingService } from '../indexing/indexing-service.js';
+
+/* global console */
+
 export class WorkflowEngine {
   private workflows: Map<string, any>;
   private activeWorkflows: Map<string, any>;
+  private indexingService?: IndexingService;
 
   constructor() {
     this.workflows = new Map();
@@ -21,6 +26,14 @@ export class WorkflowEngine {
     this.registerWorkflow('approval', this.approvalWorkflow.bind(this));
     this.registerWorkflow('publication', this.publicationWorkflow.bind(this));
     this.registerWorkflow('archival', this.archivalWorkflow.bind(this));
+    this.registerWorkflow('update-index', this.updateIndexWorkflow.bind(this));
+  }
+
+  /**
+   * Set the indexing service for auto-indexing workflows
+   */
+  setIndexingService(indexingService: IndexingService): void {
+    this.indexingService = indexingService;
   }
 
   /**
@@ -105,5 +118,54 @@ export class WorkflowEngine {
     // - Update metadata
     // - Notify stakeholders
     console.log('Archival workflow started:', { workflowId, data });
+  }
+
+  /**
+   * Auto-indexing workflow - triggered when records are updated
+   */
+  private async updateIndexWorkflow(
+    data: any,
+    workflowId: string
+  ): Promise<void> {
+    if (!this.indexingService) {
+      console.warn('IndexingService not available for auto-indexing workflow');
+      return;
+    }
+
+    try {
+      console.log('🔄 Auto-indexing workflow started:', {
+        workflowId,
+        record: data?.record?.title,
+      });
+
+      // Determine indexing scope based on the updated record
+      const indexingOptions: any = {};
+
+      if (data?.record?.module) {
+        indexingOptions.modules = [data.record.module];
+      }
+
+      if (data?.record?.type) {
+        indexingOptions.types = [data.record.type];
+      }
+
+      // Generate indexes with the determined scope
+      const index = await this.indexingService.generateIndexes(indexingOptions);
+
+      console.log(
+        `✅ Auto-indexing completed: ${index.metadata.totalRecords} records indexed`
+      );
+
+      // Log the workflow completion
+      this.activeWorkflows.get(workflowId)!.metadata = {
+        indexedRecords: index.metadata.totalRecords,
+        modules: index.metadata.modules,
+        types: index.metadata.types,
+        generated: index.metadata.generated,
+      };
+    } catch (error) {
+      console.error('❌ Auto-indexing workflow failed:', error);
+      throw error;
+    }
   }
 }
