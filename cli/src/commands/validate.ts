@@ -1,16 +1,17 @@
 import { CAC } from 'cac';
 import { readFile, readdir } from 'fs/promises';
 import { join, extname } from 'path';
-import { loadConfig, getLogger, TemplateEngine } from '@civicpress/core';
+import { loadConfig } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
-import matter from 'gray-matter';
+import matter = require('gray-matter');
 import { glob } from 'glob';
 import * as yaml from 'yaml';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { Logger, TemplateEngine } from '@civicpress/core';
 
 interface ValidationResult {
   record: string;
@@ -40,11 +41,10 @@ export function registerValidateCommand(cli: CAC) {
     .option('-s, --strict', 'Treat warnings as errors')
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (record: string, options: any) => {
+      const logger = new Logger();
       try {
         // Initialize logger with global options
         const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
 
         const config = await loadConfig();
         if (!config) {
@@ -93,7 +93,6 @@ export function registerValidateCommand(cli: CAC) {
           logger.info('  civic validate --all --json          # JSON output');
         }
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Validation failed:', error);
         process.exit(1);
       }
@@ -105,11 +104,11 @@ async function validateAllRecords(
   options: any,
   shouldOutputJson?: boolean
 ) {
+  const logger = new Logger();
   const recordsDir = join(dataDir, 'records');
 
   try {
     if (!fs.existsSync(recordsDir)) {
-      const logger = getLogger();
       if (shouldOutputJson) {
         console.log(
           JSON.stringify({ error: 'No records directory found' }, null, 2)
@@ -124,7 +123,6 @@ async function validateAllRecords(
     const recordFiles = await glob('**/*.md', { cwd: recordsDir });
     const results: ValidationResult[] = [];
 
-    const logger = getLogger();
     if (!shouldOutputJson) {
       logger.info(`🔍 Validating ${recordFiles.length} record(s)...\n`);
     }
@@ -136,7 +134,6 @@ async function validateAllRecords(
 
     displayValidationResults(results, options, shouldOutputJson);
   } catch (error) {
-    const logger = getLogger();
     logger.error('❌ Error validating records:', error);
   }
 }
@@ -147,13 +144,13 @@ async function validateSingleRecord(
   options: any,
   shouldOutputJson?: boolean
 ) {
+  const logger = new Logger();
   const fullPath = recordPath.endsWith('.md') ? recordPath : `${recordPath}.md`;
 
   try {
     const result = await validateRecord(dataDir, fullPath, options);
     displayValidationResults([result], options, shouldOutputJson);
   } catch (error) {
-    const logger = getLogger();
     logger.error(`❌ Error validating ${recordPath}:`, error);
   }
 }
@@ -163,6 +160,7 @@ async function validateRecord(
   recordPath: string,
   options: any
 ): Promise<ValidationResult> {
+  const logger = new Logger();
   const fullPath = join(dataDir, 'records', recordPath);
 
   if (!fs.existsSync(fullPath)) {
@@ -582,7 +580,7 @@ function displayValidationResults(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = new Logger();
   const totalRecords = results.length;
   const validRecords = results.filter((r) => r.isValid).length;
   const invalidRecords = totalRecords - validRecords;

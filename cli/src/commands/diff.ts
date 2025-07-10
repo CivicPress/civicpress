@@ -1,8 +1,6 @@
 import { CAC } from 'cac';
-import { readFile, stat } from 'fs/promises';
-import { join, extname } from 'path';
 import { simpleGit, SimpleGit } from 'simple-git';
-import { loadConfig, getLogger } from '@civicpress/core';
+import { loadConfig } from '@civicpress/core';
 import chalk from 'chalk';
 import * as diff from 'diff';
 import * as readline from 'readline';
@@ -70,12 +68,11 @@ export function registerDiffCommand(cli: CAC) {
       'Interactive mode - show commit history and select version'
     )
     .action(async (record: string, options: DiffOptions) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         const config = await loadConfig();
         if (!config) {
           logger.error(
@@ -120,7 +117,6 @@ export function registerDiffCommand(cli: CAC) {
           displayDiffResults(results, diffOptions, shouldOutputJson);
         }
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Diff failed:', error);
         process.exit(1);
       }
@@ -128,7 +124,7 @@ export function registerDiffCommand(cli: CAC) {
 }
 
 async function handleInteractiveDiff(dataDir: string, options: DiffOptions) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const git = simpleGit(dataDir);
   const recordPath = options.record!.endsWith('.md')
     ? options.record!
@@ -347,6 +343,7 @@ async function compareSingleRecord(
   commit2: string,
   options: DiffOptions
 ): Promise<DiffResult | null> {
+  const logger = initializeLogger();
   try {
     // Get file content at both commits
     const content1 = await getFileContent(git, recordPath, commit1);
@@ -433,7 +430,6 @@ async function compareSingleRecord(
         changes.length > 0 ? formatMetadataDiff(changes) : undefined,
     };
   } catch (error) {
-    const logger = getLogger();
     logger.warn(`Error comparing ${recordPath}:`, error);
     return null;
   }
@@ -458,11 +454,11 @@ async function getChangedFiles(
   commit1: string,
   commit2: string
 ): Promise<string[]> {
+  const logger = initializeLogger();
   try {
     const diff = await git.diff([`${commit1}..${commit2}`, '--name-only']);
     return diff.split('\n').filter((file) => file.trim());
   } catch (error) {
-    const logger = getLogger();
     logger.warn('Error getting changed files:', error);
     return [];
   }
@@ -515,8 +511,7 @@ function displayDiffResults(
   options: DiffOptions,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
-
+  const logger = initializeLogger();
   if (shouldOutputJson) {
     console.log(
       JSON.stringify(

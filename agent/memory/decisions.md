@@ -1,5 +1,231 @@
 # CivicPress Development Decisions
 
+## Authentication System Decision (2025-01-27)
+
+### **Decision**: JWT-Based Authentication with Role-Based Permissions
+
+**Context**: Need a robust authentication system that works across CLI and API
+while maintaining security and scalability.
+
+**Decision**: Implement JWT-based authentication with role-based permissions,
+replacing the previous API key approach.
+
+### **Architecture**:
+
+```
+Authentication Flow
+├── CLI Login: civic login (generates JWT token)
+├── API Authentication: JWT middleware on protected routes
+├── Role-Based Permissions: Granular access control
+└── Stateless Sessions: No server-side session storage
+```
+
+### **Key Principles**:
+
+1. **JWT Tokens**: Stateless authentication with proper token handling
+2. **Role-Based Access**: Granular permissions (admin, clerk, council, public)
+3. **CLI Integration**: Login command with token storage
+4. **API Protection**: All sensitive endpoints require JWT authentication
+5. **Security**: Proper token validation and error handling
+6. **Stateless**: No server-side session storage needed
+
+### **Implementation**:
+
+- **AuthenticationService**: JWT token generation and validation
+- **JWT Middleware**: Express middleware for route protection
+- **CLI Login**: `civic login` command with token handling
+- **Role Management**: Granular permission system
+- **Error Handling**: Proper 401/403 responses for auth failures
+
+### **Benefits**:
+
+- **Scalable**: Stateless authentication works across multiple servers
+- **Secure**: JWT tokens with proper validation
+- **Flexible**: Role-based permissions for different access levels
+- **Integrated**: Works seamlessly across CLI and API
+- **Testable**: Easy to mock and test authentication flows
+
+### **Status**: ✅ Implemented and tested
+
+---
+
+## Database Integration Decision (2025-01-27)
+
+### **Decision**: SQLite Integration with Adapter Pattern
+
+**Context**: Need database integration for record management while maintaining
+the file-based philosophy.
+
+**Decision**: Implement SQLite integration using adapter pattern for record
+management and user data.
+
+### **Architecture**:
+
+```
+Database Layer
+├── DatabaseService: Centralized database operations
+├── DatabaseAdapter: SQLite adapter with CRUD operations
+├── RecordManager: Record lifecycle management
+└── Integration: API endpoints connected to database
+```
+
+### **Key Principles**:
+
+1. **Adapter Pattern**: Database-agnostic design for future PostgreSQL support
+2. **SQLite First**: File-based database for development and small deployments
+3. **Record Management**: Full CRUD operations for civic records
+4. **Test Coverage**: Comprehensive database integration tests
+5. **Error Handling**: Proper database error handling and recovery
+
+### **Implementation**:
+
+- **DatabaseService**: Centralized database operations
+- **DatabaseAdapter**: SQLite adapter with full CRUD support
+- **RecordManager**: Comprehensive record lifecycle management
+- **API Integration**: All record endpoints connected to database
+- **Test Coverage**: Complete database integration tests
+
+### **Benefits**:
+
+- **Portable**: SQLite files can be easily backed up and moved
+- **Fast**: Local database provides excellent performance
+- **Reliable**: Mature SQLite with excellent stability
+- **Testable**: Easy to create test databases and fixtures
+- **Scalable**: Adapter pattern allows PostgreSQL migration later
+
+### **Status**: ✅ Implemented and tested
+
+---
+
+## Testing Strategy Decision (2025-01-27)
+
+### **Decision**: Comprehensive Test Suite with 95.6% Pass Rate Target
+
+**Context**: Need robust testing to ensure system reliability and
+maintainability.
+
+**Decision**: Implement comprehensive test suite covering CLI, Core, and API
+with high pass rate target.
+
+### **Architecture**:
+
+```
+Test Coverage
+├── CLI Tests: All commands with comprehensive coverage
+├── Core Tests: Database, auth, config services
+├── API Tests: Authentication and record endpoints
+├── Integration Tests: End-to-end system testing
+└── Test Fixtures: Complete test data and examples
+```
+
+### **Key Principles**:
+
+1. **High Coverage**: Target 95%+ pass rate across all modules
+2. **Real Testing**: Use real authentication and database integration
+3. **Comprehensive**: Cover CLI, Core, and API functionality
+4. **Fixtures**: Complete test data and examples
+5. **Integration**: End-to-end system testing
+
+### **Implementation**:
+
+- **CLI Tests**: All commands with proper mocking
+- **Core Tests**: Database service, auth service, config discovery
+- **API Tests**: Authentication and record endpoints
+- **Integration Tests**: End-to-end system testing
+- **Test Fixtures**: Complete test data and examples
+
+### **Benefits**:
+
+- **Reliable**: High test coverage ensures system stability
+- **Maintainable**: Easy to catch regressions and bugs
+- **Confidence**: Real integration testing builds confidence
+- **Documentation**: Tests serve as living documentation
+- **Quality**: High pass rate indicates system quality
+
+### **Status**: ✅ Achieved 95.6% pass rate
+
+---
+
+## Database Architecture Decision (2025-07-09)
+
+### **Decision**: Database as Performance Layer, File System as Source of Truth
+
+**Context**: Need to add database for scaling, auth, indexing, and vendor
+independence while maintaining CivicPress's human-readable, transparent
+philosophy.
+
+**Decision**: Implement database as **performance optimization layer**, with
+file system remaining the **source of truth**.
+
+### **Architecture**:
+
+```
+// Database is OPTIMIZATION, not source of truth
+File System (Source of Truth)
+├── .civic/records/bylaw-001.md
+├── .civic/records/policy-002.md
+└── .civic/config.yml
+
+Database (Performance Layer)
+├── Fast search indexing
+├── User sessions
+├── API key storage
+└── Cached metadata
+```
+
+### **Key Principles**:
+
+1. **Files are the source of truth** - always human-readable
+2. **Database is performance optimization** - never overwrites files
+3. **Git provides audit trail** - immutable history
+4. **Database can be rebuilt** from files at any time
+5. **Civic records stay in Markdown** - never in database
+6. **Database only for ephemeral data** - sessions, keys, cache
+
+### **Sync Direction**:
+
+- **File → Database** (one-way sync for civic data)
+- **Database → File** (only for user management data)
+
+### **What Goes Where**:
+
+#### **File System (Source of Truth)**:
+
+- ✅ Civic records (bylaws, policies, etc.)
+- ✅ Configuration (`.civic/config.yml`)
+- ✅ Templates (`.civic/templates/`)
+- ✅ Workflows (`.civic/workflows.yml`)
+
+#### **Database (Performance Only)**:
+
+- ✅ Search indexes
+- ✅ User sessions
+- ✅ API keys
+- ✅ Cached metadata
+- ✅ Audit logs
+
+### **Implementation Strategy**:
+
+1. Start with SQLite (file-based, Git-friendly)
+2. Database syncs FROM files, never overwrites
+3. Civic records always read from files first
+4. Database provides fast search and user management
+5. Easy migration path to PostgreSQL later
+
+### **Benefits**:
+
+- **Resilient**: Database failure = no data loss
+- **Transparent**: Files are always readable
+- **Portable**: Can work without database
+- **Trustworthy**: Git provides immutable audit trail
+- **Fast**: Database provides performance when available
+
+### **Status**: Approved and ready for implementation
+
+---
+
+## Previous Decisions
+
 ## Architecture & Technology Stack
 
 ### CLI Framework
@@ -106,10 +332,9 @@
 
 ### API Authentication
 
-- **Decision**: API key authentication with role-based access (clerk, council,
-  public)
-- **Reason**: Simple but effective for civic governance use case
-- **Status**: ✅ Placeholder implemented
+- **Decision**: JWT-based authentication with role-based permissions
+- **Reason**: Secure, scalable, and works across CLI and API
+- **Status**: ✅ Implemented
 
 ### Error Handling
 

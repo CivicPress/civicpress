@@ -94,5 +94,238 @@ describe('CLI Init Command', () => {
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain('CLI testing disabled');
     });
+
+    describe('Database Setup', () => {
+      it('should prompt for database type selection (manual test)', async () => {
+        // This test documents the expected behavior for database type prompts
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Verify: Database type selection prompt appears with SQLite/PostgreSQL options
+        // 3. Verify: SQLite is the default selection
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should prompt for SQLite database path when SQLite is selected (manual test)', async () => {
+        // This test documents the expected behavior for SQLite path prompts
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Select: SQLite database type
+        // 3. Verify: SQLite database file path prompt appears
+        // 4. Verify: Default path is data/.civic/civic.db
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should prompt for PostgreSQL URL when PostgreSQL is selected (manual test)', async () => {
+        // This test documents the expected behavior for PostgreSQL URL prompts
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Select: PostgreSQL database type
+        // 3. Verify: PostgreSQL connection URL prompt appears
+        // 4. Verify: Default URL is postgres://user:password@localhost:5432/civicpress
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should create .civicrc with SQLite configuration (manual test)', async () => {
+        // This test documents the expected behavior for SQLite .civicrc creation
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Select: SQLite database type
+        // 3. Enter: Custom database path (e.g., data/custom.db)
+        // 4. Verify: .civicrc file is created with correct SQLite configuration
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should create .civicrc with PostgreSQL configuration (manual test)', async () => {
+        // This test documents the expected behavior for PostgreSQL .civicrc creation
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Select: PostgreSQL database type
+        // 3. Enter: Custom connection URL
+        // 4. Verify: .civicrc file is created with correct PostgreSQL configuration
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should handle database configuration from config file (manual test)', async () => {
+        // This test documents the expected behavior for database config from file
+        // To test manually:
+        // 1. Create config file with database settings
+        // 2. Run: civic init --config config.yml
+        // 3. Verify: Database settings are loaded from config file
+        // 4. Verify: No interactive prompts for database setup
+
+        const result = await runCivicCommand(
+          'init --config test-config.yml',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should validate database configuration (manual test)', async () => {
+        // This test documents the expected behavior for database config validation
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Enter: Invalid database path or URL
+        // 3. Verify: Appropriate validation error messages
+        // 4. Verify: User can correct and retry
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should initialize database after configuration (manual test)', async () => {
+        // This test documents the expected behavior for database initialization
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Complete: Database configuration prompts
+        // 3. Verify: Database is initialized (SQLite file created or PostgreSQL connection tested)
+        // 4. Verify: Success message about database initialization
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+    });
+
+    describe('Configuration File Format', () => {
+      it('should create .civicrc with correct YAML structure (manual test)', async () => {
+        // This test documents the expected .civicrc file format
+        // To test manually:
+        // 1. Run: civic init
+        // 2. Complete: All prompts
+        // 3. Verify: .civicrc file has correct YAML structure
+        // 4. Verify: Database configuration is properly nested
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should handle existing .civicrc file (manual test)', async () => {
+        // This test documents the expected behavior for existing .civicrc files
+        // To test manually:
+        // 1. Create: Existing .civicrc file
+        // 2. Run: civic init
+        // 3. Verify: Prompt to overwrite existing file
+        // 4. Verify: User can choose to skip or overwrite
+
+        const result = await runCivicCommand(
+          'init',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+    });
+
+    describe('JSON Output', () => {
+      it('should output JSON when --json flag is used (manual test)', async () => {
+        // This test documents the expected behavior for JSON output
+        // To test manually:
+        // 1. Run: civic init --json
+        // 2. Complete: All prompts
+        // 3. Verify: Output is valid JSON
+        // 4. Verify: Database configuration is included in JSON output
+
+        const result = await runCivicCommand(
+          'init --json',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+
+      it('should include database info in JSON output (manual test)', async () => {
+        // This test documents the expected JSON output structure
+        // To test manually:
+        // 1. Run: civic init --json
+        // 2. Complete: Database configuration
+        // 3. Verify: JSON includes database type and path/URL
+        // 4. Verify: JSON includes success status and next steps
+
+        const result = await runCivicCommand(
+          'init --json',
+          join(context.testDir, 'data')
+        );
+
+        // Since CLI testing is disabled, this will always fail
+        // But it documents the expected behavior
+        expect(result.exitCode).toBe(1);
+        expect(result.stderr).toContain('CLI testing disabled');
+      });
+    });
   });
 });

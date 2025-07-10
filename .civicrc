@@ -1,0 +1,13 @@
+# CivicPress Central Configuration
+# This file tells all CivicPress components where to find the data directory
+
+# Data directory (relative to project root)
+dataDir: data
+
+# Database configuration
+database:
+  type: sqlite
+  sqlite:
+    file: .civic/civic.db
+# Optional: Override with environment variable CIVIC_DATA_DIR
+# Example: export CIVIC_DATA_DIR=/path/to/custom/data

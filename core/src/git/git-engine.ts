@@ -1,4 +1,5 @@
-import simpleGit, { SimpleGit } from 'simple-git';
+import { simpleGit, SimpleGit } from 'simple-git';
+import { cwd } from 'process';
 
 /**
  * GitEngine - Git Integration with Role-Aware Commits
@@ -12,7 +13,7 @@ export class GitEngine {
   private currentRole: string | null = null;
 
   constructor(repoPath?: string) {
-    this.repoPath = repoPath || process.cwd();
+    this.repoPath = repoPath || cwd();
     this.git = simpleGit(this.repoPath);
   }
 

@@ -43,9 +43,43 @@ Initialize a new CivicPress data directory and configuration.
 civic init
 ```
 
-- Prompts for setup options and creates `.civic/config.yml`.
+- Prompts for setup options and creates `.civicrc` at the project root.
+- Asks for database type (SQLite or PostgreSQL) and location/connection info.
 - Initializes a Git repo if needed.
 - Sets up default templates and validation rules.
+
+**Interactive Prompts:**
+
+- Data directory location
+- Database type (SQLite or PostgreSQL)
+- SQLite file path or PostgreSQL connection URL
+
+**Example: SQLite**
+
+```yaml
+# .civicrc
+---
+dataDir: data
+database:
+  type: sqlite
+  sqlite:
+    file: data/.civic/civic.db
+```
+
+**Example: PostgreSQL**
+
+```yaml
+# .civicrc
+---
+dataDir: data
+database:
+  type: postgres
+  postgres:
+    url: postgres://user:password@localhost:5432/civicpress
+```
+
+> The database file (for SQLite) will be created and initialized automatically
+> if it does not exist.
 
 ---
 

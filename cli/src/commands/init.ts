@@ -1,6 +1,6 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress, getLogger } from '@civicpress/core';
+import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
@@ -20,8 +20,7 @@ export const initCommand = (cli: CAC) => {
     .action(async (options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      initializeLogger(globalOptions);
-      const logger = getLogger();
+      const logger = initializeLogger();
 
       // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
@@ -129,36 +128,37 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
-        // Check if config already exists
-        const configPath = path.join(civicDir, 'config.yml');
-        const configExists = fs.existsSync(configPath);
+        // Check if .civicrc already exists
+        const civicrcPath = path.join(process.cwd(), '.civicrc');
+        const civicrcExists = fs.existsSync(civicrcPath);
 
-        if (configExists && !options.config) {
+        if (civicrcExists && !options.config) {
           const { overwrite } = await inquirer.prompt([
             {
               type: 'confirm',
               name: 'overwrite',
-              message: 'Configuration file already exists. Overwrite it?',
+              message: '.civicrc file already exists. Overwrite it?',
               default: false,
             },
           ]);
 
           if (!overwrite) {
-            logger.warn('⏭️  Skipping configuration setup');
+            logger.warn('⏭️  Skipping .civicrc setup');
           } else {
-            await setupConfiguration(configPath);
+            await setupCivicrc(civicrcPath, dataDir, logger);
           }
-        } else if (!configExists || options.config) {
+        } else if (!civicrcExists || options.config) {
           if (options.config) {
             // Use the provided config file
-            await setupConfigurationFromFile(configPath, config);
+            await setupCivicrcFromFile(civicrcPath, config, dataDir, logger);
           } else {
-            await setupConfiguration(configPath);
+            await setupCivicrc(civicrcPath, dataDir, logger);
           }
         }
 
         // Initialize CivicPress core with data directory
-        const civic = new CivicPress({ repoPath: fullDataDir });
+        const civic = new CivicPress({ dataDir: fullDataDir });
+        await civic.initialize();
         if (!shouldOutputJson) {
           logger.success('🔧 Initialized CivicPress core');
         }
@@ -218,7 +218,6 @@ export const initCommand = (cli: CAC) => {
             )
           );
         } else {
-          const logger = getLogger();
           logger.error('❌ Failed to initialize repository:', error);
         }
         process.exit(1);
@@ -228,9 +227,9 @@ export const initCommand = (cli: CAC) => {
 
 async function setupConfigurationFromFile(
   configPath: string,
-  config: any
+  config: any,
+  logger: any
 ): Promise<void> {
-  const logger = getLogger();
   logger.info('⚙️  Setting up CivicPress configuration from file...');
 
   // Ensure required fields are present
@@ -271,8 +270,10 @@ async function setupConfigurationFromFile(
   logger.success('⚙️  Configuration saved to .civic/config.yml');
 }
 
-async function setupConfiguration(configPath: string): Promise<void> {
-  const logger = getLogger();
+async function setupConfiguration(
+  configPath: string,
+  logger: any
+): Promise<void> {
   logger.info('⚙️  Setting up CivicPress configuration...');
 
   const answers = await inquirer.prompt([
@@ -403,4 +404,114 @@ async function setupConfiguration(configPath: string): Promise<void> {
   const yamlContent = yaml.stringify(config);
   fs.writeFileSync(configPath, yamlContent);
   logger.success('⚙️  Configuration saved to .civic/config.yml');
+}
+
+async function setupCivicrcFromFile(
+  civicrcPath: string,
+  config: any,
+  dataDir: string,
+  logger: any
+): Promise<void> {
+  logger.info('⚙️  Setting up .civicrc from file...');
+
+  // Ensure required fields are present
+  const requiredFields = ['name', 'city', 'state', 'country', 'timezone'];
+  for (const field of requiredFields) {
+    if (!config[field]) {
+      throw new Error(`Missing required field in config: ${field}`);
+    }
+  }
+
+  // Set defaults for optional fields
+  const finalCivicrc = {
+    version: '1.0.0',
+    name: config.name,
+    city: config.city,
+    state: config.state,
+    country: config.country,
+    timezone: config.timezone,
+    repo_url: config.repo_url || null,
+    modules: config.modules || ['legal-register'],
+    record_types: config.record_types || ['bylaw', 'policy'],
+    default_role: config.default_role || 'clerk',
+    hooks: {
+      enabled: config.hooks?.enabled ?? true,
+    },
+    workflows: {
+      enabled: config.workflows?.enabled ?? true,
+    },
+    audit: {
+      enabled: config.audit?.enabled ?? true,
+    },
+    database: {
+      type: 'sqlite', // Default to SQLite
+      path: path.join(dataDir, 'civicpress.db'),
+    },
+    created: new Date().toISOString(),
+  };
+
+  // Write .civicrc file
+  const yamlContent = yaml.stringify(finalCivicrc);
+  fs.writeFileSync(civicrcPath, yamlContent);
+  logger.success('⚙️  .civicrc saved to .civicrc');
+}
+
+async function setupCivicrc(
+  civicrcPath: string,
+  dataDir: string,
+  logger: any
+): Promise<void> {
+  logger.info('⚙️  Setting up .civicrc...');
+
+  const answers = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'database_type',
+      message: 'Select database type:',
+      choices: [
+        { name: 'SQLite (recommended for local development)', value: 'sqlite' },
+        { name: 'PostgreSQL (for production)', value: 'postgres' },
+      ],
+      default: 'sqlite',
+    },
+    {
+      type: 'input',
+      name: 'database_path',
+      message: 'SQLite database file path:',
+      default: path.join(dataDir, '.civic/civic.db'),
+      when: (answers: any) => answers.database_type === 'sqlite',
+    },
+    {
+      type: 'input',
+      name: 'database_url',
+      message: 'PostgreSQL connection URL:',
+      default: 'postgres://user:password@localhost:5432/civicpress',
+      when: (answers: any) => answers.database_type === 'postgres',
+    },
+  ]);
+
+  // Create .civicrc object with simplified format
+  const civicrc = {
+    dataDir: dataDir,
+    database: {
+      type: answers.database_type,
+      sqlite:
+        answers.database_type === 'sqlite'
+          ? {
+              file: answers.database_path,
+            }
+          : undefined,
+      postgres:
+        answers.database_type === 'postgres'
+          ? {
+              url: answers.database_url,
+            }
+          : undefined,
+    },
+  };
+
+  // Write .civicrc file
+  const yamlContent = yaml.stringify(civicrc);
+  fs.writeFileSync(civicrcPath, yamlContent);
+  logger.success('⚙️  .civicrc saved to .civicrc');
 }

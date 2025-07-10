@@ -1,9 +1,8 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import matter = require('gray-matter');
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -18,18 +17,16 @@ export const listCommand = (cli: CAC) => {
     )
     .option('-a, --all', 'Show all details')
     .action(async (type: string, options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         logger.info('📋 Listing civic records...');
 
-        // Initialize CivicPress (will auto-discover config)
-        const civic = new CivicPress();
-        const core = civic.getCore();
-        const dataDir = core.getDataDir();
+        // Get data directory from central configuration
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
 
         // Check if we should output JSON
         const shouldOutputJson = globalOptions.json;
@@ -232,7 +229,6 @@ export const listCommand = (cli: CAC) => {
           logger.success('\n✅ Records listed successfully!');
         }
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Failed to list records:', error);
         process.exit(1);
       }

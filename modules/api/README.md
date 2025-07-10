@@ -1,7 +1,101 @@
 # CivicPress API
 
-REST API for the CivicPress governance platform, providing programmatic access
-to civic records, workflows, and governance features.
+## CivicPress API-to-Core Integration
+
+All record operations (create, update, archive/delete, get, list) are now fully
+integrated with the CivicPress **CivicCore** platform. This means:
+
+- **Every API call** for records goes through the CivicCore `RecordManager`.
+- **Hooks and workflows** are triggered for audit trails, notifications, and
+  business logic.
+- **Git commits** are automatically created for every change, ensuring a full
+  audit trail.
+- **Permission checks** are enforced via the workflow configuration (role-based
+  access).
+- **Logical delete** (archive) is used—records are never physically deleted, but
+  moved to the archive folder and marked as archived.
+
+### High-Level Flow
+
+```mermaid
+graph TD
+  A[API Request] --> B[CivicCore RecordManager]
+  B --> C[Hooks & Workflows]
+  B --> D[Git Commit]
+  B --> E[Filesystem]
+  C --> F[Audit Trail]
+  D --> F
+```
+
+---
+
+## Endpoints
+
+### Create Record
+
+- Triggers: `record:created` hook, Git commit, permission check
+- Fails if role is not allowed to create the record type
+
+### Update Record
+
+- Triggers: `record:updated` hook, Git commit, permission check
+- Fails if role is not allowed to edit the record type
+
+### Archive (Delete) Record
+
+- Triggers: `record:archived` hook, Git commit, permission check
+- Moves the record to the archive folder, updates status and metadata
+- Fails if role is not allowed to delete the record type
+
+### Get/List Records
+
+- Reads from the CivicCore-managed records directory
+- Returns metadata and content
+
+---
+
+## Permissions & Roles
+
+- API keys are mapped to roles (`admin`, `clerk`, `council`, `public`)
+- Permissions are enforced via the workflow config (`data/.civic/workflows.yml`)
+- Example error response for insufficient permissions:
+
+```json
+{
+  "error": {
+    "message": "Failed to create record",
+    "details": "Permission denied: Role 'public' cannot create records of type 'bylaw'"
+  }
+}
+```
+
+---
+
+## Logical Delete (Archive)
+
+- DELETE requests do **not** remove files, but move them to `archive/<type>/`
+  and update their status to `archived`.
+- The API response includes the archive location and timestamp.
+
+---
+
+## Example Record Lifecycle
+
+1. **Create**: POST `/api/v1/records` → triggers hooks, Git commit, file created
+2. **Update**: PUT `/api/v1/records/:id` → triggers hooks, Git commit, file
+   updated
+3. **Archive**: DELETE `/api/v1/records/:id` → triggers hooks, Git commit, file
+   moved to archive
+
+---
+
+## See Also
+
+- [CivicCore RecordManager Documentation](../../core/README.md)
+- [Workflow Configuration](../../data/.civic/workflows.yml)
+- [Hooks & Workflows](../core/src/hooks/hook-system.ts)
+
+---
 
 ## 🚀 Quick Start
 
@@ -267,7 +361,7 @@ curl -X PUT http://localhost:3000/api/v1/records/api-test-record \
   }'
 ```
 
-##### Delete Record
+##### Archive Record (Logical Delete)
 
 ```http
 DELETE /api/v1/records/{id}
@@ -276,6 +370,10 @@ DELETE /api/v1/records/{id}
 **Path Parameters:**
 
 - `id` - Record ID
+
+**Note:** This endpoint performs a **logical delete** - the record is moved to
+the archive folder rather than being permanently deleted, maintaining the audit
+trail as required by CivicPress specifications.
 
 **Example:**
 
@@ -288,8 +386,10 @@ curl -X DELETE http://localhost:3000/api/v1/records/api-test-record \
 
 ```json
 {
-  "message": "Record api-test-record deleted successfully",
-  "deletedAt": "2025-07-09T02:35:12.123Z"
+  "message": "Record api-test-record archived successfully",
+  "archivedAt": "2025-07-09T02:35:12.123Z",
+  "archiveLocation": "archive/bylaw/api-test-record.md",
+  "note": "Record has been moved to archive and is no longer active"
 }
 ```
 
@@ -303,11 +403,11 @@ curl -X DELETE http://localhost:3000/api/v1/records/api-test-record \
 
 ### Roles & Permissions
 
-| Role      | Create                       | Read   | Update | Delete | Status Transitions  |
-| --------- | ---------------------------- | ------ | ------ | ------ | ------------------- |
-| `clerk`   | ✅ bylaw, policy, resolution | ✅ all | ✅ all | ❌     | draft → proposed    |
-| `council` | ✅ bylaw, policy, resolution | ✅ all | ✅ all | ✅     | proposed → approved |
-| `public`  | ❌                           | ✅ all | ❌     | ❌     | ❌                  |
+| Role      | Create                       | Read   | Update | Archive | Status Transitions  |
+| --------- | ---------------------------- | ------ | ------ | ------- | ------------------- |
+| `clerk`   | ✅ bylaw, policy, resolution | ✅ all | ✅ all | ❌      | draft → proposed    |
+| `council` | ✅ bylaw, policy, resolution | ✅ all | ✅ all | ✅      | proposed → approved |
+| `public`  | ❌                           | ✅ all | ❌     | ❌      | ❌                  |
 
 ### Status Workflow
 

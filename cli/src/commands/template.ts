@@ -1,10 +1,9 @@
 import { CAC } from 'cac';
-import { readFile, writeFile, mkdir, readdir } from 'fs/promises';
-import { join, extname } from 'path';
-import { loadConfig, getLogger, TemplateEngine } from '@civicpress/core';
-import chalk from 'chalk';
-import * as fs from 'fs';
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { Logger, TemplateEngine, loadConfig } from '@civicpress/core';
 import * as yaml from 'yaml';
+import * as fs from 'fs';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -44,12 +43,11 @@ export function registerTemplateCommand(cli: CAC) {
     .option('--partial <name>', 'Show partial details')
     .option('--create-partial <name>', 'Create a new partial')
     .action(async (options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         const config = await loadConfig();
         if (!config) {
           logger.error(
@@ -129,7 +127,6 @@ export function registerTemplateCommand(cli: CAC) {
           );
         }
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Template command failed:', error);
         process.exit(1);
       }
@@ -140,6 +137,7 @@ async function initializeDefaultTemplates(
   dataDir: string,
   shouldOutputJson?: boolean
 ) {
+  const logger = initializeLogger();
   const templatesDir = join(dataDir, '.civic', 'templates');
 
   try {
@@ -155,7 +153,6 @@ async function initializeDefaultTemplates(
       const templateContent = yaml.stringify(template);
       await writeFile(templatePath, templateContent);
       createdTemplates.push(template.name);
-      const logger = getLogger();
       if (!shouldOutputJson) {
         logger.info(`✅ Created template: ${template.name}`);
       }
@@ -174,11 +171,9 @@ async function initializeDefaultTemplates(
         )
       );
     } else {
-      const logger = getLogger();
       logger.info('\n🎉 Default templates initialized successfully!');
     }
   } catch (error) {
-    const logger = getLogger();
     if (shouldOutputJson) {
       console.log(
         JSON.stringify(
@@ -460,7 +455,7 @@ function getDefaultTemplates(): LegacyTemplate[] {
 }
 
 async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
@@ -553,7 +548,7 @@ async function showTemplate(
   templateName: string,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
@@ -665,7 +660,7 @@ async function createTemplate(
   recordType?: string,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = new Logger();
   const templatesDir = join(dataDir, '.civic', 'templates');
   const templatePath = join(templatesDir, `${templateName}.yml`);
 
@@ -767,7 +762,7 @@ async function validateTemplate(
   templateName: string,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const templatePath = join(
     dataDir,
     '.civic',
@@ -892,7 +887,7 @@ async function previewTemplate(
   templateName: string,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
@@ -1001,7 +996,7 @@ export {
 };
 
 async function listPartials(dataDir: string, shouldOutputJson?: boolean) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
@@ -1054,7 +1049,7 @@ async function showPartial(
   partialName: string,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
@@ -1123,8 +1118,7 @@ async function createPartial(
   partialName: string,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
-
+  const logger = initializeLogger();
   try {
     const partialsDir = join(dataDir, '.civic', 'partials');
     await mkdir(partialsDir, { recursive: true });

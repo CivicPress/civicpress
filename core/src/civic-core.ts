@@ -1,96 +1,159 @@
 import { ConfigDiscovery } from './config/config-discovery.js';
-import * as fs from 'fs';
-import * as yaml from 'yaml';
+import { WorkflowEngine } from './workflows/workflow-engine.js';
+import { GitEngine } from './git/git-engine.js';
+import { HookSystem } from './hooks/hook-system.js';
+import { DatabaseService } from './database/database-service.js';
+import { AuthService } from './auth/auth-service.js';
+import { RecordManager } from './records/record-manager.js';
+import { TemplateEngine } from './utils/template-engine.js';
+import { Logger } from './utils/logger.js';
 
-/**
- * CivicCore - Main Platform Manager
- *
- * Handles core platform functionality, configuration,
- * and coordination between different systems.
- */
-export class CivicCore {
-  private config: any;
-  private modules: Map<string, any>;
-  private configPath: string | null = null;
-  private dataDir: string | null = null;
+const logger = new Logger();
 
-  constructor() {
-    this.config = {};
-    this.modules = new Map();
+export interface CivicPressConfig {
+  dataDir: string;
+  database?: {
+    type: 'sqlite' | 'postgres';
+    sqlite?: {
+      file: string;
+    };
+    postgres?: {
+      url: string;
+    };
+  };
+}
+
+export interface CreateRecordRequest {
+  title: string;
+  type: string;
+  content?: string;
+  metadata?: Record<string, any>;
+  role?: string;
+}
+
+export interface UpdateRecordRequest {
+  title?: string;
+  content?: string;
+  status?: string;
+  metadata?: Record<string, any>;
+}
+
+export class CivicPress {
+  private config: CivicPressConfig;
+  private configDiscovery: ConfigDiscovery;
+  private workflowEngine: WorkflowEngine;
+  private gitEngine: GitEngine;
+  private hookSystem: HookSystem;
+  private databaseService: DatabaseService;
+  private authService: AuthService;
+  private recordManager: RecordManager;
+  private templateEngine: TemplateEngine;
+
+  constructor(config: CivicPressConfig) {
+    this.config = config;
+
+    // Initialize database service
+    const dbConfig = config.database || {
+      type: 'sqlite' as const,
+      sqlite: {
+        file: `${config.dataDir}/.civic/civic.db`,
+      },
+    };
+
+    this.databaseService = new DatabaseService(dbConfig);
+    this.authService = new AuthService(this.databaseService);
+
+    // Initialize other services
+    this.configDiscovery = new ConfigDiscovery();
+    this.workflowEngine = new WorkflowEngine();
+    this.gitEngine = new GitEngine(config.dataDir);
+    this.hookSystem = new HookSystem(config.dataDir);
+    this.templateEngine = new TemplateEngine(config.dataDir);
+    this.recordManager = new RecordManager(
+      this.databaseService,
+      this.gitEngine,
+      this.hookSystem,
+      this.workflowEngine,
+      this.templateEngine,
+      config.dataDir
+    );
   }
 
-  /**
-   * Initialize the core platform
-   */
   async initialize(): Promise<void> {
-    // Load configuration
-    await this.loadConfig();
+    try {
+      logger.info('Initializing CivicPress...');
 
-    // Initialize modules
-    await this.initializeModules();
-  }
+      // Initialize database first
+      await this.databaseService.initialize();
+      logger.info('Database initialized');
 
-  /**
-   * Load platform configuration
-   */
-  private async loadConfig(): Promise<void> {
-    // Find config file using discovery
-    this.configPath = ConfigDiscovery.findConfig();
+      // Initialize other services
+      await this.workflowEngine.initialize();
+      await this.gitEngine.initialize();
+      await this.hookSystem.initialize();
 
-    if (!this.configPath) {
-      throw new Error(
-        'CivicPress config not found. Run "civic init" to initialize.'
-      );
+      logger.info('CivicPress initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize CivicPress:', error);
+      throw error;
     }
-
-    // Get data directory from config path
-    this.dataDir = ConfigDiscovery.getDataDirFromConfig(this.configPath);
-
-    // Load and parse config file
-    const configContent = fs.readFileSync(this.configPath, 'utf8');
-    this.config = yaml.parse(configContent);
   }
 
-  /**
-   * Initialize registered modules
-   */
-  private async initializeModules(): Promise<void> {
-    // TODO: Load and initialize modules
-    // This will be implemented when we add module loading
+  async shutdown(): Promise<void> {
+    try {
+      logger.info('Shutting down CivicPress...');
+
+      // Close database connection
+      await this.databaseService.close();
+
+      logger.info('CivicPress shutdown complete');
+    } catch (error) {
+      logger.error('Error during shutdown:', error);
+      throw error;
+    }
   }
 
-  /**
-   * Get platform configuration
-   */
-  getConfig(): any {
-    return this.config;
+  // Database and Auth services
+  getDatabaseService(): DatabaseService {
+    return this.databaseService;
   }
 
-  /**
-   * Get the data directory path
-   */
-  getDataDir(): string | null {
-    return this.dataDir;
+  getAuthService(): AuthService {
+    return this.authService;
   }
 
-  /**
-   * Get the config file path
-   */
-  getConfigPath(): string | null {
-    return this.configPath;
+  getRecordManager(): RecordManager {
+    return this.recordManager;
   }
 
-  /**
-   * Register a module
-   */
-  registerModule(name: string, module: any): void {
-    this.modules.set(name, module);
+  // Existing services
+  getConfigDiscovery(): ConfigDiscovery {
+    return this.configDiscovery;
   }
 
-  /**
-   * Get a registered module
-   */
-  getModule(name: string): any {
-    return this.modules.get(name);
+  getWorkflowEngine(): WorkflowEngine {
+    return this.workflowEngine;
+  }
+
+  getGitEngine(): GitEngine {
+    return this.gitEngine;
+  }
+
+  getHookSystem(): HookSystem {
+    return this.hookSystem;
+  }
+
+  // Health check
+  async healthCheck(): Promise<{
+    status: 'healthy' | 'unhealthy';
+    database: boolean;
+  }> {
+    const dbHealthy = await this.databaseService.healthCheck();
+    const status = dbHealthy ? 'healthy' : 'unhealthy';
+
+    return {
+      status,
+      database: dbHealthy,
+    };
   }
 }

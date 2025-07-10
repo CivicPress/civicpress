@@ -1,4 +1,4 @@
-import { createLogger, setLogger } from '@civicpress/core';
+import { Logger } from '@civicpress/core';
 
 export interface GlobalOptions {
   silent?: boolean;
@@ -8,19 +8,12 @@ export interface GlobalOptions {
   noColor?: boolean;
 }
 
-export function initializeLogger(options: GlobalOptions): void {
-  const logger = createLogger({
-    silent: options.silent,
-    quiet: options.quiet,
-    verbose: options.verbose,
-    json: options.json,
-    noColor: options.noColor,
-  });
-  setLogger(logger);
+export function initializeLogger(): Logger {
+  return new Logger();
 }
 
 export function getGlobalOptionsFromArgs(): GlobalOptions {
-  const args = process.argv;
+  const args = (globalThis as any).process?.argv || [];
   const options: GlobalOptions = {};
 
   for (let i = 0; i < args.length; i++) {

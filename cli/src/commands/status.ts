@@ -1,10 +1,10 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress, getLogger } from '@civicpress/core';
+import { CivicPress } from '@civicpress/core';
 import { WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import matter = require('gray-matter');
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -29,8 +29,7 @@ export const statusCommand = (cli: CAC) => {
     .action(async (recordName: string, newStatus: string, options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      initializeLogger(globalOptions);
-      const logger = getLogger();
+      const logger = initializeLogger();
 
       // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
@@ -71,9 +70,16 @@ export const statusCommand = (cli: CAC) => {
         }
 
         // Initialize CivicPress (will auto-discover config)
-        const civic = new CivicPress();
-        const core = civic.getCore();
-        const dataDir = core.getDataDir();
+        // Get data directory from config discovery
+        const { loadConfig } = await import('@civicpress/core');
+        const config = await loadConfig();
+        if (!config) {
+          throw new Error(
+            'CivicPress not initialized. Run "civic init" first.'
+          );
+        }
+        const dataDir = config.dataDir;
+        const civic = new CivicPress({ dataDir });
 
         if (!dataDir) {
           if (shouldOutputJson) {
@@ -450,7 +456,6 @@ export const statusCommand = (cli: CAC) => {
             )
           );
         } else {
-          const logger = getLogger();
           logger.error('❌ Failed to change status:', error);
         }
         process.exit(1);

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
+    "module": "Node16",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -14,8 +14,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "moduleResolution": "bundler",
-    "types": ["node"]
+    "moduleResolution": "node16",
+    "types": ["node"],
+    "moduleDetection": "force"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

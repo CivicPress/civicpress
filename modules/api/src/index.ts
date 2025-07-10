@@ -1,230 +1,194 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-import { CivicPress } from '@civicpress/core';
-import path from 'path';
+import { CivicPress, Logger, CentralConfigManager } from '@civicpress/core';
+
+const logger = new Logger();
+
+// Import routes
+import authRouter from './routes/auth';
 import { healthRouter } from './routes/health';
-import { recordsRouter } from './routes/records';
-import { templatesRouter } from './routes/templates';
-import { workflowsRouter } from './routes/workflows';
-import { hooksRouter } from './routes/hooks';
+import { createRecordsRouter } from './routes/records';
+import { RecordsService } from './services/records-service';
+import { searchRouter } from './routes/search';
 import { exportRouter } from './routes/export';
 import { importRouter } from './routes/import';
-import { searchRouter } from './routes/search';
+import { hooksRouter } from './routes/hooks';
+import { templatesRouter } from './routes/templates';
+import { workflowsRouter } from './routes/workflows';
 import docsRouter from './routes/docs';
+
+// Import middleware
 import { errorHandler } from './middleware/error-handler';
 import { notFoundHandler } from './middleware/not-found';
+import { authMiddleware } from './middleware/auth';
 
-export interface ApiServerOptions {
-  port?: number;
-  host?: string;
-  corsOrigin?: string | string[];
-  rateLimitWindowMs?: number;
-  rateLimitMax?: number;
-  enableAuth?: boolean;
-  dataDir?: string;
-}
-
-export class CivicPressApi {
+export class CivicPressAPI {
   private app: express.Application;
-  private server: any;
-  private civicPress: CivicPress;
-  private options: Required<ApiServerOptions>;
+  private civicPress: CivicPress | null = null;
+  private port: number;
 
-  constructor(options: ApiServerOptions = {}) {
-    // Determine the data directory - default to project root/data
-    const dataDir =
-      options.dataDir || path.resolve(process.cwd(), '../../data');
-
-    // Set environment variable for CivicPress core to find the config
-    process.env.CIVIC_DATA_DIR = dataDir;
-
-    this.options = {
-      port: options.port || 3000,
-      host: options.host || 'localhost',
-      corsOrigin: options.corsOrigin || '*',
-      rateLimitWindowMs: options.rateLimitWindowMs || 15 * 60 * 1000, // 15 minutes
-      rateLimitMax: options.rateLimitMax || 100,
-      enableAuth: options.enableAuth || false,
-      dataDir,
-    };
-
-    this.civicPress = new CivicPress();
+  constructor(port: number = 3000) {
+    this.port = port;
     this.app = express();
     this.setupMiddleware();
-    this.setupRoutes();
-    this.setupErrorHandling();
   }
 
   private setupMiddleware(): void {
-    // Security middleware with more permissive CSP for Hoppscotch
-    this.app.use(
-      helmet({
-        contentSecurityPolicy: {
-          directives: {
-            defaultSrc: ["'self'", 'https:', 'data:'],
-            styleSrc: ["'self'", "'unsafe-inline'", 'https:', 'data:'],
-            scriptSrc: ["'self'", "'unsafe-inline'", 'https:', 'data:'],
-            frameSrc: ["'self'", 'https:', 'data:'],
-            frameAncestors: ["'self'", 'https:', 'data:'],
-            imgSrc: ["'self'", 'data:', 'https:'],
-            connectSrc: ["'self'", 'https:', 'data:'],
-            fontSrc: ["'self'", 'https:', 'data:'],
-            objectSrc: ["'none'"],
-            mediaSrc: ["'self'", 'https:', 'data:'],
-          },
-        },
-      })
-    );
-
     // CORS
     this.app.use(
       cors({
-        origin: this.options.corsOrigin,
+        origin: process.env.CORS_ORIGIN || '*',
         credentials: true,
       })
     );
 
-    // Compression
-    this.app.use(compression());
-
-    // Logging
-    this.app.use(morgan('combined'));
-
-    // Rate limiting
-    const limiter = rateLimit({
-      windowMs: this.options.rateLimitWindowMs,
-      max: this.options.rateLimitMax,
-      message: {
-        error: 'Too many requests from this IP, please try again later.',
-      },
-      standardHeaders: true,
-      legacyHeaders: false,
-    });
-    this.app.use(limiter);
-
     // Body parsing
     this.app.use(express.json({ limit: '10mb' }));
-    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  }
+    this.app.use(express.urlencoded({ extended: true }));
 
-  private setupRoutes(): void {
-    // Health check (no auth required)
-    this.app.use('/health', healthRouter);
-
-    // API routes (versioned)
-    this.app.use('/api/v1/records', recordsRouter);
-    this.app.use('/api/v1/templates', templatesRouter);
-    this.app.use('/api/v1/workflows', workflowsRouter);
-    this.app.use('/api/v1/hooks', hooksRouter);
-    this.app.use('/api/v1/export', exportRouter);
-    this.app.use('/api/v1/import', importRouter);
-    this.app.use('/api/v1/search', searchRouter);
-    this.app.use('/api/v1/docs', docsRouter);
-
-    // Root endpoint
-    this.app.get('/', (req, res) => {
-      res.json({
-        name: 'CivicPress API',
-        version: '1.0.0',
-        description: 'REST API for CivicPress governance platform',
-        documentation: '/api/v1/docs',
-        dataDir: this.options.dataDir,
-        endpoints: {
-          records: '/api/v1/records',
-          templates: '/api/v1/templates',
-          workflows: '/api/v1/workflows',
-          hooks: '/api/v1/hooks',
-          export: '/api/v1/export',
-          import: '/api/v1/import',
-          search: '/api/v1/search',
-          docs: '/api/v1/docs',
-          health: '/health',
-        },
+    // Request logging
+    this.app.use((req, res, next) => {
+      logger.info(`${req.method} ${req.path}`, {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
       });
+      next();
     });
   }
 
-  private setupErrorHandling(): void {
-    // 404 handler
-    this.app.use(notFoundHandler);
-
-    // Global error handler
-    this.app.use(errorHandler);
-  }
-
-  /**
-   * Get the Express app instance
-   */
-  getApp(): express.Application {
-    return this.app;
-  }
-
-  /**
-   * Get the CivicPress instance
-   */
-  getCivicPress(): CivicPress {
-    return this.civicPress;
-  }
-
-  /**
-   * Start the API server
-   */
-  async start(): Promise<void> {
+  async initialize(dataDir: string): Promise<void> {
     try {
-      // Initialize CivicPress
-      await this.civicPress.getCore().initialize();
+      logger.info('Initializing CivicPress API...');
 
-      // Start server
-      this.server = this.app.listen(
-        this.options.port,
-        this.options.host,
-        () => {
-          console.log(
-            `🚀 CivicPress API server running on http://${this.options.host}:${this.options.port}`
-          );
-          console.log(
-            `📚 API Documentation: http://${this.options.host}:${this.options.port}/api/v1/docs`
-          );
-          console.log(
-            `💚 Health Check: http://${this.options.host}:${this.options.port}/health`
-          );
-          console.log(`📁 Data Directory: ${this.options.dataDir}`);
-        }
-      );
+      // Load database config from central config
+      logger.info('Loading database config...');
+      const dbConfig = CentralConfigManager.getDatabaseConfig();
+      logger.info('Database config loaded:', dbConfig);
+
+      // Initialize CivicPress core
+      logger.info('Creating CivicPress instance...');
+      this.civicPress = new CivicPress({
+        dataDir,
+        database: dbConfig,
+      });
+
+      logger.info('Initializing CivicPress core...');
+      await this.civicPress.initialize();
+      logger.info('CivicPress core initialized');
+
+      // Setup routes after CivicPress is initialized
+      logger.info('Setting up routes...');
+      this.setupRoutes();
+
+      // Error handling middleware (must be last)
+      this.app.use(notFoundHandler);
+      this.app.use(errorHandler);
+
+      logger.info('CivicPress API initialized successfully');
     } catch (error) {
-      console.error('Failed to start CivicPress API server:', error);
+      logger.error('Failed to initialize CivicPress API:', error);
+      console.error('Full error details:', error);
       throw error;
     }
   }
 
-  /**
-   * Stop the API server
-   */
-  async stop(): Promise<void> {
-    if (this.server) {
-      return new Promise((resolve, reject) => {
-        this.server.close((err: any) => {
-          if (err) {
-            reject(err);
-          } else {
-            console.log('🛑 CivicPress API server stopped');
-            resolve();
-          }
-        });
-      });
+  private setupRoutes(): void {
+    if (!this.civicPress) {
+      throw new Error('CivicPress not initialized');
     }
+
+    // Create RecordsService instance
+    const recordsService = new RecordsService(this.civicPress);
+
+    // Health check (no auth required)
+    this.app.use('/health', healthRouter);
+
+    // Documentation (no auth required)
+    this.app.use('/docs', docsRouter);
+
+    // Auth routes (no auth required) - these need CivicPress instance
+    this.app.use(
+      '/auth',
+      (req, res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      authRouter
+    );
+
+    // Protected routes (require authentication)
+    this.app.use('/api', authMiddleware(this.civicPress), (req, res, next) => {
+      // Add CivicPress instance to request for route handlers
+      (req as any).civicPress = this.civicPress;
+      next();
+    });
+
+    this.app.use('/api/records', createRecordsRouter(recordsService));
+    this.app.use('/api/search', searchRouter);
+    this.app.use('/api/export', exportRouter);
+    this.app.use('/api/import', importRouter);
+    this.app.use('/api/hooks', hooksRouter);
+    this.app.use('/api/templates', templatesRouter);
+    this.app.use('/api/workflows', workflowsRouter);
+  }
+
+  async start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const server = this.app.listen(this.port, () => {
+        logger.info(`CivicPress API server running on port ${this.port}`);
+        resolve();
+      });
+
+      server.on('error', (error) => {
+        logger.error('Failed to start API server:', error);
+        reject(error);
+      });
+    });
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.civicPress) {
+      await this.civicPress.shutdown();
+    }
+    logger.info('CivicPress API server shutdown complete');
+  }
+
+  getApp(): express.Application {
+    return this.app;
   }
 }
 
-// Export for use as module
-export default CivicPressApi;
+// Start server if this file is run directly
+if (require.main === module) {
+  // Determine data directory - if running from root, use ./data, otherwise use relative path
+  const isRunningFromRoot = process.cwd().endsWith('civicpress');
+  const dataDir =
+    process.env.CIVIC_DATA_DIR || (isRunningFromRoot ? './data' : '../../data');
+  const port = parseInt(process.env.PORT || '3000');
 
-// Start server if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const api = new CivicPressApi();
-  api.start().catch(console.error);
+  const api = new CivicPressAPI(port);
+
+  api
+    .initialize(dataDir)
+    .then(() => api.start())
+    .then(() => {
+      logger.info('CivicPress API server started successfully');
+    })
+    .catch((error) => {
+      logger.error('Failed to start CivicPress API server:', error);
+      process.exit(1);
+    });
+
+  // Graceful shutdown
+  process.on('SIGINT', async () => {
+    logger.info('Received SIGINT, shutting down gracefully...');
+    await api.shutdown();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    logger.info('Received SIGTERM, shutting down gracefully...');
+    await api.shutdown();
+    process.exit(0);
+  });
 }

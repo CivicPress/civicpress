@@ -2,9 +2,11 @@
   "name": "civicpress",
   "version": "1.0.0",
   "description": "CivicPress project",
+  "type": "module",
   "packageManager": "pnpm@8.15.0",
   "scripts": {
-    "dev": "pnpm -r run dev",
+    "dev": "cd modules/api && pnpm run dev",
+    "dev:all": "pnpm -r run dev",
     "build": "pnpm -r run build",
     "format": "prettier --write \"**/*.{md,json,js,ts,jsx,tsx}\"",
     "format:check": "prettier --check \"**/*.{md,json,js,ts,jsx,tsx}\"",

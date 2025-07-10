@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.11.1-brightgreen.svg)](https://nodejs.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-workspace-blue.svg)](https://pnpm.io/)
+[![Tests](https://img.shields.io/badge/tests-95.6%25%20passing-brightgreen.svg)](https://github.com/CivicPress/civicpress)
 
 ## 🎯 Mission
 
@@ -44,21 +45,24 @@ cd civicpress
 # Or manually install dependencies
 pnpm install
 
-# Build the CLI
-cd cli && pnpm run build && cd ..
+# Build all packages
+pnpm run build
 ```
 
 ### First Steps
 
 ```bash
 # Initialize your CivicPress repository
-node cli/dist/index.js init
+civic init
+
+# Login to get JWT token
+civic login
 
 # Create your first record
-node cli/dist/index.js create bylaw "Public Meeting Procedures"
+civic create bylaw "Public Meeting Procedures"
 
 # View your records
-node cli/dist/index.js list
+civic list
 ```
 
 ### Development
@@ -70,7 +74,7 @@ pnpm install
 # Start the development environment
 pnpm run dev
 
-# Run tests
+# Run tests (95.6% pass rate)
 pnpm run test:run
 
 # Format code
@@ -102,11 +106,13 @@ pnpm run spec:check
 - [Workflow Configuration](docs/workflows.md)
 - [🔌 API Integration Guide](docs/api-integration-guide.md) - **NEW!** REST API
   for programmatic access
+- [🛠️ Development Patterns](docs/dev-pattern.md) - **NEW!** Development
+  guidelines and patterns
 
 ## 🔌 REST API
 
-CivicPress provides a comprehensive REST API for programmatic access to civic
-records, workflows, and governance features:
+CivicPress provides a comprehensive REST API with JWT authentication for
+programmatic access to civic records, workflows, and governance features:
 
 ### Quick API Start
 
@@ -121,23 +127,34 @@ curl http://localhost:3000/api/v1/records
 
 ### API Features
 
-- **📋 Records Management**: Full CRUD operations for civic records
-- **🔐 Role-based Access**: Enforce permissions based on user roles
+- **🔐 JWT Authentication**: Secure JWT-based authentication with role-based
+  permissions
+- **📋 Records Management**: Full CRUD operations for civic records with
+  database integration
+- **👥 Role-based Access**: Enforce permissions based on user roles (admin,
+  clerk, council, public)
 - **🔄 Workflow Control**: Manage record status transitions
 - **📄 Template System**: Use predefined templates for record creation
 - **📊 Export/Import**: Bulk data operations
 - **🔍 Search & Filter**: Advanced querying capabilities
+- **🗄️ Database Integration**: SQLite database with full record management
 
 ### Example API Usage
 
 ```bash
-# List all records
-curl http://localhost:3000/api/v1/records
+# Login to get JWT token
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "clerk", "password": "password"}'
+
+# Use JWT token for authenticated requests
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  http://localhost:3000/api/v1/records
 
 # Create new bylaw
 curl -X POST http://localhost:3000/api/v1/records \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: clerk" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "title": "Parking Regulations",
     "type": "bylaw",
@@ -147,7 +164,7 @@ curl -X POST http://localhost:3000/api/v1/records \
 # Update record status
 curl -X PUT http://localhost:3000/api/v1/records/parking-regulations \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: council" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{"status": "proposed"}'
 ```
 
@@ -162,39 +179,49 @@ curl -X PUT http://localhost:3000/api/v1/records/parking-regulations \
 
 ## 🎛️ CLI Features
 
-CivicPress provides a comprehensive command-line interface for managing civic
-records with governance workflows, role-based permissions, and advanced
-features:
+CivicPress provides a comprehensive command-line interface with JWT
+authentication for managing civic records with governance workflows, role-based
+permissions, and advanced features:
+
+### Authentication
+
+```bash
+# Login to get JWT token
+civic login
+
+# Check authentication status
+civic status
+```
 
 ### Record Management
 
 ```bash
 # Create records with templates
-node cli/dist/index.js create bylaw "Public Meeting Procedures" --template advanced
-node cli/dist/index.js create policy "Data Privacy Policy" --template default
-node cli/dist/index.js create resolution "Budget Approval 2024" --template standard
+civic create bylaw "Public Meeting Procedures" --template advanced
+civic create policy "Data Privacy Policy" --template default
+civic create resolution "Budget Approval 2024" --template standard
 
 # View and edit records
-node cli/dist/index.js view "public-meeting-procedures"
-node cli/dist/index.js edit "data-privacy-policy"
+civic view "public-meeting-procedures"
+civic edit "data-privacy-policy"
 
 # List and search records
-node cli/dist/index.js list --type bylaw --status draft
-node cli/dist/index.js search "privacy" --type policy
+civic list --type bylaw --status draft
+civic search "privacy" --type policy
 ```
 
 ### Governance Workflows
 
 ```bash
 # Change record status with role-based permissions
-node cli/dist/index.js status "public-meeting-procedures" proposed --role clerk
-node cli/dist/index.js status "budget-approval" approved --role council
+civic status "public-meeting-procedures" proposed --role clerk
+civic status "budget-approval" approved --role council
 
 # View available status transitions
-node cli/dist/index.js status "public-meeting-procedures"
+civic status "public-meeting-procedures"
 
 # Commit changes with role-based messages
-node cli/dist/index.js commit "public-meeting-procedures" --role clerk
+civic commit "public-meeting-procedures" --role clerk
 ```
 
 ### Import & Export

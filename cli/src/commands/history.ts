@@ -1,6 +1,4 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
-import { CivicPress, getLogger } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -14,16 +12,21 @@ export const historyCommand = (cli: CAC) => {
     })
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (record: string, options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         // Initialize CivicPress (will auto-discover config)
-        const civic = new CivicPress();
-        const core = civic.getCore();
-        const dataDir = core.getDataDir();
+        // Get data directory from config discovery
+        const { loadConfig } = await import('@civicpress/core');
+        const config = await loadConfig();
+        if (!config) {
+          throw new Error(
+            'CivicPress not initialized. Run "civic init" first.'
+          );
+        }
+        const dataDir = config.dataDir;
 
         if (!dataDir) {
           throw new Error('Data directory not found. Run "civic init" first.');
@@ -83,7 +86,6 @@ export const historyCommand = (cli: CAC) => {
 
         logger.success('✅ History displayed successfully!');
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Failed to view history:', error);
         process.exit(1);
       }

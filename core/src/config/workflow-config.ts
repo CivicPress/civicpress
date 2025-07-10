@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as fs from 'fs';
 import { getLogger } from '../utils/logger.js';
+import yaml from 'js-yaml';
 
 export interface WorkflowConfig {
   statuses: string[];
@@ -44,9 +45,8 @@ export class WorkflowConfigManager {
       }
 
       const content = await readFile(this.configPath, 'utf-8');
-      // Note: You'll need to add a YAML parser like 'js-yaml'
-      // For now, we'll use JSON format
-      const parsedConfig = JSON.parse(content) as WorkflowConfig;
+      // Parse as YAML
+      const parsedConfig = yaml.load(content) as WorkflowConfig;
       this.config = parsedConfig;
       return this.config;
     } catch (error) {

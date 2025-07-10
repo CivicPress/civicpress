@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import * as yaml from 'yaml';
+import yaml from 'yaml';
 import chalk from 'chalk';
 
 export interface HookContext {

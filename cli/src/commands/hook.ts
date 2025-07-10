@@ -1,11 +1,8 @@
 import { CAC } from 'cac';
-import { readFile, writeFile } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { loadConfig, getLogger } from '@civicpress/core';
-import chalk from 'chalk';
-import * as fs from 'fs';
-import * as yaml from 'yaml';
+import { loadConfig } from '@civicpress/core';
 import { HookSystem } from '@civicpress/core';
 import {
   initializeLogger,
@@ -24,12 +21,11 @@ export function registerHookCommand(cli: CAC) {
     .option('--logs', 'Show hook execution logs')
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (action: string, options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         const config = await loadConfig();
         if (!config) {
           logger.error(
@@ -77,7 +73,6 @@ export function registerHookCommand(cli: CAC) {
           showHelp();
         }
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Hook management failed:', error);
         process.exit(1);
       }
@@ -89,7 +84,7 @@ async function listHooks(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const config = hookSystem.getConfiguration();
   const registeredHooks = hookSystem.getRegisteredHooks();
 
@@ -153,7 +148,7 @@ async function showConfig(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const config = hookSystem.getConfiguration();
 
   if (shouldOutputJson) {
@@ -196,7 +191,7 @@ async function testHook(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   if (!hookName) {
     if (shouldOutputJson) {
       console.log(
@@ -281,7 +276,7 @@ async function enableHook(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   if (!hookName) {
     if (shouldOutputJson) {
       console.log(
@@ -367,7 +362,7 @@ async function disableHook(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   if (!hookName) {
     if (shouldOutputJson) {
       console.log(
@@ -453,7 +448,7 @@ async function listWorkflows(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const config = hookSystem.getConfiguration();
   const workflows = new Set<string>();
 
@@ -503,7 +498,7 @@ async function showLogs(
   options: any,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 
   if (!existsSync(logPath)) {
@@ -581,7 +576,7 @@ async function showLogs(
 }
 
 function showHelp() {
-  const logger = getLogger();
+  const logger = initializeLogger();
   logger.info('🪝 CivicPress Hook Management');
   logger.info('─'.repeat(50));
   logger.info('  civic hook list                    # List all hooks');

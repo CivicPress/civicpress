@@ -1,9 +1,8 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress, getLogger } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import matter = require('gray-matter');
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -14,18 +13,23 @@ export const viewCommand = (cli: CAC) => {
     .command('view <record>', 'View a specific civic record')
     .option('-r, --raw', 'Show raw markdown content')
     .action(async (recordName: string, options: any) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         logger.info(`📖 Viewing record: ${recordName}`);
 
         // Initialize CivicPress (will auto-discover config)
-        const civic = new CivicPress();
-        const core = civic.getCore();
-        const dataDir = core.getDataDir();
+        // Get data directory from config discovery
+        const { loadConfig } = await import('@civicpress/core');
+        const config = await loadConfig();
+        if (!config) {
+          throw new Error(
+            'CivicPress not initialized. Run "civic init" first.'
+          );
+        }
+        const dataDir = config.dataDir;
 
         // Check if we should output JSON
         const shouldOutputJson = globalOptions.json;
@@ -226,7 +230,6 @@ export const viewCommand = (cli: CAC) => {
         logger.info('\n' + '='.repeat(60));
         logger.success('✅ Record displayed successfully!');
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Failed to view record:', error);
         process.exit(1);
       }

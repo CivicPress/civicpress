@@ -39,6 +39,64 @@ node cli/dist/index.js --help
 
 You should see the CivicPress CLI help output with all available commands.
 
+## 🗄️ Database Configuration
+
+CivicPress uses a central configuration file, `.civicrc`, at the project root to
+define where your data lives and how the database is set up.
+
+By default, CivicPress uses SQLite for local development. In the future, you can
+switch to PostgreSQL for production or scaling needs.
+
+### Example: .civicrc for SQLite (default)
+
+```yaml
+# .civicrc
+# Central CivicPress configuration
+
+dataDir: data
+
+database:
+  type: sqlite
+  sqlite:
+    file: .civic/civic.db
+```
+
+- `dataDir`: Path to your civic data directory (relative to project root)
+- `database.type`: Set to `sqlite` for local development
+- `database.sqlite.file`: Path to the SQLite database file (recommended: inside
+  `.civic/`)
+
+### Example: .civicrc for PostgreSQL (future)
+
+```yaml
+# .civicrc
+
+dataDir: data
+
+database:
+  type: postgres
+  postgres:
+    url: postgres://user:password@localhost:5432/civicpress
+```
+
+- `database.type`: Set to `postgres` for PostgreSQL
+- `database.postgres.url`: Connection string for your PostgreSQL instance
+
+> **Note:** Only SQLite is supported at the moment. PostgreSQL support is coming
+> soon!
+
+### Architectural Principle
+
+- **File system is the source of truth**: All civic records and configuration
+  are stored as human-readable files and versioned with Git.
+- **Database is a performance layer**: Used for fast search, user sessions, API
+  keys, and caching. The database can always be rebuilt from the files.
+
+For more details, see [database.md](../.civic/specs/database.md) and the
+[architecture decision](../agent/memory/decisions.md).
+
+---
+
 ## 🎯 2. Initialize Your CivicPress Repository
 
 ### Basic Initialization

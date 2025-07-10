@@ -1,10 +1,9 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, extname, dirname } from 'path';
-import { loadConfig, getLogger } from '@civicpress/core';
-import chalk from 'chalk';
+import { join, dirname } from 'path';
+import { loadConfig } from '@civicpress/core';
 import * as fs from 'fs';
-import matter from 'gray-matter';
+import matter = require('gray-matter');
 import { glob } from 'glob';
 import {
   initializeLogger,
@@ -53,12 +52,11 @@ export function registerExportCommand(cli: CAC) {
     .option('--pretty', 'Pretty-print JSON output')
     .option('--template <template>', 'Custom HTML template file')
     .action(async (record: string, options: ExportOptions) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         const config = await loadConfig();
         if (!config) {
           logger.error(
@@ -92,7 +90,6 @@ export function registerExportCommand(cli: CAC) {
           await exportRecords(config.dataDir, exportOptions, shouldOutputJson);
         }
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Export failed:', error);
         process.exit(1);
       }
@@ -105,6 +102,7 @@ async function exportSingleRecord(
   options: ExportOptions,
   shouldOutputJson?: boolean
 ) {
+  const logger = initializeLogger();
   const fullPath = join(dataDir, 'records', recordPath);
 
   try {
@@ -121,7 +119,6 @@ async function exportSingleRecord(
         );
         return;
       } else {
-        const logger = getLogger();
         logger.error(`❌ Record not found: ${recordPath}`);
         process.exit(1);
       }
@@ -176,7 +173,6 @@ async function exportSingleRecord(
         )
       );
     } else {
-      const logger = getLogger();
       logger.error(`❌ Error exporting ${recordPath}:`, error);
       process.exit(1);
     }
@@ -188,6 +184,7 @@ async function exportRecords(
   options: ExportOptions,
   shouldOutputJson?: boolean
 ) {
+  const logger = initializeLogger();
   const recordsDir = join(dataDir, 'records');
 
   try {
@@ -204,7 +201,6 @@ async function exportRecords(
         );
         return;
       } else {
-        const logger = getLogger();
         logger.warn('📁 No records directory found.');
         return;
       }
@@ -255,7 +251,6 @@ async function exportRecords(
         );
         return;
       } else {
-        const logger = getLogger();
         logger.warn('🔍 No records found matching your criteria.');
         return;
       }
@@ -286,7 +281,6 @@ async function exportRecords(
       return;
     }
 
-    const logger = getLogger();
     logger.info(`📦 Exporting ${records.length} record(s)...`);
 
     const output = await formatExport(records, options);
@@ -304,7 +298,6 @@ async function exportRecords(
         )
       );
     } else {
-      const logger = getLogger();
       logger.error('❌ Error exporting records:', error);
       process.exit(1);
     }
@@ -483,6 +476,7 @@ function parseDateFilter(dateFilter: string): Date | null {
 }
 
 async function writeExport(output: string, options: ExportOptions) {
+  const logger = initializeLogger();
   if (options.output) {
     // Ensure output directory exists
     const outputDir = dirname(options.output);
@@ -491,11 +485,9 @@ async function writeExport(output: string, options: ExportOptions) {
     }
 
     await writeFile(options.output, output);
-    const logger = getLogger();
     logger.success(`✅ Export saved to: ${options.output}`);
   } else {
     // Output to stdout
-    const logger = getLogger();
     logger.output(output);
   }
 }

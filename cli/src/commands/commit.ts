@@ -1,6 +1,5 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
-import { CivicPress, getLogger } from '@civicpress/core';
+import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -17,8 +16,7 @@ export const commitCommand = (cli: CAC) => {
     .action(async (recordName: string, options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      initializeLogger(globalOptions);
-      const logger = getLogger();
+      const logger = initializeLogger();
 
       // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
@@ -49,9 +47,16 @@ export const commitCommand = (cli: CAC) => {
         }
 
         // Initialize CivicPress (will auto-discover config)
-        const civic = new CivicPress();
-        const core = civic.getCore();
-        const dataDir = core.getDataDir();
+        // Get data directory from config discovery
+        const { loadConfig } = await import('@civicpress/core');
+        const config = await loadConfig();
+        if (!config) {
+          throw new Error(
+            'CivicPress not initialized. Run "civic init" first.'
+          );
+        }
+        const dataDir = config.dataDir;
+        const civic = new CivicPress({ dataDir });
 
         if (!dataDir) {
           if (shouldOutputJson) {
@@ -303,7 +308,6 @@ export const commitCommand = (cli: CAC) => {
             )
           );
         } else {
-          const logger = getLogger();
           logger.error('❌ Failed to commit records:', error);
         }
         process.exit(1);

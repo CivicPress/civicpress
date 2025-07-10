@@ -12,6 +12,12 @@ module.exports = [
         project: './tsconfig.json',
         sourceType: 'module',
       },
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        require: 'readonly',
+        module: 'readonly',
+      },
     },
     plugins: {
       '@typescript-eslint': tseslint,

@@ -1,9 +1,9 @@
 import { CAC } from 'cac';
-import { readdir, readFile, stat } from 'fs/promises';
-import { join, extname } from 'path';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 import { glob } from 'glob';
-import { simpleGit, SimpleGit } from 'simple-git';
-import { loadConfig, getLogger } from '@civicpress/core';
+import { simpleGit } from 'simple-git';
+import { loadConfig } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -61,12 +61,11 @@ export function registerSearchCommand(cli: CAC) {
     .option('-l, --limit <number>', 'Limit number of results', { default: 50 })
     .option('-f, --format <format>', 'Output format', { default: 'table' })
     .action(async (query: string, options: SearchOptions) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         const config = await loadConfig();
         if (!config) {
           logger.error(
@@ -119,7 +118,6 @@ export function registerSearchCommand(cli: CAC) {
 
         displayResults(results, searchOptions);
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Search failed:', error);
         process.exit(1);
       }
@@ -346,7 +344,7 @@ function searchInText(
       if (matches_array) {
         matches.push(...matches_array);
       }
-    } catch (error) {
+    } catch {
       console.warn('Invalid regex pattern:', searchTerm);
     }
   } else {
@@ -375,7 +373,7 @@ function matchesPattern(
       const flags = caseSensitive ? '' : 'i';
       const regexObj = new RegExp(pattern, flags);
       return regexObj.test(text);
-    } catch (error) {
+    } catch {
       return false;
     }
   } else {
@@ -489,7 +487,7 @@ async function searchGitHistory(
               });
             }
           }
-        } catch (error) {
+        } catch {
           // Invalid regex, skip
         }
       } else if (commitMessage.includes(searchLower)) {
@@ -520,7 +518,7 @@ async function searchGitHistory(
       }
     }
   } catch (error) {
-    const logger = getLogger();
+    const logger = initializeLogger();
     logger.warn('Git history search failed:', error);
   }
 
@@ -540,7 +538,7 @@ function removeDuplicates(results: SearchResult[]): SearchResult[] {
 }
 
 function displayResults(results: SearchResult[], options: SearchOptions) {
-  const logger = getLogger();
+  const logger = initializeLogger();
 
   if (results.length === 0) {
     logger.warn('🔍 No records found matching your search criteria.');

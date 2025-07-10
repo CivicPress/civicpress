@@ -1,6 +1,5 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
-import { CivicPress, getLogger, WorkflowConfigManager } from '@civicpress/core';
+import { CivicPress, WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
@@ -25,8 +24,7 @@ export const createCommand = (cli: CAC) => {
     .action(async (type: string, title: string, options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      initializeLogger(globalOptions);
-      const logger = getLogger();
+      const logger = initializeLogger();
 
       // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
@@ -60,10 +58,17 @@ export const createCommand = (cli: CAC) => {
         }
 
         // Initialize CivicPress (will auto-discover config)
-        const civic = new CivicPress();
+        // Get data directory from config discovery
+        const { loadConfig } = await import('@civicpress/core');
+        const config = await loadConfig();
+        if (!config) {
+          throw new Error(
+            'CivicPress not initialized. Run "civic init" first.'
+          );
+        }
+        const dataDir = config.dataDir;
+        const civic = new CivicPress({ dataDir });
 
-        // Get data directory from core
-        const dataDir = civic.getCore().getDataDir();
         if (!dataDir) {
           if (shouldOutputJson) {
             console.log(
@@ -336,7 +341,6 @@ export const createCommand = (cli: CAC) => {
             )
           );
         } else {
-          const logger = getLogger();
           logger.error('❌ Failed to create record:', error);
         }
         process.exit(1);

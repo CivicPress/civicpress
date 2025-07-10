@@ -18,6 +18,12 @@ build/
 .cache/
 .nyc_output/
 
+# Compiled JavaScript files
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+
 # CivicPress
 .civic/state/
 .civic/hooks.log.jsonl

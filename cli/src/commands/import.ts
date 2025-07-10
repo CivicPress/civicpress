@@ -1,10 +1,9 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join, extname, dirname, basename } from 'path';
-import { loadConfig, getLogger } from '@civicpress/core';
-import chalk from 'chalk';
+import { join, dirname } from 'path';
+import { loadConfig } from '@civicpress/core';
 import * as fs from 'fs';
-import matter from 'gray-matter';
+import matter = require('gray-matter');
 import { glob } from 'glob';
 import {
   initializeLogger,
@@ -48,12 +47,11 @@ export function registerImportCommand(cli: CAC) {
     .option('--validate', 'Validate imported records')
     .option('--template <template>', 'Default template for imported records')
     .action(async (file: string, options: ImportOptions) => {
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeLogger(globalOptions);
-        const logger = getLogger();
+      // Initialize logger with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
 
+      try {
         const config = await loadConfig();
         if (!config) {
           logger.error(
@@ -86,7 +84,6 @@ export function registerImportCommand(cli: CAC) {
           await importRecords(config.dataDir, importOptions, shouldOutputJson);
         }
       } catch (error) {
-        const logger = getLogger();
         logger.error('❌ Import failed:', error);
         process.exit(1);
       }
@@ -99,8 +96,7 @@ async function importSingleFile(
   options: ImportOptions,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
-
+  const logger = initializeLogger();
   try {
     if (!fs.existsSync(filePath)) {
       if (shouldOutputJson) {
@@ -172,7 +168,7 @@ async function importRecords(
   options: ImportOptions,
   shouldOutputJson?: boolean
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const inputPath = options.input || '.';
 
   try {
@@ -425,8 +421,7 @@ function getFilePattern(format: string): string {
 }
 
 async function dryRunImport(records: ImportRecord[], options: ImportOptions) {
-  const logger = getLogger();
-
+  const logger = initializeLogger();
   logger.info('🔍 Dry run - would import the following records:');
 
   for (const record of records) {
@@ -455,7 +450,7 @@ async function performImport(
   dataDir: string,
   options: ImportOptions
 ) {
-  const logger = getLogger();
+  const logger = initializeLogger();
   const recordsDir = join(dataDir, 'records');
 
   // Ensure records directory exists

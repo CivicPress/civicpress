@@ -20,13 +20,16 @@
   "author": "CivicPress Team",
   "license": "MIT",
   "dependencies": {
+    "@types/jsonwebtoken": "9.0.10",
     "gray-matter": "^4.0.3",
-    "simple-git": "^3.22.0",
-    "yaml": "^2.3.4"
+    "jsonwebtoken": "9.0.2",
+    "simple-git": "^3.28.0",
+    "sqlite3": "5.1.7",
+    "yaml": "^2.8.0"
   },
   "devDependencies": {
     "@types/jest": "^29.0.0",
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.4",
     "@typescript-eslint/eslint-plugin": "8.36.0",
     "@typescript-eslint/parser": "8.36.0",
     "eslint": "9.30.1",

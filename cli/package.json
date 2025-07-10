@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "description": "CivicPress Command Line Interface",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/progressive.js",
   "bin": {
-    "civic": "dist/index.js"
+    "civic": "dist/progressive.js"
   },
   "scripts": {
     "build": "tsc",
+    "build:progressive": "tsc src/progressive.ts --outDir dist --target es2022 --module esnext --moduleResolution node",
     "dev": "tsc --watch",
     "test": "jest",
     "lint": "eslint src/**/*.ts",

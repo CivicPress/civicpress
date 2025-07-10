@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { cac } from 'cac';
-import chalk from 'chalk';
 import { initCommand } from './commands/init.js';
 import { createCommand } from './commands/create.js';
 import { commitCommand } from './commands/commit.js';
@@ -17,7 +16,7 @@ import { registerImportCommand } from './commands/import.js';
 import { registerTemplateCommand } from './commands/template.js';
 import { registerValidateCommand } from './commands/validate.js';
 import { registerHookCommand } from './commands/hook.js';
-import { getLogger, setLogger, createLogger, LogLevel } from '@civicpress/core';
+import { loginCommand } from './commands/login.js';
 
 const cli = cac('civic');
 
@@ -46,6 +45,7 @@ registerImportCommand(cli);
 registerTemplateCommand(cli);
 registerValidateCommand(cli);
 registerHookCommand(cli);
+loginCommand(cli);
 
 // Parse and run
 cli.parse();
