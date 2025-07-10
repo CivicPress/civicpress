@@ -91,7 +91,11 @@ export class TemplateEngine {
   private partialsPath: string; // New: path to partials directory
 
   constructor(dataDir: string) {
-    this.baseTemplatePath = path.join(process.cwd(), '.civic', 'templates');
+    this.baseTemplatePath = path.join(
+      process.cwd(),
+      '.system-data',
+      'templates'
+    );
     this.customTemplatePath = path.join(dataDir, '.civic', 'templates');
     this.partialsPath = path.join(dataDir, '.civic', 'partials'); // New: partials directory
   }

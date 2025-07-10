@@ -4,10 +4,12 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { AuthUtils } from '../utils/auth-utils.js';
 
 export const autoIndexCommand = (cli: CAC) => {
   cli
     .command('auto-index', 'Test and demonstrate auto-indexing workflow')
+    .option('--token <token>', 'Session token for authentication')
     .option('--create <title>', 'Create a test record with title')
     .option('--update <id>', 'Update a record by ID')
     .option('--list', 'List all records')
@@ -18,13 +20,16 @@ export const autoIndexCommand = (cli: CAC) => {
       try {
         const globalOpts = getGlobalOptionsFromArgs();
         const logger = initializeLogger();
+        const shouldOutputJson = globalOpts.json;
 
-        // Initialize CivicPress
-        const civicPress = new CivicPress({
-          dataDir: 'data',
-        });
+        // Validate authentication and get civic instance
+        const { civic } = await AuthUtils.requireAuthWithCivic(
+          options.token,
+          shouldOutputJson
+        );
 
-        await civicPress.initialize();
+        // Use the authenticated civic instance
+        const civicPress = civic;
 
         if (options.demo) {
           await runAutoIndexingDemo(civicPress, options, globalOpts, logger);

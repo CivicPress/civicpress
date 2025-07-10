@@ -1,5 +1,5 @@
 import { CAC } from 'cac';
-import { CivicPress, WorkflowConfigManager } from '@civicpress/core';
+import { WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
@@ -7,10 +7,12 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { AuthUtils } from '../utils/auth-utils.js';
 
 export const createCommand = (cli: CAC) => {
   cli
     .command('create <type> <title>', 'Create a new civic record')
+    .option('--token <token>', 'Session token for authentication')
     .option('--dry-run', 'Complete dry-run (no files created, no commits)')
     .option(
       '--dry-run-hooks <hooks>',
@@ -28,6 +30,14 @@ export const createCommand = (cli: CAC) => {
 
       // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication
+      const { civic } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      // Get data directory from civic instance
+      const dataDir = civic.getDataDir();
 
       try {
         if (!shouldOutputJson) {
@@ -53,39 +63,6 @@ export const createCommand = (cli: CAC) => {
           } else {
             logger.error(`❌ Invalid record type: ${type}`);
             logger.info('Valid types: ' + validTypes.join(', '));
-          }
-          process.exit(1);
-        }
-
-        // Initialize CivicPress (will auto-discover config)
-        // Get data directory from config discovery
-        const { loadConfig } = await import('@civicpress/core');
-        const config = await loadConfig();
-        if (!config) {
-          throw new Error(
-            'CivicPress not initialized. Run "civic init" first.'
-          );
-        }
-        const dataDir = config.dataDir;
-        const civic = new CivicPress({ dataDir });
-
-        if (!dataDir) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Data directory not found',
-                  details: 'Run "civic init" first',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            throw new Error(
-              'Data directory not found. Run "civic init" first.'
-            );
           }
           process.exit(1);
         }
@@ -164,26 +141,6 @@ export const createCommand = (cli: CAC) => {
           .replace(/\s+/g, '-')
           .replace(/-+/g, '-')
           .trim();
-        if (!dataDir) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Data directory not found',
-                  details: 'Run "civic init" first',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            throw new Error(
-              'Data directory not found. Run "civic init" first.'
-            );
-          }
-          process.exit(1);
-        }
 
         // Create directory structure
         const recordsDir = path.join(dataDir, 'records', type);
@@ -268,7 +225,7 @@ export const createCommand = (cli: CAC) => {
         if (isCompleteDryRun) {
           if (!shouldOutputJson) {
             logger.warn(
-              `📋 Would commit: "feat(record): create ${type} "${title}""`
+              `📋 Would commit: feat(record): create ${type} "${title}"`
             );
             logger.warn(`📋 Would stage: ${filePath}`);
           }

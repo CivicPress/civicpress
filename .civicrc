@@ -8,6 +8,6 @@ dataDir: data
 database:
   type: sqlite
   sqlite:
-    file: .civic/civic.db
+    file: .system-data/civic.db
 # Optional: Override with environment variable CIVIC_DATA_DIR
 # Example: export CIVIC_DATA_DIR=/path/to/custom/data

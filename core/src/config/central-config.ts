@@ -59,7 +59,7 @@ export class CentralConfigManager {
         database: {
           type: 'sqlite',
           sqlite: {
-            file: 'data/.civic/civic.db',
+            file: '.system-data/civic.db',
           },
         },
       };
@@ -88,7 +88,7 @@ export class CentralConfigManager {
         database: {
           type: 'sqlite',
           sqlite: {
-            file: 'data/.civic/civic.db',
+            file: '.system-data/civic.db',
           },
         },
       };

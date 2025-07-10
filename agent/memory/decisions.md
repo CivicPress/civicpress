@@ -1,5 +1,60 @@
 # CivicPress Development Decisions
 
+## Global Authentication Utility Decision (2024-07-10)
+
+### **Decision**: Implement `AuthUtils` Class for Centralized CLI Authentication
+
+**Context**: Multiple CLI commands needed authentication validation, leading to
+duplicated code and inconsistent error handling across commands.
+
+**Decision**: Implement `AuthUtils` class to centralize authentication logic and
+provide consistent error handling across all CLI commands.
+
+### **Architecture**:
+
+```
+AuthUtils Class
+├── requireAuthWithCivic(): Validates token and returns civic instance
+├── requireAuth(): Validates token and returns user info
+├── validateAuth(): Core validation logic with error handling
+└── Consistent Error Messages: Same format across all commands
+```
+
+### **Key Principles**:
+
+1. **DRY Principle**: No duplicated authentication code
+2. **Consistent Errors**: Same error messages across all commands
+3. **Easy Integration**: Simple import and method call
+4. **Centralized Logic**: All auth logic in one place
+5. **Better Maintainability**: Changes only need to be made once
+
+### **Implementation**:
+
+- **AuthUtils Class**: `cli/src/utils/auth-utils.ts`
+- **Core Method**: `requireAuthWithCivic(token, shouldOutputJson)`
+- **Error Handling**: Consistent JSON and human-readable output
+- **CivicPress Integration**: Returns initialized civic instance
+- **User Validation**: Validates session tokens and returns user info
+
+### **Commands Updated**:
+
+- ✅ `civic create` - Uses `AuthUtils.requireAuthWithCivic()`
+- ✅ `civic edit` - Uses `AuthUtils.requireAuthWithCivic()`
+- ✅ `civic commit` - Uses `AuthUtils.requireAuthWithCivic()`
+- ✅ `civic me` - Uses existing auth validation
+
+### **Benefits**:
+
+- **Reduced Code**: ~50 lines less per command
+- **Consistent UX**: Same error messages everywhere
+- **Easy to Add**: Simple to add auth to new commands
+- **Maintainable**: Centralized auth logic
+- **Testable**: Single point to test authentication
+
+### **Status**: ✅ Implemented and tested
+
+---
+
 ## Authentication System Decision (2025-01-27)
 
 ### **Decision**: JWT-Based Authentication with Role-Based Permissions

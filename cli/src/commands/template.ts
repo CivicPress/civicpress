@@ -1,13 +1,14 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { Logger, TemplateEngine, loadConfig } from '@civicpress/core';
+import { Logger, TemplateEngine } from '@civicpress/core';
 import * as yaml from 'yaml';
 import * as fs from 'fs';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { AuthUtils } from '../utils/auth-utils.js';
 
 interface LegacyTemplate {
   name: string;
@@ -32,6 +33,7 @@ interface ValidationRules {
 export function registerTemplateCommand(cli: CAC) {
   cli
     .command('template', 'Manage record templates')
+    .option('--token <token>', 'Session token for authentication')
     .option('-l, --list', 'List all available templates')
     .option('-s, --show <template>', 'Show template details')
     .option('-c, --create <name>', 'Create a new template')
@@ -46,54 +48,39 @@ export function registerTemplateCommand(cli: CAC) {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
       const logger = initializeLogger();
+      const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication and get civic instance
+      const { civic } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      const dataDir = civic.getDataDir();
 
       try {
-        const config = await loadConfig();
-        if (!config) {
-          logger.error(
-            '❌ No CivicPress configuration found. Run "civic init" first.'
-          );
-          process.exit(1);
-        }
-
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
-
         if (options.init) {
-          await initializeDefaultTemplates(config.dataDir, shouldOutputJson);
+          await initializeDefaultTemplates(dataDir, shouldOutputJson);
         } else if (options.list) {
-          await listTemplates(config.dataDir, shouldOutputJson);
+          await listTemplates(dataDir, shouldOutputJson);
         } else if (options.show) {
-          await showTemplate(config.dataDir, options.show, shouldOutputJson);
+          await showTemplate(dataDir, options.show, shouldOutputJson);
         } else if (options.create) {
           await createTemplate(
-            config.dataDir,
+            dataDir,
             options.create,
             options.type,
             shouldOutputJson
           );
         } else if (options.validate) {
-          await validateTemplate(
-            config.dataDir,
-            options.validate,
-            shouldOutputJson
-          );
+          await validateTemplate(dataDir, options.validate, shouldOutputJson);
         } else if (options.preview) {
-          await previewTemplate(
-            config.dataDir,
-            options.preview,
-            shouldOutputJson
-          );
+          await previewTemplate(dataDir, options.preview, shouldOutputJson);
         } else if (options.partials) {
-          await listPartials(config.dataDir, shouldOutputJson);
+          await listPartials(dataDir, shouldOutputJson);
         } else if (options.partial) {
-          await showPartial(config.dataDir, options.partial, shouldOutputJson);
+          await showPartial(dataDir, options.partial, shouldOutputJson);
         } else if (options.createPartial) {
-          await createPartial(
-            config.dataDir,
-            options.createPartial,
-            shouldOutputJson
-          );
+          await createPartial(dataDir, options.createPartial, shouldOutputJson);
         } else {
           logger.info('📋 Template Management Commands:');
           logger.info(
@@ -499,7 +486,7 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
               logger.info('');
             }
           }
-        } catch (error) {
+        } catch {
           // Skip templates that can't be loaded
           continue;
         }

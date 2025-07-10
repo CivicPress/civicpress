@@ -12,7 +12,7 @@ import * as path from 'path';
  */
 export class ConfigDiscovery {
   private static readonly CONFIG_FILENAME = 'config.yml';
-  private static readonly CIVIC_DIR = '.civic';
+  private static readonly CIVIC_DIR = '.system-data';
 
   /**
    * Find the civic config file

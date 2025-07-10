@@ -19,6 +19,7 @@ import { registerHookCommand } from './commands/hook.js';
 import { loginCommand } from './commands/login.js';
 import { indexCommand } from './commands/index.js';
 import { autoIndexCommand } from './commands/auto-index.js';
+import setupAuthCommand from './commands/auth.js';
 
 const cli = cac('civic');
 
@@ -50,6 +51,9 @@ registerHookCommand(cli);
 loginCommand(cli);
 indexCommand(cli);
 autoIndexCommand(cli);
+
+// Setup auth commands
+setupAuthCommand(cli);
 
 // Parse and run
 cli.parse();

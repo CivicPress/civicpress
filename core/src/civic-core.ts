@@ -8,6 +8,7 @@ import { RecordManager } from './records/record-manager.js';
 import { TemplateEngine } from './utils/template-engine.js';
 import { IndexingService } from './indexing/indexing-service.js';
 import { Logger } from './utils/logger.js';
+import { initializeRoleManager } from './auth/role-utils.js';
 
 const logger = new Logger();
 
@@ -58,12 +59,15 @@ export class CivicPress {
     const dbConfig = config.database || {
       type: 'sqlite' as const,
       sqlite: {
-        file: `${config.dataDir}/.civic/civic.db`,
+        file: `.system-data/civic.db`,
       },
     };
 
     this.databaseService = new DatabaseService(dbConfig);
-    this.authService = new AuthService(this.databaseService);
+    this.authService = new AuthService(this.databaseService, config.dataDir);
+
+    // Initialize role manager
+    initializeRoleManager(config.dataDir);
 
     // Initialize other services
     this.configDiscovery = new ConfigDiscovery();
@@ -152,6 +156,10 @@ export class CivicPress {
 
   getHookSystem(): HookSystem {
     return this.hookSystem;
+  }
+
+  getDataDir(): string {
+    return this.config.dataDir;
   }
 
   // Health check

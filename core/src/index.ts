@@ -27,14 +27,12 @@ export { TemplateEngine } from './utils/template-engine.js';
 
 // Export utility functions for CLI use
 export async function loadConfig() {
-  const { ConfigDiscovery } = await import('./config/config-discovery.js');
-  const configPath = ConfigDiscovery.findConfig();
-  if (!configPath) {
-    return null;
-  }
-
-  const dataDir = ConfigDiscovery.getDataDirFromConfig(configPath);
-  return { configPath, dataDir };
+  const { CentralConfigManager } = await import('./config/central-config.js');
+  const config = CentralConfigManager.getConfig();
+  return {
+    configPath: '.civicrc',
+    dataDir: config.dataDir,
+  };
 }
 
 // Export central configuration

@@ -2,16 +2,17 @@ import { CAC } from 'cac';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { loadConfig } from '@civicpress/core';
 import { HookSystem } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { AuthUtils } from '../utils/auth-utils.js';
 
 export function registerHookCommand(cli: CAC) {
   cli
     .command('hook [action]', 'Manage CivicPress hooks and workflows')
+    .option('--token <token>', 'Session token for authentication')
     .option('-l, --list', 'List all hooks and their status')
     .option('-c, --config', 'Show hook configuration')
     .option('-t, --test <hook>', 'Test a specific hook')
@@ -24,20 +25,17 @@ export function registerHookCommand(cli: CAC) {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
       const logger = initializeLogger();
+      const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication and get civic instance
+      const { civic } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      const dataDir = civic.getDataDir();
 
       try {
-        const config = await loadConfig();
-        if (!config) {
-          logger.error(
-            '❌ No CivicPress configuration found. Run "civic init" first.'
-          );
-          process.exit(1);
-        }
-
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
-
-        const hookSystem = new HookSystem(config.dataDir);
+        const hookSystem = new HookSystem(dataDir);
         await hookSystem.initialize();
 
         if (options.list || action === 'list') {
@@ -68,7 +66,7 @@ export function registerHookCommand(cli: CAC) {
         } else if (options.workflows || action === 'workflows') {
           await listWorkflows(hookSystem, options, shouldOutputJson);
         } else if (options.logs || action === 'logs') {
-          await showLogs(config.dataDir, options, shouldOutputJson);
+          await showLogs(dataDir, options, shouldOutputJson);
         } else {
           showHelp();
         }
@@ -334,7 +332,7 @@ async function enableHook(
           logger.info(`💾 Configuration committed: ${commitHash}`);
         }
       }
-    } catch (error) {
+    } catch {
       if (!shouldOutputJson) {
         logger.warn('⚠️  Failed to auto-commit configuration change');
       }
@@ -421,7 +419,7 @@ async function disableHook(
           logger.info(`💾 Configuration committed: ${commitHash}`);
         }
       }
-    } catch (error) {
+    } catch {
       if (!shouldOutputJson) {
         logger.warn('⚠️  Failed to auto-commit configuration change');
       }
@@ -562,7 +560,7 @@ async function showLogs(
         if (entry.type === 'error') {
           logger.error(`    ${entry.data.error}`);
         }
-      } catch (error) {
+      } catch {
         logger.warn(`  Invalid log entry: ${line}`);
       }
     }

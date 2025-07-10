@@ -1,6 +1,8 @@
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database-service.js';
 import { Logger } from '../utils/logger.js';
+import { OAuthProviderManager } from './oauth-provider.js';
+import { RoleManager } from './role-manager.js';
 
 const logger = new Logger();
 
@@ -32,9 +34,77 @@ export interface Session {
 
 export class AuthService {
   private db: DatabaseService;
+  private oauthManager: OAuthProviderManager;
+  private roleManager: RoleManager;
 
-  constructor(db: DatabaseService) {
+  constructor(db: DatabaseService, dataDir: string) {
     this.db = db;
+    this.oauthManager = new OAuthProviderManager();
+    this.roleManager = new RoleManager(dataDir);
+  }
+
+  /**
+   * Check if a user can perform a specific action
+   * @param user - The authenticated user
+   * @param permission - The permission to check (e.g., 'records:create', 'system:admin')
+   * @param context - Optional context for the permission check
+   * @returns boolean indicating if the user has permission
+   */
+  async userCan(
+    user: AuthUser,
+    permission: string | string[],
+    context?: {
+      recordType?: string;
+      action?: 'create' | 'edit' | 'delete' | 'view';
+      fromStatus?: string;
+      toStatus?: string;
+    }
+  ): Promise<boolean> {
+    return this.roleManager.userCan(user, permission, context);
+  }
+
+  /**
+   * Check if a user has a specific role
+   * @param user - The authenticated user
+   * @param role - The role to check (can be array for multiple roles)
+   * @returns boolean indicating if the user has the role
+   */
+  async userHasRole(user: AuthUser, role: string | string[]): Promise<boolean> {
+    return this.roleManager.userHasRole(user, role);
+  }
+
+  /**
+   * Get all permissions for a user (including inherited permissions)
+   * @param user - The authenticated user
+   * @returns Array of permission strings
+   */
+  async getUserPermissions(user: AuthUser): Promise<string[]> {
+    return this.roleManager.getUserPermissions(user);
+  }
+
+  /**
+   * Get the default role for new users
+   * @returns The default role name
+   */
+  async getDefaultRole(): Promise<string> {
+    return this.roleManager.getDefaultRole();
+  }
+
+  /**
+   * Get all available roles
+   * @returns Array of role names
+   */
+  async getAvailableRoles(): Promise<string[]> {
+    return this.roleManager.getAvailableRoles();
+  }
+
+  /**
+   * Validate a role exists
+   * @param role - The role to validate
+   * @returns boolean indicating if the role exists
+   */
+  async isValidRole(role: string): Promise<boolean> {
+    return this.roleManager.isValidRole(role);
   }
 
   // API Key Authentication
@@ -176,12 +246,18 @@ export class AuthService {
   // User Management
   async createUser(userData: {
     username: string;
-    role: string;
+    role?: string;
     email?: string;
     name?: string;
     avatar_url?: string;
   }): Promise<AuthUser> {
-    const userId = await this.db.createUser(userData);
+    // Set default role if not provided
+    const role = userData.role || (await this.getDefaultRole());
+
+    const userId = await this.db.createUser({
+      ...userData,
+      role,
+    });
     const user = await this.db.getUserById(userId);
 
     if (!user) {
@@ -199,40 +275,47 @@ export class AuthService {
   }
 
   async getUserByUsername(username: string): Promise<AuthUser | null> {
-    const user = await this.db.getUserByUsername(username);
+    try {
+      const user = await this.db.getUserByUsername(username);
+      if (!user) {
+        return null;
+      }
 
-    if (!user) {
+      return {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        avatar_url: user.avatar_url,
+      };
+    } catch (error) {
+      logger.error('Failed to get user by username:', error);
       return null;
     }
-
-    return {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      email: user.email,
-      name: user.name,
-      avatar_url: user.avatar_url,
-    };
   }
 
   async getUserById(id: number): Promise<AuthUser | null> {
-    const user = await this.db.getUserById(id);
+    try {
+      const user = await this.db.getUserById(id);
+      if (!user) {
+        return null;
+      }
 
-    if (!user) {
+      return {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        avatar_url: user.avatar_url,
+      };
+    } catch (error) {
+      logger.error('Failed to get user by ID:', error);
       return null;
     }
-
-    return {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      email: user.email,
-      name: user.name,
-      avatar_url: user.avatar_url,
-    };
   }
 
-  // Utility methods
   private generateSecureToken(): string {
     return crypto.randomBytes(32).toString('hex');
   }
@@ -241,42 +324,61 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
-  // Audit logging
   async logAuthEvent(
     userId: number | undefined,
     action: string,
     details?: string,
     ipAddress?: string
   ): Promise<void> {
-    await this.db.logAuditEvent({
-      userId,
-      action,
-      resourceType: 'auth',
-      details,
-      ipAddress,
-    });
+    try {
+      await this.db.logAuditEvent({
+        userId,
+        action,
+        resourceType: 'auth',
+        details,
+        ipAddress,
+      });
+    } catch (error) {
+      logger.error('Failed to log auth event:', error);
+    }
   }
 
-  // GitHub OAuth Authentication
   async authenticateWithGitHub(
-    _token: string // TODO: Implement actual GitHub token validation
+    token: string
   ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
     try {
-      // For now, we'll create a mock user from the token
-      // In a real implementation, this would validate the token with GitHub API
-      const mockUser = await this.createUser({
-        username: `github-${Date.now()}`,
-        role: 'clerk',
-        email: 'user@example.com',
-        name: 'GitHub User',
-      });
+      const githubUser = await this.oauthManager.validateToken('github', token);
 
-      const session = await this.createSession(mockUser.id, 24);
+      // Check if user exists, create if not
+      let user = await this.getUserByUsername(githubUser.username);
+      if (!user) {
+        const defaultRole = await this.getDefaultRole();
+        user = await this.createUser({
+          username: githubUser.username,
+          role: defaultRole,
+          email: githubUser.email,
+          name: githubUser.name,
+          avatar_url: githubUser.avatar_url,
+        });
+      }
+
+      // Create session
+      const { token: sessionToken, session } = await this.createSession(
+        user.id
+      );
+
+      // Log authentication event
+      await this.logAuthEvent(
+        user.id,
+        'github_login',
+        `GitHub login for user ${user.username}`,
+        'github'
+      );
 
       return {
-        token: session.token,
-        user: session.session.user,
-        expiresAt: session.session.expiresAt,
+        token: sessionToken,
+        user,
+        expiresAt: session.expiresAt,
       };
     } catch (error) {
       logger.error('GitHub authentication failed:', error);
@@ -284,17 +386,63 @@ export class AuthService {
     }
   }
 
-  // Logout functionality
+  async authenticateWithOAuth(
+    provider: string,
+    token: string
+  ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
+    try {
+      const oauthUser = await this.oauthManager.validateToken(provider, token);
+
+      // Check if user exists, create if not
+      let user = await this.getUserByUsername(oauthUser.username);
+      if (!user) {
+        const defaultRole = await this.getDefaultRole();
+        user = await this.createUser({
+          username: oauthUser.username,
+          role: defaultRole,
+          email: oauthUser.email,
+          name: oauthUser.name,
+          avatar_url: oauthUser.avatar_url,
+        });
+      }
+
+      // Create session
+      const { token: sessionToken, session } = await this.createSession(
+        user.id
+      );
+
+      // Log authentication event
+      await this.logAuthEvent(
+        user.id,
+        `${provider}_login`,
+        `${provider} login for user ${user.username}`,
+        provider
+      );
+
+      return {
+        token: sessionToken,
+        user,
+        expiresAt: session.expiresAt,
+      };
+    } catch (error) {
+      logger.error(`${provider} authentication failed:`, error);
+      throw new Error(`${provider} authentication failed`);
+    }
+  }
+
+  getAvailableOAuthProviders(): string[] {
+    return this.oauthManager.getAvailableProviders();
+  }
+
   async logout(): Promise<void> {
-    // In a real implementation, this would invalidate the current session
+    // This would typically invalidate the current session
     // For now, we'll just log the event
     await this.logAuthEvent(undefined, 'logout', 'User logged out');
   }
 
-  // Get current user (placeholder for session management)
   async getCurrentUser(): Promise<AuthUser | null> {
-    // In a real implementation, this would check the current session
-    // For now, return null to indicate no authenticated user
+    // This would typically get the current user from the session
+    // For now, return null as this is context-dependent
     return null;
   }
 }

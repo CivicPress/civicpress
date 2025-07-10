@@ -1,7 +1,6 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
-import { loadConfig } from '@civicpress/core';
 import * as fs from 'fs';
 import matter = require('gray-matter');
 import { glob } from 'glob';
@@ -9,8 +8,10 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { AuthUtils } from '../utils/auth-utils.js';
 
 interface ImportOptions {
+  token?: string;
   format?: 'json' | 'csv' | 'markdown';
   input?: string;
   type?: string;
@@ -37,6 +38,7 @@ interface ImportRecord {
 export function registerImportCommand(cli: CAC) {
   cli
     .command('import [file]', 'Import records from various formats')
+    .option('--token <token>', 'Session token for authentication')
     .option('-f, --format <format>', 'Import format', { default: 'json' })
     .option('-i, --input <path>', 'Input file or directory path')
     .option('-t, --type <type>', 'Default record type for imported records')
@@ -50,19 +52,16 @@ export function registerImportCommand(cli: CAC) {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
       const logger = initializeLogger();
+      const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication and get civic instance
+      const { civic } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      const dataDir = civic.getDataDir();
 
       try {
-        const config = await loadConfig();
-        if (!config) {
-          logger.error(
-            '❌ No CivicPress configuration found. Run "civic init" first.'
-          );
-          process.exit(1);
-        }
-
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
-
         const importOptions: ImportOptions = {
           ...options,
           format: options.format || 'json',
@@ -74,14 +73,14 @@ export function registerImportCommand(cli: CAC) {
         // If specific file is provided, import just that file
         if (file) {
           await importSingleFile(
-            config.dataDir,
+            dataDir,
             file,
             importOptions,
             shouldOutputJson
           );
         } else {
           // Import from input directory or file
-          await importRecords(config.dataDir, importOptions, shouldOutputJson);
+          await importRecords(dataDir, importOptions, shouldOutputJson);
         }
       } catch (error) {
         logger.error('❌ Import failed:', error);

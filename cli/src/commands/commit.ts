@@ -1,5 +1,5 @@
 import { CAC } from 'cac';
-import { CivicPress } from '@civicpress/core';
+import { AuthUtils } from '../utils/auth-utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -10,6 +10,7 @@ import {
 export const commitCommand = (cli: CAC) => {
   cli
     .command('commit [record]', 'Commit civic records with role-based messages')
+    .option('--token <token>', 'Session token for authentication')
     .option('-m, --message <message>', 'Commit message')
     .option('-r, --role <role>', 'Role for commit (clerk, council, etc.)')
     .option('-a, --all', 'Commit all changes (not just specific files)')
@@ -17,9 +18,14 @@ export const commitCommand = (cli: CAC) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
       const logger = initializeLogger();
-
-      // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication and get civic instance
+      const { civic } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      const dataDir = civic.getDataDir();
 
       try {
         if (!shouldOutputJson) {
@@ -42,39 +48,6 @@ export const commitCommand = (cli: CAC) => {
             );
           } else {
             logger.error('❌ Commit message is required. Use -m or --message');
-          }
-          process.exit(1);
-        }
-
-        // Initialize CivicPress (will auto-discover config)
-        // Get data directory from config discovery
-        const { loadConfig } = await import('@civicpress/core');
-        const config = await loadConfig();
-        if (!config) {
-          throw new Error(
-            'CivicPress not initialized. Run "civic init" first.'
-          );
-        }
-        const dataDir = config.dataDir;
-        const civic = new CivicPress({ dataDir });
-
-        if (!dataDir) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Data directory not found',
-                  details: 'Run "civic init" first',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            throw new Error(
-              'Data directory not found. Run "civic init" first.'
-            );
           }
           process.exit(1);
         }
@@ -199,28 +172,17 @@ export const commitCommand = (cli: CAC) => {
                   {
                     success: false,
                     error: 'No changes to commit',
-                    details: `Record "${recordName}" has no changes to commit`,
+                    details: `No changes found for record "${recordName}"`,
                   },
                   null,
                   2
                 )
               );
             } else {
-              logger.warn(
-                `⚠️  Record "${recordName}" has no changes to commit.`
-              );
+              logger.warn(`No changes found for record "${recordName}"`);
             }
             process.exit(1);
           }
-        } else {
-          // Default: commit all changed files
-          const status = await git.status();
-          filesToCommit = [
-            ...status.modified,
-            ...status.created,
-            ...status.deleted,
-            ...status.renamed,
-          ];
         }
 
         if (filesToCommit.length === 0) {
@@ -230,70 +192,23 @@ export const commitCommand = (cli: CAC) => {
                 {
                   success: false,
                   error: 'No files to commit',
-                  details: 'All changes are already committed',
+                  details: 'No changes found to commit',
                 },
                 null,
                 2
               )
             );
           } else {
-            logger.warn(
-              '⚠️  No files to commit. All changes are already committed.'
-            );
+            logger.warn('No files to commit.');
           }
           process.exit(1);
         }
 
-        let commitHash: string;
-
-        if (options.all) {
-          if (!shouldOutputJson) {
-            logger.info('📁 Committing all changes...');
-          }
-          commitHash = await git.commit(options.message);
-        } else {
-          if (!shouldOutputJson) {
-            logger.info('📁 Files to commit:');
-            filesToCommit.forEach((file) => {
-              logger.debug(`  ${file}`);
-            });
-          }
-
-          // Create role-based commit with specific files
-          commitHash = await git.commit(options.message, filesToCommit);
+        // Commit the files
+        await git.commit(options.message, filesToCommit);
+        if (!shouldOutputJson) {
+          logger.success('✅ Committed successfully!');
         }
-
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                message: 'Committed successfully',
-                data: {
-                  commitHash: commitHash,
-                  message: options.message,
-                  role: options.role || 'unknown',
-                  filesCommitted: filesToCommit,
-                  commitAll: options.all || false,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.success(`✅ Committed successfully!`);
-          logger.info(`🔗 Commit hash: ${commitHash}`);
-        }
-
-        // Emit hook for audit trail
-        const hooks = civic.getHookSystem();
-        await hooks.emit('record:committed', {
-          commitHash,
-          message: options.message,
-          role: options.role || 'unknown',
-          timestamp: new Date().toISOString(),
-        });
       } catch (error) {
         if (shouldOutputJson) {
           console.log(

@@ -1,7 +1,6 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
-import { loadConfig } from '@civicpress/core';
 import * as fs from 'fs';
 import matter = require('gray-matter');
 import { glob } from 'glob';
@@ -9,8 +8,10 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import { AuthUtils } from '../utils/auth-utils.js';
 
 interface ExportOptions {
+  token?: string;
   format?: 'json' | 'csv' | 'html' | 'pdf';
   output?: string;
   type?: string;
@@ -38,6 +39,7 @@ interface ExportRecord {
 export function registerExportCommand(cli: CAC) {
   cli
     .command('export [record]', 'Export records in various formats')
+    .option('--token <token>', 'Session token for authentication')
     .option('-f, --format <format>', 'Export format', { default: 'json' })
     .option('-o, --output <path>', 'Output file or directory path')
     .option('-t, --type <type>', 'Filter by record type')
@@ -55,19 +57,16 @@ export function registerExportCommand(cli: CAC) {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
       const logger = initializeLogger();
+      const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication and get civic instance
+      const { civic } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      const dataDir = civic.getDataDir();
 
       try {
-        const config = await loadConfig();
-        if (!config) {
-          logger.error(
-            '❌ No CivicPress configuration found. Run "civic init" first.'
-          );
-          process.exit(1);
-        }
-
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
-
         const exportOptions: ExportOptions = {
           ...options,
           format: options.format || 'json',
@@ -80,14 +79,14 @@ export function registerExportCommand(cli: CAC) {
         if (record) {
           const recordPath = record.endsWith('.md') ? record : `${record}.md`;
           await exportSingleRecord(
-            config.dataDir,
+            dataDir,
             recordPath,
             exportOptions,
             shouldOutputJson
           );
         } else {
           // Export filtered records
-          await exportRecords(config.dataDir, exportOptions, shouldOutputJson);
+          await exportRecords(dataDir, exportOptions, shouldOutputJson);
         }
       } catch (error) {
         logger.error('❌ Export failed:', error);

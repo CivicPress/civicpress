@@ -25,6 +25,7 @@ build/
 *.d.ts.map
 
 # CivicPress
+.system-data/
 .civic/state/
 .civic/hooks.log.jsonl
 records/**/*.bak
@@ -38,12 +39,12 @@ data/
 .pnpm-store/
 
 # Hook logs (operational data, not configuration)
-.civic/hooks.log.jsonl
+.system-data/hooks.log.jsonl
 
 # Mac system files
 Icon?
 ._*
 
 # backup exports
-.civic/backup/
+.system-data/backup/
 *.zip

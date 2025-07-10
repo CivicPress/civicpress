@@ -5,16 +5,16 @@ const router = Router();
 
 /**
  * POST /api/auth/login
- * Authenticate with GitHub OAuth token
+ * Authenticate with OAuth provider token
  */
 router.post('/login', async (req, res) => {
   try {
-    const { githubToken } = req.body;
+    const { token, provider = 'github' } = req.body;
 
-    if (!githubToken) {
+    if (!token) {
       return res.status(400).json({
         error: {
-          message: 'GitHub token is required',
+          message: 'OAuth token is required',
           code: 'MISSING_TOKEN',
         },
       });
@@ -24,8 +24,20 @@ router.post('/login', async (req, res) => {
     const civicPress = (req as any).civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
-    // Authenticate with GitHub
-    const session = await authService.authenticateWithGitHub(githubToken);
+    // Check if provider is supported
+    const availableProviders = authService.getAvailableOAuthProviders();
+    if (!availableProviders.includes(provider)) {
+      return res.status(400).json({
+        error: {
+          message: `OAuth provider '${provider}' is not supported`,
+          code: 'UNSUPPORTED_PROVIDER',
+          availableProviders,
+        },
+      });
+    }
+
+    // Authenticate with OAuth provider
+    const session = await authService.authenticateWithOAuth(provider, token);
 
     res.json({
       success: true,
@@ -42,6 +54,34 @@ router.post('/login', async (req, res) => {
         message: 'Authentication failed',
         details: error instanceof Error ? error.message : 'Unknown error',
         code: 'AUTH_FAILED',
+      },
+    });
+  }
+});
+
+/**
+ * GET /api/auth/providers
+ * Get available OAuth providers
+ */
+router.get('/providers', async (req, res) => {
+  try {
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    const providers = authService.getAvailableOAuthProviders();
+
+    res.json({
+      success: true,
+      providers,
+    });
+  } catch (error) {
+    console.error('Providers error:', error);
+    res.status(500).json({
+      error: {
+        message: 'Failed to get providers',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        code: 'PROVIDERS_FAILED',
       },
     });
   }

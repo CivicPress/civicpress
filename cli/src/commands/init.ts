@@ -119,12 +119,12 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
-        // Create .civic directory inside data (only for config)
-        const civicDir = path.join(fullDataDir, '.civic');
-        if (!fs.existsSync(civicDir)) {
-          fs.mkdirSync(civicDir, { recursive: true });
+        // Create .system-data directory in project root (for system data)
+        const systemDataDir = path.join(process.cwd(), '.system-data');
+        if (!fs.existsSync(systemDataDir)) {
+          fs.mkdirSync(systemDataDir, { recursive: true });
           if (!shouldOutputJson) {
-            logger.success('📁 Created .civic directory');
+            logger.success('📁 Created .system-data directory');
           }
         }
 
@@ -171,9 +171,9 @@ export const initCommand = (cli: CAC) => {
                 message: 'CivicPress repository initialized successfully',
                 data: {
                   dataDir: fullDataDir,
-                  civicDir: civicDir,
+                  systemDataDir: systemDataDir,
                   gitInitialized: initGit || gitExists,
-                  configPath: path.join(civicDir, 'config.yml'),
+                  configPath: path.join(systemDataDir, 'config.yml'),
                 },
                 nextSteps: [
                   `cd ${dataDir}`,
@@ -478,7 +478,7 @@ async function setupCivicrc(
       type: 'input',
       name: 'database_path',
       message: 'SQLite database file path:',
-      default: path.join(dataDir, '.civic/civic.db'),
+      default: path.join(process.cwd(), '.system-data/civic.db'),
       when: (answers: any) => answers.database_type === 'sqlite',
     },
     {
