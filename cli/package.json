@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/progressive.js",
   "bin": {
-    "civic": "dist/progressive.js"
+    "civic": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
