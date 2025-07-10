@@ -25,7 +25,7 @@ build/
 *.d.ts.map
 
 # CivicPress
-.system-data/
+.system-data/civic.db
 .civic/state/
 .civic/hooks.log.jsonl
 records/**/*.bak
