@@ -16,6 +16,19 @@ export {
 // Export auth services
 export { AuthService, AuthUser, ApiKey, Session } from './auth/auth-service.js';
 
+// Export role-based authorization utilities
+export {
+  userCan,
+  userHasRole,
+  getUserPermissions,
+  userCanCreate,
+  userCanEdit,
+  userCanDelete,
+  userCanView,
+  userIsAdmin,
+  initializeRoleManager,
+} from './auth/role-utils.js';
+
 // Export existing services
 export { GitEngine } from './git/git-engine.js';
 export { HookSystem } from './hooks/hook-system.js';
