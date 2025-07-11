@@ -525,3 +525,220 @@ Database (Performance Layer)
 - **Decision**: TBD - likely containerized deployment
 - **Reason**: Consistent environments
 - **Status**: 🔄 To be decided
+
+## API Architecture Decisions
+
+### Centralized Response System (2024-01-XX)
+
+**Decision**: Implement centralized response handling across all API routes
+**Rationale**:
+
+- Ensures consistent error handling and logging
+- Provides standardized success/error response formats
+- Improves maintainability and debugging
+- Enables better observability and monitoring **Implementation**: Created
+  `sendSuccess` and `sendError` utilities in API middleware
+
+### Status API Design (2024-01-XX)
+
+**Decision**: Implement comprehensive system monitoring API with multiple
+endpoints **Rationale**:
+
+- Provides system health and performance monitoring
+- Enables Git repository status tracking
+- Offers record statistics and configuration monitoring
+- Supports operational visibility and troubleshooting **Implementation**:
+- `GET /api/status` - Comprehensive system status
+- `GET /api/status/git` - Detailed Git status
+- `GET /api/status/records` - Record statistics
+- Includes system health, memory usage, uptime, configuration status
+
+### Validation API Design (2024-01-XX)
+
+**Decision**: Implement record validation API with issue categorization
+**Rationale**:
+
+- Ensures data quality and governance compliance
+- Provides detailed issue reporting with severity levels
+- Supports both single and bulk validation operations
+- Enables proactive quality monitoring **Implementation**:
+- `POST /api/validation/record` - Single record validation
+- `POST /api/validation/bulk` - Bulk validation with summaries
+- `GET /api/validation/status` - System-wide validation status
+- `GET /api/validation/record/:recordId` - Validate specific record
+- Issue categorization: error, warning, info
+- YAML validation, content analysis, template variable detection
+
+### History API Implementation (2024-01-XX)
+
+**Decision**: Implement Git commit history API for transparency and audit
+**Rationale**:
+
+- Provides trust and transparency for record changes
+- Enables audit trail functionality
+- Supports filtering and pagination for large histories
+- Mirrors CLI history command functionality **Implementation**:
+- `GET /api/history` - Git commit history with filtering
+- `GET /api/history/:record` - History for specific record
+- Supports author, date range, pagination filtering
+- Returns detailed commit information with metadata
+
+## CLI Architecture Decisions
+
+### Centralized Output System (2024-01-XX)
+
+**Decision**: Implement centralized CLI output system with structured logging
+**Rationale**:
+
+- Ensures consistent user experience across commands
+- Provides JSON and silent modes for automation
+- Improves maintainability and debugging
+- Enables better error reporting and progress tracking **Implementation**:
+  Created CLI output utilities with success/error/info/debug/progress outputs
+
+### CLI Command Convention (2024-01-XX)
+
+**Decision**: Mirror CLI commands after REST API endpoints **Rationale**:
+
+- Provides consistent interface patterns
+- Reduces cognitive load for users
+- Enables easier API-to-CLI mapping
+- Supports automation and scripting **Implementation**: CLI commands follow REST
+  API resource patterns
+
+## Core Architecture Decisions
+
+### Centralized Core Output System (2024-01-XX)
+
+**Decision**: Implement centralized output system for core module **Rationale**:
+
+- Provides consistent logging across core services
+- Enables structured output and context awareness
+- Improves debugging and monitoring
+- Supports operation timing and error context **Implementation**: Built on
+  existing logger with structured output capabilities
+
+## Testing Decisions
+
+### Standardized Test Suite (2024-01-XX)
+
+**Decision**: Use standardized test suite with robust setup/teardown
+**Rationale**:
+
+- Ensures consistent test environment
+- Provides reusable fixtures and configurations
+- Improves test reliability and maintainability
+- Supports comprehensive test coverage **Implementation**: Created fixtures for
+  configs, roles, and YAML documents
+
+### Test Output Expectations (2024-01-XX)
+
+**Decision**: CLI commands return exit code 0 when no records found
+**Rationale**:
+
+- Distinguishes between "no results" and "error"
+- Enables proper error handling in scripts
+- Provides consistent behavior across commands
+- Supports automation workflows **Implementation**: All CLI commands return
+  success with appropriate output messages
+
+## Configuration Decisions
+
+### Template Storage (2024-01-XX)
+
+**Decision**: Store templates in `.civic` folder with default templates
+**Rationale**:
+
+- Provides centralized template management
+- Ensures templates are version controlled
+- Supports default templates for new installations
+- Enables easy template customization **Implementation**: Templates stored in
+  `.civic/templates/` with basic defaults
+
+### Hook Configuration (2024-01-XX)
+
+**Decision**: Auto-commit hook configuration changes **Rationale**:
+
+- Ensures configuration changes are tracked
+- Reduces manual intervention
+- Provides audit trail for configuration changes
+- Supports automation workflows **Implementation**: Hook commands automatically
+  commit configuration changes
+
+## Development Workflow Decisions
+
+### Build Process (2024-01-XX)
+
+**Decision**: Use `pnpm run build` for CLI builds without post-build patching
+**Rationale**:
+
+- Avoids bad practice of patching dist/ folder
+- Ensures clean build process
+- Improves build reliability
+- Supports proper dependency management **Implementation**: CLI builds use
+  standard pnpm build process
+
+### Documentation Standards (2024-01-XX)
+
+**Decision**: Use Mermaid for all architecture diagrams **Rationale**:
+
+- Provides consistent diagram format
+- Enables version-controlled documentation
+- Supports automated diagram generation
+- Improves documentation maintainability **Implementation**: All diagrams use
+  Mermaid syntax in `.civic/diagrams/`
+
+### Commit Message Style (2024-01-XX)
+
+**Decision**: Use toned-down, non-pretentious commit messages **Rationale**:
+
+- Improves readability and clarity
+- Reduces cognitive load for reviewers
+- Supports clear change tracking
+- Enables better project history **Implementation**: Commit messages use clear,
+  descriptive language
+
+## Security Decisions
+
+### Authentication Strategy (2024-01-XX)
+
+**Decision**: Use OAuth-based authentication with role mapping **Rationale**:
+
+- Provides secure, industry-standard authentication
+- Supports multiple identity providers
+- Enables role-based access control
+- Reduces security maintenance burden **Implementation**: OAuth integration with
+  GitHub, Google, Microsoft support
+
+### Permission System (2024-01-XX)
+
+**Decision**: Implement granular, role-based permission system **Rationale**:
+
+- Provides fine-grained access control
+- Supports governance and compliance requirements
+- Enables flexible user role management
+- Ensures data security and privacy **Implementation**: Permission system with
+  inherited permissions hierarchy
+
+## Performance Decisions
+
+### API Response Optimization (2024-01-XX)
+
+**Decision**: Implement strategic caching for frequently accessed data
+**Rationale**:
+
+- Improves response times for common operations
+- Reduces server load and resource usage
+- Enhances user experience
+- Supports scalability requirements **Implementation**: Caching for status,
+  validation, and history endpoints
+
+### Git Operations Optimization (2024-01-XX)
+
+**Decision**: Optimize Git operations for large repositories **Rationale**:
+
+- Improves performance for history and status operations
+- Reduces memory usage for large commit histories
+- Enhances user experience
+- Supports enterprise-scale deployments **Implementation**: Efficient Git
+  command execution with proper pagination

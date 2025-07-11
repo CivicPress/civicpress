@@ -1,5 +1,10 @@
 import { Router } from 'express';
 import { CivicPress } from '@civicpress/core';
+import {
+  sendSuccess,
+  handleApiError,
+  logApiRequest,
+} from '../utils/api-logger';
 
 const router = Router();
 
@@ -8,16 +13,19 @@ const router = Router();
  * Authenticate with OAuth provider token
  */
 router.post('/login', async (req, res) => {
+  logApiRequest(req, { operation: 'login' });
+
   try {
     const { token, provider = 'github' } = req.body;
 
     if (!token) {
-      return res.status(400).json({
-        error: {
-          message: 'OAuth token is required',
-          code: 'MISSING_TOKEN',
-        },
-      });
+      return handleApiError(
+        'login',
+        new Error('OAuth token is required'),
+        req,
+        res,
+        'OAuth token is required'
+      );
     }
 
     // Get CivicPress instance from request
@@ -27,35 +35,30 @@ router.post('/login', async (req, res) => {
     // Check if provider is supported
     const availableProviders = authService.getAvailableOAuthProviders();
     if (!availableProviders.includes(provider)) {
-      return res.status(400).json({
-        error: {
-          message: `OAuth provider '${provider}' is not supported`,
-          code: 'UNSUPPORTED_PROVIDER',
-          availableProviders,
-        },
-      });
+      const error = new Error(`OAuth provider '${provider}' is not supported`);
+      (error as any).statusCode = 400;
+      (error as any).code = 'UNSUPPORTED_PROVIDER';
+      (error as any).details = { availableProviders };
+      return handleApiError('login', error, req, res);
     }
 
     // Authenticate with OAuth provider
     const session = await authService.authenticateWithOAuth(provider, token);
 
-    res.json({
-      success: true,
-      session: {
-        token: session.token,
-        user: session.user,
-        expiresAt: session.expiresAt,
+    sendSuccess(
+      {
+        session: {
+          token: session.token,
+          user: session.user,
+          expiresAt: session.expiresAt,
+        },
       },
-    });
+      req,
+      res,
+      { operation: 'login' }
+    );
   } catch (error) {
-    console.error('Authentication error:', error);
-    res.status(401).json({
-      error: {
-        message: 'Authentication failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        code: 'AUTH_FAILED',
-      },
-    });
+    handleApiError('login', error, req, res, 'Authentication failed');
   }
 });
 
@@ -64,6 +67,8 @@ router.post('/login', async (req, res) => {
  * Get available OAuth providers
  */
 router.get('/providers', async (req, res) => {
+  logApiRequest(req, { operation: 'get_providers' });
+
   try {
     // Get CivicPress instance from request
     const civicPress = (req as any).civicPress as CivicPress;
@@ -71,19 +76,9 @@ router.get('/providers', async (req, res) => {
 
     const providers = authService.getAvailableOAuthProviders();
 
-    res.json({
-      success: true,
-      providers,
-    });
+    sendSuccess({ providers }, req, res, { operation: 'get_providers' });
   } catch (error) {
-    console.error('Providers error:', error);
-    res.status(500).json({
-      error: {
-        message: 'Failed to get providers',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        code: 'PROVIDERS_FAILED',
-      },
-    });
+    handleApiError('get_providers', error, req, res, 'Failed to get providers');
   }
 });
 
@@ -92,16 +87,16 @@ router.get('/providers', async (req, res) => {
  * Get current authenticated user info
  */
 router.get('/me', async (req, res) => {
+  logApiRequest(req, { operation: 'get_me' });
+
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        error: {
-          message: 'Authorization header required',
-          code: 'MISSING_AUTH',
-        },
-      });
+      const error = new Error('Authorization header required');
+      (error as any).statusCode = 401;
+      (error as any).code = 'MISSING_AUTH';
+      return handleApiError('get_me', error, req, res);
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
@@ -114,35 +109,30 @@ router.get('/me', async (req, res) => {
     const user = await authService.validateSession(token);
 
     if (!user) {
-      return res.status(401).json({
-        error: {
-          message: 'Invalid or expired token',
-          code: 'INVALID_TOKEN',
-        },
-      });
+      const error = new Error('Invalid or expired token');
+      (error as any).statusCode = 401;
+      (error as any).code = 'INVALID_TOKEN';
+      return handleApiError('get_me', error, req, res);
     }
 
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        name: user.name,
-        avatar_url: user.avatar_url,
-        permissions: [], // TODO: Add permissions to AuthUser interface
+    sendSuccess(
+      {
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          email: user.email,
+          name: user.name,
+          avatar_url: user.avatar_url,
+          permissions: [], // TODO: Add permissions to AuthUser interface
+        },
       },
-    });
+      req,
+      res,
+      { operation: 'get_me' }
+    );
   } catch (error) {
-    console.error('Session validation error:', error);
-    res.status(500).json({
-      error: {
-        message: 'Session validation failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        code: 'VALIDATION_FAILED',
-      },
-    });
+    handleApiError('get_me', error, req, res, 'Session validation failed');
   }
 });
 
@@ -151,35 +141,27 @@ router.get('/me', async (req, res) => {
  * Logout (in stateless mode, just returns success)
  */
 router.post('/logout', async (req, res) => {
+  logApiRequest(req, { operation: 'logout' });
+
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        error: {
-          message: 'Authorization header required',
-          code: 'MISSING_AUTH',
-        },
-      });
+      const error = new Error('Authorization header required');
+      (error as any).statusCode = 401;
+      (error as any).code = 'MISSING_AUTH';
+      return handleApiError('logout', error, req, res);
     }
 
     // In stateless mode, we don't actually invalidate sessions
     // The client should delete the token
     // TODO: Implement proper session invalidation if needed
 
-    res.json({
-      success: true,
-      message: 'Logged out successfully',
+    sendSuccess({ message: 'Logged out successfully' }, req, res, {
+      operation: 'logout',
     });
   } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      error: {
-        message: 'Logout failed',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        code: 'LOGOUT_FAILED',
-      },
-    });
+    handleApiError('logout', error, req, res, 'Logout failed');
   }
 });
 

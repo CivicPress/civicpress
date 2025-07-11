@@ -15,12 +15,22 @@ import { importRouter } from './routes/import';
 import { hooksRouter } from './routes/hooks';
 import { templatesRouter } from './routes/templates';
 import { workflowsRouter } from './routes/workflows';
+import { createIndexingRouter } from './routes/indexing';
+import { createHistoryRouter } from './routes/history';
+import { createStatusRouter } from './routes/status';
 import docsRouter from './routes/docs';
+import { createValidationRouter } from './routes/validation';
 
 // Import middleware
-import { errorHandler } from './middleware/error-handler';
+import { errorHandler, requestIdMiddleware } from './middleware/error-handler';
 import { notFoundHandler } from './middleware/not-found';
 import { authMiddleware } from './middleware/auth';
+import {
+  apiLoggingMiddleware,
+  authLoggingMiddleware,
+  performanceMonitoringMiddleware,
+  requestContextMiddleware,
+} from './middleware/logging';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -46,14 +56,12 @@ export class CivicPressAPI {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
 
-    // Request logging
-    this.app.use((req, res, next) => {
-      logger.info(`${req.method} ${req.path}`, {
-        ip: req.ip,
-        userAgent: req.get('User-Agent'),
-      });
-      next();
-    });
+    // Enhanced request logging and tracing
+    this.app.use(requestIdMiddleware);
+    this.app.use(requestContextMiddleware);
+    this.app.use(performanceMonitoringMiddleware);
+    this.app.use(apiLoggingMiddleware);
+    this.app.use(authLoggingMiddleware);
   }
 
   async initialize(dataDir: string): Promise<void> {
@@ -130,6 +138,10 @@ export class CivicPressAPI {
     this.app.use('/api/hooks', hooksRouter);
     this.app.use('/api/templates', templatesRouter);
     this.app.use('/api/workflows', workflowsRouter);
+    this.app.use('/api/indexing', createIndexingRouter());
+    this.app.use('/api/history', createHistoryRouter());
+    this.app.use('/api/status', createStatusRouter());
+    this.app.use('/api/validation', createValidationRouter());
   }
 
   async start(): Promise<void> {

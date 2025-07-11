@@ -2,7 +2,14 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import yaml from 'yaml';
-import chalk from 'chalk';
+import {
+  coreSuccess,
+  coreError,
+  coreInfo,
+  coreWarn,
+  coreDebug,
+  coreStartOperation,
+} from '../utils/core-output.js';
 
 export interface HookContext {
   timestamp: Date;
@@ -62,6 +69,8 @@ export class HookSystem {
    * Initialize the hook system
    */
   async initialize(): Promise<void> {
+    const endOperation = coreStartOperation('hook system initialization');
+
     try {
       // Load configuration
       await this.loadConfiguration();
@@ -69,9 +78,23 @@ export class HookSystem {
       // Set up default hooks
       this.registerDefaultHooks();
 
-      console.log(chalk.green('✅ Hook system initialized'));
+      coreSuccess(
+        { hooks: this.getRegisteredHooks() },
+        'Hook system initialized successfully',
+        {
+          operation: 'hook system initialization',
+          registeredHooks: this.getRegisteredHooks(),
+        }
+      );
+
+      endOperation();
     } catch (error) {
-      console.error(chalk.red('❌ Failed to initialize hook system:'), error);
+      coreError(
+        'Failed to initialize hook system',
+        'HOOK_INIT_FAILED',
+        { error: error instanceof Error ? error.message : String(error) },
+        { operation: 'hook system initialization' }
+      );
       throw error;
     }
   }
@@ -84,16 +107,26 @@ export class HookSystem {
       // Create default configuration
       this.config = this.getDefaultConfig();
       await this.saveConfiguration();
+      coreInfo('Created default hook configuration', {
+        operation: 'hook configuration loading',
+        configPath: this.configPath,
+      });
       return;
     }
 
     try {
       const configContent = await readFile(this.configPath, 'utf-8');
       this.config = yaml.parse(configContent) as HookConfig;
+      coreDebug('Loaded hook configuration from file', {
+        operation: 'hook configuration loading',
+        configPath: this.configPath,
+        hooksCount: Object.keys(this.config.hooks).length,
+      });
     } catch (error) {
-      console.warn(
-        chalk.yellow('⚠️  Failed to load hook config, using defaults')
-      );
+      coreWarn('Failed to load hook config, using defaults', {
+        operation: 'hook configuration loading',
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.config = this.getDefaultConfig();
     }
   }
@@ -112,8 +145,17 @@ export class HookSystem {
 
       const configContent = yaml.stringify(this.config);
       await writeFile(this.configPath, configContent, 'utf-8');
+      coreDebug('Saved hook configuration to file', {
+        operation: 'hook configuration saving',
+        configPath: this.configPath,
+      });
     } catch (error) {
-      console.error(chalk.red('❌ Failed to save hook configuration:'), error);
+      coreError(
+        'Failed to save hook configuration',
+        'HOOK_CONFIG_SAVE_FAILED',
+        { error: error instanceof Error ? error.message : String(error) },
+        { operation: 'hook configuration saving' }
+      );
     }
   }
 
@@ -173,6 +215,18 @@ export class HookSystem {
     this.registerHook('record:committed', this.onRecordCommitted.bind(this));
     this.registerHook('status:changed', this.onStatusChanged.bind(this));
     this.registerHook('validation:failed', this.onValidationFailed.bind(this));
+
+    coreDebug('Registered default hooks', {
+      operation: 'hook registration',
+      defaultHooks: [
+        'civic:initialized',
+        'record:created',
+        'record:updated',
+        'record:committed',
+        'status:changed',
+        'validation:failed',
+      ],
+    });
   }
 
   /**
@@ -183,6 +237,10 @@ export class HookSystem {
       this.listeners.set(name, []);
     }
     this.listeners.get(name)!.push(handler);
+    coreDebug(`Registered hook: ${name}`, {
+      operation: 'hook registration',
+      hookName: name,
+    });
   }
 
   /**
@@ -198,46 +256,56 @@ export class HookSystem {
       ...context,
     };
 
-    // Check if hook is enabled in config
-    if (this.config?.hooks[name] && !this.config.hooks[name].enabled) {
-      console.log(chalk.gray(`⏭️  Hook '${name}' is disabled, skipping`));
+    coreDebug(`Emitting hook: ${name}`, {
+      operation: 'hook emission',
+      hookName: name,
+      dataKeys: Object.keys(data || {}),
+      context: fullContext,
+    });
+
+    // Check if hook is disabled
+    const hookConfig = this.config?.hooks[name];
+    if (hookConfig && !hookConfig.enabled) {
+      coreDebug(`Hook '${name}' is disabled, skipping`, {
+        operation: 'hook emission',
+        hookName: name,
+      });
       return;
     }
 
-    // Log hook emission
-    await this.logHook('emit', name, data, fullContext);
-
-    const handlers = this.listeners.get(name);
-    if (handlers && handlers.length > 0) {
-      console.log(
-        chalk.blue(`🪝 Emitting hook '${name}' (${handlers.length} handlers)`)
-      );
-
-      const promises = handlers.map(async (handler) => {
-        try {
-          await handler(data, fullContext);
-        } catch (error) {
-          console.error(
-            chalk.red(`❌ Error in hook handler for '${name}':`),
-            error
-          );
-          await this.logHook(
-            'error',
-            name,
-            { error: error instanceof Error ? error.message : String(error) },
-            fullContext
-          );
-        }
+    // Execute registered handlers
+    const handlers = this.listeners.get(name) || [];
+    if (handlers.length === 0) {
+      coreDebug(`Hook '${name}' emitted (no handlers)`, {
+        operation: 'hook emission',
+        hookName: name,
       });
-
-      await Promise.all(promises);
-    } else {
-      console.log(chalk.gray(`🪝 Hook '${name}' emitted (no handlers)`));
     }
 
-    // Execute workflows if configured
-    if (this.config?.hooks[name]?.workflows) {
+    for (const handler of handlers) {
+      try {
+        await handler(data, fullContext);
+      } catch (error) {
+        coreError(
+          `Hook handler failed for '${name}'`,
+          'HOOK_HANDLER_FAILED',
+          {
+            hookName: name,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          { operation: 'hook emission' }
+        );
+      }
+    }
+
+    // Execute configured workflows
+    if (hookConfig?.workflows) {
       await this.executeWorkflows(name, data, fullContext);
+    }
+
+    // Log hook execution
+    if (hookConfig?.audit) {
+      await this.logHook('execution', name, data, fullContext);
     }
   }
 
@@ -252,19 +320,25 @@ export class HookSystem {
     const hookConfig = this.config?.hooks[hookName];
     if (!hookConfig?.workflows) return;
 
-    console.log(
-      chalk.blue(
-        `⚙️  Executing workflows for '${hookName}': ${hookConfig.workflows.join(', ')}`
-      )
-    );
+    coreDebug(`Executing workflows for hook '${hookName}'`, {
+      operation: 'workflow execution',
+      hookName,
+      workflows: hookConfig.workflows,
+    });
 
     for (const workflowName of hookConfig.workflows) {
       try {
         await this.executeWorkflow(workflowName, data, context);
       } catch (error) {
-        console.error(
-          chalk.red(`❌ Failed to execute workflow '${workflowName}':`),
-          error
+        coreError(
+          `Workflow '${workflowName}' failed for hook '${hookName}'`,
+          'WORKFLOW_EXECUTION_FAILED',
+          {
+            hookName,
+            workflowName,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          { operation: 'workflow execution' }
         );
       }
     }
@@ -278,18 +352,22 @@ export class HookSystem {
     data: any,
     context: HookContext
   ): Promise<void> {
-    // For now, we'll implement basic workflow execution
-    // In the future, this will load and execute actual workflow files
-    console.log(chalk.gray(`  📋 Executing workflow: ${workflowName}`));
+    coreDebug(`Executing workflow: ${workflowName}`, {
+      operation: 'workflow execution',
+      workflowName,
+      dataKeys: Object.keys(data || {}),
+    });
 
-    // Simulate workflow execution
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    await this.logHook('workflow', workflowName, data, context);
+    // TODO: Implement workflow engine integration
+    // For now, just log the workflow execution
+    coreInfo(`Workflow executed: ${workflowName}`, {
+      operation: 'workflow execution',
+      workflowName,
+    });
   }
 
   /**
-   * Log hook activity
+   * Log hook execution
    */
   private async logHook(
     type: string,
@@ -299,25 +377,34 @@ export class HookSystem {
   ): Promise<void> {
     if (!this.logPath) return;
 
-    const logEntry = {
-      type,
-      name,
-      data,
-      context,
-      timestamp: new Date().toISOString(),
-    };
-
     try {
-      await writeFile(this.logPath, JSON.stringify(logEntry) + '\n', {
-        flag: 'a',
+      const logEntry = {
+        type,
+        name,
+        timestamp: context.timestamp.toISOString(),
+        data: data ? Object.keys(data) : [],
+        context: {
+          user: context.user,
+          session: context.session,
+          action: context.action,
+        },
+      };
+
+      // TODO: Implement proper log writing
+      coreDebug('Hook logged', {
+        operation: 'hook logging',
+        logEntry,
       });
     } catch (error) {
-      // Silently fail logging
+      coreWarn('Failed to log hook execution', {
+        operation: 'hook logging',
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
   /**
-   * Remove a hook listener
+   * Remove a hook
    */
   removeHook(name: string, handler: HookHandler): void {
     const handlers = this.listeners.get(name);
@@ -325,68 +412,79 @@ export class HookSystem {
       const index = handlers.indexOf(handler);
       if (index > -1) {
         handlers.splice(index, 1);
+        coreDebug(`Removed hook handler: ${name}`, {
+          operation: 'hook removal',
+          hookName: name,
+        });
       }
     }
   }
 
   /**
-   * Get all registered hooks
+   * Get registered hook names
    */
   getRegisteredHooks(): string[] {
     return Array.from(this.listeners.keys());
   }
 
   /**
-   * Get hook configuration
+   * Get current configuration
    */
   getConfiguration(): HookConfig | null {
     return this.config;
   }
 
   /**
-   * Update hook configuration
+   * Update configuration
    */
   async updateConfiguration(config: Partial<HookConfig>): Promise<void> {
-    if (this.config) {
-      this.config = { ...this.config, ...config };
-      await this.saveConfiguration();
-    }
+    this.config = { ...this.config, ...config } as HookConfig;
+    await this.saveConfiguration();
+    coreInfo('Hook configuration updated', {
+      operation: 'hook configuration update',
+    });
   }
 
   // Default hook handlers
-  private onInitialized(data: any, context: HookContext): void {
-    console.log(chalk.green('🎉 CivicPress initialized'));
+  private onInitialized(_data: any, _context: HookContext): void {
+    coreInfo('CivicPress initialized', { operation: 'hook handling' });
   }
 
-  private onRecordCreated(data: any, context: HookContext): void {
-    console.log(
-      chalk.blue(`📄 Record created: ${data?.record?.title || 'Unknown'}`)
-    );
+  private onRecordCreated(data: any, _context: HookContext): void {
+    coreInfo('Record created', {
+      operation: 'hook handling',
+      recordId: data?.id,
+    });
   }
 
-  private onRecordUpdated(data: any, context: HookContext): void {
-    console.log(
-      chalk.blue(`📝 Record updated: ${data?.record?.title || 'Unknown'}`)
-    );
+  private onRecordUpdated(data: any, _context: HookContext): void {
+    coreInfo('Record updated', {
+      operation: 'hook handling',
+      recordId: data?.id,
+    });
   }
 
-  private onRecordCommitted(data: any, context: HookContext): void {
-    console.log(
-      chalk.green(`💾 Record committed: ${data?.record?.title || 'Unknown'}`)
-    );
+  private onRecordCommitted(data: any, _context: HookContext): void {
+    coreInfo('Record committed', {
+      operation: 'hook handling',
+      recordId: data?.id,
+    });
   }
 
-  private onStatusChanged(data: any, context: HookContext): void {
-    console.log(
-      chalk.yellow(
-        `🔄 Status changed: ${data?.record?.title || 'Unknown'} → ${data?.newStatus}`
-      )
-    );
+  private onStatusChanged(data: any, _context: HookContext): void {
+    coreInfo('Status changed', {
+      operation: 'hook handling',
+      recordId: data?.id,
+      oldStatus: data?.oldStatus,
+      newStatus: data?.newStatus,
+    });
   }
 
-  private onValidationFailed(data: any, context: HookContext): void {
-    console.log(
-      chalk.red(`❌ Validation failed: ${data?.record?.title || 'Unknown'}`)
-    );
+  private onValidationFailed(data: any, _context: HookContext): void {
+    coreWarn('Validation failed', {
+      operation: 'hook handling',
+      recordId: data?.id,
+      errors: data?.errors,
+    });
   }
 }

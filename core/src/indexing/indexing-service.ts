@@ -8,6 +8,7 @@ import {
 import { join, dirname, basename } from 'path';
 import * as yaml from 'js-yaml';
 import { CivicPress } from '../civic-core.js';
+import { Logger } from '../utils/logger.js';
 
 export interface CivicIndexEntry {
   file: string;
@@ -40,6 +41,8 @@ export interface IndexingOptions {
   modules?: string[];
   types?: string[];
   statuses?: string[];
+  syncDatabase?: boolean;
+  conflictResolution?: 'file-wins' | 'database-wins' | 'manual' | 'timestamp';
 }
 
 /* global console */
@@ -91,6 +94,14 @@ export class IndexingService {
 
     // Generate module-specific indexes
     await this.generateModuleIndexes(recordsDir, entries);
+
+    // Sync to database if requested
+    if (options.syncDatabase) {
+      await this.syncToDatabase(
+        index,
+        options.conflictResolution || 'file-wins'
+      );
+    }
 
     return index;
   }
@@ -355,5 +366,171 @@ export class IndexingService {
     }
 
     return results;
+  }
+
+  /**
+   * Sync indexed records to database
+   */
+  private async syncToDatabase(
+    index: CivicIndex,
+    conflictResolution: 'file-wins' | 'database-wins' | 'manual' | 'timestamp'
+  ): Promise<void> {
+    const recordManager = this.civicPress.getRecordManager();
+    const logger = new Logger();
+
+    logger.info('🔄 Syncing indexed records to database...');
+    logger.info(`📊 Found ${index.entries.length} records to sync`);
+
+    let syncedCount = 0;
+    let skippedCount = 0;
+    let conflictCount = 0;
+
+    for (const entry of index.entries) {
+      try {
+        // Generate record ID from slug or filename
+        const recordId = entry.slug || entry.file.replace('.md', '');
+
+        // Check if record exists in database
+        const existingRecord = await recordManager.getRecord(recordId);
+
+        if (!existingRecord) {
+          // Record doesn't exist - create it
+          await this.createRecordFromFile(entry, recordManager);
+          syncedCount++;
+          logger.info(`✅ Created record: ${entry.title}`);
+        } else {
+          // Record exists - handle conflict
+          const shouldUpdate = await this.shouldUpdateRecord(
+            entry,
+            existingRecord,
+            conflictResolution
+          );
+
+          if (shouldUpdate) {
+            await this.updateRecordFromFile(
+              entry,
+              existingRecord,
+              recordManager
+            );
+            syncedCount++;
+            logger.info(`🔄 Updated record: ${entry.title}`);
+          } else {
+            skippedCount++;
+            logger.info(`⏭️  Skipped record: ${entry.title}`);
+          }
+        }
+      } catch (error) {
+        conflictCount++;
+        logger.warn(`❌ Failed to sync ${entry.title}: ${error}`);
+        console.error(`Detailed error for ${entry.title}:`, error);
+      }
+    }
+
+    logger.info(
+      `📊 Sync complete: ${syncedCount} synced, ${skippedCount} skipped, ${conflictCount} conflicts`
+    );
+  }
+
+  /**
+   * Create a new record from file
+   */
+  private async createRecordFromFile(
+    entry: CivicIndexEntry,
+    recordManager: any
+  ): Promise<void> {
+    const filePath = join(this.dataDir, 'records', entry.file);
+    const fileContent = readFileSync(filePath, 'utf-8');
+
+    // Extract content (everything after frontmatter)
+    const contentMatch = fileContent.match(
+      /^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/
+    );
+    const content = contentMatch ? contentMatch[1].trim() : '';
+
+    await recordManager.createRecord(
+      {
+        title: entry.title,
+        type: entry.type,
+        content: content,
+        metadata: {
+          author: entry.authors?.[0]?.name || 'admin',
+          created: entry.created,
+          updated: entry.updated,
+          tags: entry.tags,
+          module: entry.module,
+          source: 'file-sync',
+          file_path: entry.file,
+        },
+      },
+      'admin'
+    );
+  }
+
+  /**
+   * Update existing record from file
+   */
+  private async updateRecordFromFile(
+    entry: CivicIndexEntry,
+    existingRecord: any,
+    recordManager: any
+  ): Promise<void> {
+    const filePath = join(this.dataDir, 'records', entry.file);
+    const fileContent = readFileSync(filePath, 'utf-8');
+
+    // Extract content (everything after frontmatter)
+    const contentMatch = fileContent.match(
+      /^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/
+    );
+    const content = contentMatch ? contentMatch[1].trim() : '';
+
+    await recordManager.updateRecord(
+      existingRecord.id,
+      {
+        title: entry.title,
+        content: content,
+        metadata: {
+          ...existingRecord.metadata,
+          updated: entry.updated,
+          tags: entry.tags,
+          module: entry.module,
+          source: 'file-sync',
+          file_path: entry.file,
+        },
+      },
+      'admin'
+    );
+  }
+
+  /**
+   * Determine if record should be updated based on conflict resolution strategy
+   */
+  private async shouldUpdateRecord(
+    entry: CivicIndexEntry,
+    existingRecord: any,
+    strategy: 'file-wins' | 'database-wins' | 'manual' | 'timestamp'
+  ): Promise<boolean> {
+    switch (strategy) {
+      case 'file-wins':
+        return true;
+
+      case 'database-wins':
+        return false;
+
+      case 'timestamp': {
+        const fileTime = entry.updated ? new Date(entry.updated).getTime() : 0;
+        const dbTime = existingRecord.updated_at
+          ? new Date(existingRecord.updated_at).getTime()
+          : 0;
+        return fileTime > dbTime;
+      }
+
+      case 'manual':
+        // For manual resolution, we'll skip for now and log
+        console.warn(`⚠️  Manual resolution needed for: ${entry.title}`);
+        return false;
+
+      default:
+        return true;
+    }
   }
 }

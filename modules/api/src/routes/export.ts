@@ -1,11 +1,24 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
+import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
+import { sendSuccess, logApiRequest } from '../utils/api-logger';
 
 export const exportRouter = Router();
 
 // GET /api/v1/export - Export data
-exportRouter.get('/', (req: Request, res: Response) => {
-  res.json({
-    message: 'Export functionality',
-    formats: ['json', 'csv', 'markdown'],
-  });
-});
+exportRouter.get(
+  '/',
+  requirePermission('records:export'),
+  (req: AuthenticatedRequest, res: Response) => {
+    logApiRequest(req, { operation: 'export_data' });
+
+    sendSuccess(
+      {
+        message: 'Export functionality',
+        formats: ['json', 'csv', 'markdown'],
+      },
+      req,
+      res,
+      { operation: 'export_data' }
+    );
+  }
+);

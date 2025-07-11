@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
+import { sendSuccess, logApiRequest } from '../utils/api-logger';
 
 export const docsRouter = Router();
 
@@ -464,7 +465,9 @@ docsRouter.get(
 
 // Serve the OpenAPI spec as JSON
 docsRouter.get('/api-docs.json', (req, res) => {
-  res.json(swaggerSpec);
+  logApiRequest(req, { operation: 'get_api_docs' });
+
+  sendSuccess(swaggerSpec, req, res, { operation: 'get_api_docs' });
 });
 
 export default docsRouter;

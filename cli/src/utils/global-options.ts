@@ -1,4 +1,5 @@
 import { Logger } from '@civicpress/core';
+import { cliOutput, CliOutputOptions } from './cli-output.js';
 
 export interface GlobalOptions {
   silent?: boolean;
@@ -38,4 +39,25 @@ export function getGlobalOptionsFromArgs(): GlobalOptions {
   }
 
   return options;
+}
+
+export function initializeCliOutput(options: GlobalOptions): void {
+  const cliOptions: CliOutputOptions = {
+    silent: options.silent || options.quiet,
+    json: options.json,
+    noColor: options.noColor,
+    verbose: options.verbose,
+  };
+
+  cliOutput.setOptions(cliOptions);
+}
+
+export function getCliOutputOptions(): CliOutputOptions {
+  const globalOptions = getGlobalOptionsFromArgs();
+  return {
+    silent: globalOptions.silent || globalOptions.quiet,
+    json: globalOptions.json,
+    noColor: globalOptions.noColor,
+    verbose: globalOptions.verbose,
+  };
 }

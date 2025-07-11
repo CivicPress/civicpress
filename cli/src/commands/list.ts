@@ -1,14 +1,21 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter = require('gray-matter');
 import { userCan } from '@civicpress/core';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliDebug,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export const listCommand = (cli: CAC) => {
   cli
@@ -20,72 +27,58 @@ export const listCommand = (cli: CAC) => {
     )
     .option('-a, --all', 'Show all details')
     .action(async (type: string, options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
-      const shouldOutputJson = globalOptions.json;
+      initializeCliOutput(globalOptions);
 
-      // Validate authentication and get civic instance
-      const { civic, user } = await AuthUtils.requireAuthWithCivic(
-        options.token,
-        shouldOutputJson
-      );
-      const dataDir = civic.getDataDir();
-
-      // Check view permissions
-      const canView = await userCan(user, 'records:view');
-      if (!canView) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to view records',
-                requiredPermission: 'records:view',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to view records');
-          logger.info(`Role '${user.role}' cannot view records`);
-        }
-        process.exit(1);
-      }
+      const endOperation = cliStartOperation('list records');
 
       try {
-        logger.info('📋 Listing civic records...');
+        // Validate authentication and get civic instance
+        const { civic, user } = await AuthUtils.requireAuthWithCivic(
+          options.token,
+          globalOptions.json
+        );
+        const dataDir = civic.getDataDir();
 
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
+        // Check view permissions
+        const canView = await userCan(user, 'records:view');
+        if (!canView) {
+          cliError(
+            'Insufficient permissions to view records',
+            'PERMISSION_DENIED',
+            {
+              requiredPermission: 'records:view',
+              userRole: user.role,
+            },
+            'list records'
+          );
+          process.exit(1);
+        }
+
+        cliInfo('Listing civic records...', 'list records');
 
         if (!dataDir) {
-          throw new Error('Data directory not found. Run "civic init" first.');
+          cliError(
+            'Data directory not found. Run "civic init" first.',
+            'DATA_DIR_NOT_FOUND',
+            undefined,
+            'list records'
+          );
+          process.exit(1);
         }
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  records: [],
-                  summary: { totalRecords: 0, byStatus: {}, byType: {} },
-                },
-                null,
-                2
-              )
-            );
-            return;
-          } else {
-            logger.warn(
-              '📁 No records directory found. Create some records first!'
-            );
-            return;
-          }
+          cliSuccess(
+            {
+              records: [],
+              summary: { totalRecords: 0, byStatus: {}, byType: {} },
+            },
+            'No records found',
+            { operation: 'list records', totalRecords: 0 }
+          );
+          return;
         }
 
         // Get all record types
@@ -95,22 +88,15 @@ export const listCommand = (cli: CAC) => {
           .map((dirent) => dirent.name);
 
         if (recordTypes.length === 0) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  records: [],
-                  summary: { totalRecords: 0, byStatus: {}, byType: {} },
-                },
-                null,
-                2
-              )
-            );
-            return;
-          } else {
-            logger.warn('📁 No record types found. Create some records first!');
-            return;
-          }
+          cliSuccess(
+            {
+              records: [],
+              summary: { totalRecords: 0, byStatus: {}, byType: {} },
+            },
+            'No record types found',
+            { operation: 'list records', totalRecords: 0 }
+          );
+          return;
         }
 
         // Filter by type if specified
@@ -137,12 +123,11 @@ export const listCommand = (cli: CAC) => {
             continue;
           }
 
-          if (!shouldOutputJson) {
-            logger.info(
-              `\n📁 ${recordType.toUpperCase()} (${files.length} records):`
-            );
-            logger.debug('─'.repeat(50));
-          }
+          cliDebug(
+            `Processing ${recordType} type with ${files.length} records`,
+            { recordType, fileCount: files.length },
+            'list records'
+          );
 
           for (const filePath of files) {
             try {
@@ -193,74 +178,45 @@ export const listCommand = (cli: CAC) => {
 
               records.push(record);
 
-              // Human-readable output
-              if (!shouldOutputJson) {
-                // Status color
-                const statusColors: Record<string, any> = {
-                  draft: chalk.yellow,
-                  proposed: chalk.blue,
-                  approved: chalk.green,
-                  active: chalk.green,
-                  archived: chalk.gray,
-                };
-                const statusColor = statusColors[status] || chalk.white;
-
-                logger.info(`  📄 ${title}`);
-                logger.debug(`     Status: ${statusColor(status)}`);
-
-                if (options.all) {
-                  logger.debug(`     Created: ${record.created}`);
-                  logger.debug(`     Updated: ${record.updated}`);
-                  logger.debug(`     Author: ${author}`);
-                  logger.debug(`     File: ${record.path}`);
-                }
-
-                logger.debug('');
-              }
+              cliDebug(
+                `Processed record: ${title}`,
+                { title, status, type: recordType },
+                'list records'
+              );
             } catch (error) {
-              logger.error(
-                `  ❌ Error reading ${path.basename(filePath)}: ${error}`
+              cliWarn(
+                `Error reading ${path.basename(filePath)}: ${error}`,
+                'list records'
               );
             }
           }
         }
 
-        // Output JSON or human-readable summary
-        if (shouldOutputJson) {
-          const jsonOutput = {
-            records,
-            summary: {
-              totalRecords,
-              byStatus: statusCounts,
-              byType: typeCounts,
-            },
-          };
-          console.log(JSON.stringify(jsonOutput, null, 2));
-        } else {
-          // Human-readable summary
-          logger.info(`\n📊 Summary:`);
-          logger.info(`  Total records: ${totalRecords}`);
+        // Prepare output data
+        const outputData = {
+          records,
+          summary: {
+            totalRecords,
+            byStatus: statusCounts,
+            byType: typeCounts,
+          },
+        };
 
-          if (Object.keys(statusCounts).length > 0) {
-            logger.info(`  By status:`);
-            for (const [status, count] of Object.entries(statusCounts)) {
-              const statusColor =
-                {
-                  draft: chalk.yellow,
-                  proposed: chalk.blue,
-                  approved: chalk.green,
-                  active: chalk.green,
-                  archived: chalk.gray,
-                }[status] || chalk.white;
+        cliSuccess(outputData, `Successfully listed ${totalRecords} records`, {
+          operation: 'list records',
+          totalRecords,
+          recordTypes: Object.keys(typeCounts),
+          statuses: Object.keys(statusCounts),
+        });
 
-              logger.debug(`    ${statusColor(status)}: ${count}`);
-            }
-          }
-
-          logger.success('\n✅ Records listed successfully!');
-        }
+        endOperation();
       } catch (error) {
-        logger.error('❌ Failed to list records:', error);
+        cliError(
+          'Failed to list records',
+          'LIST_FAILED',
+          { error: error instanceof Error ? error.message : String(error) },
+          'list records'
+        );
         process.exit(1);
       }
     });

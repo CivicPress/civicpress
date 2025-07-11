@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   IndexingService,
   CivicIndex,
@@ -21,6 +21,14 @@ describe('IndexingService', () => {
     // Initialize CivicPress
     civicPress = new CivicPress({ dataDir: testDataDir });
     await civicPress.initialize();
+
+    // Mock getRecordManager for sync tests
+    civicPress.getRecordManager = vi.fn().mockReturnValue({
+      createRecord: vi.fn().mockResolvedValue({ id: 'test-record-1' }),
+      updateRecord: vi.fn().mockResolvedValue({ id: 'test-record-1' }),
+      getRecord: vi.fn().mockResolvedValue({ id: 'test-record-1' }),
+      listRecords: vi.fn().mockResolvedValue({ records: [], total: 0 }),
+    } as any);
 
     // Create test records directory
     const recordsDir = join(testDataDir, 'records');
@@ -112,8 +120,12 @@ This resolution approves the 2025 budget.`,
       expect(index.entries).toHaveLength(3);
       expect(index.metadata.totalRecords).toBe(3);
       expect(index.metadata.modules).toContain('legal-register');
-      expect(index.metadata.types).toContain('bylaw', 'policy', 'resolution');
-      expect(index.metadata.statuses).toContain('adopted', 'draft', 'proposed');
+      expect(index.metadata.types).toContain('bylaw');
+      expect(index.metadata.types).toContain('policy');
+      expect(index.metadata.types).toContain('resolution');
+      expect(index.metadata.statuses).toContain('adopted');
+      expect(index.metadata.statuses).toContain('draft');
+      expect(index.metadata.statuses).toContain('proposed');
     });
 
     it('should filter by type', async () => {
@@ -250,6 +262,33 @@ This resolution approves the 2025 budget.`,
       expect(noiseEntry?.created).toBe('2025-06-12');
       expect(noiseEntry?.updated).toBe('2025-07-01');
       expect(noiseEntry?.slug).toBe('noise-restrictions');
+    });
+  });
+
+  describe('generateIndexes with sync', () => {
+    it('should generate indexes with sync to database', async () => {
+      const index = await indexingService.generateIndexes({
+        syncDatabase: true,
+        conflictResolution: 'file-wins',
+      });
+
+      expect(index).toBeDefined();
+      expect(index.entries).toHaveLength(3);
+      expect(index.metadata.totalRecords).toBe(3);
+    });
+
+    it('should generate indexes with different conflict resolution strategies', async () => {
+      const strategies = ['file-wins', 'database-wins', 'timestamp', 'manual'];
+
+      for (const strategy of strategies) {
+        const index = await indexingService.generateIndexes({
+          syncDatabase: true,
+          conflictResolution: strategy as any,
+        });
+
+        expect(index).toBeDefined();
+        expect(index.metadata.totalRecords).toBe(3);
+      }
     });
   });
 });

@@ -51,7 +51,7 @@ describe.skip('Authentication API', () => {
     vi.clearAllMocks();
 
     // Create API instance
-    api = new CivicPressAPI(3001);
+    api = new CivicPressAPI(3004);
     await api.initialize('/mock/data/dir');
 
     // Get mock auth service - access it from the API's CivicPress instance

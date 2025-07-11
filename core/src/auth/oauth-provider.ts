@@ -1,4 +1,3 @@
-import { Octokit } from 'octokit';
 import { Logger } from '../utils/logger.js';
 
 const logger = new Logger();
@@ -19,12 +18,39 @@ export interface OAuthProvider {
   getUserInfo(token: string): Promise<OAuthUser>;
 }
 
+// Import Octokit dynamically to avoid the problematic @octokit/app subpackage
+let Octokit: any = null;
+
+async function getOctokit() {
+  if (Octokit) return Octokit;
+
+  try {
+    // Import the main Octokit package directly
+    const { Octokit: OctokitClass } = await import('octokit');
+    Octokit = OctokitClass;
+    return Octokit;
+  } catch (error) {
+    logger.warn(
+      'Failed to load Octokit, GitHub OAuth will be disabled:',
+      error
+    );
+    return null;
+  }
+}
+
 export class GitHubOAuthProvider implements OAuthProvider {
   name = 'github';
 
   async validateToken(token: string): Promise<OAuthUser> {
+    const OctokitClass = await getOctokit();
+    if (!OctokitClass) {
+      throw new Error(
+        'GitHub OAuth is not available - Octokit dependency is missing'
+      );
+    }
+
     try {
-      const octokit = new Octokit({ auth: token });
+      const octokit = new OctokitClass({ auth: token });
 
       // Test the token by making a request to the GitHub API
       const { data: user } = await octokit.rest.users.getAuthenticated();

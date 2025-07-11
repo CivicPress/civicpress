@@ -15,6 +15,12 @@ export const indexCommand = (cli: CAC) => {
     .option('--search <query>', 'Search within existing index')
     .option('--list', 'List all available indexes')
     .option('--validate', 'Validate existing indexes')
+    .option('--sync-db', 'Sync indexed records to database')
+    .option(
+      '--conflict-resolution <strategy>',
+      'Conflict resolution strategy (file-wins, database-wins, timestamp, manual)',
+      { default: 'file-wins' }
+    )
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     .action(async (options: any) => {
@@ -67,6 +73,8 @@ async function handleGenerate(
     modules: options.module ? [options.module] : undefined,
     types: options.type ? [options.type] : undefined,
     statuses: options.status ? [options.status] : undefined,
+    syncDatabase: options.syncDb || options['sync-db'],
+    conflictResolution: options.conflictResolution,
   };
 
   if (!globalOpts.silent) {
@@ -86,6 +94,12 @@ async function handleGenerate(
       logger.info(`Types: ${index.metadata.types.join(', ')}`);
       logger.info(`Statuses: ${index.metadata.statuses.join(', ')}`);
       logger.info(`Generated at: ${index.metadata.generated}`);
+
+      if (options.syncDb || options['sync-db']) {
+        logger.info(
+          `🔄 Database sync completed with conflict resolution: ${options.conflictResolution}`
+        );
+      }
     }
   }
 }
