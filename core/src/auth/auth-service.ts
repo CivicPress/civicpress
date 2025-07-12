@@ -13,6 +13,8 @@ export interface AuthUser {
   email?: string;
   name?: string;
   avatar_url?: string;
+  created_at?: Date;
+  updated_at?: Date;
 }
 
 export interface ApiKey {
@@ -107,6 +109,13 @@ export class AuthService {
     return this.roleManager.isValidRole(role);
   }
 
+  /**
+   * Force reload the role configuration (useful for testing)
+   */
+  async reloadRoleConfig(): Promise<void> {
+    await this.roleManager.reloadConfig();
+  }
+
   // API Key Authentication
   async createApiKey(
     userId: number,
@@ -128,7 +137,7 @@ export class AuthService {
       id: apiKeyData.id,
       keyHash: apiKeyData.key_hash,
       userId: apiKeyData.user_id,
-      name: apiKeyData.name,
+      name: apiKeyData.name, // This is the API key's name from the api_keys table
       expiresAt: apiKeyData.expires_at
         ? new Date(apiKeyData.expires_at)
         : undefined,
@@ -137,7 +146,7 @@ export class AuthService {
         username: apiKeyData.username,
         role: apiKeyData.role,
         email: apiKeyData.email,
-        name: apiKeyData.name,
+        name: apiKeyData.user_name, // This should be the user's name
         avatar_url: apiKeyData.avatar_url,
       },
     };
@@ -288,6 +297,8 @@ export class AuthService {
         email: user.email,
         name: user.name,
         avatar_url: user.avatar_url,
+        created_at: user.created_at ? new Date(user.created_at) : undefined,
+        updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
       };
     } catch (error) {
       logger.error('Failed to get user by username:', error);
@@ -309,10 +320,177 @@ export class AuthService {
         email: user.email,
         name: user.name,
         avatar_url: user.avatar_url,
+        created_at: user.created_at ? new Date(user.created_at) : undefined,
+        updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
       };
     } catch (error) {
       logger.error('Failed to get user by ID:', error);
       return null;
+    }
+  }
+
+  /**
+   * List all users
+   */
+  async listUsers(): Promise<AuthUser[]> {
+    try {
+      const result = await this.db.listUsers();
+      return result.users.map((user: any) => ({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        avatar_url: user.avatar_url,
+        created_at: user.created_at ? new Date(user.created_at) : undefined,
+        updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
+      }));
+    } catch (error) {
+      logger.error('Failed to list users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create user with password hash
+   */
+  async createUserWithPassword(userData: {
+    username: string;
+    role?: string;
+    email?: string;
+    name?: string;
+    avatar_url?: string;
+    passwordHash?: string;
+  }): Promise<AuthUser> {
+    // Set default role if not provided
+    const role = userData.role || (await this.getDefaultRole());
+
+    const userId = await this.db.createUserWithPassword({
+      ...userData,
+      role,
+    });
+    const user = await this.db.getUserById(userId);
+
+    if (!user) {
+      throw new Error('Failed to create user');
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      email: user.email,
+      name: user.name,
+      avatar_url: user.avatar_url,
+      created_at: user.created_at ? new Date(user.created_at) : undefined,
+      updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
+    };
+  }
+
+  /**
+   * Update user information
+   */
+  async updateUser(
+    userId: number,
+    userData: {
+      email?: string;
+      name?: string;
+      role?: string;
+      passwordHash?: string;
+      avatar_url?: string;
+    }
+  ): Promise<AuthUser | null> {
+    try {
+      const updated = await this.db.updateUser(userId, userData);
+      if (!updated) {
+        throw new Error('User not found');
+      }
+
+      const user = await this.db.getUserById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      return {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        name: user.name,
+        avatar_url: user.avatar_url,
+      };
+    } catch (error) {
+      logger.error('Failed to update user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete user
+   */
+  async deleteUser(userId: number): Promise<boolean> {
+    try {
+      const user = await this.db.getUserById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      await this.db.deleteUser(userId);
+      return true;
+    } catch (error) {
+      logger.error('Failed to delete user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Authenticate with username and password
+   */
+  async authenticateWithPassword(
+    username: string,
+    password: string
+  ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
+    try {
+      // Get user with password hash
+      const user = await this.db.getUserWithPassword(username);
+      if (!user) {
+        throw new Error('Invalid username or password');
+      }
+
+      // Verify password
+      const bcrypt = await import('bcrypt');
+      const isValid = await bcrypt.compare(password, user.password_hash);
+      if (!isValid) {
+        throw new Error('Invalid username or password');
+      }
+
+      // Create session
+      const { token: sessionToken, session } = await this.createSession(
+        user.id
+      );
+
+      // Log authentication event
+      await this.logAuthEvent(
+        user.id,
+        'password_login',
+        `Password login for user ${user.username}`,
+        'password'
+      );
+
+      return {
+        token: sessionToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          email: user.email,
+          name: user.name,
+          avatar_url: user.avatar_url,
+        },
+        expiresAt: session.expiresAt,
+      };
+    } catch (error) {
+      logger.error('Password authentication failed:', error);
+      throw new Error('Invalid username or password');
     }
   }
 
@@ -430,8 +608,93 @@ export class AuthService {
     }
   }
 
+  /**
+   * Get available OAuth providers
+   */
   getAvailableOAuthProviders(): string[] {
     return this.oauthManager.getAvailableProviders();
+  }
+
+  /**
+   * Create a simulated user account for testing/development
+   */
+  async createSimulatedUser(userData: {
+    username: string;
+    role: string;
+    email?: string;
+    name?: string;
+    avatar_url?: string;
+  }): Promise<AuthUser> {
+    // Check if user already exists
+    const existingUser = await this.getUserByUsername(userData.username);
+    if (existingUser) {
+      return existingUser;
+    }
+
+    // Validate role
+    if (!(await this.isValidRole(userData.role))) {
+      throw new Error(`Invalid role: ${userData.role}`);
+    }
+
+    // Create user
+    const user = await this.createUser({
+      username: userData.username,
+      role: userData.role,
+      email: userData.email,
+      name: userData.name,
+      avatar_url: userData.avatar_url,
+    });
+
+    // Log the creation
+    await this.logAuthEvent(
+      user.id,
+      'simulated_user_created',
+      `Simulated user created: ${user.username} with role ${user.role}`,
+      'simulated'
+    );
+
+    return user;
+  }
+
+  /**
+   * Authenticate with simulated account (for development/testing)
+   */
+  async authenticateWithSimulatedAccount(
+    username: string,
+    role: string = 'public'
+  ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
+    try {
+      // Create or get simulated user
+      const user = await this.createSimulatedUser({
+        username,
+        role,
+        name: username,
+        email: `${username}@simulated.local`,
+        avatar_url: `https://avatars.githubusercontent.com/u/${Math.floor(Math.random() * 1000000)}?v=4`,
+      });
+
+      // Create session
+      const { token: sessionToken, session } = await this.createSession(
+        user.id
+      );
+
+      // Log authentication event
+      await this.logAuthEvent(
+        user.id,
+        'simulated_login',
+        `Simulated login for user ${user.username}`,
+        'simulated'
+      );
+
+      return {
+        token: sessionToken,
+        user,
+        expiresAt: session.expiresAt,
+      };
+    } catch (error) {
+      logger.error('Simulated authentication failed:', error);
+      throw new Error('Simulated authentication failed');
+    }
   }
 
   async logout(): Promise<void> {

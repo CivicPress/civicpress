@@ -33,6 +33,7 @@ export function authMiddleware(civicPress: CivicPress) {
 
       if (!authHeader) {
         return res.status(401).json({
+          success: false,
           error: 'Authentication required',
           message: 'No authorization header provided',
         });
@@ -42,6 +43,7 @@ export function authMiddleware(civicPress: CivicPress) {
 
       if (scheme.toLowerCase() !== 'bearer') {
         return res.status(401).json({
+          success: false,
           error: 'Invalid authorization scheme',
           message: 'Use Bearer token authentication',
         });
@@ -49,6 +51,7 @@ export function authMiddleware(civicPress: CivicPress) {
 
       if (!token) {
         return res.status(401).json({
+          success: false,
           error: 'No token provided',
           message: 'Authorization token is required',
         });
@@ -65,6 +68,7 @@ export function authMiddleware(civicPress: CivicPress) {
 
       if (!user) {
         return res.status(401).json({
+          success: false,
           error: 'Invalid token',
           message: 'The provided token is invalid or expired',
         });
@@ -106,6 +110,7 @@ export function requirePermission(permission: string | string[]) {
     try {
       if (!req.user) {
         res.status(401).json({
+          success: false,
           error: {
             message: 'Authentication required',
             code: 'UNAUTHENTICATED',
@@ -163,6 +168,7 @@ export function requireRecordPermission(
     try {
       if (!req.user) {
         res.status(401).json({
+          success: false,
           error: {
             message: 'Authentication required',
             code: 'UNAUTHENTICATED',

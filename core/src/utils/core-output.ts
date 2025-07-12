@@ -46,6 +46,8 @@ export class CoreOutput {
 
   setOptions(options: CoreOutputOptions): void {
     this.options = { ...this.options, ...options };
+    // Update the logger with the new options
+    this.logger = new Logger(options);
   }
 
   // Success output with structured formatting

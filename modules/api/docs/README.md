@@ -115,6 +115,14 @@ router.get('/records', async (req, res) => {
 - `GET /api/validation/status` - Get validation status and issues
 - `GET /api/validation/record/:recordId` - Validate specific record by ID
 
+### Diff & Comparison
+
+- `GET /api/diff/:recordId` - Compare record versions between commits
+- `GET /api/diff/:recordId/history` - Get commit history for a record
+- `POST /api/diff/bulk` - Bulk diff operations on multiple records
+- `GET /api/diff/commits/:commit1/:commit2` - Compare all records between
+  commits
+
 ### Indexing
 
 - `POST /api/indexing/generate` - Generate indexes

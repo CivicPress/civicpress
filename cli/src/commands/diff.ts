@@ -111,8 +111,14 @@ export function registerDiffCommand(cli: CAC) {
 
         // Handle interactive mode
         if (diffOptions.interactive && diffOptions.record) {
+          if (!config.dataDir) {
+            throw new Error('dataDir is not configured');
+          }
           await handleInteractiveDiff(config.dataDir, diffOptions);
         } else {
+          if (!config.dataDir) {
+            throw new Error('dataDir is not configured');
+          }
           const results = await compareRecords(config.dataDir, diffOptions);
           displayDiffResults(results, diffOptions, shouldOutputJson);
         }

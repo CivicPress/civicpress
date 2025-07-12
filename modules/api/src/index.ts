@@ -20,6 +20,8 @@ import { createHistoryRouter } from './routes/history';
 import { createStatusRouter } from './routes/status';
 import docsRouter from './routes/docs';
 import { createValidationRouter } from './routes/validation';
+import { createDiffRouter } from './routes/diff';
+import usersRouter from './routes/users';
 
 // Import middleware
 import { errorHandler, requestIdMiddleware } from './middleware/error-handler';
@@ -40,6 +42,31 @@ export class CivicPressAPI {
   constructor(port: number = 3000) {
     this.port = port;
     this.app = express();
+
+    // Custom middleware to catch JSON parse errors (must be first, outside setupMiddleware)
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(
+      (
+        err: any,
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+      ) => {
+        if (err instanceof SyntaxError && 'body' in err) {
+          // DEBUG: Log when JSON parse error is caught
+          // eslint-disable-next-line no-console
+          console.error(
+            '[DEBUG] JSON parse error middleware triggered:',
+            err.message
+          );
+          (err as any).statusCode = 400;
+          (err as any).message = 'Malformed JSON';
+          return errorHandler(err, req, res, next);
+        }
+        next(err);
+      }
+    );
+
     this.setupMiddleware();
   }
 
@@ -87,6 +114,12 @@ export class CivicPressAPI {
       // Setup routes after CivicPress is initialized
       logger.info('Setting up routes...');
       this.setupRoutes();
+
+      // Load auth configuration
+      logger.info('Loading auth configuration...');
+      const { AuthConfigManager } = await import('@civicpress/core');
+      await AuthConfigManager.getInstance().loadConfig();
+      logger.info('Auth configuration loaded');
 
       // Error handling middleware (must be last)
       this.app.use(notFoundHandler);
@@ -142,6 +175,8 @@ export class CivicPressAPI {
     this.app.use('/api/history', createHistoryRouter());
     this.app.use('/api/status', createStatusRouter());
     this.app.use('/api/validation', createValidationRouter());
+    this.app.use('/api/diff', createDiffRouter());
+    this.app.use('/api/users', usersRouter);
   }
 
   async start(): Promise<void> {
@@ -167,6 +202,11 @@ export class CivicPressAPI {
 
   getApp(): express.Application {
     return this.app;
+  }
+
+  // Expose CivicPress core instance for testing
+  getCivicPress(): CivicPress | null {
+    return this.civicPress;
   }
 }
 

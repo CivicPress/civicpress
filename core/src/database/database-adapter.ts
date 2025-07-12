@@ -111,6 +111,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         email TEXT,
         name TEXT,
         avatar_url TEXT,
+        password_hash TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`,

@@ -109,6 +109,67 @@ export class RecordManager {
   }
 
   /**
+   * Create a new record with a specific ID
+   */
+  async createRecordWithId(
+    recordId: string,
+    request: CreateRecordRequest,
+    userRole: string
+  ): Promise<RecordData> {
+    const recordPath = `records/${request.type}/${recordId}.md`;
+
+    // Create the record object
+    const record: RecordData = {
+      id: recordId,
+      title: request.title,
+      type: request.type,
+      status: 'draft',
+      content: request.content,
+      metadata: {
+        ...request.metadata,
+        author: userRole,
+        created: new Date().toISOString(),
+      },
+      path: recordPath,
+      author: userRole,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Save to database
+    await this.db.createRecord({
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      metadata: JSON.stringify(record.metadata),
+      path: record.path,
+      author: record.author,
+    });
+
+    // Create file in git repository
+    await this.createRecordFile(record);
+
+    // Log audit event
+    await this.db.logAuditEvent({
+      action: 'create_record',
+      resourceType: 'record',
+      resourceId: record.id,
+      details: `Created record ${record.id} of type ${record.type}`,
+    });
+
+    // Trigger hooks
+    await this.hooks.emit('record:created', {
+      record,
+      user: userRole,
+      action: 'create',
+    });
+
+    return record;
+  }
+
+  /**
    * Get a specific record
    */
   async getRecord(id: string): Promise<RecordData | null> {

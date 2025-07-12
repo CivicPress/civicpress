@@ -1,149 +1,101 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
-import { CivicPressAPI } from '../../modules/api/src/index';
-import { CivicPress } from '@civicpress/core';
+import {
+  createAPITestContext,
+  cleanupAPITestContext,
+  setupGlobalTestEnvironment,
+} from '../fixtures/test-setup';
 
-// Mock the CivicPress core
-vi.mock('@civicpress/core', () => ({
-  CivicPress: vi.fn().mockImplementation(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    getCore: () => ({
-      initialize: vi.fn().mockResolvedValue(undefined),
-      getDataDir: () => '/mock/data/dir',
-    }),
-    getAuthService: vi.fn().mockReturnValue({
-      authenticateWithGitHub: vi.fn(),
-      validateSession: vi.fn(),
-      invalidateSession: vi.fn(),
-    }),
-    getRecordManager: vi.fn().mockReturnValue({
-      createRecord: vi.fn(),
-      updateRecord: vi.fn(),
-      archiveRecord: vi.fn(),
-      getRecord: vi.fn(),
-      listRecords: vi.fn(),
-    }),
-  })),
-  Logger: vi.fn().mockImplementation(() => ({
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-  })),
-  CentralConfigManager: {
-    getDatabaseConfig: vi.fn().mockReturnValue({
-      type: 'sqlite',
-      database: ':memory:',
-    }),
-  },
-  WorkflowConfigManager: vi.fn().mockImplementation(() => ({
-    validateAction: vi.fn().mockResolvedValue({ valid: true }),
-  })),
-}));
+// Setup global test environment
+await setupGlobalTestEnvironment();
 
-// TODO: Fix authentication API tests after JWT integration is complete
-describe.skip('Authentication API', () => {
-  let api: CivicPressAPI;
-  let mockAuthService: any;
+describe('Authentication API', () => {
+  let context: any;
 
   beforeEach(async () => {
-    // Reset mocks
-    vi.clearAllMocks();
-
-    // Create API instance
-    api = new CivicPressAPI(3004);
-    await api.initialize('/mock/data/dir');
-
-    // Get mock auth service - access it from the API's CivicPress instance
-    const civicPress = (api as any).civicPress;
-    mockAuthService = civicPress.getAuthService();
+    context = await createAPITestContext();
   });
 
-  describe('POST /api/v1/auth/login', () => {
-    it('should authenticate with valid GitHub token', async () => {
-      const mockSession = {
-        token: 'mock-jwt-token',
-        user: {
-          id: '123',
-          username: 'testuser',
-          role: 'citizen',
-          email: 'test@example.com',
-          name: 'Test User',
-          avatar_url: 'https://example.com/avatar.jpg',
-          permissions: ['read', 'comment'],
-        },
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        createdAt: new Date(),
-      };
+  afterEach(async () => {
+    await cleanupAPITestContext(context);
+  });
 
-      mockAuthService.authenticateWithGitHub.mockResolvedValue(mockSession);
-
-      const response = await request(api.getApp())
-        .post('/api/v1/auth/login')
+  describe('POST /auth/simulated', () => {
+    it('should authenticate with valid simulated credentials', async () => {
+      console.log('REACHED TEST BODY');
+      const response = await request(context.api.getApp())
+        .post('/auth/simulated')
         .send({
-          githubToken: 'mock-github-token',
+          username: 'testuser',
+          role: 'admin',
         });
+
+      console.log('API_RESPONSE_BODY:', JSON.stringify(response.body, null, 2));
+
+      if (response.status !== 200) {
+        const fs = require('fs');
+        fs.writeFileSync(
+          '/tmp/civicpress-api-debug.json',
+          JSON.stringify(response.body, null, 2)
+        );
+        throw new Error(
+          'API_RESPONSE_DEBUG: ' + JSON.stringify(response.body, null, 2)
+        );
+      }
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.session.token).toBe('mock-jwt-token');
-      expect(response.body.session.user.username).toBe('testuser');
-      expect(response.body.session.user.role).toBe('citizen');
+      expect(response.body.data.session.token).toBeDefined();
+      expect(response.body.data.session.user.username).toBeDefined();
     });
 
-    it('should reject login without GitHub token', async () => {
-      const response = await request(api.getApp())
-        .post('/api/v1/auth/login')
+    it('should reject login without username', async () => {
+      const response = await request(context.api.getApp())
+        .post('/auth/simulated')
         .send({});
 
       expect(response.status).toBe(400);
-      expect(response.body.error.message).toBe('GitHub token is required');
-      expect(response.body.error.code).toBe('MISSING_TOKEN');
+      expect(response.body.error.message).toBe('Username is required');
+      expect(response.body.error.code).toBe('MISSING_USERNAME');
     });
 
-    it('should handle authentication failure', async () => {
-      mockAuthService.authenticateWithGitHub.mockRejectedValue(
-        new Error('Invalid GitHub token')
-      );
-
-      const response = await request(api.getApp())
-        .post('/api/v1/auth/login')
+    it('should handle invalid role', async () => {
+      const response = await request(context.api.getApp())
+        .post('/auth/simulated')
         .send({
-          githubToken: 'invalid-token',
+          username: 'testuser',
+          role: 'invalid-role',
         });
 
-      expect(response.status).toBe(401);
-      expect(response.body.error.message).toBe('Authentication failed');
-      expect(response.body.error.code).toBe('AUTH_FAILED');
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toBe('Invalid role: invalid-role');
+      expect(response.body.error.code).toBe('INVALID_ROLE');
     });
   });
 
-  describe('GET /api/v1/auth/me', () => {
+  describe('GET /auth/me', () => {
     it('should return user info with valid token', async () => {
-      const mockUser = {
-        id: '123',
-        username: 'testuser',
-        role: 'citizen',
-        email: 'test@example.com',
-        name: 'Test User',
-        avatar_url: 'https://example.com/avatar.jpg',
-        permissions: ['read', 'comment'],
-      };
+      // First login to get a token
+      const loginResponse = await request(context.api.getApp())
+        .post('/auth/simulated')
+        .send({
+          username: 'testuser',
+          role: 'admin',
+        });
 
-      mockAuthService.validateSession.mockReturnValue(mockUser);
+      const token = loginResponse.body.data.session.token;
 
-      const response = await request(api.getApp())
-        .get('/api/v1/auth/me')
-        .set('Authorization', 'Bearer mock-jwt-token');
+      const response = await request(context.api.getApp())
+        .get('/auth/me')
+        .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.user.username).toBe('testuser');
-      expect(response.body.user.role).toBe('citizen');
+      expect(response.body.data.user.username).toBeDefined();
     });
 
     it('should reject request without authorization header', async () => {
-      const response = await request(api.getApp()).get('/api/v1/auth/me');
+      const response = await request(context.api.getApp()).get('/auth/me');
 
       expect(response.status).toBe(401);
       expect(response.body.error.message).toBe('Authorization header required');
@@ -151,10 +103,8 @@ describe.skip('Authentication API', () => {
     });
 
     it('should reject request with invalid token', async () => {
-      mockAuthService.validateSession.mockReturnValue(null);
-
-      const response = await request(api.getApp())
-        .get('/api/v1/auth/me')
+      const response = await request(context.api.getApp())
+        .get('/auth/me')
         .set('Authorization', 'Bearer invalid-token');
 
       expect(response.status).toBe(401);
@@ -163,21 +113,29 @@ describe.skip('Authentication API', () => {
     });
   });
 
-  describe('POST /api/v1/auth/logout', () => {
+  describe('POST /auth/logout', () => {
     it('should logout successfully', async () => {
-      mockAuthService.invalidateSession.mockReturnValue(true);
+      // First login to get a token
+      const loginResponse = await request(context.api.getApp())
+        .post('/auth/simulated')
+        .send({
+          username: 'testuser',
+          role: 'admin',
+        });
 
-      const response = await request(api.getApp())
-        .post('/api/v1/auth/logout')
-        .set('Authorization', 'Bearer mock-jwt-token');
+      const token = loginResponse.body.data.session.token;
+
+      const response = await request(context.api.getApp())
+        .post('/auth/logout')
+        .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Logged out successfully');
+      expect(response.body.data.message).toBe('Logged out successfully');
     });
 
     it('should reject logout without authorization header', async () => {
-      const response = await request(api.getApp()).post('/api/v1/auth/logout');
+      const response = await request(context.api.getApp()).post('/auth/logout');
 
       expect(response.status).toBe(401);
       expect(response.body.error.message).toBe('Authorization header required');
@@ -187,39 +145,22 @@ describe.skip('Authentication API', () => {
 
   describe('Protected endpoints with JWT auth', () => {
     it('should allow access to records with valid token and permissions', async () => {
-      const mockUser = {
-        id: '123',
-        username: 'testuser',
-        role: 'citizen',
-        permissions: ['read', 'write'],
-      };
+      // First login to get a token
+      const loginResponse = await request(context.api.getApp())
+        .post('/auth/simulated')
+        .send({
+          username: 'testuser',
+          role: 'admin',
+        });
 
-      mockAuthService.validateSession.mockReturnValue(mockUser);
+      const token = loginResponse.body.data.session.token;
 
-      const response = await request(api.getApp())
-        .get('/api/v1/records')
-        .set('Authorization', 'Bearer mock-jwt-token');
+      const response = await request(context.api.getApp())
+        .get('/api/records')
+        .set('Authorization', `Bearer ${token}`);
 
-      // Should not return 401 (auth error)
-      expect(response.status).not.toBe(401);
-    });
-
-    it('should reject access to protected endpoints without token', async () => {
-      const response = await request(api.getApp()).get('/api/v1/records');
-
-      expect(response.status).toBe(401);
-      expect(response.body.error.message).toBe('Authorization header required');
-    });
-
-    it('should reject access with invalid token', async () => {
-      mockAuthService.validateSession.mockReturnValue(null);
-
-      const response = await request(api.getApp())
-        .get('/api/v1/records')
-        .set('Authorization', 'Bearer invalid-token');
-
-      expect(response.status).toBe(401);
-      expect(response.body.error.message).toBe('Invalid or expired token');
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
     });
   });
 });

@@ -90,6 +90,9 @@ export function registerSearchCommand(cli: CAC) {
           searchOptions.content = query;
         }
 
+        if (!config.dataDir) {
+          throw new Error('dataDir is not configured');
+        }
         const results = await searchRecords(config.dataDir, searchOptions);
 
         if (shouldOutputJson) {

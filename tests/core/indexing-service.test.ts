@@ -7,19 +7,30 @@ import {
 import { CivicPress } from '../../core/src/civic-core.js';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import {
+  createTestDirectory,
+  cleanupTestDirectory,
+  createRolesConfig,
+} from '../fixtures/test-setup';
 
 describe('IndexingService', () => {
   let indexingService: IndexingService;
   let civicPress: CivicPress;
-  let testDataDir: string;
+  let testConfig: any;
 
   beforeEach(async () => {
-    // Create test data directory
-    testDataDir = join(process.cwd(), 'test-indexing-data');
-    mkdirSync(testDataDir, { recursive: true });
+    // Create test directory with proper structure
+    testConfig = createTestDirectory('indexing-service-test');
+
+    // Debug: check if testConfig is properly created
+    console.log('testConfig:', testConfig);
+    console.log('testConfig.dataDir:', testConfig.dataDir);
+
+    // Create roles configuration
+    createRolesConfig(testConfig);
 
     // Initialize CivicPress
-    civicPress = new CivicPress({ dataDir: testDataDir });
+    civicPress = new CivicPress({ dataDir: testConfig.dataDir });
     await civicPress.initialize();
 
     // Mock getRecordManager for sync tests
@@ -31,7 +42,7 @@ describe('IndexingService', () => {
     } as any);
 
     // Create test records directory
-    const recordsDir = join(testDataDir, 'records');
+    const recordsDir = join(testConfig.recordsDir);
     mkdirSync(recordsDir, { recursive: true });
 
     // Create sample records
@@ -103,12 +114,12 @@ This resolution approves the 2025 budget.`,
       writeFileSync(join(recordsDir, record.file), record.content);
     }
 
-    indexingService = new IndexingService(civicPress, testDataDir);
+    indexingService = new IndexingService(civicPress, testConfig.dataDir);
   });
 
   afterEach(async () => {
     // Clean up test data
-    rmSync(testDataDir, { recursive: true, force: true });
+    cleanupTestDirectory(testConfig);
     await civicPress.shutdown();
   });
 
@@ -161,7 +172,7 @@ This resolution approves the 2025 budget.`,
       // Generate index first
       await indexingService.generateIndexes();
 
-      const indexPath = join(testDataDir, 'records', 'index.yml');
+      const indexPath = join(testConfig.recordsDir, 'index.yml');
       const loadedIndex = indexingService.loadIndex(indexPath);
 
       expect(loadedIndex).toBeDefined();

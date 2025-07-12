@@ -71,30 +71,50 @@ export class Logger {
   }
 
   error(message: string, data?: any): void {
+    // Suppress all output in JSON mode to avoid polluting CLI JSON output
+    if (this.json) {
+      return;
+    }
     if (this.shouldLog(LogLevel.ERROR)) {
       console.error(this.formatMessage(LogLevel.ERROR, message, data));
     }
   }
 
   warn(message: string, data?: any): void {
+    // Suppress warnings in JSON mode or silent mode to avoid polluting stdout
+    if (this.json || this.level === LogLevel.SILENT) {
+      return;
+    }
     if (this.shouldLog(LogLevel.WARN)) {
       console.warn(this.formatMessage(LogLevel.WARN, message, data));
     }
   }
 
   info(message: string, data?: any): void {
+    // Suppress all output in JSON mode to avoid polluting CLI JSON output
+    if (this.json) {
+      return;
+    }
     if (this.shouldLog(LogLevel.INFO)) {
       console.log(this.formatMessage(LogLevel.INFO, message, data));
     }
   }
 
   debug(message: string, data?: any): void {
+    // Suppress all output in JSON mode to avoid polluting CLI JSON output
+    if (this.json) {
+      return;
+    }
     if (this.shouldLog(LogLevel.DEBUG)) {
       console.log(this.formatMessage(LogLevel.DEBUG, message, data));
     }
   }
 
   verbose(message: string, data?: any): void {
+    // Suppress all output in JSON mode to avoid polluting CLI JSON output
+    if (this.json) {
+      return;
+    }
     if (this.shouldLog(LogLevel.VERBOSE)) {
       console.log(this.formatMessage(LogLevel.VERBOSE, message, data));
     }
@@ -102,6 +122,10 @@ export class Logger {
 
   // Convenience methods for common patterns
   success(message: string, data?: any): void {
+    // Suppress all output in JSON mode to avoid polluting CLI JSON output
+    if (this.json) {
+      return;
+    }
     if (this.shouldLog(LogLevel.INFO)) {
       const formattedMessage = this.noColor ? message : chalk.green(message);
       console.log(this.formatMessage(LogLevel.INFO, formattedMessage, data));
@@ -110,6 +134,10 @@ export class Logger {
 
   // Raw output (always shown unless silent)
   output(message: string): void {
+    // Suppress all output in JSON mode to avoid polluting CLI JSON output
+    if (this.json) {
+      return;
+    }
     if (this.level > LogLevel.SILENT) {
       console.log(message);
     }
@@ -117,6 +145,10 @@ export class Logger {
 
   // Error output (always shown unless silent)
   errorOutput(message: string): void {
+    // Suppress all output in JSON mode to avoid polluting CLI JSON output
+    if (this.json) {
+      return;
+    }
     if (this.level > LogLevel.SILENT) {
       console.error(message);
     }

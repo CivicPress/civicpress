@@ -144,30 +144,58 @@ export class RoleManager {
   async isValidRole(role: string): Promise<boolean> {
     try {
       const config = await this.loadConfig();
-      return Object.keys(config.roles).includes(role);
+      const availableRoles = Object.keys(config.roles);
+      const isValid = availableRoles.includes(role);
+      logger.debug(
+        `[RoleManager] isValidRole('${role}') available: [${availableRoles.join(', ')}] result: ${isValid}`
+      );
+      return isValid;
     } catch (error) {
-      logger.error('Failed to validate role:', error);
+      logger.error('[RoleManager] Failed to validate role:', error);
       return false;
     }
   }
 
+  /**
+   * Force reload the configuration (useful for testing)
+   */
+  async reloadConfig(): Promise<void> {
+    this.config = null;
+    await this.loadConfig();
+  }
+
   private async loadConfig(): Promise<RolesConfig> {
     if (this.config) {
+      logger.debug(
+        `[RoleManager] Returning cached config for: ${this.configPath}`
+      );
       return this.config;
     }
 
     try {
-      if (!fs.existsSync(this.configPath)) {
+      logger.debug(
+        `[RoleManager] Attempting to load roles config from: ${this.configPath}`
+      );
+      const fileExists = fs.existsSync(this.configPath);
+      logger.debug(`[RoleManager] roles.yml exists: ${fileExists}`);
+      if (!fileExists) {
+        logger.debug(`[RoleManager] roles.yml not found, using default config`);
         this.config = this.getDefaultConfig();
         return this.config;
       }
 
       const content = await readFile(this.configPath, 'utf-8');
       const parsedConfig = yaml.load(content) as RolesConfig;
+      logger.debug(
+        `[RoleManager] Loaded roles: ${Object.keys(parsedConfig.roles).join(', ')}`
+      );
       this.config = parsedConfig;
       return this.config;
     } catch (error) {
-      logger.warn('Failed to load roles config, using defaults:', error);
+      logger.warn(
+        '[RoleManager] Failed to load roles config, using defaults:',
+        error
+      );
       this.config = this.getDefaultConfig();
       return this.config;
     }
@@ -184,11 +212,46 @@ export class RoleManager {
       toStatus?: string;
     }
   ): boolean {
+    // If status transition context is present, only check status_transitions
+    if (context?.fromStatus && context?.toStatus) {
+      const roleConfig = config.roles[userRole];
+      if (roleConfig) {
+        if (roleConfig.status_transitions) {
+          const allowedTransitions =
+            roleConfig.status_transitions[context.fromStatus] ||
+            roleConfig.status_transitions['any'] ||
+            [];
+          if (allowedTransitions.includes(context.toStatus)) {
+            return true;
+          }
+        }
+        // Role exists but does not allow this transition
+        return false;
+      }
+      // If role doesn't exist, check public role for status transitions
+      const publicRole = config.roles['public'];
+      if (publicRole?.status_transitions) {
+        const publicAllowedTransitions =
+          publicRole.status_transitions[context.fromStatus] ||
+          publicRole.status_transitions['any'] ||
+          [];
+        if (publicAllowedTransitions.includes(context.toStatus)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     // Get all permissions for the user role (including inherited)
     const userPermissions = this.getRolePermissions(userRole, config);
 
     // Check if user has the specific permission
     if (userPermissions.includes(permission)) {
+      return true;
+    }
+
+    // Check if user has wildcard permission ('*')
+    if (userPermissions.includes('*')) {
       return true;
     }
 
@@ -210,34 +273,6 @@ export class RoleManager {
           const publicRecordTypePermissions =
             publicRole.record_types[`can_${context.action}`];
           if (publicRecordTypePermissions?.includes(context.recordType)) {
-            return true;
-          }
-        }
-      }
-    }
-
-    // Check status transition permissions
-    if (context?.fromStatus && context?.toStatus) {
-      const roleConfig = config.roles[userRole];
-      if (roleConfig?.status_transitions) {
-        const allowedTransitions =
-          roleConfig.status_transitions[context.fromStatus] ||
-          roleConfig.status_transitions['any'] ||
-          [];
-        if (allowedTransitions.includes(context.toStatus)) {
-          return true;
-        }
-      }
-
-      // If role doesn't exist, check public role for status transitions
-      if (!roleConfig) {
-        const publicRole = config.roles['public'];
-        if (publicRole?.status_transitions) {
-          const publicAllowedTransitions =
-            publicRole.status_transitions[context.fromStatus] ||
-            publicRole.status_transitions['any'] ||
-            [];
-          if (publicAllowedTransitions.includes(context.toStatus)) {
             return true;
           }
         }

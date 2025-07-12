@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'path';
-import { existsSync, rmSync, mkdirSync, writeFileSync } from 'fs';
 import { CivicPress } from '../../core/src/civic-core.js';
 import { AuthUser } from '../../core/src/auth/auth-service.js';
 import {
@@ -9,118 +8,62 @@ import {
   getUserPermissions,
   getDefaultRole,
   initializeRoleManager,
+  getRoleManager,
 } from '../../core/src/auth/role-utils.js';
+import {
+  createTestDirectory,
+  createRolesConfig,
+  cleanupTestDirectory,
+} from '../fixtures/test-setup';
 
 describe('Role-Based Authorization System', () => {
   let civicPress: CivicPress;
-  let testDataDir: string;
+  let testConfig: any;
 
   beforeEach(async () => {
-    // Create test data directory
-    testDataDir = join(__dirname, '../fixtures/role-auth-test');
-    if (existsSync(testDataDir)) {
-      rmSync(testDataDir, { recursive: true, force: true });
-    }
-    mkdirSync(testDataDir, { recursive: true });
+    // Use shared fixture for test directory and roles config
+    testConfig = createTestDirectory('role-auth-test');
+    createRolesConfig(testConfig);
 
-    // Create .civic directory
-    const civicDir = join(testDataDir, '.civic');
-    mkdirSync(civicDir, { recursive: true });
-
-    // Create sample roles configuration
-    const rolesConfig = {
-      default_role: 'public',
-      roles: {
-        admin: {
-          name: 'Administrator',
-          description: 'Full system access',
-          permissions: [
-            'system:admin',
-            'records:create',
-            'records:edit',
-            'records:delete',
-            'records:view',
-          ],
-          record_types: {
-            can_create: ['bylaw', 'policy', 'resolution'],
-            can_edit: ['bylaw', 'policy', 'resolution'],
-            can_delete: ['bylaw', 'policy', 'resolution'],
-            can_view: ['bylaw', 'policy', 'resolution'],
-          },
-          status_transitions: {
-            draft: ['proposed', 'archived'],
-            proposed: ['reviewed', 'archived'],
-            reviewed: ['approved', 'archived'],
-            approved: ['archived'],
-            any: ['archived'],
-          },
-        },
-        clerk: {
-          name: 'City Clerk',
-          description: 'Administrative support',
-          permissions: ['records:create', 'records:edit', 'records:view'],
-          record_types: {
-            can_create: ['bylaw', 'policy', 'resolution'],
-            can_edit: ['bylaw', 'policy', 'resolution'],
-            can_view: ['bylaw', 'policy', 'resolution'],
-          },
-          status_transitions: {
-            draft: ['proposed'],
-          },
-        },
-        public: {
-          name: 'Public',
-          description: 'Read-only access',
-          permissions: ['records:view'],
-          record_types: {
-            can_view: ['bylaw', 'policy', 'resolution'],
-          },
-          status_transitions: {},
-        },
-      },
-      permissions: {
-        'system:admin': { description: 'Full system access', level: 'system' },
-        'records:create': { description: 'Create records', level: 'record' },
-        'records:edit': { description: 'Edit records', level: 'record' },
-        'records:delete': { description: 'Delete records', level: 'record' },
-        'records:view': { description: 'View records', level: 'record' },
-      },
-      role_hierarchy: {
-        admin: [],
-        clerk: ['public'],
-        public: [],
-      },
-    };
-
-    writeFileSync(
-      join(civicDir, 'roles.yml'),
-      JSON.stringify(rolesConfig, null, 2)
-    );
+    // Debug: print testConfig and dataDir before CivicPress instantiation
+    console.log('testConfig:', testConfig);
+    console.log('testConfig.dataDir before CivicPress:', testConfig.dataDir);
+    console.log('typeof testConfig.dataDir:', typeof testConfig.dataDir);
 
     // Initialize CivicPress
     civicPress = new CivicPress({
-      dataDir: testDataDir,
+      dataDir: testConfig.dataDir,
       database: {
         type: 'sqlite',
         sqlite: {
-          file: join(testDataDir, 'test.db'),
+          file: join(testConfig.testDir, 'test.db'),
         },
       },
     });
-
     await civicPress.initialize();
 
+    // Debug: print dataDir before initializeRoleManager
+    console.log(
+      'testConfig.dataDir before initializeRoleManager:',
+      testConfig.dataDir
+    );
     // Initialize role manager for testing
-    initializeRoleManager(testDataDir);
+    initializeRoleManager(testConfig.dataDir);
+
+    // Debug: verify role manager is initialized
+    try {
+      const roleManager = getRoleManager();
+      console.log('RoleManager initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize RoleManager:', error);
+    }
   });
 
   afterEach(async () => {
     if (civicPress) {
       await civicPress.shutdown();
     }
-    if (existsSync(testDataDir)) {
-      rmSync(testDataDir, { recursive: true, force: true });
-    }
+    cleanupTestDirectory(testConfig);
   });
 
   describe('userCan() function', () => {
@@ -224,12 +167,21 @@ describe('Role-Based Authorization System', () => {
           toStatus: 'proposed',
         })
       ).toBe(true);
-      expect(
-        await userCan(clerkUser, 'workflows:manage', {
-          fromStatus: 'approved',
-          toStatus: 'archived',
-        })
-      ).toBe(false);
+
+      // Debug: check what the role manager returns for this transition
+      const result = await userCan(clerkUser, 'workflows:manage', {
+        fromStatus: 'approved',
+        toStatus: 'archived',
+      });
+      console.log('Clerk approved->archived transition result:', result);
+
+      // Debug: check the role manager configuration
+      const roleManager = getRoleManager();
+      const config = await roleManager['loadConfig']();
+      console.log('Clerk role config:', config.roles.clerk);
+      console.log('Admin role config:', config.roles.admin);
+
+      expect(result).toBe(false);
     });
 
     it('should allow public to perform view-only actions', async () => {

@@ -10,7 +10,7 @@ import {
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 
-export const statusCommand = (cli: CAC) => {
+export function statusCommand(cli: CAC) {
   cli
     .command('status <record> <status>', 'Change the status of a civic record')
     .option(
@@ -79,6 +79,9 @@ export const statusCommand = (cli: CAC) => {
           );
         }
         const dataDir = config.dataDir;
+        if (!dataDir) {
+          throw new Error('dataDir is not configured');
+        }
         const civic = new CivicPress({ dataDir });
 
         if (!dataDir) {
@@ -461,4 +464,4 @@ export const statusCommand = (cli: CAC) => {
         process.exit(1);
       }
     });
-};
+}

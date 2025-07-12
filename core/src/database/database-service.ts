@@ -5,14 +5,14 @@ import {
 } from './database-adapter.js';
 import { Logger } from '../utils/logger.js';
 
-const logger = new Logger();
-
 export class DatabaseService {
   private adapter: DatabaseAdapter;
   private isConnected = false;
+  private logger: Logger;
 
-  constructor(config: DatabaseConfig) {
+  constructor(config: DatabaseConfig, logger?: Logger) {
     this.adapter = createDatabaseAdapter(config);
+    this.logger = logger || new Logger();
   }
 
   async initialize(): Promise<void> {
@@ -20,9 +20,9 @@ export class DatabaseService {
       await this.adapter.connect();
       await this.adapter.initialize();
       this.isConnected = true;
-      logger.info('Database initialized successfully');
+      this.logger.info('Database initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize database:', error);
+      this.logger.error('Failed to initialize database:', error);
       throw error;
     }
   }
@@ -31,7 +31,7 @@ export class DatabaseService {
     if (this.isConnected) {
       await this.adapter.close();
       this.isConnected = false;
-      logger.info('Database connection closed');
+      this.logger.info('Database connection closed');
     }
   }
 
@@ -74,6 +74,131 @@ export class DatabaseService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  async getUserWithPassword(username: string): Promise<any | null> {
+    const rows = await this.adapter.query(
+      'SELECT * FROM users WHERE username = ?',
+      [username]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  async createUserWithPassword(userData: {
+    username: string;
+    role: string;
+    email?: string;
+    name?: string;
+    avatar_url?: string;
+    passwordHash?: string;
+  }): Promise<number> {
+    await this.adapter.execute(
+      'INSERT INTO users (username, role, email, name, avatar_url, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        userData.username,
+        userData.role,
+        userData.email,
+        userData.name,
+        userData.avatar_url,
+        userData.passwordHash,
+      ]
+    );
+
+    // Get the inserted ID
+    const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
+    return rows[0].id;
+  }
+
+  async updateUser(
+    userId: number,
+    userData: {
+      email?: string;
+      name?: string;
+      role?: string;
+      passwordHash?: string;
+      avatar_url?: string;
+    }
+  ): Promise<boolean> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (userData.email !== undefined) {
+      updates.push('email = ?');
+      values.push(userData.email);
+    }
+    if (userData.name !== undefined) {
+      updates.push('name = ?');
+      values.push(userData.name);
+    }
+    if (userData.role !== undefined) {
+      updates.push('role = ?');
+      values.push(userData.role);
+    }
+    if (userData.passwordHash !== undefined) {
+      updates.push('password_hash = ?');
+      values.push(userData.passwordHash);
+    }
+    if (userData.avatar_url !== undefined) {
+      updates.push('avatar_url = ?');
+      values.push(userData.avatar_url);
+    }
+
+    if (updates.length === 0) {
+      return false;
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(userId);
+
+    const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+    await this.adapter.execute(sql, values);
+    return true;
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    await this.adapter.execute('DELETE FROM users WHERE id = ?', [userId]);
+  }
+
+  async listUsers(
+    options: {
+      limit?: number;
+      offset?: number;
+      role?: string;
+      search?: string;
+    } = {}
+  ): Promise<{ users: any[]; total: number }> {
+    let sql = 'SELECT * FROM users WHERE 1=1';
+    const params: any[] = [];
+
+    if (options.role) {
+      sql += ' AND role = ?';
+      params.push(options.role);
+    }
+    if (options.search) {
+      sql += ' AND (username LIKE ? OR name LIKE ? OR email LIKE ?)';
+      const searchTerm = `%${options.search}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    // Get total count
+    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as count');
+    const countRows = await this.adapter.query(countSql, params);
+    const total = countRows[0].count;
+
+    // Get users with pagination
+    sql += ' ORDER BY created_at DESC';
+    if (options.limit) {
+      sql += ' LIMIT ?';
+      params.push(options.limit);
+      if (options.offset) {
+        sql += ' OFFSET ?';
+        params.push(options.offset);
+      }
+    }
+
+    const users = await this.adapter.query(sql, params);
+
+    return { users, total };
+  }
+
   // API key management
   async createApiKey(
     userId: number,
@@ -92,7 +217,7 @@ export class DatabaseService {
 
   async getApiKeyByHash(keyHash: string): Promise<any | null> {
     const rows = await this.adapter.query(
-      'SELECT ak.*, u.username, u.role FROM api_keys ak JOIN users u ON ak.user_id = u.id WHERE ak.key_hash = ?',
+      'SELECT ak.*, u.username, u.role, u.name as user_name, u.email, u.avatar_url FROM api_keys ak JOIN users u ON ak.user_id = u.id WHERE ak.key_hash = ?',
       [keyHash]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -119,7 +244,7 @@ export class DatabaseService {
 
   async getSessionByToken(tokenHash: string): Promise<any | null> {
     const rows = await this.adapter.query(
-      'SELECT s.*, u.username, u.role FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > ?',
+      'SELECT s.*, u.username, u.role, u.name, u.email, u.avatar_url FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > ?',
       [tokenHash, new Date().toISOString()]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -367,7 +492,7 @@ export class DatabaseService {
       await this.adapter.query('SELECT 1');
       return true;
     } catch (error) {
-      logger.error('Database health check failed:', error);
+      this.logger.error('Database health check failed:', error);
       return false;
     }
   }

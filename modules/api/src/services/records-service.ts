@@ -4,6 +4,7 @@ import {
   UpdateRecordRequest,
   WorkflowConfigManager,
   RecordManager,
+  userCan,
 } from '@civicpress/core';
 
 /**
@@ -45,15 +46,25 @@ export class RecordsService {
     },
     userRole: string = 'unknown'
   ): Promise<any> {
-    // Validate permissions
-    const actionValidation = await this.workflowManager.validateAction(
-      'create',
-      data.type,
-      userRole
-    );
+    // Create a mock user object for permission checking
+    const mockUser = {
+      id: 1,
+      username: 'api-user',
+      role: userRole,
+      email: 'api@example.com',
+      name: 'API User',
+    };
 
-    if (!actionValidation.valid) {
-      throw new Error(`Permission denied: ${actionValidation.reason}`);
+    // Validate permissions using the same system as API middleware
+    const hasPermission = await userCan(mockUser, 'records:create', {
+      recordType: data.type,
+      action: 'create',
+    });
+
+    if (!hasPermission) {
+      throw new Error(
+        `Permission denied: Cannot create records of type '${data.type}'`
+      );
     }
 
     // Create record request
@@ -122,15 +133,25 @@ export class RecordsService {
       return null;
     }
 
-    // Validate permissions
-    const actionValidation = await this.workflowManager.validateAction(
-      'edit',
-      currentRecord.type,
-      userRole
-    );
+    // Create a mock user object for permission checking
+    const mockUser = {
+      id: 1,
+      username: 'api-user',
+      role: userRole,
+      email: 'api@example.com',
+      name: 'API User',
+    };
 
-    if (!actionValidation.valid) {
-      throw new Error(`Permission denied: ${actionValidation.reason}`);
+    // Validate permissions using the same system as API middleware
+    const hasPermission = await userCan(mockUser, 'records:edit', {
+      recordType: currentRecord.type,
+      action: 'edit',
+    });
+
+    if (!hasPermission) {
+      throw new Error(
+        `Permission denied: Cannot edit records of type '${currentRecord.type}'`
+      );
     }
 
     // Update record request
@@ -178,15 +199,25 @@ export class RecordsService {
       return false;
     }
 
-    // Validate permissions
-    const actionValidation = await this.workflowManager.validateAction(
-      'delete',
-      record.type,
-      userRole
-    );
+    // Create a mock user object for permission checking
+    const mockUser = {
+      id: 1,
+      username: 'api-user',
+      role: userRole,
+      email: 'api@example.com',
+      name: 'API User',
+    };
 
-    if (!actionValidation.valid) {
-      throw new Error(`Permission denied: ${actionValidation.reason}`);
+    // Validate permissions using the same system as API middleware
+    const hasPermission = await userCan(mockUser, 'records:delete', {
+      recordType: record.type,
+      action: 'delete',
+    });
+
+    if (!hasPermission) {
+      throw new Error(
+        `Permission denied: Cannot delete records of type '${record.type}'`
+      );
     }
 
     // Archive the record

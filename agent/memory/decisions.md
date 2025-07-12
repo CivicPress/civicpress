@@ -742,3 +742,95 @@ endpoints **Rationale**:
 - Enhances user experience
 - Supports enterprise-scale deployments **Implementation**: Efficient Git
   command execution with proper pagination
+
+# Project Decisions
+
+## Architecture Decisions
+
+### API Design Patterns
+
+- **Centralized Response Handling**: All API routes use standardized
+  `sendSuccess()` and `handleApiError()` utilities for consistent responses
+- **Structured Logging**: All API operations use `logApiRequest()` and
+  comprehensive error logging with context
+- **Authentication Middleware**: All protected routes use `requirePermission()`
+  with role-based access control
+- **Error Categorization**: Errors are categorized by severity
+  (low/medium/high/critical) and type for better monitoring
+
+### CLI Design Patterns
+
+- **Standardized Output**: All CLI commands use centralized output utilities
+  with JSON and silent modes
+- **Consistent Flags**: All commands support `--json` and `--silent` flags for
+  machine-readable output
+- **Help Integration**: All CLI commands use CAC's built-in `.help()` for
+  automatic `--help` and `-h` support
+- **Exit Codes**: Commands return appropriate exit codes (0 for success, 1 for
+  errors, 2 for validation failures)
+
+### Core Module Patterns
+
+- **Structured Logging**: Core uses enhanced logger with context awareness and
+  operation timing
+- **Configuration Management**: Centralized config loading with fallback
+  mechanisms
+- **Error Context**: All errors include rich context for debugging and
+  monitoring
+
+## Technology Decisions
+
+### Testing Framework
+
+- **Vitest**: Chosen for Nuxt-based project with comprehensive test coverage
+- **Test Structure**: Standardized test suite with fixtures for configs, roles,
+  and YAML documents
+- **Test Commands**: `pnpm run test:run` for running tests,
+  `pnpm run spec:validate` for validation
+
+### Build System
+
+- **pnpm**: Package manager for monorepo with workspace support
+- **Build Commands**: `pnpm run build` for CLI, `pnpm run dev` for development
+  server
+- **No Post-Build Patching**: Avoid patching dist/ folder after build as it's
+  considered bad practice
+
+### File Organization
+
+- **Data Structure**: User records in `data/records/`, system files in
+  `data/.civic/`
+- **Template Storage**: Templates stored in `.civic` folder with basic defaults
+- **Test Files**: Root-level `tests/` directory with organized subdirectories
+
+## API Enhancement Decisions
+
+### Diff API Implementation (2025-07-11)
+
+- **GitHub-Style Interface Support**: Implemented comprehensive Diff API for
+  frontend diff interfaces
+- **Multiple Diff Formats**: Support for unified, side-by-side, and JSON diff
+  formats
+- **Word-Level Diffing**: Inline word changes for precise highlighting
+- **Bulk Operations**: Support for comparing multiple records simultaneously
+- **Commit History**: Full commit timeline with filtering and pagination
+- **Metadata Diffing**: YAML frontmatter comparison capabilities
+- **Performance Optimization**: Context control, caching strategies, and
+  efficient Git operations
+- **Frontend Integration**: Complete documentation with React, Vue.js, and
+  vanilla JavaScript examples
+- **Security**: Proper authentication and authorization with role-based
+  permissions
+- **Error Handling**: Comprehensive error categorization and meaningful error
+  messages
+
+### API Architecture Pattern
+
+- **CivicPress Instance Integration**: All API routes use the shared CivicPress
+  instance for consistent data access
+- **Centralized Data Directory**: All operations use `civicPress.getDataDir()`
+  for consistent path resolution
+- **Debug Logging**: Strategic debug logging for troubleshooting path and
+  configuration issues
+- **Type Safety**: Full TypeScript support with comprehensive interfaces for all
+  diff operations

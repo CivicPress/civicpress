@@ -1,5 +1,6 @@
 import { CivicPress } from '@civicpress/core';
 import { Logger } from '@civicpress/core';
+import * as path from 'path';
 
 /**
  * Authentication utilities for CLI commands
@@ -41,14 +42,32 @@ export class AuthUtils {
 
     try {
       // Initialize CivicPress
-      const { loadConfig } = await import('@civicpress/core');
+      const { loadConfig, CentralConfigManager } = await import(
+        '@civicpress/core'
+      );
       const config = await loadConfig();
       if (!config) {
         throw new Error('CivicPress not initialized. Run "civic init" first.');
       }
 
       const dataDir = config.dataDir;
-      const civic = new CivicPress({ dataDir });
+      if (!dataDir) {
+        throw new Error('dataDir is not configured');
+      }
+
+      // Get database configuration from CentralConfigManager
+      const dbConfig = CentralConfigManager.getDatabaseConfig() || {
+        type: 'sqlite' as const,
+        sqlite: {
+          file: path.join(dataDir, 'civic.db'),
+        },
+      };
+
+      const civic = new CivicPress({
+        dataDir,
+        database: dbConfig,
+        logger: { json: shouldOutputJson },
+      });
       await civic.initialize();
 
       // Validate session token

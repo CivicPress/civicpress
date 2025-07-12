@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AuthService } from '../../core/src/auth/auth-service';
 import { DatabaseService } from '../../core/src/database/database-service';
 import { DatabaseConfig } from '../../core/src/database/database-adapter';
+import {
+  createTestDirectory,
+  cleanupTestDirectory,
+  createRolesConfig,
+} from '../fixtures/test-setup';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -9,32 +14,31 @@ import * as os from 'os';
 describe('AuthService', () => {
   let authService: AuthService;
   let dbService: DatabaseService;
-  let tempDir: string;
-  let dbPath: string;
+  let testConfig: any;
 
   beforeEach(async () => {
-    // Create temporary directory for test database
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'civicpress-test-'));
-    dbPath = path.join(tempDir, 'test.db');
+    // Create test directory with proper structure
+    testConfig = createTestDirectory('auth-service-test');
+
+    // Create roles configuration
+    createRolesConfig(testConfig);
 
     const config: DatabaseConfig = {
       type: 'sqlite',
       sqlite: {
-        file: dbPath,
+        file: path.join(testConfig.testDir, 'test.db'),
       },
     };
 
     dbService = new DatabaseService(config);
     await dbService.initialize();
-    authService = new AuthService(dbService);
+    authService = new AuthService(dbService, testConfig.dataDir);
   });
 
   afterEach(async () => {
     await dbService.close();
-    // Clean up temporary directory
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    // Clean up test directory
+    cleanupTestDirectory(testConfig);
   });
 
   describe('User Management', () => {

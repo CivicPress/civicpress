@@ -23,7 +23,9 @@
   "packageManager": "pnpm@10.12.4",
   "dependencies": {
     "@civicpress/core": "workspace:*",
+    "@types/bcrypt": "5.0.2",
     "@types/swagger-ui-express": "4.1.8",
+    "bcrypt": "6.0.0",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "express": "^4.18.2",

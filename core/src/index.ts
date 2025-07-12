@@ -15,6 +15,11 @@ export {
 
 // Export auth services
 export { AuthService, AuthUser, ApiKey, Session } from './auth/auth-service.js';
+export {
+  GitHubOAuthProvider,
+  OAuthProviderManager,
+} from './auth/oauth-provider.js';
+export { AuthConfigManager } from './auth/auth-config.js';
 
 // Export role-based authorization utilities
 export {

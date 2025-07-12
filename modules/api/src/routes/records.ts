@@ -10,10 +10,33 @@ import {
   sendSuccess,
   handleApiError,
   logApiRequest,
-  handleValidationError,
 } from '../utils/api-logger';
 
 const logger = new Logger();
+
+// Custom validation error handler for records API
+function handleRecordsValidationError(
+  operation: string,
+  errors: any[],
+  req: any,
+  res: any
+): void {
+  logger.warn(`${operation} validation failed`, {
+    operation,
+    validationErrors: errors,
+    requestId: (req as any).requestId,
+    userId: (req as any).user?.id,
+    userRole: (req as any).user?.role,
+  });
+
+  res.status(400).json({
+    success: false,
+    error: {
+      message: 'Invalid record data',
+      details: errors,
+    },
+  });
+}
 
 export function createRecordsRouter(recordsService: RecordsService) {
   const router = Router();
@@ -71,7 +94,12 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return handleValidationError('get_record', errors.array(), req, res);
+        return handleRecordsValidationError(
+          'get_record',
+          errors.array(),
+          req,
+          res
+        );
       }
 
       try {
@@ -113,7 +141,12 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return handleValidationError('create_record', errors.array(), req, res);
+        return handleRecordsValidationError(
+          'create_record',
+          errors.array(),
+          req,
+          res
+        );
       }
 
       try {
@@ -160,7 +193,12 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return handleValidationError('update_record', errors.array(), req, res);
+        return handleRecordsValidationError(
+          'update_record',
+          errors.array(),
+          req,
+          res
+        );
       }
 
       try {
@@ -200,7 +238,12 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return handleValidationError('delete_record', errors.array(), req, res);
+        return handleRecordsValidationError(
+          'delete_record',
+          errors.array(),
+          req,
+          res
+        );
       }
 
       try {

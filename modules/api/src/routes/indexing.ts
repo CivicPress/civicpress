@@ -438,5 +438,69 @@ export function createIndexingRouter() {
     }
   );
 
+  /**
+   * GET /api/indexing/stats
+   * Get indexing statistics
+   */
+  router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
+    logApiRequest(req, { operation: 'get_indexing_stats' });
+
+    try {
+      const civicPress = (req as any).civicPress;
+      if (!civicPress) {
+        const error = new Error('CivicPress instance not available');
+        (error as any).statusCode = 500;
+        (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
+        throw error;
+      }
+
+      const indexingService = civicPress.getIndexingService();
+      const stats = await indexingService.getIndexingStats();
+
+      sendSuccess(
+        {
+          stats,
+        },
+        req,
+        res,
+        { operation: 'get_indexing_stats' }
+      );
+    } catch (error) {
+      handleApiError('get_indexing_stats', error, req, res);
+    }
+  });
+
+  /**
+   * GET /api/indexing/validate
+   * Validate all indexes
+   */
+  router.get('/validate', async (req: AuthenticatedRequest, res: Response) => {
+    logApiRequest(req, { operation: 'validate_indexes' });
+
+    try {
+      const civicPress = (req as any).civicPress;
+      if (!civicPress) {
+        const error = new Error('CivicPress instance not available');
+        (error as any).statusCode = 500;
+        (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
+        throw error;
+      }
+
+      const indexingService = civicPress.getIndexingService();
+      const validation = await indexingService.validateIndexes();
+
+      sendSuccess(
+        {
+          validation,
+        },
+        req,
+        res,
+        { operation: 'validate_indexes' }
+      );
+    } catch (error) {
+      handleApiError('validate_indexes', error, req, res);
+    }
+  });
+
   return router;
 }

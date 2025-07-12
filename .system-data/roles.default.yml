@@ -1,313 +1,43 @@
-# TODO: Copy this file to data/.civic/roles.yml during 'civic init' if it doesn't exist
-# This provides a comprehensive default role configuration for new CivicPress installations
-default_role: 'public'
-
 roles:
   admin:
     name: 'Administrator'
-    description: 'Full system access with all permissions'
+    description: 'Full system access'
     permissions:
-      - 'system:admin'
-      - 'records:create'
-      - 'records:edit'
-      - 'records:delete'
-      - 'records:view'
-      - 'records:archive'
-      - 'workflows:manage'
+      - '*'
+      - 'records:import'
+      - 'records:export'
+      - 'templates:view'
       - 'templates:manage'
+      - 'hooks:view'
       - 'hooks:manage'
-      - 'users:manage'
-      - 'system:configure'
-    record_types:
-      can_create:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-      can_edit:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-      can_delete:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
+      - 'workflows:manage'
     status_transitions:
-      draft: ['proposed', 'archived']
-      proposed: ['reviewed', 'archived']
-      reviewed: ['approved', 'archived']
-      approved: ['archived']
-      any: ['archived']
-
-  mayor:
-    name: 'Mayor'
-    description: 'Executive authority with approval powers'
-    permissions:
-      - 'records:create'
-      - 'records:edit'
-      - 'records:view'
-      - 'records:archive'
-      - 'workflows:approve'
-      - 'templates:view'
-    record_types:
-      can_create:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-      can_edit:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-    status_transitions:
-      reviewed: ['approved']
-      approved: ['archived']
-      any: ['archived']
-
-  council:
-    name: 'City Council'
-    description: 'Legislative body with voting and approval powers'
-    permissions:
-      - 'records:create'
-      - 'records:edit'
-      - 'records:view'
-      - 'records:archive'
-      - 'workflows:vote'
-      - 'templates:view'
-    record_types:
-      can_create:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-      can_edit:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-    status_transitions:
-      proposed: ['reviewed']
-      reviewed: ['approved']
-      approved: ['archived']
-      any: ['archived']
+      - 'draft'
+      - 'review'
+      - 'approved'
+      - 'rejected'
+      - 'archived'
 
   clerk:
-    name: 'City Clerk'
-    description: 'Administrative support with document management'
+    name: 'Clerk'
+    description: 'Can create and edit records'
     permissions:
       - 'records:create'
       - 'records:edit'
       - 'records:view'
+      - 'records:list'
+      - 'users:view'
       - 'templates:view'
-    record_types:
-      can_create:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'minutes'
-      can_edit:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'minutes'
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
     status_transitions:
-      draft: ['proposed']
-
-  editor:
-    name: 'Editor'
-    description: 'Content editor with create and edit permissions'
-    permissions:
-      - 'records:create'
-      - 'records:edit'
-      - 'records:view'
-      - 'templates:view'
-    record_types:
-      can_create:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-      can_edit:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-    status_transitions:
-      draft: ['proposed']
-
-  viewer:
-    name: 'Viewer'
-    description: 'Read-only access to all records'
-    permissions:
-      - 'records:view'
-      - 'templates:view'
-    record_types:
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-    status_transitions: {}
-
-  legal_dept:
-    name: 'Legal Department'
-    description: 'Legal review and compliance'
-    permissions:
-      - 'records:edit'
-      - 'records:view'
-      - 'workflows:review'
-      - 'templates:view'
-    record_types:
-      can_edit:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-    status_transitions:
-      proposed: ['reviewed']
-
-  citizen:
-    name: 'Citizen'
-    description: 'Public citizen with basic access'
-    permissions:
-      - 'records:view'
-    record_types:
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-    status_transitions: {}
+      - 'draft'
+      - 'review'
 
   public:
     name: 'Public'
-    description: 'Read-only access to published records'
+    description: 'Read-only access'
     permissions:
       - 'records:view'
-    record_types:
-      can_view:
-        - 'bylaw'
-        - 'policy'
-        - 'resolution'
-        - 'proclamation'
-        - 'ordinance'
-        - 'minutes'
-    status_transitions: {}
+      - 'records:list'
+    status_transitions: []
 
-permissions:
-  'system:admin':
-    description: 'Full system administration access'
-    level: 'system'
-  'system:configure':
-    description: 'Configure system settings'
-    level: 'system'
-  'records:create':
-    description: 'Create new records'
-    level: 'record'
-  'records:edit':
-    description: 'Edit existing records'
-    level: 'record'
-  'records:delete':
-    description: 'Delete records'
-    level: 'record'
-  'records:view':
-    description: 'View records'
-    level: 'record'
-  'records:archive':
-    description: 'Archive records'
-    level: 'record'
-  'workflows:manage':
-    description: 'Manage workflow transitions'
-    level: 'workflow'
-  'workflows:approve':
-    description: 'Approve workflow transitions'
-    level: 'workflow'
-  'workflows:vote':
-    description: 'Vote on workflow transitions'
-    level: 'workflow'
-  'workflows:review':
-    description: 'Review workflow transitions'
-    level: 'workflow'
-  'templates:manage':
-    description: 'Manage templates'
-    level: 'template'
-  'templates:view':
-    description: 'View templates'
-    level: 'template'
-  'hooks:manage':
-    description: 'Manage event hooks'
-    level: 'hook'
-  'users:manage':
-    description: 'Manage users and roles'
-    level: 'user'
-
-role_hierarchy:
-  admin: []
-  mayor: ['council']
-  council: ['clerk']
-  clerk: ['editor']
-  editor: ['viewer']
-  viewer: ['public']
-  legal_dept: ['public']
-  citizen: ['public']
-  public: []
-
-# Keep existing GitHub and organization mappings
-github_users: {}
-organizations: {}
+default_role: 'public'

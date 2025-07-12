@@ -9,8 +9,7 @@ import { TemplateEngine } from './utils/template-engine.js';
 import { IndexingService } from './indexing/indexing-service.js';
 import { Logger } from './utils/logger.js';
 import { initializeRoleManager } from './auth/role-utils.js';
-
-const logger = new Logger();
+import { coreOutput } from './utils/core-output.js';
 
 export interface CivicPressConfig {
   dataDir: string;
@@ -22,6 +21,13 @@ export interface CivicPressConfig {
     postgres?: {
       url: string;
     };
+  };
+  logger?: {
+    json?: boolean;
+    silent?: boolean;
+    quiet?: boolean;
+    verbose?: boolean;
+    noColor?: boolean;
   };
 }
 
@@ -51,9 +57,30 @@ export class CivicPress {
   private recordManager: RecordManager;
   private templateEngine: TemplateEngine;
   private indexingService: IndexingService;
+  private logger: Logger;
 
   constructor(config: CivicPressConfig) {
     this.config = config;
+
+    // Create logger with options from config
+    const loggerOptions = config.logger || {};
+    this.logger = new Logger(loggerOptions);
+
+    // Configure core output with the same options
+    coreOutput.setOptions(loggerOptions);
+
+    // Debug: log the config being passed (only in verbose mode)
+    if (this.logger.isVerbose()) {
+      this.logger.info('CivicPress constructor - config:', config);
+      this.logger.info(
+        'CivicPress constructor - config.dataDir:',
+        config.dataDir
+      );
+      this.logger.info(
+        'CivicPress constructor - typeof config.dataDir:',
+        typeof config.dataDir
+      );
+    }
 
     // Initialize database service
     const dbConfig = config.database || {
@@ -63,7 +90,7 @@ export class CivicPress {
       },
     };
 
-    this.databaseService = new DatabaseService(dbConfig);
+    this.databaseService = new DatabaseService(dbConfig, this.logger);
     this.authService = new AuthService(this.databaseService, config.dataDir);
 
     // Initialize role manager
@@ -92,34 +119,34 @@ export class CivicPress {
 
   async initialize(): Promise<void> {
     try {
-      logger.info('Initializing CivicPress...');
+      this.logger.info('Initializing CivicPress...');
 
       // Initialize database first
       await this.databaseService.initialize();
-      logger.info('Database initialized');
+      this.logger.info('Database initialized');
 
       // Initialize other services
       await this.workflowEngine.initialize();
       await this.gitEngine.initialize();
       await this.hookSystem.initialize();
 
-      logger.info('CivicPress initialized successfully');
+      this.logger.info('CivicPress initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize CivicPress:', error);
+      this.logger.error('Failed to initialize CivicPress:', error);
       throw error;
     }
   }
 
   async shutdown(): Promise<void> {
     try {
-      logger.info('Shutting down CivicPress...');
+      this.logger.info('Shutting down CivicPress...');
 
       // Close database connection
       await this.databaseService.close();
 
-      logger.info('CivicPress shutdown complete');
+      this.logger.info('CivicPress shutdown complete');
     } catch (error) {
-      logger.error('Error during shutdown:', error);
+      this.logger.error('Error during shutdown:', error);
       throw error;
     }
   }

@@ -165,4 +165,83 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/auth/simulated
+ * Authenticate with simulated account (for development/testing)
+ */
+router.post('/simulated', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      success: false,
+      error: {
+        message: 'Simulated accounts are disabled in production',
+        code: 'SIMULATED_AUTH_DISABLED',
+      },
+    });
+  }
+  logApiRequest(req, { operation: 'simulated_login' });
+
+  try {
+    const { username, role = 'public' } = req.body;
+
+    if (!username) {
+      const error = new Error('Username is required');
+      (error as any).statusCode = 400;
+      (error as any).code = 'MISSING_USERNAME';
+      return handleApiError(
+        'simulated_login',
+        error,
+        req,
+        res,
+        'Username is required'
+      );
+    }
+
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    // Validate role
+    const isValidRole = await authService.isValidRole(role);
+    console.log(`[API] Role validation for '${role}': ${isValidRole}`);
+    if (!isValidRole) {
+      const error = new Error(`Invalid role: ${role}`);
+      (error as any).statusCode = 400;
+      (error as any).code = 'INVALID_ROLE';
+      (error as any).details = {
+        role,
+        availableRoles: await authService.getAvailableRoles(),
+      };
+      return handleApiError('simulated_login', error, req, res);
+    }
+
+    // Authenticate with simulated account
+    const session = await authService.authenticateWithSimulatedAccount(
+      username,
+      role
+    );
+
+    sendSuccess(
+      {
+        session: {
+          token: session.token,
+          user: session.user,
+          expiresAt: session.expiresAt,
+        },
+      },
+      req,
+      res,
+      { operation: 'simulated_login' }
+    );
+  } catch (error) {
+    handleApiError(
+      'simulated_login',
+      error,
+      req,
+      res,
+      'Simulated authentication failed'
+    );
+  }
+});
+
 export default router;

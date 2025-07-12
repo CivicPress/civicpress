@@ -1,46 +1,53 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
-import { CivicPressAPI } from '../../modules/api/src/index.js';
+import {
+  createAPITestContext,
+  cleanupAPITestContext,
+  setupGlobalTestEnvironment,
+} from '../fixtures/test-setup';
+
+// Setup global test environment
+await setupGlobalTestEnvironment();
 
 describe('Health API', () => {
-  let api: CivicPressAPI;
+  let context: any;
 
   beforeEach(async () => {
-    api = new CivicPressAPI(3001);
-    await api.initialize('./test-health-data');
-    await api.start();
+    context = await createAPITestContext();
   });
 
   afterEach(async () => {
-    await api.shutdown();
+    await cleanupAPITestContext(context);
   });
 
   it('should return health status', async () => {
-    const response = await request(api.getApp()).get('/health').expect(200);
+    const response = await request(context.api.getApp())
+      .get('/health')
+      .expect(200);
 
-    expect(response.body.status).toBe('healthy');
-    expect(response.body.timestamp).toBeDefined();
-    expect(response.body.uptime).toBeDefined();
-    expect(response.body.environment).toBeDefined();
+    expect(response.body.data.status).toBe('healthy');
+    expect(response.body.data.timestamp).toBeDefined();
+    expect(response.body.data.uptime).toBeDefined();
+    expect(response.body.data.environment).toBeDefined();
   });
 
   it('should return detailed health status', async () => {
-    const response = await request(api.getApp())
+    const response = await request(context.api.getApp())
       .get('/health/detailed')
       .expect(200);
 
-    expect(response.body.status).toBe('healthy');
-    expect(response.body.timestamp).toBeDefined();
-    expect(response.body.uptime).toBeDefined();
-    expect(response.body.memory).toBeDefined();
-    expect(response.body.version).toBeDefined();
-    expect(response.body.platform).toBeDefined();
-    expect(response.body.arch).toBeDefined();
-    expect(response.body.pid).toBeDefined();
+    expect(response.body.data.status).toBe('healthy');
+    expect(response.body.data.timestamp).toBeDefined();
+    expect(response.body.data.uptime).toBeDefined();
+    expect(response.body.data.memory).toBeDefined();
+    expect(response.body.data.version).toBeDefined();
+    expect(response.body.data.platform).toBeDefined();
+    expect(response.body.data.arch).toBeDefined();
+    expect(response.body.data.pid).toBeDefined();
   });
 
   it('should test validation error logging', async () => {
-    const response = await request(api.getApp())
+    const response = await request(context.api.getApp())
       .post('/health/test-error')
       .send({ errorType: 'validation' })
       .expect(400);
@@ -50,7 +57,7 @@ describe('Health API', () => {
   });
 
   it('should test not found error logging', async () => {
-    const response = await request(api.getApp())
+    const response = await request(context.api.getApp())
       .post('/health/test-error')
       .send({ errorType: 'not_found' })
       .expect(404);
@@ -60,7 +67,7 @@ describe('Health API', () => {
   });
 
   it('should test server error logging', async () => {
-    const response = await request(api.getApp())
+    const response = await request(context.api.getApp())
       .post('/health/test-error')
       .send({ errorType: 'server_error' })
       .expect(500);
@@ -70,7 +77,7 @@ describe('Health API', () => {
   });
 
   it('should test generic error logging', async () => {
-    const response = await request(api.getApp())
+    const response = await request(context.api.getApp())
       .post('/health/test-error')
       .send({ errorType: 'generic' })
       .expect(500);

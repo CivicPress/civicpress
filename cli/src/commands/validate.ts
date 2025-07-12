@@ -63,6 +63,10 @@ export function registerValidateCommand(cli: CAC) {
         // Check if we should output JSON
         const shouldOutputJson = globalOptions.json;
 
+        if (!config.dataDir) {
+          throw new Error('dataDir is not configured');
+        }
+
         if (options.all) {
           await validateAllRecords(
             config.dataDir,

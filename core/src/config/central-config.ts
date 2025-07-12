@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import yaml from 'yaml';
-import { Logger } from '../utils/logger.js';
+import { Logger, LoggerOptions } from '../utils/logger.js';
 
 export interface CentralConfig {
-  dataDir: string;
+  dataDir?: string;
   database?: {
     type: 'sqlite' | 'postgres';
     sqlite?: {
@@ -14,6 +14,7 @@ export interface CentralConfig {
       url: string;
     };
   };
+  auth?: any; // Auth configuration from .civicrc
 }
 
 /**
@@ -25,7 +26,13 @@ export interface CentralConfig {
 export class CentralConfigManager {
   private static readonly CONFIG_FILENAME = '.civicrc';
   private static config: CentralConfig | null = null;
-  private static logger = new Logger();
+  private static loggerOptions: LoggerOptions = {};
+  private static logger: Logger = new Logger();
+
+  static setLoggerOptions(options: LoggerOptions) {
+    this.loggerOptions = options;
+    this.logger = new Logger(options);
+  }
 
   /**
    * Get the central configuration
@@ -52,55 +59,98 @@ export class CentralConfigManager {
 
     // Find .civicrc file
     const configPath = this.findConfigFile();
-    if (!configPath) {
-      // Default configuration
-      this.config = {
-        dataDir: 'data',
-        database: {
-          type: 'sqlite',
-          sqlite: {
-            file: '.system-data/civic.db',
-          },
-        },
-      };
-      return this.config;
-    }
+    const fallbackPath = configPath
+      ? path.join(path.dirname(configPath), '.civicrc.default')
+      : null;
 
-    // Read and parse config file
-    try {
-      const configContent = fs.readFileSync(configPath, 'utf8');
-      const parsedConfig = yaml.parse(configContent) as CentralConfig;
+    let mainConfig: CentralConfig = {};
+    let fallbackConfig: CentralConfig = {};
 
-      // Resolve relative paths
-      const projectRoot = path.dirname(configPath);
-      if (parsedConfig.dataDir && !path.isAbsolute(parsedConfig.dataDir)) {
-        parsedConfig.dataDir = path.resolve(projectRoot, parsedConfig.dataDir);
+    // Load main config
+    if (configPath && fs.existsSync(configPath)) {
+      try {
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        mainConfig = yaml.parse(configContent) as CentralConfig;
+
+        // Resolve relative paths
+        const projectRoot = path.dirname(configPath);
+        if (mainConfig.dataDir && !path.isAbsolute(mainConfig.dataDir)) {
+          mainConfig.dataDir = path.resolve(projectRoot, mainConfig.dataDir);
+        }
+      } catch (error) {
+        this.logger.warn(`Warning: Could not parse ${configPath}:`, error);
       }
+    }
 
-      this.config = parsedConfig;
-      return this.config;
-    } catch (error) {
-      this.logger.warn(`Warning: Could not parse ${configPath}:`, error);
+    // Load fallback config
+    if (fallbackPath && fs.existsSync(fallbackPath)) {
+      try {
+        const fallbackContent = fs.readFileSync(fallbackPath, 'utf8');
+        fallbackConfig = yaml.parse(fallbackContent) as CentralConfig;
 
-      // Fallback to default
-      this.config = {
-        dataDir: 'data',
-        database: {
-          type: 'sqlite',
-          sqlite: {
-            file: '.system-data/civic.db',
-          },
+        // Resolve relative paths for fallback config
+        const projectRoot = path.dirname(fallbackPath);
+        if (
+          fallbackConfig.dataDir &&
+          !path.isAbsolute(fallbackConfig.dataDir)
+        ) {
+          fallbackConfig.dataDir = path.resolve(
+            projectRoot,
+            fallbackConfig.dataDir
+          );
+        }
+      } catch (error) {
+        this.logger.warn(`Warning: Could not parse ${fallbackPath}:`, error);
+      }
+    }
+
+    // Merge configs (fallback fills missing fields)
+    const mergedConfig = { ...fallbackConfig, ...mainConfig };
+
+    // Check for missing required fields and warn if fallback was used
+    const requiredFields = ['dataDir', 'database'] as const;
+    const missingFields = requiredFields.filter(
+      (field) => !mergedConfig[field]
+    );
+
+    if (missingFields.length > 0) {
+      // Suppress warnings in test mode
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.warn(
+          `Warning: Missing required fields in .civicrc: ${missingFields.join(', ')}`
+        );
+        if (fallbackPath && fs.existsSync(fallbackPath)) {
+          this.logger.warn(`Using fallback values from .civicrc.default`);
+        }
+      }
+    }
+
+    // Ensure we have a valid config
+    if (!mergedConfig.dataDir) {
+      mergedConfig.dataDir = 'data';
+    }
+    if (!mergedConfig.database) {
+      mergedConfig.database = {
+        type: 'sqlite',
+        sqlite: {
+          file: path.join(mergedConfig.dataDir, 'civic.db'),
         },
       };
-      return this.config;
     }
+
+    this.config = mergedConfig;
+    return this.config;
   }
 
   /**
    * Get just the data directory
    */
   static getDataDir(): string {
-    return this.getConfig().dataDir;
+    const config = this.getConfig();
+    if (!config.dataDir) {
+      throw new Error('dataDir is not configured');
+    }
+    return config.dataDir;
   }
 
   /**

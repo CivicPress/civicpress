@@ -54,7 +54,7 @@ function categorizeError(error: any): {
   severity: 'low' | 'medium' | 'high' | 'critical';
   actionable: boolean;
 } {
-  if (error.name === 'ValidationError') {
+  if (error.name === 'ValidationError' || error.name === 'SyntaxError') {
     return { category: 'validation', severity: 'low', actionable: true };
   }
   if (error.name === 'UnauthorizedError') {
@@ -83,10 +83,16 @@ export function errorHandler(
   err: ApiError,
   req: Request,
   res: Response,
-  next: NextFunction
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _next: NextFunction
 ): void {
-  const statusCode = err.statusCode || 500;
+  let statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
+
+  // Handle JSON parsing errors
+  if (err.name === 'SyntaxError') {
+    statusCode = 400;
+  }
   const context = extractRequestContext(req);
   const categorization = categorizeError(err);
 

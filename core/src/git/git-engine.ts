@@ -8,13 +8,13 @@ import { cwd } from 'process';
  * role-based commit messages and audit trail management.
  */
 export class GitEngine {
-  private git: SimpleGit;
+  private git: SimpleGit | null = null;
   private repoPath: string;
   private currentRole: string | null = null;
 
   constructor(repoPath?: string) {
     this.repoPath = repoPath || cwd();
-    this.git = simpleGit(this.repoPath);
+    // Don't initialize simpleGit immediately - wait until initialize() is called
   }
 
   /**
@@ -22,6 +22,9 @@ export class GitEngine {
    */
   async initialize(): Promise<void> {
     try {
+      // Initialize simpleGit only when needed
+      this.git = simpleGit(this.repoPath);
+
       // Check if we're in a Git repository
       const isRepo = await this.git.checkIsRepo();
       if (!isRepo) {
@@ -30,6 +33,16 @@ export class GitEngine {
     } catch (error) {
       throw new Error(`Failed to initialize Git engine: ${error}`);
     }
+  }
+
+  /**
+   * Get the Git instance, initializing if needed
+   */
+  private getGit(): SimpleGit {
+    if (!this.git) {
+      throw new Error('Git engine not initialized. Call initialize() first.');
+    }
+    return this.git;
   }
 
   /**
@@ -51,11 +64,13 @@ export class GitEngine {
    */
   async commit(message: string, files?: string[]): Promise<string> {
     try {
+      const git = this.getGit();
+
       // Stage files if provided
       if (files && files.length > 0) {
-        await this.git.add(files);
+        await git.add(files);
       } else {
-        await this.git.add('.');
+        await git.add('.');
       }
 
       // Create role-based commit message
@@ -63,7 +78,7 @@ export class GitEngine {
       const commitMessage = `${rolePrefix}${message}`;
 
       // Create commit
-      const result = await this.git.commit(commitMessage);
+      const result = await git.commit(commitMessage);
 
       return result.commit;
     } catch (error) {
@@ -76,8 +91,9 @@ export class GitEngine {
    */
   async getHistory(limit?: number): Promise<any[]> {
     try {
+      const git = this.getGit();
       const options = limit ? ['-n', limit.toString()] : [];
-      const log = await this.git.log(options);
+      const log = await git.log(options);
       return Array.from(log.all);
     } catch (error) {
       throw new Error(`Failed to get history: ${error}`);
@@ -89,7 +105,8 @@ export class GitEngine {
    */
   async getDiff(commitHash: string): Promise<string> {
     try {
-      const diff = await this.git.diff([commitHash]);
+      const git = this.getGit();
+      const diff = await git.diff([commitHash]);
       return diff;
     } catch (error) {
       throw new Error(`Failed to get diff: ${error}`);
@@ -101,6 +118,12 @@ export class GitEngine {
    */
   async init(): Promise<void> {
     try {
+      // Initialize simpleGit if not already done
+      if (!this.git) {
+        this.git = simpleGit(this.repoPath);
+      }
+
+      // Initialize the repository
       await this.git.init();
     } catch (error) {
       throw new Error(`Failed to initialize Git repository: ${error}`);
@@ -112,7 +135,8 @@ export class GitEngine {
    */
   async status(): Promise<any> {
     try {
-      return await this.git.status();
+      const git = this.getGit();
+      return await git.status();
     } catch (error) {
       throw new Error(`Failed to get status: ${error}`);
     }

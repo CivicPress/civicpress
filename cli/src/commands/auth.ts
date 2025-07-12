@@ -29,6 +29,10 @@ export default function setupAuthCommand(cli: CAC) {
         const civic = new CivicPress({
           dataDir,
           database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
         });
         await civic.initialize();
 
@@ -155,6 +159,10 @@ export default function setupAuthCommand(cli: CAC) {
         const civic = new CivicPress({
           dataDir,
           database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
         });
         await civic.initialize();
 
@@ -267,6 +275,221 @@ export default function setupAuthCommand(cli: CAC) {
         if (!options.silent) {
           console.error(
             '❌ Token validation failed:',
+            error instanceof Error ? error.message : 'Unknown error'
+          );
+        }
+        process.exit(1);
+      }
+    });
+
+  cli
+    .command(
+      'auth:simulated',
+      'Authenticate with simulated account (for development)'
+    )
+    .option('--username <username>', 'Username for simulated account')
+    .option('--role <role>', 'Role for simulated account', {
+      default: 'public',
+    })
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (options) => {
+      // Check production environment first, before any initialization
+      if (process.env.NODE_ENV === 'production') {
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              { error: 'Simulated accounts are disabled in production' },
+              null,
+              2
+            )
+          );
+        } else {
+          console.error('Error: Simulated accounts are disabled in production');
+        }
+        process.exit(1);
+      }
+
+      try {
+        if (!options.username) {
+          if (!options.silent) {
+            console.error('Error: --username is required');
+          }
+          process.exit(1);
+        }
+
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress with database configuration
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Validate role
+        if (!(await authService.isValidRole(options.role))) {
+          const availableRoles = await authService.getAvailableRoles();
+          if (!options.silent) {
+            console.error(`Error: Invalid role '${options.role}'`);
+            console.error(`Available roles: ${availableRoles.join(', ')}`);
+          }
+          process.exit(1);
+        }
+
+        // Authenticate with simulated account
+        const session = await authService.authenticateWithSimulatedAccount(
+          options.username,
+          options.role
+        );
+
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                message: 'Successfully authenticated with simulated account',
+                session: {
+                  token: session.token,
+                  user: session.user,
+                  expiresAt: session.expiresAt,
+                },
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          console.log('✅ Successfully authenticated with simulated account!');
+          console.log(
+            `👤 User: ${session.user.username} (${session.user.role})`
+          );
+          console.log(`⏰ Session expires: ${session.expiresAt.toISOString()}`);
+          console.log(`🎫 Session token: ${session.token.substring(0, 20)}...`);
+          console.log(
+            '💡 You can now use CivicPress commands without specifying --role'
+          );
+        }
+
+        await civic.shutdown();
+      } catch (error) {
+        const errorMsg =
+          error instanceof Error
+            ? error.message
+            : 'Simulated authentication failed';
+        if (options.json) {
+          console.log(JSON.stringify({ error: errorMsg }, null, 2));
+        } else {
+          console.error(`❌ ${errorMsg}`);
+        }
+        process.exit(1);
+      }
+    });
+
+  cli
+    .command('auth:password', 'Authenticate with username and password')
+    .option('--username <username>', 'Username')
+    .option('--password <password>', 'Password')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (options) => {
+      try {
+        let username = options.username;
+        let password = options.password;
+
+        // If not provided via command line, prompt interactively
+        if (!username || !password) {
+          const inquirer = await import('inquirer');
+          const prompts = [];
+
+          if (!username) {
+            prompts.push({
+              type: 'input',
+              name: 'username',
+              message: 'Username:',
+              validate: (input: string) => {
+                if (!input.trim()) return 'Username is required';
+                return true;
+              },
+            });
+          }
+
+          if (!password) {
+            prompts.push({
+              type: 'password',
+              name: 'password',
+              message: 'Password:',
+              validate: (input: string) => {
+                if (!input.trim()) return 'Password is required';
+                return true;
+              },
+            });
+          }
+
+          const answers = await inquirer.default.prompt(prompts);
+          username = username || answers.username;
+          password = password || answers.password;
+        }
+
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress with database configuration
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Authenticate with username and password
+        const session = await authService.authenticateWithPassword(
+          username,
+          password
+        );
+
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                session: {
+                  token: session.token,
+                  user: session.user,
+                  expiresAt: session.expiresAt,
+                },
+              },
+              null,
+              2
+            )
+          );
+        } else if (!options.silent) {
+          console.log('✅ Password authentication successful!');
+          console.log(
+            `👤 User: ${session.user.username} (${session.user.name})`
+          );
+          console.log(`🔑 Role: ${session.user.role}`);
+          console.log(`⏰ Expires: ${session.expiresAt.toISOString()}`);
+          console.log(`🎫 Session token: ${session.token.substring(0, 20)}...`);
+        }
+
+        await civic.shutdown();
+      } catch (error) {
+        if (!options.silent) {
+          console.error(
+            '❌ Password authentication failed:',
             error instanceof Error ? error.message : 'Unknown error'
           );
         }

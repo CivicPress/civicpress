@@ -37,8 +37,8 @@ describe('CLI Authorization', () => {
     const rolesContent = execSync(`cat ${rolesPath}`, { encoding: 'utf8' });
     expect(rolesContent).toContain('roles:');
     expect(rolesContent).toContain('admin:');
-    expect(rolesContent).toContain('editor:');
-    expect(rolesContent).toContain('viewer:');
+    expect(rolesContent).toContain('clerk:');
+    expect(rolesContent).toContain('public:');
   });
 
   it('should show authorization error for insufficient permissions', () => {

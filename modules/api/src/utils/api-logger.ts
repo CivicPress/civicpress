@@ -215,10 +215,11 @@ export class ApiLogger {
     error: Error | any,
     req: Request,
     defaultMessage: string = 'Operation failed'
-  ): { statusCode: number; error: any } {
+  ): { statusCode: number; success: false; error: any } {
     if (error instanceof Error && 'statusCode' in error) {
       return {
         statusCode: (error as any).statusCode || 500,
+        success: false,
         error: {
           message: error.message,
           code: (error as any).code || 'API_ERROR',
@@ -228,6 +229,7 @@ export class ApiLogger {
 
     return {
       statusCode: 500,
+      success: false,
       error: {
         message: defaultMessage,
         details: error instanceof Error ? error.message : 'Unknown error',
@@ -259,6 +261,7 @@ export class ApiLogger {
     this.logValidationError(operation, errors, req);
 
     res.status(400).json({
+      success: false,
       error: {
         message: 'Invalid request data',
         details: errors,

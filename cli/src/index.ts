@@ -20,6 +20,17 @@ import { loginCommand } from './commands/login.js';
 import { indexCommand } from './commands/index.js';
 import { autoIndexCommand } from './commands/auto-index.js';
 import setupAuthCommand from './commands/auth.js';
+import setupUsersCommand from './commands/users.js';
+import { CentralConfigManager } from '@civicpress/core';
+
+// Set logger options immediately to prevent warnings during config loading
+CentralConfigManager.setLoggerOptions({
+  json: process.argv.includes('--json'),
+  silent: process.argv.includes('--silent'),
+  quiet: process.argv.includes('--quiet'),
+  verbose: process.argv.includes('--verbose'),
+  noColor: process.argv.includes('--no-color'),
+});
 
 const cli = cac('civic');
 
@@ -54,6 +65,9 @@ autoIndexCommand(cli);
 
 // Setup auth commands
 setupAuthCommand(cli);
+
+// Setup users commands
+setupUsersCommand(cli);
 
 // Parse and run
 cli.parse();

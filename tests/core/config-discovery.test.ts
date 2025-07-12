@@ -113,8 +113,9 @@ describe('Config Discovery with Database Configuration', () => {
         expect(config).toBeDefined();
         // dataDir should be resolved to absolute path
         expect(config.dataDir).toContain('data');
-        // Should not have database configuration when not present in .civicrc
-        expect(config.database).toBeUndefined();
+        // Should provide default database configuration when not present in .civicrc
+        expect(config.database).toBeDefined();
+        expect(config.database?.type).toBe('sqlite');
       } finally {
         process.chdir(originalCwd);
       }

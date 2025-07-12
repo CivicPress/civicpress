@@ -97,13 +97,21 @@ healthRouter.post('/test-error', (req: Request, res: Response) => {
         throw notFoundError;
       }
 
-      case 'server_error':
-        throw new Error('Server error test');
+      case 'server_error': {
+        const serverError = new Error('Server error test');
+        (serverError as any).statusCode = 500;
+        (serverError as any).code = 'TEST_ERROR';
+        throw serverError;
+      }
 
-      default:
-        throw new Error('Generic error test');
+      default: {
+        const genericError = new Error('Generic error test');
+        (genericError as any).statusCode = 500;
+        (genericError as any).code = 'TEST_ERROR';
+        throw genericError;
+      }
     }
   } catch (error) {
-    handleApiError('Error Test', error, req, res, 'Error test failed');
+    handleApiError('Error Test', error, req, res);
   }
 });
