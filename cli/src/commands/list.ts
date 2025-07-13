@@ -26,6 +26,8 @@ export const listCommand = (cli: CAC) => {
       'Filter by status (draft, proposed, approved, active, archived, rejected)'
     )
     .option('-a, --all', 'Show all details')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
     .action(async (type: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();

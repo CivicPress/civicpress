@@ -60,6 +60,8 @@ export function registerSearchCommand(cli: CAC) {
     .option('-r, --regex', 'Treat search terms as regular expressions')
     .option('-l, --limit <number>', 'Limit number of results', { default: 50 })
     .option('-f, --format <format>', 'Output format', { default: 'table' })
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
     .action(async (query: string, options: SearchOptions) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();

@@ -23,6 +23,8 @@ export const createCommand = (cli: CAC) => {
       'Template to use for creation (defaults to type/default)'
     )
     .option('-r, --role <role>', 'Role for the action (clerk, council, etc.)')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
     .action(async (type: string, title: string, options: any) => {
       // Initialize logger with global options
       const globalOptions = getGlobalOptionsFromArgs();
