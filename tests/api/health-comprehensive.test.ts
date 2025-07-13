@@ -13,7 +13,7 @@ import request from 'supertest';
 // Setup global test environment
 await setupGlobalTestEnvironment();
 
-describe('Health API (Refactored)', () => {
+describe('Health API (Comprehensive)', () => {
   let context: any;
 
   beforeEach(async () => {

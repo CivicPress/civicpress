@@ -15,7 +15,7 @@ import request from 'supertest';
 // Setup global test environment (mocks, etc.)
 setupGlobalTestEnvironment();
 
-describe('API Records Integration (Migrated Example)', () => {
+describe('API Integration Example', () => {
   let context: any;
 
   beforeEach(async () => {

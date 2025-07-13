@@ -14,7 +14,7 @@ import request from 'supertest';
 
 setupGlobalTestEnvironment();
 
-describe('API Tests with Dynamic Port', () => {
+describe('Concurrent Testing Example', () => {
   let context: any;
 
   beforeEach(async () => {
