@@ -1,0 +1,142 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="About CivicPress - Open Source Civic Software">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-center mb-12">
+      <h1 class="text-4xl font-bold text-gray-900 mb-4">About CivicPress</h1>
+      <p class="text-xl text-gray-600">
+        Open source software for transparent, accessible civic governance.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Mission -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Our Mission</h2>
+        <p class="text-gray-600 mb-4">
+          CivicPress aims to make local government more transparent and accessible by providing 
+          open-source tools for managing and publishing civic records, bylaws, policies, and 
+          other important documents.
+        </p>
+        <p class="text-gray-600">
+          We believe that civic information should be freely available, easily searchable, 
+          and accessible to all citizens.
+        </p>
+      </div>
+
+      <!-- Features -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Key Features</h2>
+        <ul class="space-y-3 text-gray-600">
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-civic-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span>Markdown-based document management</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-civic-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span>Git version control for all changes</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-civic-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span>Full-text search capabilities</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-civic-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span>REST API for integration</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-civic-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span>PWA for mobile access</span>
+          </li>
+          <li class="flex items-start">
+            <svg class="h-5 w-5 text-civic-500 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span>Role-based access control</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Technology -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Technology Stack</h2>
+        <div class="space-y-3 text-gray-600">
+          <div class="flex items-center justify-between">
+            <span>Backend</span>
+            <span class="text-sm bg-gray-100 px-2 py-1 rounded">Node.js + TypeScript</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span>API</span>
+            <span class="text-sm bg-gray-100 px-2 py-1 rounded">Express.js</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span>Frontend</span>
+            <span class="text-sm bg-gray-100 px-2 py-1 rounded">Astro + Tailwind CSS</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span>Database</span>
+            <span class="text-sm bg-gray-100 px-2 py-1 rounded">SQLite</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span>Version Control</span>
+            <span class="text-sm bg-gray-100 px-2 py-1 rounded">Git</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Open Source -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-4">Open Source</h2>
+        <p class="text-gray-600 mb-4">
+          CivicPress is completely open source and available under the MIT license. 
+          We welcome contributions from developers, civic technologists, and anyone 
+          interested in improving civic software.
+        </p>
+        <div class="space-y-2">
+          <a href="https://github.com/civicpress/civicpress" class="inline-flex items-center text-civic-600 hover:text-civic-700 font-medium">
+            <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
+            </svg>
+            View on GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div class="mt-12 bg-civic-50 rounded-lg p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-4 text-center">Get Involved</h2>
+      <p class="text-gray-600 text-center mb-6">
+        CivicPress is built by and for the civic technology community. 
+        Whether you're a developer, government official, or concerned citizen, 
+        there are many ways to contribute.
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-2">Report Issues</h3>
+          <p class="text-sm text-gray-600">Help us improve by reporting bugs or suggesting features</p>
+        </div>
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-2">Contribute Code</h3>
+          <p class="text-sm text-gray-600">Submit pull requests to add new features or fix bugs</p>
+        </div>
+        <div>
+          <h3 class="font-semibold text-gray-900 mb-2">Spread the Word</h3>
+          <p class="text-sm text-gray-600">Help other municipalities discover CivicPress</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout> 

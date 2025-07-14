@@ -1,0 +1,69 @@
+---
+export interface Props {
+	title: string;
+	description?: string;
+}
+
+const { title, description = "CivicPress - Browse civic records and documents" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content={description} />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		
+		<!-- PWA Meta Tags -->
+		<meta name="theme-color" content="#0ea5e9" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="apple-mobile-web-app-title" content="CivicPress" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		
+		<!-- Manifest -->
+		<link rel="manifest" href="/manifest.json" />
+		
+		<!-- Preconnect to API -->
+		<link rel="preconnect" href="http://localhost:3000" />
+	</head>
+	<body class="bg-gray-50 min-h-screen">
+		<header class="bg-white shadow-sm border-b border-gray-200">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="flex justify-between items-center py-4">
+					<div class="flex items-center">
+						<div class="flex-shrink-0">
+							<h1 class="text-2xl font-bold text-civic-600">CivicPress</h1>
+						</div>
+					</div>
+					<nav class="hidden md:flex space-x-8">
+						<a href="/" class="text-gray-500 hover:text-civic-600 px-3 py-2 rounded-md text-sm font-medium">Records</a>
+						<a href="/search" class="text-gray-500 hover:text-civic-600 px-3 py-2 rounded-md text-sm font-medium">Search</a>
+						<a href="/about" class="text-gray-500 hover:text-civic-600 px-3 py-2 rounded-md text-sm font-medium">About</a>
+					</nav>
+				</div>
+			</div>
+		</header>
+		
+		<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<slot />
+		</main>
+		
+		<footer class="bg-white border-t border-gray-200 mt-auto">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div class="text-center text-gray-500 text-sm">
+					<p>&copy; 2025 CivicPress. Open source civic software.</p>
+				</div>
+			</div>
+		</footer>
+	</body>
+</html>
+
+<style is:global>
+	html {
+		font-family: system-ui, sans-serif;
+	}
+</style>

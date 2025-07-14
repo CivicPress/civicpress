@@ -1,27 +1,19 @@
 {
-  "version": "1.0.0",
-  "name": "Civic Records",
-  "city": "Richmond",
-  "state": "Virginia",
-  "country": "USA",
-  "timezone": "America/New_York",
-  "repo_url": null,
-  "modules": [
-    "legal-register"
-  ],
-  "record_types": [
-    "bylaw",
-    "policy"
-  ],
-  "default_role": "clerk",
-  "hooks": {
-    "enabled": true
-  },
-  "workflows": {
-    "enabled": true
-  },
-  "audit": {
-    "enabled": true
-  },
-  "created": "2025-07-12T01:36:56.228Z"
+  'version': '1.0.0',
+  'name': 'Civic Records',
+  'city': 'Richmond',
+  'state': 'Virginia',
+  'country': 'USA',
+  'timezone': 'America/New_York',
+  'repo_url': null,
+  'dataDir': 'data',
+  'database':
+    { 'type': 'sqlite', 'sqlite': { 'file': 'data/.civic/civic.db' } },
+  'modules': ['legal-register'],
+  'record_types': ['bylaw', 'policy'],
+  'default_role': 'clerk',
+  'hooks': { 'enabled': true },
+  'workflows': { 'enabled': true },
+  'audit': { 'enabled': true },
+  'created': '2025-07-12T01:36:56.228Z',
 }
