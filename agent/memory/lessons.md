@@ -140,6 +140,35 @@
 - **Debugging Tools:** Use proper debugging tools and techniques
 - **Version Control:** Commit frequently with clear messages
 
+## Configuration Management Lessons
+
+### Configuration Architecture
+
+- **Separation of Concerns:** Keep system config (`.civicrc`) separate from
+  organization config (`org-config.yml`)
+- **Default Centralization:** Centralize all defaults in `core/src/defaults/`
+  for consistency
+- **Template Standardization:** Create standardized templates for all record
+  types
+- **Configuration Evolution:** Design configs to evolve independently
+
+### Initialization Workflow
+
+- **Automatic Indexing:** Always index and sync records after initialization for
+  immediate availability
+- **Git Integration:** Initialize Git repository and create initial commit
+  during setup
+- **Interactive Flexibility:** Support both interactive and non-interactive
+  modes
+- **Error Handling:** Gracefully handle indexing and sync failures
+
+### CLI Command Design
+
+- **Info Commands:** Provide easy access to configuration details
+- **Debug Commands:** Include development and troubleshooting tools
+- **Cleanup Commands:** Support testing and development scenarios
+- **Consistent Output:** Maintain JSON and human-readable output formats
+
 ## Future Considerations
 
 ### Scalability

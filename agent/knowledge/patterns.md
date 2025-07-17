@@ -126,7 +126,58 @@
 - **Benefits**: Ensures civic accessibility
 - **Examples**: Public-facing civic dashboard
 
-### **6. Role-Based Authorization**
+### **6. Configuration Management**
+
+#### **Pattern**: Configuration separation
+
+- **When to Use**: For all configuration management
+- **How to Apply**:
+  1. Separate system config (`.civicrc`) from organization config
+     (`org-config.yml`)
+  2. Keep system settings in `.civicrc` (database, modules, workflows)
+  3. Keep organization details in `org-config.yml` (name, city, branding)
+  4. Centralize defaults in `core/src/defaults/`
+- **Benefits**: Cleaner configuration management and better separation of
+  concerns
+- **Examples**: Organization config separation in CivicPress
+
+#### **Pattern**: Default configuration centralization
+
+- **When to Use**: For all default configurations and templates
+- **How to Apply**:
+  1. Store all defaults in `core/src/defaults/`
+  2. Use consistent file structure for templates and configs
+  3. Copy defaults during initialization
+  4. Allow customization after initialization
+- **Benefits**: Single source of truth and consistent defaults
+- **Examples**: Default templates and configurations in CivicPress
+
+### **7. Initialization Workflow**
+
+#### **Pattern**: Complete initialization
+
+- **When to Use**: For project setup and initialization
+- **How to Apply**:
+  1. Create all necessary directories and files
+  2. Copy default configurations and templates
+  3. Initialize Git repository
+  4. Index and sync all records to database
+  5. Create initial commit with all files
+- **Benefits**: Users get a complete, ready-to-use repository
+- **Examples**: `civic init` command with automatic indexing
+
+#### **Pattern**: Interactive and non-interactive modes
+
+- **When to Use**: For CLI commands that need flexibility
+- **How to Apply**:
+  1. Support interactive prompts for manual setup
+  2. Support `--yes` flag for automated setup
+  3. Support `--config` flag for configuration files
+  4. Support `--data-dir` flag for custom data directories
+- **Benefits**: Works for both manual setup and automated deployment
+- **Examples**: `civic init` with multiple initialization modes
+
+### **8. Role-Based Authorization**
 
 #### **Pattern**: Granular permission checking
 

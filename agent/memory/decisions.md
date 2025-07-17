@@ -197,6 +197,91 @@ responses
 **Implementation:** Created detailed API documentation  
 **Result:** Easy API integration and usage
 
+## Configuration Architecture Decisions
+
+### Organization Config Separation ✅
+
+**Decision:** Separate organization/branding config from system config  
+**Rationale:** Allows organization details to evolve independently from system
+settings  
+**Implementation:** Created `data/.civic/org-config.yml` for organization
+details, kept `.civicrc` for system settings  
+**Result:** Cleaner configuration management and better separation of concerns
+
+### Default Configuration Centralization ✅
+
+**Decision:** Centralize all default configurations in `core/src/defaults/`  
+**Rationale:** Single source of truth for all default templates and
+configurations  
+**Implementation:** Moved all defaults to centralized location with proper
+structure  
+**Result:** Easier maintenance and consistent defaults across all installations
+
+### Template Standardization ✅
+
+**Decision:** Create standardized templates for all supported record types  
+**Rationale:** Ensures consistent record creation and better user experience  
+**Implementation:** Created default templates for bylaw, ordinance, policy,
+proclamation, and resolution  
+**Result:** Users can create records of any type with proper structure
+
+## Initialization Workflow Decisions
+
+### Automatic Indexing and Database Sync ✅
+
+**Decision:** Automatically index and sync records after `civic init`  
+**Rationale:** Ensures imported records are immediately available for listing
+and searching  
+**Implementation:** Added automatic indexing and database sync to init
+workflow  
+**Result:** Demo records are immediately available after initialization
+
+### Git Repository Initialization ✅
+
+**Decision:** Initialize Git repository and create initial commit during
+`civic init`  
+**Rationale:** Provides version control from the start with all configuration
+files committed  
+**Implementation:** Added Git initialization and automatic initial commit to
+init workflow  
+**Result:** Users get a complete, version-controlled repository ready for use
+
+### Interactive vs Non-Interactive Init ✅
+
+**Decision:** Support both interactive and non-interactive initialization
+modes  
+**Rationale:** Provides flexibility for different use cases (manual setup vs
+automation)  
+**Implementation:** Added `--yes`, `--config`, and `--data-dir` options to init
+command  
+**Result:** Init command works for both manual setup and automated deployment
+
+## CLI Enhancement Decisions
+
+### Info Command Implementation ✅
+
+**Decision:** Add `civic info` command to display organization and system
+configuration  
+**Rationale:** Provides easy access to configuration details for users and
+administrators  
+**Implementation:** Created info command with organization details (public) and
+system details (admin only)  
+**Result:** Users can easily view configuration information
+
+### Debug Commands for Development ✅
+
+**Decision:** Add debug commands for development and troubleshooting  
+**Rationale:** Helps developers and administrators troubleshoot issues  
+**Implementation:** Created debug commands for permissions and configuration  
+**Result:** Better development experience and easier troubleshooting
+
+### Cleanup Command for Testing ✅
+
+**Decision:** Add cleanup command for removing test data and resetting state  
+**Rationale:** Useful for testing and development scenarios  
+**Implementation:** Created cleanup command with interactive confirmation  
+**Result:** Easy cleanup of test data and repository reset
+
 ## Performance Decisions
 
 ### Database Optimization ✅
