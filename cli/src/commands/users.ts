@@ -5,6 +5,7 @@ import { AuthUtils } from '../utils/auth-utils.js';
 export default function setupUsersCommand(cli: CAC) {
   cli
     .command('users:create', 'Create a new user account')
+    .option('--token <token>', 'Session token for authentication')
     .option('--username <username>', 'Username')
     .option('--email <email>', 'Email address')
     .option('--name <name>', 'Full name')
@@ -95,6 +96,35 @@ export default function setupUsersCommand(cli: CAC) {
           },
         });
         await civic.initialize();
+
+        // Require authentication for user creation
+        const { user } = await AuthUtils.requireAuthWithCivic(
+          options.token,
+          options.json
+        );
+
+        // Check permission to create users
+        if (
+          user.role !== 'admin' &&
+          !(await civic.getAuthService().userCan(user, 'users:manage'))
+        ) {
+          if (options.json) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Insufficient permissions',
+                  details: 'You do not have permission to create users',
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            console.error('❌ Insufficient permissions to create users');
+          }
+          process.exit(1);
+        }
 
         const authService = civic.getAuthService();
 

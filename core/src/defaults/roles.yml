@@ -40,4 +40,12 @@ roles:
       - 'records:list'
     status_transitions: []
 
+role_hierarchy:
+  admin:
+    - clerk
+    - public
+  clerk:
+    - public
+  public: []
+
 default_role: 'public'

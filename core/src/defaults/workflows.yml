@@ -1,0 +1,79 @@
+statuses:
+  - draft
+  - proposed
+  - reviewed
+  - approved
+  - archived
+
+transitions:
+  draft:
+    - proposed
+    - archived
+  proposed:
+    - reviewed
+    - archived
+  reviewed:
+    - approved
+    - archived
+  approved:
+    - archived
+  archived: []
+
+roles:
+  admin:
+    can_create:
+      - bylaw
+      - policy
+      - resolution
+      - proclamation
+      - ordinance
+    can_edit:
+      - bylaw
+      - policy
+      - resolution
+      - proclamation
+      - ordinance
+    can_delete:
+      - bylaw
+      - policy
+      - resolution
+      - proclamation
+      - ordinance
+    can_view:
+      - bylaw
+      - policy
+      - resolution
+      - proclamation
+      - ordinance
+    can_transition:
+      draft: [proposed, archived]
+      proposed: [reviewed, archived]
+      reviewed: [approved, archived]
+      approved: [archived]
+      any: [archived]
+
+  clerk:
+    can_create:
+      - bylaw
+      - policy
+      - resolution
+    can_edit:
+      - bylaw
+      - policy
+      - resolution
+    can_view:
+      - bylaw
+      - policy
+      - resolution
+      - proclamation
+      - ordinance
+    can_transition:
+      draft: [proposed]
+
+  public:
+    can_view:
+      - bylaw
+      - policy
+      - resolution
+      - proclamation
+      - ordinance

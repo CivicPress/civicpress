@@ -1,0 +1,44 @@
+# Organization Configuration
+# This file contains branding and organization information
+# It is versioned with your repository and can evolve over time
+
+# Basic Organization Information
+name: Civic Records
+city: Richmond
+state: Quebec
+country: Canada
+timezone: America/Montreal
+
+# Contact and Online Presence
+website: null
+repo_url: null
+email: null
+phone: null
+
+# Branding Assets (relative paths from data/.civic/)
+logo: null
+favicon: null
+banner: null
+
+# Additional Branding Information
+description: null
+tagline: null
+mission: null
+
+# Social Media (optional)
+social:
+  twitter: null
+  facebook: null
+  linkedin: null
+  instagram: null
+
+# Custom Branding Fields (can be extended)
+custom:
+  primary_color: null
+  secondary_color: null
+  font_family: null
+
+# Metadata
+version: 1.0.0
+created: null
+updated: null

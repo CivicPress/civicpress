@@ -16,6 +16,11 @@ export const loginCommand = (cli: CAC) => {
   cli
     .command('login', 'Authenticate with CivicPress')
     .option('--token <token>', 'GitHub OAuth token for authentication')
+    .option('--username <username>', 'Username for password authentication')
+    .option('--password <password>', 'Password for authentication')
+    .option('--method <method>', 'Authentication method (github, password)', {
+      default: 'password',
+    })
     .option('--logout', 'Log out and clear current session')
     .option('--status', 'Show current authentication status')
     .action(async (options: any) => {
@@ -102,29 +107,69 @@ async function handleLogin(
   shouldOutputJson: boolean,
   logger: any
 ): Promise<void> {
-  let token: string;
-
-  if (options.token) {
-    token = options.token;
-  } else {
-    // Interactive prompt for token
-    const { githubToken } = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'githubToken',
-        message: 'Enter your GitHub OAuth token:',
-        validate: (input: string) => {
-          if (!input.trim()) return 'GitHub token is required';
-          return true;
-        },
-      },
-    ]);
-    token = githubToken;
-  }
+  const authService = civic.getAuthService();
+  let session: any;
 
   try {
-    const authService = civic.getAuthService();
-    const session = await authService.authenticateWithGitHub(token);
+    if (options.method === 'github') {
+      // GitHub OAuth authentication
+      let token: string;
+
+      if (options.token) {
+        token = options.token;
+      } else {
+        // Interactive prompt for token
+        const { githubToken } = await inquirer.prompt([
+          {
+            type: 'password',
+            name: 'githubToken',
+            message: 'Enter your GitHub OAuth token:',
+            validate: (input: string) => {
+              if (!input.trim()) return 'GitHub token is required';
+              return true;
+            },
+          },
+        ]);
+        token = githubToken;
+      }
+
+      session = await authService.authenticateWithGitHub(token);
+    } else {
+      // Username/password authentication
+      let username: string;
+      let password: string;
+
+      if (options.username && options.password) {
+        username = options.username;
+        password = options.password;
+      } else {
+        // Interactive prompts for username/password
+        const credentials = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'username',
+            message: 'Username:',
+            validate: (input: string) => {
+              if (!input.trim()) return 'Username is required';
+              return true;
+            },
+          },
+          {
+            type: 'password',
+            name: 'password',
+            message: 'Password:',
+            validate: (input: string) => {
+              if (!input.trim()) return 'Password is required';
+              return true;
+            },
+          },
+        ]);
+        username = credentials.username;
+        password = credentials.password;
+      }
+
+      session = await authService.authenticateWithPassword(username, password);
+    }
 
     if (shouldOutputJson) {
       console.log(
@@ -133,6 +178,7 @@ async function handleLogin(
             success: true,
             message: 'Successfully authenticated',
             session: {
+              token: session.token,
               user: session.user,
               expiresAt: session.expiresAt,
             },
@@ -144,9 +190,11 @@ async function handleLogin(
     } else {
       logger.success('✅ Successfully authenticated!');
       logger.info(`👤 User: ${session.user.username} (${session.user.role})`);
+      logger.info(`📧 Email: ${session.user.email || 'Not provided'}`);
       logger.info(`⏰ Session expires: ${session.expiresAt.toISOString()}`);
+      logger.info(`🎫 Session token: ${session.token.substring(0, 20)}...`);
       logger.info(
-        '💡 You can now use CivicPress commands without specifying --role'
+        '💡 You can now use CivicPress commands with --token <token>'
       );
     }
   } catch (error) {

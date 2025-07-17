@@ -130,67 +130,9 @@ export const initCommand = (cli: CAC) => {
           dataDir = dataDirPrompt;
         }
 
-        // Check if .civicrc already exists
+        // Check if .civicrc already exists (will be handled later)
         const civicrcPath = path.join(process.cwd(), '.civicrc');
         const civicrcExists = fs.existsSync(civicrcPath);
-
-        if (civicrcExists && !options.config && !options.dataDir) {
-          const { overwrite } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'overwrite',
-              message: '.civicrc file already exists. Overwrite it?',
-              default: false,
-            },
-          ]);
-          if (!overwrite) {
-            if (!shouldOutputJson) {
-              logger.warn('Initialization cancelled by user.');
-            }
-            return;
-          }
-        }
-
-        // Ask about demo data if not already specified
-        let loadDemoDataFlag = options.demoData;
-        if (
-          !loadDemoDataFlag &&
-          !skipPrompts &&
-          !options.config &&
-          !options.dataDir
-        ) {
-          const { loadDemo } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'loadDemo',
-              message: 'Would you like to load demo data to get started?',
-              default: true,
-            },
-          ]);
-
-          if (loadDemo) {
-            const { demoCity } = await inquirer.prompt([
-              {
-                type: 'list',
-                name: 'demoCity',
-                message: 'Which demo city would you like to load?',
-                choices: [
-                  {
-                    name: 'Richmond, Quebec (Bilingual)',
-                    value: 'richmond-quebec',
-                  },
-                  {
-                    name: 'Springfield, Illinois (Comprehensive)',
-                    value: 'springfield-usa',
-                  },
-                  // Future: Add more cities here
-                ],
-                default: 'richmond-quebec',
-              },
-            ]);
-            loadDemoDataFlag = demoCity;
-          }
-        }
 
         const fullDataDir = path.resolve(dataDir);
         if (!shouldOutputJson) {
@@ -211,19 +153,75 @@ export const initCommand = (cli: CAC) => {
           fs.mkdirSync(civicDir, { recursive: true });
         }
 
-        // Copy default roles.yml if it doesn't exist
+        // Copy default configuration files if they don't exist
         const __filename = fileURLToPath(import.meta.url);
         const projectRoot = path.resolve(path.dirname(__filename), '../../../');
-        const rolesSrc = path.join(
-          projectRoot,
-          '.system-data',
-          'roles.default.yml'
-        );
+        const defaultsDir = path.join(projectRoot, 'core', 'src', 'defaults');
+
+        // Copy roles.yml
+        const rolesSrc = path.join(defaultsDir, 'roles.yml');
         const rolesDest = path.join(civicDir, 'roles.yml');
         if (!fs.existsSync(rolesDest) && fs.existsSync(rolesSrc)) {
           fs.copyFileSync(rolesSrc, rolesDest);
           if (!shouldOutputJson) {
             logger.success('👥 Default roles.yml created');
+          }
+        }
+
+        // Copy workflows.yml
+        const workflowsSrc = path.join(defaultsDir, 'workflows.yml');
+        const workflowsDest = path.join(civicDir, 'workflows.yml');
+        if (!fs.existsSync(workflowsDest) && fs.existsSync(workflowsSrc)) {
+          fs.copyFileSync(workflowsSrc, workflowsDest);
+          if (!shouldOutputJson) {
+            logger.success('⚙️  Default workflows.yml created');
+          }
+        }
+
+        // Copy hooks.yml
+        const hooksSrc = path.join(defaultsDir, 'hooks.yml');
+        const hooksDest = path.join(civicDir, 'hooks.yml');
+        if (!fs.existsSync(hooksDest) && fs.existsSync(hooksSrc)) {
+          fs.copyFileSync(hooksSrc, hooksDest);
+          if (!shouldOutputJson) {
+            logger.success('🔗 Default hooks.yml created');
+          }
+        }
+
+        // Copy org-config.yml
+        const orgConfigSrc = path.join(defaultsDir, 'org-config.yml');
+        const orgConfigDest = path.join(civicDir, 'org-config.yml');
+        if (!fs.existsSync(orgConfigDest) && fs.existsSync(orgConfigSrc)) {
+          fs.copyFileSync(orgConfigSrc, orgConfigDest);
+          if (!shouldOutputJson) {
+            logger.success('🏢 Default org-config.yml created');
+          }
+        }
+
+        // Copy default templates
+        const templatesSrc = path.join(defaultsDir, 'templates');
+        const templatesDest = path.join(civicDir, 'templates');
+        if (!fs.existsSync(templatesDest) && fs.existsSync(templatesSrc)) {
+          // Copy templates directory recursively
+          const copyRecursive = (src: string, dest: string) => {
+            if (fs.statSync(src).isDirectory()) {
+              if (!fs.existsSync(dest)) {
+                fs.mkdirSync(dest, { recursive: true });
+              }
+              const files = fs.readdirSync(src);
+              files.forEach((file) => {
+                const srcPath = path.join(src, file);
+                const destPath = path.join(dest, file);
+                copyRecursive(srcPath, destPath);
+              });
+            } else {
+              fs.copyFileSync(src, dest);
+            }
+          };
+
+          copyRecursive(templatesSrc, templatesDest);
+          if (!shouldOutputJson) {
+            logger.success('📄 Default templates created');
           }
         }
 
@@ -301,6 +299,131 @@ export const initCommand = (cli: CAC) => {
           logger.success('🔧 Initialized CivicPress core');
         }
 
+        // Create admin user if not already specified
+        if (!skipPrompts && !options.config && !options.dataDir) {
+          const { createAdmin } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'createAdmin',
+              message: 'Would you like to create an admin user now?',
+              default: true,
+            },
+          ]);
+
+          if (createAdmin) {
+            const adminDetails = await inquirer.prompt([
+              {
+                type: 'input',
+                name: 'username',
+                message: 'Admin username:',
+                default: 'admin',
+                validate: (input: string) => {
+                  if (!input.trim()) return 'Username is required';
+                  if (input.length < 3)
+                    return 'Username must be at least 3 characters';
+                  return true;
+                },
+              },
+              {
+                type: 'input',
+                name: 'email',
+                message: 'Admin email:',
+                validate: (input: string) => {
+                  if (!input.trim()) return 'Email is required';
+                  if (!input.includes('@')) return 'Please enter a valid email';
+                  return true;
+                },
+              },
+              {
+                type: 'password',
+                name: 'password',
+                message: 'Admin password:',
+                validate: (input: string) => {
+                  if (input.length < 6)
+                    return 'Password must be at least 6 characters';
+                  return true;
+                },
+              },
+              {
+                type: 'input',
+                name: 'name',
+                message: 'Admin full name:',
+                default: 'System Administrator',
+              },
+            ]);
+
+            try {
+              const authService = civic.getAuthService();
+
+              // Hash the password
+              const bcrypt = await import('bcrypt');
+              const passwordHash = await bcrypt.hash(adminDetails.password, 12);
+
+              await authService.createUserWithPassword({
+                username: adminDetails.username,
+                email: adminDetails.email,
+                passwordHash: passwordHash,
+                name: adminDetails.name,
+                role: 'admin',
+              });
+
+              if (!shouldOutputJson) {
+                logger.success(
+                  `👤 Created admin user: ${adminDetails.username}`
+                );
+                logger.info(`📧 Email: ${adminDetails.email}`);
+                logger.info(`🔑 Role: admin`);
+              }
+            } catch (error: any) {
+              logger.warn(`⚠️  Failed to create admin user: ${error.message}`);
+              logger.info(
+                '💡 You can create an admin user later with: civic users create'
+              );
+            }
+          }
+        }
+
+        // Ask about demo data if not already specified (now at the end)
+        let loadDemoDataFlag = options.demoData;
+        if (
+          !loadDemoDataFlag &&
+          !skipPrompts &&
+          !options.config &&
+          !options.dataDir
+        ) {
+          const { loadDemo } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'loadDemo',
+              message: 'Would you like to load demo data to get started?',
+              default: true,
+            },
+          ]);
+
+          if (loadDemo) {
+            const { demoCity } = await inquirer.prompt([
+              {
+                type: 'list',
+                name: 'demoCity',
+                message: 'Which demo city would you like to load?',
+                choices: [
+                  {
+                    name: 'Richmond, Quebec (Bilingual)',
+                    value: 'richmond-quebec',
+                  },
+                  {
+                    name: 'Springfield, Illinois (Comprehensive)',
+                    value: 'springfield-usa',
+                  },
+                  // Future: Add more cities here
+                ],
+                default: 'richmond-quebec',
+              },
+            ]);
+            loadDemoDataFlag = demoCity;
+          }
+        }
+
         // Load demo data if requested
         if (loadDemoDataFlag) {
           const demoCity =
@@ -308,6 +431,61 @@ export const initCommand = (cli: CAC) => {
               ? loadDemoDataFlag
               : 'richmond-quebec';
           await loadDemoData(fullDataDir, demoCity, logger);
+        }
+
+        // Always run indexing and db sync after init (whether or not demo data was loaded)
+        try {
+          if (!shouldOutputJson) logger.info('🔄 Indexing records...');
+          const civic = new CivicPress({ dataDir: fullDataDir });
+          await civic.initialize();
+          const indexingService = civic.getIndexingService();
+          await indexingService.generateIndexes();
+          if (!shouldOutputJson) logger.success('📊 Indexing complete');
+
+          if (!shouldOutputJson)
+            logger.info('🔄 Syncing indexed records to database...');
+          await indexingService.generateIndexes({ syncDatabase: true });
+          if (!shouldOutputJson) logger.success('🗄️  Database sync complete');
+        } catch (err: any) {
+          logger.warn(
+            '⚠️  Indexing or DB sync failed: ' +
+              (err && err.message ? err.message : err)
+          );
+        }
+
+        // Commit all files to Git if repository was initialized
+        if (initGit || gitExists) {
+          try {
+            const { GitEngine } = await import('@civicpress/core');
+            const git = new GitEngine(fullDataDir);
+            await git.initialize();
+
+            // Create initial commit with all files
+            const commitMessage = `Initial CivicPress setup
+
+- Created configuration files (.civicrc, org-config.yml)
+- Added default templates and workflows
+- ${loadDemoDataFlag ? `Loaded demo data (${typeof loadDemoDataFlag === 'string' ? loadDemoDataFlag : 'richmond-quebec'})` : 'No demo data loaded'}
+- Initialized CivicPress repository structure
+
+Generated by: civic init
+Date: ${new Date().toISOString()}`;
+
+            await git.commit(commitMessage);
+
+            if (!shouldOutputJson) {
+              logger.success('📝 Initial commit created');
+            }
+          } catch (commitError: any) {
+            if (!shouldOutputJson) {
+              logger.warn(
+                `⚠️  Failed to create initial commit: ${commitError.message}`
+              );
+              logger.info(
+                '💡 You can manually commit files with: git add . && git commit -m "Initial setup"'
+              );
+            }
+          }
         }
 
         if (shouldOutputJson) {
@@ -382,7 +560,7 @@ async function setupCivicrcFromFile(
   dataDir: string,
   logger: any
 ): Promise<void> {
-  logger.info('⚙️  Setting up .civicrc from file...');
+  logger.info('⚙️  Setting up configuration from file...');
 
   // Ensure required fields are present
   const requiredFields = ['name', 'city', 'state', 'country', 'timezone'];
@@ -392,15 +570,10 @@ async function setupCivicrcFromFile(
     }
   }
 
-  // Set defaults for optional fields
-  const finalCivicrc = {
+  // Create .civicrc object (system config - only system settings)
+  const civicrc = {
     version: '1.0.0',
-    name: config.name,
-    city: config.city,
-    state: config.state,
-    country: config.country,
-    timezone: config.timezone,
-    repo_url: config.repo_url || null,
+    dataDir: dataDir,
     modules: config.modules || ['legal-register'],
     record_types: config.record_types || ['bylaw', 'policy'],
     default_role: config.default_role || 'clerk',
@@ -414,16 +587,83 @@ async function setupCivicrcFromFile(
       enabled: config.audit?.enabled ?? true,
     },
     database: {
-      type: 'sqlite', // Default to SQLite
-      path: path.join(dataDir, 'civicpress.db'),
+      type: config.database?.type || 'sqlite',
+      sqlite:
+        config.database?.type === 'sqlite'
+          ? {
+              file:
+                config.database?.sqlite?.file ||
+                path.join(process.cwd(), '.system-data/civic.db'),
+            }
+          : undefined,
+      postgres:
+        config.database?.type === 'postgres'
+          ? {
+              url:
+                config.database?.postgres?.url ||
+                'postgres://user:password@localhost:5432/civicpress',
+            }
+          : undefined,
     },
     created: new Date().toISOString(),
   };
 
-  // Write .civicrc file
-  const yamlContent = yaml.stringify(finalCivicrc);
-  fs.writeFileSync(civicrcPath, yamlContent);
-  logger.success('⚙️  .civicrc saved to .civicrc');
+  // Write .civicrc file (system config)
+  const civicrcYaml = yaml.stringify(civicrc);
+  fs.writeFileSync(civicrcPath, civicrcYaml);
+  logger.success('⚙️  .civicrc saved (system configuration)');
+
+  // Create org-config.yml object (organization config - branding and org details)
+  const orgConfig = {
+    // Basic Organization Information
+    name: config.name,
+    city: config.city,
+    state: config.state,
+    country: config.country,
+    timezone: config.timezone,
+
+    // Contact and Online Presence
+    website: config.website || null,
+    repo_url: config.repo_url || null,
+    email: config.email || null,
+    phone: config.phone || null,
+
+    // Branding Assets (relative paths from data/.civic/)
+    logo: config.logo || null,
+    favicon: config.favicon || null,
+    banner: config.banner || null,
+
+    // Additional Branding Information
+    description: config.description || null,
+    tagline: config.tagline || null,
+    mission: config.mission || null,
+
+    // Social Media (optional)
+    social: {
+      twitter: config.social?.twitter || null,
+      facebook: config.social?.facebook || null,
+      linkedin: config.social?.linkedin || null,
+      instagram: config.social?.instagram || null,
+    },
+
+    // Custom Branding Fields (can be extended)
+    custom: {
+      primary_color: config.custom?.primary_color || null,
+      secondary_color: config.custom?.secondary_color || null,
+      font_family: config.custom?.font_family || null,
+    },
+
+    // Metadata
+    version: '1.0.0',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+  };
+
+  // Write org-config.yml file (organization config)
+  const orgConfigPath = path.join(dataDir, '.civic', 'org-config.yml');
+  const orgConfigYaml = yaml.stringify(orgConfig);
+  fs.writeFileSync(orgConfigPath, orgConfigYaml);
+  logger.success('🏢 org-config.yml saved (organization configuration)');
 }
 
 async function setupCivicrcNonInteractive(
@@ -431,23 +671,89 @@ async function setupCivicrcNonInteractive(
   dataDir: string,
   logger: any
 ): Promise<void> {
-  logger.info('⚙️  Setting up .civicrc (non-interactive)...');
+  logger.info('⚙️  Setting up configuration (non-interactive)...');
 
-  // Create .civicrc object with default values
+  // Create .civicrc object with default values (system config)
   const civicrc = {
+    version: '1.0.0',
     dataDir: dataDir,
+    modules: ['legal-register'],
+    record_types: ['bylaw', 'policy'],
+    default_role: 'clerk',
+    hooks: {
+      enabled: true,
+    },
+    workflows: {
+      enabled: true,
+    },
+    audit: {
+      enabled: true,
+    },
     database: {
       type: 'sqlite',
       sqlite: {
         file: path.join(process.cwd(), '.system-data/civic.db'),
       },
     },
+    created: new Date().toISOString(),
   };
 
-  // Write .civicrc file
-  const yamlContent = yaml.stringify(civicrc);
-  fs.writeFileSync(civicrcPath, yamlContent);
-  logger.success('⚙️  .civicrc saved to .civicrc');
+  // Write .civicrc file (system config)
+  const civicrcYaml = yaml.stringify(civicrc);
+  fs.writeFileSync(civicrcPath, civicrcYaml);
+  logger.success('⚙️  .civicrc saved (system configuration)');
+
+  // Create org-config.yml object with default values (organization config)
+  const orgConfig = {
+    // Basic Organization Information
+    name: 'Civic Records',
+    city: 'Richmond',
+    state: 'Quebec',
+    country: 'Canada',
+    timezone: 'America/Montreal',
+
+    // Contact and Online Presence
+    website: null,
+    repo_url: null,
+    email: null,
+    phone: null,
+
+    // Branding Assets (relative paths from data/.civic/)
+    logo: null,
+    favicon: null,
+    banner: null,
+
+    // Additional Branding Information
+    description: null,
+    tagline: null,
+    mission: null,
+
+    // Social Media (optional)
+    social: {
+      twitter: null,
+      facebook: null,
+      linkedin: null,
+      instagram: null,
+    },
+
+    // Custom Branding Fields (can be extended)
+    custom: {
+      primary_color: null,
+      secondary_color: null,
+      font_family: null,
+    },
+
+    // Metadata
+    version: '1.0.0',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+  };
+
+  // Write org-config.yml file (organization config)
+  const orgConfigPath = path.join(dataDir, '.civic', 'org-config.yml');
+  const orgConfigYaml = yaml.stringify(orgConfig);
+  fs.writeFileSync(orgConfigPath, orgConfigYaml);
+  logger.success('🏢 org-config.yml saved (organization configuration)');
 }
 
 async function loadDemoData(
@@ -636,9 +942,65 @@ async function setupCivicrc(
   dataDir: string,
   logger: any
 ): Promise<void> {
-  logger.info('⚙️  Setting up .civicrc...');
+  logger.info('⚙️  Setting up configuration...');
 
   const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'name',
+      message: 'Organization name:',
+      default: 'Civic Records',
+      validate: (input: string) => {
+        if (!input.trim()) return 'Organization name is required';
+        return true;
+      },
+    },
+    {
+      type: 'input',
+      name: 'city',
+      message: 'City:',
+      default: 'Richmond',
+      validate: (input: string) => {
+        if (!input.trim()) return 'City is required';
+        return true;
+      },
+    },
+    {
+      type: 'input',
+      name: 'state',
+      message: 'State/Province:',
+      default: 'Quebec',
+      validate: (input: string) => {
+        if (!input.trim()) return 'State/Province is required';
+        return true;
+      },
+    },
+    {
+      type: 'input',
+      name: 'country',
+      message: 'Country:',
+      default: 'Canada',
+      validate: (input: string) => {
+        if (!input.trim()) return 'Country is required';
+        return true;
+      },
+    },
+    {
+      type: 'input',
+      name: 'timezone',
+      message: 'Timezone:',
+      default: 'America/Montreal',
+      validate: (input: string) => {
+        if (!input.trim()) return 'Timezone is required';
+        return true;
+      },
+    },
+    {
+      type: 'input',
+      name: 'repo_url',
+      message: 'Repository URL (optional):',
+      default: '',
+    },
     {
       type: 'list',
       name: 'database_type',
@@ -665,9 +1027,22 @@ async function setupCivicrc(
     },
   ]);
 
-  // Create .civicrc object with simplified format
+  // Create .civicrc object (system config - only system settings)
   const civicrc = {
+    version: '1.0.0',
     dataDir: dataDir,
+    modules: ['legal-register'],
+    record_types: ['bylaw', 'policy'],
+    default_role: 'clerk',
+    hooks: {
+      enabled: true,
+    },
+    workflows: {
+      enabled: true,
+    },
+    audit: {
+      enabled: true,
+    },
     database: {
       type: answers.database_type,
       sqlite:
@@ -683,10 +1058,63 @@ async function setupCivicrc(
             }
           : undefined,
     },
+    created: new Date().toISOString(),
   };
 
-  // Write .civicrc file
-  const yamlContent = yaml.stringify(civicrc);
-  fs.writeFileSync(civicrcPath, yamlContent);
-  logger.success('⚙️  .civicrc saved to .civicrc');
+  // Write .civicrc file (system config)
+  const civicrcYaml = yaml.stringify(civicrc);
+  fs.writeFileSync(civicrcPath, civicrcYaml);
+  logger.success('⚙️  .civicrc saved (system configuration)');
+
+  // Create org-config.yml object (organization config - branding and org details)
+  const orgConfig = {
+    // Basic Organization Information
+    name: answers.name,
+    city: answers.city,
+    state: answers.state,
+    country: answers.country,
+    timezone: answers.timezone,
+
+    // Contact and Online Presence
+    website: null,
+    repo_url: answers.repo_url || null,
+    email: null,
+    phone: null,
+
+    // Branding Assets (relative paths from data/.civic/)
+    logo: null,
+    favicon: null,
+    banner: null,
+
+    // Additional Branding Information
+    description: null,
+    tagline: null,
+    mission: null,
+
+    // Social Media (optional)
+    social: {
+      twitter: null,
+      facebook: null,
+      linkedin: null,
+      instagram: null,
+    },
+
+    // Custom Branding Fields (can be extended)
+    custom: {
+      primary_color: null,
+      secondary_color: null,
+      font_family: null,
+    },
+
+    // Metadata
+    version: '1.0.0',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+  };
+
+  // Write org-config.yml file (organization config)
+  const orgConfigPath = path.join(dataDir, '.civic', 'org-config.yml');
+  const orgConfigYaml = yaml.stringify(orgConfig);
+  fs.writeFileSync(orgConfigPath, orgConfigYaml);
+  logger.success('🏢 org-config.yml saved (organization configuration)');
 }

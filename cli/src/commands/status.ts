@@ -21,6 +21,7 @@ export function statusCommand(cli: CAC) {
       '-r, --role <role>',
       'Role for the status change (clerk, council, etc.)'
     )
+    .option('--token <token>', 'Session token for authentication')
     .option('--dry-run', 'Complete dry-run (no files modified, no commits)')
     .option(
       '--dry-run-hooks <hooks>',

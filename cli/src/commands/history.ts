@@ -35,9 +35,36 @@ export const historyCommand = (cli: CAC) => {
         // Create GitEngine with the data directory
         const git = new (await import('@civicpress/core')).GitEngine(dataDir);
 
+        // Initialize GitEngine
+        try {
+          await git.initialize();
+        } catch (error: any) {
+          logger.error(
+            '❌ Failed to initialize Git repository:',
+            error.message
+          );
+          logger.info('💡 Run "civic init" to set up the repository first');
+          process.exit(1);
+        }
+
         // Get commit history
         const limit = parseInt(options.limit) || 10;
-        const history = await git.getHistory(limit);
+        let history: any[] = [];
+
+        try {
+          history = await git.getHistory(limit);
+        } catch (error: any) {
+          // Handle case where there are no commits yet
+          if (
+            error.message.includes('does not have any commits yet') ||
+            error.message.includes('No commits found') ||
+            error.message.includes('does not have any commits')
+          ) {
+            history = [];
+          } else {
+            throw error;
+          }
+        }
 
         // Check if we should output JSON
         const shouldOutputJson = globalOptions.json;
@@ -63,7 +90,10 @@ export const historyCommand = (cli: CAC) => {
         logger.info('📜 Viewing civic record history...');
 
         if (history.length === 0) {
-          logger.warn('📜 No commits found');
+          logger.warn('📜 No commits found yet');
+          logger.info(
+            '💡 Try creating a record first: civic create <type> <title>'
+          );
           return;
         }
 
@@ -85,8 +115,11 @@ export const historyCommand = (cli: CAC) => {
         }
 
         logger.success('✅ History displayed successfully!');
-      } catch (error) {
-        logger.error('❌ Failed to view history:', error);
+      } catch (error: any) {
+        logger.error('❌ Failed to view history:', error.message);
+        if (error.stack) {
+          logger.debug('Stack trace:', error.stack);
+        }
         process.exit(1);
       }
     });

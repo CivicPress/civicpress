@@ -3,8 +3,66 @@ import * as path from 'path';
 import yaml from 'yaml';
 import { Logger, LoggerOptions } from '../utils/logger.js';
 
+export interface OrgConfig {
+  // Basic Organization Information
+  name?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  timezone?: string;
+
+  // Contact and Online Presence
+  website?: string | null;
+  repo_url?: string | null;
+  email?: string | null;
+  phone?: string | null;
+
+  // Branding Assets
+  logo?: string | null;
+  favicon?: string | null;
+  banner?: string | null;
+
+  // Additional Branding Information
+  description?: string | null;
+  tagline?: string | null;
+  mission?: string | null;
+
+  // Social Media
+  social?: {
+    twitter?: string | null;
+    facebook?: string | null;
+    linkedin?: string | null;
+    instagram?: string | null;
+  };
+
+  // Custom Branding Fields
+  custom?: {
+    primary_color?: string | null;
+    secondary_color?: string | null;
+    font_family?: string | null;
+  };
+
+  // Metadata
+  version?: string;
+  created?: string;
+  updated?: string;
+}
+
 export interface CentralConfig {
   dataDir?: string;
+  // System configuration (from .civicrc)
+  modules?: string[];
+  record_types?: string[];
+  default_role?: string;
+  hooks?: {
+    enabled?: boolean;
+  };
+  workflows?: {
+    enabled?: boolean;
+  };
+  audit?: {
+    enabled?: boolean;
+  };
   database?: {
     type: 'sqlite' | 'postgres';
     sqlite?: {
@@ -15,6 +73,8 @@ export interface CentralConfig {
     };
   };
   auth?: any; // Auth configuration from .civicrc
+  version?: string;
+  created?: string;
 }
 
 /**
@@ -158,6 +218,78 @@ export class CentralConfigManager {
    */
   static getDatabaseConfig(): CentralConfig['database'] {
     return this.getConfig().database;
+  }
+
+  /**
+   * Get organization configuration
+   */
+  static getOrgConfig(): OrgConfig {
+    const dataDir = this.getDataDir();
+    const orgConfigPath = path.join(dataDir, '.civic', 'org-config.yml');
+
+    if (fs.existsSync(orgConfigPath)) {
+      try {
+        const configContent = fs.readFileSync(orgConfigPath, 'utf8');
+        return yaml.parse(configContent) as OrgConfig;
+      } catch (error) {
+        this.logger.warn(`Warning: Could not parse ${orgConfigPath}:`, error);
+      }
+    }
+
+    // Return default values if org config doesn't exist
+    return {
+      name: 'Civic Records',
+      city: 'Richmond',
+      state: 'Quebec',
+      country: 'Canada',
+      timezone: 'America/Montreal',
+      repo_url: null,
+    };
+  }
+
+  /**
+   * Get organization branding information
+   */
+  static getOrganizationInfo(): {
+    name?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    timezone?: string;
+    repo_url?: string | null;
+  } {
+    const orgConfig = this.getOrgConfig();
+    return {
+      name: orgConfig.name,
+      city: orgConfig.city,
+      state: orgConfig.state,
+      country: orgConfig.country,
+      timezone: orgConfig.timezone,
+      repo_url: orgConfig.repo_url,
+    };
+  }
+
+  /**
+   * Get organization name
+   */
+  static getOrganizationName(): string | undefined {
+    return this.getOrgConfig().name;
+  }
+
+  /**
+   * Get organization location (city, state, country)
+   */
+  static getOrganizationLocation(): {
+    city?: string;
+    state?: string;
+    country?: string;
+  } {
+    const orgConfig = this.getOrgConfig();
+    return {
+      city: orgConfig.city,
+      state: orgConfig.state,
+      country: orgConfig.country,
+    };
   }
 
   /**

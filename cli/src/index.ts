@@ -19,9 +19,12 @@ import { registerHookCommand } from './commands/hook.js';
 import { loginCommand } from './commands/login.js';
 import { indexCommand } from './commands/index.js';
 import { autoIndexCommand } from './commands/auto-index.js';
+import { cleanupCommand } from './commands/cleanup.js';
+import { debugCommand } from './commands/debug.js';
 import setupAuthCommand from './commands/auth.js';
 import setupUsersCommand from './commands/users.js';
 import { CentralConfigManager } from '@civicpress/core';
+import { infoCommand } from './commands/info.js';
 
 // Set logger options immediately to prevent warnings during config loading
 CentralConfigManager.setLoggerOptions({
@@ -38,6 +41,7 @@ const cli = cac('civic');
 cli.option('--silent', 'Suppress all output except errors');
 cli.option('--quiet', 'Suppress info messages (show only errors and warnings)');
 cli.option('--verbose', 'Show verbose output including debug messages');
+cli.option('--json', 'Output as JSON');
 cli.option('--no-color', 'Disable colored output');
 
 cli.version('1.0.0').help();
@@ -61,6 +65,9 @@ registerHookCommand(cli);
 loginCommand(cli);
 indexCommand(cli);
 autoIndexCommand(cli);
+cleanupCommand(cli);
+debugCommand(cli);
+infoCommand(cli);
 
 // Setup auth commands
 setupAuthCommand(cli);

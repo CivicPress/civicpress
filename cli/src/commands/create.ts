@@ -71,7 +71,14 @@ export const createCommand = (cli: CAC) => {
         }
 
         // Validate record type
-        const validTypes = ['bylaw', 'policy', 'proposal', 'resolution'];
+        const validTypes = [
+          'bylaw',
+          'policy',
+          'proposal',
+          'resolution',
+          'proclamation',
+          'ordinance',
+        ];
         if (!validTypes.includes(type)) {
           if (shouldOutputJson) {
             console.log(

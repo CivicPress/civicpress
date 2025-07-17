@@ -291,8 +291,9 @@ export class RoleManager {
       roleConfig.permissions.forEach((p) => permissions.add(p));
     }
 
-    // Get inherited permissions from role hierarchy
-    const inheritedRoles = config.role_hierarchy[role] || [];
+    // Get inherited permissions from role hierarchy (handle missing role_hierarchy)
+    const roleHierarchy = config.role_hierarchy || {};
+    const inheritedRoles = roleHierarchy[role] || [];
     for (const inheritedRole of inheritedRoles) {
       const inheritedPermissions = this.getRolePermissions(
         inheritedRole,

@@ -1,19 +1,19 @@
-{
-  'version': '1.0.0',
-  'name': 'Civic Records',
-  'city': 'Richmond',
-  'state': 'Virginia',
-  'country': 'USA',
-  'timezone': 'America/New_York',
-  'repo_url': null,
-  'dataDir': 'data',
-  'database':
-    { 'type': 'sqlite', 'sqlite': { 'file': '.system-data/civic.db' } },
-  'modules': ['legal-register'],
-  'record_types': ['bylaw', 'policy'],
-  'default_role': 'clerk',
-  'hooks': { 'enabled': true },
-  'workflows': { 'enabled': true },
-  'audit': { 'enabled': true },
-  'created': '2025-07-12T01:36:56.228Z',
-}
+version: 1.0.0
+dataDir: data
+modules:
+  - legal-register
+record_types:
+  - bylaw
+  - policy
+default_role: clerk
+hooks:
+  enabled: true
+workflows:
+  enabled: true
+audit:
+  enabled: true
+database:
+  type: sqlite
+  sqlite:
+    file: /Users/stakabo/Work/repos/civicpress/civicpress/.system-data/civic.db
+created: 2025-07-17T21:20:16.085Z

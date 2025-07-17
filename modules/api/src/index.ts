@@ -25,6 +25,7 @@ import docsRouter from './routes/docs';
 import { createValidationRouter } from './routes/validation';
 import { createDiffRouter } from './routes/diff';
 import usersRouter from './routes/users';
+import infoRouter from './routes/info';
 
 // Import middleware
 import { errorHandler, requestIdMiddleware } from './middleware/error-handler';
@@ -192,6 +193,9 @@ export class CivicPressAPI {
 
     // Documentation (no auth required)
     this.app.use('/docs', docsRouter);
+
+    // Info endpoint (no auth required)
+    this.app.use('/info', infoRouter);
 
     // Public records endpoint (no auth required)
     this.app.use(
