@@ -268,6 +268,68 @@ validation
 **Implementation:** Created health check API endpoints  
 **Result:** Easy monitoring and system reliability
 
+## Project Decisions
+
+### Frontend Technology Stack
+
+### Migration from Astro to Nuxt PWA (2024-12-19)
+
+**Decision:** Replace Astro frontend with Nuxt PWA for unified Vue-based
+architecture.
+
+**Rationale:**
+
+- Single codebase for both public browsing and admin functionality
+- Vue/Nuxt ecosystem alignment (no React dependencies)
+- Built-in PWA support for offline capabilities
+- Better mobile experience and app-like feel
+- Easier maintenance with one tech stack
+- Static site generation still possible with Nuxt
+
+**Implementation:**
+
+- Migrate static pages (homepage, record browsing) to Nuxt
+- Add admin interface (dashboard, CRUD operations)
+- Integrate with existing CivicPress API
+- Deploy as PWA with offline support
+- Maintain static site generation capabilities
+
+**Benefits:**
+
+- Unified Vue-based architecture
+- PWA features (offline, installable)
+- Better mobile experience
+- Single deployment target
+- Easier feature development
+
+**Timeline:** 4-6 hours for full migration
+
+## Previous Decisions
+
+### Static Site Generation
+
+- Use Astro for static site generation
+- No server-side rendering required
+- Deploy to static hosting (Netlify, GitHub Pages, etc.)
+
+### API Integration
+
+- REST API for data access
+- Authentication required for admin functions
+- Public endpoints for record browsing
+
+### Content Management
+
+- Markdown files for record content
+- Frontmatter for metadata
+- Git-based version control
+
+### Authentication
+
+- JWT-based authentication
+- Role-based access control
+- Simulated authentication for development
+
 ---
 
 **Last Updated:** January 12, 2025  

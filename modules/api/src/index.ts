@@ -7,7 +7,10 @@ const logger = new Logger();
 // Import routes
 import authRouter from './routes/auth';
 import { healthRouter } from './routes/health';
-import { createRecordsRouter } from './routes/records';
+import {
+  createRecordsRouter,
+  createPublicRecordsRouter,
+} from './routes/records';
 import { RecordsService } from './services/records-service';
 import { searchRouter } from './routes/search';
 import { exportRouter } from './routes/export';
@@ -95,6 +98,13 @@ export class CivicPressAPI {
     try {
       logger.info('Initializing CivicPress API...');
 
+      // Change to project root directory to ensure database paths are resolved correctly
+      const projectRoot = this.findProjectRoot();
+      if (projectRoot && process.cwd() !== projectRoot) {
+        logger.info(`Changing to project root: ${projectRoot}`);
+        process.chdir(projectRoot);
+      }
+
       // Load database config from central config
       logger.info('Loading database config...');
       const dbConfig = CentralConfigManager.getDatabaseConfig();
@@ -110,6 +120,23 @@ export class CivicPressAPI {
       logger.info('Initializing CivicPress core...');
       await this.civicPress.initialize();
       logger.info('CivicPress core initialized');
+
+      // Auto-index records on startup
+      logger.info('Auto-indexing records on startup...');
+      try {
+        const indexingService = this.civicPress.getIndexingService();
+        if (indexingService) {
+          await indexingService.generateIndexes({
+            syncDatabase: true,
+            conflictResolution: 'file-wins',
+          });
+          logger.info('Auto-indexing completed successfully');
+        } else {
+          logger.warn('IndexingService not available for auto-indexing');
+        }
+      } catch (error) {
+        logger.warn('Auto-indexing failed, continuing without sync:', error);
+      }
 
       // Setup routes after CivicPress is initialized
       logger.info('Setting up routes...');
@@ -133,6 +160,25 @@ export class CivicPressAPI {
     }
   }
 
+  private findProjectRoot(): string | null {
+    let currentPath = process.cwd();
+    const rootPath = require('path').parse(currentPath).root;
+
+    while (currentPath !== rootPath) {
+      const civicrcPath = require('path').join(currentPath, '.civicrc');
+      if (require('fs').existsSync(civicrcPath)) {
+        return currentPath;
+      }
+      const parentPath = require('path').dirname(currentPath);
+      if (parentPath === currentPath) {
+        break;
+      }
+      currentPath = parentPath;
+    }
+
+    return null;
+  }
+
   private setupRoutes(): void {
     if (!this.civicPress) {
       throw new Error('CivicPress not initialized');
@@ -146,6 +192,16 @@ export class CivicPressAPI {
 
     // Documentation (no auth required)
     this.app.use('/docs', docsRouter);
+
+    // Public records endpoint (no auth required)
+    this.app.use(
+      '/public/records',
+      (req, res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      createPublicRecordsRouter(recordsService)
+    );
 
     // Auth routes (no auth required) - these need CivicPress instance
     this.app.use(
@@ -212,10 +268,9 @@ export class CivicPressAPI {
 
 // Start server if this file is run directly
 if (require.main === module) {
-  // Determine data directory - if running from root, use ./data, otherwise use relative path
-  const isRunningFromRoot = process.cwd().endsWith('civicpress');
-  const dataDir =
-    process.env.CIVIC_DATA_DIR || (isRunningFromRoot ? './data' : '../../data');
+  // Use CentralConfigManager to get both data directory and database config
+  const { CentralConfigManager } = require('@civicpress/core');
+  const dataDir = CentralConfigManager.getDataDir();
   const port = parseInt(process.env.PORT || '3000');
 
   const api = new CivicPressAPI(port);

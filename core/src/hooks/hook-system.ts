@@ -40,8 +40,8 @@ export interface HookSettings {
 }
 
 export type HookHandler = (
-  data: any,
-  context: HookContext
+  _data: any,
+  _context: HookContext
 ) => Promise<void> | void;
 
 /**
@@ -215,6 +215,7 @@ export class HookSystem {
     this.registerHook('record:committed', this.onRecordCommitted.bind(this));
     this.registerHook('status:changed', this.onStatusChanged.bind(this));
     this.registerHook('validation:failed', this.onValidationFailed.bind(this));
+    this.registerHook('demo:data:loaded', this.onDemoDataLoaded.bind(this));
 
     coreDebug('Registered default hooks', {
       operation: 'hook registration',
@@ -450,41 +451,49 @@ export class HookSystem {
     coreInfo('CivicPress initialized', { operation: 'hook handling' });
   }
 
-  private onRecordCreated(data: any, _context: HookContext): void {
+  private onRecordCreated(_data: any, _context: HookContext): void {
     coreInfo('Record created', {
       operation: 'hook handling',
-      recordId: data?.id,
+      recordId: _data?.id,
     });
   }
 
-  private onRecordUpdated(data: any, _context: HookContext): void {
+  private onRecordUpdated(_data: any, _context: HookContext): void {
     coreInfo('Record updated', {
       operation: 'hook handling',
-      recordId: data?.id,
+      recordId: _data?.id,
     });
   }
 
-  private onRecordCommitted(data: any, _context: HookContext): void {
+  private onRecordCommitted(_data: any, _context: HookContext): void {
     coreInfo('Record committed', {
       operation: 'hook handling',
-      recordId: data?.id,
+      recordId: _data?.id,
     });
   }
 
-  private onStatusChanged(data: any, _context: HookContext): void {
+  private onStatusChanged(_data: any, _context: HookContext): void {
     coreInfo('Status changed', {
       operation: 'hook handling',
-      recordId: data?.id,
-      oldStatus: data?.oldStatus,
-      newStatus: data?.newStatus,
+      recordId: _data?.id,
+      oldStatus: _data?.oldStatus,
+      newStatus: _data?.newStatus,
     });
   }
 
-  private onValidationFailed(data: any, _context: HookContext): void {
+  private onValidationFailed(_data: any, _context: HookContext): void {
     coreWarn('Validation failed', {
       operation: 'hook handling',
-      recordId: data?.id,
-      errors: data?.errors,
+      recordId: _data?.id,
+      errors: _data?.errors,
+    });
+  }
+
+  private onDemoDataLoaded(_data: any, _context: HookContext): void {
+    coreInfo('Demo data loaded', {
+      operation: 'hook handling',
+      demoCity: _data?.demoCity,
+      recordCount: _data?.recordCount,
     });
   }
 }

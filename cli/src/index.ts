@@ -35,6 +35,7 @@ CentralConfigManager.setLoggerOptions({
 const cli = cac('civic');
 
 // Global options for silent mode
+cli.option('--silent', 'Suppress all output except errors');
 cli.option('--quiet', 'Suppress info messages (show only errors and warnings)');
 cli.option('--verbose', 'Show verbose output including debug messages');
 cli.option('--no-color', 'Disable colored output');

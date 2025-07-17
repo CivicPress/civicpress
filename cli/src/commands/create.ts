@@ -95,7 +95,7 @@ export const createCommand = (cli: CAC) => {
 
         // Validate role permissions for creating this record type
         const workflowManager = new WorkflowConfigManager(dataDir);
-        const role = options.role || 'unknown';
+        const role = options.role || user.role;
         const actionValidation = await workflowManager.validateAction(
           'create',
           type,
@@ -257,6 +257,7 @@ export const createCommand = (cli: CAC) => {
           }
         } else {
           const git = new (await import('@civicpress/core')).GitEngine(dataDir);
+          await git.initialize();
           await git.commit(`feat(record): create ${type} "${title}"`, [
             filePath,
           ]);

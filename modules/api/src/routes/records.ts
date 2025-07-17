@@ -38,6 +38,93 @@ function handleRecordsValidationError(
   });
 }
 
+export function createPublicRecordsRouter(recordsService: RecordsService) {
+  const router = Router();
+
+  // GET /public/records - List all records (public access, no auth required)
+  router.get('/', async (req: any, res: Response) => {
+    logApiRequest(req, { operation: 'list_records_public' });
+
+    try {
+      const { type, status, limit, offset } = req.query;
+
+      logger.info('Listing records (public)', {
+        type,
+        status,
+        limit,
+        offset,
+        requestId: (req as any).requestId,
+      });
+
+      const result = await recordsService.listRecords({
+        type: type as string,
+        status: status as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined,
+      });
+
+      logger.info('Records listed successfully (public)', {
+        totalRecords: result.records?.length || 0,
+        requestId: (req as any).requestId,
+      });
+
+      sendSuccess(result, req, res, { operation: 'list_records_public' });
+    } catch (error) {
+      handleApiError(
+        'list_records_public',
+        error,
+        req,
+        res,
+        'Failed to list records'
+      );
+    }
+  });
+
+  // GET /public/records/:id - Get a specific record (public access)
+  router.get(
+    '/:id',
+    param('id').isString().notEmpty(),
+    async (req: any, res: Response) => {
+      logApiRequest(req, { operation: 'get_record_public' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'get_record_public',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+
+        const record = await recordsService.getRecord(id);
+
+        if (!record) {
+          const error = new Error('Record not found');
+          (error as any).statusCode = 404;
+          (error as any).code = 'RECORD_NOT_FOUND';
+          throw error;
+        }
+
+        sendSuccess(record, req, res, { operation: 'get_record_public' });
+      } catch (error) {
+        handleApiError(
+          'get_record_public',
+          error,
+          req,
+          res,
+          'Failed to retrieve record'
+        );
+      }
+    }
+  );
+
+  return router;
+}
+
 export function createRecordsRouter(recordsService: RecordsService) {
   const router = Router();
 

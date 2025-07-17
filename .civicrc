@@ -8,7 +8,7 @@
   'repo_url': null,
   'dataDir': 'data',
   'database':
-    { 'type': 'sqlite', 'sqlite': { 'file': 'data/.civic/civic.db' } },
+    { 'type': 'sqlite', 'sqlite': { 'file': '.system-data/civic.db' } },
   'modules': ['legal-register'],
   'record_types': ['bylaw', 'policy'],
   'default_role': 'clerk',

@@ -63,6 +63,59 @@ router.post('/login', async (req, res) => {
 });
 
 /**
+ * POST /api/auth/password
+ * Authenticate with username and password
+ */
+router.post('/password', async (req, res) => {
+  logApiRequest(req, { operation: 'password_auth' });
+
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return handleApiError(
+        'password_auth',
+        new Error('Username and password are required'),
+        req,
+        res,
+        'Username and password are required'
+      );
+    }
+
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    // Authenticate with password
+    const session = await authService.authenticateWithPassword(
+      username,
+      password
+    );
+
+    sendSuccess(
+      {
+        session: {
+          token: session.token,
+          user: session.user,
+          expiresAt: session.expiresAt,
+        },
+      },
+      req,
+      res,
+      { operation: 'password_auth' }
+    );
+  } catch (error) {
+    handleApiError(
+      'password_auth',
+      error,
+      req,
+      res,
+      'Password authentication failed'
+    );
+  }
+});
+
+/**
  * GET /api/auth/providers
  * Get available OAuth providers
  */

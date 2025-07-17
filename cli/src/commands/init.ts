@@ -21,6 +21,10 @@ export const initCommand = (cli: CAC) => {
       'Path to configuration file to use instead of prompts'
     )
     .option('--data-dir <path>', 'Specify the data directory for CivicPress')
+    .option(
+      '--demo-data [city]',
+      'Load demo data (optional: specify city name)'
+    )
     .action(async (options: any) => {
       const skipPrompts = options.yes || options.noPrompt;
       // Initialize logger with global options
@@ -49,9 +53,9 @@ export const initCommand = (cli: CAC) => {
             version: '1.0.0',
             name: 'Civic Records',
             city: 'Richmond',
-            state: 'Virginia',
-            country: 'USA',
-            timezone: 'America/New_York',
+            state: 'Quebec',
+            country: 'Canada',
+            timezone: 'America/Montreal',
             repo_url: null,
             modules: ['legal-register'],
             record_types: ['bylaw', 'policy'],
@@ -69,6 +73,16 @@ export const initCommand = (cli: CAC) => {
           if (!existsSync(dataDir)) {
             mkdirSync(dataDir, { recursive: true });
           }
+
+          // Handle demo data loading for skipPrompts mode
+          if (options.demoData) {
+            const demoCity =
+              typeof options.demoData === 'string'
+                ? options.demoData
+                : 'richmond-quebec';
+            await loadDemoData(dataDir, demoCity, logger);
+          }
+
           if (!shouldOutputJson) {
             console.log('✅ CivicPress project initialized with defaults.');
           }
@@ -114,6 +128,68 @@ export const initCommand = (cli: CAC) => {
             },
           ]);
           dataDir = dataDirPrompt;
+        }
+
+        // Check if .civicrc already exists
+        const civicrcPath = path.join(process.cwd(), '.civicrc');
+        const civicrcExists = fs.existsSync(civicrcPath);
+
+        if (civicrcExists && !options.config && !options.dataDir) {
+          const { overwrite } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'overwrite',
+              message: '.civicrc file already exists. Overwrite it?',
+              default: false,
+            },
+          ]);
+          if (!overwrite) {
+            if (!shouldOutputJson) {
+              logger.warn('Initialization cancelled by user.');
+            }
+            return;
+          }
+        }
+
+        // Ask about demo data if not already specified
+        let loadDemoDataFlag = options.demoData;
+        if (
+          !loadDemoDataFlag &&
+          !skipPrompts &&
+          !options.config &&
+          !options.dataDir
+        ) {
+          const { loadDemo } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'loadDemo',
+              message: 'Would you like to load demo data to get started?',
+              default: true,
+            },
+          ]);
+
+          if (loadDemo) {
+            const { demoCity } = await inquirer.prompt([
+              {
+                type: 'list',
+                name: 'demoCity',
+                message: 'Which demo city would you like to load?',
+                choices: [
+                  {
+                    name: 'Richmond, Quebec (Bilingual)',
+                    value: 'richmond-quebec',
+                  },
+                  {
+                    name: 'Springfield, Illinois (Comprehensive)',
+                    value: 'springfield-usa',
+                  },
+                  // Future: Add more cities here
+                ],
+                default: 'richmond-quebec',
+              },
+            ]);
+            loadDemoDataFlag = demoCity;
+          }
         }
 
         const fullDataDir = path.resolve(dataDir);
@@ -191,10 +267,6 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
-        // Check if .civicrc already exists
-        const civicrcPath = path.join(process.cwd(), '.civicrc');
-        const civicrcExists = fs.existsSync(civicrcPath);
-
         if (civicrcExists && !options.config && !options.dataDir) {
           const { overwrite } = await inquirer.prompt([
             {
@@ -227,6 +299,15 @@ export const initCommand = (cli: CAC) => {
         await civic.initialize();
         if (!shouldOutputJson) {
           logger.success('🔧 Initialized CivicPress core');
+        }
+
+        // Load demo data if requested
+        if (loadDemoDataFlag) {
+          const demoCity =
+            typeof loadDemoDataFlag === 'string'
+              ? loadDemoDataFlag
+              : 'richmond-quebec';
+          await loadDemoData(fullDataDir, demoCity, logger);
         }
 
         if (shouldOutputJson) {
@@ -367,6 +448,187 @@ async function setupCivicrcNonInteractive(
   const yamlContent = yaml.stringify(civicrc);
   fs.writeFileSync(civicrcPath, yamlContent);
   logger.success('⚙️  .civicrc saved to .civicrc');
+}
+
+async function loadDemoData(
+  dataDir: string,
+  demoCity: string = 'richmond-quebec',
+  logger: any
+): Promise<void> {
+  try {
+    logger.info(`📦 Loading demo data for ${demoCity}...`);
+
+    // Get the demo data directory path
+    const __filename = fileURLToPath(import.meta.url);
+    const projectRoot = path.resolve(path.dirname(__filename), '../../../');
+    const demoDataDir = path.join(projectRoot, 'cli', 'src', 'demo-data');
+
+    // Load demo config
+    const configPath = path.join(demoDataDir, 'config', `${demoCity}.yml`);
+    if (!fs.existsSync(configPath)) {
+      throw new Error(
+        `Demo city '${demoCity}' not found. Available cities: richmond-quebec`
+      );
+    }
+
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const demoConfig = yaml.parse(configContent);
+
+    // Create records directory
+    const recordsDir = path.join(dataDir, 'records');
+    if (!fs.existsSync(recordsDir)) {
+      fs.mkdirSync(recordsDir, { recursive: true });
+    }
+
+    // Copy demo records
+    const recordsSrc = path.join(demoDataDir, 'records');
+    let copiedCount = 0;
+
+    for (const recordFile of demoConfig.demo_data.records) {
+      const srcPath = path.join(recordsSrc, recordFile);
+      const destPath = path.join(recordsDir, recordFile);
+
+      if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, destPath);
+        copiedCount++;
+      } else {
+        logger.warn(`⚠️  Demo record not found: ${recordFile}`);
+      }
+    }
+
+    // Copy hooks if they exist
+    if (demoConfig.demo_data.hooks) {
+      const hooksSrc = path.join(demoDataDir, 'hooks');
+      const hooksDest = path.join(dataDir, '.civic', 'hooks');
+      if (!fs.existsSync(hooksDest)) {
+        fs.mkdirSync(hooksDest, { recursive: true });
+      }
+
+      for (const hookFile of demoConfig.demo_data.hooks) {
+        const srcPath = path.join(hooksSrc, hookFile);
+        const destPath = path.join(hooksDest, hookFile);
+
+        if (fs.existsSync(srcPath)) {
+          fs.copyFileSync(srcPath, destPath);
+          logger.info(`📋 Copied hook: ${hookFile}`);
+        }
+      }
+    }
+
+    // Copy templates if they exist
+    if (demoConfig.demo_data.templates) {
+      const templatesSrc = path.join(demoDataDir, 'templates');
+      const templatesDest = path.join(dataDir, '.civic', 'templates');
+      if (!fs.existsSync(templatesDest)) {
+        fs.mkdirSync(templatesDest, { recursive: true });
+      }
+
+      for (const templateFile of demoConfig.demo_data.templates) {
+        const srcPath = path.join(templatesSrc, templateFile);
+        const destPath = path.join(templatesDest, templateFile);
+
+        if (fs.existsSync(srcPath)) {
+          fs.copyFileSync(srcPath, destPath);
+          logger.info(`📄 Copied template: ${templateFile}`);
+        }
+      }
+    }
+
+    // Copy workflows if they exist
+    if (demoConfig.demo_data.workflows) {
+      const workflowsSrc = path.join(demoDataDir, 'workflows');
+      const workflowsDest = path.join(dataDir, '.civic', 'workflows');
+      if (!fs.existsSync(workflowsDest)) {
+        fs.mkdirSync(workflowsDest, { recursive: true });
+      }
+
+      for (const workflowFile of demoConfig.demo_data.workflows) {
+        const srcPath = path.join(workflowsSrc, workflowFile);
+        const destPath = path.join(workflowsDest, workflowFile);
+
+        if (fs.existsSync(srcPath)) {
+          fs.copyFileSync(srcPath, destPath);
+          logger.info(`⚙️  Copied workflow: ${workflowFile}`);
+        }
+      }
+    }
+
+    logger.success(`✅ Loaded ${copiedCount} demo records for ${demoCity}`);
+
+    // Trigger hooks for demo data loading
+    try {
+      const { CivicPress } = await import('@civicpress/core');
+      const civic = new CivicPress({ dataDir });
+      await civic.initialize();
+
+      const hookSystem = civic.getHookSystem();
+
+      // Trigger demo data loaded hook
+      await hookSystem.emit(
+        'demo:data:loaded',
+        {
+          demoCity,
+          recordCount: copiedCount,
+          records: demoConfig.demo_data.records,
+          hooks: demoConfig.demo_data.hooks || [],
+          templates: demoConfig.demo_data.templates || [],
+          workflows: demoConfig.demo_data.workflows || [],
+        },
+        {
+          user: 'system',
+          action: 'demo-data-load',
+          metadata: {
+            demoCity,
+            source: 'init-command',
+          },
+        }
+      );
+
+      // Trigger individual record created hooks for each loaded record
+      for (const recordFile of demoConfig.demo_data.records) {
+        const recordPath = path.join(recordsDir, recordFile);
+        if (fs.existsSync(recordPath)) {
+          const recordContent = fs.readFileSync(recordPath, 'utf8');
+          const frontmatterMatch = recordContent.match(/^---\n([\s\S]*?)\n---/);
+
+          if (frontmatterMatch) {
+            const frontmatter = yaml.parse(frontmatterMatch[1]);
+            await hookSystem.emit(
+              'record:created',
+              {
+                record: {
+                  title: frontmatter.title,
+                  type: frontmatter.type,
+                  status: frontmatter.status,
+                  path: recordPath,
+                  slug: frontmatter.slug,
+                  authors: frontmatter.authors,
+                  tags: frontmatter.tags,
+                },
+                demoData: true,
+              },
+              {
+                user: 'system',
+                action: 'demo-record-created',
+                metadata: {
+                  demoCity,
+                  recordFile,
+                },
+              }
+            );
+          }
+        }
+      }
+
+      logger.info(`🎯 Triggered hooks for demo data loading`);
+    } catch (hookError: any) {
+      logger.warn(`⚠️  Hook triggering failed: ${hookError.message}`);
+      // Don't fail the entire demo data loading if hooks fail
+    }
+  } catch (error: any) {
+    logger.error(`❌ Failed to load demo data: ${error.message}`);
+    throw error;
+  }
 }
 
 async function setupCivicrc(

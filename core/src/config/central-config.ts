@@ -165,16 +165,24 @@ export class CentralConfigManager {
    */
   private static findConfigFile(): string | null {
     let currentPath = process.cwd();
+    const rootPath = path.parse(currentPath).root;
 
-    // Check current directory and parent directories
-    while (currentPath !== path.dirname(currentPath)) {
+    // Check current directory and parent directories until we reach the filesystem root
+    while (currentPath !== rootPath) {
       const configPath = path.join(currentPath, this.CONFIG_FILENAME);
       if (fs.existsSync(configPath)) {
+        this.logger.debug(`Found .civicrc at: ${configPath}`);
         return configPath;
       }
-      currentPath = path.dirname(currentPath);
+      const parentPath = path.dirname(currentPath);
+      // Prevent infinite loop if we can't go up further
+      if (parentPath === currentPath) {
+        break;
+      }
+      currentPath = parentPath;
     }
 
+    this.logger.debug(`No .civicrc found, searched from: ${process.cwd()}`);
     return null;
   }
 
