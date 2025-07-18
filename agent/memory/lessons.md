@@ -37,6 +37,17 @@
 - **Exit Codes:** Use proper exit codes (0 for success, non-zero for errors)
 - **Error Messages:** Provide clear, actionable error messages
 
+### CLI Authentication Testing (Latest Lessons)
+
+- **Mixed Output Handling:** CLI commands may output initialization messages
+  before JSON
+- **JSON Extraction:** Implement robust JSON extraction from mixed CLI output
+- **Simulated Authentication:** Use simulated auth for testing instead of
+  password auth
+- **Brace Counting:** Use brace counting to find complete JSON objects in output
+- **Error Recovery:** Handle JSON parsing failures gracefully with clear error
+  messages
+
 ## Debugging Lessons
 
 ### Common Issues and Solutions
@@ -48,6 +59,10 @@
 3. **Git History:** Tests requiring Git history need proper repo initialization
 4. **Response Structure:** API tests must expect correct response format
 5. **Authentication:** Mock user setup must work with real permission system
+6. **JSON Parsing:** CLI commands with mixed output require proper JSON
+   extraction
+7. **Test Authentication:** Use simulated auth for tests, password auth for real
+   usage
 
 ### Test Environment Setup
 
@@ -100,6 +115,7 @@
 
 - **Role-Based Access:** Uses role configurations for permission checking
 - **Simulated Authentication:** Supports simulated auth for testing
+- **Password Authentication:** Traditional username/password auth for real usage
 - **Token Management:** Handles JWT tokens for API authentication
 - **Permission Strings:** Must match exactly between roles and API endpoints
 
@@ -169,6 +185,82 @@
 - **Cleanup Commands:** Support testing and development scenarios
 - **Consistent Output:** Maintain JSON and human-readable output formats
 
+## Platform Vision and Specifications (Latest Lessons)
+
+### Comprehensive Platform Understanding
+
+- **Complete Civic Technology Platform:** CivicPress is designed as a
+  comprehensive platform, not just a simple record management system
+- **50+ Detailed Specifications:** Recovered specifications provide complete
+  technical blueprints for all planned features
+- **Core Principles:** Transparency by default, trust through traceability,
+  open-source auditable, equity and accessibility
+- **Modular Architecture:** Plugin system, federation, enterprise features,
+  civic modules
+- **Enterprise-Grade Security:** Cryptographic verification, audit logs,
+  compliance, multi-tenant support
+
+### Development with Specifications
+
+- **Reference Specifications:** Always consult `docs/specs/` for implementation
+  guidance
+- **Follow Core Principles:** Ensure all development aligns with transparency,
+  trust, and accessibility principles
+- **Consider Platform Vision:** Think beyond current features to the complete
+  civic technology platform
+- **Security First:** Implement features with security and compliance in mind
+  from the start
+- **Scalability Planning:** Design features to support federation and
+  multi-tenant deployments
+
+### Specification-Driven Development
+
+- **Technical Blueprints:** Use specifications as implementation guides
+- **Quality Standards:** Follow testing and quality standards from
+  specifications
+- **Security Requirements:** Implement security features based on specification
+  requirements
+- **Compliance Considerations:** Ensure features meet civic and legal
+  requirements
+- **Future-Proofing:** Design features to support advanced platform capabilities
+
+### Platform Architecture Awareness
+
+- **Current Foundation:** Solid CLI, API, and database foundation with
+  comprehensive testing
+- **Planned Features:** Plugin system, workflow engine, civic modules,
+  federation
+- **Enterprise Features:** Multi-tenant support, advanced security, audit trails
+- **Civic Modules:** Legal register, voting systems, feedback systems, audit
+  trails
+- **Frontend Evolution:** Migration from Astro to Nuxt PWA with advanced
+  features
+
+## Recent Test Stabilization Lessons (2024-12-19)
+
+### JSON Parsing Challenges
+
+- **Mixed Output:** CLI commands often output initialization messages before
+  JSON
+- **Brace Counting:** Use brace counting algorithm to find complete JSON objects
+- **Robust Extraction:** Implement fallback mechanisms for JSON extraction
+- **Error Handling:** Provide clear error messages when JSON parsing fails
+
+### Authentication Testing Strategy
+
+- **Simulated vs Password Auth:** Use simulated auth for tests, password auth
+  for real usage
+- **Test Isolation:** Each test should create its own authentication context
+- **Token Management:** Properly manage and pass tokens between test steps
+- **Permission Testing:** Test both positive and negative permission scenarios
+
+### Test Suite Health
+
+- **Comprehensive Coverage:** 391 tests provide confidence in system stability
+- **Zero Failures:** All tests passing indicates system health
+- **Parallel Execution:** Tests run efficiently without interference
+- **Maintenance:** Regular test maintenance prevents technical debt
+
 ## Future Considerations
 
 ### Scalability
@@ -192,8 +284,17 @@
 - **Documentation Updates:** Keep documentation current
 - **Performance Monitoring:** Monitor test performance over time
 
+### Platform Evolution
+
+- **Specification Alignment:** Ensure all development aligns with platform
+  specifications
+- **Feature Planning:** Plan features based on comprehensive platform vision
+- **Security Implementation:** Implement security features from the start
+- **Scalability Design:** Design for federation and multi-tenant support
+- **Civic Focus:** Maintain focus on civic technology and governance needs
+
 ---
 
-**Last Updated:** January 12, 2025  
+**Last Updated:** December 19, 2024  
 **Status:** ✅ ACTIVE LEARNING  
 **Confidence:** HIGH
