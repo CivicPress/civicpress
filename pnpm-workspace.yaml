@@ -7,5 +7,6 @@ packages:
   - cli
   - core
   - modules/api
+  - modules/ui
   - modules/legal-register
   # - modules/serve (Astro frontend removed)
