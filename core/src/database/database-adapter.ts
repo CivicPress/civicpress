@@ -184,31 +184,44 @@ export class SQLiteAdapter implements DatabaseAdapter {
 }
 
 // Placeholder for PostgreSQL adapter (future implementation)
-/* eslint-disable @typescript-eslint/no-unused-vars */
 export class PostgresAdapter implements DatabaseAdapter {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(_config: DatabaseConfig) {
-    // TODO: Implement PostgreSQL adapter
-    throw new Error('PostgreSQL adapter not implemented yet');
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
   }
 
   async connect(): Promise<void> {
-    throw new Error('PostgreSQL adapter not implemented yet');
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async query(_sql: string, _params?: any[]): Promise<any[]> {
-    throw new Error('PostgreSQL adapter not implemented yet');
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async execute(_sql: string, _params?: any[]): Promise<void> {
-    throw new Error('PostgreSQL adapter not implemented yet');
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
   }
 
   async close(): Promise<void> {
-    throw new Error('PostgreSQL adapter not implemented yet');
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
   }
 
   async initialize(): Promise<void> {
-    throw new Error('PostgreSQL adapter not implemented yet');
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
   }
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */

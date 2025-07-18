@@ -160,11 +160,6 @@ export function expectCommandSuccess(result: {
   stderr: string;
   exitCode: number;
 }) {
-  if (result.exitCode !== 0 || result.stderr) {
-    // Print output for debugging
-    console.log('--- CLI STDOUT ---\n' + result.stdout);
-    console.log('--- CLI STDERR ---\n' + result.stderr);
-  }
   expect(result.exitCode).toBe(0);
   expect(result.stderr).toBe('');
 }
@@ -173,11 +168,6 @@ export function expectCommandFailure(
   result: { stdout: string; stderr: string; exitCode: number },
   expectedExitCode = 1
 ) {
-  if (result.exitCode !== expectedExitCode) {
-    // Print output for debugging
-    console.log('--- CLI STDOUT ---\n' + result.stdout);
-    console.log('--- CLI STDERR ---\n' + result.stderr);
-  }
   expect(result.exitCode).toBe(expectedExitCode);
 }
 

@@ -25,11 +25,6 @@ describe('Role-Based Authorization System', () => {
     testConfig = createTestDirectory('role-auth-test');
     createRolesConfig(testConfig);
 
-    // Debug: print testConfig and dataDir before CivicPress instantiation
-    console.log('testConfig:', testConfig);
-    console.log('testConfig.dataDir before CivicPress:', testConfig.dataDir);
-    console.log('typeof testConfig.dataDir:', typeof testConfig.dataDir);
-
     // Initialize CivicPress
     civicPress = new CivicPress({
       dataDir: testConfig.dataDir,
@@ -42,21 +37,8 @@ describe('Role-Based Authorization System', () => {
     });
     await civicPress.initialize();
 
-    // Debug: print dataDir before initializeRoleManager
-    console.log(
-      'testConfig.dataDir before initializeRoleManager:',
-      testConfig.dataDir
-    );
     // Initialize role manager for testing
     initializeRoleManager(testConfig.dataDir);
-
-    // Debug: verify role manager is initialized
-    try {
-      const roleManager = getRoleManager();
-      console.log('RoleManager initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize RoleManager:', error);
-    }
   });
 
   afterEach(async () => {
@@ -168,18 +150,10 @@ describe('Role-Based Authorization System', () => {
         })
       ).toBe(true);
 
-      // Debug: check what the role manager returns for this transition
       const result = await userCan(clerkUser, 'workflows:manage', {
         fromStatus: 'approved',
         toStatus: 'archived',
       });
-      console.log('Clerk approved->archived transition result:', result);
-
-      // Debug: check the role manager configuration
-      const roleManager = getRoleManager();
-      const config = await roleManager['loadConfig']();
-      console.log('Clerk role config:', config.roles.clerk);
-      console.log('Admin role config:', config.roles.admin);
 
       expect(result).toBe(false);
     });

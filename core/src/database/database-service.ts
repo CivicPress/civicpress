@@ -20,7 +20,10 @@ export class DatabaseService {
       await this.adapter.connect();
       await this.adapter.initialize();
       this.isConnected = true;
-      this.logger.info('Database initialized successfully');
+      // Suppress database messages in test environment
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.info('Database initialized successfully');
+      }
     } catch (error) {
       this.logger.error('Failed to initialize database:', error);
       throw error;
@@ -31,7 +34,10 @@ export class DatabaseService {
     if (this.isConnected) {
       await this.adapter.close();
       this.isConnected = false;
-      this.logger.info('Database connection closed');
+      // Suppress database messages in test environment
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.info('Database connection closed');
+      }
     }
   }
 

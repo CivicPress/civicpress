@@ -54,10 +54,11 @@ fill in:
 
 ### **Quick Context Check**
 
-1. **Read current session**: `agent/sessions/current-session.md`
-2. **Check project state**: `agent/memory/project-state.md`
-3. **Review recent decisions**: `agent/memory/decisions.md`
-4. **Check for blockers**: `agent/context/blockers.md`
+1. **Read startup guide**: `agent/sessions/START_HERE.md` (read this first!)
+2. **Read current session**: `agent/sessions/current-session.md`
+3. **Check project state**: `agent/memory/project-state.md`
+4. **Review recent decisions**: `agent/memory/decisions.md`
+5. **Check for blockers**: `agent/context/blockers.md`
 
 ### **Acknowledge Handover**
 

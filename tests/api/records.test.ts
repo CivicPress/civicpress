@@ -137,7 +137,7 @@ describe('API Records Integration', () => {
         id: 'test-record',
         title: 'Updated Test Record',
         type: 'bylaw',
-        status: 'archived',
+        status: 'draft',
       });
     });
 

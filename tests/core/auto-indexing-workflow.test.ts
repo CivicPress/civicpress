@@ -13,8 +13,16 @@ describe.skip('Auto-Indexing Workflow', () => {
     testDataDir = join(process.cwd(), 'test-auto-indexing');
     mkdirSync(testDataDir, { recursive: true });
 
-    // Initialize CivicPress
-    civicPress = new CivicPress({ dataDir: testDataDir });
+    // Initialize CivicPress with test database
+    civicPress = new CivicPress({
+      dataDir: testDataDir,
+      database: {
+        type: 'sqlite' as const,
+        sqlite: {
+          file: join(testDataDir, 'test.db'),
+        },
+      },
+    });
     await civicPress.initialize();
   });
 
