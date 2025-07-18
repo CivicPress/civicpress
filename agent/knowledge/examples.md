@@ -124,6 +124,216 @@ export class WorkflowEngine {
 }
 ```
 
+## ⚙️ **Configuration Examples**
+
+### **Organization Config Separation**
+
+```yaml
+# data/.civic/org-config.yml (Organization Config)
+name: City of Springfield
+city: Springfield
+state: Illinois
+country: USA
+timezone: America/Chicago
+website: https://springfield.gov
+repo_url: https://github.com/springfield/civic-records
+email: clerk@springfield.gov
+phone: (555) 123-4567
+
+# Branding
+logo: assets/logo.png
+favicon: assets/favicon.ico
+description: Official civic records for the City of Springfield
+tagline: Transparency in Government
+
+# Social Media
+social:
+  twitter: @SpringfieldGov
+  facebook: SpringfieldGovernment
+  linkedin: city-of-springfield
+
+# Custom Branding
+custom:
+  primary_color: "#1e40af"
+  secondary_color: "#3b82f6"
+  font_family: "Inter, system-ui, sans-serif"
+```
+
+```yaml
+# .civicrc (System Config)
+version: "1.0.0"
+dataDir: "data"
+modules: ["legal-register"]
+record_types: ["bylaw", "policy", "resolution", "ordinance", "proclamation"]
+default_role: "clerk"
+hooks:
+  enabled: true
+workflows:
+  enabled: true
+audit:
+  enabled: true
+database:
+  type: "sqlite"
+  sqlite:
+    file: ".system-data/civic.db"
+```
+
+### **Default Configuration Structure**
+
+```typescript
+// core/src/defaults/index.ts
+export const DEFAULT_CONFIGS = {
+  roles: 'roles.yml',
+  workflows: 'workflows.yml',
+  hooks: 'hooks.yml',
+  orgConfig: 'org-config.yml',
+  templates: {
+    bylaw: 'templates/bylaw/default.md',
+    ordinance: 'templates/ordinance/default.md',
+    policy: 'templates/policy/default.md',
+    proclamation: 'templates/proclamation/default.md',
+    resolution: 'templates/resolution/default.md'
+  }
+};
+
+export async function copyDefaults(dataDir: string): Promise<void> {
+  const defaultsDir = path.join(__dirname, '..');
+
+  // Copy configuration files
+  for (const [name, file] of Object.entries(DEFAULT_CONFIGS)) {
+    if (name === 'templates') continue;
+    await copyFile(path.join(defaultsDir, file), path.join(dataDir, '.civic', file));
+  }
+
+  // Copy templates
+  for (const [type, template] of Object.entries(DEFAULT_CONFIGS.templates)) {
+    await copyFile(
+      path.join(defaultsDir, template),
+      path.join(dataDir, '.civic', template)
+    );
+  }
+}
+```
+
+### **Enhanced Init Command**
+
+```typescript
+// cli/src/commands/init.ts
+export const initCommand = (cli: CAC) => {
+  cli
+    .command('init', 'Initialize a new CivicPress project')
+    .option('--yes', 'Skip all prompts and use defaults')
+    .option('--config <path>', 'Path to configuration file')
+    .option('--data-dir <path>', 'Specify the data directory')
+    .option('--demo-data [city]', 'Load demo data')
+    .action(async (options: any) => {
+      // ... setup logic ...
+
+      // Copy default configurations
+      await copyDefaults(fullDataDir);
+
+      // Load demo data if requested
+      if (loadDemoDataFlag) {
+        await loadDemoData(fullDataDir, demoCity, logger);
+      }
+
+      // Always run indexing and db sync after init
+      try {
+        logger.info('🔄 Indexing records...');
+        const civic = new CivicPress({ dataDir: fullDataDir });
+        await civic.initialize();
+        const indexingService = civic.getIndexingService();
+
+        // Index all records
+        await indexingService.generateIndexes();
+        logger.success('📊 Indexing complete');
+
+        // Sync to database
+        logger.info('🔄 Syncing indexed records to database...');
+        await indexingService.generateIndexes({ syncDatabase: true });
+        logger.success('🗄️  Database sync complete');
+      } catch (err: any) {
+        logger.warn('⚠️  Indexing or DB sync failed: ' + err.message);
+      }
+
+      // Create initial commit
+      if (initGit || gitExists) {
+        const git = new GitEngine(fullDataDir);
+        await git.initialize();
+        await git.commit('Initial CivicPress setup');
+        logger.success('📝 Initial commit created');
+      }
+    });
+};
+```
+
+### **Info Command Implementation**
+
+```typescript
+// cli/src/commands/info.ts
+export const infoCommand = (cli: CAC) => {
+  cli
+    .command('info', 'Show organization and system configuration info')
+    .option('--token <token>', 'Authentication token for admin access')
+    .action(async (options: any) => {
+      const civic = new CivicPress({ dataDir: 'data' });
+      await civic.initialize();
+
+      const configManager = civic.getConfigManager();
+      const orgConfig = await configManager.getOrgConfig();
+
+      const info = {
+        organization: {
+          name: orgConfig.name,
+          city: orgConfig.city,
+          state: orgConfig.state,
+          country: orgConfig.country,
+          timezone: orgConfig.timezone,
+          website: orgConfig.website,
+          repo_url: orgConfig.repo_url
+        }
+      };
+
+      // Add system config if admin token provided
+      if (options.token) {
+        try {
+          const authService = civic.getAuthService();
+          const user = await authService.validateToken(options.token);
+
+          if (user.role === 'admin') {
+            const systemConfig = await configManager.getSystemConfig();
+            info.system = {
+              version: systemConfig.version,
+              modules: systemConfig.modules,
+              record_types: systemConfig.record_types,
+              database: systemConfig.database
+            };
+          }
+        } catch (error) {
+          // Invalid token - continue without system info
+        }
+      }
+
+      if (globalOptions.json) {
+        console.log(JSON.stringify(info, null, 2));
+      } else {
+        // Human-readable output
+        console.log('🏢 Organization Information:');
+        console.log(`   Name: ${info.organization.name}`);
+        console.log(`   Location: ${info.organization.city}, ${info.organization.state}, ${info.organization.country}`);
+        console.log(`   Timezone: ${info.organization.timezone}`);
+
+        if (info.system) {
+          console.log('\n⚙️  System Configuration:');
+          console.log(`   Version: ${info.system.version}`);
+          console.log(`   Modules: ${info.system.modules.join(', ')}`);
+          console.log(`   Record Types: ${info.system.record_types.join(', ')}`);
+        }
+      }
+    });
+};
+```
+
 ## 🏛️ **Module Examples**
 
 ### **Legal Register Module**

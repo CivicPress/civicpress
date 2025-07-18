@@ -1,0 +1,97 @@
+name: 'Approval Workflow'
+description: 'Standard approval process for civic records'
+enabled: true
+steps:
+  - name: 'draft'
+    description: 'Initial draft created'
+    actions:
+      - type: 'notify'
+        target: 'author'
+        message: 'Draft created successfully'
+
+  - name: 'review'
+    description: 'Under review by department'
+    requirements:
+      - field: 'status'
+        value: 'review'
+    actions:
+      - type: 'notify'
+        target: 'department-head'
+        message: 'Record ready for department review'
+      - type: 'validate'
+        command: 'civic validate --comprehensive'
+
+  - name: 'legal-review'
+    description: 'Legal department review'
+    requirements:
+      - field: 'status'
+        value: 'legal-review'
+    actions:
+      - type: 'notify'
+        target: 'legal-counsel'
+        message: 'Record requires legal review'
+      - type: 'validate'
+        command: 'civic validate --legal-check'
+
+  - name: 'council-review'
+    description: 'City Council review'
+    requirements:
+      - field: 'status'
+        value: 'council-review'
+    actions:
+      - type: 'notify'
+        target: 'council-members'
+        message: 'Record ready for council review'
+      - type: 'publish'
+        target: 'public-notice'
+
+  - name: 'public-hearing'
+    description: 'Public hearing scheduled'
+    requirements:
+      - field: 'status'
+        value: 'public-hearing'
+    actions:
+      - type: 'notify'
+        target: 'public'
+        message: 'Public hearing scheduled'
+      - type: 'schedule'
+        event: 'public-hearing'
+
+  - name: 'adopted'
+    description: 'Record adopted by council'
+    requirements:
+      - field: 'status'
+        value: 'adopted'
+    actions:
+      - type: 'notify'
+        target: 'all-staff'
+        message: 'Record officially adopted'
+      - type: 'publish'
+        target: 'official-gazette'
+      - type: 'index'
+        command: 'civic index --update'
+
+transitions:
+  - from: 'draft'
+    to: 'review'
+    condition: 'author-submits'
+
+  - from: 'review'
+    to: 'legal-review'
+    condition: 'department-approves'
+
+  - from: 'legal-review'
+    to: 'council-review'
+    condition: 'legal-approves'
+
+  - from: 'council-review'
+    to: 'public-hearing'
+    condition: 'council-requires-hearing'
+
+  - from: 'council-review'
+    to: 'adopted'
+    condition: 'council-adopts'
+
+  - from: 'public-hearing'
+    to: 'adopted'
+    condition: 'council-adopts-after-hearing'

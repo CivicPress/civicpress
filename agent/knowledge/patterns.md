@@ -126,6 +126,82 @@
 - **Benefits**: Ensures civic accessibility
 - **Examples**: Public-facing civic dashboard
 
+### **6. Configuration Management**
+
+#### **Pattern**: Configuration separation
+
+- **When to Use**: For all configuration management
+- **How to Apply**:
+  1. Separate system config (`.civicrc`) from organization config
+     (`org-config.yml`)
+  2. Keep system settings in `.civicrc` (database, modules, workflows)
+  3. Keep organization details in `org-config.yml` (name, city, branding)
+  4. Centralize defaults in `core/src/defaults/`
+- **Benefits**: Cleaner configuration management and better separation of
+  concerns
+- **Examples**: Organization config separation in CivicPress
+
+#### **Pattern**: Default configuration centralization
+
+- **When to Use**: For all default configurations and templates
+- **How to Apply**:
+  1. Store all defaults in `core/src/defaults/`
+  2. Use consistent file structure for templates and configs
+  3. Copy defaults during initialization
+  4. Allow customization after initialization
+- **Benefits**: Single source of truth and consistent defaults
+- **Examples**: Default templates and configurations in CivicPress
+
+### **7. Initialization Workflow**
+
+#### **Pattern**: Complete initialization
+
+- **When to Use**: For project setup and initialization
+- **How to Apply**:
+  1. Create all necessary directories and files
+  2. Copy default configurations and templates
+  3. Initialize Git repository
+  4. Index and sync all records to database
+  5. Create initial commit with all files
+- **Benefits**: Users get a complete, ready-to-use repository
+- **Examples**: `civic init` command with automatic indexing
+
+#### **Pattern**: Interactive and non-interactive modes
+
+- **When to Use**: For CLI commands that need flexibility
+- **How to Apply**:
+  1. Support interactive prompts for manual setup
+  2. Support `--yes` flag for automated setup
+  3. Support `--config` flag for configuration files
+  4. Support `--data-dir` flag for custom data directories
+- **Benefits**: Works for both manual setup and automated deployment
+- **Examples**: `civic init` with multiple initialization modes
+
+### **8. Role-Based Authorization**
+
+#### **Pattern**: Granular permission checking
+
+- **When to Use**: For all CLI commands and API endpoints
+- **How to Apply**:
+  1. Check specific permissions for each operation
+  2. Use `userCan(user, permission)` function
+  3. Provide clear error messages for denied access
+  4. Support JSON output for scripting
+- **Benefits**: Ensures security and proper access control
+- **Examples**: All CLI commands check appropriate permissions
+
+#### **Pattern**: Role hierarchy inheritance
+
+- **When to Use**: For complex permission scenarios
+- **How to Apply**:
+  1. Define role hierarchy: Admin > Mayor > Council > Clerk > Editor > Viewer >
+     Public
+  2. Implement permission inheritance from parent roles
+  3. Allow role-specific permission overrides
+  4. Provide fallback to public role for unknown users
+- **Benefits**: Supports complex civic government workflows
+- **Examples**: Role-based authorization system with inheritance
+
 ## 🔧 **Technical Patterns**
 
 ### **Module Development Pattern**
@@ -197,6 +273,108 @@ module.exports = async ({ record, context }) => {
 
   return result;
 };
+```
+
+### **CLI Authorization Pattern**
+
+```typescript
+// cli/src/commands/example.ts
+import { userCan } from '@civicpress/core';
+import { AuthUtils } from '../utils/auth-utils.js';
+
+export const exampleCommand = (cli: CAC) => {
+  cli
+    .command('example', 'Example command')
+    .option('--token <token>', 'Session token for authentication')
+    .action(async (options: any) => {
+      // Initialize logger and get global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      const logger = initializeLogger();
+      const shouldOutputJson = globalOptions.json;
+
+      // Validate authentication and get civic instance
+      const { civic, user } = await AuthUtils.requireAuthWithCivic(
+        options.token,
+        shouldOutputJson
+      );
+      const dataDir = civic.getDataDir();
+
+      // Check specific permissions
+      const canPerformAction = await userCan(user, 'specific:permission');
+      if (!canPerformAction) {
+        if (shouldOutputJson) {
+          console.log(
+            JSON.stringify(
+              {
+                success: false,
+                error: 'Insufficient permissions',
+                details: 'You do not have permission to perform this action',
+                requiredPermission: 'specific:permission',
+                userRole: user.role,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Insufficient permissions to perform action');
+          logger.info(`Role '${user.role}' cannot perform this action`);
+        }
+        process.exit(1);
+      }
+
+      // Perform authorized action
+      // ... command logic here
+    });
+};
+```
+
+### **Role Configuration Pattern**
+
+```yaml
+# .civic/roles.yml
+roles:
+  admin:
+    name: 'System Administrator'
+    description: 'Full system access'
+    permissions:
+      - 'records:create'
+      - 'records:edit'
+      - 'records:view'
+      - 'records:export'
+      - 'records:import'
+      - 'templates:manage'
+      - 'hooks:manage'
+    record_types:
+      can_create: ['bylaw', 'policy', 'resolution', 'proclamation']
+      can_edit: ['bylaw', 'policy', 'resolution', 'proclamation']
+      can_view: ['bylaw', 'policy', 'resolution', 'proclamation']
+
+  editor:
+    name: 'Content Editor'
+    description: 'Can edit and create records'
+    permissions:
+      - 'records:create'
+      - 'records:edit'
+      - 'records:view'
+    record_types:
+      can_create: ['bylaw', 'policy']
+      can_edit: ['bylaw', 'policy']
+      can_view: ['bylaw', 'policy', 'resolution']
+
+  viewer:
+    name: 'Content Viewer'
+    description: 'Read-only access to records'
+    permissions:
+      - 'records:view'
+    record_types:
+      can_view: ['bylaw', 'policy', 'resolution']
+
+role_hierarchy:
+  admin: []
+  editor: ['viewer']
+  viewer: ['public']
+  public: []
 ```
 
 ### **Plugin Pattern**

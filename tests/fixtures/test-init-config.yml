@@ -1,0 +1,23 @@
+# Test configuration for CivicPress initialization
+name: test-repository
+city: Test City
+state: Test State
+country: Test Country
+timezone: UTC
+dataDir: data
+git:
+  init: true
+  autoCommit: false
+roles:
+  default: public
+  admin: admin
+  clerk: clerk
+  council: council
+  mayor: mayor
+templates:
+  default: basic
+  custom: []
+workflows:
+  autoIndex: false
+  hooks: []
+  plugins: []

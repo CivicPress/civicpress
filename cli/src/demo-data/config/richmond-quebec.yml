@@ -1,0 +1,24 @@
+name: 'Ville de Richmond'
+city: 'Richmond'
+state: 'Quebec'
+country: 'Canada'
+timezone: 'America/Montreal'
+repo_url: null
+modules: ['legal-register']
+record_types: ['bylaw', 'policy', 'resolution']
+default_role: 'clerk'
+hooks:
+  enabled: true
+workflows:
+  enabled: true
+audit:
+  enabled: true
+demo_data:
+  name: 'richmond-quebec'
+  description: 'Richmond, Quebec - Bilingual civic records'
+  records:
+    - 'bylaw-noise-restrictions.md'
+    - 'bylaw-parking-regulations.md'
+    - 'policy-data-privacy.md'
+    - 'policy-accessibility.md'
+    - 'resolution-budget-2025.md'

@@ -1,0 +1,51 @@
+# Example .civicrc configurations for testing
+
+# SQLite configuration example
+sqlite_example:
+  dataDir: 'data'
+  database:
+    type: 'sqlite'
+    sqlite:
+      file: 'data/.civic/civic.db'
+
+# PostgreSQL configuration example
+postgres_example:
+  dataDir: 'data'
+  database:
+    type: 'postgres'
+    postgres:
+      url: 'postgres://user:password@localhost:5432/civicpress'
+
+# Minimal SQLite configuration
+minimal_sqlite:
+  dataDir: 'data'
+  database:
+    type: 'sqlite'
+    sqlite:
+      file: 'data/civicpress.db'
+
+# Custom PostgreSQL configuration
+custom_postgres:
+  dataDir: 'data'
+  database:
+    type: 'postgres'
+    postgres:
+      url: 'postgres://civicpress:secret@db.example.com:5432/civicpress_prod'
+
+# Configuration with all optional fields
+full_config:
+  dataDir: 'data'
+  database:
+    type: 'sqlite'
+    sqlite:
+      file: 'data/.civic/civic.db'
+  # Additional fields that might be added in the future
+  templates:
+    enabled: true
+    path: 'data/.civic/templates'
+  hooks:
+    enabled: true
+    path: 'data/.civic/hooks'
+  workflows:
+    enabled: true
+    path: 'data/.civic/workflows'
