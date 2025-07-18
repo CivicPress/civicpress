@@ -498,3 +498,117 @@ The protocol is now:
 - **Practical for real development sessions**
 
 This should work much better for actual AI agent handovers! 🚀
+
+# Project Decisions
+
+## UI Module Architecture (2025-01-27)
+
+### Module Name
+
+- **Decision:** `ui` module (instead of "frontend")
+- **Rationale:** Clean, descriptive, focuses on interface aspect
+- **Status:** ✅ Confirmed
+
+### Authentication Strategy
+
+- **Decision:** Support both OAuth and user/password authentication
+- **Implementation:** Both methods return valid JWT tokens for API access
+- **Priority:** Start with user/password (simpler), then add OAuth
+- **Status:** ✅ Confirmed
+
+### Development Configuration
+
+- **Decision:** Run UI module on port 3030
+- **Rationale:** Avoid conflicts with API (port 3000) and CLI
+- **Status:** ✅ Confirmed
+
+### Plugin Architecture
+
+- **Decision:** Complex plugin registry with hooks system
+- **Features:**
+  - Plugin registry for extensibility
+  - Hook system for lifecycle events
+  - Theme engine for customization
+  - Replaceable components
+- **Status:** ✅ Confirmed
+
+### Technology Stack
+
+- **Framework:** Nuxt 4 (SPA mode - no SSR)
+- **UI Library:** Nuxt UI (built on Tailwind CSS)
+- **API Integration:** Connect from Day 1 to existing API
+- **Authentication:** JWT-based with role permissions
+- **Status:** ✅ Confirmed
+
+### User Journey Flow
+
+```
+Home → Login → Sign Up → Record List → Single Record → Search → User CRUD
+```
+
+- **Status:** ✅ Confirmed
+
+### Interface Design
+
+- **Decision:** Single interface for all users
+- **Implementation:** Edit panels only appear for authenticated users
+- **Role-based:** UI respects permissions from `.civic/roles.yml`
+- **Status:** ✅ Confirmed
+
+### Module Structure
+
+- **Decision:** Place UI module in `modules/ui/` (following existing pattern)
+- **Rationale:** Consistent with other modules (api, legal-register)
+- **Status:** ✅ Implemented
+
+### Dependencies
+
+- **Decision:** Add `vue-tsc` for TypeScript checking
+- **Issue:** Initial setup failed due to missing vue-tsc dependency
+- **Fix:** Added vue-tsc@^2.0.0 to package.json
+- **Status:** ✅ Fixed
+
+### API Integration
+
+- **Decision:** Connect to API from Day 1
+- **Configuration:** API base URL: http://localhost:3000
+- **Proxy:** Configured Nitro devProxy for API calls
+- **Status:** ✅ Configured
+
+### YAML Frontmatter Fix
+
+- **Issue:** API failing due to YAML parsing error in accessibility policy
+- **Problem:** Escaped single quote in title causing parsing failure
+- **Fix:** Changed from single quotes to double quotes for title
+- **File:** `cli/src/demo-data/records/policy-accessibility.md`
+- **Status:** ✅ Fixed
+
+### Current Status
+
+- **UI Server:** ✅ Running on http://localhost:3030
+- **API Server:** ✅ Running on http://localhost:3000
+- **Monorepo:** ✅ Properly integrated with pnpm workspace
+- **TypeScript:** ✅ Full type checking enabled
+- **Development Tools:** ✅ Nuxt DevTools available
+
+---
+
+## Previous Decisions
+
+### PostgreSQL Support (2025-01-27)
+
+- **Decision:** Mark PostgreSQL as "unsupported" in civic init
+- **Implementation:** Add warnings and auto-fallback to SQLite
+- **Status:** ✅ Implemented
+
+### Test Suite Stabilization (2025-01-27)
+
+- **Decision:** Tests should use their own database instances
+- **Implementation:** Configure test-specific SQLite files
+- **Status:** ✅ Implemented
+
+### Debug Message Removal (2025-01-27)
+
+- **Decision:** Remove all debug console.log statements from tests
+- **Implementation:** Clean up test files and remove debug output
+- **Status:** ✅ Implemented

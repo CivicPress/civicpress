@@ -1,0 +1,26 @@
+{
+  "name": "@civicpress/ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@nuxt/eslint": "1.6.0",
+    "@nuxt/scripts": "0.11.10",
+    "@nuxt/test-utils": "3.19.2",
+    "@nuxt/ui": "3.2.0",
+    "@unhead/vue": "^2.0.3",
+    "eslint": "^9.0.0",
+    "nuxt": "^4.0.0",
+    "typescript": "^5.6.3",
+    "vue": "^3.5.17",
+    "vue-router": "^4.5.1",
+    "vue-tsc": "^2.0.0"
+  }
+}

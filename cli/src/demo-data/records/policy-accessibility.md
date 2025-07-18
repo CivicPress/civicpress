@@ -1,5 +1,5 @@
 ---
-title: 'Politique d\'accessibilité universelle'
+title: "Politique d'accessibilité universelle"
 type: policy
 status: adopted
 module: legal-register
