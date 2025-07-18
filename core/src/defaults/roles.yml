@@ -1,0 +1,51 @@
+roles:
+  admin:
+    name: 'Administrator'
+    description: 'Full system access'
+    permissions:
+      - '*'
+      - 'records:import'
+      - 'records:export'
+      - 'templates:view'
+      - 'templates:manage'
+      - 'hooks:view'
+      - 'hooks:manage'
+      - 'workflows:manage'
+    status_transitions:
+      - 'draft'
+      - 'review'
+      - 'approved'
+      - 'rejected'
+      - 'archived'
+
+  clerk:
+    name: 'Clerk'
+    description: 'Can create and edit records'
+    permissions:
+      - 'records:create'
+      - 'records:edit'
+      - 'records:view'
+      - 'records:list'
+      - 'users:view'
+      - 'templates:view'
+    status_transitions:
+      - 'draft'
+      - 'review'
+
+  public:
+    name: 'Public'
+    description: 'Read-only access'
+    permissions:
+      - 'records:view'
+      - 'records:list'
+    status_transitions: []
+
+role_hierarchy:
+  admin:
+    - clerk
+    - public
+  clerk:
+    - public
+  public: []
+
+default_role: 'public'

@@ -1,0 +1,41 @@
+name: 'Pre-Commit Validation'
+description: 'Validates civic records before commit'
+trigger: 'pre-commit'
+enabled: true
+actions:
+  - name: 'validate-frontmatter'
+    type: 'script'
+    command: 'civic validate --check-frontmatter'
+    description: 'Validate YAML frontmatter structure'
+
+  - name: 'check-required-fields'
+    type: 'script'
+    command: 'civic validate --check-required-fields'
+    description: 'Check for required metadata fields'
+
+  - name: 'validate-links'
+    type: 'script'
+    command: 'civic validate --check-links'
+    description: 'Validate internal and external links'
+
+  - name: 'spell-check'
+    type: 'script'
+    command: 'civic validate --spell-check'
+    description: 'Run spell check on content'
+
+  - name: 'format-check'
+    type: 'script'
+    command: 'civic validate --check-formatting'
+    description: 'Check markdown formatting standards'
+
+conditions:
+  - field: 'status'
+    operator: 'in'
+    value: ['draft', 'review', 'adopted']
+
+  - field: 'type'
+    operator: 'in'
+    value: ['bylaw', 'policy', 'resolution', 'ordinance']
+
+failure_action: 'block'
+success_action: 'continue'

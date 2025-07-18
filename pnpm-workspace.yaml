@@ -4,20 +4,8 @@
 # As the project grows, we can add packages here.
 
 packages:
-  # Core packages
-  - 'packages/*'
-
-  # Apps (when we add them)
-  - 'apps/*'
-
-  # Tools and utilities
-  - 'tools/*'
-
-  # Documentation
-  - 'docs/*'
-
-  # Examples
-  - 'examples/*'
-
-  # Root package (this directory)
-  - '.'
+  - cli
+  - core
+  - modules/api
+  - modules/legal-register
+  # - modules/serve (Astro frontend removed)

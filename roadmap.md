@@ -1,13 +1,15 @@
 # 🗺️ CivicPress Roadmap
 
-> This roadmap outlines the development path for CivicPress, from MVP to long-term goals.  
+> This roadmap outlines the development path for CivicPress, from MVP to
+> long-term goals.  
 > It is designed to prioritize transparency, resilience, and civic trust.
 
 ---
 
 ## 🧪 MVP — Local Demo with Shadow Town (Richmond)
 
-🎯 Goal: Simulate a working civic platform using real town data in Markdown and Git.
+🎯 Goal: Simulate a working civic platform using real town data in Markdown and
+Git.
 
 ### Modules & Features
 
@@ -19,8 +21,8 @@
 - [x] ✅ `api` — REST interface for UI/app
 - [x] ✅ `frontend` — Public-facing read-only civic portal
 - [x] ✅ `permissions` — Role-based restrictions (manual for now)
-- [ ] 🔲 `auth` — GitHub OAuth + simulated accounts
-- [ ] 🔲 `indexing` — Parse `index.yml`, structure civic data
+- [x] ✅ `auth` — GitHub OAuth + simulated accounts
+- [x] ✅ `indexing` — Parse `index.yml`, structure civic data
 - [ ] 🔲 `serve` — Minimal PWA to browse civic records
 
 🎉 Target: **Working Shadow Mode for Richmond**  
@@ -30,7 +32,8 @@
 
 ## 🚀 Phase 2 — Alpha Launch
 
-🎯 Goal: Let a small real town (or simulated) use the system for decision tracking
+🎯 Goal: Let a small real town (or simulated) use the system for decision
+tracking
 
 ### Planned
 
@@ -71,4 +74,3 @@
 
 **This roadmap is a living document.**  
 Contribute ideas via issues or submit a spec in `.civic/specs/`.
-

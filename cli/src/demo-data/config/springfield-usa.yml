@@ -1,0 +1,49 @@
+name: 'City of Springfield'
+city: 'Springfield'
+state: 'Illinois'
+country: 'USA'
+timezone: 'America/Chicago'
+repo_url: 'https://github.com/springfield-il/civic-records'
+modules: ['legal-register', 'planning', 'finance']
+record_types: ['bylaw', 'policy', 'resolution', 'ordinance', 'proclamation']
+default_role: 'clerk'
+hooks:
+  enabled: true
+  pre_commit: true
+  post_commit: true
+workflows:
+  enabled: true
+  auto_index: true
+  approval_process: true
+audit:
+  enabled: true
+  log_changes: true
+demo_data:
+  name: 'springfield-usa'
+  description: 'Springfield, Illinois - Comprehensive civic records'
+  records:
+    - 'bylaw-zoning-code.md'
+    - 'bylaw-building-codes.md'
+    - 'bylaw-noise-ordinance.md'
+    - 'bylaw-parking-enforcement.md'
+    - 'policy-environmental-protection.md'
+    - 'policy-employee-handbook.md'
+    - 'policy-digital-services.md'
+    - 'policy-public-safety.md'
+    - 'resolution-budget-2025.md'
+    - 'resolution-capital-projects.md'
+    - 'resolution-committee-appointments.md'
+    - 'ordinance-tax-increase.md'
+    - 'ordinance-business-licensing.md'
+    - 'proclamation-mayors-day.md'
+    - 'proclamation-veterans-day.md'
+  hooks:
+    - 'pre-commit-validation.yml'
+    - 'post-commit-notification.yml'
+  templates:
+    - 'bylaw-template.md'
+    - 'policy-template.md'
+    - 'resolution-template.md'
+  workflows:
+    - 'approval-workflow.yml'
+    - 'publication-workflow.yml'
