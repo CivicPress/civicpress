@@ -35,6 +35,16 @@ simulated accounts for development.
 
 ### GitHub OAuth Authentication
 
+#### Getting a GitHub Token
+
+1. **Create a Personal Access Token**:
+   - Go to GitHub Settings > Developer settings > Personal access tokens
+   - Click "Generate new token (classic)"
+   - Select scopes: `repo`, `read:user`, `user:email`
+   - Copy the generated token (you won't see it again!)
+
+2. **Using the Token**:
+
 ```bash
 # Authenticate with GitHub token
 civic auth:login --token <github_token>
@@ -45,6 +55,9 @@ civic auth:validate --token <github_token>
 # Interactive login (prompts for token)
 civic auth:login
 ```
+
+**Note**: GitHub tokens are required for most operations. Store your token
+securely!
 
 ### Simulated Authentication (Development)
 
