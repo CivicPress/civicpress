@@ -919,9 +919,66 @@ export async function createCLITestContext(): Promise<CLITestContext> {
     stdio: 'pipe',
   });
 
+  // Create admin user using simulated authentication (for testing)
+  let adminToken: string | undefined;
+  try {
+    // Use simulated authentication for admin user
+    const authResult = execSync(
+      `cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} auth:simulated --username testadmin --role admin --json`,
+      { encoding: 'utf8' }
+    );
+
+    // Extract JSON from the output (it's at the end after initialization messages)
+    const lines = authResult.split('\n');
+
+    // Find the JSON object in the output
+    let jsonStart = -1;
+    let jsonEnd = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim().startsWith('{')) {
+        jsonStart = i;
+        break;
+      }
+    }
+
+    if (jsonStart !== -1) {
+      // Find the closing brace
+      let braceCount = 0;
+      for (let i = jsonStart; i < lines.length; i++) {
+        const line = lines[i];
+        for (const char of line) {
+          if (char === '{') braceCount++;
+          if (char === '}') braceCount--;
+          if (braceCount === 0) {
+            jsonEnd = i;
+            break;
+          }
+        }
+        if (jsonEnd !== -1) break;
+      }
+
+      if (jsonEnd !== -1) {
+        const jsonText = lines.slice(jsonStart, jsonEnd + 1).join('\n');
+        const authJson = JSON.parse(jsonText);
+        adminToken = authJson.session.token;
+      } else {
+        throw new Error(
+          'Could not find complete JSON object in simulated authentication'
+        );
+      }
+    } else {
+      throw new Error('No JSON output found in simulated authentication');
+    }
+  } catch (error) {
+    // If admin user creation failed, we'll continue without admin token
+    // Tests that need authentication will need to handle this case
+    console.warn('Warning: Failed to create admin user for CLI tests:', error);
+  }
+
   return {
     testDir: config.testDir,
     cliPath: TEST_CONFIG.CLI_PATH,
+    adminToken,
   };
 }
 

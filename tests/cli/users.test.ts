@@ -16,6 +16,11 @@ describe('CLI User Management', () => {
 
   beforeEach(async () => {
     context = await createCLITestContext();
+    adminToken = context.adminToken;
+
+    if (!adminToken) {
+      throw new Error('Admin token not available for testing');
+    }
   });
 
   afterEach(async () => {
@@ -25,7 +30,7 @@ describe('CLI User Management', () => {
   describe('User Creation', () => {
     it('should create a user with all required fields', () => {
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser1 --password testpass123 --name "Test User 1" --role public`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser1 --password testpass123 --name "Test User 1" --role public --token ${adminToken}`,
         { encoding: 'utf8' }
       );
 
@@ -35,7 +40,7 @@ describe('CLI User Management', () => {
 
     it('should create a user with minimal fields (defaults to public role)', () => {
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser2 --password testpass123`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser2 --password testpass123 --token ${adminToken}`,
         { encoding: 'utf8' }
       );
 
@@ -46,7 +51,7 @@ describe('CLI User Management', () => {
     it('should fail when username is missing', () => {
       expect(() => {
         execSync(
-          `cd ${context.testDir} && node ${context.cliPath} users:create --password testpass123`,
+          `cd ${context.testDir} && node ${context.cliPath} users:create --password testpass123 --token ${adminToken}`,
           { encoding: 'utf8' }
         );
       }).toThrow();
@@ -55,7 +60,7 @@ describe('CLI User Management', () => {
     it('should fail when password is missing', () => {
       expect(() => {
         execSync(
-          `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser3`,
+          `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser3 --token ${adminToken}`,
           { encoding: 'utf8' }
         );
       }).toThrow();
@@ -63,7 +68,7 @@ describe('CLI User Management', () => {
 
     it('should output JSON when --json flag is used', () => {
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser4 --password testpass123 --name "Test User 4" --json`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser4 --password testpass123 --name "Test User 4" --json --token ${adminToken}`,
         { encoding: 'utf8' }
       );
 
@@ -75,29 +80,64 @@ describe('CLI User Management', () => {
 
   describe('User Authentication', () => {
     beforeEach(() => {
-      // Create test users for authentication tests
+      // Create test users for authentication tests using admin token
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testadmin --password adminpass123 --name "Test Admin" --role admin`,
-        { stdio: 'pipe' }
-      );
-      execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
     });
 
     it('should authenticate admin user and return token', () => {
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testadmin --password adminpass123 --json`,
+        `cd ${context.testDir} && node ${context.cliPath} auth:simulated --username testadmin --role admin --json`,
         { encoding: 'utf8' }
       );
 
-      const jsonResult = JSON.parse(result);
-      expect(jsonResult.success).toBe(true);
-      expect(jsonResult.session.token).toBeDefined();
-      expect(jsonResult.session.user.role).toBe('admin');
+      // Extract JSON from the output (it's at the end after initialization messages)
+      const lines = result.split('\n');
 
-      adminToken = jsonResult.session.token;
+      // Find the JSON object in the output
+      let jsonStart = -1;
+      let jsonEnd = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim().startsWith('{')) {
+          jsonStart = i;
+          break;
+        }
+      }
+
+      if (jsonStart !== -1) {
+        // Find the closing brace
+        let braceCount = 0;
+        for (let i = jsonStart; i < lines.length; i++) {
+          const line = lines[i];
+          for (const char of line) {
+            if (char === '{') braceCount++;
+            if (char === '}') braceCount--;
+            if (braceCount === 0) {
+              jsonEnd = i;
+              break;
+            }
+          }
+          if (jsonEnd !== -1) break;
+        }
+
+        if (jsonEnd !== -1) {
+          const jsonText = lines.slice(jsonStart, jsonEnd + 1).join('\n');
+          const jsonResult = JSON.parse(jsonText);
+          expect(jsonResult.success).toBe(true);
+          expect(jsonResult.session.token).toBeDefined();
+          expect(jsonResult.session.user.role).toBe('admin');
+
+          adminToken = jsonResult.session.token;
+        } else {
+          throw new Error(
+            'Could not find complete JSON object in simulated authentication'
+          );
+        }
+      } else {
+        throw new Error('No JSON output found in simulated authentication');
+      }
     });
 
     it('should authenticate regular user and return token', () => {
@@ -135,23 +175,11 @@ describe('CLI User Management', () => {
 
   describe('User Listing (Permission Tests)', () => {
     beforeEach(() => {
-      // Create test users for permission tests
+      // Create test users for permission tests using admin token
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testadmin --password adminpass123 --name "Test Admin" --role admin`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
-      execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public`,
-        { stdio: 'pipe' }
-      );
-
-      // Get admin token
-      const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testadmin --password adminpass123 --json`,
-        { encoding: 'utf8' }
-      );
-      const jsonResult = JSON.parse(result);
-      adminToken = jsonResult.session.token;
 
       // Get regular user token
       const regularResult = execSync(
@@ -208,23 +236,11 @@ describe('CLI User Management', () => {
 
   describe('User Updates (Permission Tests)', () => {
     beforeEach(() => {
-      // Create test users for update tests
+      // Create test users for update tests using admin token
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testadmin --password adminpass123 --name "Test Admin" --role admin`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
-      execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public`,
-        { stdio: 'pipe' }
-      );
-
-      // Get admin token
-      const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testadmin --password adminpass123 --json`,
-        { encoding: 'utf8' }
-      );
-      const jsonResult = JSON.parse(result);
-      adminToken = jsonResult.session.token;
 
       // Get regular user token
       const regularResult = execSync(
@@ -270,27 +286,15 @@ describe('CLI User Management', () => {
 
   describe('User Deletion (Permission Tests)', () => {
     beforeEach(() => {
-      // Create test users for deletion tests
+      // Create test users for deletion tests using admin token
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testadmin --password adminpass123 --name "Test Admin" --role admin`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testdelete --password deletepass123 --name "Test Delete" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
-      execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testdelete --password deletepass123 --name "Test Delete" --role public`,
-        { stdio: 'pipe' }
-      );
-
-      // Get admin token
-      const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testadmin --password adminpass123 --json`,
-        { encoding: 'utf8' }
-      );
-      const jsonResult = JSON.parse(result);
-      adminToken = jsonResult.session.token;
 
       // Get regular user token
       const regularResult = execSync(
