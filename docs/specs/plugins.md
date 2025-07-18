@@ -1,33 +1,21 @@
 # 🧩 CivicPress Spec: `plugins.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-04'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive development examples
 - security testing patterns
 - CLI documentation
-- performance testing frameworks
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- performance testing frameworks fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
   - 'permissions.md: >=1.0.0'
   - 'plugin-api.md: >=1.0.0'
   - 'plugin-development.md: >=1.0.0'
-  - 'testing-framework.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'testing-framework.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -66,21 +54,21 @@ This spec defines how plugins are structured, loaded, and sandboxed.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Plugin manifests         | Plugin configuration and metadata files |
-| Plugin code              | JavaScript/TypeScript plugin source code |
-| Plugin assets            | UI components, styles, and resources |
-| Plugin hooks             | Event handlers and lifecycle callbacks |
-| Plugin configuration      | User-defined plugin settings and options |
+| Input                | Description                              |
+| -------------------- | ---------------------------------------- |
+| Plugin manifests     | Plugin configuration and metadata files  |
+| Plugin code          | JavaScript/TypeScript plugin source code |
+| Plugin assets        | UI components, styles, and resources     |
+| Plugin hooks         | Event handlers and lifecycle callbacks   |
+| Plugin configuration | User-defined plugin settings and options |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Loaded plugins           | Active plugins in the CivicPress system |
-| Plugin routes            | API endpoints registered by plugins |
-| Plugin widgets           | UI components injected by plugins |
-| Plugin workflows         | Automated processes triggered by plugins |
-| Plugin notifications     | Alerts and messages from plugins |
+| Output               | Description                              |
+| -------------------- | ---------------------------------------- |
+| Loaded plugins       | Active plugins in the CivicPress system  |
+| Plugin routes        | API endpoints registered by plugins      |
+| Plugin widgets       | UI components injected by plugins        |
+| Plugin workflows     | Automated processes triggered by plugins |
+| Plugin notifications | Alerts and messages from plugins         |
 
 ---
 
@@ -207,7 +195,7 @@ description: 'Adds town founding anniversary banner and calendar reminders.'
 entry: 'hooks.js'
 author: 'Sophie Germain'
 license: 'MIT'
-repository: 'https://github.com/civicpress/civic-anniversary'
+repository: 'https://github.com/CivicPress/civic-anniversary'
 homepage: 'https://civicpress.org/plugins/anniversary'
 
 # Plugin capabilities and permissions
@@ -256,7 +244,7 @@ metadata:
     - 'sophie@civic-press.org'
   support:
     email: 'support@civicpress.org'
-    issues: 'https://github.com/civicpress/civic-anniversary/issues'
+    issues: 'https://github.com/CivicPress/civic-anniversary/issues'
 ```
 
 ---
@@ -817,10 +805,10 @@ export class AnniversaryCLI {
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/civicpress/civic-anniversary.git"
+    "url": "https://github.com/CivicPress/civic-anniversary.git"
   },
   "bugs": {
-    "url": "https://github.com/civicpress/civic-anniversary/issues"
+    "url": "https://github.com/CivicPress/civic-anniversary/issues"
   },
   "homepage": "https://civicpress.org/plugins/anniversary"
 }

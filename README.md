@@ -55,7 +55,7 @@ provides:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/civicpress.git
+git clone https://github.com/CivicPress/civicpress.git
 cd civicpress
 
 # Install dependencies
@@ -64,6 +64,9 @@ pnpm install
 # Build the project
 pnpm run build
 ```
+
+**Note**: Most operations require a GitHub Personal Access Token. See
+[Authentication Guide](docs/auth-system.md) for setup instructions.
 
 ### Initialize a New CivicPress Instance
 
