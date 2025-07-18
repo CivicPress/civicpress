@@ -133,13 +133,15 @@ describe('CLI Init Command', () => {
         expect(result.stderr).toContain('CLI testing disabled');
       });
 
-      it('should prompt for PostgreSQL URL when PostgreSQL is selected (manual test)', async () => {
-        // This test documents the expected behavior for PostgreSQL URL prompts
+      it('should warn about PostgreSQL being unsupported when selected (manual test)', async () => {
+        // This test documents the expected behavior for PostgreSQL selection
         // To test manually:
         // 1. Run: civic init
         // 2. Select: PostgreSQL database type
-        // 3. Verify: PostgreSQL connection URL prompt appears
-        // 4. Verify: Default URL is postgres://user:password@localhost:5432/civicpress
+        // 3. Verify: Warning message appears about PostgreSQL not being implemented
+        // 4. Verify: User is prompted to continue or switch to SQLite
+        // 5. Verify: If user continues, PostgreSQL URL prompt appears
+        // 6. Verify: If user switches, SQLite is used instead
 
         const result = await runCivicCommand(
           'init',
@@ -171,13 +173,16 @@ describe('CLI Init Command', () => {
         expect(result.stderr).toContain('CLI testing disabled');
       });
 
-      it('should create .civicrc with PostgreSQL configuration (manual test)', async () => {
+      it('should create .civicrc with PostgreSQL configuration after warning (manual test)', async () => {
         // This test documents the expected behavior for PostgreSQL .civicrc creation
         // To test manually:
         // 1. Run: civic init
         // 2. Select: PostgreSQL database type
-        // 3. Enter: Custom connection URL
-        // 4. Verify: .civicrc file is created with correct PostgreSQL configuration
+        // 3. Verify: Warning appears about PostgreSQL not being implemented
+        // 4. Choose: Continue with PostgreSQL anyway
+        // 5. Enter: Custom connection URL
+        // 6. Verify: .civicrc file is created with correct PostgreSQL configuration
+        // 7. Note: This will cause errors when the system tries to use PostgreSQL
 
         const result = await runCivicCommand(
           'init',

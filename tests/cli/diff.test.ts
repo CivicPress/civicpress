@@ -170,31 +170,10 @@ describe('CLI Diff Command', () => {
       const commits = gitLog.toString().trim().split('\n').filter(Boolean);
 
       if (commits.length < 2) {
-        console.log('Not enough commits found. Git log:', gitLog.toString());
         return; // Skip this test if we don't have enough commits
       }
 
       const [commit2, commit1] = commits;
-
-      // Debug: print git log and file contents at each commit
-      console.log(
-        'GIT LOG:\n' +
-          execSync('git log --oneline', {
-            cwd: join(context.testDir, 'data'),
-          }).toString()
-      );
-      console.log(
-        'COMMIT1 CONTENT:\n' +
-          execSync(`git show ${commit1}:records/resolution/test-diff.md`, {
-            cwd: join(context.testDir, 'data'),
-          }).toString()
-      );
-      console.log(
-        'COMMIT2 CONTENT:\n' +
-          execSync(`git show ${commit2}:records/resolution/test-diff.md`, {
-            cwd: join(context.testDir, 'data'),
-          }).toString()
-      );
 
       // Step 4: Run the diff command between the two commits
       const result = await runCivicCommand(

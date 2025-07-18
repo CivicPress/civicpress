@@ -65,7 +65,8 @@ pnpm install
 pnpm run build
 ```
 
-**Note**: Most operations require a GitHub Personal Access Token. See
+**Note**: Most operations require authentication. CivicPress supports both
+GitHub Personal Access Tokens and username/password authentication. See
 [Authentication Guide](docs/auth-system.md) for setup instructions.
 
 ### Initialize a New CivicPress Instance
@@ -76,6 +77,21 @@ civic init
 
 # Or initialize with defaults
 civic init --non-interactive
+```
+
+### Authentication
+
+CivicPress supports multiple authentication methods:
+
+```bash
+# GitHub OAuth (recommended for development)
+civic auth:login --token <your_github_token>
+
+# Username/Password (traditional authentication)
+civic auth:password --username <username> --password <password>
+
+# Interactive login (prompts for credentials)
+civic auth:password
 ```
 
 ### Basic Usage
@@ -99,15 +115,20 @@ civic history record-id
 ### Authentication
 
 ```bash
-# Simulated authentication (for testing)
-curl -X POST http://localhost:3000/api/auth/simulated \
+# GitHub OAuth authentication
+curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "role": "admin"}'
+  -d '{"token": "your_github_token", "provider": "github"}'
 
 # Password authentication
 curl -X POST http://localhost:3000/api/auth/password \
   -H "Content-Type: application/json" \
   -d '{"username": "user", "password": "password"}'
+
+# Simulated authentication (for testing)
+curl -X POST http://localhost:3000/api/auth/simulated \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "role": "admin"}'
 ```
 
 ### Records API

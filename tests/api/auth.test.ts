@@ -22,26 +22,12 @@ describe('Authentication API', () => {
 
   describe('POST /auth/simulated', () => {
     it('should authenticate with valid simulated credentials', async () => {
-      console.log('REACHED TEST BODY');
       const response = await request(context.api.getApp())
         .post('/auth/simulated')
         .send({
           username: 'testuser',
           role: 'admin',
         });
-
-      console.log('API_RESPONSE_BODY:', JSON.stringify(response.body, null, 2));
-
-      if (response.status !== 200) {
-        const fs = require('fs');
-        fs.writeFileSync(
-          '/tmp/civicpress-api-debug.json',
-          JSON.stringify(response.body, null, 2)
-        );
-        throw new Error(
-          'API_RESPONSE_DEBUG: ' + JSON.stringify(response.body, null, 2)
-        );
-      }
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);

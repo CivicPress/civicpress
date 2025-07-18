@@ -33,9 +33,13 @@ simulated accounts for development.
 
 ## 🔧 CLI Commands
 
-### GitHub OAuth Authentication
+### Authentication Methods
 
-#### Getting a GitHub Token
+CivicPress supports multiple authentication methods:
+
+#### 1. GitHub OAuth Authentication
+
+**Getting a GitHub Token**:
 
 1. **Create a Personal Access Token**:
    - Go to GitHub Settings > Developer settings > Personal access tokens
@@ -56,8 +60,23 @@ civic auth:validate --token <github_token>
 civic auth:login
 ```
 
-**Note**: GitHub tokens are required for most operations. Store your token
-securely!
+#### 2. Username/Password Authentication
+
+For traditional username/password authentication:
+
+```bash
+# Login with username and password
+civic auth:password --username <username> --password <password>
+
+# Interactive password login (prompts for credentials)
+civic auth:password
+
+# Validate password authentication
+civic auth:validate --username <username> --password <password>
+```
+
+**Note**: Both GitHub tokens and username/password are supported. Choose the
+method that works best for your setup!
 
 ### Simulated Authentication (Development)
 
@@ -102,6 +121,19 @@ Authenticate with OAuth provider token.
 {
   "token": "github_oauth_token",
   "provider": "github"
+}
+```
+
+#### POST /api/auth/password
+
+Authenticate with username and password.
+
+**Request:**
+
+```json
+{
+  "username": "your_username",
+  "password": "your_password"
 }
 ```
 

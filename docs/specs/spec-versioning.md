@@ -1,16 +1,11 @@
 # 📋 CivicPress Spec: `spec-versioning.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-04'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-authors:
 
-- 'Sophie Germain <sophie@civic-press.org>'
-reviewers:
+version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-15'
+deprecated: false sunset_date: null authors:
+
+- 'Sophie Germain <sophie@civic-press.org>' reviewers:
 - 'Ada Lovelace'
 - 'Irène Joliot-Curie'
 
@@ -47,21 +42,21 @@ of updates across the development team and community.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Spec files               | Markdown specification files to version |
-| Version metadata         | Version numbers, status, and dates |
-| Change requests          | Proposed changes and modifications |
-| Dependency updates       | Changes to spec dependencies |
-| Migration requirements   | Breaking change migration needs |
+| Input                  | Description                             |
+| ---------------------- | --------------------------------------- |
+| Spec files             | Markdown specification files to version |
+| Version metadata       | Version numbers, status, and dates      |
+| Change requests        | Proposed changes and modifications      |
+| Dependency updates     | Changes to spec dependencies            |
+| Migration requirements | Breaking change migration needs         |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Versioned specs          | Updated specification files with new versions |
-| Changelog entries        | Documented changes and classifications |
-| Migration guides         | Step-by-step migration instructions |
-| Version matrices         | Compatibility and dependency matrices |
-| Release notifications    | Notifications of spec updates |
+| Output                | Description                                   |
+| --------------------- | --------------------------------------------- |
+| Versioned specs       | Updated specification files with new versions |
+| Changelog entries     | Documented changes and classifications        |
+| Migration guides      | Step-by-step migration instructions           |
+| Version matrices      | Compatibility and dependency matrices         |
+| Release notifications | Notifications of spec updates                 |
 
 ---
 
@@ -198,7 +193,7 @@ export class MigrationPathTests {
       migrationTests.map(test => this.generateMigrationPath(test.from, test.to))
     );
 
-    const passed = results.every((r, i) => 
+    const passed = results.every((r, i) =>
       r.steps.length === migrationTests[i].expectedSteps
     );
 
@@ -290,7 +285,7 @@ export class ChangelogGenerationTests {
     const changelog = await this.generateChangelog('test-spec.md', '1.0.0', '2.0.0');
     const requiredSections = ['Breaking Changes', 'Additions', 'Fixes'];
 
-    const hasRequiredSections = requiredSections.every(section => 
+    const hasRequiredSections = requiredSections.every(section =>
       changelog.content.includes(section)
     );
 
@@ -309,7 +304,7 @@ export class ChangelogGenerationTests {
     ];
 
     const changelog = await this.generateChangelogFromChanges(changes);
-    const allChangesIncluded = changes.every(change => 
+    const allChangesIncluded = changes.every(change =>
       changelog.content.includes(change.description)
     );
 
@@ -574,7 +569,7 @@ reviewers:
 
 ### Breaking Change Migration
 
-```markdown
+````markdown
 ## 🔄 Migration Guide: v1.4.0 → v2.0.0
 
 ### Breaking Changes
@@ -591,9 +586,9 @@ version: '1.0.0'
 description: 'Adds town founding anniversary banner and calendar reminders.'
 entry: 'hooks.js'
 author: 'Sophie Germain'
-```
+````
 
-```
+````
 
 **After (v2.0.0):**
 
@@ -606,7 +601,7 @@ description: 'Adds town founding anniversary banner and calendar reminders.'
 entry: 'hooks.js'
 author: 'Sophie Germain'
 license: 'MIT' # NEW: Required field
-repository: 'https://github.com/civicpress/civic-anniversary' # NEW: Required field
+repository: 'https://github.com/CivicPress/civic-anniversary' # NEW: Required field
 capabilities: # NEW: Required section
   - 'api:routes'
   - 'ui:widgets'
@@ -614,7 +609,7 @@ capabilities: # NEW: Required section
 security: # NEW: Required section
   signed: true
   gpg_key: '0x1234567890ABCDEF'
-```
+````
 
 #### 2. API Interface Changes
 
@@ -672,7 +667,7 @@ civic spec migrate v1.4.0 v2.0.0 --auto
 civic spec validate-migration
 ```
 
-```
+````
 
 ### Deprecation Process
 
@@ -705,7 +700,7 @@ The following features are deprecated and will be removed in v2.0.0:
 | v1.5.0 | 2025-07-15 | **Current** | Deprecation warnings |
 | v1.6.0 | 2025-08-15 | **Future** | Enhanced warnings |
 | v2.0.0 | 2025-10-15 | **Future** | Complete removal |
-```
+````
 
 ---
 

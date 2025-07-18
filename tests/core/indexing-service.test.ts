@@ -22,15 +22,19 @@ describe('IndexingService', () => {
     // Create test directory with proper structure
     testConfig = createTestDirectory('indexing-service-test');
 
-    // Debug: check if testConfig is properly created
-    console.log('testConfig:', testConfig);
-    console.log('testConfig.dataDir:', testConfig.dataDir);
-
     // Create roles configuration
     createRolesConfig(testConfig);
 
-    // Initialize CivicPress
-    civicPress = new CivicPress({ dataDir: testConfig.dataDir });
+    // Initialize CivicPress with test database
+    civicPress = new CivicPress({
+      dataDir: testConfig.dataDir,
+      database: {
+        type: 'sqlite' as const,
+        sqlite: {
+          file: join(testConfig.testDir, 'test.db'),
+        },
+      },
+    });
     await civicPress.initialize();
 
     // Mock getRecordManager for sync tests

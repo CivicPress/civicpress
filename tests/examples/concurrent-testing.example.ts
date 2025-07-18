@@ -20,7 +20,6 @@ describe('Concurrent Testing Example', () => {
   beforeEach(async () => {
     // This now uses a random port between 3000-3999
     context = await createAPITestContext();
-    console.log(`API server running on port ${context.port}`);
   });
 
   afterEach(async () => {
@@ -37,7 +36,6 @@ describe('Concurrent Testing Example', () => {
       .set('Authorization', `Bearer ${authToken}`);
 
     expect(response.status).toBe(200);
-    console.log(`Test completed on port ${context.port}`);
   });
 
   it('should handle multiple concurrent tests', async () => {
@@ -50,6 +48,5 @@ describe('Concurrent Testing Example', () => {
       .set('Authorization', `Bearer ${authToken}`);
 
     expect(response.status).toBe(200);
-    console.log(`Concurrent test completed on port ${context.port}`);
   });
 });

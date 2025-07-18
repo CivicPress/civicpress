@@ -570,6 +570,22 @@ async function setupCivicrcFromFile(
     }
   }
 
+  // Warn if PostgreSQL is configured in the file
+  if (config.database?.type === 'postgres') {
+    logger.warn('⚠️  PostgreSQL is not yet implemented and will cause errors.');
+    logger.warn(
+      '💡 Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
+
+    // Override to SQLite to prevent errors
+    logger.info('🔄 Switching to SQLite to avoid errors...');
+    config.database.type = 'sqlite';
+    config.database.sqlite = {
+      file: path.join(process.cwd(), '.system-data/civic.db'),
+    };
+    delete config.database.postgres;
+  }
+
   // Create .civicrc object (system config - only system settings)
   const civicrc = {
     version: '1.0.0',
@@ -1007,7 +1023,10 @@ async function setupCivicrc(
       message: 'Select database type:',
       choices: [
         { name: 'SQLite (recommended for local development)', value: 'sqlite' },
-        { name: 'PostgreSQL (for production)', value: 'postgres' },
+        {
+          name: 'PostgreSQL (unsupported - not implemented yet)',
+          value: 'postgres',
+        },
       ],
       default: 'sqlite',
     },
@@ -1026,6 +1045,30 @@ async function setupCivicrc(
       when: (answers: any) => answers.database_type === 'postgres',
     },
   ]);
+
+  // Warn if PostgreSQL is selected
+  if (answers.database_type === 'postgres') {
+    logger.warn('⚠️  PostgreSQL is not yet implemented and will cause errors.');
+    logger.warn(
+      '💡 Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
+
+    const { continueWithPostgres } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continueWithPostgres',
+        message:
+          'Do you want to continue with PostgreSQL anyway? (not recommended)',
+        default: false,
+      },
+    ]);
+
+    if (!continueWithPostgres) {
+      logger.info('🔄 Switching to SQLite...');
+      answers.database_type = 'sqlite';
+      answers.database_path = path.join(process.cwd(), '.system-data/civic.db');
+    }
+  }
 
   // Create .civicrc object (system config - only system settings)
   const civicrc = {

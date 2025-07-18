@@ -365,12 +365,24 @@ function createMockIndexingService() {
             slug: 'noise-restrictions',
             path: 'records/bylaw-noise-restrictions.md',
           },
+          {
+            title: 'Old Regulation',
+            type: 'bylaw',
+            status: 'archived',
+            module: 'legal-register',
+            tags: ['archived', 'historical'],
+            authors: [{ name: 'Historical Department', role: 'clerk' }],
+            created: '2020-01-01',
+            updated: '2025-01-01',
+            slug: 'old-regulation',
+            path: 'records/bylaw-old-regulation.md',
+          },
         ],
         metadata: {
-          totalRecords: 1,
+          totalRecords: 2,
           modules: ['legal-register'],
           types: ['bylaw'],
-          statuses: ['adopted'],
+          statuses: ['adopted', 'archived'],
           generatedAt: new Date().toISOString(),
         },
       };
@@ -385,6 +397,16 @@ function createMockIndexingService() {
           options.statuses.includes(entry.status)
         );
       }
+
+      // Update metadata based on filtered entries
+      index.metadata.totalRecords = index.entries.length;
+      index.metadata.types = [...new Set(index.entries.map((e) => e.type))];
+      index.metadata.statuses = [
+        ...new Set(index.entries.map((e) => e.status)),
+      ];
+      index.metadata.modules = [
+        ...new Set(index.entries.map((e) => e.module).filter(Boolean)),
+      ];
 
       return index;
     }),
@@ -748,16 +770,6 @@ export function createRolesConfig(config: TestConfig) {
   };
 
   writeFileSync(join(config.civicDir, 'roles.yml'), yaml.dump(rolesConfig));
-
-  // Debug output: log the path and existence of the roles config file
-  const rolesPath = join(config.civicDir, 'roles.yml');
-  // eslint-disable-next-line no-console
-  console.log(
-    '[DEBUG] roles.yml written at:',
-    rolesPath,
-    'exists:',
-    existsSync(rolesPath)
-  );
 }
 
 // Sample data generation
@@ -803,13 +815,41 @@ export function createSampleRecords(config: TestConfig) {
       },
       path: 'records/resolution-budget-2025.md',
     },
+    {
+      id: 'bylaw-old-regulation',
+      title: 'Old Regulation',
+      type: 'bylaw',
+      status: 'archived',
+      content: '# Old Regulation\n\nThis regulation has been archived.',
+      metadata: {
+        author: 'Historical Department',
+        created: '2020-01-01',
+        tags: ['archived', 'historical', 'old'],
+      },
+      path: 'records/bylaw-old-regulation.md',
+    },
   ];
 
   sampleRecords.forEach((record) => {
     const filePath = join(config.recordsDir, record.path);
     const dir = join(filePath, '..');
     mkdirSync(dir, { recursive: true });
-    writeFileSync(filePath, record.content);
+
+    // Create proper frontmatter format
+    const frontmatter = `---
+id: ${record.id}
+title: ${record.title}
+type: ${record.type}
+status: ${record.status}
+author: ${record.metadata.author}
+created: ${record.metadata.created}
+${record.metadata.tags ? `tags: [${record.metadata.tags.map((tag) => `"${tag}"`).join(', ')}]` : ''}
+${record.metadata.attachments ? `attachments: [${record.metadata.attachments.map((att) => `"${att}"`).join(', ')}]` : ''}
+---
+
+${record.content}`;
+
+    writeFileSync(filePath, frontmatter);
   });
 
   return sampleRecords;
@@ -1012,15 +1052,17 @@ export async function createAPITestContext(): Promise<APITestContext> {
   await dataGit.add('.');
   await dataGit.commit('Initial commit');
 
-  // Add a sample record file and commit it
+  // Add sample record files and commit them
   const bylawDir = join(config.dataDir, 'records', 'bylaw');
   await (await import('fs/promises')).mkdir(bylawDir, { recursive: true });
+
+  // Add the test record
   const sampleRecordPath = join(bylawDir, 'test-record.md');
   const sampleRecordContent = `---
 id: test-record
 title: Test Record
 type: bylaw
-status: draft
+status: archived
 author: test
 ---
 
@@ -1030,15 +1072,43 @@ This is a test record for API testing.`;
   await (
     await import('fs/promises')
   ).writeFile(sampleRecordPath, sampleRecordContent);
+
+  // Add an archived record for indexing tests
+  const archivedRecordPath = join(bylawDir, 'old-regulation.md');
+  const archivedRecordContent = `---
+id: old-regulation
+title: Old Regulation
+type: bylaw
+status: archived
+author: Historical Department
+---
+
+# Old Regulation
+
+This regulation has been archived.`;
+  await (
+    await import('fs/promises')
+  ).writeFile(archivedRecordPath, archivedRecordContent);
+
   await dataGit.add(sampleRecordPath);
-  await dataGit.commit('feat(admin): Add test-record for API tests');
+  await dataGit.add(archivedRecordPath);
+  await dataGit.commit('feat(admin): Add test records for API tests');
 
   // Initialize API with dynamic port
   const { CivicPressAPI } = await import('../../modules/api/src/index.js');
   const api = new CivicPressAPI(port);
 
-  // Initialize CivicPress core first, then force reload role config before setting up routes
-  await api.initialize(config.dataDir);
+  // Change to test directory so CentralConfigManager finds the .civicrc file
+  const originalCwd = process.cwd();
+  process.chdir(config.testDir);
+
+  try {
+    // Initialize CivicPress core first, then force reload role config before setting up routes
+    await api.initialize(config.dataDir);
+  } finally {
+    // Restore original working directory
+    process.chdir(originalCwd);
+  }
 
   // Generate the index after creating sample records and initializing the API
   const civicPress = api.getCivicPress();
@@ -1053,11 +1123,6 @@ This is a test record for API testing.`;
   // Force reload role configuration after CivicPress initialization but before routes are fully set up
   if (civicPress && typeof civicPress.getAuthService === 'function') {
     await civicPress.getAuthService().reloadRoleConfig();
-    const { getLogger } = await import('../../core/dist/utils/logger.js');
-    const logger = getLogger();
-    logger.debug(
-      'API test context: Called civicPress.getAuthService().reloadRoleConfig() after CivicPress initialization'
-    );
   }
 
   return {
@@ -1219,9 +1284,6 @@ export async function setupGlobalTestEnvironment() {
   const loggerModule = await import('../../core/dist/utils/logger.js');
   const logger = new loggerModule.Logger({ level: 4 }); // DEBUG level
   loggerModule.setLogger(logger);
-
-  // Force a test log to confirm logger is working
-  logger.debug('Test setup: Logger configured with DEBUG level');
 
   // Setup core mocks - COMMENTED OUT FOR INTEGRATION TESTS
   // setupCoreMocks();
