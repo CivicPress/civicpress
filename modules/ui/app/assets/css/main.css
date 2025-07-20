@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@import "@nuxt/ui-pro";
+
+/* Custom styles for CivicPress */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: aqua;
+  }
+}
+
+@layer components {
+  /* .glass-card {
+    @apply bg-white/80 backdrop-blur-sm border-0 shadow-lg;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent;
+  }
+  
+  .gradient-bg {
+    @apply bg-gradient-to-br from-blue-50 to-indigo-100;
+  } */
+} 

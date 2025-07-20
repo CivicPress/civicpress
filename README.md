@@ -14,6 +14,7 @@ provides:
 - **Role-based access control** with granular permissions for different civic
   roles
 - **Comprehensive API** for programmatic access and integration
+- **Modern UI** with Nuxt 4 and Nuxt UI Pro for user interaction
 - **Modular architecture** supporting plugins and federation
 - **Enterprise-grade security** with cryptographic verification and audit logs
 - **Scalable design** supporting multi-tenant deployments and federation
@@ -30,6 +31,7 @@ provides:
 - **Authentication**: Multiple auth methods (OAuth, simulated, password)
 - **Indexing System**: Advanced search and discovery capabilities
 - **User Management**: Complete CRUD operations for users with role management
+- **Modern UI**: Nuxt 4 frontend with Nuxt UI Pro components
 
 ### ✅ Record Management (Implemented)
 
@@ -108,6 +110,18 @@ civic search "keyword"
 
 # View record history
 civic history record-id
+```
+
+### Running the UI
+
+```bash
+# Start the API server (required for UI)
+pnpm dev:api
+
+# Start the UI development server
+pnpm dev:ui
+
+# Access the UI at http://localhost:3030
 ```
 
 ## API Usage
@@ -189,6 +203,10 @@ pnpm run lint
 
 # Type check
 pnpm run type-check
+
+# Start development servers
+pnpm dev:api    # API server on port 3000
+pnpm dev:ui     # UI server on port 3030
 ```
 
 ## Architecture
@@ -198,9 +216,11 @@ CivicPress
 ├── CLI (Node.js + CAC) ✅ Fully tested
 ├── API (Node.js + Express) ✅ Fully tested
 ├── Core (TypeScript libraries) ✅ Fully tested
-├── Modules (Plugin system) 🚀 Planned
-├── Federation (Multi-node sync) 🚀 Planned
-└── Frontend (Astro → Nuxt PWA) ⏳ Migration planned
+├── Database (SQLite + Git) ✅ Fully tested
+└── UI (Nuxt 4 + Nuxt UI Pro) ✅ Static page working
+    ├── API Integration 🔄 In progress
+    ├── Authentication 🔄 Planned
+    └── Admin Interface 🔄 Planned
 ```
 
 ## Technology Stack

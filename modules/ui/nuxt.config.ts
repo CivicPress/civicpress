@@ -9,7 +9,10 @@ export default defineNuxtConfig({
   },
 
   // Modules
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui-pro'],
+
+  // CSS
+  css: ['~/assets/css/main.css'],
 
   // Runtime configuration
   runtimeConfig: {

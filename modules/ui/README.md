@@ -1,119 +1,260 @@
 # CivicPress UI Module
 
-The web interface for CivicPress, built with Nuxt 4 and Nuxt UI.
+## Overview
 
-## 🏗️ Architecture
+The UI module provides a modern, responsive frontend for CivicPress using Nuxt 4
+with Nuxt UI Pro. This module serves as the primary user interface for
+interacting with the CivicPress API.
+
+## Architecture
 
 ### Technology Stack
 
-- **Framework:** Nuxt 4 (SPA mode)
-- **UI Library:** Nuxt UI (built on Tailwind CSS)
-- **Authentication:** JWT-based (OAuth + user/password)
-- **API Integration:** Direct connection to CivicPress API
+- **Framework**: Nuxt 4 (Vue 3)
+- **UI Library**: Nuxt UI Pro (built on Tailwind CSS)
+- **Mode**: SPA (Single Page Application)
+- **Port**: 3030
+- **API Integration**: RESTful API calls to CivicPress backend
 
-### Module Structure
+### Key Decisions
+
+1. **Nuxt UI Pro**: Chosen over standard Nuxt UI for enhanced components and
+   features
+   - Note: Planned to become free soon
+   - Provides advanced components and better styling out of the box
+
+2. **SPA Mode**: No SSR since we're API-driven
+   - Faster development and deployment
+   - Simpler architecture for API integration
+
+3. **Port 3030**: Dedicated port to avoid conflicts with API (3000)
+
+4. **API-First Design**: Frontend consumes REST API endpoints
+   - Clean separation of concerns
+   - Enables multiple frontend implementations
+
+## Current Status
+
+### ✅ Working
+
+- Nuxt 4 development server running on port 3030
+- Nuxt UI Pro components available
+- Static page serving successfully
+- API server integration configured
+- Development tools enabled
+
+### 🔄 In Progress
+
+- API integration implementation
+- Authentication system
+- Dynamic content loading
+- User interface components
+
+### 📋 Planned
+
+- OAuth authentication integration
+- Record management interface
+- User dashboard
+- Admin panel
+- Plugin registry interface
+
+## Development
+
+### Prerequisites
+
+```bash
+# Install dependencies
+pnpm install
+
+# Ensure API server is running on port 3000
+pnpm dev:api
+```
+
+### Running the UI
+
+```bash
+# Start UI development server
+pnpm dev:ui
+
+# Or from project root
+pnpm dev:ui
+```
+
+### Available Scripts
+
+- `pnpm dev` - Start development server
+- `pnpm build` - Build for production
+- `pnpm preview` - Preview production build
+
+## Configuration
+
+### Environment Variables
+
+- `API_BASE_URL` - Backend API URL (default: http://localhost:3000)
+
+### Runtime Config
+
+```typescript
+runtimeConfig: {
+  public: {
+    apiBase: 'http://localhost:3000',
+    appName: 'CivicPress',
+    appVersion: '1.0.0'
+  }
+}
+```
+
+## File Structure
 
 ```
 modules/ui/
-├── app/                     # App-level components
-├── pages/                   # File-based routing
+├── app/
+│   └── app.vue              # Root app component
+├── pages/
+│   └── index.vue            # Home page
 ├── components/              # Vue components
-├── composables/             # Composables
-├── plugins/                 # Nuxt plugins
-├── utils/                   # Utilities
-├── types/                   # TypeScript types
-└── assets/                  # Static assets
+├── composables/            # Nuxt composables
+├── assets/                 # Static assets
+├── nuxt.config.ts          # Nuxt configuration
+└── package.json            # Dependencies
 ```
 
-### Plugin Architecture
+## API Integration
 
-- **Plugin Registry:** Extensible plugin system
-- **Hook System:** Lifecycle events and customization points
-- **Theme Engine:** Configurable theming system
-- **Replaceable Components:** Modular component architecture
+### Current Setup
 
-## 🚀 Development
+- API proxy configured for `/api` routes
+- Base URL configurable via environment
+- Ready for REST API consumption
 
-### Setup
+### Planned Integration
+
+- Authentication endpoints
+- Record CRUD operations
+- User management
+- Workflow integration
+
+## Styling
+
+### Current Approach
+
+- Using Nuxt UI Pro components
+- Tailwind CSS included via Nuxt UI Pro
+- No custom CSS files needed initially
+
+### Future Enhancements
+
+- Custom theme configuration
+- Brand-specific styling
+- Responsive design improvements
+
+## Authentication
+
+### Planned Implementation
+
+- OAuth 2.0 integration
+- User/password authentication
+- Role-based access control
+- Session management
+
+## Plugin System
+
+### Architecture
+
+- Complex plugin registry with hooks
+- Extensible component system
+- Custom workflow integration
+- Third-party plugin support
+
+## Testing
+
+### Planned Testing Strategy
+
+- Unit tests for components
+- Integration tests for API calls
+- E2E tests for user workflows
+- Visual regression testing
+
+## Deployment
+
+### Development
+
+- Hot reload enabled
+- Development tools available
+- API proxy configured
+
+### Production
+
+- Static site generation
+- API integration
+- CDN deployment ready
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Port conflicts**: Ensure port 3030 is available
+2. **API connection**: Verify API server is running on port 3000
+3. **Styling issues**: Nuxt UI Pro handles most styling automatically
+
+### Debug Commands
 
 ```bash
-# From project root
-cd modules/ui
-pnpm install
-pnpm dev
+# Check if servers are running
+curl http://localhost:3000/health
+curl http://localhost:3030
+
+# View logs
+pnpm dev:ui --verbose
 ```
 
-### Configuration
+## Next Steps
 
-- **Port:** 3030 (to avoid conflicts with API on 3000)
-- **API Base:** http://localhost:3000
-- **Mode:** SPA (no SSR)
+1. **Immediate**
+   - Implement API composables
+   - Add authentication flow
+   - Create basic record management interface
 
-### Authentication
+2. **Short Term**
+   - User dashboard
+   - Record CRUD operations
+   - Search and filtering
 
-- **OAuth:** GitHub integration
-- **User/Password:** Simulated authentication
-- **JWT Tokens:** Both methods return valid tokens
+3. **Medium Term**
+   - Admin panel
+   - Plugin registry
+   - Advanced workflows
 
-## 🎯 Features
+4. **Long Term**
+   - Mobile optimization
+   - Offline capabilities
+   - Advanced analytics
 
-### User Journey
+## Contributing
 
-```
-Home → Login → Sign Up → Record List → Single Record → Search → User CRUD
-```
+When contributing to the UI module:
 
-### Role-Based Interface
+1. Follow Vue 3 composition API patterns
+2. Use Nuxt UI Pro components when possible
+3. Test API integration thoroughly
+4. Maintain responsive design
+5. Document new features
 
-- **Single UI** for all users
-- **Edit panels** only for authenticated users
-- **Permission-based** feature visibility
+## Dependencies
 
-### API Integration
+### Core
 
-- **Real data** from Day 1
-- **No mock data** or development mode
-- **Direct API calls** to CivicPress backend
+- `nuxt`: ^4.0.0
+- `@nuxt/ui-pro`: Latest version
+- `vue`: ^3.5.0
 
-## 🔧 Plugin System
+### Development
 
-### Hook Points
+- `vue-tsc`: TypeScript checking
+- `@nuxt/devtools`: Development tools
 
-- `beforeRecordView` - Before displaying a record
-- `afterRecordEdit` - After editing a record
-- `onAuthChange` - When authentication state changes
-- `onThemeChange` - When theme is changed
+### Notes
 
-### Extension Points
-
-- **Components:** Replaceable UI components
-- **Themes:** Customizable theme system
-- **Authentication:** Pluggable auth providers
-- **API Clients:** Extensible API integration
-
-## 📝 Development Status
-
-- [x] Module initialization
-- [ ] Authentication system
-- [ ] Record browsing
-- [ ] Search functionality
-- [ ] Admin features
-- [ ] Plugin architecture
-- [ ] Theme system
-- [ ] PWA features
-
-## 🛠️ Commands
-
-```bash
-# Development
-pnpm dev          # Start dev server on port 3030
-
-# Build
-pnpm build        # Build for production
-
-# Preview
-pnpm preview      # Preview production build
-
-# Type checking
-pnpm typecheck    # Run TypeScript checks
-```
+- Nuxt UI Pro is currently paid but planned to go free
+- All styling handled by Nuxt UI Pro components
+- No custom Tailwind configuration needed initially
