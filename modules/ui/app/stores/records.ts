@@ -6,11 +6,20 @@ export interface CivicRecord {
   type: 'bylaw' | 'ordinance' | 'policy' | 'proclamation' | 'resolution';
   content: string;
   status: 'draft' | 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-  updatedAt: string;
+  path: string;
   author: string;
-  tags: string[];
-  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  metadata: {
+    author: string;
+    created: string;
+    updated: string;
+    tags: string[];
+    module: string;
+    source: string;
+    file_path: string;
+    updated_by: string;
+  };
 }
 
 export interface RecordsState {
@@ -64,7 +73,10 @@ export const useRecordsStore = defineStore('records', {
           (record) =>
             record.title.toLowerCase().includes(search) ||
             record.content.toLowerCase().includes(search) ||
-            record.tags.some((tag) => tag.toLowerCase().includes(search))
+            record.metadata?.tags?.some((tag: string) =>
+              tag.toLowerCase().includes(search)
+            ) ||
+            false
         );
       }
 
@@ -110,10 +122,30 @@ export const useRecordsStore = defineStore('records', {
         if (params?.status) queryParams.append('status', params.status);
         if (params?.search) queryParams.append('search', params.search);
 
-        const response = await $fetch(`/api/records?${queryParams.toString()}`);
+        const response = await useNuxtApp().$civicApi('/api/records');
 
-        this.records = response.records;
-        this.pagination = response.pagination;
+        console.log('response >>>>>', response);
+
+        // Safely extract data from response
+        if (
+          typeof response === 'object' &&
+          response !== null &&
+          'success' in response &&
+          (response as any).success &&
+          'data' in response &&
+          (response as any).data
+        ) {
+          const data = (response as any).data;
+          this.records = data.records || [];
+          this.pagination = {
+            page: data.page || 1,
+            limit: data.limit || 20,
+            total: data.total || 0,
+          };
+        } else {
+          this.records = [];
+          this.pagination = { page: 1, limit: 20, total: 0 };
+        }
         this.filters = {
           type: params?.type,
           status: params?.status,
@@ -134,7 +166,21 @@ export const useRecordsStore = defineStore('records', {
       this.error = null;
 
       try {
-        const record = await $fetch(`/api/records/${id}`);
+        const response = await useNuxtApp().$civicApi(`/records/${id}`);
+
+        console.log('response >>>>>', response.data);
+        // Safely extract record from response
+        let record: CivicRecord;
+        if (
+          typeof response === 'object' &&
+          response !== null &&
+          'data' in response &&
+          (response as any).data
+        ) {
+          record = (response as any).data as CivicRecord;
+        } else {
+          throw new Error('Invalid response format');
+        }
 
         // Update or add the record to the store
         const index = this.records.findIndex((r) => r.id === id);
@@ -160,10 +206,23 @@ export const useRecordsStore = defineStore('records', {
       this.error = null;
 
       try {
-        const newRecord = await $fetch('/api/records', {
+        const response = await useNuxtApp().$civicApi('/records', {
           method: 'POST',
           body: recordData,
         });
+
+        // Safely extract record from response
+        let newRecord: CivicRecord;
+        if (
+          typeof response === 'object' &&
+          response !== null &&
+          'data' in response &&
+          (response as any).data
+        ) {
+          newRecord = (response as any).data as CivicRecord;
+        } else {
+          throw new Error('Invalid response format');
+        }
 
         this.records.unshift(newRecord);
         return newRecord;
@@ -180,10 +239,23 @@ export const useRecordsStore = defineStore('records', {
       this.error = null;
 
       try {
-        const updatedRecord = await $fetch(`/api/records/${id}`, {
+        const response = await useNuxtApp().$civicApi(`/records/${id}`, {
           method: 'PUT',
           body: updates,
         });
+
+        // Safely extract record from response
+        let updatedRecord: CivicRecord;
+        if (
+          typeof response === 'object' &&
+          response !== null &&
+          'data' in response &&
+          (response as any).data
+        ) {
+          updatedRecord = (response as any).data as CivicRecord;
+        } else {
+          throw new Error('Invalid response format');
+        }
 
         const index = this.records.findIndex((r) => r.id === id);
         if (index > -1) {
@@ -204,7 +276,7 @@ export const useRecordsStore = defineStore('records', {
       this.error = null;
 
       try {
-        await $fetch(`/api/records/${id}`, {
+        await useNuxtApp().$civicApi(`/records/${id}`, {
           method: 'DELETE',
         });
 

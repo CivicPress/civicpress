@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TabsItem } from '@nuxt/ui'
-import { useAuthStore } from '~/stores'
 
 const authStore = useAuthStore()
 
