@@ -59,6 +59,38 @@ export const initCommand = (cli: CAC) => {
             repo_url: null,
             modules: ['legal-register'],
             record_types: ['bylaw', 'policy'],
+            record_types_config: {
+              bylaw: {
+                label: 'Bylaws',
+                description: 'Municipal bylaws and regulations',
+                source: 'core',
+                priority: 1,
+              },
+              ordinance: {
+                label: 'Ordinances',
+                description: 'Local ordinances and laws',
+                source: 'core',
+                priority: 2,
+              },
+              policy: {
+                label: 'Policies',
+                description: 'Administrative policies',
+                source: 'core',
+                priority: 3,
+              },
+              proclamation: {
+                label: 'Proclamations',
+                description: 'Official proclamations',
+                source: 'core',
+                priority: 4,
+              },
+              resolution: {
+                label: 'Resolutions',
+                description: 'Council resolutions',
+                source: 'core',
+                priority: 5,
+              },
+            },
             default_role: 'clerk',
             hooks: { enabled: true },
             workflows: { enabled: true },

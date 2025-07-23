@@ -26,6 +26,7 @@ import { createValidationRouter } from './routes/validation';
 import { createDiffRouter } from './routes/diff';
 import usersRouter from './routes/users';
 import infoRouter from './routes/info';
+import configRouter from './routes/config';
 
 // Import middleware
 import { errorHandler, requestIdMiddleware } from './middleware/error-handler';
@@ -237,6 +238,7 @@ export class CivicPressAPI {
     this.app.use('/api/validation', createValidationRouter());
     this.app.use('/api/diff', createDiffRouter());
     this.app.use('/api/users', usersRouter);
+    this.app.use('/api/config', configRouter);
   }
 
   async start(): Promise<void> {

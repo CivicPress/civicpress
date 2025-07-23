@@ -2,6 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import yaml from 'yaml';
 import { Logger, LoggerOptions } from '../utils/logger.js';
+import {
+  RecordTypesConfig,
+  DEFAULT_RECORD_TYPES,
+  validateRecordTypeConfig,
+  mergeRecordTypes,
+} from './record-types.js';
 
 export interface OrgConfig {
   // Basic Organization Information
@@ -53,6 +59,7 @@ export interface CentralConfig {
   // System configuration (from .civicrc)
   modules?: string[];
   record_types?: string[];
+  record_types_config?: RecordTypesConfig;
   default_role?: string;
   hooks?: {
     enabled?: boolean;
@@ -290,6 +297,39 @@ export class CentralConfigManager {
       state: orgConfig.state,
       country: orgConfig.country,
     };
+  }
+
+  /**
+   * Get record types configuration
+   */
+  static getRecordTypesConfig(): RecordTypesConfig {
+    const config = this.getConfig();
+
+    // Start with default record types
+    let recordTypes = { ...DEFAULT_RECORD_TYPES };
+
+    // Merge with config if present
+    if (config.record_types_config) {
+      recordTypes = mergeRecordTypes(recordTypes, config.record_types_config);
+    }
+
+    return recordTypes;
+  }
+
+  /**
+   * Validate record types configuration
+   */
+  static validateRecordTypes(): string[] {
+    const recordTypes = this.getRecordTypesConfig();
+    return validateRecordTypeConfig(recordTypes);
+  }
+
+  /**
+   * Get available record type keys
+   */
+  static getRecordTypeKeys(): string[] {
+    const recordTypes = this.getRecordTypesConfig();
+    return Object.keys(recordTypes);
   }
 
   /**

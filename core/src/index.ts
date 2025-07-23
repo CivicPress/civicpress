@@ -57,6 +57,19 @@ export async function loadConfig() {
 export { CentralConfigManager } from './config/central-config.js';
 export type { CentralConfig } from './config/central-config.js';
 
+// Export record types configuration
+export {
+  DEFAULT_RECORD_TYPES,
+  validateRecordTypeConfig,
+  mergeRecordTypes,
+  getRecordTypesWithMetadata,
+} from './config/record-types.js';
+export type {
+  RecordTypeConfig,
+  RecordTypesConfig,
+  RecordTypeMetadata,
+} from './config/record-types.js';
+
 // Export indexing services
 export { IndexingService } from './indexing/indexing-service.js';
 export type {
