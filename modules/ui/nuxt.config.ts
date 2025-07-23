@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  // SPA mode - no SSR since we're API-driven
+  // SSR mode - works better with Nuxt UI Pro
   ssr: false,
 
   // Development server configuration
@@ -9,16 +9,20 @@ export default defineNuxtConfig({
   },
 
   // Modules
-  modules: ['@nuxt/ui-pro'],
-
-  // CSS
+  modules: ['@nuxt/ui-pro', '@pinia/nuxt'],
   css: ['~/assets/css/main.css'],
+  ui: {
+    // Minimal theme configuration to prevent useHead issues
+    theme: {
+      colors: ['primary', 'error'],
+    },
+  },
 
   // Runtime configuration
   runtimeConfig: {
     public: {
       // API base URL
-      apiBase: process.env.API_BASE_URL || 'http://localhost:3000',
+      civicApiUrl: process.env.API_BASE_URL || 'http://localhost:3000',
       // App configuration
       appName: 'CivicPress',
       appVersion: '1.0.0',
@@ -37,9 +41,9 @@ export default defineNuxtConfig({
   },
 
   // Build configuration
-  build: {
-    transpile: ['@nuxt/ui'],
-  },
+  // build: {
+  //   transpile: ['@nuxt/ui'],
+  // },
 
   // Nitro configuration (for API proxy if needed)
   nitro: {
