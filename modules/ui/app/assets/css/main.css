@@ -1,24 +1,33 @@
 @import "tailwindcss";
 @import "@nuxt/ui-pro";
 
-/* Custom styles for CivicPress */
-@layer base {
-  html {
-    font-family: 'Inter', system-ui, sans-serif;
-    background-color: aqua;
+
+/* @theme static {
+  --font-sans: 'Public Sans', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+} */
+
+/* html,
+body {
+  height: 100vh;
+  width: 100vw;
+} */
+
+:root {
+  --ui-container: var(--container-4xl);
+  --ui-primary: #000000;
+
+
+
+  ::selection {
+    color: #282a30;
+    background-color: #c8c8c8;
   }
 }
 
-@layer components {
-  /* .glass-card {
-    @apply bg-white/80 backdrop-blur-sm border-0 shadow-lg;
+.dark {
+  ::selection {
+    color: #ffffff;
+    background-color: #474747;
   }
-  
-  .gradient-text {
-    @apply bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent;
-  }
-  
-  .gradient-bg {
-    @apply bg-gradient-to-br from-blue-50 to-indigo-100;
-  } */
-} 
+}
