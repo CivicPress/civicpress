@@ -32,9 +32,9 @@ export default defineNuxtPlugin((nuxtApp) => {
       if (response.status === 401) {
         // Handle unauthorized - clear auth state and redirect to login
         console.log('Unauthorized request, clearing auth state');
-        const authStore = useAuthStore();
-        authStore.clearAuth();
-        await navigateTo('/auth/login');
+        // const authStore = useAuthStore();
+        // authStore.clearAuth();
+        // await navigateTo('/auth/login');
       }
     },
   });

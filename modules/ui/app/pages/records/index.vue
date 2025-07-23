@@ -1,6 +1,7 @@
 <script setup lang="ts">
 
 import { useRecordTypes } from '~/composables/useRecordTypes'
+import { useRecordStatuses } from '~/composables/useRecordStatuses'
 
 const recordsStore = useRecordsStore()
 const {
@@ -8,46 +9,46 @@ const {
     loading: recordTypesLoading,
     error: recordTypesError,
     fetchRecordTypes,
-    recordTypeOptions,
     getRecordTypeIcon,
-    getRecordTypeLabel
+    getRecordTypeLabel,
+    recordTypeOptions,
 } = useRecordTypes()
+
+const {
+    recordStatuses,
+    loading: recordStatusesLoading,
+    error: recordStatusesError,
+    fetchRecordStatuses,
+    getRecordStatusLabel,
+    recordStatusOptions,
+} = useRecordStatuses()
 
 // Reactive data
 const searchQuery = ref('')
-const selectedType = ref('')
-const selectedStatus = ref('')
+const selectedRecordTypes = ref([])
+const selectedRecordStatuses = ref([])
 
-const recordStatuses = [
-    { value: '', label: 'All Statuses' },
-    { value: 'draft', label: 'Draft' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'rejected', label: 'Rejected' },
-]
+// Record statuses are now loaded dynamically from the composable
 
-// Load records and record types on page mount
+// On mounted - fetch all records
 onMounted(async () => {
-    try {
-        await Promise.all([
-            recordsStore.fetchRecords(),
-            fetchRecordTypes()
-        ])
-    } catch (error) {
-        console.error('Failed to load data:', error)
-    }
+    await recordsStore.fetchRecords()
 })
 
-// Watch for filter changes
-watch([searchQuery, selectedType, selectedStatus], async () => {
-    try {
-        await recordsStore.fetchRecords({
-            search: searchQuery.value,
-            type: selectedType.value,
-            status: selectedStatus.value,
-        })
-    } catch (error) {
-        console.error('Failed to filter records:', error)
+// Watch for filter changes - use list endpoint
+watch([selectedRecordTypes, selectedRecordStatuses], async () => {
+    await recordsStore.fetchRecords({
+        type: selectedRecordTypes.value.join(','),
+        status: selectedRecordStatuses.value.join(','),
+    })
+})
+
+// For search - use search endpoint
+watch(searchQuery, async () => {
+    if (searchQuery.value) {
+        await recordsStore.searchRecords(searchQuery.value)
+    } else {
+        await recordsStore.fetchRecords()
     }
 })
 
@@ -60,17 +61,44 @@ const formatDate = (dateString: string) => {
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'draft': return 'neutral'
-        case 'pending': return 'primary'
+        case 'pending_review': return 'primary'
+        case 'under_review': return 'primary'
         case 'approved': return 'primary'
+        case 'published': return 'primary'
         case 'rejected': return 'error'
+        case 'archived': return 'neutral'
+        case 'expired': return 'neutral'
         default: return 'neutral'
     }
 }
+
+const recordTypeOptionsComputed = computed(() => {
+    return recordTypeOptions().map((option: any) => {
+        return {
+            label: option.label,
+            icon: option.icon,
+            id: option.key
+        }
+    })
+})
+
+
+const recordStatusOptionsComputed = computed(() => {
+    return recordStatusOptions().map((option: any) => {
+        return {
+            label: option.label,
+            icon: option.icon,
+            id: option.key
+        }
+    })
+})
+
 
 // Get type icon - now uses the composable
 const getTypeIcon = (type: string) => {
     return getRecordTypeIcon(type)
 }
+
 </script>
 
 <template>
@@ -80,24 +108,32 @@ const getTypeIcon = (type: string) => {
         </template>
 
         <template #body>
+
+
+
             <div class="space-y-6">
+
+
+
+
                 <!-- Search and Filters -->
                 <div class="flex flex-col sm:flex-row gap-4">
                     <UInput v-model="searchQuery" placeholder="Search records..." icon="i-lucide-search"
                         class="flex-1" />
-
-                    <USelect v-model="selectedType" :options="recordTypeOptions" placeholder="Filter by type"
-                        class="w-full sm:w-48" :loading="recordTypesLoading" />
-
-                    <USelect v-model="selectedStatus" :options="recordStatuses" placeholder="Filter by status"
-                        class="w-full sm:w-48" />
+                    <USelectMenu v-model="selectedRecordTypes" :items="recordTypeOptionsComputed" multiple
+                        :loading="recordTypesLoading" placeholder="Select Record Types" class="w-full sm:w-48" />
+                    <USelectMenu v-model="selectedRecordStatuses" :items="recordStatusOptionsComputed" multiple
+                        :loading="recordStatusesLoading" placeholder="Select Record Statuses" class="w-full sm:w-48" />
 
                     <UButton icon="i-lucide-plus" label="New Record" color="primary"
                         @click="navigateTo('/records/new')" />
                 </div>
 
+
                 <!-- Error Display -->
                 <UAlert v-if="recordsStore.recordsError" color="error" variant="soft" :title="recordsStore.recordsError"
+                    icon="i-lucide-alert-circle" />
+                <UAlert v-if="recordStatusesError" color="error" variant="soft" :title="recordStatusesError"
                     icon="i-lucide-alert-circle" />
 
                 <!-- Records List -->
@@ -163,6 +199,92 @@ const getTypeIcon = (type: string) => {
                     <p class="mt-2 text-gray-600">Loading records...</p>
                 </div>
             </div>
+
+
+            <hr class="my-8 border-gray-200" />
+            <hr class="my-8 border-gray-200" />
+            <!-- Record Types Overview -->
+            <div v-if="!recordTypesLoading && recordTypes.length > 0" class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-900">Record Types</h3>
+                    <UButton variant="ghost" size="sm" @click="navigateTo('/records/new')" icon="i-lucide-plus">
+                        Create Record
+                    </UButton>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <UCard v-for="recordType in recordTypes" :key="recordType.key"
+                        class="hover:shadow-md transition-shadow cursor-pointer"
+                        @click="navigateTo(`/records/new?type=${recordType.key}`)">
+                        <div class="flex items-start space-x-3">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center">
+                                    <UIcon :name="getRecordTypeIcon(recordType.key)" class="w-5 h-5 text-primary-600" />
+                                </div>
+                            </div>
+
+                            <div class="flex-1 min-w-0">
+                                <h4 class="text-sm font-medium text-gray-900 mb-1">
+                                    {{ recordType.label }}
+                                </h4>
+                                <p class="text-xs text-gray-600 line-clamp-2">
+                                    {{ recordType.description }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <template #footer>
+                            <div class="flex items-center justify-between text-xs text-gray-500">
+                                <span class="flex items-center space-x-1">
+                                    <UIcon name="i-lucide-tag" class="w-3 h-3" />
+                                    <span>{{ recordType.source }}</span>
+                                </span>
+                                <span class="flex items-center space-x-1">
+                                    <UIcon name="i-lucide-hash" class="w-3 h-3" />
+                                    <span>Priority {{ recordType.priority }}</span>
+                                </span>
+                            </div>
+                        </template>
+                    </UCard>
+                </div>
+            </div>
+
+            <hr class="my-8 border-gray-200" />
+
+
+            <!-- Record Statuses Overview -->
+            <div v-if="!recordStatusesLoading && recordStatuses.length > 0" class="space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">Record Statuses</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div v-for="status in recordStatuses" :key="status.key"
+                        class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center" :class="{
+                                'bg-neutral-100': getStatusColor(status.key) === 'neutral',
+                                'bg-primary-100': getStatusColor(status.key) === 'primary',
+                                'bg-error-100': getStatusColor(status.key) === 'error'
+                            }">
+                                <UIcon name="i-lucide-circle" class="w-4 h-4" :class="{
+                                    'text-neutral-600': getStatusColor(status.key) === 'neutral',
+                                    'text-primary-600': getStatusColor(status.key) === 'primary',
+                                    'text-error-600': getStatusColor(status.key) === 'error'
+                                }" />
+                            </div>
+                        </div>
+
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-sm font-medium text-gray-900">
+                                {{ status.label }}
+                            </h4>
+                            <p class="text-xs text-gray-600 line-clamp-1">
+                                {{ status.description }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </template>
     </UDashboardPanel>
 </template>

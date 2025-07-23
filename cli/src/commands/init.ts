@@ -91,6 +91,58 @@ export const initCommand = (cli: CAC) => {
                 priority: 5,
               },
             },
+            record_statuses_config: {
+              draft: {
+                label: 'Draft',
+                description:
+                  'Initial working version, not yet ready for review',
+                source: 'core',
+                priority: 1,
+              },
+              pending_review: {
+                label: 'Pending Review',
+                description: 'Submitted for review and awaiting approval',
+                source: 'core',
+                priority: 2,
+              },
+              under_review: {
+                label: 'Under Review',
+                description:
+                  'Currently under active review by authorized personnel',
+                source: 'core',
+                priority: 3,
+              },
+              approved: {
+                label: 'Approved',
+                description: 'Approved and currently in effect',
+                source: 'core',
+                priority: 4,
+              },
+              published: {
+                label: 'Published',
+                description: 'Publicly available and in effect',
+                source: 'core',
+                priority: 5,
+              },
+              rejected: {
+                label: 'Rejected',
+                description: 'Rejected and not approved',
+                source: 'core',
+                priority: 6,
+              },
+              archived: {
+                label: 'Archived',
+                description: 'No longer active but preserved for reference',
+                source: 'core',
+                priority: 7,
+              },
+              expired: {
+                label: 'Expired',
+                description: 'Past its effective date and no longer in force',
+                source: 'core',
+                priority: 8,
+              },
+            },
             default_role: 'clerk',
             hooks: { enabled: true },
             workflows: { enabled: true },
