@@ -8,6 +8,13 @@ import {
   validateRecordTypeConfig,
   mergeRecordTypes,
 } from './record-types.js';
+import {
+  RecordStatusesConfig,
+  DEFAULT_RECORD_STATUSES,
+  validateRecordStatusConfig,
+  mergeRecordStatuses,
+  getRecordStatusesWithMetadata,
+} from './record-statuses.js';
 
 export interface OrgConfig {
   // Basic Organization Information
@@ -60,6 +67,7 @@ export interface CentralConfig {
   modules?: string[];
   record_types?: string[];
   record_types_config?: RecordTypesConfig;
+  record_statuses_config?: RecordStatusesConfig;
   default_role?: string;
   hooks?: {
     enabled?: boolean;
@@ -330,6 +338,37 @@ export class CentralConfigManager {
   static getRecordTypeKeys(): string[] {
     const recordTypes = this.getRecordTypesConfig();
     return Object.keys(recordTypes);
+  }
+
+  /**
+   * Get record statuses configuration
+   */
+  static getRecordStatusesConfig(): RecordStatusesConfig {
+    const config = this.getConfig();
+    let recordStatuses = { ...DEFAULT_RECORD_STATUSES };
+    if (config.record_statuses_config) {
+      recordStatuses = mergeRecordStatuses(
+        recordStatuses,
+        config.record_statuses_config
+      );
+    }
+    return recordStatuses;
+  }
+
+  /**
+   * Validate record statuses configuration
+   */
+  static validateRecordStatuses(): string[] {
+    const recordStatuses = this.getRecordStatusesConfig();
+    return validateRecordStatusConfig(recordStatuses);
+  }
+
+  /**
+   * Get available record status keys
+   */
+  static getRecordStatusKeys(): string[] {
+    const recordStatuses = this.getRecordStatusesConfig();
+    return Object.keys(recordStatuses);
   }
 
   /**

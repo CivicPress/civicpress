@@ -70,6 +70,19 @@ export type {
   RecordTypeMetadata,
 } from './config/record-types.js';
 
+// Export record statuses configuration
+export {
+  DEFAULT_RECORD_STATUSES,
+  validateRecordStatusConfig,
+  mergeRecordStatuses,
+  getRecordStatusesWithMetadata,
+} from './config/record-statuses.js';
+export type {
+  RecordStatusConfig,
+  RecordStatusesConfig,
+  RecordStatusMetadata,
+} from './config/record-statuses.js';
+
 // Export indexing services
 export { IndexingService } from './indexing/indexing-service.js';
 export type {

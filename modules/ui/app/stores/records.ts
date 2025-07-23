@@ -89,7 +89,7 @@ export const useRecordsStore = defineStore('records', {
           if (!acc[record.type]) {
             acc[record.type] = [];
           }
-          acc[record.type].push(record);
+          acc[record.type]!.push(record);
           return acc;
         },
         {} as Record<string, CivicRecord[]>
@@ -161,6 +161,70 @@ export const useRecordsStore = defineStore('records', {
       }
     },
 
+    async searchRecords(
+      query: string,
+      params?: {
+        type?: string;
+        status?: string;
+        limit?: number;
+        offset?: number;
+      }
+    ) {
+      this.loading = true;
+      this.error = null;
+
+      try {
+        const queryParams = new URLSearchParams();
+        queryParams.append('q', query);
+
+        if (params?.type) queryParams.append('type', params.type);
+        if (params?.status) queryParams.append('status', params.status);
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
+        if (params?.offset)
+          queryParams.append('offset', params.offset.toString());
+
+        const response = await useNuxtApp().$civicApi(
+          `/api/search?${queryParams.toString()}`
+        );
+
+        console.log('Search response:', response);
+
+        // Safely extract data from response
+        if (
+          typeof response === 'object' &&
+          response !== null &&
+          'success' in response &&
+          (response as any).success &&
+          'data' in response &&
+          (response as any).data
+        ) {
+          const data = (response as any).data;
+          this.records = data.results || [];
+          this.pagination = {
+            page: data.page || 1,
+            limit: data.limit || 20,
+            total: data.total || 0,
+          };
+        } else {
+          this.records = [];
+          this.pagination = { page: 1, limit: 20, total: 0 };
+        }
+
+        this.filters = {
+          type: params?.type,
+          status: params?.status,
+          search: query,
+        };
+
+        return response;
+      } catch (error: any) {
+        this.error = error.message || 'Failed to search records';
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+
     async fetchRecord(id: string) {
       this.loading = true;
       this.error = null;
@@ -168,7 +232,7 @@ export const useRecordsStore = defineStore('records', {
       try {
         const response = await useNuxtApp().$civicApi(`/records/${id}`);
 
-        console.log('response >>>>>', response.data);
+        console.log('response >>>>>', response);
         // Safely extract record from response
         let record: CivicRecord;
         if (
