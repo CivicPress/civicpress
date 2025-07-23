@@ -2,6 +2,7 @@
 import { useAppStore } from '~/stores/app'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // Simple test function
 const toggleSidebar = () => {

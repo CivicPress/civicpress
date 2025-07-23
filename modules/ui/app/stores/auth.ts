@@ -20,14 +20,54 @@ export interface AuthState {
 }
 
 export const useAuthStore = defineStore('auth', {
-  state: (): AuthState => ({
-    user: null,
-    isAuthenticated: false,
-    token: null,
-    sessionExpiresAt: null,
-    loading: false,
-    error: null,
-  }),
+  state: (): AuthState => {
+    // Try to restore state from localStorage on initialization
+    let initialState: AuthState = {
+      user: null,
+      isAuthenticated: false,
+      token: null,
+      sessionExpiresAt: null,
+      loading: false,
+      error: null,
+    };
+
+    if (process.client) {
+      try {
+        const storedToken = localStorage.getItem('civic_auth_token');
+        const storedExpiresAt = localStorage.getItem('civic_auth_expires_at');
+        const storedUser = localStorage.getItem('civic_auth_user');
+
+        if (storedToken && storedExpiresAt && storedUser) {
+          // Check if token is still valid
+          const expiresAt = new Date(storedExpiresAt);
+          const now = new Date();
+
+          if (expiresAt > now) {
+            initialState = {
+              ...initialState,
+              token: storedToken,
+              sessionExpiresAt: storedExpiresAt,
+              isAuthenticated: true,
+              user: JSON.parse(storedUser),
+            };
+          } else {
+            // Token expired, clear localStorage
+            localStorage.removeItem('civic_auth_token');
+            localStorage.removeItem('civic_auth_expires_at');
+            localStorage.removeItem('civic_auth_user');
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to restore auth state from localStorage:', error);
+        // Clear corrupted localStorage
+        localStorage.removeItem('civic_auth_token');
+        localStorage.removeItem('civic_auth_expires_at');
+        localStorage.removeItem('civic_auth_user');
+      }
+    }
+
+    return initialState;
+  },
 
   getters: {
     currentUser: (state) => state.user,
@@ -43,6 +83,22 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
+    // Private method to save auth state to localStorage
+    saveAuthState() {
+      if (process.client) {
+        try {
+          localStorage.setItem('civic_auth_token', this.token || '');
+          localStorage.setItem(
+            'civic_auth_expires_at',
+            this.sessionExpiresAt || ''
+          );
+          localStorage.setItem('civic_auth_user', JSON.stringify(this.user));
+        } catch (error) {
+          console.warn('Failed to save auth state to localStorage:', error);
+        }
+      }
+    },
+
     // Private method to handle common login logic
     async handleLoginResponse(
       response: any,
@@ -75,11 +131,8 @@ export const useAuthStore = defineStore('auth', {
         this.sessionExpiresAt = session.expiresAt;
         this.isAuthenticated = true;
 
-        // Store token and expiration in localStorage with civic_ prefix
-        if (process.client) {
-          localStorage.setItem('civic_auth_token', session.token);
-          localStorage.setItem('civic_auth_expires_at', session.expiresAt);
-        }
+        // Save auth state to localStorage
+        this.saveAuthState();
       } else {
         throw new Error('Invalid response format');
       }
@@ -147,37 +200,6 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async checkAuth() {
-      if (!this.token) {
-        // Try to get token from localStorage
-        if (process.client) {
-          const storedToken = localStorage.getItem('civic_auth_token');
-          if (storedToken) {
-            this.token = storedToken;
-          } else {
-            return false;
-          }
-        } else {
-          return false;
-        }
-      }
-
-      try {
-        const response = await $fetch('/api/auth/me', {
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
-        });
-
-        this.user = response.user;
-        this.isAuthenticated = true;
-        return true;
-      } catch (error) {
-        this.clearAuth();
-        return false;
-      }
-    },
-
     clearAuth() {
       this.user = null;
       this.token = null;
@@ -187,7 +209,12 @@ export const useAuthStore = defineStore('auth', {
       if (process.client) {
         localStorage.removeItem('civic_auth_token');
         localStorage.removeItem('civic_auth_expires_at');
+        localStorage.removeItem('civic_auth_user');
       }
+
+      // Also clear app state on logout
+      const appStore = useAppStore();
+      appStore.clearAppState();
     },
 
     setError(error: string) {
