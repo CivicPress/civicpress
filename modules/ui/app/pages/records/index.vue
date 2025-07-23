@@ -1,21 +1,22 @@
 <script setup lang="ts">
 
+import { useRecordTypes } from '~/composables/useRecordTypes'
+
 const recordsStore = useRecordsStore()
+const {
+    recordTypes,
+    loading: recordTypesLoading,
+    error: recordTypesError,
+    fetchRecordTypes,
+    recordTypeOptions,
+    getRecordTypeIcon,
+    getRecordTypeLabel
+} = useRecordTypes()
 
 // Reactive data
 const searchQuery = ref('')
 const selectedType = ref('')
 const selectedStatus = ref('')
-
-// Record types and statuses for filters
-const recordTypes = [
-    { value: '', label: 'All Types' },
-    { value: 'bylaw', label: 'Bylaws' },
-    { value: 'ordinance', label: 'Ordinances' },
-    { value: 'policy', label: 'Policies' },
-    { value: 'proclamation', label: 'Proclamations' },
-    { value: 'resolution', label: 'Resolutions' },
-]
 
 const recordStatuses = [
     { value: '', label: 'All Statuses' },
@@ -25,12 +26,15 @@ const recordStatuses = [
     { value: 'rejected', label: 'Rejected' },
 ]
 
-// Load records on page mount
+// Load records and record types on page mount
 onMounted(async () => {
     try {
-        await recordsStore.fetchRecords()
+        await Promise.all([
+            recordsStore.fetchRecords(),
+            fetchRecordTypes()
+        ])
     } catch (error) {
-        console.error('Failed to load records:', error)
+        console.error('Failed to load data:', error)
     }
 })
 
@@ -63,16 +67,9 @@ const getStatusColor = (status: string) => {
     }
 }
 
-// Get type icon
+// Get type icon - now uses the composable
 const getTypeIcon = (type: string) => {
-    switch (type) {
-        case 'bylaw': return 'i-lucide-file-text'
-        case 'ordinance': return 'i-lucide-gavel'
-        case 'policy': return 'i-lucide-book-open'
-        case 'proclamation': return 'i-lucide-megaphone'
-        case 'resolution': return 'i-lucide-vote'
-        default: return 'i-lucide-file'
-    }
+    return getRecordTypeIcon(type)
 }
 </script>
 
@@ -89,8 +86,8 @@ const getTypeIcon = (type: string) => {
                     <UInput v-model="searchQuery" placeholder="Search records..." icon="i-lucide-search"
                         class="flex-1" />
 
-                    <USelect v-model="selectedType" :options="recordTypes" placeholder="Filter by type"
-                        class="w-full sm:w-48" />
+                    <USelect v-model="selectedType" :options="recordTypeOptions" placeholder="Filter by type"
+                        class="w-full sm:w-48" :loading="recordTypesLoading" />
 
                     <USelect v-model="selectedStatus" :options="recordStatuses" placeholder="Filter by status"
                         class="w-full sm:w-48" />
