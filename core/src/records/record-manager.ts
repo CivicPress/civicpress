@@ -286,7 +286,7 @@ export class RecordManager {
   }
 
   /**
-   * List records with filtering and pagination
+   * List records with optional filtering
    */
   async listRecords(
     options: {
@@ -295,30 +295,17 @@ export class RecordManager {
       limit?: number;
       offset?: number;
     } = {}
-  ): Promise<{ records: RecordData[]; total: number }> {
+  ): Promise<{ records: any[]; total: number }> {
     const result = await this.db.listRecords(options);
 
-    // Parse metadata for each record
-    const records = result.records.map((record) => {
-      if (record.metadata) {
-        try {
-          record.metadata = JSON.parse(record.metadata);
-        } catch (error) {
-          logger.warn(
-            `Failed to parse metadata for record ${record.id}:`,
-            error
-          );
-          record.metadata = {};
-        }
-      }
-      return record;
-    });
-
-    return { records, total: result.total };
+    return {
+      records: result.records,
+      total: result.total,
+    };
   }
 
   /**
-   * Search records
+   * Search records with optional filtering
    */
   async searchRecords(
     query: string,
@@ -328,14 +315,23 @@ export class RecordManager {
       limit?: number;
       offset?: number;
     } = {}
-  ): Promise<{ records: RecordData[]; total: number }> {
-    const searchResults = await this.db.searchRecords(query, options.type);
+  ): Promise<{ records: any[]; total: number }> {
+    // Use the recordType parameter for type filtering
+    const recordType = options.type;
+    const searchResults = await this.db.searchRecords(query, recordType);
 
     // Get full record details for search results
-    const records: RecordData[] = [];
+    const records: any[] = [];
     for (const searchResult of searchResults) {
       const record = await this.getRecord(searchResult.record_id);
-      if (record && (!options.status || record.status === options.status)) {
+      if (record) {
+        // Handle comma-separated status filters
+        if (options.status) {
+          const statusFilters = options.status.split(',').map((s) => s.trim());
+          if (!statusFilters.includes(record.status)) {
+            continue;
+          }
+        }
         records.push(record);
       }
     }

@@ -36,6 +36,8 @@ export interface RecordsState {
     limit: number;
     total: number;
   };
+  // Track the current fetch strategy
+  lastFetchStrategy: 'all' | 'filtered' | 'search' | null;
 }
 
 export const useRecordsStore = defineStore('records', {
@@ -49,24 +51,36 @@ export const useRecordsStore = defineStore('records', {
       limit: 20,
       total: 0,
     },
+    lastFetchStrategy: null,
   }),
 
   getters: {
+    /**
+     * Get filtered records based on current filters
+     * This is the main getter that returns the correct subset
+     */
     filteredRecords: (state) => {
       let filtered = state.records;
 
+      // Apply type filter (handle comma-separated values)
       if (state.filters.type) {
-        filtered = filtered.filter(
-          (record) => record.type === state.filters.type
+        const typeFilters = state.filters.type.split(',').map((t) => t.trim());
+        filtered = filtered.filter((record) =>
+          typeFilters.includes(record.type)
         );
       }
 
+      // Apply status filter (handle comma-separated values)
       if (state.filters.status) {
-        filtered = filtered.filter(
-          (record) => record.status === state.filters.status
+        const statusFilters = state.filters.status
+          .split(',')
+          .map((s) => s.trim());
+        filtered = filtered.filter((record) =>
+          statusFilters.includes(record.status)
         );
       }
 
+      // Apply search filter (client-side search)
       if (state.filters.search) {
         const search = state.filters.search.toLowerCase();
         filtered = filtered.filter(
@@ -83,6 +97,9 @@ export const useRecordsStore = defineStore('records', {
       return filtered;
     },
 
+    /**
+     * Get records grouped by type
+     */
     recordsByType: (state) => {
       return state.records.reduce(
         (acc, record) => {
@@ -96,35 +113,74 @@ export const useRecordsStore = defineStore('records', {
       );
     },
 
+    /**
+     * Get records grouped by status
+     */
+    recordsByStatus: (state) => {
+      return state.records.reduce(
+        (acc, record) => {
+          if (!acc[record.status]) {
+            acc[record.status] = [];
+          }
+          acc[record.status]!.push(record);
+          return acc;
+        },
+        {} as Record<string, CivicRecord[]>
+      );
+    },
+
     isLoading: (state) => state.loading,
     recordsError: (state) => state.error,
     currentFilters: (state) => state.filters,
     currentPagination: (state) => state.pagination,
+    totalRecords: (state) => state.records.length,
+    totalFilteredRecords: (state) => {
+      // Use the filteredRecords getter to get the count
+      const store = useRecordsStore();
+      return store.filteredRecords.length;
+    },
   },
 
   actions: {
-    async fetchRecords(params?: {
-      page?: number;
-      limit?: number;
-      type?: string;
-      status?: string;
-      search?: string;
-    }) {
+    /**
+     * Add or update records in the store
+     * This is the main method for accumulating records
+     */
+    addOrUpdateRecords(newRecords: CivicRecord[]) {
+      newRecords.forEach((newRecord) => {
+        const existingIndex = this.records.findIndex(
+          (record) => record.id === newRecord.id
+        );
+
+        if (existingIndex >= 0) {
+          // Update existing record
+          this.records[existingIndex] = newRecord;
+        } else {
+          // Add new record
+          this.records.push(newRecord);
+        }
+      });
+    },
+
+    /**
+     * Fetch all records (no filters)
+     * Use this for initial load or when clearing filters
+     */
+    async fetchAllRecords(params?: { offset?: number; limit?: number }) {
       this.loading = true;
       this.error = null;
 
       try {
         const queryParams = new URLSearchParams();
 
-        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.offset !== undefined)
+          queryParams.append('offset', params.offset.toString());
         if (params?.limit) queryParams.append('limit', params.limit.toString());
-        if (params?.type) queryParams.append('type', params.type);
-        if (params?.status) queryParams.append('status', params.status);
-        if (params?.search) queryParams.append('search', params.search);
 
-        const response = await useNuxtApp().$civicApi('/api/records');
+        const url = `/api/records${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        const response = await useNuxtApp().$civicApi(url);
 
-        console.log('response >>>>>', response);
+        console.log('Fetch all records response:', response);
 
         // Safely extract data from response
         if (
@@ -136,21 +192,20 @@ export const useRecordsStore = defineStore('records', {
           (response as any).data
         ) {
           const data = (response as any).data;
-          this.records = data.records || [];
+          const newRecords = data.records || [];
+
+          // Always add or update records to accumulate them in the store
+          this.addOrUpdateRecords(newRecords);
+
           this.pagination = {
             page: data.page || 1,
             limit: data.limit || 20,
             total: data.total || 0,
           };
-        } else {
-          this.records = [];
-          this.pagination = { page: 1, limit: 20, total: 0 };
         }
-        this.filters = {
-          type: params?.type,
-          status: params?.status,
-          search: params?.search,
-        };
+
+        this.filters = {};
+        this.lastFetchStrategy = 'all';
 
         return response;
       } catch (error: any) {
@@ -161,6 +216,74 @@ export const useRecordsStore = defineStore('records', {
       }
     },
 
+    /**
+     * Fetch records with server-side filtering
+     * Use this when type or status filters are applied
+     */
+    async fetchFilteredRecords(params: {
+      type?: string;
+      status?: string;
+      offset?: number;
+      limit?: number;
+    }) {
+      this.loading = true;
+      this.error = null;
+
+      try {
+        const queryParams = new URLSearchParams();
+
+        if (params.type) queryParams.append('type', params.type);
+        if (params.status) queryParams.append('status', params.status);
+        if (params.offset !== undefined)
+          queryParams.append('offset', params.offset.toString());
+        if (params.limit) queryParams.append('limit', params.limit.toString());
+
+        const url = `/api/records?${queryParams.toString()}`;
+        const response = await useNuxtApp().$civicApi(url);
+
+        console.log('Fetch filtered records response:', response);
+
+        // Safely extract data from response
+        if (
+          typeof response === 'object' &&
+          response !== null &&
+          'success' in response &&
+          (response as any).success &&
+          'data' in response &&
+          (response as any).data
+        ) {
+          const data = (response as any).data;
+          const newRecords = data.records || [];
+
+          // Always add or update records to accumulate them in the store
+          this.addOrUpdateRecords(newRecords);
+
+          this.pagination = {
+            page: data.page || 1,
+            limit: data.limit || 20,
+            total: data.total || 0,
+          };
+        }
+
+        this.filters = {
+          type: params.type,
+          status: params.status,
+        };
+        this.lastFetchStrategy = 'filtered';
+
+        return response;
+      } catch (error: any) {
+        this.error = error.message || 'Failed to fetch filtered records';
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    /**
+     * Search records using the search API
+     * Use this when user enters a search query
+     */
     async searchRecords(
       query: string,
       params?: {
@@ -183,9 +306,8 @@ export const useRecordsStore = defineStore('records', {
         if (params?.offset)
           queryParams.append('offset', params.offset.toString());
 
-        const response = await useNuxtApp().$civicApi(
-          `/api/search?${queryParams.toString()}`
-        );
+        const url = `/api/search?${queryParams.toString()}`;
+        const response = await useNuxtApp().$civicApi(url);
 
         console.log('Search response:', response);
 
@@ -199,15 +321,16 @@ export const useRecordsStore = defineStore('records', {
           (response as any).data
         ) {
           const data = (response as any).data;
-          this.records = data.results || [];
+          const newRecords = data.results || [];
+
+          // Always add or update records to accumulate them in the store
+          this.addOrUpdateRecords(newRecords);
+
           this.pagination = {
             page: data.page || 1,
             limit: data.limit || 20,
             total: data.total || 0,
           };
-        } else {
-          this.records = [];
-          this.pagination = { page: 1, limit: 20, total: 0 };
         }
 
         this.filters = {
@@ -215,6 +338,7 @@ export const useRecordsStore = defineStore('records', {
           status: params?.status,
           search: query,
         };
+        this.lastFetchStrategy = 'search';
 
         return response;
       } catch (error: any) {
@@ -225,14 +349,52 @@ export const useRecordsStore = defineStore('records', {
       }
     },
 
+    /**
+     * Smart fetch method that chooses the best strategy based on filters
+     */
+    async fetchRecords(params?: {
+      type?: string;
+      status?: string;
+      search?: string;
+      offset?: number;
+      limit?: number;
+    }) {
+      // If there's a search query, use search API
+      if (params?.search && params.search.trim()) {
+        return await this.searchRecords(params.search, {
+          type: params.type,
+          status: params.status,
+          limit: params.limit,
+          offset: params.offset,
+        });
+      }
+
+      // If there are type or status filters, use filtered fetch
+      if (params?.type || params?.status) {
+        return await this.fetchFilteredRecords({
+          type: params.type,
+          status: params.status,
+          offset: params.offset,
+          limit: params.limit,
+        });
+      }
+
+      // Otherwise, fetch all records
+      return await this.fetchAllRecords({
+        offset: params?.offset,
+        limit: params?.limit,
+      });
+    },
+
     async fetchRecord(id: string) {
       this.loading = true;
       this.error = null;
 
       try {
-        const response = await useNuxtApp().$civicApi(`/records/${id}`);
+        const response = await useNuxtApp().$civicApi(`/api/records/${id}`);
 
-        console.log('response >>>>>', response);
+        console.log('Fetch single record response:', response);
+
         // Safely extract record from response
         let record: CivicRecord;
         if (
@@ -246,13 +408,8 @@ export const useRecordsStore = defineStore('records', {
           throw new Error('Invalid response format');
         }
 
-        // Update or add the record to the store
-        const index = this.records.findIndex((r) => r.id === id);
-        if (index > -1) {
-          this.records[index] = record;
-        } else {
-          this.records.push(record);
-        }
+        // Add or update the record in the store
+        this.addOrUpdateRecords([record]);
 
         return record;
       } catch (error: any) {
@@ -270,7 +427,7 @@ export const useRecordsStore = defineStore('records', {
       this.error = null;
 
       try {
-        const response = await useNuxtApp().$civicApi('/records', {
+        const response = await useNuxtApp().$civicApi('/api/records', {
           method: 'POST',
           body: recordData,
         });
@@ -288,7 +445,8 @@ export const useRecordsStore = defineStore('records', {
           throw new Error('Invalid response format');
         }
 
-        this.records.unshift(newRecord);
+        // Add the new record to the store
+        this.addOrUpdateRecords([newRecord]);
         return newRecord;
       } catch (error: any) {
         this.error = error.message || 'Failed to create record';
@@ -303,7 +461,7 @@ export const useRecordsStore = defineStore('records', {
       this.error = null;
 
       try {
-        const response = await useNuxtApp().$civicApi(`/records/${id}`, {
+        const response = await useNuxtApp().$civicApi(`/api/records/${id}`, {
           method: 'PUT',
           body: updates,
         });
@@ -321,10 +479,8 @@ export const useRecordsStore = defineStore('records', {
           throw new Error('Invalid response format');
         }
 
-        const index = this.records.findIndex((r) => r.id === id);
-        if (index > -1) {
-          this.records[index] = updatedRecord;
-        }
+        // Update the record in the store
+        this.addOrUpdateRecords([updatedRecord]);
 
         return updatedRecord;
       } catch (error: any) {
@@ -340,10 +496,11 @@ export const useRecordsStore = defineStore('records', {
       this.error = null;
 
       try {
-        await useNuxtApp().$civicApi(`/records/${id}`, {
+        await useNuxtApp().$civicApi(`/api/records/${id}`, {
           method: 'DELETE',
         });
 
+        // Remove the record from the store
         const index = this.records.findIndex((r) => r.id === id);
         if (index > -1) {
           this.records.splice(index, 1);
@@ -356,12 +513,29 @@ export const useRecordsStore = defineStore('records', {
       }
     },
 
+    /**
+     * Set filters and trigger re-filtering
+     */
     setFilters(filters: Partial<RecordsState['filters']>) {
       this.filters = { ...this.filters, ...filters };
     },
 
+    /**
+     * Clear all filters
+     */
     clearFilters() {
       this.filters = {};
+      this.lastFetchStrategy = null;
+    },
+
+    /**
+     * Clear all records from the store
+     */
+    clearRecords() {
+      this.records = [];
+      this.filters = {};
+      this.lastFetchStrategy = null;
+      this.pagination = { page: 1, limit: 20, total: 0 };
     },
 
     setError(error: string) {

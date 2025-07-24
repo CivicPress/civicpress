@@ -17,20 +17,37 @@ export interface RecordStatusesResponse {
 
 import { ref, readonly } from 'vue';
 
+// Global cache for record statuses
+let globalRecordStatuses: RecordStatusMetadata[] = [];
+let globalFetched = false;
+let globalLoading = false;
+let globalError: string | null = null;
+
 export function useRecordStatuses() {
-  const recordStatuses = ref<RecordStatusMetadata[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const fetched = ref(false); // Cache flag
+  const recordStatuses = ref<RecordStatusMetadata[]>(globalRecordStatuses);
+  const loading = ref(globalLoading);
+  const error = ref<string | null>(globalError);
+  const fetched = ref(globalFetched);
 
   const fetchRecordStatuses = async () => {
-    // Skip if already fetched
+    // Skip if already fetched globally
+    if (globalFetched && globalRecordStatuses.length > 0) {
+      recordStatuses.value = globalRecordStatuses;
+      loading.value = false;
+      error.value = null;
+      fetched.value = true;
+      return;
+    }
+
+    // Skip if already fetched locally
     if (fetched.value && recordStatuses.value.length > 0) {
       return;
     }
 
     loading.value = true;
     error.value = null;
+    globalLoading = true;
+    globalError = null;
 
     try {
       const response = (await useNuxtApp().$civicApi(
@@ -38,16 +55,24 @@ export function useRecordStatuses() {
       )) as RecordStatusesResponse;
 
       if (response.success && response.data) {
-        recordStatuses.value = response.data.record_statuses || [];
+        const newRecordStatuses = response.data.record_statuses || [];
+        recordStatuses.value = newRecordStatuses;
         fetched.value = true;
+
+        // Update global cache
+        globalRecordStatuses = newRecordStatuses;
+        globalFetched = true;
       } else {
         throw new Error('Invalid response format');
       }
     } catch (err: any) {
-      error.value = err.message || 'Failed to fetch record statuses';
+      const errorMessage = err.message || 'Failed to fetch record statuses';
+      error.value = errorMessage;
+      globalError = errorMessage;
       console.error('Error fetching record statuses:', err);
     } finally {
       loading.value = false;
+      globalLoading = false;
     }
   };
 
@@ -59,15 +84,12 @@ export function useRecordStatuses() {
   };
 
   const recordStatusOptions = () => {
-    return [
-      { label: 'All Statuses', value: '', type: 'item' },
-      ...recordStatuses.value.map((status) => ({
-        label: status.label,
-        value: status.key,
-        type: 'item',
-        icon: getRecordStatusIcon(status.key),
-      })),
-    ];
+    return recordStatuses.value.map((status) => ({
+      label: status.label,
+      value: status.key,
+      type: 'item',
+      icon: getRecordStatusIcon(status.key),
+    }));
   };
 
   const sortedRecordStatuses = () => {

@@ -144,6 +144,17 @@ export function createRecordsRouter(recordsService: RecordsService) {
           limit,
           offset,
           requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+        });
+
+        // Log the raw and decoded values
+        logger.info('Filter values received:', {
+          rawType: type,
+          rawStatus: status,
+          decodedType: type as string,
+          decodedStatus: status as string,
+          requestId: (req as any).requestId,
         });
 
         const result = await recordsService.listRecords({
@@ -156,6 +167,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
         logger.info('Records listed successfully', {
           totalRecords: result.records?.length || 0,
           requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
         });
 
         sendSuccess(result, req, res, { operation: 'list_records' });

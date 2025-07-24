@@ -1,5 +1,11 @@
 import { ref, readonly } from 'vue';
 
+// Global cache for record types
+let globalRecordTypes: RecordTypeMetadata[] = [];
+let globalFetched = false;
+let globalLoading = false;
+let globalError: string | null = null;
+
 export interface RecordTypeMetadata {
   key: string;
   label: string;
@@ -18,19 +24,30 @@ export interface RecordTypesResponse {
 }
 
 export function useRecordTypes() {
-  const recordTypes = ref<RecordTypeMetadata[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const fetched = ref(false); // Cache flag
+  const recordTypes = ref<RecordTypeMetadata[]>(globalRecordTypes);
+  const loading = ref(globalLoading);
+  const error = ref<string | null>(globalError);
+  const fetched = ref(globalFetched);
 
   const fetchRecordTypes = async () => {
-    // Skip if already fetched
+    // Skip if already fetched globally
+    if (globalFetched && globalRecordTypes.length > 0) {
+      recordTypes.value = globalRecordTypes;
+      loading.value = false;
+      error.value = null;
+      fetched.value = true;
+      return;
+    }
+
+    // Skip if already fetched locally
     if (fetched.value && recordTypes.value.length > 0) {
       return;
     }
 
     loading.value = true;
     error.value = null;
+    globalLoading = true;
+    globalError = null;
 
     try {
       const response = (await useNuxtApp().$civicApi(
@@ -38,16 +55,24 @@ export function useRecordTypes() {
       )) as RecordTypesResponse;
 
       if (response.success && response.data) {
-        recordTypes.value = response.data.record_types || [];
+        const newRecordTypes = response.data.record_types || [];
+        recordTypes.value = newRecordTypes;
         fetched.value = true;
+
+        // Update global cache
+        globalRecordTypes = newRecordTypes;
+        globalFetched = true;
       } else {
         throw new Error('Invalid response format');
       }
     } catch (err: any) {
-      error.value = err.message || 'Failed to fetch record types';
+      const errorMessage = err.message || 'Failed to fetch record types';
+      error.value = errorMessage;
+      globalError = errorMessage;
       console.error('Error fetching record types:', err);
     } finally {
       loading.value = false;
+      globalLoading = false;
     }
   };
 
@@ -96,15 +121,12 @@ export function useRecordTypes() {
   };
 
   const recordTypeOptions = () => {
-    return [
-      { label: 'All Types', value: '', type: 'item' },
-      ...recordTypes.value.map((type) => ({
-        label: type.label,
-        value: type.key,
-        type: 'item',
-        icon: getRecordTypeIcon(type.key),
-      })),
-    ];
+    return recordTypes.value.map((type) => ({
+      label: type.label,
+      value: type.key,
+      type: 'item',
+      icon: getRecordTypeIcon(type.key),
+    }));
   };
 
   const sortedRecordTypes = () => {
