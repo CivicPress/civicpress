@@ -29,14 +29,14 @@ provides:
 - **REST API**: Comprehensive API with 20+ endpoints and authentication
 - **CLI Interface**: Full command-line interface with JSON output support
 - **Authentication**: Multiple auth methods (OAuth, simulated, password)
-- **Indexing System**: Advanced search and discovery capabilities
+- **Search System**: Advanced full-text search and discovery capabilities
 - **User Management**: Complete CRUD operations for users with role management
 - **Modern UI**: Nuxt 4 frontend with Nuxt UI Pro components
 
 ### ✅ Record Management (Implemented)
 
 - **Markdown Schema**: YAML+Markdown with validation
-- **Lifecycle Management**: Draft → Published → Archived flow
+- **Lifecycle Management**: Draft → Proposed → Approved → Archived flow
 - **Bulk Operations**: Efficient bulk record operations
 - **Search & Discovery**: Advanced indexing and search
 - **Validation System**: Comprehensive record validation and integrity
@@ -68,7 +68,7 @@ pnpm run build
 ```
 
 **Note**: Most operations require authentication. CivicPress supports both
-GitHub Personal Access Tokens and username/password authentication. See
+GitHub OAuth and simulated authentication for development. See
 [Authentication Guide](docs/auth-system.md) for setup instructions.
 
 ### Initialize a New CivicPress Instance
@@ -77,8 +77,11 @@ GitHub Personal Access Tokens and username/password authentication. See
 # Initialize with interactive setup
 civic init
 
-# Or initialize with defaults
-civic init --non-interactive
+# Or initialize with demo data
+civic init --demo-data "Springfield"
+
+# Or initialize with configuration file
+civic init --config config.yml
 ```
 
 ### Authentication
@@ -86,30 +89,33 @@ civic init --non-interactive
 CivicPress supports multiple authentication methods:
 
 ```bash
-# GitHub OAuth (recommended for development)
+# Simulated authentication (development)
+civic auth:simulated --username admin --role admin
+
+# GitHub OAuth (production)
 civic auth:login --token <your_github_token>
 
 # Username/Password (traditional authentication)
 civic auth:password --username <username> --password <password>
-
-# Interactive login (prompts for credentials)
-civic auth:password
 ```
 
 ### Basic Usage
 
 ```bash
 # Create a new record
-civic create --title "My Record" --type policy
+civic create bylaw "Noise Ordinance"
 
 # List all records
 civic list
 
 # Search records
-civic search "keyword"
+civic search "budget"
 
 # View record history
-civic history record-id
+civic history bylaw/noise-ordinance
+
+# Change record status
+civic status bylaw/noise-ordinance proposed
 ```
 
 ### Running the UI
@@ -129,20 +135,20 @@ pnpm dev:ui
 ### Authentication
 
 ```bash
+# Simulated authentication (development)
+curl -X POST http://localhost:3000/auth/simulated \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "role": "admin"}'
+
 # GitHub OAuth authentication
-curl -X POST http://localhost:3000/api/auth/login \
+curl -X POST http://localhost:3000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"token": "your_github_token", "provider": "github"}'
 
 # Password authentication
-curl -X POST http://localhost:3000/api/auth/password \
+curl -X POST http://localhost:3000/auth/password \
   -H "Content-Type: application/json" \
   -d '{"username": "user", "password": "password"}'
-
-# Simulated authentication (for testing)
-curl -X POST http://localhost:3000/api/auth/simulated \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "role": "admin"}'
 ```
 
 ### Records API
@@ -155,8 +161,12 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 # Create record
 curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title": "New Record", "type": "policy"}' \
+  -d '{"title": "New Bylaw", "type": "bylaw", "status": "draft"}' \
   http://localhost:3000/api/records
+
+# Search records
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "http://localhost:3000/api/search?q=policy"
 ```
 
 ## Civic Roles & Permissions
@@ -164,15 +174,12 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
 CivicPress implements a comprehensive role-based access control system designed
 for civic governance:
 
-| Role             | Description                                | Permissions                      |
-| ---------------- | ------------------------------------------ | -------------------------------- |
-| `clerk`          | Creates, edits, and proposes civic records | Create, edit, propose records    |
-| `council-member` | Reviews, comments, and approves records    | Review, comment, approve records |
-| `mayor`          | Final approval and publishing              | Final approval, publish to main  |
-| `auditor`        | Read-only access for auditing              | Audit commits and records        |
-| `contributor`    | Proposes drafts requiring review           | Propose drafts                   |
-| `admin`          | Full system access and setup               | Full access                      |
-| `public`         | Read-only access to published data         | Read published records           |
+| Role      | Description                                | Permissions                      |
+| --------- | ------------------------------------------ | -------------------------------- |
+| `admin`   | Full system access and setup               | All permissions                  |
+| `clerk`   | Creates, edits, and proposes civic records | Create, edit, propose records    |
+| `council` | Reviews, comments, and approves records    | Review, comment, approve records |
+| `public`  | Read-only access to published data         | Read published records           |
 
 ## Development
 
@@ -240,6 +247,8 @@ CivicPress
 - **[API Integration Guide](docs/api-integration-guide.md)** - Developer guide
   with examples
 - **[CLI Usage Guide](docs/cli.md)** - Command-line interface documentation
+- **[Authentication Guide](docs/auth-system.md)** - Authentication and
+  authorization
 - **[Specifications](docs/specs-index.md)** - Complete platform specifications
   (50+ specs)
 
@@ -261,10 +270,10 @@ CivicPress
 
 ### 🚀 Phase 2: API Enhancement (Current)
 
-- Diff API for record comparison
-- Analytics API for usage statistics
-- Bulk Operations API
-- Advanced Search API
+- Search API with full-text search
+- Configuration API for record types and statuses
+- Export/Import API for bulk operations
+- Status and monitoring API
 
 ### 🔮 Phase 3: Advanced Features (Planned)
 
