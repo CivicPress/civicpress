@@ -241,6 +241,7 @@ export class RecordsService {
     limit: number;
   }> {
     const result = await this.recordManager.listRecords(options);
+
     return {
       records: result.records,
       total: result.total,

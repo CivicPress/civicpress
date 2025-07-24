@@ -12,46 +12,13 @@ const links = [[{
   label: 'Home',
   icon: 'i-lucide-house',
   to: '/',
-  onSelect: () => {
-    appStore.setSidebarOpen(true)
-  }
+
 }, {
   label: 'Records',
   to: '/records',
   icon: 'i-lucide-scale',
-  defaultOpen: true,
-  type: 'trigger',
-  children: [{
-    label: 'Bylaws',
-    to: '/records?type=bylaws',
-    exact: true,
-    onSelect: () => {
-      appStore.setSidebarOpen(false)
-    }
-  }, {
-    label: 'Minutes',
-    to: '/records?type=minutes',
-    onSelect: () => {
-      appStore.setSidebarOpen(false)
-    }
-  }, {
-    label: 'Resolutions',
-    to: '/records?type=resolutions',
-    onSelect: () => {
-      appStore.setSidebarOpen(false)
-    }
-  }]
-}], [{
-  label: 'Feedback',
-  icon: 'i-lucide-message-circle',
-  to: 'https://github.com/nuxt-ui-pro/dashboard',
-  target: '_blank'
-}, {
-  label: 'Help & Support',
-  icon: 'i-lucide-info',
-  to: 'https://github.com/nuxt/ui-pro',
-  target: '_blank'
-}]] satisfies NavigationMenuItem[][]
+
+}], []] satisfies NavigationMenuItem[][]
 
 onMounted(async () => {
   const cookie = useCookie('cookie-consent')
