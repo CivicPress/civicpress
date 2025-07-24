@@ -1,993 +1,689 @@
 # CivicPress CLI Usage Guide
 
-Welcome to the CivicPress CLI! This guide covers all available commands,
-options, and usage examples for managing civic records with CivicPress.
+The CivicPress CLI provides a comprehensive command-line interface for managing
+civic records, workflows, and system administration.
 
-## Table of Contents
+## Quick Start
 
-- [Overview](#overview)
-- [Command Reference](#command-reference)
-  - [init](#init)
-  - [create](#create)
-  - [commit](#commit)
-  - [history](#history)
-  - [list](#list)
-  - [view](#view)
-  - [edit](#edit)
-  - [status](#status)
-  - [search](#search)
-  - [diff](#diff)
-  - [export](#export)
-  - [template](#template)
-  - [validate](#validate)
-  - [hook](#hook)
+### Installation
 
----
+```bash
+# Install dependencies
+pnpm install
 
-## Overview
+# Build the CLI
+pnpm run build
 
-CivicPress CLI lets you manage civic records, policies, bylaws, and more using a
-Git-backed, file-based workflow with comprehensive role-based authorization. All
-records and configuration live in a dedicated data directory (e.g., `data/`).
+# Initialize a new CivicPress instance
+civic init
+```
 
-The CLI features advanced template system with inheritance, comprehensive
-validation, powerful record management capabilities, and granular role-based
-permissions.
+### Authentication
 
-### Authentication & Authorization
+```bash
+# Authenticate with simulated account (development)
+civic auth:simulated --username admin --role admin
 
-All CLI commands require authentication and check appropriate permissions:
+# Authenticate with GitHub OAuth
+civic auth:login --token <github_token>
 
-- **Authentication**: Use `--token <token>` to provide session token
-- **Authorization**: Commands check role-based permissions before execution
-- **JSON Output**: Use `--json` for machine-readable error messages
-- **Silent Mode**: Use `--silent` to suppress output
-
-**Default Roles:**
-
-- `admin` - Full system access
-- `mayor` - High-level management
-- `council` - Legislative oversight
-- `clerk` - Administrative support
-- `editor` - Content editing
-- `viewer` - Read-only access
-- `public` - Minimal access (fallback)
-
-**Permission Examples:**
-
-- `records:create` - Create new records
-- `records:edit` - Edit existing records
-- `records:view` - View records
-- `records:export` - Export records
-- `records:import` - Import records
-- `templates:manage` - Manage templates
-- `hooks:manage` - Manage hooks
+# Authenticate with username/password
+civic auth:password --username <username> --password <password>
+```
 
 ## Command Reference
 
-### `init`
+### Core Commands
 
-Initialize a new CivicPress data directory and configuration.
+#### `init`
 
-```sh
+Initialize a new CivicPress project.
+
+```bash
 civic init [options]
 ```
 
 **Options:**
 
-- `--config <path>` - Path to configuration file to use instead of prompts
-- `--data-dir <path>` - Specify the data directory for CivicPress
-- `--token <token>` - Session token for authentication (optional for init)
+- `--config <path>` - Use configuration file instead of prompts
+- `--data-dir <path>` - Specify data directory
+- `--demo-data [city]` - Load demo data (optional city name)
+- `--yes` - Skip prompts and use defaults
 
-**Features:**
+**Examples:**
 
-- Prompts for setup options and creates `.civicrc` at the project root.
-- Asks for database type (SQLite or PostgreSQL) and location/connection info.
-- Initializes a Git repo if needed.
-- Sets up default templates and validation rules.
-- **Automatically copies default roles configuration** to `.civic/roles.yml`
-- **Non-interactive mode** when `--data-dir` is provided
+```bash
+# Interactive initialization
+civic init
 
-**Interactive Prompts:**
+# Non-interactive with config file
+civic init --config config.yml
 
-- Data directory location
-- Database type (SQLite or PostgreSQL)
-- SQLite file path or PostgreSQL connection URL
-
-**Example: SQLite**
-
-```yaml
-# .civicrc
----
-dataDir: data
-database:
-  type: sqlite
-  sqlite:
-    file: data/.civic/civic.db
+# Initialize with demo data
+civic init --demo-data "Springfield"
 ```
 
-**Example: PostgreSQL**
+#### `create`
 
-```yaml
-# .civicrc
----
-dataDir: data
-database:
-  type: postgres
-  postgres:
-    url: postgres://user:password@localhost:5432/civicpress
-```
+Create a new civic record.
 
-> The database file (for SQLite) will be created and initialized automatically
-> if it does not exist.
-
----
-
-### `create`
-
-Create a new record (policy, bylaw, resolution, etc.) with template support.
-
-```sh
-civic create <type> <name> [options]
+```bash
+civic create <type> <title> [options]
 ```
 
 **Required Permission:** `records:create`
 
-**Authentication:** Requires valid session token
-
-**Basic Usage:**
-
-```sh
-civic create policy "Public Records Policy"
-civic create bylaw "Public Meeting Procedures" --template advanced
-civic create resolution "Budget Approval 2024" --template standard
-```
-
 **Options:**
 
-- `--template <template>` - Use specific template (default: type/default)
-- `--dry-run` - Complete dry-run (no files created, no commits)
-- `--dry-run-hooks <hooks>` - Dry-run specific hooks (comma-separated)
-- `--json` - Output results in JSON format
+- `--template <template>` - Use specific template
+- `--dry-run` - Preview without creating
+- `--json` - Output as JSON
+- `--silent` - Suppress output
 
 **Examples:**
 
-```sh
-# Create with advanced template
-civic create bylaw "Financial Procedures" --template advanced
+```bash
+# Create a new bylaw
+civic create bylaw "Noise Ordinance"
+
+# Create with template
+civic create policy "Data Privacy" --template advanced
 
 # Dry-run creation
-civic create policy "Test Policy" --dry-run
-
-# Hook dry-run
-civic create policy "Test" --dry-run-hooks record:created,record:committed
-
-# JSON output
-civic create bylaw "Test Bylaw" --json
+civic create resolution "Budget 2025" --dry-run
 ```
 
----
+#### `list`
 
-### `commit`
+List records with filtering.
 
-Commit changes to records in the data directory.
-
-```sh
-civic commit [record] [--all]
-```
-
-**Required Permission:** `records:edit`
-
-**Authentication:** Requires valid session token
-
-- Commit a specific record: `civic commit policy/public-records-policy`
-- Commit all changes: `civic commit --all`
-
----
-
-### `history`
-
-Show the Git history of civic records.
-
-```sh
-civic history [record] [options]
-```
-
-**Options:**
-
-- `--limit <number>` - Limit number of commits shown
-- `--format <format>` - Output format (human, json)
-- `--author <author>` - Filter by author
-
-**Examples:**
-
-```sh
-# Show history for specific record
-civic history bylaw/public-meeting-procedures
-
-# Show recent commits with limit
-civic history --limit 10
-
-# JSON output
-civic history --format json
-```
-
----
-
-### `list`
-
-List records by type and status with advanced filtering.
-
-```sh
+```bash
 civic list [type] [options]
 ```
 
 **Required Permission:** `records:view`
 
-**Authentication:** Requires valid session token
-
 **Options:**
 
-- `--status <status>` - Filter by status (comma-separated)
+- `--status <status>` - Filter by status
 - `--author <author>` - Filter by author
 - `--format <format>` - Output format (human, json, csv)
-- `--include-content` - Include record content in output
-- `--sort <field>` - Sort by field (title, created, updated, status)
+- `--include-content` - Include record content
+- `--sort <field>` - Sort by field
 
 **Examples:**
 
-```sh
+```bash
 # List all records
 civic list
 
-# List only policies
-civic list policy
+# List only bylaws
+civic list bylaw
 
 # Filter by status
-civic list bylaw --status active,approved
+civic list --status draft,proposed
 
-# Filter by author
-civic list --author "City Council"
-
-# JSON output with content
-civic list --format json --include-content
-
-# Sort by creation date
-civic list --sort created
+# JSON output
+civic list --format json
 ```
 
----
+#### `view`
 
-### `view`
+View a specific record.
 
-View a specific record's content and metadata.
-
-```sh
-civic view <record> [options]
+```bash
+civic view <record-id> [options]
 ```
 
 **Required Permission:** `records:view`
 
-**Authentication:** Requires valid session token
-
 **Options:**
 
-- `--raw` - Show raw markdown
-- `--format <format>` - Output format (human, json, yaml)
-- `--include-content` - Include record content
+- `--format <format>` - Output format (human, json, markdown)
 - `--include-metadata` - Include full metadata
+- `--json` - Output as JSON
 
 **Examples:**
 
-```sh
+```bash
 # View record
-civic view policy/public-records-policy
-
-# Raw markdown output
-civic view bylaw/public-meeting-procedures --raw
+civic view bylaw/noise-ordinance
 
 # JSON output
-civic view resolution/budget-approval --format json
-
-# Include content and metadata
-civic view policy/test --include-content --include-metadata
+civic view policy/data-privacy --json
 ```
 
----
+#### `edit`
 
-### `edit`
+Edit a record.
 
-Edit a record in your preferred editor.
-
-```sh
-civic edit <record> [options]
+```bash
+civic edit <record-id> [options]
 ```
 
 **Required Permission:** `records:edit`
 
-**Authentication:** Requires valid session token
-
 **Options:**
 
-- `--editor <editor>` - Specify editor (vim, nano, code, etc.)
-- `--dry-run` - Show what would be edited without opening editor
+- `--title <title>` - Update title
+- `--content <content>` - Update content
+- `--status <status>` - Update status
+- `--dry-run` - Preview changes
+- `--json` - Output as JSON
 
 **Examples:**
 
-```sh
+```bash
 # Edit record
-civic edit bylaw/test-clean-structure
+civic edit bylaw/noise-ordinance --title "Updated Noise Ordinance"
 
-# Use specific editor
-civic edit policy/public-records-policy --editor vim
-
-# Dry-run edit
-civic edit resolution/test --dry-run
+# Update status
+civic edit policy/data-privacy --status proposed
 ```
 
----
+#### `commit`
 
-### `status`
+Commit changes to records.
 
-Change the status of a record (e.g., draft → approved).
-
-```sh
-civic status <record> <new-status> [options]
+```bash
+civic commit [record] [options]
 ```
 
-**Valid Statuses:**
-
-- `draft` - Initial draft state
-- `proposed` - Proposed for review
-- `approved` - Approved and active
-- `active` - Currently in effect
-- `archived` - No longer in effect
-- `rejected` - Rejected or withdrawn
+**Required Permission:** `records:edit`
 
 **Options:**
 
-- `--message <msg>` - Add status change message
-- `--dry-run` - Complete dry-run
-- `--dry-run-hooks <hooks>` - Dry-run specific hooks
-- `--json` - Output results in JSON format
+- `--message <message>` - Commit message
+- `--all` - Commit all changes
+- `--dry-run` - Preview commit
+- `--json` - Output as JSON
 
 **Examples:**
 
-```sh
-# Change status
-civic status policy/public-records-policy approved --message "Policy approved by council"
+```bash
+# Commit specific record
+civic commit bylaw/noise-ordinance --message "Update noise restrictions"
 
-# Dry-run status change
-civic status policy/test approved --dry-run
-
-# Hook dry-run
-civic status policy/test approved --dry-run-hooks status:changed
-
-# JSON output
-civic status bylaw/test approved --json
+# Commit all changes
+civic commit --all --message "Batch update"
 ```
 
----
+### Search & Discovery
 
-### `search`
+#### `search`
 
-Search records by content, metadata, status, type, author, date, or Git history.
+Search records by content, metadata, or Git history.
 
-```sh
+```bash
 civic search [query] [options]
 ```
 
 **Options:**
 
-- `--type <type>` - Filter by record type
+- `--content <text>` - Search in record content
+- `--title <text>` - Search in record titles
+- `--tags <text>` - Search in record tags
 - `--status <status>` - Filter by status
-- `--author <author>` - Filter by author
-- `--date <date>` - Filter by date (YYYY-MM-DD or relative)
-- `--regex` - Use regex for search
-- `--content` - Search in content only
-- `--metadata` - Search in metadata only
-- `--format <format>` - Output format (human, json, csv)
-- `--limit <number>` - Limit number of results
+- `--type <type>` - Filter by record type
+- `--author <author>` - Search by author
+- `--date <date>` - Search by date
+- `--git <text>` - Search in Git history
+- `--case-sensitive` - Case-sensitive search
+- `--regex` - Treat as regular expressions
+- `--limit <number>` - Limit results (default: 50)
+- `--format <format>` - Output format (table, json, list)
 
 **Examples:**
 
-```sh
-# Search content
-civic search "budget"
+```bash
+# Basic search
+civic search "noise"
 
-# Filter by type and status
-civic search --type policy --status approved
+# Search with filters
+civic search "budget" --type resolution --status approved
 
-# Search by author
-civic search --author system
-
-# Regex search
-civic search --regex --content "test"
-
-# Date range search
-civic search --date "2024-01-01..2024-12-31"
+# Search in Git history
+civic search "update" --git
 
 # JSON output
-civic search --format json
-
-# Limit results
-civic search "privacy" --limit 5
+civic search "policy" --format json
 ```
 
----
+### Authentication & Users
 
-### `diff`
+#### `auth:simulated`
 
-Compare record versions or show changes between commits.
+Create simulated user account (development only).
 
-```sh
-civic diff [record] [options]
+```bash
+civic auth:simulated --username <username> --role <role>
 ```
 
 **Options:**
 
-- `--from <commit>` - Compare from specific commit
-- `--to <commit>` - Compare to specific commit
-- `--interactive` - Interactive diff mode
-- `--metadata` - Show only metadata changes
-- `--content` - Show only content changes
-- `--format <format>` - Output format (human, json)
-- `--stat` - Show statistics only
+- `--username <username>` - Username (required)
+- `--role <role>` - User role (default: public)
+- `--json` - Output as JSON
 
 **Examples:**
 
-```sh
-# Compare last two commits
-civic diff
+```bash
+# Create admin user
+civic auth:simulated --username admin --role admin
 
-# Compare specific record
-civic diff policy/public-records-policy
-
-# Interactive mode
-civic diff policy/public-records-policy --interactive
-
-# Show only metadata changes
-civic diff --metadata
-
-# Show only content changes
-civic diff --content
-
-# JSON output
-civic diff --format json
-
-# Compare specific commits
-civic diff --from v1.0.0 --to v1.1.0
+# Create clerk user
+civic auth:simulated --username clerk --role clerk
 ```
 
----
+#### `auth:login`
 
-### `export`
+Authenticate with GitHub OAuth.
 
-Export records in various formats (JSON, CSV, HTML, PDF).
+```bash
+civic auth:login --token <github_token>
+```
 
-```sh
+**Options:**
+
+- `--token <token>` - GitHub OAuth token
+- `--json` - Output as JSON
+
+#### `auth:password`
+
+Authenticate with username/password.
+
+```bash
+civic auth:password --username <username> --password <password>
+```
+
+**Options:**
+
+- `--username <username>` - Username
+- `--password <password>` - Password
+- `--json` - Output as JSON
+
+#### `users`
+
+Manage users (admin only).
+
+```bash
+civic users [command] [options]
+```
+
+**Commands:**
+
+- `list` - List all users
+- `create` - Create new user
+- `update` - Update user
+- `delete` - Delete user
+
+**Examples:**
+
+```bash
+# List users
+civic users list
+
+# Create user
+civic users create --username clerk --role clerk
+```
+
+### System & Configuration
+
+#### `status`
+
+Change record status.
+
+```bash
+civic status <record> <status> [options]
+```
+
+**Required Permission:** `records:edit`
+
+**Options:**
+
+- `--message <message>` - Status change message
+- `--role <role>` - Role for status change
+- `--dry-run` - Preview change
+- `--json` - Output as JSON
+
+**Examples:**
+
+```bash
+# Change status
+civic status bylaw/noise-ordinance proposed
+
+# With message
+civic status policy/data-privacy approved --message "Approved by council"
+```
+
+#### `info`
+
+Show system information.
+
+```bash
+civic info [options]
+```
+
+**Options:**
+
+- `--token <token>` - Authentication token
+- `--json` - Output as JSON
+
+#### `debug`
+
+Debug system configuration.
+
+```bash
+civic debug [command] [options]
+```
+
+**Commands:**
+
+- `config` - Show configuration
+- `permissions` - Show permissions
+- `hooks` - Show hooks
+
+**Examples:**
+
+```bash
+# Show configuration
+civic debug config
+
+# Show permissions
+civic debug permissions
+```
+
+### Templates & Workflows
+
+#### `template`
+
+Manage record templates.
+
+```bash
+civic template [command] [options]
+```
+
+**Commands:**
+
+- `--list` - List all templates
+- `--show <template>` - Show template details
+- `--create <name>` - Create new template
+- `--validate <template>` - Validate template
+- `--init` - Initialize default templates
+
+**Examples:**
+
+```bash
+# List templates
+civic template --list
+
+# Show template
+civic template --show bylaw/default
+
+# Create template
+civic template --create "advanced-bylaw" --type bylaw
+```
+
+#### `hook`
+
+Manage hooks and workflows.
+
+```bash
+civic hook [command] [options]
+```
+
+**Commands:**
+
+- `--list` - List all hooks
+- `--enable <hook>` - Enable hook
+- `--disable <hook>` - Disable hook
+- `--test <hook>` - Test hook
+- `--workflows` - List workflows
+
+**Examples:**
+
+```bash
+# List hooks
+civic hook --list
+
+# Enable hook
+civic hook --enable record:created
+
+# Test hook
+civic hook --test record:updated
+```
+
+### Import & Export
+
+#### `export`
+
+Export records.
+
+```bash
 civic export [options]
 ```
 
-**Required Permission:** `records:export`
-
-**Authentication:** Requires valid session token
-
 **Options:**
 
-- `--type <type>` - Export specific types (comma-separated)
+- `--format <format>` - Export format (json, csv, markdown)
+- `--type <type>` - Filter by record type
 - `--status <status>` - Filter by status
-- `--author <author>` - Filter by author
-- `--date <date>` - Filter by date
-- `--format <format>` - Output format (json, csv, html, pdf)
-- `--output <path>` - Output file or directory
-- `--include-content` - Include record content
-- `--include-metadata` - Include full metadata
-- `--template <template>` - Custom HTML template
-- `--pretty` - Pretty-print JSON output
+- `--output <file>` - Output file
+- `--json` - Output as JSON
 
 **Examples:**
 
-```sh
+```bash
 # Export all records
-civic export
-
-# Export specific types
-civic export --type policy,bylaw
-
-# Filter by status
-civic export --status approved,active
-
-# Include content
-civic export --include-content
-
-# Output formats
 civic export --format json
-civic export --format csv
-civic export --format html --template custom-template.html
 
-# Custom output path
-civic export --output reports/
-
-# Pretty JSON
-civic export --format json --pretty
+# Export specific type
+civic export --type bylaw --format csv
 ```
 
----
+#### `import`
 
-### `import`
+Import records.
 
-Import records from various formats (JSON, CSV, Markdown).
-
-```sh
-civic import [file] [options]
+```bash
+civic import <file> [options]
 ```
-
-**Required Permission:** `records:import`
-
-**Authentication:** Requires valid session token
 
 **Options:**
 
 - `--format <format>` - Import format (json, csv, markdown)
-- `--input <path>` - Input file or directory path
-- `--type <type>` - Default record type for imported records
-- `--status <status>` - Default status for imported records
-- `--author <author>` - Default author for imported records
-- `--overwrite` - Overwrite existing records
-- `--dry-run` - Show what would be imported without importing
-- `--validate` - Validate imported records
-- `--template <template>` - Default template for imported records
+- `--dry-run` - Preview import
+- `--json` - Output as JSON
 
 **Examples:**
 
-```sh
-# Import from JSON file
-civic import records.json
+```bash
+# Import records
+civic import records.json --format json
 
-# Import from CSV
-civic import --format csv --input data.csv
-
-# Import with defaults
-civic import records.json --type policy --status draft --author "City Clerk"
-
-# Dry-run import
-civic import records.json --dry-run
-
-# Validate imported records
-civic import records.json --validate
-
-# Overwrite existing records
-civic import records.json --overwrite
+# Preview import
+civic import records.csv --format csv --dry-run
 ```
 
----
+### Validation & Testing
 
-### `template`
+#### `validate`
 
-Manage record templates with advanced inheritance and validation.
+Validate records.
 
-```sh
-civic template [command] [options]
-```
-
-**Required Permission:** `templates:manage`
-
-**Authentication:** Requires valid session token
-
-**Commands:**
-
-#### List Templates
-
-```sh
-civic template --list [options]
-```
-
-**Options:**
-
-- `--type <type>` - List templates for specific type
-- `--format <format>` - Output format (human, json)
-- `--include-inheritance` - Show inheritance information
-
-**Examples:**
-
-```sh
-# List all templates
-civic template --list
-
-# List bylaw templates
-civic template --list --type bylaw
-
-# JSON output
-civic template --list --format json
-
-# Show inheritance info
-civic template --list --include-inheritance
-```
-
-#### Show Template Details
-
-```sh
-civic template --show <template> [options]
-```
-
-**Options:**
-
-- `--format <format>` - Output format (human, json, yaml)
-- `--include-content` - Include template content
-- `--include-validation` - Include validation rules
-
-**Examples:**
-
-```sh
-# Show template details
-civic template --show bylaw/advanced
-
-# JSON output
-civic template --show policy/default --format json
-
-# Include content and validation
-civic template --show resolution/standard --include-content --include-validation
-```
-
-#### Create Custom Templates
-
-```sh
-civic template --create <name> [options]
-```
-
-**Options:**
-
-- `--type <type>` - Record type for template
-- `--extends <template>` - Extend existing template
-- `--description <desc>` - Template description
-- `--format <format>` - Output format (human, json)
-
-**Examples:**
-
-```sh
-# Create new template
-civic template --create "custom-bylaw" --type bylaw
-
-# Create with inheritance
-civic template --create "financial-bylaw" --type bylaw --extends bylaw/base
-
-# Add description
-civic template --create "privacy-policy" --type policy --description "Privacy policy template"
-```
-
-#### Validate Templates
-
-```sh
-civic template --validate <template> [options]
-```
-
-**Options:**
-
-- `--format <format>` - Output format (human, json)
-- `--strict` - Treat warnings as errors
-
-**Examples:**
-
-```sh
-# Validate template
-civic template --validate bylaw/advanced
-
-# JSON output
-civic template --validate policy/default --format json
-
-# Strict validation
-civic template --validate resolution/standard --strict
-```
-
----
-
-### `validate`
-
-Validate records against their templates with comprehensive rule checking.
-
-```sh
-civic validate [record] [options]
+```bash
+civic validate [options]
 ```
 
 **Options:**
 
 - `--all` - Validate all records
-- `--fix` - Attempt to auto-fix validation issues
-- `--strict` - Treat warnings as errors
-- `--format <format>` - Output format (human, json)
-- `--include-suggestions` - Include improvement suggestions
+- `--record <id>` - Validate specific record
+- `--format <format>` - Output format
+- `--json` - Output as JSON
 
 **Examples:**
 
-#### Validate Single Record
-
-```sh
-# Basic validation
-civic validate bylaw/public-meeting-procedures
-
-# JSON output
-civic validate policy/public-records-policy --json
-
-# Strict validation
-civic validate resolution/budget-approval --strict
-```
-
-#### Validate All Records
-
-```sh
+```bash
 # Validate all records
 civic validate --all
 
-# JSON output
-civic validate --all --json
-
-# Auto-fix issues
-civic validate --all --fix
-
-# Strict validation
-civic validate --all --strict
-
-# Include suggestions
-civic validate --all --include-suggestions
+# Validate specific record
+civic validate --record bylaw/noise-ordinance
 ```
 
-#### Validation Output Examples
+#### `diff`
 
-**Human Readable:**
+Show differences between records or commits.
 
-```
-📊 Validation Summary:
-  Total records: 15
-  Valid records: 12
-  Invalid records: 3
-
-📄 bylaw/public-meeting-procedures.md
-  ❌ Invalid
-    ❌ bylaw_number: Required field 'bylaw_number' is missing or empty
-    ⚠️  contact_email: Invalid email format
-    ⚠️  content: Found 2 placeholder(s) in content
-
-📊 Final Summary:
-  Total errors: 1
-  Total warnings: 2
-
-❌ Some records have validation errors that need to be fixed.
-```
-
-**JSON Output:**
-
-```json
-{
-  "results": [
-    {
-      "record": "bylaw/public-meeting-procedures.md",
-      "isValid": false,
-      "errors": [
-        {
-          "field": "bylaw_number",
-          "message": "Required field 'bylaw_number' is missing or empty",
-          "severity": "error"
-        }
-      ],
-      "warnings": [
-        {
-          "field": "contact_email",
-          "message": "Invalid email format",
-          "suggestion": "Use a valid email format (e.g., user@example.com)"
-        }
-      ],
-      "suggestions": []
-    }
-  ],
-  "summary": {
-    "totalRecords": 15,
-    "validRecords": 12,
-    "invalidRecords": 3,
-    "totalErrors": 1,
-    "totalWarnings": 2
-  }
-}
-```
-
----
-
-### `hook`
-
-Manage event hooks and automation workflows.
-
-```sh
-civic hook [command] [options]
-```
-
-**Required Permission:** `hooks:manage`
-
-**Authentication:** Requires valid session token
-
-**Commands:**
-
-#### List Hooks
-
-```sh
-civic hook --list [options]
+```bash
+civic diff [options]
 ```
 
 **Options:**
 
-- `--format <format>` - Output format (human, json)
-- `--enabled` - Show only enabled hooks
-- `--disabled` - Show only disabled hooks
+- `--record <id>` - Compare record versions
+- `--commit1 <commit>` - First commit
+- `--commit2 <commit>` - Second commit
+- `--format <format>` - Output format
+- `--json` - Output as JSON
 
 **Examples:**
 
-```sh
-# List all hooks
-civic hook --list
+```bash
+# Compare record versions
+civic diff --record bylaw/noise-ordinance
 
-# JSON output
-civic hook --list --format json
-
-# Show enabled hooks only
-civic hook --list --enabled
+# Compare commits
+civic diff --commit1 HEAD~1 --commit2 HEAD
 ```
-
-#### Enable/Disable Hooks
-
-```sh
-civic hook --enable <hook>
-civic hook --disable <hook>
-```
-
-**Examples:**
-
-```sh
-# Enable hook
-civic hook --enable record:created
-
-# Disable hook
-civic hook --disable record:committed
-```
-
-#### Show Hook Details
-
-```sh
-civic hook --show <hook> [options]
-```
-
-**Options:**
-
-- `--format <format>` - Output format (human, json)
-
-**Examples:**
-
-```sh
-# Show hook details
-civic hook --show record:created
-
-# JSON output
-civic hook --show status:changed --format json
-```
-
----
 
 ## Global Options
 
 All commands support these global options:
 
-- `--json` - Output results in JSON format
-- `--silent` - Suppress all output (except errors)
-- `--verbose` - Enable verbose output
-- `--debug` - Enable debug output
+- `--json` - Output as JSON
+- `--silent` - Suppress output
+- `--quiet` - Minimal output
+- `--verbose` - Verbose output
+- `--no-color` - Disable color output
+- `--token <token>` - Authentication token
 
-**Examples:**
+## User Roles & Permissions
 
-```sh
-# JSON output for any command
-civic list --json
-civic search "test" --json
-civic validate --all --json
+### Available Roles
 
-# Silent mode
-civic create policy "Test" --silent
+| Role      | Description        | Permissions                 |
+| --------- | ------------------ | --------------------------- |
+| `admin`   | Full system access | All permissions             |
+| `clerk`   | Municipal clerk    | Create, edit, view records  |
+| `council` | Council member     | Approve, edit, view records |
+| `public`  | Public citizen     | View published records only |
 
-# Verbose output
-civic validate --all --verbose
+### Permission Examples
 
-# Debug mode
-civic template --list --debug
-```
+- **`records:create`** - Create new civic records
+- **`records:edit`** - Edit existing records
+- **`records:view`** - View records
+- **`records:delete`** - Archive/delete records
+- **`system:admin`** - Administrative access
+- **`workflows:execute`** - Execute workflows
 
----
+## Error Handling
 
-## Configuration
+The CLI provides consistent error handling:
 
-CivicPress CLI configuration is stored in `.civic/config.yml`:
-
-```yaml
-# .civic/config.yml
-dataDir: data
-hooks:
-  record:created:
-    enabled: true
-    workflows: [validate-record, notify-council]
-  record:committed:
-    enabled: true
-    workflows: [validate-record]
-validation:
-  strict_mode: false
-  auto_fix: false
-  max_warnings: 10
-templates:
-  default_type: default
-  inheritance_enabled: true
-```
-
----
+- **Exit codes**: 0 for success, 1 for errors
+- **JSON output**: Use `--json` for machine-readable errors
+- **Silent mode**: Use `--silent` to suppress error output
+- **Validation**: Commands validate inputs and permissions
 
 ## Examples
 
 ### Complete Workflow
 
-```sh
-# Initialize CivicPress
-civic init
+```bash
+# 1. Initialize project
+civic init --demo-data "Springfield"
 
-# Create a new bylaw with advanced template
-civic create bylaw "Public Meeting Procedures" --template advanced
+# 2. Authenticate
+civic auth:simulated --username admin --role admin
 
-# Edit the record
-civic edit bylaw/public-meeting-procedures
+# 3. Create record
+civic create bylaw "Noise Ordinance" --template default
 
-# Validate the record
-civic validate bylaw/public-meeting-procedures
+# 4. Edit record
+civic edit bylaw/noise-ordinance --status proposed
 
-# Change status to approved
-civic status bylaw/public-meeting-procedures approved --message "Approved by council"
+# 5. Commit changes
+civic commit bylaw/noise-ordinance --message "Propose noise ordinance"
 
-# View the final record
-civic view bylaw/public-meeting-procedures
+# 6. Search records
+civic search "noise" --type bylaw
 
-# Export for distribution
-civic export --type bylaw --status approved --format html --output reports/
+# 7. Export data
+civic export --format json --type bylaw
 ```
 
-### Template Management
+### Development Workflow
 
-```sh
-# List available templates
-civic template --list
+```bash
+# 1. Setup development environment
+civic init --config dev-config.yml
 
-# Show advanced template details
-civic template --show bylaw/advanced
+# 2. Create test user
+civic auth:simulated --username test --role clerk
 
-# Create custom template
-civic template --create "financial-bylaw" --type bylaw --extends bylaw/base
+# 3. Create test records
+civic create policy "Test Policy" --dry-run
+civic create bylaw "Test Bylaw" --dry-run
 
-# Validate template
-civic template --validate bylaw/advanced
-```
-
-### Validation and Quality
-
-```sh
-# Validate all records
+# 4. Validate setup
 civic validate --all
-
-# Validate with auto-fix
-civic validate --all --fix
-
-# Strict validation
-civic validate --all --strict
-
-# Export validation report
-civic validate --all --json > validation-report.json
+civic debug config
 ```
 
----
+## Troubleshooting
 
-## Additional Resources
+### Common Issues
 
-- [Template System Guide](templates.md)
-- [Validation System Guide](validation.md)
-- [Configuration Reference](../.civic/config.yml)
-- [Template Examples](../.civic/templates/)
+**Authentication Errors:**
+
+```bash
+# Check if user exists
+civic auth:simulated --username admin --role admin
+
+# Verify permissions
+civic debug permissions
+```
+
+**Permission Errors:**
+
+```bash
+# Check user role
+civic auth:me
+
+# Verify record permissions
+civic debug permissions --user <username>
+```
+
+**Configuration Issues:**
+
+```bash
+# Show configuration
+civic debug config
+
+# Reinitialize if needed
+civic init --config config.yml
+```
+
+### Getting Help
+
+```bash
+# Show command help
+civic --help
+civic create --help
+
+# List all commands
+civic --help
+```
