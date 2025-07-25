@@ -94,7 +94,12 @@ export const useRecordsStore = defineStore('records', {
         );
       }
 
-      return filtered;
+      // Apply pagination
+      const startIndex = (state.pagination.page - 1) * state.pagination.limit;
+      const endIndex = startIndex + state.pagination.limit;
+      const paginated = filtered.slice(startIndex, endIndex);
+
+      return paginated;
     },
 
     /**
@@ -137,7 +142,49 @@ export const useRecordsStore = defineStore('records', {
     totalFilteredRecords: (state) => {
       // Use the filteredRecords getter to get the count
       const store = useRecordsStore();
-      return store.filteredRecords.length;
+      const allFiltered = store.getFilteredRecordsWithoutPagination();
+      return allFiltered.length;
+    },
+
+    /**
+     * Get filtered records without pagination (for counting total)
+     */
+    getFilteredRecordsWithoutPagination: (state) => () => {
+      let filtered = state.records;
+
+      // Apply type filter (handle comma-separated values)
+      if (state.filters.type) {
+        const typeFilters = state.filters.type.split(',').map((t) => t.trim());
+        filtered = filtered.filter((record) =>
+          typeFilters.includes(record.type)
+        );
+      }
+
+      // Apply status filter (handle comma-separated values)
+      if (state.filters.status) {
+        const statusFilters = state.filters.status
+          .split(',')
+          .map((s) => s.trim());
+        filtered = filtered.filter((record) =>
+          statusFilters.includes(record.status)
+        );
+      }
+
+      // Apply search filter (client-side search)
+      if (state.filters.search) {
+        const search = state.filters.search.toLowerCase();
+        filtered = filtered.filter(
+          (record) =>
+            record.title.toLowerCase().includes(search) ||
+            record.content.toLowerCase().includes(search) ||
+            record.metadata?.tags?.some((tag: string) =>
+              tag.toLowerCase().includes(search)
+            ) ||
+            false
+        );
+      }
+
+      return filtered;
     },
   },
 
@@ -163,6 +210,13 @@ export const useRecordsStore = defineStore('records', {
     },
 
     /**
+     * Replace all records (for pagination)
+     */
+    replaceRecords(newRecords: CivicRecord[]) {
+      this.records = [...newRecords];
+    },
+
+    /**
      * Fetch all records (no filters)
      * Use this for initial load or when clearing filters
      */
@@ -178,9 +232,8 @@ export const useRecordsStore = defineStore('records', {
         if (params?.limit) queryParams.append('limit', params.limit.toString());
 
         const url = `/api/records${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        console.log('Fetching records from:', url);
         const response = await useNuxtApp().$civicApi(url);
-
-        console.log('Fetch all records response:', response);
 
         // Safely extract data from response
         if (
@@ -202,6 +255,8 @@ export const useRecordsStore = defineStore('records', {
             limit: data.limit || 20,
             total: data.total || 0,
           };
+        } else {
+          console.log('Response structure not as expected:', response);
         }
 
         this.filters = {};
@@ -209,6 +264,7 @@ export const useRecordsStore = defineStore('records', {
 
         return response;
       } catch (error: any) {
+        console.error('Error in fetchAllRecords:', error);
         this.error = error.message || 'Failed to fetch records';
         throw error;
       } finally {
@@ -240,8 +296,6 @@ export const useRecordsStore = defineStore('records', {
 
         const url = `/api/records?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
-
-        console.log('Fetch filtered records response:', response);
 
         // Safely extract data from response
         if (
@@ -308,8 +362,6 @@ export const useRecordsStore = defineStore('records', {
 
         const url = `/api/search?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
-
-        console.log('Search response:', response);
 
         // Safely extract data from response
         if (
@@ -392,8 +444,6 @@ export const useRecordsStore = defineStore('records', {
 
       try {
         const response = await useNuxtApp().$civicApi(`/api/records/${id}`);
-
-        console.log('Fetch single record response:', response);
 
         // Safely extract record from response
         let record: CivicRecord;
@@ -518,6 +568,13 @@ export const useRecordsStore = defineStore('records', {
      */
     setFilters(filters: Partial<RecordsState['filters']>) {
       this.filters = { ...this.filters, ...filters };
+    },
+
+    /**
+     * Update pagination state
+     */
+    setPagination(pagination: Partial<RecordsState['pagination']>) {
+      this.pagination = { ...this.pagination, ...pagination };
     },
 
     /**

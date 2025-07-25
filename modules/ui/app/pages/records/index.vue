@@ -24,14 +24,32 @@ const {
     recordStatusOptions,
 } = useRecordStatuses()
 
+// Record utilities composable
+const { formatDate, getStatusColor, getTypeIcon, getTypeLabel, getStatusLabel } = useRecordUtils()
+
+// Route and router for URL state management
+const route = useRoute()
+const router = useRouter()
+
 // Reactive data
 const searchQuery = ref('')
 const selectedRecordTypes = ref<any[]>([])
 const selectedRecordStatuses = ref<any[]>([])
 
-// Pagination state
-const currentPage = ref(1)
-const pageSize = ref(10) // Default page size
+// Pagination state - use store pagination
+const currentPage = computed({
+    get: () => recordsStore.pagination.page,
+    set: (page: number) => {
+        recordsStore.setPagination({ page })
+    }
+})
+
+const pageSize = computed({
+    get: () => recordsStore.pagination.limit,
+    set: (limit: number) => {
+        recordsStore.setPagination({ limit })
+    }
+})
 
 // Page size options
 const pageSizeOptions = [
@@ -48,6 +66,58 @@ const selectedPageSizeOption = computed({
         pageSize.value = option.value
     }
 })
+
+// URL state management functions
+const updateURL = (replace = true) => {
+    const query: any = {}
+
+    if (searchQuery.value) query.search = searchQuery.value
+    if (selectedRecordTypes.value.length > 0) {
+        query.types = selectedRecordTypes.value.map(item =>
+            typeof item === 'string' ? item : item.value || item.id
+        ).join(',')
+    }
+    if (selectedRecordStatuses.value.length > 0) {
+        query.statuses = selectedRecordStatuses.value.map(item =>
+            typeof item === 'string' ? item : item.value || item.id
+        ).join(',')
+    }
+    if (recordsStore.pagination.page > 1) query.page = recordsStore.pagination.page.toString()
+    if (recordsStore.pagination.limit !== 10) query.size = recordsStore.pagination.limit.toString()
+
+    if (replace) {
+        router.replace({ query })
+    } else {
+        router.push({ query })
+    }
+}
+
+const restoreFromURL = () => {
+    // Restore search query
+    if (route.query.search) {
+        searchQuery.value = route.query.search as string
+    }
+
+    // Restore record types
+    if (route.query.types) {
+        const typeValues = (route.query.types as string).split(',')
+        selectedRecordTypes.value = typeValues.map(value => ({ value, label: getTypeLabel(value) }))
+    }
+
+    // Restore record statuses
+    if (route.query.statuses) {
+        const statusValues = (route.query.statuses as string).split(',')
+        selectedRecordStatuses.value = statusValues.map(value => ({ value, label: getStatusLabel(value) }))
+    }
+
+    // Restore pagination
+    if (route.query.page) {
+        recordsStore.setPagination({ page: Math.max(1, parseInt(route.query.page as string)) })
+    }
+    if (route.query.size) {
+        recordsStore.setPagination({ limit: parseInt(route.query.size as string) || 10 })
+    }
+}
 
 // Debounced API search - only for API calls
 const debouncedApiSearch = useDebounceFn(async (query: string) => {
@@ -69,22 +139,25 @@ const debouncedApiSearch = useDebounceFn(async (query: string) => {
     }
 }, 300)
 
-// On mounted - fetch all records initially (but don't wait to display)
+// On mounted - restore from URL and fetch data
 onMounted(async () => {
-    // Fetch record types and statuses (will use global cache if already fetched)
-    await Promise.all([
+    // Restore state from URL first
+    restoreFromURL()
+
+    // Start fetching records immediately (don't wait for types/statuses)
+    await fetchRecordsForCurrentPage()
+
+    // Fetch record types and statuses in parallel (will use global cache if already fetched)
+    Promise.all([
         fetchRecordTypes(),
         fetchRecordStatuses()
-    ])
-
-    // Start fetching records immediately, but don't await
-    await fetchRecordsForCurrentPage()
+    ]).catch(error => {
+        console.error('Error fetching record types/statuses:', error)
+    })
 })
 
 // Function to fetch records for current page
 const fetchRecordsForCurrentPage = async () => {
-    const offset = (currentPage.value - 1) * pageSize.value
-
     // Extract string values from the selected objects
     const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
     const statusValues = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
@@ -97,22 +170,17 @@ const fetchRecordsForCurrentPage = async () => {
         await recordsStore.fetchFilteredRecords({
             type: typeFilter,
             status: statusFilter,
-            offset,
-            limit: pageSize.value,
         })
     } else {
         // If no filters, fetch all records
-        await recordsStore.fetchAllRecords({
-            offset,
-            limit: pageSize.value,
-        })
+        await recordsStore.fetchAllRecords()
     }
 }
 
-// Watch for filter changes - fetch fresh data and add to store
+// Watch for filter changes - fetch fresh data and update URL
 watch([selectedRecordTypes, selectedRecordStatuses], async () => {
     // Reset to first page when filters change
-    currentPage.value = 1
+    recordsStore.setPagination({ page: 1 })
 
     // Extract string values from the selected objects
     const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
@@ -127,13 +195,16 @@ watch([selectedRecordTypes, selectedRecordStatuses], async () => {
         status: statusFilter
     })
 
+    // Update URL
+    updateURL()
+
     await fetchRecordsForCurrentPage()
 })
 
-// Watch for search query changes - fetch fresh data and add to store
+// Watch for search query changes - fetch fresh data and update URL
 watch(searchQuery, (newQuery) => {
     // Reset to first page when search changes
-    currentPage.value = 1
+    recordsStore.setPagination({ page: 1 })
 
     // Extract current type and status filters to preserve them
     const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
@@ -149,6 +220,9 @@ watch(searchQuery, (newQuery) => {
         search: newQuery
     })
 
+    // Update URL
+    updateURL()
+
     // Debounced API call for server-side search
     if (newQuery && newQuery.trim()) {
         debouncedApiSearch(newQuery)
@@ -160,65 +234,24 @@ watch(searchQuery, (newQuery) => {
 
 // Watch for page changes
 watch(currentPage, async () => {
-    await fetchRecordsForCurrentPage()
+    // Update URL
+    updateURL()
+    // No need to fetch since pagination is handled by the store getter
 })
 
 // Watch for page size changes
 watch(pageSize, async () => {
     // Reset to first page when page size changes
-    currentPage.value = 1
-    await fetchRecordsForCurrentPage()
+    recordsStore.setPagination({ page: 1 })
+    // Update URL
+    updateURL()
+    // No need to fetch since pagination is handled by the store getter
 })
 
 // Handle page change from pagination component
 const handlePageChange = async (page: number) => {
-    currentPage.value = page
-    // fetchRecordsForCurrentPage will be called by the watcher
-}
-
-// Format date for display
-const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString()
-}
-
-// Get status color
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'draft': return 'neutral'
-        case 'pending_review': return 'primary'
-        case 'under_review': return 'primary'
-        case 'approved': return 'primary'
-        case 'published': return 'primary'
-        case 'rejected': return 'error'
-        case 'archived': return 'neutral'
-        case 'expired': return 'neutral'
-        default: return 'neutral'
-    }
-}
-
-const recordTypeOptionsComputed = computed(() => {
-    return recordTypeOptions().map((option: any) => {
-        return {
-            label: option.label,
-            icon: option.icon,
-            value: option.value // Use value instead of id
-        }
-    })
-})
-
-const recordStatusOptionsComputed = computed(() => {
-    return recordStatusOptions().map((option: any) => {
-        return {
-            label: option.label,
-            icon: option.icon,
-            value: option.value // Use value instead of id
-        }
-    })
-})
-
-// Get type icon - now uses the composable
-const getTypeIcon = (type: string) => {
-    return getRecordTypeIcon(type)
+    recordsStore.setPagination({ page })
+    // No need to fetch since pagination is handled by the store getter
 }
 
 // Computed properties for better reactivity
@@ -238,12 +271,17 @@ const totalFilteredRecords = computed(() => {
     return recordsStore.totalFilteredRecords
 })
 
+// Check if we should show loading state
+const shouldShowLoading = computed(() => {
+    return recordsStore.isLoading
+})
+
 // Computed properties for reactive pagination data
-const paginationTotal = computed(() => recordsStore.pagination.total)
-const paginationLimit = computed(() => recordsStore.pagination.limit || pageSize.value)
+const paginationTotal = computed(() => recordsStore.totalFilteredRecords)
+const paginationLimit = computed(() => recordsStore.pagination.limit)
 
 // Ensure pagination data is reactive to page size changes
-const effectivePageSize = computed(() => pageSize.value)
+const effectivePageSize = computed(() => recordsStore.pagination.limit)
 
 const totalPages = computed(() => {
     return Math.ceil(paginationTotal.value / effectivePageSize.value)
@@ -255,6 +293,26 @@ const currentPageStart = computed(() => {
 
 const currentPageEnd = computed(() => {
     return Math.min(currentPage.value * effectivePageSize.value, paginationTotal.value)
+})
+
+const recordTypeOptionsComputed = computed(() => {
+    return recordTypeOptions().map((option: any) => {
+        return {
+            label: option.label,
+            icon: option.icon,
+            value: option.value // Use value instead of id
+        }
+    })
+})
+
+const recordStatusOptionsComputed = computed(() => {
+    return recordStatusOptions().map((option: any) => {
+        return {
+            label: option.label,
+            icon: option.icon,
+            value: option.value // Use value instead of id
+        }
+    })
 })
 
 </script>
@@ -324,7 +382,7 @@ const currentPageEnd = computed(() => {
                         </p>
                     </div>
 
-                    <div v-else-if="displayRecords.length === 0 && recordsStore.isLoading" class="text-center py-12">
+                    <div v-else-if="recordsStore.isLoading" class="text-center py-12">
                         <UIcon name="i-lucide-loader-2" class="w-8 h-8 mx-auto animate-spin text-gray-400" />
                         <p class="mt-2 text-gray-600">Loading records...</p>
                     </div>
@@ -358,7 +416,7 @@ const currentPageEnd = computed(() => {
 
                                 <!-- Status Badge -->
                                 <div class="flex-shrink-0">
-                                    <UBadge :color="getStatusColor(record.status)" variant="soft" size="sm">
+                                    <UBadge :color="getStatusColor(record.status) as any" variant="soft" size="sm">
                                         {{ record.status }}
                                     </UBadge>
                                 </div>

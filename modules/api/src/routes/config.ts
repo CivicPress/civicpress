@@ -6,37 +6,37 @@ import {
 } from '@civicpress/core';
 
 // Declare setTimeout and clearTimeout for TypeScript
-declare const setTimeout: any;
-declare const clearTimeout: any;
+// declare const setTimeout: any;
+// declare const clearTimeout: any;
 
 const router = Router();
 
-// Development-only delay middleware for testing loading states
-const addDevDelay = async (req: any, res: any, next: any) => {
-  // Check if we're in development mode (NODE_ENV not set or equals 'development')
-  const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+// // Development-only delay middleware for testing loading states
+// const addDevDelay = async (req: any, res: any, next: any) => {
+//   // Check if we're in development mode (NODE_ENV not set or equals 'development')
+//   const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
 
-  console.log(
-    '🔍 Delay middleware - NODE_ENV:',
-    process.env.NODE_ENV,
-    'isDev:',
-    isDev
-  );
+//   console.log(
+//     '🔍 Delay middleware - NODE_ENV:',
+//     process.env.NODE_ENV,
+//     'isDev:',
+//     isDev
+//   );
 
-  if (isDev) {
-    console.log('🔄 Adding 3-second delay for config endpoint:', req.path);
-    // Simple delay using promise
-    await new Promise((resolve) => {
-      const timer = setTimeout(resolve, 5000);
-      // Clean up timer if request is cancelled
-      req.on('close', () => clearTimeout(timer));
-    });
-  }
-  next();
-};
+//   if (isDev) {
+//     console.log('🔄 Adding 3-second delay for config endpoint:', req.path);
+//     // Simple delay using promise
+//     await new Promise((resolve) => {
+//       const timer = setTimeout(resolve, 5000);
+//       // Clean up timer if request is cancelled
+//       req.on('close', () => clearTimeout(timer));
+//     });
+//   }
+//   next();
+// };
 
 // Apply delay middleware to all config routes in development
-router.use(addDevDelay);
+// router.use(addDevDelay);
 
 /**
  * GET /api/config/record-types
