@@ -2,7 +2,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const civicApi = $fetch.create({
     baseURL: useRuntimeConfig().public.civicApiUrl,
     onRequest({ request, options }) {
-      console.log('civicApi onRequest', request, options);
+      // console.log('civicApi onRequest', request, options);
 
       // Skip authorization for login endpoints
       const url = typeof request === 'string' ? request : request.toString();
