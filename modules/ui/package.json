@@ -19,6 +19,7 @@
     "@unhead/vue": "^2.0.3",
     "@vueuse/core": "13.5.0",
     "eslint": "^9.0.0",
+    "marked": "16.1.1",
     "nuxt": "^4.0.0",
     "pinia": "3.0.3",
     "pinia-plugin-persistedstate": "4.4.1",

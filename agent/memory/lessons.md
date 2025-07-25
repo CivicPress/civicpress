@@ -1,5 +1,197 @@
 # Agent Memory: Lessons Learned
 
+## UI Development Lessons (Latest)
+
+### Vue 3 and Nuxt UI Pro Patterns
+
+- **Component Resolution**: Some Nuxt UI Pro components like `ULoadingBlock` may
+  not be available - use standard alternatives like `UIcon` with `animate-spin`
+- **Reactive State Management**: Direct access to Pinia store properties
+  (`recordsStore.isLoading`) is more reliable than `storeToRefs` for certain
+  reactive properties
+- **Composable Architecture**: Extract reusable logic into composables
+  (`useMarkdown`, `useRecordUtils`, `useRecordTypes`, `useRecordStatuses`) for
+  DRY principle
+- **Type Safety**: Use proper TypeScript casting for component props (e.g.,
+  `color="getStatusColor(record.status) as any"`)
+
+### URL State Management
+
+- **Query Parameter Synchronization**: Use `useRoute` and `useRouter` to sync UI
+  state with URL query parameters
+- **State Persistence**: Implement `updateURL` and `restoreFromURL` functions to
+  preserve filters, search, and pagination across navigation
+- **Back Navigation**: Use `router.back()` instead of `navigateTo('/records')`
+  to preserve previous page state
+- **Debounced Updates**: Use `useDebounceFn` for search input to avoid excessive
+  API calls
+
+### Pagination and Data Management
+
+- **Client-Side Pagination**: Implement pagination in the `filteredRecords`
+  getter rather than server-side for every page change
+- **Record Accumulation**: Always call `addOrUpdateRecords` to accumulate
+  records in the store, never replace
+- **Display Logic**: Separate data fetching from display logic - display should
+  show current page subset from accumulated data
+- **Page Size Reactivity**: Use computed properties for pagination display to
+  ensure reactivity to page size changes
+
+### Loading States and Error Handling
+
+- **Loading Indicators**: Show loading states during initial load and subsequent
+  data fetches
+- **Parallel Loading**: Use `Promise.all` to fetch records and configuration
+  data in parallel
+- **Error Boundaries**: Implement proper error handling with user-friendly
+  messages and retry options
+- **State Debugging**: Use extensive `console.log` to trace reactive state
+  issues between store and UI
+
+### Markdown Rendering
+
+- **Custom Renderer**: Use `marked` library with custom renderer to shift
+  heading levels and avoid conflicts with page structure
+- **HTML Rendering**: Use `v-html` directive to render parsed Markdown HTML
+  instead of displaying as plain text
+- **Styling Integration**: Apply Tailwind's `prose` classes and custom CSS for
+  consistent styling with Nuxt UI Pro theme
+- **Content Safety**: Ensure Markdown content is properly sanitized before
+  rendering
+
+### API Integration Patterns
+
+- **Request Interceptors**: Use `$fetch.create` wrapper with request
+  interceptors for automatic token injection
+- **Response Handling**: Implement proper error handling for API responses
+- **Type Safety**: Use proper TypeScript interfaces for API responses and
+  request payloads
+- **Headers Management**: Handle different header formats (array, Headers
+  object, plain object) in request interceptors
+
+### Search and Filtering Logic
+
+- **Filter Combinations**: Implement OR logic within filter types and AND logic
+  between different filter types
+- **Search Integration**: Ensure search queries work correctly with active
+  filters
+- **Clear Functionality**: Implement individual clear buttons for filters and
+  search with proper state updates
+- **Debounced Search**: Use debounced search to avoid excessive API calls while
+  typing
+
+### Component Design Patterns
+
+- **Slot Usage**: Use named slots (e.g., `#trailing`) for complex input
+  components with clear buttons
+- **Computed Properties**: Use computed properties for derived state that
+  depends on multiple reactive sources
+- **Watchers**: Use watchers for side effects like API calls when reactive state
+  changes
+- **Template Organization**: Keep templates clean with proper conditional
+  rendering and loading states
+
+### Performance Optimization
+
+- **Caching**: Cache record types and statuses globally to avoid repeated API
+  calls
+- **Lazy Loading**: Load data only when needed and show appropriate loading
+  states
+- **Memory Management**: Properly manage accumulated records to prevent memory
+  leaks
+- **Efficient Rendering**: Use `v-if` and `v-else` for conditional rendering
+  instead of `v-show` when appropriate
+
+### Development and Debugging
+
+- **Build Process**: Remember to rebuild core module (`pnpm run build` in `core`
+  directory) for API changes
+- **API Delays**: Use temporary delays in API for testing loading states, then
+  remove them
+- **Console Debugging**: Use extensive logging to trace data flow between
+  frontend and backend
+- **Component Resolution**: Check for missing components and use available
+  alternatives
+
+### CSS and Styling
+
+- **SCSS Integration**: Be cautious with SCSS integration - Nuxt UI Pro may have
+  compatibility issues with `sass-embedded`
+- **Fallback Strategy**: Revert to plain CSS if SCSS causes build issues
+- **Theme Integration**: Ensure custom styles integrate properly with Nuxt UI
+  Pro theme
+- **Responsive Design**: Use Tailwind's responsive utilities for mobile-friendly
+  interfaces
+
+### Testing Considerations
+
+- **Component Testing**: Test Vue components with proper mocking of composables
+  and stores
+- **API Mocking**: Mock API responses for consistent testing
+- **State Testing**: Test reactive state changes and computed properties
+- **User Interaction**: Test user interactions like search, filtering, and
+  pagination
+
+## Authentication Implementation Lessons (Latest)
+
+### UI Authentication Patterns
+
+- **Dual Authentication Support**: Implement both username/password and GitHub
+  token authentication for flexibility
+- **Form Validation**: Use real-time validation with computed properties for
+  better UX
+- **Loading States**: Always show loading indicators during authentication
+  operations
+- **Error Handling**: Comprehensive error display with user-friendly messages
+- **Session Persistence**: Use localStorage with proper cleanup and expiration
+  handling
+
+### JWT Token Management
+
+- **Automatic Injection**: Configure API plugin to automatically add
+  Authorization headers
+- **Token Expiration**: Check token expiration on app startup and clear invalid
+  tokens
+- **401 Handling**: Automatically logout and redirect on authentication failures
+- **Security**: Never store sensitive data in localStorage, only tokens and user
+  info
+- **Cleanup**: Proper cleanup of all auth data on logout or token expiry
+
+### Pinia Store Patterns
+
+- **Centralized State**: Use Pinia store for all authentication state management
+- **Persistence**: Implement localStorage persistence with error handling
+- **Reactivity**: Ensure all auth state changes trigger proper UI updates
+- **Integration**: Seamless integration between store and API plugin
+- **Permissions**: Implement role and permission checking in store getters
+
+### API Integration Best Practices
+
+- **Login Endpoint Bypass**: Skip token injection for authentication endpoints
+- **Error Recovery**: Graceful handling of network errors and auth failures
+- **Request Interceptors**: Use request interceptors for automatic token
+  injection
+- **Response Interceptors**: Use response interceptors for 401 error handling
+- **Type Safety**: Proper TypeScript typing for API responses and auth state
+
+### User Experience Considerations
+
+- **Confirmation Dialogs**: Use confirmation dialogs for destructive actions
+  like logout
+- **User Feedback**: Always provide clear feedback for all authentication
+  actions
+- **Redirect Flow**: Proper redirect handling after login/logout
+- **Form UX**: Disable forms during loading states
+- **Error Display**: Clear, actionable error messages for users
+
+### Security Considerations
+
+- **Token Storage**: Store tokens securely with proper expiration handling
+- **State Cleanup**: Complete cleanup of all auth data on logout
+- **Error Handling**: Don't expose sensitive information in error messages
+- **Validation**: Client-side validation for better UX, server-side for security
+- **Session Management**: Proper session timeout and cleanup
+
 ## Test Infrastructure Lessons
 
 ### Test Setup Patterns

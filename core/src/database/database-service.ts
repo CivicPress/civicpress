@@ -477,14 +477,14 @@ export class DatabaseService {
     // Apply ordering and pagination
     sql += ' ORDER BY created_at DESC';
 
-    if (options.limit) {
-      sql += ' LIMIT ?';
-      params.push(options.limit);
+    // Always apply limit (default to 10 if not provided)
+    const limit = options.limit || 10;
+    sql += ' LIMIT ?';
+    params.push(limit);
 
-      if (options.offset) {
-        sql += ' OFFSET ?';
-        params.push(options.offset);
-      }
+    if (options.offset) {
+      sql += ' OFFSET ?';
+      params.push(options.offset);
     }
 
     const records = await this.adapter.query(sql, params);

@@ -246,7 +246,7 @@ export class RecordsService {
       records: result.records,
       total: result.total,
       page: 1,
-      limit: 10,
+      limit: options.limit || 10,
     };
   }
 
@@ -272,7 +272,7 @@ export class RecordsService {
       records: result.records,
       total: result.total,
       page: 1,
-      limit: 10,
+      limit: options.limit || 10,
     };
   }
 }
