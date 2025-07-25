@@ -50,10 +50,15 @@ const items = computed<DropdownMenuItem[][]>(() => {
             avatar: generateAvatar()
         }])
 
-        // Profile option (only if logged in)
+        // Settings section (only if logged in)
         menuItems.push([{
-            label: 'Profile',
-            icon: 'i-lucide-user'
+            label: 'Settings',
+            icon: 'i-lucide-settings',
+            children: [{
+                label: 'Profile',
+                icon: 'i-lucide-user',
+                onClick: () => navigateTo('/settings/profile')
+            }]
         }])
     }
 
