@@ -580,3 +580,22 @@
 - **Git Lock Issue**: Resolved `.git/index.lock` conflicts during API startup
 - **Lesson**: Always improve developer experience with hot reload and proper
   error handling
+
+### Centralized Error Handling Implementation
+
+- **Problem**: Repetitive error handling code scattered across stores and components
+- **Solution**: Created `useErrorHandler` composable with specialized handlers:
+  - `handleApiError()` - General API errors with toast notifications
+  - `handleNetworkError()` - Connection issues with appropriate messaging
+  - `handleValidationError()` - Form validation errors with field details
+  - `handleAuthError()` - Authentication issues with security focus
+  - `handleError()` - Smart error routing based on error type
+- **API Interceptor Enhancement**: Enhanced `civicApi` plugin with automatic error handling:
+  - **401 errors**: Auto-clear auth state and redirect to login
+  - **403 errors**: Show permission denied messages
+  - **422 errors**: Display validation details
+  - **500 errors**: Show server error messages
+  - **Toast notifications**: Automatic user feedback for all errors
+- **Store Integration**: Updated all stores to use centralized error handling
+- **Benefits**: Consistent UX, automatic user feedback, better error categorization, reduced code duplication
+- **Lesson**: Centralize error handling for consistent user experience and maintainable code

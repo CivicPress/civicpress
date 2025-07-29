@@ -143,12 +143,12 @@ export const useAuthStore = defineStore('auth', {
         console.log('response', response);
         return await this.handleLoginResponse(response, 'Login failed');
       } catch (error: any) {
-        const { handleError } = useErrorHandler()
+        const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Login Failed',
-          showToast: true
-        })
-        this.error = errorMessage
+          showToast: true,
+        });
+        this.error = errorMessage;
         throw error;
       } finally {
         this.loading = false;
@@ -167,12 +167,12 @@ export const useAuthStore = defineStore('auth', {
         console.log('response', response);
         return await this.handleLoginResponse(response, 'Token login failed');
       } catch (error: any) {
-        const { handleError } = useErrorHandler()
+        const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Token Login Failed',
-          showToast: true
-        })
-        this.error = errorMessage
+          showToast: true,
+        });
+        this.error = errorMessage;
         throw error;
       } finally {
         this.loading = false;

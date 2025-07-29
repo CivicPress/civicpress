@@ -102,3 +102,46 @@ All AI or agent-based development for CivicPress **must follow this flow**:
 - Begin with CLI logic
 - Extract reusable logic to `core/`
 - Only expose via API or UI once stable
+
+---
+
+## 🛡️ Error Handling Pattern
+
+### Centralized Error Management
+
+CivicPress uses a centralized error handling approach:
+
+- **`useErrorHandler` Composable**: Provides specialized error handlers for different error types
+- **API Interceptor**: Automatic error handling in `civicApi` plugin with user feedback
+- **Consistent UX**: Toast notifications for all errors with appropriate styling and timeouts
+
+### Error Handler Types
+
+- **API Errors**: General API failures with user-friendly messages
+- **Network Errors**: Connection issues with clear guidance
+- **Validation Errors**: Form validation with field-specific details
+- **Auth Errors**: Authentication issues with security focus
+
+### Implementation Pattern
+
+```typescript
+// In stores and components
+const { handleError } = useErrorHandler()
+
+try {
+  // API call
+} catch (error) {
+  const errorMessage = handleError(error, {
+    title: 'Operation Failed',
+    showToast: true
+  })
+  // Handle error state
+}
+```
+
+### Benefits
+
+- **Consistent UX**: All errors handled uniformly across the application
+- **Automatic Feedback**: Toast notifications for immediate user feedback
+- **Better Debugging**: Centralized logging and error categorization
+- **Maintainable Code**: Single place to update error handling logic

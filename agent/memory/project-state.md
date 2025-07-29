@@ -14,6 +14,7 @@
   logs
 - **API Watch Mode**: Added file watching for API development with `tsx --watch`
 - **Git Lock Fix**: Resolved Git lock file conflicts during API startup
+- **Centralized Error Handling**: Created `useErrorHandler` composable with specialized error handlers and enhanced API interceptor with automatic user feedback
 
 ### 🎯 Basic UI Status
 
@@ -21,7 +22,7 @@
 - **Single Record View**: ✅ Complete with Markdown rendering
 - **Search Functionality**: ✅ Complete with suggestions and proper limits
 - **Navigation**: ✅ Complete with proper back button handling
-- **API Integration**: ✅ Complete with error handling and loading states
+- **API Integration**: ✅ Complete with centralized error handling, automatic user feedback, and loading states
 
 ### 📋 Next Milestone Candidates
 

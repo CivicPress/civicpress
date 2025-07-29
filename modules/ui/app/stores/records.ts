@@ -294,12 +294,12 @@ export const useRecordsStore = defineStore('records', {
           search: query,
         };
       } catch (error: any) {
-        const { handleError } = useErrorHandler()
+        const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Search Failed',
-          showToast: true
-        })
-        this.error = errorMessage
+          showToast: true,
+        });
+        this.error = errorMessage;
         throw error;
       } finally {
         this.loading = false;
@@ -332,12 +332,12 @@ export const useRecordsStore = defineStore('records', {
 
         return civicRecord;
       } catch (error: any) {
-        const { handleError } = useErrorHandler()
+        const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Failed to Fetch Record',
-          showToast: true
-        })
-        this.error = errorMessage
+          showToast: true,
+        });
+        this.error = errorMessage;
         throw error;
       }
     },
