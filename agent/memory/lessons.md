@@ -538,3 +538,35 @@
 **Last Updated:** Current  
 **Status:** ✅ ACTIVE LEARNING  
 **Confidence:** HIGH
+
+## Search and Record Page Fixes (July 2025)
+
+### Search API Limit Issue
+
+- **Problem**: UI was sending `limit=300` but API validation only allowed max
+  100
+- **Solution**: Increased search API validation from `max: 100` to `max: 300` in
+  `modules/api/src/routes/search.ts`
+- **Lesson**: Always ensure API validation limits match UI expectations
+
+### Single Record Page Functionality
+
+- **Problem**: `fetchRecord` method didn't exist in records store
+- **Solution**: Added `fetchRecord` method to `modules/ui/app/stores/records.ts`
+  with proper API response transformation
+- **Key Fix**: API returns `created`/`updated` but CivicRecord interface expects
+  `created_at`/`updated_at`
+- **Lesson**: Always transform API responses to match frontend interfaces
+
+### Navigation UX Improvement
+
+- **Problem**: `router.back()` fails when accessing record page via direct link
+- **Solution**: Check `window.history.length > 1` before using `router.back()`,
+  fallback to `router.push('/records')`
+- **Lesson**: Consider direct link scenarios when implementing navigation
+
+### Debug Code Cleanup
+
+- **Removed**: PerformanceMonitor component, debug CLI commands, console.log
+  statements
+- **Lesson**: Keep codebase clean by removing debug code before committing
