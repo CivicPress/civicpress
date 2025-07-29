@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { query, validationResult } from 'express-validator';
-import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
 import {
   sendSuccess,
   logApiRequest,
@@ -10,44 +9,43 @@ import {
 import { Logger } from '@civicpress/core';
 
 // Declare setTimeout and clearTimeout for TypeScript
-declare const setTimeout: any;
-declare const clearTimeout: any;
+// declare const setTimeout: any;
+// declare const clearTimeout: any;
 
 const logger = new Logger();
 
 export const searchRouter = Router();
 
 // Development-only delay middleware for testing loading states
-const addDevDelay = async (req: any, res: any, next: any) => {
-  // Check if we're in development mode (NODE_ENV not set or equals 'development')
-  const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+// const addDevDelay = async (req: any, res: any, next: any) => {
+//   // Check if we're in development mode (NODE_ENV not set or equals 'development')
+//   const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
 
-  console.log(
-    '🔍 Search delay middleware - NODE_ENV:',
-    process.env.NODE_ENV,
-    'isDev:',
-    isDev
-  );
+//   console.log(
+//     '🔍 Search delay middleware - NODE_ENV:',
+//     process.env.NODE_ENV,
+//     'isDev:',
+//     isDev
+//   );
 
-  if (isDev) {
-    console.log('🔄 Adding 3-second delay for search endpoint:', req.path);
-    // Simple delay using promise
-    await new Promise((resolve) => {
-      const timer = setTimeout(resolve, 3000);
-      // Clean up timer if request is cancelled
-      req.on('close', () => clearTimeout(timer));
-    });
-  }
-  next();
-};
+//   if (isDev) {
+//     console.log('🔄 Adding 3-second delay for search endpoint:', req.path);
+//     // Simple delay using promise
+//     await new Promise((resolve) => {
+//       const timer = setTimeout(resolve, 3000);
+//       // Clean up timer if request is cancelled
+//       req.on('close', () => clearTimeout(timer));
+//     });
+//   }
+//   next();
+// };
 
 // Apply delay middleware to search routes in development
-searchRouter.use(addDevDelay);
+// searchRouter.use(addDevDelay);
 
-// GET /api/search - Search records
+// GET /api/search - Search records (handles both public and authenticated access)
 searchRouter.get(
   '/',
-  requirePermission('records:view'),
   [
     query('q')
       .isString()
@@ -67,30 +65,36 @@ searchRouter.get(
       .isInt({ min: 0 })
       .withMessage('Offset must be a non-negative integer'),
   ],
-  async (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'search_records' });
+  async (req: any, res: Response) => {
+    const isAuthenticated = (req as any).user !== undefined;
+    const operation = isAuthenticated
+      ? 'search_records_authenticated'
+      : 'search_records_public';
+
+    logApiRequest(req, { operation });
 
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return handleValidationError(
-          'search_records',
-          errors.array(),
-          req,
-          res
-        );
+        return handleValidationError(operation, errors.array(), req, res);
       }
 
       const { q: query, type, status, limit, offset } = req.query;
 
-      logger.info('Searching records', {
-        query,
-        type,
-        status,
-        limit,
-        offset,
-        requestId: (req as any).requestId,
-      });
+      logger.info(
+        `Searching records (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          query,
+          type,
+          status,
+          limit,
+          offset,
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
+      );
 
       const civicPress = (req as any).civicPress;
       if (!civicPress) {
@@ -105,11 +109,17 @@ searchRouter.get(
         offset: offset ? parseInt(offset as string) : undefined,
       });
 
-      logger.info('Search completed successfully', {
-        query,
-        totalResults: result.total,
-        requestId: (req as any).requestId,
-      });
+      logger.info(
+        `Search completed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          query,
+          totalResults: result.total,
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
+      );
 
       sendSuccess(
         {
@@ -119,15 +129,94 @@ searchRouter.get(
         },
         req,
         res,
-        { operation: 'search_records' }
+        { operation }
+      );
+    } catch (error) {
+      handleApiError(operation, error, req, res, 'Failed to search records');
+    }
+  }
+);
+
+// GET /api/search/suggestions - Get search suggestions
+searchRouter.get(
+  '/suggestions',
+  [
+    query('q')
+      .isString()
+      .notEmpty()
+      .withMessage('Query parameter "q" is required'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 20 })
+      .withMessage('Limit must be between 1 and 20'),
+  ],
+  async (req: any, res: Response) => {
+    const isAuthenticated = (req as any).user !== undefined;
+    const operation = 'search_suggestions';
+
+    logApiRequest(req, { operation });
+
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleValidationError(operation, errors.array(), req, res);
+      }
+
+      const { q: query, limit = 10 } = req.query;
+
+      logger.info(
+        `Getting search suggestions (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          query,
+          limit,
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
+      );
+
+      const civicPress = (req as any).civicPress;
+      if (!civicPress) {
+        throw new Error('CivicPress instance not available');
+      }
+
+      const recordManager = civicPress.getRecordManager();
+      const suggestions = await recordManager.getSearchSuggestions(
+        query as string,
+        {
+          limit: parseInt(limit as string),
+        }
+      );
+
+      logger.info(
+        `Search suggestions completed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          query,
+          suggestionsCount: suggestions.length,
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
+      );
+
+      sendSuccess(
+        {
+          suggestions,
+          query: query as string,
+        },
+        req,
+        res,
+        { operation }
       );
     } catch (error) {
       handleApiError(
-        'search_records',
+        operation,
         error,
         req,
         res,
-        'Failed to search records'
+        'Failed to get search suggestions'
       );
     }
   }

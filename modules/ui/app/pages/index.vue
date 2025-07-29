@@ -3,6 +3,7 @@ import type { CivicRecord } from '~/stores/records'
 
 // Store
 const recordsStore = useRecordsStore()
+const authStore = useAuthStore()
 
 // Composables
 const { $civicApi } = useNuxtApp()
@@ -14,8 +15,12 @@ const systemStats = ref<any>(null)
 const recentRecords = ref<CivicRecord[]>([])
 const loading = ref(true)
 const error = ref('')
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 
-// Fetch organization info
+// Computed properties
+const defaultDescription = computed(() => 'A modern civic technology platform for transparent, accessible, and accountable local government.')
+
+// Fetch organization info (public endpoint)
 const fetchOrganizationInfo = async () => {
   try {
     const response = await $civicApi('/info') as any
@@ -24,11 +29,17 @@ const fetchOrganizationInfo = async () => {
     }
   } catch (err: any) {
     console.error('Error fetching organization info:', err)
+    // Don't set error for organization info - it's not critical
   }
 }
 
-// Fetch system statistics
+// Fetch system statistics (requires authentication)
 const fetchSystemStats = async () => {
+  if (!isAuthenticated.value) {
+    console.log('User not authenticated, skipping system stats')
+    return
+  }
+
   try {
     const response = await $civicApi('/api/status') as any
     if (response.success) {
@@ -36,11 +47,17 @@ const fetchSystemStats = async () => {
     }
   } catch (err: any) {
     console.error('Error fetching system stats:', err)
+    // Don't set error for system stats - it's not critical
   }
 }
 
-// Fetch recent records
+// Fetch recent records (requires authentication)
 const fetchRecentRecords = async () => {
+  if (!isAuthenticated.value) {
+    console.log('User not authenticated, skipping recent records')
+    return
+  }
+
   try {
     const response = await $civicApi('/api/records?limit=5') as any
     if (response.success) {
@@ -48,6 +65,7 @@ const fetchRecentRecords = async () => {
     }
   } catch (err: any) {
     console.error('Error fetching recent records:', err)
+    // Don't set error for recent records - it's not critical
   }
 }
 
@@ -57,11 +75,16 @@ const loadDashboardData = async () => {
   error.value = ''
 
   try {
-    await Promise.all([
-      fetchOrganizationInfo(),
-      fetchSystemStats(),
-      fetchRecentRecords()
-    ])
+    // Always fetch organization info (public)
+    await fetchOrganizationInfo()
+
+    // Only fetch authenticated data if user is logged in
+    if (isAuthenticated.value) {
+      await Promise.all([
+        fetchSystemStats(),
+        fetchRecentRecords()
+      ])
+    }
   } catch (err: any) {
     error.value = err.message || 'Failed to load dashboard data'
     console.error('Error loading dashboard data:', err)
@@ -79,9 +102,21 @@ const navigateToCreate = () => {
   navigateTo('/records/create')
 }
 
+const navigateToLogin = () => {
+  navigateTo('/auth/login')
+}
+
 // Load data on mount
 onMounted(() => {
   loadDashboardData()
+})
+
+// Watch for authentication changes
+watch(isAuthenticated, (newValue) => {
+  if (newValue) {
+    // User just logged in, reload authenticated data
+    loadDashboardData()
+  }
 })
 </script>
 
@@ -121,160 +156,106 @@ onMounted(() => {
       </UAlert>
 
       <!-- Dashboard Content -->
-      <div v-else class="space-y-6">
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <UCard>
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <UIcon name="i-lucide-files" class="w-8 h-8 text-blue-500" />
-              </div>
-              <div class="ml-4">
-                <p class="text-sm font-medium text-gray-500">Total Records</p>
-                <p class="text-2xl font-bold text-gray-900">
-                  {{ systemStats?.records?.totalRecords || 0 }}
-                </p>
-              </div>
-            </div>
-          </UCard>
-
-          <UCard>
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <UIcon name="i-lucide-git-branch" class="w-8 h-8 text-green-500" />
-              </div>
-              <div class="ml-4">
-                <p class="text-sm font-medium text-gray-500">Pending Changes</p>
-                <p class="text-2xl font-bold text-gray-900">
-                  {{ systemStats?.git?.modified?.length || 0 }}
-                </p>
-              </div>
-            </div>
-          </UCard>
-
-          <UCard>
-            <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <UIcon name="i-lucide-check-circle" class="w-8 h-8 text-green-500" />
-              </div>
-              <div class="ml-4">
-                <p class="text-sm font-medium text-gray-500">System Status</p>
-                <p class="text-2xl font-bold text-gray-900 capitalize">
-                  {{ systemStats?.system?.status || 'Unknown' }}
-                </p>
-              </div>
-            </div>
-          </UCard>
+      <div v-else class="space-y-8">
+        <!-- Welcome Section -->
+        <div class="text-center py-8">
+          <UIcon name="i-lucide-building-2" class="w-16 h-16 text-primary-500 mx-auto mb-4" />
+          <h2 class="text-3xl font-bold text-gray-900 mb-2">
+            {{ organizationInfo?.name || 'CivicPress' }}
+          </h2>
+          <p class="text-gray-600 max-w-2xl mx-auto">
+            {{ organizationInfo?.description || defaultDescription }}
+          </p>
         </div>
 
         <!-- Quick Actions -->
-        <div class="bg-white rounded-lg border p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <UButton @click="navigateToRecords" color="primary" variant="soft" class="h-16 text-lg">
-              <template #leading>
-                <UIcon name="i-lucide-search" class="w-5 h-5" />
-              </template>
-              Browse Records
-            </UButton>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <UCard class="text-center hover:shadow-lg transition-shadow cursor-pointer" @click="navigateToRecords">
+            <UIcon name="i-lucide-file-text" class="w-12 h-12 text-blue-500 mx-auto mb-4" />
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Browse Records</h3>
+            <p class="text-gray-600">View and search through civic records, bylaws, and policies.</p>
+          </UCard>
 
-            <UButton @click="navigateToCreate" color="primary" variant="soft" class="h-16 text-lg">
-              <template #leading>
-                <UIcon name="i-lucide-plus" class="w-5 h-5" />
-              </template>
-              Create Record
-            </UButton>
-          </div>
+          <UCard v-if="isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToCreate">
+            <UIcon name="i-lucide-plus-circle" class="w-12 h-12 text-green-500 mx-auto mb-4" />
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Create Record</h3>
+            <p class="text-gray-600">Create new civic records, bylaws, or policies.</p>
+          </UCard>
+
+          <UCard v-if="!isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToLogin">
+            <UIcon name="i-lucide-log-in" class="w-12 h-12 text-purple-500 mx-auto mb-4" />
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Sign In</h3>
+            <p class="text-gray-600">Access administrative features and create records.</p>
+          </UCard>
         </div>
 
-        <!-- Recent Records -->
-        <div v-if="recentRecords.length > 0" class="bg-white rounded-lg border">
-          <div class="border-b px-6 py-4">
-            <h2 class="text-lg font-semibold text-gray-900">Recent Records</h2>
-          </div>
-          <div class="divide-y">
-            <div v-for="record in recentRecords" :key="record.id" class="px-6 py-4 hover:bg-gray-50 cursor-pointer"
+        <!-- Recent Records (if authenticated) -->
+        <div v-if="isAuthenticated && recentRecords.length > 0" class="space-y-4">
+          <h3 class="text-xl font-semibold text-gray-900">Recent Records</h3>
+          <div class="grid gap-4">
+            <UCard v-for="record in recentRecords" :key="record.id"
+              class="hover:shadow-md transition-shadow cursor-pointer"
               @click="navigateTo(`/records/${record.type}/${record.id}`)">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                  <UIcon :name="getTypeIcon(record.type)" class="w-5 h-5 text-gray-400" />
-                  <div>
-                    <h3 class="text-sm font-medium text-gray-900">{{ record.title }}</h3>
-                    <div class="flex items-center space-x-2 mt-1">
-                      <UBadge :color="getStatusColor(record.status) as any" variant="soft" size="sm">
-                        {{ record.status }}
-                      </UBadge>
-                      <UBadge color="neutral" variant="soft" size="sm">
-                        {{ record.type }}
-                      </UBadge>
-                    </div>
-                  </div>
-                </div>
-                <div class="text-right">
-                  <p class="text-xs text-gray-500">
-                    {{ formatDate(record.created_at) }}
-                  </p>
-                  <UIcon name="i-lucide-chevron-right" class="w-4 h-4 text-gray-400" />
+              <div class="flex items-start space-x-4">
+                <UIcon :name="getTypeIcon(record.type)" class="w-8 h-8 text-gray-500 flex-shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <h4 class="text-sm font-medium text-gray-900 truncate">{{ record.title }}</h4>
+                  <p class="text-sm text-gray-500">{{ formatDate(record.created_at) }}</p>
+                  <UBadge :color="getStatusColor(record.status) as any" variant="soft" size="sm">
+                    {{ record.status }}
+                  </UBadge>
                 </div>
               </div>
-            </div>
+            </UCard>
           </div>
         </div>
 
-        <!-- No Recent Records -->
-        <div v-else class="bg-white rounded-lg border p-6 text-center">
-          <UIcon name="i-lucide-files" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 class="text-lg font-medium text-gray-900 mb-2">No Records Yet</h3>
-          <p class="text-gray-600 mb-4">
-            Get started by creating your first record or browsing existing ones.
-          </p>
-          <div class="flex justify-center space-x-4">
-            <UButton @click="navigateToRecords" color="primary" variant="soft">
-              Browse Records
-            </UButton>
-            <UButton @click="navigateToCreate" color="primary" variant="soft">
-              Create Record
-            </UButton>
+        <!-- System Stats (if authenticated) -->
+        <div v-if="isAuthenticated && systemStats" class="space-y-4">
+          <h3 class="text-xl font-semibold text-gray-900">System Overview</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <UCard>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-blue-600">{{ systemStats.totalRecords || 0 }}</div>
+                <div class="text-sm text-gray-600">Total Records</div>
+              </div>
+            </UCard>
+            <UCard>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-green-600">{{ systemStats.activeRecords || 0 }}</div>
+                <div class="text-sm text-gray-600">Active Records</div>
+              </div>
+            </UCard>
+            <UCard>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-purple-600">{{ systemStats.recentUpdates || 0 }}</div>
+                <div class="text-sm text-gray-600">Recent Updates</div>
+              </div>
+            </UCard>
           </div>
         </div>
 
-        <!-- Organization Info -->
-        <div v-if="organizationInfo" class="bg-white rounded-lg border p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Organization Information</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-if="organizationInfo.name" class="space-y-1">
-              <dt class="text-sm font-medium text-gray-500">Name</dt>
-              <dd class="text-sm text-gray-900">{{ organizationInfo.name }}</dd>
+        <!-- Public Information -->
+        <div v-if="organizationInfo" class="space-y-4">
+          <h3 class="text-xl font-semibold text-gray-900">About {{ organizationInfo.name }}</h3>
+          <UCard>
+            <div class="space-y-2">
+              <div v-if="organizationInfo.city && organizationInfo.state" class="flex items-center space-x-2">
+                <UIcon name="i-lucide-map-pin" class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700">{{ organizationInfo.city }}, {{ organizationInfo.state }}</span>
+              </div>
+              <div v-if="organizationInfo.country" class="flex items-center space-x-2">
+                <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700">{{ organizationInfo.country }}</span>
+              </div>
+              <div v-if="organizationInfo.timezone" class="flex items-center space-x-2">
+                <UIcon name="i-lucide-clock" class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700">{{ organizationInfo.timezone }}</span>
+              </div>
             </div>
-            <div v-if="organizationInfo.city && organizationInfo.state" class="space-y-1">
-              <dt class="text-sm font-medium text-gray-500">Location</dt>
-              <dd class="text-sm text-gray-900">{{ organizationInfo.city }}, {{ organizationInfo.state }}</dd>
-            </div>
-            <div v-if="organizationInfo.country" class="space-y-1">
-              <dt class="text-sm font-medium text-gray-500">Country</dt>
-              <dd class="text-sm text-gray-900">{{ organizationInfo.country }}</dd>
-            </div>
-            <div v-if="organizationInfo.timezone" class="space-y-1">
-              <dt class="text-sm font-medium text-gray-500">Timezone</dt>
-              <dd class="text-sm text-gray-900">{{ organizationInfo.timezone }}</dd>
-            </div>
-            <div v-if="organizationInfo.website" class="space-y-1">
-              <dt class="text-sm font-medium text-gray-500">Website</dt>
-              <dd class="text-sm text-gray-900">
-                <a :href="organizationInfo.website" target="_blank" class="text-primary-600 hover:underline">
-                  {{ organizationInfo.website }}
-                </a>
-              </dd>
-            </div>
-            <div v-if="organizationInfo.email" class="space-y-1">
-              <dt class="text-sm font-medium text-gray-500">Email</dt>
-              <dd class="text-sm text-gray-900">
-                <a :href="`mailto:${organizationInfo.email}`" class="text-primary-600 hover:underline">
-                  {{ organizationInfo.email }}
-                </a>
-              </dd>
-            </div>
-          </div>
+          </UCard>
         </div>
       </div>
     </template>

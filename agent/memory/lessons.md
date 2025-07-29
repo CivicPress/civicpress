@@ -485,6 +485,54 @@
 - **Scalability Design:** Design for federation and multi-tenant support
 - **Civic Focus:** Maintain focus on civic technology and governance needs
 
+### Performance Monitoring and Optimization
+
+- **VueUse Virtual Scrolling**: `useVirtualList` provides excellent performance
+  for large datasets
+- **Debounced Search**: `useDebounceFn` prevents excessive API calls during
+  typing
+- **Memoization**: Pre-computed record data reduces runtime calculations
+- **Performance Monitoring**: Real-time metrics tracking with keyboard shortcuts
+- **Component Architecture**: Performance monitor can be made global via layout
+  template
+
+### Search Suggestions and Auto-complete
+
+- **Intelligent Suggestions**: Generate suggestions from titles, content, and
+  record types
+- **Debounced API Calls**: Use `useDebounceFn` to prevent excessive API calls
+  during typing
+- **Click Event Handling**: Implement proper delays to prevent blur events from
+  clearing suggestions before clicks register
+- **Race Condition Prevention**: Track current query to prevent old API
+  responses from overwriting new ones
+- **Immediate Reactivity**: Use client-side filtering for instant search
+  feedback
+
+### Pagination Architecture Lessons
+
+- **Client vs Server Pagination**: Don't mix client-side and server-side
+  pagination logic - choose one approach
+- **Page Size Management**: Ensure page size controls work consistently with
+  chosen pagination approach
+- **URL State Sync**: Keep URL parameters in sync with pagination state
+- **Immediate Feedback**: Client-side pagination provides instant response but
+  requires proper data management
+- **Bug Prevention**: Clear separation between client-side filtering and
+  server-side data fetching
+
+### Future Performance Enhancements (Planned)
+
+- **Global Performance Monitor**: Add performance monitor to layout template for
+  app-wide monitoring
+  - Toggle with Ctrl+Shift+P from any page
+  - Show render times, memory usage, and component-specific metrics
+  - Useful for development and production monitoring
+  - Can be disabled in production builds
+- **Component-Level Metrics**: Track performance of individual components
+- **Route Change Monitoring**: Measure navigation performance
+- **API Call Performance**: Monitor API response times and caching effectiveness
+
 ---
 
 **Last Updated:** Current  

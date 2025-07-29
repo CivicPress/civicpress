@@ -2,15 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { CivicPress, Logger, CentralConfigManager } from '@civicpress/core';
 
+// Declare setTimeout for TypeScript
+declare const setTimeout: any;
+
 const logger = new Logger();
 
 // Import routes
 import authRouter from './routes/auth';
 import { healthRouter } from './routes/health';
-import {
-  createRecordsRouter,
-  createPublicRecordsRouter,
-} from './routes/records';
+import { createRecordsRouter } from './routes/records';
 import { RecordsService } from './services/records-service';
 import { searchRouter } from './routes/search';
 import { exportRouter } from './routes/export';
@@ -31,7 +31,6 @@ import configRouter from './routes/config';
 // Import middleware
 import { errorHandler, requestIdMiddleware } from './middleware/error-handler';
 import { notFoundHandler } from './middleware/not-found';
-import { authMiddleware } from './middleware/auth';
 import {
   apiLoggingMiddleware,
   authLoggingMiddleware,
@@ -87,6 +86,62 @@ export class CivicPressAPI {
     // Body parsing
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
+
+    // Global delay middleware for development (to see loading states)
+    this.app.use((req, res, next) => {
+      // Check if we're in development mode
+      const isDev =
+        !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+
+      if (isDev) {
+        // Define allowlist (endpoints that should NOT be delayed)
+        const allowlist = [
+          '/health',
+          '/info',
+          '/docs',
+          '/auth/login',
+          '/auth/password',
+          '/api/search/suggestions', // Search suggestions - no delay
+        ];
+
+        // Define blocklist (endpoints that should always be delayed)
+        const blocklist = [
+          '/api/search', // Main search endpoint - WITH delay
+          '/api/records',
+          '/api/status',
+        ];
+
+        const path = req.path;
+        const isAllowlisted = allowlist.some((endpoint) =>
+          path.startsWith(endpoint)
+        );
+        const isBlocklisted = blocklist.some((endpoint) =>
+          path.startsWith(endpoint)
+        );
+
+        // Allowlist takes precedence over blocklist
+        const shouldDelay = isBlocklisted && !isAllowlisted;
+
+        if (shouldDelay) {
+          // Add a 5 second delay for specified requests in development
+          const delay = 5000; // 5 seconds
+          console.log(
+            `🔄 Adding ${delay}ms delay for: ${req.method} ${req.path}`
+          );
+
+          setTimeout(() => {
+            next();
+          }, delay);
+        } else {
+          console.log(
+            `⚡ No delay for: ${req.method} ${req.path} (allowlisted)`
+          );
+          next();
+        }
+      } else {
+        next();
+      }
+    });
 
     // Enhanced request logging and tracing
     this.app.use(requestIdMiddleware);
@@ -198,16 +253,6 @@ export class CivicPressAPI {
     // Info endpoint (no auth required)
     this.app.use('/info', infoRouter);
 
-    // Public records endpoint (no auth required)
-    this.app.use(
-      '/public/records',
-      (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
-        next();
-      },
-      createPublicRecordsRouter(recordsService)
-    );
-
     // Auth routes (no auth required) - these need CivicPress instance
     this.app.use(
       '/auth',
@@ -218,8 +263,8 @@ export class CivicPressAPI {
       authRouter
     );
 
-    // Protected routes (require authentication)
-    this.app.use('/api', authMiddleware(this.civicPress), (req, res, next) => {
+    // API routes (authentication optional)
+    this.app.use('/api', (req, res, next) => {
       // Add CivicPress instance to request for route handlers
       (req as any).civicPress = this.civicPress;
       next();

@@ -305,7 +305,7 @@ export class RecordManager {
   }
 
   /**
-   * Search records with optional filtering
+   * Search records with pagination and filtering
    */
   async searchRecords(
     query: string,
@@ -343,6 +343,62 @@ export class RecordManager {
     const paginatedRecords = records.slice(offset, offset + limit);
 
     return { records: paginatedRecords, total };
+  }
+
+  /**
+   * Get search suggestions based on record titles and content
+   */
+  async getSearchSuggestions(
+    query: string,
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<string[]> {
+    const limit = options.limit || 10;
+
+    // Get search results from database
+    const searchResults = await this.db.searchRecords(query);
+
+    // Extract unique suggestions from titles and content
+    const suggestions = new Set<string>();
+
+    for (const result of searchResults.slice(0, limit * 2)) {
+      // Get more results to filter
+      const record = await this.getRecord(result.record_id);
+      if (record) {
+        // Add title as suggestion
+        if (record.title.toLowerCase().includes(query.toLowerCase())) {
+          suggestions.add(record.title);
+        }
+
+        // Extract words from content that match the query
+        if (record.content) {
+          const words = record.content
+            .split(/\s+/)
+            .filter(
+              (word) =>
+                word.length > 2 &&
+                word.toLowerCase().includes(query.toLowerCase()) &&
+                !suggestions.has(word)
+            );
+
+          words.slice(0, 3).forEach((word) => suggestions.add(word));
+        }
+
+        // Add record type as suggestion if it matches
+        if (record.type.toLowerCase().includes(query.toLowerCase())) {
+          suggestions.add(record.type);
+        }
+      }
+
+      // Stop if we have enough suggestions
+      if (suggestions.size >= limit) {
+        break;
+      }
+    }
+
+    // Convert to array and limit results
+    return Array.from(suggestions).slice(0, limit);
   }
 
   /**

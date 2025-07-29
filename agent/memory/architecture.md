@@ -1,7 +1,7 @@
 # 🏗️ CivicPress Architecture Memory
 
 **Last Updated**: 2025-01-27  
-**Architecture Version**: 1.0.0
+**Architecture Version**: 2.0.0
 
 ## 🎯 **System Overview**
 
@@ -39,29 +39,44 @@ simplicity, security, and civic trust.
 - Open source by design
 - No hidden automation
 
-## 📁 **Directory Structure**
+## 📁 **Actual Directory Structure**
 
 ```
 civicpress/
-├── .civic/                    # Platform configuration
-│   ├── specs/                 # 50+ detailed specifications
-│   ├── workflows/             # Civic workflow definitions
-│   ├── plugins/               # Plugin installations
-│   └── config/                # Platform configuration
-├── core/                      # Core platform modules
-│   ├── civic-core.ts          # Main platform loader
-│   ├── hooks.ts               # Event system
-│   ├── workflow-engine.ts     # Workflow execution
-│   └── git-integration.ts     # Git operations
+├── .civicrc                    # System configuration (dataDir, modules, roles)
+├── .system-data/               # Sensitive system data (database, logs)
+│   └── civic.db               # SQLite database
+├── data/                       # User data directory (IMPLEMENTED)
+│   ├── .civic/                # Platform configuration (IMPLEMENTED)
+│   │   ├── org-config.yml     # Organization configuration
+│   │   ├── workflows.yml      # Workflow definitions
+│   │   ├── hooks.yml          # Hook configurations
+│   │   ├── roles.yml          # Role definitions
+│   │   ├── templates/         # Template directory
+│   │   └── workflows/         # Workflow directory
+│   ├── records/               # Civic records (IMPLEMENTED)
+│   │   ├── bylaw/            # Bylaw records
+│   │   ├── policy/           # Policy records
+│   │   ├── resolution/       # Resolution records
+│   │   ├── ordinance/        # Ordinance records
+│   │   └── proclamation/     # Proclamation records
+│   └── .git/                 # Git repository for records
+├── core/                      # Core platform modules (IMPLEMENTED)
+│   ├── civic-core.ts          # Main CivicPress orchestrator
+│   ├── hooks/hook-system.ts   # Event system
+│   ├── workflows/workflow-engine.ts # Workflow execution
+│   ├── git/git-engine.ts      # Git operations
+│   ├── database/database-service.ts # Database service
+│   ├── auth/auth-service.ts   # Authentication service
+│   ├── records/record-manager.ts # Record management
+│   ├── utils/template-engine.ts # Template engine
+│   └── indexing/indexing-service.ts # Indexing service
 ├── modules/                   # Civic modules
-│   ├── legal-register/        # Legal document management
-│   ├── feedback/              # Public feedback system
-│   └── notifications/         # Notification system
-├── records/                   # Civic records (Markdown)
-│   ├── bylaws/               # Municipal bylaws
-│   ├── minutes/              # Meeting minutes
-│   ├── policies/             # Municipal policies
-│   └── proposals/            # Public proposals
+│   ├── api/                  # REST API module (IMPLEMENTED)
+│   ├── cli/                  # CLI module (IMPLEMENTED)
+│   ├── ui/                   # UI module (95% COMPLETE)
+│   └── legal-register/       # Legal document management (PLANNED)
+├── docs/specs/               # 50+ detailed specifications
 └── agent/                    # AI agent memory system
     ├── memory/               # Core memory
     ├── context/              # Contextual information
@@ -69,209 +84,335 @@ civicpress/
     └── sessions/             # Session management
 ```
 
-## 🔧 **Core Components**
+## 🔧 **Core Components (IMPLEMENTED)**
 
-### 1. **Civic Core (`civic-core.ts`)**
+### 1. **CivicPress Class (`civic-core.ts`)**
 
-- **Purpose**: Main platform loader and coordinator
+- **Purpose**: Central orchestrator managing all services
 - **Responsibilities**:
-  - Load and initialize modules
-  - Manage plugin system
-  - Coordinate hook system
+  - Initialize and manage all core services
+  - Coordinate service interactions
   - Handle platform lifecycle
+  - Provide unified API for all services
 - **Key Methods**:
   - `initialize()` - Platform startup
-  - `loadModule(name)` - Load civic modules
-  - `emitHook(event, data)` - Trigger events
-  - `getConfig()` - Access configuration
+  - `shutdown()` - Platform shutdown
+  - `getService()` - Access individual services
+  - `healthCheck()` - System health monitoring
 
-### 2. **Hook System (`hooks.ts`)**
+### 2. **Hook System (`hook-system.ts`)**
 
 - **Purpose**: Event-driven architecture for civic processes
 - **Responsibilities**:
-  - Emit civic events
-  - Handle event listeners
-  - Trigger workflows
-  - Log event activity
+  - Emit civic events with `emit()` method
+  - Handle event listeners and workflows
+  - Configure hooks via `data/.civic/hooks.yml`
+  - Log event activity for audit trails
 - **Key Events**:
-  - `onRecordCreated` - New civic record
-  - `onRecordPublished` - Record published
-  - `onFeedbackSubmitted` - Public feedback
-  - `onWorkflowTriggered` - Workflow execution
+  - `record:created` - New civic record
+  - `record:updated` - Record modified
+  - `record:committed` - Record committed to Git
+  - `status:changed` - Record status change
+  - `validation:failed` - Record validation failure
 
 ### 3. **Workflow Engine (`workflow-engine.ts`)**
 
 - **Purpose**: Execute civic processes and automation
 - **Responsibilities**:
-  - Load workflow definitions
-  - Execute workflows safely
-  - Handle workflow state
-  - Log workflow activity
+  - Load workflow definitions from `data/.civic/workflows.yml`
+  - Execute workflows safely with auto-indexing
+  - Handle workflow state and transitions
+  - Log workflow activity for audit
 - **Security**: Sandboxed execution environment
 - **Examples**:
-  - Approval workflows
-  - Notification workflows
-  - Validation workflows
+  - Approval workflows with role validation
+  - Auto-indexing workflows triggered by record changes
+  - Notification workflows for status changes
+  - Validation workflows for record integrity
 
-### 4. **Git Integration (`git-integration.ts`)**
+### 4. **Git Engine (`git-engine.ts`)**
 
 - **Purpose**: Git-native civic record management
 - **Responsibilities**:
-  - Commit civic changes
-  - Handle role-aware commits
+  - Commit civic changes with role-aware messages
+  - Handle Git history and diff operations
   - Manage branches for proposals
-  - Track civic history
+  - Track civic history with audit trails
 - **Key Features**:
   - Role-based commit messages
-  - Branch-based proposal workflow
-  - Audit trail preservation
-  - Conflict resolution
+  - Automatic Git integration for all record changes
+  - History tracking and diff capabilities
+  - Conflict resolution strategies
+
+### 5. **Database Service (`database-service.ts`)**
+
+- **Purpose**: Persistent data storage and management
+- **Responsibilities**:
+  - SQLite database management
+  - User and session storage
+  - Record metadata storage
+  - Search index management
+- **Key Features**:
+  - SQLite with full CRUD operations
+  - User management with roles
+  - Session management with JWT
+  - Search index persistence
+
+### 6. **Auth Service (`auth-service.ts`)**
+
+- **Purpose**: Authentication and authorization management
+- **Responsibilities**:
+  - Multiple authentication methods (OAuth, password, simulated)
+  - JWT token management
+  - Role-based access control
+  - Session management
+- **Key Features**:
+  - GitHub OAuth integration
+  - Password authentication
+  - Simulated accounts for development
+  - JWT token validation and management
+
+### 7. **Record Manager (`record-manager.ts`)**
+
+- **Purpose**: Civic record lifecycle management
+- **Responsibilities**:
+  - Create, read, update, delete records
+  - Manage record lifecycle (draft → proposed → approved → archived)
+  - Validate record integrity
+  - Coordinate with Git and workflow systems
+- **Key Features**:
+  - Complete CRUD operations
+  - Lifecycle management with status transitions
+  - Validation and integrity checks
+  - Integration with Git and workflows
+
+### 8. **Template Engine (`template-engine.ts`)**
+
+- **Purpose**: Record template management
+- **Responsibilities**:
+  - Load templates from `data/.civic/templates/`
+  - Generate records from templates
+  - Validate template structure
+  - Support all record types
+- **Key Features**:
+  - Template system for all record types
+  - Template validation and integrity
+  - Dynamic template generation
+  - Template customization support
+
+### 9. **Indexing Service (`indexing-service.ts`)**
+
+- **Purpose**: Search and discovery system
+- **Responsibilities**:
+  - Generate search indexes
+  - Provide full-text search capabilities
+  - Support filtering and ranking
+  - Auto-update indexes on record changes
+- **Key Features**:
+  - Full-text search across all records
+  - Advanced filtering by type, status, author
+  - Search result ranking and relevance
+  - Auto-indexing with workflow integration
 
 ## 🧩 **Module Architecture**
 
-### Module Structure
+### API Module (`modules/api/`)
 
+- **Status**: ✅ Fully implemented
+- **Purpose**: REST API for programmatic access
+- **Features**:
+  - 20+ REST endpoints
+  - Authentication middleware
+  - Authorization with role-based access
+  - Comprehensive error handling
+  - API documentation
+
+### CLI Module (`modules/cli/`)
+
+- **Status**: ✅ Fully implemented
+- **Purpose**: Command-line interface for all operations
+- **Features**:
+  - 20+ CLI commands
+  - JSON output support
+  - Authentication integration
+  - Role-based access control
+  - Git integration
+
+### UI Module (`modules/ui/`)
+
+- **Status**: ✅ 95% complete
+- **Purpose**: Modern web interface
+- **Features**:
+  - Nuxt 4 + Vue 3 + Nuxt UI Pro
+  - Complete authentication system
+  - Records interface with search and filtering
+  - Record detail pages with Markdown rendering
+  - Responsive design with modern components
+
+### Legal Register Module (`modules/legal-register/`)
+
+- **Status**: 📋 Planned (only README exists)
+- **Purpose**: Specialized legal document management
+- **Features**: Planned for future implementation
+
+## 🔌 **Configuration System (IMPLEMENTED)**
+
+### System Configuration (`.civicrc`)
+
+```yaml
+version: 1.0.0
+dataDir: data
+modules: [legal-register]
+record_types: [bylaw, policy]
+default_role: clerk
+hooks: { enabled: true }
+workflows: { enabled: true }
+audit: { enabled: true }
+database: { type: sqlite }
 ```
-modules/legal-register/
-├── package.json              # Module metadata
-├── src/
-│   ├── index.ts              # Module entry point
-│   ├── types.ts              # TypeScript definitions
-│   ├── validation.ts         # Record validation
-│   └── workflows.ts          # Module workflows
-├── tests/                    # Module tests
-└── README.md                 # Module documentation
+
+### Organization Configuration (`data/.civic/org-config.yml`)
+
+```yaml
+name: Civic Records
+city: Richmond
+state: Quebec
+country: Canada
+timezone: America/Montreal
+# ... complete organization details
 ```
 
-### Module Lifecycle
+### Workflow Configuration (`data/.civic/workflows.yml`)
 
-1. **Discovery**: Core scans for available modules
-2. **Loading**: Module code loaded and initialized
-3. **Registration**: Module registers hooks and routes
-4. **Execution**: Module handles civic events
-5. **Cleanup**: Module cleanup on shutdown
+```yaml
+statuses: [draft, proposed, reviewed, approved, archived]
+transitions:
+  draft: [proposed, archived]
+  proposed: [reviewed, archived]
+  # ... complete workflow transitions
+roles:
+  admin: # Full admin permissions
+  clerk: # Limited clerk permissions
+  public: # Public view permissions
+```
 
-## 🔌 **Plugin System**
+### Hook Configuration (`data/.civic/hooks.yml`)
 
-### Plugin Architecture
-
-- **Sandboxed Execution**: Plugins run in isolated environment
-- **API Access**: Controlled access to CivicPress APIs
-- **Lifecycle Hooks**: Plugin initialization and cleanup
-- **Configuration**: Plugin-specific settings
-
-### Plugin Capabilities
-
-- **UI Widgets**: Add components to civic dashboard
-- **CLI Commands**: Extend command-line interface
-- **API Routes**: Add REST API endpoints
-- **Workflows**: Define civic automation
-- **Hooks**: Respond to civic events
+```yaml
+hooks:
+  record:created:
+    enabled: true
+    workflows: [validate-record, notify-council]
+    audit: true
+  # ... complete hook configuration
+```
 
 ## 🔐 **Security Architecture**
 
-### 1. **Sandboxing**
+### 1. **Authentication & Authorization**
 
-- Workflow execution in isolated environment
-- Plugin execution with limited permissions
-- File system access controls
-- Network access restrictions
+- **Multiple Methods**: OAuth (GitHub), user/password, simulated accounts
+- **JWT Tokens**: All methods return valid JWT tokens with proper validation
+- **Role-Based Access**: Granular permissions system with role hierarchy
+- **Session Management**: JWT-based stateless sessions with proper cleanup
 
-### 2. **Role-Based Access**
+### 2. **Data Integrity**
 
-- User roles defined in `.civic/roles.yml`
-- Permission-based access control
-- Audit logging for all actions
-- Cryptographic signatures for approvals
+- **Git Integration**: All changes tracked in Git with role-aware commits
+- **Validation**: Comprehensive record validation and integrity checks
+- **Audit Trails**: Complete audit logging for all operations
+- **Backup**: Git provides natural backup and version control
 
-### 3. **Data Integrity**
+### 3. **Configuration Security**
 
-- Cryptographic hashing of records
-- Tamper-evident audit logs
-- Version control for all changes
-- Backup and recovery procedures
+- **Separation**: System config (`.civicrc`) vs Organization config
+  (`data/.civic/`)
+- **Validation**: Configuration validation and integrity checks
+- **Access Control**: Role-based access to configuration
+- **Audit**: Configuration changes logged and tracked
 
 ## 🎨 **User Interface Architecture**
 
 ### Frontend Design
 
-- **Progressive Enhancement**: Works without JavaScript
-- **Accessibility First**: WCAG 2.2 AA compliance
-- **Responsive Design**: Works on all devices
-- **Civic-Focused**: Designed for public use
+- **Modern Stack**: Nuxt 4 + Vue 3 + Nuxt UI Pro
+- **SPA Mode**: Single Page Application for API-driven architecture
+- **Responsive Design**: Works on all devices with modern components
+- **Accessibility**: WCAG compliant with proper accessibility features
 
 ### UI Components
 
-- **Record Viewer**: Display civic documents
-- **Feedback Forms**: Public input collection
-- **Admin Dashboard**: Municipal staff interface
-- **Search Interface**: Find civic records
+- **Authentication**: Complete login/logout with JWT token management
+- **Records Interface**: Complete with search, filtering, pagination
+- **Record Detail**: Complete with Markdown rendering and metadata
+- **API Integration**: Complete integration with backend REST API
+- **Composables**: Complete reusable composables for DRY principle
 
 ## 🔄 **Data Flow**
 
 ### 1. **Record Creation**
 
 ```
-User Input → Validation → Git Commit → Hook Event → Workflow Trigger
+User Input → Validation → Git Commit → Hook Event → Workflow Trigger → Index Update
 ```
 
 ### 2. **Record Publication**
 
 ```
-Approval → Git Merge → Hook Event → Notification → Public Display
+Approval → Git Merge → Hook Event → Notification → Public Display → Index Update
 ```
 
-### 3. **Feedback Processing**
+### 3. **Configuration Changes**
 
 ```
-Public Input → Validation → Hook Event → Workflow → Response
+Config Update → Validation → Service Reload → Hook Event → Workflow Trigger
 ```
 
 ## 📊 **Performance Considerations**
 
 ### 1. **Scalability**
 
-- Static file generation for public records
-- Caching for frequently accessed data
-- Database for dynamic content only
-- CDN for public assets
+- **Client-Side Pagination**: Efficient pagination without server calls
+- **Caching**: Global caching for record types and statuses
+- **Indexing**: Fast search with advanced filtering and ranking
+- **Git Operations**: Efficient for large repositories
 
 ### 2. **Reliability**
 
-- Git as source of truth
-- Backup and recovery procedures
-- Offline capability for core functions
-- Graceful degradation
+- **Git as Source of Truth**: Complete audit trail through Git history
+- **Database Backup**: SQLite with Git-based backup
+- **Error Handling**: Comprehensive error handling and recovery
+- **Graceful Degradation**: System continues working with partial failures
 
 ### 3. **Monitoring**
 
-- Comprehensive logging
-- Performance metrics
-- Error tracking
-- Usage analytics
+- **Comprehensive Logging**: Structured logging with configurable levels
+- **Health Checks**: System health monitoring and reporting
+- **Performance Metrics**: Response time and resource usage tracking
+- **Error Tracking**: Detailed error reporting and debugging
 
 ## 🛠️ **Development Patterns**
 
-### 1. **Specification-Driven Development**
+### 1. **Service Integration**
 
-- All features specified before implementation
-- Comprehensive testing requirements
-- Security review for all changes
-- Documentation as code
+- **CivicPress Class**: Central orchestrator for all services
+- **Dependency Injection**: Services injected and managed centrally
+- **Lifecycle Management**: Proper initialization and shutdown procedures
+- **Error Handling**: Comprehensive error handling across all services
 
-### 2. **Civic-First Design**
+### 2. **Configuration-Driven Development**
 
-- Public transparency requirements
-- Accessibility by default
-- Audit trail for all actions
-- User-friendly interfaces
+- **Centralized Config**: All configuration in `data/.civic/`
+- **Validation**: Configuration validation and integrity checks
+- **Hot Reload**: Configuration changes without restart
+- **Audit**: Configuration changes logged and tracked
 
-### 3. **Security-First Implementation**
+### 3. **Event-Driven Architecture**
 
-- Sandboxed execution
-- Input validation
-- Output sanitization
-- Error handling
+- **Hook System**: Event-driven architecture for all operations
+- **Workflow Integration**: Workflows triggered by hooks
+- **Audit Trails**: Complete audit logging for all events
+- **Extensibility**: Easy to add new hooks and workflows
 
 ## 📚 **Key Specifications**
 
@@ -287,7 +428,7 @@ Public Input → Validation → Hook Event → Workflow → Response
 - `api.md` - REST API design
 - `cli.md` - Command-line interface
 - `frontend.md` - User interface design
-- `plugins.md` - Plugin system architecture
+- `ui.md` - UI architecture and components
 
 ### Security
 
@@ -295,25 +436,28 @@ Public Input → Validation → Hook Event → Workflow → Response
 - `testing-framework.md` - Testing standards
 - `accessibility.md` - Accessibility requirements
 
-## 🎯 **Implementation Priorities**
+## 🎯 **Implementation Status**
 
-### Phase 1: Core Foundation
+### Phase 1: Core Foundation ✅ COMPLETE
 
-1. Implement `civic-core.ts` loader
-2. Build basic hook system
-3. Create simple workflow engine
-4. Add Git integration
+- ✅ Implement `CivicPress` class orchestrator
+- ✅ Build complete hook system with `emit()` method
+- ✅ Create workflow engine with auto-indexing
+- ✅ Add Git integration with role-aware commits
+- ✅ Implement complete authentication system
+- ✅ Add comprehensive configuration management
 
-### Phase 2: First Module
+### Phase 2: Development Experience ✅ COMPLETE
 
-1. Complete legal-register module
-2. Add record validation
-3. Implement basic workflows
-4. Create approval processes
+- ✅ Implement complete CLI with 20+ commands
+- ✅ Build comprehensive REST API with 20+ endpoints
+- ✅ Create modern UI with Nuxt 4 + Vue 3 + Nuxt UI Pro
+- ✅ Add complete testing framework with 391 tests
+- ✅ Implement comprehensive documentation
 
-### Phase 3: Development Tools
+### Phase 3: Advanced Features 🚀 IN PROGRESS
 
-1. Build testing framework
-2. Implement specification validation
-3. Create development documentation
-4. Add example implementations
+- 🔄 Complete UI module (95% done - only account management missing)
+- 📋 Implement plugin system
+- 📋 Complete legal-register module
+- 📋 Add advanced workflows and federation

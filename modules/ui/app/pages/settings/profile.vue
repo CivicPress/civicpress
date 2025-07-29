@@ -16,9 +16,21 @@ const tokenCopied = ref(false)
 // Fetch user information
 const fetchUserInfo = async () => {
     try {
-        const response = await $civicApi('/auth/me') as any
-        if (response.success) {
-            userInfo.value = response.data.user
+        // Use data from auth store if available
+        if (authStore.user && authStore.isAuthenticated) {
+            userInfo.value = authStore.user
+            loading.value = false
+            return
+        }
+
+        // Otherwise try to fetch from API (requires authentication)
+        if (authStore.token) {
+            const response = await $civicApi('/auth/me') as any
+            if (response.success) {
+                userInfo.value = response.data.user
+            }
+        } else {
+            error.value = 'Authentication required. Please log in to view your profile.'
         }
     } catch (err: any) {
         error.value = err.message || 'Failed to fetch user information'
@@ -94,6 +106,13 @@ const getRoleColor = (role: string) => {
 
 // Load user info on mount
 onMounted(() => {
+    // Check if user is authenticated
+    if (!authStore.isAuthenticated) {
+        error.value = 'Authentication required. Please log in to view your profile.'
+        loading.value = false
+        return
+    }
+
     fetchUserInfo()
 })
 </script>
