@@ -109,24 +109,24 @@ export const useAuthStore = defineStore('auth', {
       const data = validateApiResponse(response, ['session']);
       const { session } = data;
 
-        // Update user info
-        this.user = {
-          id: session.user.id.toString(),
-          username: session.user.username,
-          email: session.user.email,
-          name: session.user.name,
-          role: session.user.role,
-          avatar: session.user.avatar_url,
-          permissions: [], // TODO: Add permissions if available
-        };
+      // Update user info
+      this.user = {
+        id: session.user.id.toString(),
+        username: session.user.username,
+        email: session.user.email,
+        name: session.user.name,
+        role: session.user.role,
+        avatar: session.user.avatar_url,
+        permissions: [], // TODO: Add permissions if available
+      };
 
-        // Update token and auth state
-        this.token = session.token;
-        this.sessionExpiresAt = session.expiresAt;
-        this.isAuthenticated = true;
+      // Update token and auth state
+      this.token = session.token;
+      this.sessionExpiresAt = session.expiresAt;
+      this.isAuthenticated = true;
 
-        // Save auth state to localStorage
-        this.saveAuthState();
+      // Save auth state to localStorage
+      this.saveAuthState();
 
       return response;
     },
@@ -143,7 +143,12 @@ export const useAuthStore = defineStore('auth', {
         console.log('response', response);
         return await this.handleLoginResponse(response, 'Login failed');
       } catch (error: any) {
-        this.error = error.message || 'Login failed';
+        const { handleError } = useErrorHandler()
+        const errorMessage = handleError(error, {
+          title: 'Login Failed',
+          showToast: true
+        })
+        this.error = errorMessage
         throw error;
       } finally {
         this.loading = false;
@@ -162,7 +167,12 @@ export const useAuthStore = defineStore('auth', {
         console.log('response', response);
         return await this.handleLoginResponse(response, 'Token login failed');
       } catch (error: any) {
-        this.error = error.message || 'Token login failed';
+        const { handleError } = useErrorHandler()
+        const errorMessage = handleError(error, {
+          title: 'Token Login Failed',
+          showToast: true
+        })
+        this.error = errorMessage
         throw error;
       } finally {
         this.loading = false;

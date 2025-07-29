@@ -196,8 +196,12 @@ export const useRecordsStore = defineStore('records', {
           this.hasMore = data.hasMore || false;
         }
       } catch (error: any) {
-        console.error('Error loading initial records:', error);
-        this.error = error.message || 'Failed to load records';
+        const { handleError } = useErrorHandler();
+        const errorMessage = handleError(error, {
+          title: 'Failed to Load Records',
+          showToast: true,
+        });
+        this.error = errorMessage;
         throw error;
       } finally {
         this.loading = false;
@@ -238,8 +242,12 @@ export const useRecordsStore = defineStore('records', {
         this.nextCursor = data.nextCursor || null;
         this.hasMore = data.hasMore || false;
       } catch (error: any) {
-        console.error('Error loading more records:', error);
-        this.error = error.message || 'Failed to load more records';
+        const { handleError } = useErrorHandler();
+        const errorMessage = handleError(error, {
+          title: 'Failed to Load More Records',
+          showToast: true,
+        });
+        this.error = errorMessage;
         throw error;
       } finally {
         this.loading = false;
@@ -286,8 +294,12 @@ export const useRecordsStore = defineStore('records', {
           search: query,
         };
       } catch (error: any) {
-        console.error('Error searching API:', error);
-        this.error = error.message || 'Failed to search records';
+        const { handleError } = useErrorHandler()
+        const errorMessage = handleError(error, {
+          title: 'Search Failed',
+          showToast: true
+        })
+        this.error = errorMessage
         throw error;
       } finally {
         this.loading = false;
@@ -320,8 +332,12 @@ export const useRecordsStore = defineStore('records', {
 
         return civicRecord;
       } catch (error: any) {
-        console.error('Error fetching record:', error);
-        this.error = error.message || 'Failed to fetch record';
+        const { handleError } = useErrorHandler()
+        const errorMessage = handleError(error, {
+          title: 'Failed to Fetch Record',
+          showToast: true
+        })
+        this.error = errorMessage
         throw error;
       }
     },
