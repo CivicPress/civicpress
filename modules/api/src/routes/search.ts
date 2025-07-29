@@ -58,12 +58,12 @@ searchRouter.get(
       .withMessage('Status must be a string'),
     query('limit')
       .optional()
-      .isInt({ min: 1, max: 100 })
-      .withMessage('Limit must be between 1 and 100'),
-    query('offset')
+      .isInt({ min: 1, max: 300 })
+      .withMessage('Limit must be between 1 and 300'),
+    query('cursor')
       .optional()
-      .isInt({ min: 0 })
-      .withMessage('Offset must be a non-negative integer'),
+      .isString()
+      .withMessage('Cursor must be a string'),
   ],
   async (req: any, res: Response) => {
     const isAuthenticated = (req as any).user !== undefined;
@@ -79,7 +79,7 @@ searchRouter.get(
         return handleValidationError(operation, errors.array(), req, res);
       }
 
-      const { q: query, type, status, limit, offset } = req.query;
+      const { q: query, type, status, limit, cursor } = req.query;
 
       logger.info(
         `Searching records (${isAuthenticated ? 'authenticated' : 'public'})`,
@@ -88,7 +88,7 @@ searchRouter.get(
           type,
           status,
           limit,
-          offset,
+          cursor: cursor ? '***' : undefined, // Don't log the actual cursor
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
@@ -101,19 +101,22 @@ searchRouter.get(
         throw new Error('CivicPress instance not available');
       }
 
-      const recordManager = civicPress.getRecordManager();
-      const result = await recordManager.searchRecords(query as string, {
+      const recordsService = new (
+        await import('../services/records-service')
+      ).RecordsService(civicPress);
+      const result = await recordsService.searchRecords(query as string, {
         type: type as string,
         status: status as string,
-        limit: limit ? parseInt(limit as string) : undefined,
-        offset: offset ? parseInt(offset as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 20,
+        cursor: cursor as string,
       });
 
       logger.info(
         `Search completed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
         {
           query,
-          totalResults: result.total,
+          totalResults: result.records.length,
+          hasMore: result.hasMore,
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
@@ -124,7 +127,8 @@ searchRouter.get(
       sendSuccess(
         {
           results: result.records,
-          total: result.total,
+          nextCursor: result.nextCursor,
+          hasMore: result.hasMore,
           query: query as string,
         },
         req,

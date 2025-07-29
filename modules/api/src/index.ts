@@ -57,12 +57,6 @@ export class CivicPressAPI {
         next: express.NextFunction
       ) => {
         if (err instanceof SyntaxError && 'body' in err) {
-          // DEBUG: Log when JSON parse error is caught
-          // eslint-disable-next-line no-console
-          console.error(
-            '[DEBUG] JSON parse error middleware triggered:',
-            err.message
-          );
           (err as any).statusCode = 400;
           (err as any).message = 'Malformed JSON';
           return errorHandler(err, req, res, next);
@@ -86,62 +80,6 @@ export class CivicPressAPI {
     // Body parsing
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
-
-    // Global delay middleware for development (to see loading states)
-    this.app.use((req, res, next) => {
-      // Check if we're in development mode
-      const isDev =
-        !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
-
-      if (isDev) {
-        // Define allowlist (endpoints that should NOT be delayed)
-        const allowlist = [
-          '/health',
-          '/info',
-          '/docs',
-          '/auth/login',
-          '/auth/password',
-          '/api/search/suggestions', // Search suggestions - no delay
-        ];
-
-        // Define blocklist (endpoints that should always be delayed)
-        const blocklist = [
-          '/api/search', // Main search endpoint - WITH delay
-          '/api/records',
-          '/api/status',
-        ];
-
-        const path = req.path;
-        const isAllowlisted = allowlist.some((endpoint) =>
-          path.startsWith(endpoint)
-        );
-        const isBlocklisted = blocklist.some((endpoint) =>
-          path.startsWith(endpoint)
-        );
-
-        // Allowlist takes precedence over blocklist
-        const shouldDelay = isBlocklisted && !isAllowlisted;
-
-        if (shouldDelay) {
-          // Add a 5 second delay for specified requests in development
-          const delay = 5000; // 5 seconds
-          console.log(
-            `🔄 Adding ${delay}ms delay for: ${req.method} ${req.path}`
-          );
-
-          setTimeout(() => {
-            next();
-          }, delay);
-        } else {
-          console.log(
-            `⚡ No delay for: ${req.method} ${req.path} (allowlisted)`
-          );
-          next();
-        }
-      } else {
-        next();
-      }
-    });
 
     // Enhanced request logging and tracing
     this.app.use(requestIdMiddleware);

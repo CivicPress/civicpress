@@ -225,33 +225,95 @@ export class RecordsService {
   }
 
   /**
-   * List records
+   * List records with cursor-based pagination
    */
   async listRecords(
     options: {
       type?: string;
       status?: string;
       limit?: number;
-      offset?: number;
+      cursor?: string;
     } = {}
   ): Promise<{
     records: any[];
-    total: number;
-    page: number;
-    limit: number;
+    nextCursor: string | null;
+    hasMore: boolean;
   }> {
-    const result = await this.recordManager.listRecords(options);
+    const { type, status, limit = 20, cursor } = options;
+
+    // Get all records from the record manager
+    const result = await this.recordManager.listRecords({
+      type,
+      status,
+      limit: 1000, // Get a large number of records for cursor-based pagination
+      offset: undefined,
+    });
+
+    // Apply filters to the records array
+    let filteredRecords = result.records;
+
+    if (type) {
+      const types = type.split(',').map((t) => t.trim());
+      filteredRecords = filteredRecords.filter((record: any) =>
+        types.includes(record.type)
+      );
+    }
+
+    if (status) {
+      const statuses = status.split(',').map((s) => s.trim());
+      filteredRecords = filteredRecords.filter((record: any) =>
+        statuses.includes(record.status)
+      );
+    }
+
+    // Sort records by creation date (newest first) for consistent cursor behavior
+    filteredRecords.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    // Find the starting index based on cursor
+    let startIndex = 0;
+    if (cursor) {
+      const cursorIndex = filteredRecords.findIndex(
+        (record: any) => record.id === cursor
+      );
+      if (cursorIndex !== -1) {
+        startIndex = cursorIndex + 1; // Start after the cursor
+      }
+    }
+
+    // Get the requested number of records
+    const endIndex = startIndex + limit;
+    const records = filteredRecords.slice(startIndex, endIndex);
+
+    // Determine if there are more records
+    const hasMore = endIndex < filteredRecords.length;
+    const nextCursor = hasMore ? records[records.length - 1]?.id || null : null;
+
+    // Transform records for API response
+    const transformedRecords = records.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      metadata: record.metadata || {},
+      path: record.path,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      author: record.author,
+    }));
 
     return {
-      records: result.records,
-      total: result.total,
-      page: 1,
-      limit: options.limit || 10,
+      records: transformedRecords,
+      nextCursor,
+      hasMore,
     };
   }
 
   /**
-   * Search records
+   * Search records with offset-based pagination (more efficient than cursor-based for search)
    */
   async searchRecords(
     query: string,
@@ -259,20 +321,54 @@ export class RecordsService {
       type?: string;
       status?: string;
       limit?: number;
-      offset?: number;
+      cursor?: string;
     } = {}
   ): Promise<{
     records: any[];
-    total: number;
-    page: number;
-    limit: number;
+    nextCursor: string | null;
+    hasMore: boolean;
   }> {
-    const result = await this.recordManager.searchRecords(query, options);
+    const { type, status, limit = 20, cursor } = options;
+
+    // Convert cursor to offset for simpler pagination
+    let offset = 0;
+    if (cursor) {
+      // For now, we'll use a simple approach: assume cursor is the last record ID
+      // In a real implementation, you'd store cursor->offset mapping or use a different approach
+      offset = parseInt(cursor) || 0;
+    }
+
+    // Get search results with proper pagination
+    const result = await this.recordManager.searchRecords(query, {
+      type,
+      status,
+      limit: limit + 1, // Get one extra to determine if there are more results
+      offset,
+    });
+
+    // Determine if there are more records
+    const hasMore = result.records.length > limit;
+    const records = hasMore ? result.records.slice(0, limit) : result.records;
+    const nextCursor = hasMore ? (offset + limit).toString() : null;
+
+    // Transform records for API response
+    const transformedRecords = records.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      metadata: record.metadata || {},
+      path: record.path,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      author: record.author,
+    }));
+
     return {
-      records: result.records,
-      total: result.total,
-      page: 1,
-      limit: options.limit || 10,
+      records: transformedRecords,
+      nextCursor,
+      hasMore,
     };
   }
 }

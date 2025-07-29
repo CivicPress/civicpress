@@ -36,7 +36,6 @@ const fetchOrganizationInfo = async () => {
 // Fetch system statistics (requires authentication)
 const fetchSystemStats = async () => {
   if (!isAuthenticated.value) {
-    console.log('User not authenticated, skipping system stats')
     return
   }
 
@@ -54,7 +53,6 @@ const fetchSystemStats = async () => {
 // Fetch recent records (requires authentication)
 const fetchRecentRecords = async () => {
   if (!isAuthenticated.value) {
-    console.log('User not authenticated, skipping recent records')
     return
   }
 

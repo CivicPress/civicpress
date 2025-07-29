@@ -46,107 +46,50 @@ const searchQuery = ref('')
 const selectedRecordTypes = ref<any[]>([])
 const selectedRecordStatuses = ref<any[]>([])
 
-// Pagination state - use store pagination
-const currentPage = computed({
-    get: () => recordsStore.pagination.page,
-    set: (page: number) => {
-        recordsStore.setPagination({ page })
-    }
-})
-
-const pageSize = computed({
-    get: () => recordsStore.pagination.limit,
-    set: (limit: number) => {
-        recordsStore.setPagination({ limit })
-    }
-})
-
-// Page size options
-const pageSizeOptions = [
-    { label: '10 per page', value: 10 },
-    { label: '20 per page', value: 20 },
-    { label: '50 per page', value: 50 },
-    { label: '100 per page', value: 100 }
-]
-
-// Computed property for selected page size option
-const selectedPageSizeOption = computed({
-    get: () => pageSizeOptions.find(option => option.value === pageSize.value) || pageSizeOptions[0],
-    set: (option: any) => {
-        pageSize.value = option.value
-    }
-})
-
 // URL state management functions
-const updateURL = (replace = true) => {
+const updateURL = () => {
     const query: any = {}
 
     if (searchQuery.value) query.search = searchQuery.value
-    if (selectedRecordTypes.value.length > 0) {
-        query.types = selectedRecordTypes.value.map(item =>
-            typeof item === 'string' ? item : item.value || item.id
-        ).join(',')
-    }
-    if (selectedRecordStatuses.value.length > 0) {
-        query.statuses = selectedRecordStatuses.value.map(item =>
-            typeof item === 'string' ? item : item.value || item.id
-        ).join(',')
-    }
-    if (currentPage.value > 1) query.page = currentPage.value.toString()
-    if (pageSize.value !== 10) query.size = pageSize.value.toString()
+    if (selectedRecordTypes.value.length > 0) query.types = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id).join(',')
+    if (selectedRecordStatuses.value.length > 0) query.statuses = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id).join(',')
 
-    if (replace) {
-        router.replace({ query })
-    } else {
-        router.push({ query })
-    }
+    navigateTo({ query }, { replace: true })
 }
 
 const restoreFromURL = () => {
+    const route = useRoute()
+
     // Restore search query
-    if (route.query.search) {
-        searchQuery.value = route.query.search as string
-    }
+    if (route.query.search) searchQuery.value = route.query.search as string
 
     // Restore record types
     if (route.query.types) {
-        const typeValues = (route.query.types as string).split(',')
-        selectedRecordTypes.value = typeValues.map(value => ({ value, label: getTypeLabel(value) }))
+        const types = (route.query.types as string).split(',')
+        selectedRecordTypes.value = types.map(type => ({ value: type, label: getTypeLabel(type) }))
     }
 
     // Restore record statuses
     if (route.query.statuses) {
-        const statusValues = (route.query.statuses as string).split(',')
-        selectedRecordStatuses.value = statusValues.map(value => ({ value, label: getStatusLabel(value) }))
-    }
-
-    // Restore pagination
-    if (route.query.page) {
-        currentPage.value = Math.max(1, parseInt(route.query.page as string))
-    }
-    if (route.query.size) {
-        pageSize.value = parseInt(route.query.size as string) || 10
+        const statuses = (route.query.statuses as string).split(',')
+        selectedRecordStatuses.value = statuses.map(status => ({ value: status, label: getStatusLabel(status) }))
     }
 }
 
-// Debounced API search - only for API calls
+// Debounced API search function
 const debouncedApiSearch = useDebounceFn(async (query: string) => {
-    if (query && query.trim()) {
-        // Extract string values from the selected objects
-        const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
-        const statusValues = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
+    // Extract string values from the selected objects
+    const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
+    const statusValues = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
 
-        const typeFilter = typeValues.length > 0 ? typeValues.join(',') : undefined
-        const statusFilter = statusValues.length > 0 ? statusValues.join(',') : undefined
+    const typeFilter = typeValues.length > 0 ? typeValues.join(',') : undefined
+    const statusFilter = statusValues.length > 0 ? statusValues.join(',') : undefined
 
-        // For search, we still use the search API to get new results
-        await recordsStore.searchRecords(query, {
-            type: typeFilter,
-            status: statusFilter,
-            offset: (currentPage.value - 1) * pageSize.value,
-            limit: pageSize.value,
-        })
-    }
+    // Use the new search method
+    await recordsStore.searchRecords(query, {
+        type: typeFilter,
+        status: statusFilter,
+    })
 }, 300)
 
 // On mounted - restore from URL and fetch data
@@ -167,7 +110,7 @@ onMounted(async () => {
 })
 
 // Function to fetch records for current page
-const fetchRecordsForCurrentPage = async () => {
+const fetchRecordsForCurrentPage = async (searchQuery?: string) => {
     // Extract string values from the selected objects
     const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
     const statusValues = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
@@ -175,23 +118,39 @@ const fetchRecordsForCurrentPage = async () => {
     const typeFilter = typeValues.length > 0 ? typeValues.join(',') : undefined
     const statusFilter = statusValues.length > 0 ? statusValues.join(',') : undefined
 
-    if (typeFilter || statusFilter) {
-        // Fetch filtered records from server
-        await recordsStore.fetchFilteredRecords({
+    // If there's a search query, use search
+    if (searchQuery && searchQuery.trim()) {
+        await recordsStore.searchRecords(searchQuery, {
             type: typeFilter,
             status: statusFilter,
         })
     } else {
-        // If no filters, fetch all records
-        await recordsStore.fetchAllRecords()
+        // Load initial records
+        await recordsStore.loadInitialRecords({
+            type: typeFilter,
+            status: statusFilter,
+        })
     }
+}
+
+// Function to load more records
+const loadMoreRecords = async () => {
+    // Extract current filters
+    const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
+    const statusValues = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
+
+    const typeFilter = typeValues.length > 0 ? typeValues.join(',') : undefined
+    const statusFilter = statusValues.length > 0 ? statusValues.join(',') : undefined
+
+    // Load more records
+    await recordsStore.loadMoreRecords({
+        type: typeFilter,
+        status: statusFilter,
+    })
 }
 
 // Watch for filter changes - fetch fresh data and update URL
 watch([selectedRecordTypes, selectedRecordStatuses], async () => {
-    // Reset to first page when filters change
-    recordsStore.setPagination({ page: 1 })
-
     // Extract string values from the selected objects
     const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
     const statusValues = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
@@ -204,6 +163,9 @@ watch([selectedRecordTypes, selectedRecordStatuses], async () => {
         type: typeFilter,
         status: statusFilter
     })
+
+    // Clear records immediately when filters change to show empty state
+    recordsStore.clearRecords()
 
     // Update URL
     updateURL()
@@ -218,9 +180,6 @@ watch(searchQuery, (newQuery) => {
         return
     }
 
-    // Reset to first page when search changes
-    recordsStore.setPagination({ page: 1 })
-
     // Extract current type and status filters to preserve them
     const typeValues = selectedRecordTypes.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
     const statusValues = selectedRecordStatuses.value.map((item: any) => typeof item === 'string' ? item : item.value || item.id)
@@ -234,6 +193,14 @@ watch(searchQuery, (newQuery) => {
         status: statusFilter,
         search: newQuery
     })
+
+    // Clear records immediately when query changes to show empty state
+    if (newQuery && newQuery.trim()) {
+        recordsStore.clearRecords()
+    } else if (!newQuery || !newQuery.trim()) {
+        // Also clear records when search is cleared
+        recordsStore.clearRecords()
+    }
 
     // Update URL
     updateURL()
@@ -251,86 +218,26 @@ watch(searchQuery, (newQuery) => {
     if (newQuery && newQuery.trim()) {
         debouncedApiSearch(newQuery)
     } else {
-        // When search is cleared, fetch current filtered records or all records
-        fetchRecordsForCurrentPage()
+        // When search is cleared, refetch the original records with current filters
+        fetchRecordsForCurrentPage(undefined)
     }
 })
-
-// Watch for page changes
-watch(currentPage, async () => {
-    // Update URL
-    updateURL()
-    // No need to fetch since pagination is handled by the store getter
-})
-
-// Watch for page size changes
-watch(pageSize, async () => {
-    // Reset to first page when page size changes
-    currentPage.value = 1
-    // Update URL
-    updateURL()
-    // No need to fetch since pagination is handled client-side
-})
-
-// Handle page change from pagination component
-const handlePageChange = async (page: number) => {
-    currentPage.value = page
-    // Update URL
-    updateURL()
-    // No need to fetch since pagination is handled client-side
-}
-
-// Handle clicking outside suggestions dropdown
-const handleClickOutside = (event: Event) => {
-    const target = event.target as Element
-    if (!target.closest('.search-suggestions-container')) {
-        clearSuggestions()
-    }
-}
 
 // Computed properties for better reactivity
 const displayRecords = computed(() => {
-    // Direct filtering based on current search query for immediate reactivity
-    const currentSearch = searchQuery.value
-    const currentRecords = recordsStore.records
-
-    // If no search query, return all records
-    if (!currentSearch || !currentSearch.trim()) {
-        return currentRecords
-    }
-
-    // Apply search filter directly for immediate feedback
-    const search = currentSearch.toLowerCase().trim()
-    const filtered = currentRecords.filter(record =>
-        record.title.toLowerCase().includes(search) ||
-        record.content.toLowerCase().includes(search) ||
-        record.metadata?.tags?.some(tag => tag.toLowerCase().includes(search)) ||
-        false
-    )
-
-    return filtered
+    // Just show what's in the store (all loaded records)
+    return recordsStore.records
 })
 
-// Paginated records for display
-const paginatedRecords = computed(() => {
-    const startIndex = (currentPage.value - 1) * effectivePageSize.value
-    const endIndex = startIndex + effectivePageSize.value
-    return displayRecords.value.slice(startIndex, endIndex)
-})
-
-// Memoized computed properties for better performance
-const memoizedRecordTypes = computed(() => recordTypeOptions())
-const memoizedRecordStatuses = computed(() => recordStatusOptions())
-
-// Cached record processing
+// Records for display (same as displayRecords since we're cursor-based)
 const processedRecords = computed(() => {
-    return paginatedRecords.value.map(record => ({
+    return displayRecords.value.map(record => ({
         ...record,
         formattedDate: formatDate(record.created_at),
         statusColor: getStatusColor(record.status),
         typeIcon: getTypeIcon(record.type),
         typeLabel: getTypeLabel(record.type),
-        statusLabel: getStatusLabel(record.status),
+        statusLabel: getTypeLabel(record.status),
         excerpt: record.content.substring(0, 150) + '...'
     }))
 })
@@ -355,31 +262,9 @@ const shouldShowLoading = computed(() => {
     return recordsStore.isLoading
 })
 
-// Computed properties for reactive pagination data
-const paginationTotal = computed(() => recordsStore.totalFilteredRecords)
-const paginationLimit = computed(() => recordsStore.pagination.limit)
-
-// Ensure pagination data is reactive to page size changes
-const effectivePageSize = computed(() => pageSize.value)
-
-// Client-side pagination for filtered records
-const totalPages = computed(() => {
-    return Math.ceil(displayRecords.value.length / effectivePageSize.value)
-})
-
-const currentPageStart = computed(() => {
-    return displayRecords.value.length > 0 ? ((currentPage.value - 1) * effectivePageSize.value + 1) : 0
-})
-
-const currentPageEnd = computed(() => {
-    return Math.min(currentPage.value * effectivePageSize.value, displayRecords.value.length)
-})
-
-// Computed property to determine if pagination should be shown
-const shouldShowPagination = computed(() => {
-    // Use client-side filtered records for immediate response
-    const clientSideTotal = displayRecords.value.length
-    return clientSideTotal > effectivePageSize.value
+// Check if we should show "Load More" button
+const shouldShowLoadMore = computed(() => {
+    return recordsStore.hasMore && displayRecords.value.length > 0 && !recordsStore.isLoading
 })
 
 const recordTypeOptionsComputed = computed(() => {
@@ -460,9 +345,16 @@ const handleInputBlur = () => {
     }, 150)
 }
 
-// Performance monitoring
-const performanceMonitor = ref()
-const isPerformanceMode = ref(false) // Toggle with Ctrl+Shift+P
+// Handle clicking outside suggestions dropdown
+const handleClickOutside = (event: Event) => {
+    const target = event.target as Element
+    // Only clear suggestions if:
+    // 1. Click is outside the search suggestions container
+    // 2. Search query is not empty (to avoid clearing when no suggestions are shown)
+    if (!target.closest('.search-suggestions-container') && searchQuery.value && searchQuery.value.trim()) {
+        clearSuggestions()
+    }
+}
 
 // Virtual list for large datasets
 const virtualListContainer = ref<HTMLElement>()
@@ -470,43 +362,12 @@ const { list: virtualList } = useVirtualList(processedRecords, {
     itemHeight: 120,
 })
 
-// Update performance metrics
-const updatePerformanceMetrics = () => {
-    if (performanceMonitor.value) {
-        performanceMonitor.value.metrics.recordCount = processedRecords.value.length
-        performanceMonitor.value.metrics.filterCount = selectedRecordTypes.value.length + selectedRecordStatuses.value.length
-        performanceMonitor.value.trackRenderTime()
-    }
-}
-
-// Keyboard shortcut for performance mode
-const togglePerformanceMode = (event: KeyboardEvent) => {
-    if (event.ctrlKey && event.shiftKey && event.key === 'P') {
-        isPerformanceMode.value = !isPerformanceMode.value
-        event.preventDefault()
-
-        // Show visual feedback
-        console.log(`Performance mode ${isPerformanceMode.value ? 'enabled' : 'disabled'}`)
-    }
-}
-
 onMounted(() => {
     document.addEventListener('click', handleClickOutside)
-    document.addEventListener('keydown', togglePerformanceMode)
-    updatePerformanceMetrics()
-
-    // Show help message
-    console.log('Press Ctrl+Shift+P to toggle performance monitor')
 })
 
 onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside)
-    document.removeEventListener('keydown', togglePerformanceMode)
-})
-
-// Watch for changes and update metrics
-watch([processedRecords, selectedRecordTypes, selectedRecordStatuses], () => {
-    updatePerformanceMetrics()
 })
 
 </script>
@@ -516,12 +377,7 @@ watch([processedRecords, selectedRecordTypes, selectedRecordStatuses], () => {
         <template #header>
             <UDashboardNavbar title="Records">
                 <!-- Performance Mode Indicator -->
-                <template #trailing>
-                    <div v-if="isPerformanceMode" class="flex items-center space-x-2">
-                        <UIcon name="i-lucide-zap" class="w-4 h-4 text-yellow-500" />
-                        <span class="text-xs text-yellow-600 font-medium">Performance Mode</span>
-                    </div>
-                </template>
+
             </UDashboardNavbar>
         </template>
 
@@ -585,14 +441,10 @@ watch([processedRecords, selectedRecordTypes, selectedRecordStatuses], () => {
                 <!-- Records Summary -->
                 <div class="text-sm text-gray-600">
                     <span v-if="hasActiveFilters">
-                        Showing {{ currentPageStart }}-{{ currentPageEnd }}
-                        of {{ displayRecords.length }} filtered records
-                        ({{ totalPages }} pages)
+                        Showing {{ displayRecords.length }} filtered records
                     </span>
                     <span v-else>
-                        Showing {{ currentPageStart }}-{{ currentPageEnd }}
-                        of {{ displayRecords.length }} records
-                        ({{ totalPages }} pages)
+                        Showing {{ displayRecords.length }} records
                     </span>
 
                     <!-- Performance indicator -->
@@ -733,13 +585,7 @@ watch([processedRecords, selectedRecordTypes, selectedRecordStatuses], () => {
                             </UCard>
                         </div>
 
-                        <!-- Loading indicator at bottom of list -->
-                        <div v-if="recordsStore.isLoading" class="text-center py-6">
-                            <div class="flex items-center justify-center text-sm text-gray-500">
-                                <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin mr-2" />
-                                Getting more records...
-                            </div>
-                        </div>
+
                     </div>
 
                     <!-- Show loading only when no existing records -->
@@ -760,24 +606,24 @@ watch([processedRecords, selectedRecordTypes, selectedRecordStatuses], () => {
                     </div>
                 </div>
 
-                <!-- Pagination -->
-                <div class="flex justify-between items-center mt-6">
-                    <!-- Page size dropdown on the left -->
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm text-gray-600">Show:</span>
-                        <USelectMenu v-model="selectedPageSizeOption" :items="pageSizeOptions" class="w-32" size="sm" />
+                <!-- Loading Indicator (below records) -->
+                <div v-if="recordsStore.isLoading && displayRecords.length > 0" class="text-center py-6">
+                    <div class="flex items-center justify-center space-x-2">
+                        <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin text-gray-500" />
+                        <span class="text-sm text-gray-600">Loading more records...</span>
                     </div>
+                </div>
 
-                    <!-- Pagination on the right -->
-                    <UPagination v-model:page="currentPage" :total="displayRecords.length" :per-page="effectivePageSize"
-                        variant="link" @update:page="handlePageChange" v-if="shouldShowPagination" />
+                <!-- Load More Button -->
+                <div v-if="shouldShowLoadMore" class="text-center py-6">
+                    <UButton @click="loadMoreRecords" color="primary" variant="outline" size="lg">
+                        <UIcon name="i-lucide-plus" class="w-4 h-4 mr-2" />
+                        Load More Records
+                    </UButton>
                 </div>
             </div>
 
 
         </template>
     </UDashboardPanel>
-
-    <!-- Performance Monitor -->
-    <PerformanceMonitor ref="performanceMonitor" :enabled="isPerformanceMode" />
 </template>

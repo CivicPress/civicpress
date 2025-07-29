@@ -26,8 +26,29 @@ const fetchRecord = async () => {
     error.value = ''
 
     try {
-        const fetchedRecord = await recordsStore.fetchRecord(id)
-        record.value = fetchedRecord
+        // Direct API call for now to test
+        const { $civicApi } = useNuxtApp()
+        const response = await $civicApi(`/api/records/${id}`)
+
+        if (response && response.success && response.data) {
+            const apiRecord = response.data
+
+            // Transform API response to match CivicRecord interface
+            record.value = {
+                id: apiRecord.id,
+                title: apiRecord.title,
+                type: apiRecord.type,
+                content: apiRecord.content || '',
+                status: apiRecord.status,
+                path: apiRecord.path,
+                author: apiRecord.author,
+                created_at: apiRecord.created || apiRecord.created_at,
+                updated_at: apiRecord.updated || apiRecord.updated_at,
+                metadata: apiRecord.metadata || {},
+            }
+        } else {
+            throw new Error('Failed to fetch record')
+        }
     } catch (err: any) {
         error.value = err.message || 'Failed to load record'
         console.error('Error fetching record:', err)
@@ -38,8 +59,14 @@ const fetchRecord = async () => {
 
 // Navigate back to records list
 const goBack = () => {
-    // Use router.back() to preserve the previous page state (filters, pagination, etc.)
-    router.back()
+    // Check if we can go back in browser history
+    if (window.history.length > 1) {
+        // Use router.back() to preserve the previous page state (filters, pagination, etc.)
+        router.back()
+    } else {
+        // Fall back to navigating to the records list page
+        router.push('/records')
+    }
 }
 
 // Fetch record on mount

@@ -20,7 +20,7 @@ import { loginCommand } from './commands/login.js';
 import { indexCommand } from './commands/index.js';
 import { autoIndexCommand } from './commands/auto-index.js';
 import { cleanupCommand } from './commands/cleanup.js';
-import { debugCommand } from './commands/debug.js';
+
 import setupAuthCommand from './commands/auth.js';
 import setupUsersCommand from './commands/users.js';
 import { CentralConfigManager } from '@civicpress/core';
@@ -66,7 +66,7 @@ loginCommand(cli);
 indexCommand(cli);
 autoIndexCommand(cli);
 cleanupCommand(cli);
-debugCommand(cli);
+
 infoCommand(cli);
 
 // Setup auth commands

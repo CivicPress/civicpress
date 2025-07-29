@@ -51,7 +51,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
     logApiRequest(req, { operation });
 
     try {
-      const { type, status, limit, offset } = req.query;
+      const { type, status, limit, cursor } = req.query;
 
       logger.info(
         `Listing records (${isAuthenticated ? 'authenticated' : 'public'})`,
@@ -59,7 +59,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
           type,
           status,
           limit,
-          offset,
+          cursor: cursor ? '***' : undefined, // Don't log the actual cursor
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
@@ -70,14 +70,15 @@ export function createRecordsRouter(recordsService: RecordsService) {
       const result = await recordsService.listRecords({
         type: type as string,
         status: status as string,
-        limit: limit ? parseInt(limit as string) : undefined,
-        offset: offset ? parseInt(offset as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 20,
+        cursor: cursor as string,
       });
 
       logger.info(
         `Records listed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
         {
           totalRecords: result.records?.length || 0,
+          hasMore: result.hasMore,
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
