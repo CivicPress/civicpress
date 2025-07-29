@@ -570,3 +570,12 @@
 - **Removed**: PerformanceMonitor component, debug CLI commands, console.log
   statements
 - **Lesson**: Keep codebase clean by removing debug code before committing
+
+### API Watch Mode Enhancement
+
+- **Problem**: API development required manual restarts for every code change
+- **Solution**: Added `tsx --watch` functionality with new scripts:
+  - `pnpm run dev:api:watch` - API with file watching
+  - `pnpm run dev:all:watch` - Combined API + UI with API watching
+- **Git Lock Issue**: Resolved `.git/index.lock` conflicts during API startup
+- **Lesson**: Always improve developer experience with hot reload and proper error handling

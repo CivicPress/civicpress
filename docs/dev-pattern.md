@@ -1,6 +1,7 @@
 # 🧱 CivicPress Development Pattern: CLI → Core → API
 
-CivicPress follows a **CLI-first architecture** to ensure that each new feature is:
+CivicPress follows a **CLI-first architecture** to ensure that each new feature
+is:
 
 - Easy to test locally
 - Independent of frontend/API concerns
@@ -56,6 +57,40 @@ graph TD
 
   CLI --> Core
   API --> Core
+```
+
+---
+
+## 🚀 Development Commands
+
+### API Development
+
+```bash
+# Start API with file watching (recommended)
+pnpm run dev:api:watch
+
+# Start API without watch
+pnpm run dev:api
+
+# Start both API and UI with API watching
+pnpm run dev:all:watch
+```
+
+### UI Development
+
+```bash
+# Start UI development server
+pnpm run dev:ui
+```
+
+### Combined Development
+
+```bash
+# Start both API and UI (no watch)
+pnpm run dev:all
+
+# Start all services in parallel
+pnpm run dev:parallel
 ```
 
 ---

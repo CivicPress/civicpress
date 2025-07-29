@@ -288,3 +288,4 @@ if (require.main === module) {
     process.exit(0);
   });
 }
+// Test comment for watch

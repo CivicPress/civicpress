@@ -12,6 +12,8 @@
   history
 - **Debug Cleanup**: Removed PerformanceMonitor, debug commands, and console
   logs
+- **API Watch Mode**: Added file watching for API development with `tsx --watch`
+- **Git Lock Fix**: Resolved Git lock file conflicts during API startup
 
 ### 🎯 Basic UI Status
 

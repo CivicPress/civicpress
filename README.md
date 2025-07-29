@@ -84,6 +84,24 @@ civic init --demo-data "Springfield"
 civic init --config config.yml
 ```
 
+### Development
+
+CivicPress provides multiple development commands for different workflows:
+
+```bash
+# API development with file watching (recommended)
+pnpm run dev:api:watch
+
+# UI development
+pnpm run dev:ui
+
+# Combined API + UI development
+pnpm run dev:all:watch
+
+# All services in parallel
+pnpm run dev:parallel
+```
+
 ### Authentication
 
 CivicPress supports multiple authentication methods:

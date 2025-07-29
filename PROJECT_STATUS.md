@@ -149,11 +149,20 @@ pnpm run build
 # Run all tests
 pnpm run test:run
 
-# Start API server
+# API development with file watching (recommended)
+pnpm run dev:api:watch
+
+# API development without watch
 pnpm run dev:api
 
-# Start UI server
+# UI development
 pnpm run dev:ui
+
+# Combined API + UI with API watching
+pnpm run dev:all:watch
+
+# All services in parallel
+pnpm run dev:parallel
 
 # Lint code
 pnpm run lint
