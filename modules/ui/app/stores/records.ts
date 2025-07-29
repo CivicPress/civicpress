@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { validateApiResponse } from '~/utils/api-response';
 
 export interface CivicRecord {
   id: string;
@@ -227,24 +228,15 @@ export const useRecordsStore = defineStore('records', {
         const url = `/api/records?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
-        if (
-          typeof response === 'object' &&
-          response !== null &&
-          'success' in response &&
-          (response as any).success &&
-          'data' in response &&
-          (response as any).data
-        ) {
-          const data = (response as any).data;
-          const newRecords = data.records || [];
+        const data = validateApiResponse(response);
+        const newRecords = data.records || [];
 
-          // Add new records to existing ones
-          this.addRecords(newRecords);
+        // Add new records to existing ones
+        this.addRecords(newRecords);
 
-          // Update cursor and hasMore
-          this.nextCursor = data.nextCursor || null;
-          this.hasMore = data.hasMore || false;
-        }
+        // Update cursor and hasMore
+        this.nextCursor = data.nextCursor || null;
+        this.hasMore = data.hasMore || false;
       } catch (error: any) {
         console.error('Error loading more records:', error);
         this.error = error.message || 'Failed to load more records';
@@ -277,24 +269,15 @@ export const useRecordsStore = defineStore('records', {
         const url = `/api/search?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
-        if (
-          typeof response === 'object' &&
-          response !== null &&
-          'success' in response &&
-          (response as any).success &&
-          'data' in response &&
-          (response as any).data
-        ) {
-          const data = (response as any).data;
-          const apiResults = data.results || [];
+        const data = validateApiResponse(response);
+        const apiResults = data.results || [];
 
-          // Replace records with search results
-          this.replaceRecords(apiResults);
+        // Replace records with search results
+        this.replaceRecords(apiResults);
 
-          // Update cursor and hasMore
-          this.nextCursor = data.nextCursor || null;
-          this.hasMore = data.hasMore || false;
-        }
+        // Update cursor and hasMore
+        this.nextCursor = data.nextCursor || null;
+        this.hasMore = data.hasMore || false;
 
         // Update filters
         this.filters = {
@@ -319,34 +302,23 @@ export const useRecordsStore = defineStore('records', {
       try {
         const response = await useNuxtApp().$civicApi(`/api/records/${id}`);
 
-        if (
-          typeof response === 'object' &&
-          response !== null &&
-          'success' in response &&
-          (response as any).success &&
-          'data' in response &&
-          (response as any).data
-        ) {
-          const apiRecord = (response as any).data;
+        const apiRecord = validateApiResponse(response);
 
-          // Transform API response to match CivicRecord interface
-          const civicRecord: CivicRecord = {
-            id: apiRecord.id,
-            title: apiRecord.title,
-            type: apiRecord.type,
-            content: apiRecord.content || '',
-            status: apiRecord.status,
-            path: apiRecord.path,
-            author: apiRecord.author,
-            created_at: apiRecord.created || apiRecord.created_at,
-            updated_at: apiRecord.updated || apiRecord.updated_at,
-            metadata: apiRecord.metadata || {},
-          };
+        // Transform API response to match CivicRecord interface
+        const civicRecord: CivicRecord = {
+          id: apiRecord.id,
+          title: apiRecord.title,
+          type: apiRecord.type,
+          content: apiRecord.content || '',
+          status: apiRecord.status,
+          path: apiRecord.path,
+          author: apiRecord.author,
+          created_at: apiRecord.created || apiRecord.created_at,
+          updated_at: apiRecord.updated || apiRecord.updated_at,
+          metadata: apiRecord.metadata || {},
+        };
 
-          return civicRecord;
-        }
-
-        return null;
+        return civicRecord;
       } catch (error: any) {
         console.error('Error fetching record:', error);
         this.error = error.message || 'Failed to fetch record';

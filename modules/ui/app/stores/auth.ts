@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { validateApiResponse } from '~/utils/api-response';
 
 export interface User {
   id: string;
@@ -105,15 +106,8 @@ export const useAuthStore = defineStore('auth', {
       errorMessage: string = 'Login failed'
     ) {
       // Safely extract user and token from the response
-      if (
-        typeof response === 'object' &&
-        response !== null &&
-        'success' in response &&
-        (response as any).success &&
-        'data' in response &&
-        (response as any).data?.session
-      ) {
-        const { session } = (response as any).data;
+      const data = validateApiResponse(response, ['session']);
+      const { session } = data;
 
         // Update user info
         this.user = {
@@ -133,9 +127,6 @@ export const useAuthStore = defineStore('auth', {
 
         // Save auth state to localStorage
         this.saveAuthState();
-      } else {
-        throw new Error('Invalid response format');
-      }
 
       return response;
     },

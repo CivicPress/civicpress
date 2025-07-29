@@ -578,4 +578,5 @@
   - `pnpm run dev:api:watch` - API with file watching
   - `pnpm run dev:all:watch` - Combined API + UI with API watching
 - **Git Lock Issue**: Resolved `.git/index.lock` conflicts during API startup
-- **Lesson**: Always improve developer experience with hot reload and proper error handling
+- **Lesson**: Always improve developer experience with hot reload and proper
+  error handling
