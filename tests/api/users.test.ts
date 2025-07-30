@@ -145,9 +145,9 @@ describe('API User Management', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.session).toBeDefined();
-      expect(response.body.session.token).toBeDefined();
-      expect(response.body.session.user.username).toBe('authuser');
+      expect(response.body.data.session).toBeDefined();
+      expect(response.body.data.session.token).toBeDefined();
+      expect(response.body.data.session.user.username).toBe('authuser');
     });
 
     it('should fail authentication with invalid password', async () => {

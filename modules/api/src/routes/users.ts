@@ -11,6 +11,9 @@ const router = express.Router();
 // Create a separate router for registration
 const registrationRouter = express.Router();
 
+// Create a separate router for authentication
+const authenticationRouter = express.Router();
+
 interface CreateUserRequest {
   username: string;
   email?: string;
@@ -480,9 +483,11 @@ registrationRouter.post('/', async (req, res) => {
 
     // Validate required fields
     if (!userData.username) {
+      const error = new Error('Username is required');
+      (error as any).statusCode = 400;
       return handleApiError(
         'register_user',
-        new Error('Username is required'),
+        error,
         req,
         res,
         'Username is required'
@@ -490,9 +495,11 @@ registrationRouter.post('/', async (req, res) => {
     }
 
     if (!userData.password) {
+      const error = new Error('Password is required');
+      (error as any).statusCode = 400;
       return handleApiError(
         'register_user',
-        new Error('Password is required'),
+        error,
         req,
         res,
         'Password is required'
@@ -500,9 +507,11 @@ registrationRouter.post('/', async (req, res) => {
     }
 
     if (!userData.email) {
+      const error = new Error('Email is required');
+      (error as any).statusCode = 400;
       return handleApiError(
         'register_user',
-        new Error('Email is required'),
+        error,
         req,
         res,
         'Email is required'
@@ -561,19 +570,21 @@ registrationRouter.post('/', async (req, res) => {
 });
 
 /**
- * POST /api/users/auth/password
- * Authenticate with username and password
+ * POST /auth/password
+ * Authenticate with username and password (no authentication required)
  */
-router.post('/auth/password', async (req, res) => {
+authenticationRouter.post('/password', async (req, res) => {
   logApiRequest(req, { operation: 'password_auth' });
 
   try {
     const { username, password }: PasswordAuthRequest = req.body;
 
     if (!username || !password) {
+      const error = new Error('Username and password are required');
+      (error as any).statusCode = 400;
       return handleApiError(
         'password_auth',
-        new Error('Username and password are required'),
+        error,
         req,
         res,
         'Username and password are required'
@@ -603,9 +614,14 @@ router.post('/auth/password', async (req, res) => {
       { operation: 'password_auth' }
     );
   } catch (error) {
+    // Set 401 status code for authentication failures
+    const authError = new Error(
+      error instanceof Error ? error.message : 'Password authentication failed'
+    );
+    (authError as any).statusCode = 401;
     handleApiError(
       'password_auth',
-      error,
+      authError,
       req,
       res,
       'Password authentication failed'
@@ -613,4 +629,4 @@ router.post('/auth/password', async (req, res) => {
   }
 });
 
-export { router, registrationRouter };
+export { router, registrationRouter, authenticationRouter };
