@@ -29,12 +29,9 @@ build/
 *.db
 *.log
 
-# CivicPress Public Data (in Git)
-# data/ folder should be committed to Git
-# But exclude any backup attempts in data/
-data/.civic/backup/
-data/**/*.bak
-data/**/*.tmp
+# CivicPress Public Data (separate Git repository)
+# data/ folder has its own Git repository and should not be tracked here
+data/
 
 # pnpm
 # Note: pnpm-lock.yaml should be committed for reproducible builds
