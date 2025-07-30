@@ -111,9 +111,12 @@ All AI or agent-based development for CivicPress **must follow this flow**:
 
 CivicPress uses a centralized error handling approach:
 
-- **`useErrorHandler` Composable**: Provides specialized error handlers for different error types
-- **API Interceptor**: Automatic error handling in `civicApi` plugin with user feedback
-- **Consistent UX**: Toast notifications for all errors with appropriate styling and timeouts
+- **`useErrorHandler` Composable**: Provides specialized error handlers for
+  different error types
+- **API Interceptor**: Automatic error handling in `civicApi` plugin with user
+  feedback
+- **Consistent UX**: Toast notifications for all errors with appropriate styling
+  and timeouts
 
 ### Error Handler Types
 

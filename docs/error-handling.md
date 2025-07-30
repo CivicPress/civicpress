@@ -1,12 +1,14 @@
 # 🛡️ Error Handling Guide
 
-CivicPress implements a comprehensive error handling system that provides consistent user experience and maintainable code.
+CivicPress implements a comprehensive error handling system that provides
+consistent user experience and maintainable code.
 
 ## 🎯 Overview
 
 The error handling system consists of:
 
-- **`useErrorHandler` Composable**: Centralized error handling with specialized handlers
+- **`useErrorHandler` Composable**: Centralized error handling with specialized
+  handlers
 - **API Interceptor**: Automatic error handling in the `civicApi` plugin
 - **Toast Notifications**: Automatic user feedback for all errors
 - **Store Integration**: Consistent error handling across all stores
@@ -35,11 +37,11 @@ try {
 ### Specialized Handlers
 
 ```typescript
-const { 
+const {
   handleApiError,
-  handleNetworkError, 
+  handleNetworkError,
   handleValidationError,
-  handleAuthError 
+  handleAuthError
 } = useErrorHandler()
 
 // For specific error types
@@ -52,26 +54,31 @@ const message = handleValidationError(error, {
 ## 🔧 Error Handler Types
 
 ### `handleApiError()`
+
 - **Purpose**: General API errors
 - **Features**: Toast notifications, console logging
 - **Use Case**: Most API failures
 
 ### `handleNetworkError()`
+
 - **Purpose**: Connection and network issues
 - **Features**: User-friendly network error messages
 - **Use Case**: Offline scenarios, connection failures
 
 ### `handleValidationError()`
+
 - **Purpose**: Form validation errors
 - **Features**: Field-specific error details
 - **Use Case**: Form submissions, input validation
 
 ### `handleAuthError()`
+
 - **Purpose**: Authentication and authorization issues
 - **Features**: Security-focused error handling
 - **Use Case**: Login failures, permission denied
 
 ### `handleError()`
+
 - **Purpose**: Smart error routing
 - **Features**: Automatically determines error type and routes appropriately
 - **Use Case**: General error handling when type is unknown
@@ -108,7 +115,7 @@ The interceptor can be customized in `modules/ui/app/plugins/civicApi.ts`:
 ```typescript
 async onResponseError({ response, error }) {
   const { handleError } = useErrorHandler()
-  
+
   // Create error object
   const apiError = {
     status: response.status,
@@ -283,6 +290,7 @@ return handleError(error) // Automatically determines type
 ### From Manual Error Handling
 
 **Before:**
+
 ```typescript
 try {
   const response = await $civicApi('/api/records')
@@ -298,6 +306,7 @@ try {
 ```
 
 **After:**
+
 ```typescript
 try {
   const response = await $civicApi('/api/records')
@@ -319,4 +328,4 @@ try {
 
 **Last Updated**: July 2025  
 **Status**: ✅ Active  
-**Maintainer**: CivicPress Team 
+**Maintainer**: CivicPress Team

@@ -583,19 +583,107 @@
 
 ### Centralized Error Handling Implementation
 
-- **Problem**: Repetitive error handling code scattered across stores and components
+- **Problem**: Repetitive error handling code scattered across stores and
+  components
 - **Solution**: Created `useErrorHandler` composable with specialized handlers:
   - `handleApiError()` - General API errors with toast notifications
   - `handleNetworkError()` - Connection issues with appropriate messaging
   - `handleValidationError()` - Form validation errors with field details
   - `handleAuthError()` - Authentication issues with security focus
   - `handleError()` - Smart error routing based on error type
-- **API Interceptor Enhancement**: Enhanced `civicApi` plugin with automatic error handling:
+- **API Interceptor Enhancement**: Enhanced `civicApi` plugin with automatic
+  error handling:
   - **401 errors**: Auto-clear auth state and redirect to login
   - **403 errors**: Show permission denied messages
   - **422 errors**: Display validation details
   - **500 errors**: Show server error messages
   - **Toast notifications**: Automatic user feedback for all errors
 - **Store Integration**: Updated all stores to use centralized error handling
-- **Benefits**: Consistent UX, automatic user feedback, better error categorization, reduced code duplication
-- **Lesson**: Centralize error handling for consistent user experience and maintainable code
+- **Benefits**: Consistent UX, automatic user feedback, better error
+  categorization, reduced code duplication
+- **Lesson**: Centralize error handling for consistent user experience and
+  maintainable code
+
+### **Key Implementation Notes**
+
+- **Configuration Location**: All sensitive notification config in
+  `.system-data/notifications.yml`
+- **Authentication Integration**: Use notifications for email verification, 2FA,
+  password reset
+- **Security First**: Encrypt sensitive config, audit all activities, rate limit
+  notifications
+- **Plugin Architecture**: Each channel (email, SMS, Slack) as separate plugin
+- **Hook Integration**: Leverage existing `HookSystem` for event-driven
+  notifications
+
+## Notification System Architecture Lessons (Latest)
+
+### **Hybrid Architecture Pattern**
+
+- **Core + Plugin Approach**: Core handles orchestration, plugins handle channel
+  integrations
+- **Security Separation**: Sensitive config in `.system-data/`, public config in
+  `.civic/`
+- **Event-Driven Design**: Leverage existing `HookSystem` for notification
+  triggers
+- **Plugin Sandboxing**: Isolated execution for third-party integrations
+
+### **Configuration Security Best Practices**
+
+- **Sensitive Storage**: All API keys, credentials, webhook URLs in
+  `.system-data/notifications.yml`
+- **Encryption**: Encrypt sensitive configuration values at rest
+- **Access Control**: Role-based access to notification configuration
+- **Audit Logging**: Track all configuration changes and notification activities
+- **Rate Limiting**: Prevent notification spam and abuse
+
+### **Authentication Integration Patterns**
+
+- **Email Verification**: Send verification emails for new user accounts
+- **Password Reset**: Email-based password recovery workflows
+- **2FA Support**: SMS/email two-factor authentication
+- **Security Alerts**: Notifications for suspicious account activities
+- **Template System**: Reusable templates for authentication workflows
+
+### **Channel Plugin Architecture**
+
+- **Unified Interface**: All channels implement same `NotificationChannel`
+  interface
+- **Plugin Discovery**: Runtime plugin loading from
+  `modules/notifications/channels/`
+- **Configuration-Driven**: Each channel configurable via YAML
+- **Error Handling**: Graceful degradation when channels fail
+- **Delivery Tracking**: Monitor delivery status and retry failed notifications
+
+### **Security & Compliance Considerations**
+
+- **Content Filtering**: Automatic PII redaction from notification content
+- **TLS Encryption**: Required for all outbound notification channels
+- **Webhook Signatures**: HMAC-SHA256 for webhook verification
+- **Audit Trails**: Complete logging for compliance and debugging
+- **Rate Limiting**: Prevent notification abuse and spam
+
+### **Implementation Strategy Lessons**
+
+- **Phase 1**: Start with core system and UI notifications
+- **Phase 2**: Add authentication integration (email verification, 2FA)
+- **Phase 3**: Implement channel plugins (email, SMS, Slack)
+- **Phase 4**: Advanced features (queue system, templates, digests)
+- **Security First**: Always implement security features from the start
+
+### **Integration with Existing Systems**
+
+- **Hook System**: Leverage existing `HookSystem` for event-driven notifications
+- **Auth System**: Integrate with existing authentication for user management
+- **Role System**: Use existing role-based access control for notification
+  permissions
+- **Audit System**: Integrate with existing audit logging for comprehensive
+  trails
+- **Configuration**: Follow existing configuration patterns and security
+  practices
+
+---
+
+**Last Updated:** Current  
+**Status:** ✅ ACTIVE LEARNING  
+**Confidence:** HIGH

@@ -1,5 +1,223 @@
 # CivicPress Development Decisions
 
+## Notification System Architecture (Latest)
+
+### **Recommended Architecture: Core + Plugin Hybrid**
+
+**Decision**: Implement notification system as a hybrid approach combining:
+
+1. **Core Notification System** - Foundation and basic functionality
+2. **Plugin System** - Extensible channel integrations
+3. **Hook Integration** - Event-driven triggers
+
+### **Configuration Storage Decision**
+
+**Decision**: Store sensitive notification configuration in `.system-data/`
+directory
+
+- **Rationale**: Sensitive information like API keys, webhook URLs, SMTP
+  credentials
+- **Security**: Keeps sensitive config separate from public `.civic/` directory
+- **Structure**: `.system-data/notifications.yml` for all channel configurations
+
+### **Authentication Integration Decision**
+
+**Decision**: Use notification system for authentication workflows
+
+- **Email Validation**: Send verification emails for new user accounts
+- **2FA Support**: SMS/email-based two-factor authentication
+- **Password Reset**: Email-based password reset workflows
+- **Account Security**: Security alerts for suspicious activities
+
+### **Architecture Components**
+
+#### **Core Notification System** (`core/src/notifications/`)
+
+```
+core/src/notifications/
+├── notification-service.ts     # Main notification orchestrator
+├── notification-manager.ts     # Notification lifecycle management
+├── notification-queue.ts       # Queue system for delivery
+├── notification-logger.ts      # Audit logging
+├── notification-validator.ts   # Content validation
+└── types/
+    ├── notification-types.ts   # Core notification interfaces
+    └── channel-types.ts        # Channel abstraction layer
+```
+
+#### **Plugin System for Channel Integrations**
+
+```
+modules/
+├── notifications/
+│   ├── channels/
+│   │   ├── email/             # SMTP, SendGrid, Mailgun
+│   │   ├── sms/              # Twilio, AWS SNS
+│   │   ├── slack/            # Slack webhooks
+│   │   ├── webhook/          # Generic webhooks
+│   │   └── ui/               # In-app notifications
+│   └── notification-ui/       # UI for notification management
+```
+
+#### **Configuration Structure**
+
+```yaml
+# .system-data/notifications.yml (SENSITIVE - not in Git)
+notifications:
+  channels:
+    email:
+      enabled: true
+      provider: 'smtp'
+      config:
+        host: 'smtp.example.com'
+        port: 587
+        secure: true
+        username: 'notifications@civicpress.org'
+        password: '***'  # Encrypted
+    sms:
+      enabled: true
+      provider: 'twilio'
+      config:
+        account_sid: '***'
+        auth_token: '***'
+        from_number: '+1234567890'
+    slack:
+      enabled: true
+      webhook_url: 'https://hooks.slack.com/***'
+
+  # Authentication-specific templates
+  auth_templates:
+    email_verification:
+      subject: 'Verify your CivicPress account'
+      body: 'Click here to verify: {verification_url}'
+    password_reset:
+      subject: 'Reset your CivicPress password'
+      body: 'Reset link: {reset_url}'
+    two_factor:
+      subject: 'Your 2FA code'
+      body: 'Code: {code}'
+    security_alert:
+      subject: 'Security alert for your account'
+      body: 'Suspicious activity detected: {details}'
+
+  # Notification rules
+  rules:
+    - event: 'user:registered'
+      channels: ['email']
+      template: 'email_verification'
+    - event: 'user:password_reset_requested'
+      channels: ['email']
+      template: 'password_reset'
+    - event: 'user:two_factor_requested'
+      channels: ['sms', 'email']
+      template: 'two_factor'
+    - event: 'record:created'
+      channels: ['email', 'ui']
+      recipients: ['council', 'clerk']
+    - event: 'status:changed'
+      channels: ['email', 'slack']
+      recipients: ['author', 'approvers']
+```
+
+### **Security & Compliance Decisions**
+
+#### **Content Protection**
+
+- **PII Filtering**: Automatic redaction of sensitive data
+- **Content Encryption**: End-to-end encryption for sensitive notifications
+- **Rate Limiting**: Prevent notification spam and abuse
+- **Audit Trails**: Complete logging for compliance
+
+#### **Channel Security**
+
+- **Webhook Signatures**: HMAC-SHA256 for webhook verification
+- **TLS Encryption**: Required for all outbound channels
+- **Authentication**: Multi-factor auth for notification admin
+- **Sandboxing**: Isolated execution for third-party integrations
+
+#### **Configuration Security**
+
+- **Sensitive Storage**: All API keys and credentials in `.system-data/`
+- **Encryption**: Encrypt sensitive configuration values
+- **Access Control**: Role-based access to notification configuration
+- **Audit Logging**: Track all configuration changes
+
+### **Implementation Strategy**
+
+#### **Phase 1: Core Foundation**
+
+1. **Core Notification Service** - Basic notification infrastructure
+2. **Hook Integration** - Connect to existing `HookSystem`
+3. **UI Notifications** - In-app notification system
+4. **Audit Logging** - Complete notification audit trail
+
+#### **Phase 2: Authentication Integration**
+
+1. **Email Verification** - New user account validation
+2. **Password Reset** - Email-based password recovery
+3. **2FA Support** - SMS/email two-factor authentication
+4. **Security Alerts** - Suspicious activity notifications
+
+#### **Phase 3: Channel Plugins**
+
+1. **Email Plugin** - SMTP/SendGrid integration
+2. **SMS Plugin** - Twilio integration
+3. **Slack Plugin** - Webhook integration
+4. **Webhook Plugin** - Generic webhook support
+
+#### **Phase 4: Advanced Features**
+
+1. **Queue System** - Retry logic and scheduling
+2. **Template Engine** - Dynamic notification templates
+3. **Digest Notifications** - Daily/weekly summaries
+4. **User Preferences** - Notification subscription management
+
+### **Benefits of This Architecture**
+
+#### **1. Modularity**
+
+- Core system handles orchestration and security
+- Channel plugins handle specific integrations
+- Easy to add/remove channels without core changes
+
+#### **2. Security**
+
+- Centralized security controls in core
+- Sandboxed plugin execution
+- Comprehensive audit logging
+- Sensitive config isolated in `.system-data/`
+
+#### **3. Extensibility**
+
+- Plugin system for unlimited channel types
+- Hook integration for event-driven notifications
+- Configuration-driven behavior
+
+#### **4. Authentication Integration**
+
+- Seamless integration with existing auth system
+- Email verification for new accounts
+- 2FA support for enhanced security
+- Security alerts for account protection
+
+#### **5. Maintainability**
+
+- Clear separation of concerns
+- Isolated testing for each component
+- Configuration-driven customization
+
+### **Key Implementation Notes**
+
+- **Configuration Location**: All sensitive notification config in
+  `.system-data/notifications.yml`
+- **Authentication Integration**: Use notifications for email verification, 2FA,
+  password reset
+- **Security First**: Encrypt sensitive config, audit all activities, rate limit
+  notifications
+- **Plugin Architecture**: Each channel (email, SMS, Slack) as separate plugin
+- **Hook Integration**: Leverage existing `HookSystem` for event-driven
+  notifications
+
 ## UI Module Development (Latest)
 
 ### Technology Stack Decisions
