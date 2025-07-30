@@ -21,7 +21,7 @@ import { createStatusRouter } from './routes/status';
 import docsRouter from './routes/docs';
 import { createValidationRouter } from './routes/validation';
 import { createDiffRouter } from './routes/diff';
-import usersRouter from './routes/users';
+import { router as usersRouter, registrationRouter } from './routes/users';
 import infoRouter from './routes/info';
 import configRouter from './routes/config';
 
@@ -199,14 +199,24 @@ export class CivicPressAPI {
       authRouter
     );
 
-    // API routes (authentication required)
+    // Public user registration endpoint (no auth required) - must come before general API middleware
+    this.app.use(
+      '/api/users/register',
+      (req, res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      registrationRouter
+    );
+
+    // Public API routes (no authentication required)
     this.app.use('/api', (req, res, next) => {
       // Add CivicPress instance to request for route handlers
       (req as any).civicPress = this.civicPress;
       next();
     });
 
-    // Apply authentication middleware to all API routes
+    // API routes (authentication required)
     this.app.use('/api', authMiddleware(this.civicPress));
 
     this.app.use('/api/records', createRecordsRouter(recordsService));

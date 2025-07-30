@@ -1,14 +1,16 @@
-import { Router } from 'express';
+import express from 'express';
 import { CivicPress } from '@civicpress/core';
 import {
+  logApiRequest,
   sendSuccess,
   handleApiError,
-  logApiRequest,
 } from '../utils/api-logger';
 
-const router = Router();
+const router = express.Router();
 
-// Types for user management
+// Create a separate router for registration
+const registrationRouter = express.Router();
+
 interface CreateUserRequest {
   username: string;
   email?: string;
@@ -467,6 +469,98 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
+ * POST /register
+ * Public user registration (no authentication required)
+ */
+registrationRouter.post('/', async (req, res) => {
+  logApiRequest(req, { operation: 'register_user' });
+
+  try {
+    const userData: CreateUserRequest = req.body;
+
+    // Validate required fields
+    if (!userData.username) {
+      return handleApiError(
+        'register_user',
+        new Error('Username is required'),
+        req,
+        res,
+        'Username is required'
+      );
+    }
+
+    if (!userData.password) {
+      return handleApiError(
+        'register_user',
+        new Error('Password is required'),
+        req,
+        res,
+        'Password is required'
+      );
+    }
+
+    if (!userData.email) {
+      return handleApiError(
+        'register_user',
+        new Error('Email is required'),
+        req,
+        res,
+        'Email is required'
+      );
+    }
+
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    // Check if username already exists
+    const existingUser = await authService.getUserByUsername(userData.username);
+    if (existingUser) {
+      const error = new Error('Username already exists');
+      (error as any).statusCode = 409;
+      (error as any).code = 'USERNAME_EXISTS';
+      return handleApiError('register_user', error, req, res);
+    }
+
+    // Hash password
+    const bcrypt = await import('bcrypt');
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(userData.password, saltRounds);
+
+    // Create user with default role (usually 'public')
+    const newUser = await authService.createUserWithPassword({
+      username: userData.username,
+      email: userData.email,
+      name: userData.name,
+      role: userData.role || 'public', // Default to 'public' role
+      passwordHash,
+      avatar_url: userData.avatar_url,
+    });
+
+    sendSuccess(
+      {
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          role: newUser.role,
+          email: newUser.email,
+          name: newUser.name,
+          avatar_url: newUser.avatar_url,
+          created_at: newUser.created_at,
+        },
+        message:
+          'User registered successfully. Please log in with your credentials.',
+      },
+      req,
+      res,
+      { operation: 'register_user' }
+    );
+  } catch (error) {
+    handleApiError('register_user', error, req, res, 'Failed to register user');
+  }
+});
+
+/**
  * POST /api/users/auth/password
  * Authenticate with username and password
  */
@@ -519,4 +613,4 @@ router.post('/auth/password', async (req, res) => {
   }
 });
 
-export default router;
+export { router, registrationRouter };
