@@ -537,10 +537,12 @@ registrationRouter.post('/', async (req, res) => {
     const passwordHash = await bcrypt.hash(userData.password, saltRounds);
 
     // Create user with default role (usually 'public')
+    // Use username as name if no name is provided
+    const userName = userData.name || userData.username;
     const newUser = await authService.createUserWithPassword({
       username: userData.username,
       email: userData.email,
-      name: userData.name,
+      name: userName,
       role: userData.role || 'public', // Default to 'public' role
       passwordHash,
       avatar_url: userData.avatar_url,

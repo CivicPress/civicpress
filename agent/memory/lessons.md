@@ -1,6 +1,251 @@
 # Agent Memory: Lessons Learned
 
+## User Registration System Lessons (Latest)
+
+### API Configuration and Database Setup
+
+- **Configuration Format**: `.civicrc` must be in YAML format, not JSON
+  - The `CentralConfigManager` expects YAML parsing with `yaml.parse()`
+  - JSON format causes parsing failures and fallback to default configuration
+  - Database path must use `sqlite.file` format, not `path` field
+- **Database Path Resolution**: API uses
+  `CentralConfigManager.getDatabaseConfig()` for database path
+  - Default fallback creates database in root directory (`./civic.db`)
+  - Proper configuration creates database in `.system-data/civic.db`
+  - Always check database file location when troubleshooting user creation
+- **Route Ordering**: Express.js route order is critical for authentication
+  bypass
+  - Public routes (`/api/users/register`, `/api/users/auth`) must be registered
+    before general auth middleware
+  - Order: Public routes → Public API middleware → Authenticated API middleware
+    → Protected routes
+  - **CRITICAL**: When adding authentication, ensure public viewing routes
+    remain accessible
+    - Records (`/api/records`) and search (`/api/search`) should remain public
+      for transparency
+    - Only administrative functions should require authentication
+    - Public routes must be registered BEFORE authentication middleware
+- **Error Status Codes**: Explicitly set `statusCode` on error objects for
+  proper HTTP responses
+  - Validation errors: `(error as any).statusCode = 400`
+  - Authentication errors: `(error as any).statusCode = 401`
+  - Conflict errors: `(error as any).statusCode = 409`
+  - Use `handleApiError()` with proper error objects for consistent responses
+
+### UI Development Patterns
+
+- **API URL Configuration**: Use runtime config for API URLs instead of relying
+  on proxy
+  - `const config = useRuntimeConfig()` to get `config.public.civicApiUrl`
+  - Direct API calls:
+    `$fetch(\`${config.public.civicApiUrl}/api/users/register\`)`
+  - Avoids proxy issues and ensures correct endpoint resolution
+- **Form Validation**: Implement comprehensive client-side validation
+  - Email format validation with regex: `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
+  - Password strength assessment with visual indicators
+  - Real-time password matching validation
+  - Disable submit button until all validations pass
+- **Password Strength Indicator**: Create visual strength assessment
+  - 5-level strength system: Very Weak → Weak → Fair → Good → Strong
+  - Color-coded progress bars with descriptive labels
+  - Real-time feedback as user types
+  - Minimum strength requirement for form submission
+- **Error Handling**: Comprehensive error display and user feedback
+  - Use `UAlert` components for error and success messages
+  - Parse API error responses: `err.data?.error?.message || err.message`
+  - Show field-specific validation errors in form help text
+  - Clear form and redirect on successful registration
+
+### Database Integration Lessons
+
+- **User Creation Flow**: Proper user creation with password hashing
+  - Use `bcrypt.hash()` with salt rounds (12) for password security
+  - Call `authService.createUserWithPassword()` with all required fields
+  - Handle username uniqueness validation before creation
+  - Return proper user object with all fields for UI display
+- **Username as Name Fallback**: Automatic fallback when no full name provided
+  - Use `userData.name || userData.username` for name field
+  - Ensures every user has a meaningful display name
+  - Maintains backward compatibility with existing name field
+  - Improves user experience by reducing required fields
+- **Database Persistence**: Ensure users are saved to correct database
+  - Verify database configuration in `.civicrc` (YAML format)
+  - Check database file location: `.system-data/civic.db` vs `./civic.db`
+  - Test user creation and retrieval to confirm persistence
+  - Monitor API logs for database connection issues
+
+### Authentication Integration
+
+- **Public Endpoints**: Registration and authentication endpoints bypass auth
+  middleware
+  - Register endpoints before general authentication middleware
+  - Add CivicPress instance to request:
+    `(req as any).civicPress = this.civicPress`
+  - Ensure proper route ordering in Express.js setup
+- **Public vs Protected Routes**: Critical distinction for government
+  transparency
+  - **Public Routes** (No Authentication): `/api/records`, `/api/search`,
+    `/api/status`, `/api/validation`
+    - These should remain accessible to all citizens for transparency
+    - Records viewing and search are fundamental public services
+  - **Protected Routes** (Authentication Required): `/api/export`,
+    `/api/import`, `/api/hooks`, `/api/templates`, `/api/workflows`,
+    `/api/indexing`, `/api/history`, `/api/diff`, `/api/users`, `/api/config`
+    - These are administrative functions that require authentication
+  - **Special Public Routes**: `/api/users/register`, `/api/users/auth`
+    - These bypass authentication for user account creation and login
+- **Session Management**: Proper JWT token handling after registration
+  - Registration doesn't automatically log in user
+  - Redirect to login page after successful registration
+  - Clear form data and show success message before redirect
+  - Use `setTimeout()` for smooth user experience
+- **Error Recovery**: Handle various authentication scenarios
+  - Username already exists (409 Conflict)
+  - Invalid email format (400 Bad Request)
+  - Weak password (400 Bad Request)
+  - Network errors with user-friendly messages
+
+### Security Considerations
+
+- **Password Security**: Implement strong password requirements
+  - Minimum 8 characters with uppercase, lowercase, numbers, special characters
+  - Visual strength indicator with real-time feedback
+  - Server-side validation in addition to client-side
+  - Secure bcrypt hashing with appropriate salt rounds
+- **Input Validation**: Comprehensive validation on both client and server
+  - Client-side for immediate user feedback
+  - Server-side for security and data integrity
+  - Email format validation with proper regex
+  - Username uniqueness checking
+- **Error Messages**: Secure error handling without information disclosure
+  - Don't reveal existing usernames in error messages
+  - Use generic messages for security-sensitive operations
+  - Log detailed errors for debugging while showing user-friendly messages
+
+### User Experience Patterns
+
+- **Form Design**: Clean, accessible registration form
+  - Clear field labels and placeholders
+  - Required field indicators
+  - Helpful validation messages
+  - Loading states during submission
+- **Success Flow**: Smooth post-registration experience
+  - Clear success message with next steps
+  - Automatic form clearing
+  - Smooth redirect to login page
+  - Preserve user intent and context
+- **Error Recovery**: Helpful error messages and recovery options
+  - Clear, actionable error messages
+  - Field-specific error highlighting
+  - Suggestions for fixing validation issues
+  - Maintain form data for easy correction
+
+### Testing and Debugging
+
+- **API Testing**: Test registration endpoint directly
+  - Use `curl` to test API endpoints independently
+  - Verify database persistence after user creation
+  - Test both success and error scenarios
+  - Check API logs for detailed error information
+- **UI Testing**: Test registration flow end-to-end
+  - Test form validation and error display
+  - Verify password strength indicator functionality
+  - Test success flow and redirect behavior
+  - Check browser network tab for API calls
+- **Database Verification**: Confirm user creation in database
+  - Use `sqlite3` to query database directly
+  - Verify user data is saved correctly
+  - Check for proper password hashing
+  - Confirm username-as-name fallback works
+
+### Configuration Management
+
+- **YAML vs JSON**: Always use YAML format for `.civicrc`
+  - `CentralConfigManager` expects YAML parsing
+  - JSON format causes parsing failures
+  - Use proper YAML syntax with correct indentation
+- **Database Configuration**: Proper database path specification
+  - Use `sqlite.file` format, not `path` field
+  - Ensure relative paths resolve correctly
+  - Test database creation and access
+- **Runtime Configuration**: Use Nuxt runtime config for API URLs
+  - Access via `useRuntimeConfig()`
+  - Configure in `nuxt.config.ts` runtimeConfig.public
+  - Avoid hardcoded URLs in components
+
 ## Notification System Lessons (Latest)
+
+### **Hybrid Architecture Pattern**
+
+- **Core + Plugin Approach**: Core handles orchestration, plugins handle channel
+  integrations
+- **Security Separation**: Sensitive config in `.system-data/`, public config in
+  `.civic/`
+- **Event-Driven Design**: Leverage existing `HookSystem` for notification
+  triggers
+- **Plugin Sandboxing**: Isolated execution for third-party integrations
+
+### **Configuration Security Best Practices**
+
+- **Sensitive Storage**: All API keys, credentials, webhook URLs in
+  `.system-data/notifications.yml`
+- **Encryption**: Encrypt sensitive configuration values at rest
+- **Access Control**: Role-based access to notification configuration
+- **Audit Logging**: Track all configuration changes and notification activities
+- **Rate Limiting**: Prevent notification spam and abuse
+
+### **Authentication Integration Patterns**
+
+- **Email Verification**: Send verification emails for new user accounts
+- **Password Reset**: Email-based password recovery workflows
+- **2FA Support**: SMS/email two-factor authentication
+- **Security Alerts**: Notifications for suspicious account activities
+- **Template System**: Reusable templates for authentication workflows
+
+### **Channel Plugin Architecture**
+
+- **Unified Interface**: All channels implement same `NotificationChannel`
+  interface
+- **Plugin Discovery**: Runtime plugin loading from
+  `modules/notifications/channels/`
+- **Configuration-Driven**: Each channel configurable via YAML
+- **Error Handling**: Graceful degradation when channels fail
+- **Delivery Tracking**: Monitor delivery status and retry failed notifications
+
+### **Security & Compliance Considerations**
+
+- **Content Filtering**: Automatic PII redaction from notification content
+- **TLS Encryption**: Required for all outbound notification channels
+- **Webhook Signatures**: HMAC-SHA256 for webhook verification
+- **Audit Trails**: Complete logging for compliance and debugging
+- **Rate Limiting**: Prevent notification abuse and spam
+
+### **Implementation Strategy Lessons**
+
+- **Phase 1**: Start with core system and UI notifications
+- **Phase 2**: Add authentication integration (email verification, 2FA)
+- **Phase 3**: Implement channel plugins (email, SMS, Slack)
+- **Phase 4**: Advanced features (queue system, templates, digests)
+- **Security First**: Always implement security features from the start
+
+### **Integration with Existing Systems**
+
+- **Hook System**: Leverage existing `HookSystem` for event-driven notifications
+- **Auth System**: Integrate with existing authentication for user management
+- **Role System**: Use existing role-based access control for notification
+  permissions
+- **Audit System**: Integrate with existing audit logging for comprehensive
+  trails
+- **Configuration**: Follow existing configuration patterns and security
+  practices
+
+---
+
+**Last Updated:** Current  
+**Status:** ✅ ACTIVE LEARNING  
+**Confidence:** HIGH
+
+## Notification System Lessons (Previous)
 
 ### CLI Development Patterns
 

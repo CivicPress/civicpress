@@ -230,11 +230,16 @@ export class CivicPressAPI {
       next();
     });
 
+    // Public routes that should be accessible to guests
+    this.app.use('/api/records', createRecordsRouter(recordsService));
+    this.app.use('/api/search', searchRouter);
+    this.app.use('/api/status', createStatusRouter());
+    this.app.use('/api/validation', createValidationRouter());
+
     // API routes (authentication required)
     this.app.use('/api', authMiddleware(this.civicPress));
 
-    this.app.use('/api/records', createRecordsRouter(recordsService));
-    this.app.use('/api/search', searchRouter);
+    // Protected routes that require authentication
     this.app.use('/api/export', exportRouter);
     this.app.use('/api/import', importRouter);
     this.app.use('/api/hooks', hooksRouter);
@@ -242,8 +247,6 @@ export class CivicPressAPI {
     this.app.use('/api/workflows', workflowsRouter);
     this.app.use('/api/indexing', createIndexingRouter());
     this.app.use('/api/history', createHistoryRouter());
-    this.app.use('/api/status', createStatusRouter());
-    this.app.use('/api/validation', createValidationRouter());
     this.app.use('/api/diff', createDiffRouter());
     this.app.use('/api/users', usersRouter);
     this.app.use('/api/config', configRouter);
