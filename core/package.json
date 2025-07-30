@@ -21,9 +21,11 @@
   "license": "MIT",
   "dependencies": {
     "@octokit/rest": "^21.0.0",
+    "@sendgrid/mail": "8.1.5",
     "@types/jsonwebtoken": "9.0.10",
     "gray-matter": "^4.0.3",
     "jsonwebtoken": "9.0.2",
+    "nodemailer": "7.0.5",
     "octokit": "^5.0.3",
     "simple-git": "^3.28.0",
     "sqlite3": "5.1.7",

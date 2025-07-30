@@ -90,3 +90,32 @@ export type {
   CivicIndexEntry,
   IndexingOptions,
 } from './indexing/indexing-service.js';
+
+// Export notification services
+export {
+  NotificationService,
+  NotificationConfig,
+  NotificationChannel,
+  NotificationTemplate,
+  NotificationAudit,
+  NotificationQueue,
+  NotificationSecurity,
+  NotificationRateLimiter,
+  NotificationLogger,
+  AuthTemplate,
+} from './notifications/index.js';
+export type {
+  NotificationRequest,
+  NotificationResponse,
+  ChannelRequest,
+  ChannelResponse,
+  ChannelConfig,
+  TemplateData,
+  ProcessedTemplate,
+  AuditEntry,
+  QueuedNotification,
+  RateLimitConfig,
+  RateLimitResult,
+  SecurityValidationResult,
+  LogEntry,
+} from './notifications/index.js';

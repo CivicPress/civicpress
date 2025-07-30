@@ -25,6 +25,7 @@ import setupAuthCommand from './commands/auth.js';
 import setupUsersCommand from './commands/users.js';
 import { CentralConfigManager } from '@civicpress/core';
 import { infoCommand } from './commands/info.js';
+import notifyCommand from './commands/notify.js';
 
 // Set logger options immediately to prevent warnings during config loading
 CentralConfigManager.setLoggerOptions({
@@ -74,6 +75,9 @@ setupAuthCommand(cli);
 
 // Setup users commands
 setupUsersCommand(cli);
+
+// Setup notification commands
+notifyCommand(cli);
 
 // Parse and run
 cli.parse();

@@ -142,12 +142,20 @@ export function mergeRecordStatuses(
 export function getRecordStatusesWithMetadata(
   config: RecordStatusesConfig
 ): RecordStatusMetadata[] {
-  return Object.entries(config).map(([key, status]) => ({
-    key,
-    label: status.label,
-    description: status.description,
-    source: status.source || 'core',
-    source_name: status.source_name,
-    priority: status.priority || 0,
-  }));
+  return Object.entries(config).map(([key, status]) => {
+    const metadata: RecordStatusMetadata = {
+      key,
+      label: status.label,
+      description: status.description,
+      source: status.source || 'core',
+      priority: status.priority || 0,
+    };
+
+    // Only include source_name if it's defined
+    if (status.source_name) {
+      metadata.source_name = status.source_name;
+    }
+
+    return metadata;
+  });
 }

@@ -2,9 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { CivicPress, Logger, CentralConfigManager } from '@civicpress/core';
 
-// Declare setTimeout for TypeScript
-declare const setTimeout: any;
-
 const logger = new Logger();
 
 // Import routes
@@ -37,6 +34,7 @@ import {
   performanceMonitoringMiddleware,
   requestContextMiddleware,
 } from './middleware/logging';
+import { authMiddleware } from './middleware/auth';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -201,12 +199,15 @@ export class CivicPressAPI {
       authRouter
     );
 
-    // API routes (authentication optional)
+    // API routes (authentication required)
     this.app.use('/api', (req, res, next) => {
       // Add CivicPress instance to request for route handlers
       (req as any).civicPress = this.civicPress;
       next();
     });
+
+    // Apply authentication middleware to all API routes
+    this.app.use('/api', authMiddleware(this.civicPress));
 
     this.app.use('/api/records', createRecordsRouter(recordsService));
     this.app.use('/api/search', searchRouter);

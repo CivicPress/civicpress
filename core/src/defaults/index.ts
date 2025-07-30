@@ -5,6 +5,7 @@ export interface DefaultConfigs {
   roles: any;
   hooks: any;
   workflows: any;
+  notifications: any;
 }
 
 /**
@@ -17,9 +18,10 @@ export function loadDefaultConfigs(): DefaultConfigs {
     roles: {},
     hooks: {},
     workflows: {},
+    notifications: {},
   };
 }
 
 export default {
   loadDefaultConfigs,
-}; 
+};

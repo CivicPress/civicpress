@@ -238,6 +238,7 @@ export class RecordsService {
     records: any[];
     nextCursor: string | null;
     hasMore: boolean;
+    total: number;
   }> {
     const { type, status, limit = 20, cursor } = options;
 
@@ -309,6 +310,7 @@ export class RecordsService {
       records: transformedRecords,
       nextCursor,
       hasMore,
+      total: filteredRecords.length,
     };
   }
 

@@ -1,6 +1,118 @@
 # Agent Memory: Lessons Learned
 
-## UI Development Lessons (Latest)
+## Notification System Lessons (Latest)
+
+### CLI Development Patterns
+
+- **Use Existing Logger System**: Don't create new utilities when the project
+  already has established patterns
+  - The login command uses `initializeLogger()` from `global-options.js`
+  - Other commands use `console.log` directly for simplicity
+  - Use `logger.info()`, `logger.success()`, `logger.error()`, `logger.warn()`
+    for proper logging
+  - Reserve `console.log` only for JSON output when `--json` is specified
+
+### Multi-Provider Architecture
+
+- **Provider-Agnostic Design**: Create provider-agnostic configuration schema
+  - Use `provider` field to specify active provider (sendgrid, ses, smtp,
+    nodemailer)
+  - Nest provider-specific configs under provider names
+  - Implement `getEmailProviderConfig()` and `validateEmailProviderConfig()`
+    methods
+  - Route requests via switch statement to provider-specific methods
+
+### Configuration Management
+
+- **Sensitive Data Storage**: Store API keys and credentials in `.system-data/`
+  (outside Git)
+  - Use YAML format for readable configuration
+  - Include default configurations for all providers
+  - Validate configuration on load with graceful fallbacks
+  - Mask sensitive data in CLI output
+
+### Email Integration
+
+- **SendGrid Integration**: Direct integration with `@sendgrid/mail` for real
+  email sending
+  - Configure API key in `.system-data/notifications.yml`
+  - Validate API key format (must start with "SG.")
+  - Handle send responses and error cases properly
+  - Test connection before sending
+
+### SMTP Integration Lessons
+
+- **Generic SMTP Support**: Implemented generic SMTP support that works with any
+  provider (Gmail, Outlook, Yahoo, custom servers)
+- **SSL Certificate Issues**: Common issue with self-signed certificates or
+  domain mismatches
+  - Solution: Add `tls: { rejectUnauthorized: false }` to configuration
+  - Lesson: Always handle SSL certificate issues gracefully
+- **Authentication Debugging**: Comprehensive debugging output for SMTP
+  connection issues
+  - Show host, port, user, authentication status
+  - Test connection before sending emails
+  - Provide detailed error messages for troubleshooting
+- **Dynamic Imports**: Use `await import()` instead of `require()` in ES modules
+  - Fixes "require is not defined" errors in CLI
+  - Use `nodemailer.default.createTransport()` and `sgMail.default.setApiKey()`
+- **Provider Selection**: CLI should respect `--provider` argument over config
+  file provider setting
+  - Lesson: Command line arguments should override configuration defaults
+
+### Template System
+
+- **AuthTemplate Design**: Create reusable templates for authentication flows
+  - Email verification, password reset, 2FA, security alerts
+  - Variable replacement with `{{variable}}` syntax
+  - Support for both text and HTML content
+  - Template validation and error handling
+
+### Queue Monitoring
+
+- **Audit Integration**: Use existing audit system for notification history
+  - Store notification events with proper metadata
+  - Track success/failure status and error messages
+  - Provide statistics and filtering capabilities
+  - Support JSON output for machine processing
+
+### Error Handling
+
+- **Comprehensive Error Handling**: Implement proper error handling throughout
+  - Validate configuration before use
+  - Handle provider-specific errors gracefully
+  - Provide meaningful error messages to users
+  - Log errors for debugging while showing user-friendly messages
+
+### Testing Strategy
+
+- **Incremental Testing**: Test each component separately
+  - Test configuration loading first
+  - Test provider validation
+  - Test actual email sending
+  - Test queue monitoring and statistics
+
+### Documentation and Integration
+
+- **Comprehensive Documentation**: Create complete documentation for
+  notification system
+  - Include configuration examples for all providers
+  - Provide troubleshooting guides for common issues
+  - Document CLI commands and API endpoints
+  - Include security best practices and compliance considerations
+- **Init Integration**: Automatically create notifications.yml during
+  `civic init`
+  - Copy default configuration from `core/src/defaults/notifications.yml`
+  - Provide helpful setup instructions
+  - Disable by default for security
+  - Include test commands for verification
+- **Production Readiness**: Test with real email delivery
+  - Verify SMTP and SendGrid integration
+  - Test with actual email addresses
+  - Confirm email delivery and formatting
+  - Validate notification tracking and audit logs
+
+## UI Development Lessons (Previous)
 
 ### Vue 3 and Nuxt UI Pro Patterns
 
