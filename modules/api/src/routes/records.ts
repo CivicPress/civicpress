@@ -3,6 +3,7 @@ import { body, param, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
   requireRecordPermission,
+  authMiddleware,
 } from '../middleware/auth';
 import { RecordsService } from '../services/records-service';
 import { Logger } from '@civicpress/core';
@@ -107,7 +108,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return handleRecordsValidationError(
-          operation,
+          'get_record',
           errors.array(),
           req,
           res
@@ -116,6 +117,17 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       try {
         const { id } = req.params;
+
+        logger.info(
+          `Getting record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
 
         const record = await recordsService.getRecord(id);
 
@@ -126,9 +138,22 @@ export function createRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
 
+        logger.info(
+          `Record ${id} retrieved successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            recordType: record.type,
+            recordStatus: record.status,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
         sendSuccess(record, req, res, { operation });
       } catch (error) {
-        handleApiError(operation, error, req, res, 'Failed to retrieve record');
+        handleApiError(operation, error, req, res, 'Failed to get record');
       }
     }
   );
@@ -158,7 +183,6 @@ export function createRecordsRouter(recordsService: RecordsService) {
           type: type as string,
           status: 'draft',
           limit: limit ? parseInt(limit as string) : undefined,
-          offset: offset ? parseInt(offset as string) : undefined,
         });
 
         logger.info('User drafts listed successfully', {
@@ -178,6 +202,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
   // POST /api/records - Create a new record (authenticated only)
   router.post(
     '/',
+    authMiddleware(recordsService.getCivicPress()),
     requireRecordPermission('create'),
     body('title').isString().notEmpty(),
     body('type').isString().notEmpty(),
@@ -230,6 +255,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
   // PUT /api/records/:id - Update a record (authenticated only)
   router.put(
     '/:id',
+    authMiddleware(recordsService.getCivicPress()),
     requireRecordPermission('edit'),
     param('id').isString().notEmpty(),
     body('title').optional().isString(),
@@ -279,6 +305,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
   // DELETE /api/records/:id - Archive a record (authenticated only)
   router.delete(
     '/:id',
+    authMiddleware(recordsService.getCivicPress()),
     requireRecordPermission('delete'),
     param('id').isString().notEmpty(),
     async (req: AuthenticatedRequest, res: Response) => {

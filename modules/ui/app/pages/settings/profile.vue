@@ -115,15 +115,36 @@ onMounted(() => {
 
     fetchUserInfo()
 })
+
+const breadcrumbItems = [
+    {
+        label: 'Settings',
+        to: '/settings'
+    },
+    {
+        label: 'Profile',
+    }
+]
 </script>
 
 <template>
     <UDashboardPanel>
         <template #header>
-            <UDashboardNavbar title="Profile Settings" />
+            <UDashboardNavbar>
+                <template #title>
+                    <h1 class="text-lg font-semibold">
+                        Profile Settings
+                    </h1>
+                </template>
+                <template #description>
+                    Manage your account settings and view your information
+                </template>
+            </UDashboardNavbar>
         </template>
 
         <template #body>
+            <UBreadcrumb :items="breadcrumbItems" />
+
             <!-- Loading State -->
             <div v-if="loading" class="flex justify-center items-center h-64">
                 <div class="text-center">
@@ -283,18 +304,12 @@ onMounted(() => {
                 <div class="bg-white rounded-lg border p-6">
                     <h2 class="text-lg font-semibold text-gray-900 mb-4">Account Actions</h2>
                     <div class="flex flex-wrap gap-4">
-                        <UButton color="primary" variant="soft">
+                        <UButton v-if="authStore.currentUser?.role === 'admin'" color="primary" variant="soft"
+                            @click="navigateTo(`/settings/users/${userInfo?.id}`)">
                             <template #leading>
                                 <UIcon name="i-lucide-edit" class="w-4 h-4" />
                             </template>
                             Edit Profile
-                        </UButton>
-
-                        <UButton :color="'orange' as any" variant="soft">
-                            <template #leading>
-                                <UIcon name="i-lucide-key" class="w-4 h-4" />
-                            </template>
-                            Change Password
                         </UButton>
 
                         <UButton :color="'red' as any" variant="soft" @click="navigateTo('/auth/logout')">

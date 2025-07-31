@@ -90,13 +90,13 @@ describe('Config API Endpoints', () => {
       });
     });
 
-    it('should require authentication', async () => {
+    it('should be accessible without authentication (public endpoint)', async () => {
       const response = await request(context.api.getApp())
         .get('/api/config/record-types')
-        .expect(401);
+        .expect(200);
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Authentication required');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('record_types');
     });
   });
 
@@ -132,13 +132,13 @@ describe('Config API Endpoints', () => {
       expect(typeof config.version).toBe('string');
     });
 
-    it('should require authentication', async () => {
+    it('should be accessible without authentication (public endpoint)', async () => {
       const response = await request(context.api.getApp())
         .get('/api/config/system')
-        .expect(401);
+        .expect(200);
 
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Authentication required');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('modules');
     });
   });
 });

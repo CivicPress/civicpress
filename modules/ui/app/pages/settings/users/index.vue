@@ -1,0 +1,156 @@
+<script setup lang="ts">
+import type { User } from '~/types/user'
+
+// Composables
+const { $civicApi } = useNuxtApp()
+const authStore = useAuthStore()
+
+// User roles composable
+const {
+    getRoleDisplayName,
+    getRoleColor
+} = useUserRoles()
+
+// Reactive state
+const users = ref<User[]>([])
+const loading = ref(true)
+const error = ref('')
+
+// Fetch users
+const fetchUsers = async () => {
+    try {
+        loading.value = true
+        error.value = ''
+
+        const response = await $civicApi('/api/users') as any
+
+        if (response.success) {
+            users.value = response.data.users || []
+        } else {
+            error.value = response.error || 'Failed to fetch users'
+        }
+    } catch (err: any) {
+        error.value = err.message || 'Failed to fetch users'
+        console.error('Error fetching users:', err)
+    } finally {
+        loading.value = false
+    }
+}
+
+// Computed properties
+const canManageUsers = computed(() => {
+    return authStore.currentUser?.role === 'admin'
+})
+
+// Format date utility
+const formatDate = (dateString: string) => {
+    if (!dateString) return 'Unknown'
+    return new Date(dateString).toLocaleDateString()
+}
+
+// Navigation
+const navigateToUser = (userId: string) => {
+    navigateTo(`/settings/users/${userId}`)
+}
+
+const breadcrumbItems = [
+    {
+        label: 'Settings',
+        to: '/settings'
+    },
+    {
+        label: 'Users',
+    }
+]
+
+// On mounted
+onMounted(() => {
+    fetchUsers()
+})
+</script>
+
+<template>
+    <UDashboardPanel>
+        <template #header>
+            <UDashboardNavbar>
+                <template #title>
+                    <h1 class="text-lg font-semibold">
+                        Users
+                    </h1>
+                </template>
+                <template #description>
+                    Manage system users and their roles
+                </template>
+                <template #right>
+                    <UButton v-if="canManageUsers" to="/settings/users/new" icon="i-lucide-plus" color="primary">
+                        Add User
+                    </UButton>
+                </template>
+            </UDashboardNavbar>
+        </template>
+
+        <template #body>
+            <UBreadcrumb :items="breadcrumbItems" />
+
+            <!-- Loading state -->
+            <div v-if="loading" class="flex justify-center py-12">
+                <!-- <ULoadingBlock /> -->
+            </div>
+
+            <!-- Error state -->
+            <UAlert v-else-if="error" :title="error" color="error" variant="soft" class="mb-6" />
+
+            <!-- Users list -->
+            <div v-else-if="users.length > 0" class="space-y-4">
+                <UCard v-for="user in users" :key="user.id"
+                    class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    @click="navigateToUser(user.id)">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="flex-shrink-0">
+                                    <div
+                                        class="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
+                                        <UIcon name="i-lucide-user"
+                                            class="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                        {{ user.name || user.username }}
+                                    </h3>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                                        {{ user.email || user.username }}
+                                    </p>
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <UBadge :color="getRoleColor(user.role) as any" variant="soft" size="sm">
+                                            {{ getRoleDisplayName(user.role) }}
+                                        </UBadge>
+                                        <span class="text-xs text-gray-500">
+                                            Created {{ formatDate(user.created_at || '') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <UIcon name="i-lucide-chevron-right" class="w-5 h-5 text-gray-400" />
+                        </div>
+                    </div>
+                </UCard>
+            </div>
+
+            <!-- Empty state -->
+            <div v-else class="text-center py-12">
+                <UIcon name="i-lucide-users" class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    No users found
+                </h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">
+                    No users have been created yet.
+                </p>
+                <UButton v-if="canManageUsers" to="/settings/users/new" icon="i-lucide-plus" color="primary">
+                    Add First User
+                </UButton>
+            </div>
+        </template>
+    </UDashboardPanel>
+</template>

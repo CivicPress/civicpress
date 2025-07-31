@@ -370,19 +370,32 @@ onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside)
 })
 
+const breadcrumbItems = [
+    {
+        label: 'Records',
+    }
+]
+
 </script>
 
 <template>
     <UDashboardPanel>
         <template #header>
-            <UDashboardNavbar title="Records">
-                <!-- Performance Mode Indicator -->
-
+            <UDashboardNavbar>
+                <template #title>
+                    <h1 class="text-lg font-semibold">
+                        Browse Records
+                    </h1>
+                </template>
+                <template #description>
+                    Browse and search through all records
+                </template>
             </UDashboardNavbar>
         </template>
 
         <template #body>
             <div class="space-y-6">
+                <UBreadcrumb :items="breadcrumbItems" />
                 <!-- Search and Filters -->
                 <div class="flex flex-col sm:flex-row gap-4">
                     <!-- Search Input with Suggestions -->
@@ -506,7 +519,7 @@ onUnmounted(() => {
                                                             <span>Type: {{ item.data.typeLabel }}</span>
                                                             <span>Created: {{ item.data.formattedDate }}</span>
                                                             <span v-if="item.data.author">By: {{ item.data.author
-                                                            }}</span>
+                                                                }}</span>
                                                         </div>
                                                     </div>
                                                 </div>

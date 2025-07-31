@@ -35,6 +35,13 @@ export class RecordsService {
   }
 
   /**
+   * Get the CivicPress instance
+   */
+  getCivicPress(): CivicPress {
+    return this.civicPress;
+  }
+
+  /**
    * Create a new record
    */
   async createRecord(

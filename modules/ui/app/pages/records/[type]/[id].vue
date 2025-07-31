@@ -73,28 +73,36 @@ const goBack = () => {
 onMounted(() => {
     fetchRecord()
 })
+
+const breadcrumbItems = computed(() => [
+    {
+        label: 'Records',
+        to: '/records'
+    },
+    {
+        label: record.value?.title || 'Record'
+    }
+])
 </script>
 
 <template>
     <UDashboardPanel>
         <template #header>
             <UDashboardNavbar>
-                <template #left>
-                    <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" @click="goBack">
-                        Back to Records
-                    </UButton>
+                <template #title>
+                    <h1 class="text-lg font-semibold">
+                        {{ record?.title || 'Record' }}
+                    </h1>
                 </template>
-                <template #center>
-                    <div class="flex items-center gap-2">
-                        <UIcon v-if="record" :name="getTypeIcon(record.type)" class="text-gray-500" />
-                        <span v-if="record" class="font-semibold">{{ record.title }}</span>
-                        <span v-else class="font-semibold">Loading Record...</span>
-                    </div>
+                <template #description>
+                    View the details of {{ record?.title || 'this record' }}
                 </template>
             </UDashboardNavbar>
         </template>
 
         <template #body>
+            <UBreadcrumb :items="breadcrumbItems" />
+
             <!-- Loading State -->
             <div v-if="loading" class="flex justify-center items-center h-64">
                 <div class="text-center">

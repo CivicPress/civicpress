@@ -86,10 +86,13 @@ describe('Record Statuses API Endpoints', () => {
       });
     });
 
-    it('should require authentication', async () => {
-      await request(context.api.getApp())
+    it('should be accessible without authentication (public endpoint)', async () => {
+      const response = await request(context.api.getApp())
         .get('/api/config/record-statuses')
-        .expect(401);
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('record_statuses');
     });
   });
 });

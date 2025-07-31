@@ -101,6 +101,14 @@ export class AuthService {
   }
 
   /**
+   * Get the role manager instance
+   * @returns RoleManager instance
+   */
+  getRoleManager(): RoleManager {
+    return this.roleManager;
+  }
+
+  /**
    * Validate a role exists
    * @param role - The role to validate
    * @returns boolean indicating if the role exists

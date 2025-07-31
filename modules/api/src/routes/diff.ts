@@ -177,8 +177,8 @@ export function createDiffRouter() {
 
         // Validate commits exist
         try {
-          await git.show([commit1]);
-          await git.show([commit2]);
+          await git.show([commit1 as string]);
+          await git.show([commit2 as string]);
         } catch (error) {
           const err = new Error('One or both commits not found');
           (err as any).statusCode = 400;
@@ -189,15 +189,15 @@ export function createDiffRouter() {
         const result = await compareRecordVersions(
           git,
           recordPath,
-          commit1,
-          commit2,
+          commit1 as string,
+          commit2 as string,
           {
-            format,
+            format: format as 'unified' | 'side-by-side' | 'json' | undefined,
             context: parseInt(context.toString()),
-            showMetadata,
-            showContent,
-            wordLevel,
-            includeStats,
+            showMetadata: showMetadata === 'true',
+            showContent: showContent === 'true',
+            wordLevel: wordLevel === 'true',
+            includeStats: includeStats === 'true',
           }
         );
 

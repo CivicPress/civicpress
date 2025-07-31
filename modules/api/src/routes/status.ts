@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { query, validationResult } from 'express-validator';
-import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
 import { Logger } from '@civicpress/core';
 import {
   sendSuccess,
@@ -17,174 +16,165 @@ export function createStatusRouter() {
   const router = Router();
 
   // GET /api/status - Get comprehensive system status
-  router.get(
-    '/',
-    requirePermission('records:view'),
-    async (req: AuthenticatedRequest, res: Response) => {
-      logApiRequest(req, { operation: 'get_system_status' });
+  router.get('/', async (req: any, res: Response) => {
+    logApiRequest(req, { operation: 'get_system_status' });
 
-      try {
-        const civicPress = (req as any).civicPress;
-        if (!civicPress) {
-          throw new Error('CivicPress not initialized');
+    try {
+      const civicPress = (req as any).civicPress;
+      if (!civicPress) {
+        throw new Error('CivicPress not initialized');
+      }
+
+      const dataDir = civicPress.getDataDir();
+      const gitEngine = civicPress.gitEngine;
+
+      // Get Git status
+      let gitStatus = null;
+      if (gitEngine) {
+        try {
+          gitStatus = await gitEngine.status();
+        } catch (error) {
+          logger.warn('Failed to get Git status', {
+            error: (error as Error).message,
+          });
         }
+      }
 
-        const dataDir = civicPress.getDataDir();
-        const gitEngine = civicPress.gitEngine;
+      // Get record statistics
+      const recordStats = await getRecordStatistics(dataDir);
 
-        // Get Git status
-        let gitStatus = null;
-        if (gitEngine) {
-          try {
-            gitStatus = await gitEngine.status();
-          } catch (error) {
-            logger.warn('Failed to get Git status', {
-              error: (error as Error).message,
-            });
-          }
-        }
+      // Get system information
+      const systemInfo = {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        nodeVersion: process.version,
+        platform: process.platform,
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString(),
+      };
 
-        // Get record statistics
-        const recordStats = await getRecordStatistics(dataDir);
+      // Get configuration status
+      const configStatus = await getConfigurationStatus(dataDir);
 
-        // Get system information
-        const systemInfo = {
-          uptime: process.uptime(),
-          memory: process.memoryUsage(),
-          nodeVersion: process.version,
-          platform: process.platform,
-          environment: process.env.NODE_ENV || 'development',
-          timestamp: new Date().toISOString(),
-        };
-
-        // Get configuration status
-        const configStatus = await getConfigurationStatus(dataDir);
-
-        const status = {
-          system: {
-            status: 'healthy',
-            ...systemInfo,
-          },
-          git: gitStatus,
-          records: recordStats,
-          configuration: configStatus,
-          summary: {
-            totalRecords: recordStats.totalRecords,
-            pendingChanges: gitStatus?.modified?.length || 0,
-            systemHealth: 'healthy',
-            lastUpdated: new Date().toISOString(),
-          },
-        };
-
-        logger.info('System status retrieved successfully', {
+      const status = {
+        system: {
+          status: 'healthy',
+          ...systemInfo,
+        },
+        git: gitStatus,
+        records: recordStats,
+        configuration: configStatus,
+        summary: {
           totalRecords: recordStats.totalRecords,
           pendingChanges: gitStatus?.modified?.length || 0,
-          requestId: (req as any).requestId,
-        });
+          systemHealth: 'healthy',
+          lastUpdated: new Date().toISOString(),
+        },
+      };
 
-        sendSuccess(status, req, res, {
-          operation: 'get_system_status',
-          meta: {
-            totalRecords: recordStats.totalRecords,
-            pendingChanges: gitStatus?.modified?.length || 0,
-          },
-        });
-      } catch (error) {
-        handleApiError(
-          'get_system_status',
-          error,
-          req,
-          res,
-          'Failed to get system status'
-        );
-      }
+      logger.info('System status retrieved successfully', {
+        totalRecords: recordStats.totalRecords,
+        pendingChanges: gitStatus?.modified?.length || 0,
+        requestId: (req as any).requestId,
+      });
+
+      sendSuccess(status, req, res, {
+        operation: 'get_system_status',
+        meta: {
+          totalRecords: recordStats.totalRecords,
+          pendingChanges: gitStatus?.modified?.length || 0,
+        },
+      });
+    } catch (error) {
+      handleApiError(
+        'get_system_status',
+        error,
+        req,
+        res,
+        'Failed to get system status'
+      );
     }
-  );
+  });
 
   // GET /api/status/git - Get detailed Git status
-  router.get(
-    '/git',
-    requirePermission('records:view'),
-    async (req: AuthenticatedRequest, res: Response) => {
-      logApiRequest(req, { operation: 'get_git_status' });
+  router.get('/git', async (req: any, res: Response) => {
+    logApiRequest(req, { operation: 'get_git_status' });
 
-      try {
-        const civicPress = (req as any).civicPress;
-        if (!civicPress) {
-          throw new Error('CivicPress not initialized');
-        }
-
-        const gitEngine = civicPress.gitEngine;
-        if (!gitEngine) {
-          const error = new Error('Git engine not available');
-          (error as any).statusCode = 503;
-          (error as any).code = 'GIT_ENGINE_UNAVAILABLE';
-          throw error;
-        }
-
-        const gitStatus = await gitEngine.status();
-
-        // Get recent commits for context
-        const recentCommits = await gitEngine.getHistory(5);
-
-        const status = {
-          status:
-            gitStatus.modified.length > 0 || gitStatus.created.length > 0
-              ? 'dirty'
-              : 'clean',
-          modified: gitStatus.modified,
-          created: gitStatus.created,
-          deleted: gitStatus.deleted,
-          renamed: gitStatus.renamed,
-          untracked: gitStatus.untracked || [],
-          recentCommits: recentCommits.map((commit: any) => ({
-            hash: commit.hash,
-            shortHash: commit.hash.substring(0, 8),
-            message: commit.message,
-            author: commit.author_name,
-            date: commit.date,
-          })),
-          summary: {
-            totalChanges:
-              gitStatus.modified.length +
-              gitStatus.created.length +
-              gitStatus.deleted.length,
-            modifiedFiles: gitStatus.modified.length,
-            newFiles: gitStatus.created.length,
-            deletedFiles: gitStatus.deleted.length,
-            renamedFiles: gitStatus.renamed.length,
-          },
-        };
-
-        logger.info('Git status retrieved successfully', {
-          totalChanges: status.summary.totalChanges,
-          requestId: (req as any).requestId,
-        });
-
-        sendSuccess(status, req, res, {
-          operation: 'get_git_status',
-          meta: {
-            totalChanges: status.summary.totalChanges,
-          },
-        });
-      } catch (error) {
-        handleApiError(
-          'get_git_status',
-          error,
-          req,
-          res,
-          'Failed to get Git status'
-        );
+    try {
+      const civicPress = (req as any).civicPress;
+      if (!civicPress) {
+        throw new Error('CivicPress not initialized');
       }
+
+      const gitEngine = civicPress.gitEngine;
+      if (!gitEngine) {
+        const error = new Error('Git engine not available');
+        (error as any).statusCode = 503;
+        (error as any).code = 'GIT_ENGINE_UNAVAILABLE';
+        throw error;
+      }
+
+      const gitStatus = await gitEngine.status();
+
+      // Get recent commits for context
+      const recentCommits = await gitEngine.getHistory(5);
+
+      const status = {
+        status:
+          gitStatus.modified.length > 0 || gitStatus.created.length > 0
+            ? 'dirty'
+            : 'clean',
+        modified: gitStatus.modified,
+        created: gitStatus.created,
+        deleted: gitStatus.deleted,
+        renamed: gitStatus.renamed,
+        untracked: gitStatus.untracked || [],
+        recentCommits: recentCommits.map((commit: any) => ({
+          hash: commit.hash,
+          shortHash: commit.hash.substring(0, 8),
+          message: commit.message,
+          author: commit.author_name,
+          date: commit.date,
+        })),
+        summary: {
+          totalChanges:
+            gitStatus.modified.length +
+            gitStatus.created.length +
+            gitStatus.deleted.length,
+          modifiedFiles: gitStatus.modified.length,
+          newFiles: gitStatus.created.length,
+          deletedFiles: gitStatus.deleted.length,
+          renamedFiles: gitStatus.renamed.length,
+        },
+      };
+
+      logger.info('Git status retrieved successfully', {
+        totalChanges: status.summary.totalChanges,
+        requestId: (req as any).requestId,
+      });
+
+      sendSuccess(status, req, res, {
+        operation: 'get_git_status',
+        meta: {
+          totalChanges: status.summary.totalChanges,
+        },
+      });
+    } catch (error) {
+      handleApiError(
+        'get_git_status',
+        error,
+        req,
+        res,
+        'Failed to get Git status'
+      );
     }
-  );
+  });
 
   // GET /api/status/records - Get detailed record statistics
   router.get(
     '/records',
-    requirePermission('records:view'),
     [query('type').optional().isString().withMessage('Type must be a string')],
-    async (req: AuthenticatedRequest, res: Response) => {
+    async (req: any, res: Response) => {
       logApiRequest(req, { operation: 'get_record_status' });
 
       try {

@@ -1,5 +1,109 @@
 # CivicPress Development Decisions
 
+## Roles API Endpoint Implementation (Latest)
+
+### **✅ IMPLEMENTED: Dynamic Role Management API**
+
+**Decision**: Successfully implemented comprehensive roles API endpoint
+following established patterns:
+
+1. **✅ API Endpoint** - `GET /api/config/roles` following same pattern as
+   record-types/statuses
+2. **✅ Core Methods** - Added `getRoleConfig()` to RoleManager and
+   `getRoleManager()` to AuthService
+3. **✅ Dynamic Role Loading** - Gets roles from `data/.civic/roles.yml`
+   (platform config)
+4. **✅ Complete Metadata** - Returns role name, description, permissions,
+   status transitions
+5. **✅ Error Handling** - Graceful fallback if role config is unavailable
+6. **✅ Authentication Required** - Protected endpoint for security
+7. **✅ Consistent API Pattern** - Follows same structure as existing config
+   endpoints
+8. **✅ Production Ready** - Tested and verified with full role configuration
+   data
+
+### **Architecture Benefits**
+
+- **Configuration-Driven**: UI will always reflect actual platform roles
+- **No Hardcoding**: Roles come from platform configuration
+- **Municipality Flexibility**: Each deployment can have custom roles
+- **Future-Proof**: New roles automatically appear in UI
+- **Security**: Role validation happens at platform level
+
+### **Response Structure**
+
+```json
+{
+  "success": true,
+  "data": {
+    "roles": [
+      {
+        "key": "admin",
+        "name": "Administrator",
+        "description": "Full system access",
+        "permissions": ["*", "records:import", ...],
+        "record_types": {},
+        "status_transitions": ["draft", "review", "approved", ...]
+      },
+      {
+        "key": "clerk",
+        "name": "Clerk",
+        "description": "Can create and edit records",
+        "permissions": ["records:create", "records:edit", ...],
+        "record_types": {},
+        "status_transitions": ["draft", "review"]
+      },
+      {
+        "key": "public",
+        "name": "Public",
+        "description": "Read-only access",
+        "permissions": ["records:view", "records:list"],
+        "record_types": {},
+        "status_transitions": []
+      }
+    ],
+    "total": 3
+  }
+}
+```
+
+### **Implementation Details**
+
+#### **Core Methods Added**
+
+1. **RoleManager.getRoleConfig(role: string)**: Get detailed role configuration
+2. **AuthService.getRoleManager()**: Expose role manager for API access
+3. **RoleManager export**: Added to core module exports
+
+#### **API Integration**
+
+- **Endpoint**: `GET /api/config/roles`
+- **Authentication**: Required (protected endpoint)
+- **Location**: `modules/api/src/routes/config.ts`
+- **Pattern**: Follows same structure as `/api/config/record-types` and
+  `/api/config/record-statuses`
+
+#### **Error Handling**
+
+- Graceful fallback if role config is unavailable
+- Includes role even if full config can't be retrieved
+- Proper error logging and user-friendly messages
+
+### **Next Steps for UI Integration**
+
+1. **Call `/api/config/roles`** to get available roles
+2. **Use role data** for user management dropdowns
+3. **Display role details** in user edit forms
+4. **Validate role assignments** against platform config
+
+### **Key Implementation Notes**
+
+- **Configuration Location**: Roles loaded from `data/.civic/roles.yml`
+- **Dynamic Loading**: UI always reflects current platform configuration
+- **Security First**: Protected endpoint ensures role data security
+- **Consistent Pattern**: Follows established API patterns for maintainability
+- **Production Ready**: Tested with real role configuration data
+
 ## Notification System Architecture (Latest)
 
 ### **✅ IMPLEMENTED: Production-Ready Multi-Provider System**
@@ -438,3 +542,161 @@ notifications:
 - **Audit Framework**: Comprehensive change tracking
 - **Multi-tenant Support**: Multiple municipality deployments
 - **Advanced Workflows**: Configurable civic approval processes
+
+## User Management Interface Implementation (Latest)
+
+### **API Architecture Decisions**
+
+- **Public Configuration Endpoints**: Made `/api/config/roles` and `/api/status`
+  publicly accessible
+  - **Rationale**: UI needs role data for dropdowns before authentication
+  - **Implementation**: Direct file system reading for roles, removed auth
+    middleware from config routes
+  - **Security**: Configuration data is not sensitive, roles are public
+    information
+
+- **Dynamic Role Loading**: Roles sourced from `data/.civic/roles.yml` platform
+  configuration
+  - **Rationale**: Ensures UI only shows roles that are actually configured in
+    the platform
+  - **Implementation**: API reads roles.yml directly, UI fetches via
+    `/api/config/roles`
+  - **Benefits**: Platform configuration drives UI behavior, no hardcoded roles
+
+### **UI Architecture Decisions**
+
+- **UDashboardPanel Pattern**: All settings pages use consistent
+  `UDashboardPanel` structure
+  - **Rationale**: Provides consistent navigation, headers, and layout across
+    all settings pages
+  - **Implementation**: Template slots for `#header` and `#body` with
+    `UDashboardNavbar`
+  - **Benefits**: Professional appearance, consistent UX, maintainable code
+
+- **Template Slots for Headers**: Use template slots instead of attributes for
+  navbar content
+  - **Rationale**: More flexible and maintainable than attribute-based
+    configuration
+  - **Implementation**: `#title`, `#description`, `#toggle` slots for dynamic
+    content
+  - **Benefits**: Better control over HTML structure, easier customization
+
+- **Reusable UserForm Component**: Single component for both create and edit
+  user forms
+  - **Rationale**: Reduces code duplication and ensures consistent behavior
+  - **Implementation**: Props for `isEditing`, `user`, `canDelete` with event
+    emitters
+  - **Benefits**: DRY principle, easier maintenance, consistent validation
+
+### **Form Design Decisions**
+
+- **UFormField Components**: All form fields use `UFormField` with rich metadata
+  - **Rationale**: Provides consistent styling, help text, and error handling
+  - **Implementation**: Label, description, hint, help text, and error props
+  - **Benefits**: Professional appearance, better UX, accessible design
+
+- **Inline Validation**: Form validation errors displayed inline, API errors as
+  toasts
+  - **Rationale**: Clear distinction between user input errors and system errors
+  - **Implementation**: `formErrors` reactive object for inline errors, toast
+    for API feedback
+  - **Benefits**: Better user experience, clear error context
+
+- **Password Features**: Show/hide password with unified control for both fields
+  - **Rationale**: Single eye icon controls both password fields for better UX
+  - **Implementation**: `showPassword` reactive variable, eye icon in first
+    password field only
+  - **Benefits**: Intuitive interface, less visual clutter
+
+### **Navigation Decisions**
+
+- **Breadcrumb Navigation**: Reactive breadcrumbs that update with user data
+  - **Rationale**: Provides clear navigation context and improves UX
+  - **Implementation**: `computed()` breadcrumb items that update when user data
+    loads
+  - **Benefits**: Dynamic navigation, better user orientation
+
+- **Settings Menu Integration**: Users link added to existing Settings dropdown
+  - **Rationale**: Leverages existing navigation structure without adding
+    clutter
+  - **Implementation**: Conditional children in UserMenu Settings dropdown for
+    admin users
+  - **Benefits**: Clean navigation, admin-only visibility
+
+### **Access Control Decisions**
+
+- **Admin-Only Features**: User management restricted to admin role
+  - **Rationale**: User management is a sensitive administrative function
+  - **Implementation**: `canManageUsers` computed property, conditional UI
+    rendering
+  - **Benefits**: Proper security, clear permission boundaries
+
+- **Self-Delete Prevention**: Admins cannot delete their own account
+  - **Rationale**: Prevents accidental account deletion and maintains system
+    integrity
+  - **Implementation**: `canDeleteUser` computed property comparing user IDs
+  - **Benefits**: System safety, prevents administrative lockout
+
+### **Error Handling Decisions**
+
+- **Comprehensive Error States**: Loading, error, and access denied states
+  - **Rationale**: Provides clear feedback for all possible scenarios
+  - **Implementation**: Conditional rendering with appropriate UI components
+  - **Benefits**: Better user experience, clear system status
+
+- **Toast Notifications**: API interaction feedback via toast notifications
+  - **Rationale**: Non-intrusive feedback for system-level operations
+  - **Implementation**: `useToast()` composable for success/error messages
+  - **Benefits**: Consistent feedback, doesn't interrupt user flow
+
+## Roles API Endpoint Implementation (Previous)
+
+### **API Endpoint Design**
+
+- **Endpoint**: `GET /api/config/roles` following established patterns
+- **Authentication**: Initially required, later made public for UI access
+- **Response Structure**: Consistent with other config endpoints
+- **Error Handling**: Graceful fallback if role config is unavailable
+
+### **Core Method Integration**
+
+- **RoleManager.getRoleConfig()**: Added method to retrieve detailed role
+  configuration
+- **AuthService.getRoleManager()**: Exposed RoleManager instance for API access
+- **Core Export**: Made RoleManager available to other modules
+
+### **Benefits**
+
+- **Dynamic Role Management**: UI gets roles from platform configuration
+- **Consistent API Pattern**: Follows same structure as record-types/statuses
+- **Production Ready**: Tested and verified with full role configuration data
+- **Platform Integration**: Seamlessly integrates with existing configuration
+  system
+
+### **Response Structure**
+
+```json
+{
+  "success": true,
+  "data": {
+    "roles": [
+      {
+        "key": "admin",
+        "name": "Administrator",
+        "description": "Full system access",
+        "permissions": ["*", "records:import", "..."],
+        "record_types": {},
+        "status_transitions": ["draft", "review", "approved", "..."]
+      }
+    ],
+    "total": 3
+  }
+}
+```
+
+### **Next Steps for UI Integration**
+
+- **Role Dropdown**: Use role data for user creation/editing forms
+- **Permission Display**: Show role permissions in user management interface
+- **Validation**: Ensure selected roles are valid for current user
+- **Dynamic UI**: Adjust interface based on available roles

@@ -58,7 +58,14 @@ const items = computed<DropdownMenuItem[][]>(() => {
                 label: 'Profile',
                 icon: 'i-lucide-user',
                 onClick: () => navigateTo('/settings/profile')
-            }]
+            },
+            // Only show Users link for admin users
+            ...(authStore.currentUser?.role === 'admin' ? [{
+                label: 'Users',
+                icon: 'i-lucide-users',
+                onClick: () => navigateTo('/settings/users')
+            }] : [])
+            ]
         }])
     }
 

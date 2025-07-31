@@ -4,6 +4,9 @@ import {
   getRecordTypesWithMetadata,
   getRecordStatusesWithMetadata,
 } from '@civicpress/core';
+import * as fs from 'fs';
+import * as path from 'path';
+import yaml from 'yaml';
 
 // Declare setTimeout and clearTimeout for TypeScript
 // declare const setTimeout: any;
@@ -87,6 +90,81 @@ router.get('/record-statuses', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch record statuses configuration',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/config/roles
+ * Get available roles with metadata
+ */
+router.get('/roles', async (req, res) => {
+  try {
+    // Get the data directory from central config
+    const dataDir = CentralConfigManager.getDataDir();
+    const rolesConfigPath = path.join(dataDir, '.civic', 'roles.yml');
+    
+    let rolesConfig: any = {};
+    
+    // Try to read the roles configuration file
+    if (fs.existsSync(rolesConfigPath)) {
+      try {
+        const content = fs.readFileSync(rolesConfigPath, 'utf-8');
+        rolesConfig = yaml.parse(content);
+      } catch (error) {
+        console.error('Error reading roles config file:', error);
+      }
+    }
+    
+    // If no roles config found, use default roles
+    if (!rolesConfig.roles) {
+      rolesConfig = {
+        roles: {
+          admin: {
+            name: 'Administrator',
+            description: 'Full system access',
+            permissions: ['*'],
+            status_transitions: ['draft', 'review', 'approved', 'rejected', 'archived']
+          },
+          clerk: {
+            name: 'Clerk',
+            description: 'Can create and edit records',
+            permissions: ['records:create', 'records:edit', 'records:view', 'records:list'],
+            status_transitions: ['draft', 'review']
+          },
+          public: {
+            name: 'Public',
+            description: 'Read-only access',
+            permissions: ['records:view', 'records:list'],
+            status_transitions: []
+          }
+        }
+      };
+    }
+    
+    // Transform roles to the expected format
+    const rolesWithMetadata = Object.entries(rolesConfig.roles).map(([key, role]: [string, any]) => ({
+      key,
+      name: role.name || key,
+      description: role.description || '',
+      permissions: role.permissions || [],
+      record_types: role.record_types || {},
+      status_transitions: role.status_transitions || []
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        roles: rolesWithMetadata,
+        total: rolesWithMetadata.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error fetching roles config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch roles configuration',
       message: error.message,
     });
   }

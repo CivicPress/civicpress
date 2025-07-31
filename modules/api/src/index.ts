@@ -235,21 +235,38 @@ export class CivicPressAPI {
     this.app.use('/api/search', searchRouter);
     this.app.use('/api/status', createStatusRouter());
     this.app.use('/api/validation', createValidationRouter());
-
-    // API routes (authentication required)
-    this.app.use('/api', authMiddleware(this.civicPress));
+    this.app.use('/api/config', configRouter);
 
     // Protected routes that require authentication
-    this.app.use('/api/export', exportRouter);
-    this.app.use('/api/import', importRouter);
-    this.app.use('/api/hooks', hooksRouter);
-    this.app.use('/api/templates', templatesRouter);
-    this.app.use('/api/workflows', workflowsRouter);
-    this.app.use('/api/indexing', createIndexingRouter());
-    this.app.use('/api/history', createHistoryRouter());
-    this.app.use('/api/diff', createDiffRouter());
-    this.app.use('/api/users', usersRouter);
-    this.app.use('/api/config', configRouter);
+    this.app.use('/api/export', authMiddleware(this.civicPress), exportRouter);
+    this.app.use('/api/import', authMiddleware(this.civicPress), importRouter);
+    this.app.use('/api/hooks', authMiddleware(this.civicPress), hooksRouter);
+    this.app.use(
+      '/api/templates',
+      authMiddleware(this.civicPress),
+      templatesRouter
+    );
+    this.app.use(
+      '/api/workflows',
+      authMiddleware(this.civicPress),
+      workflowsRouter
+    );
+    this.app.use(
+      '/api/indexing',
+      authMiddleware(this.civicPress),
+      createIndexingRouter()
+    );
+    this.app.use(
+      '/api/history',
+      authMiddleware(this.civicPress),
+      createHistoryRouter()
+    );
+    this.app.use(
+      '/api/diff',
+      authMiddleware(this.civicPress),
+      createDiffRouter()
+    );
+    this.app.use('/api/users', authMiddleware(this.civicPress), usersRouter);
   }
 
   async start(): Promise<void> {

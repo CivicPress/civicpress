@@ -20,6 +20,7 @@ export {
   OAuthProviderManager,
 } from './auth/oauth-provider.js';
 export { AuthConfigManager } from './auth/auth-config.js';
+export { RoleManager } from './auth/role-manager.js';
 
 // Export role-based authorization utilities
 export {
