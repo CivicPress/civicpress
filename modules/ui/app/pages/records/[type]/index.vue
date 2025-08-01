@@ -139,13 +139,8 @@ const breadcrumbItems = computed(() => [
                 <UBreadcrumb :items="breadcrumbItems" />
 
                 <!-- Search and Filters Component -->
-                <RecordSearch 
-                  :initial-filters="filters" 
-                  :record-type="recordType" 
-                  :disable-type-filter="true"
-                  @search="handleSearch"
-                  @filter-change="handleFilterChange" 
-                />
+                <RecordSearch :initial-filters="filters" :record-type="recordType" :disable-type-filter="true"
+                    @search="handleSearch" @filter-change="handleFilterChange" />
 
                 <!-- Records List Component -->
                 <RecordList :record-type="recordType" :filters="filters" :search-query="searchQuery" />

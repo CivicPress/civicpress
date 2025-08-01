@@ -18,7 +18,7 @@ const error = ref('')
 // Composables
 const { $api } = useNuxtApp()
 const { renderMarkdown } = useMarkdown()
-const { formatDate, getStatusColor, getTypeIcon } = useRecordUtils()
+const { formatDate, getStatusColor, getTypeIcon, getTypeLabel } = useRecordUtils()
 
 // Fetch record data
 const fetchRecord = async () => {
@@ -78,6 +78,10 @@ const breadcrumbItems = computed(() => [
     {
         label: 'Records',
         to: '/records'
+    },
+    {
+        label: getTypeLabel(type),
+        to: `/records/${type}`
     },
     {
         label: record.value?.title || 'Record'
