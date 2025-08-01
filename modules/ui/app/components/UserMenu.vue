@@ -14,26 +14,22 @@ const colorMode = useColorMode()
 
 const generateAvatar = () => {
 
-    if (authStore.currentUser?.avatar) {
-        if (authStore.currentUser.avatar.includes('https://')) {
+    if (authStore.currentUser?.avatar_url) {
+        if (authStore.currentUser.avatar_url.includes('https://')) {
             return {
-                src: authStore.currentUser.avatar,
+                src: authStore.currentUser.avatar_url,
                 alt: authStore.currentUser.name
             }
         } else {
             return {
+                src: authStore.currentUser.avatar_url,
                 alt: authStore.currentUser.name
             }
         }
     } else {
-        if (authStore.currentUser?.name) {
-            return {
-                alt: authStore.currentUser.name
-            }
-        } else {
-            return {
-                alt: 'Guest'
-            }
+        return {
+            src: undefined,
+            alt: authStore.currentUser?.name || 'User'
         }
     }
 }
@@ -59,8 +55,8 @@ const items = computed<DropdownMenuItem[][]>(() => {
                 icon: 'i-lucide-user',
                 onClick: () => navigateTo('/settings/profile')
             },
-            // Only show Users link for admin users
-            ...(authStore.currentUser?.role === 'admin' ? [{
+            // Only show Users link for admin and clerk users
+            ...(authStore.currentUser?.role === 'admin' || authStore.currentUser?.role === 'clerk' ? [{
                 label: 'Users',
                 icon: 'i-lucide-users',
                 onClick: () => navigateTo('/settings/users')

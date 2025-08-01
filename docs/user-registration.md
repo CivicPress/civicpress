@@ -1,46 +1,44 @@
-# User Registration System
+# User Registration
 
 ## Overview
 
-The CivicPress user registration system provides a complete user account
-creation and authentication flow with secure password handling, comprehensive
-validation, and a modern UI experience.
+CivicPress provides a comprehensive user registration and authentication system
+that supports both public registration and administrative user management. The
+system uses JWT-based authentication with role-based access control.
 
-## Features
+## Public User Registration
 
-### ✅ **Complete Registration Flow**
+### Registration Flow
 
-- User registration with username, email, password, and optional full name
-- Secure password hashing with bcrypt
-- Username uniqueness validation
-- Email format validation
-- Password strength assessment with visual indicator
-- Automatic username-as-name fallback when no full name provided
+1. **User visits registration page** (`/auth/register`)
+2. **Fills out registration form** with username, email, password
+3. **System validates input** and creates user account
+4. **User receives confirmation** and can log in immediately
+5. **Default role assignment** (typically "public" for basic access)
 
-### ✅ **Modern UI Experience**
+### Registration Form
 
-- Clean, accessible registration form
-- Real-time validation feedback
-- Password strength indicator with 5-level assessment
-- Comprehensive error handling and user feedback
-- Smooth success flow with form clearing and redirect
+The registration form includes:
 
-### ✅ **Security Features**
+- **Username**: Required, must be unique
+- **Email**: Required, must be valid format and unique
+- **Password**: Required, minimum security requirements
+- **Full Name**: Optional, defaults to username if not provided
 
-- Strong password requirements (8+ chars, uppercase, lowercase, numbers, special
-  chars)
-- Secure bcrypt password hashing with salt rounds
-- Input validation on both client and server
-- Secure error handling without information disclosure
-- JWT token-based authentication
+### Security Features
 
-## API Endpoints
+- **Password Hashing**: Passwords are securely hashed using bcrypt
+- **Input Validation**: Client and server-side validation
+- **Rate Limiting**: Prevents abuse of registration endpoint
+- **Email Verification**: Optional email verification (future feature)
 
-### POST /api/users/register
+### API Endpoint
 
-**Description**: Register a new user account
+#### POST /auth/register
 
-**Request Body**:
+Register a new user account (public endpoint).
+
+**Request Body:**
 
 ```json
 {
@@ -51,355 +49,425 @@ validation, and a modern UI experience.
 }
 ```
 
-**Response (Success - 200)**:
+**Response:**
 
 ```json
 {
   "success": true,
   "data": {
     "user": {
-      "id": 1,
-      "username": "john_doe",
+      "id": 2,
+      "username": "newuser",
+      "email": "newuser@example.com",
+      "name": "New User",
       "role": "public",
-      "email": "john@example.com",
-      "name": "John Doe",
       "avatar_url": null,
       "created_at": "2025-07-30T21:33:40.000Z"
     },
-    "message": "User registered successfully. Please log in with your credentials."
+    "message": "User registered successfully"
   }
 }
 ```
 
-**Response (Error - 400/409)**:
+## Admin User Management
 
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Username already exists",
-    "code": "USERNAME_EXISTS"
-  }
-}
+### Overview
+
+The CivicPress platform includes a comprehensive user management interface for
+administrators. This system allows admins to create, edit, and delete user
+accounts with role-based access control.
+
+### Features
+
+#### ✅ **Complete User Management**
+
+- **User Creation**: Create new users with username, email, password, and role
+  assignment
+- **User Editing**: Update user information including role changes and password
+  updates
+- **User Deletion**: Remove users with confirmation dialogs
+- **Role Management**: Dynamic role assignment from platform configuration
+- **Password Features**: Generate strong passwords, show/hide password
+  visibility
+
+#### ✅ **Modern UI Experience**
+
+- **Settings Integration**: Accessible via Settings → Users in the user menu
+- **Consistent Design**: Uses `UDashboardPanel` structure with proper navigation
+- **Form Validation**: Inline validation errors with API interaction toasts
+- **Reusable Components**: `UserForm` component for create/edit operations
+- **Responsive Design**: Mobile-friendly layout with proper spacing
+
+#### ✅ **Security Features**
+
+- **Admin-Only Access**: User management restricted to admin role
+- **Role-Based Permissions**: Dynamic permissions from platform configuration
+- **Password Security**: Strong password requirements and secure handling
+- **Self-Delete Prevention**: Users cannot delete their own accounts
+- **Confirmation Dialogs**: Modal confirmations for destructive actions
+
+### UI Navigation
+
+#### **Settings Menu Integration**
+
+User management is accessible through the user menu in the top-right corner:
+
+1. **User Menu** → **Settings** → **Users**
+2. **Admin-Only**: Only visible to users with admin role
+3. **Consistent Navigation**: Uses established UI patterns
+
+#### **Page Structure**
+
+- **User List** (`/settings/users`): Displays all users with role badges and
+  actions
+- **User Edit** (`/settings/users/[id]`): Edit existing user information
+- **User Create** (`/settings/users/new`): Create new user accounts
+- **Profile Integration**: Edit profile button links to user management for
+  admins
+
+### API Endpoints
+
+#### **User Management Endpoints**
+
+All user management endpoints require admin authentication:
+
+- `GET /api/users` - List all users
+- `GET /api/users/:id` - Get specific user
+- `POST /api/users` - Create new user
+- `PUT /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user
+
+#### **Configuration Endpoints**
+
+Public endpoints for UI configuration:
+
+- `GET /api/config/roles` - Get available roles (public)
+- `GET /api/config/record-types` - Get record types (public)
+- `GET /api/config/record-statuses` - Get record statuses (public)
+
+### Role System
+
+#### **Dynamic Role Configuration**
+
+Roles are defined in `data/.civic/roles.yml` and include:
+
+- **Admin**: Full system access and user management
+- **Council**: Can create, edit, and approve records
+- **Clerk**: Can create and edit records
+- **Public**: Can view published records
+
+#### **Role Features**
+
+- **Display Names**: Human-readable role names
+- **Descriptions**: Detailed role descriptions
+- **Colors**: Visual color coding for roles
+- **Icons**: Role-specific icons
+- **Permissions**: Granular permission system
+
+### Form Features
+
+#### **UserForm Component**
+
+Reusable component for user creation and editing:
+
+- **Dynamic Labels**: Adjusts based on create/edit mode
+- **Role Selection**: Dropdown with all available roles
+- **Password Management**: Generate strong passwords, show/hide visibility
+- **Validation**: Inline validation with API error handling
+- **Delete Confirmation**: Modal confirmation for user deletion
+
+#### **Form Fields**
+
+All fields use `UFormField` component with rich metadata:
+
+- **Username**: Required, unique validation
+- **Email**: Required, format validation
+- **Full Name**: Optional, falls back to username
+- **Role**: Required, dropdown with role descriptions
+- **Password**: Required for new users, optional for updates
+- **Confirm Password**: Password confirmation validation
+
+### Error Handling
+
+#### **Validation Strategy**
+
+- **Inline Errors**: Form validation errors displayed with fields
+- **API Toasts**: Success/error messages for API interactions
+- **Comprehensive States**: Loading, error, and success states
+- **User Feedback**: Clear messaging for all user actions
+
+#### **Security Considerations**
+
+- **Permission Checks**: Admin-only access enforcement
+- **Input Validation**: Client and server-side validation
+- **Error Sanitization**: Secure error messages without information disclosure
+- **Session Management**: Proper authentication and authorization
+
+### Examples
+
+#### **Creating a New User**
+
+```bash
+curl -X POST http://localhost:3000/api/users \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "clerk",
+    "email": "clerk@city.gov",
+    "password": "SecurePass123!",
+    "name": "City Clerk",
+    "role": "clerk"
+  }'
 ```
 
-### POST /api/users/auth/password
+#### **Updating User Role**
 
-**Description**: Authenticate user with username and password
-
-**Request Body**:
-
-```json
-{
-  "username": "string (required)",
-  "password": "string (required)"
-}
+```bash
+curl -X PUT http://localhost:3000/api/users/2 \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "council",
+    "name": "Senior City Clerk"
+  }'
 ```
 
-**Response (Success - 200)**:
+#### **Getting Available Roles**
 
-```json
-{
-  "success": true,
-  "data": {
-    "session": {
-      "token": "jwt_token_here",
-      "user": {
-        "id": 1,
-        "username": "john_doe",
-        "role": "public",
-        "email": "john@example.com",
-        "name": "John Doe",
-        "avatar_url": null
-      },
-      "expiresAt": "2025-07-31T17:06:40.801Z"
-    }
-  }
-}
+```bash
+curl -X GET http://localhost:3000/api/config/roles
+```
+
+### CLI Integration
+
+The CivicPress CLI also supports user management:
+
+```bash
+# List all users
+civic users list
+
+# Create a new user
+civic users create --username clerk --email clerk@city.gov --role clerk
+
+# Update user role
+civic users update 2 --role council
+
+# Delete user
+civic users delete 2
 ```
 
 ## UI Registration Page
 
 ### Location
 
-`modules/ui/app/pages/auth/register.vue`
+The registration page is located at `/auth/register` and provides a clean,
+modern interface for user registration.
 
 ### Features
 
-#### **Form Fields**
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **Real-time Validation**: Immediate feedback on form inputs
+- **Password Strength Indicator**: Visual feedback on password security
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+- **Error Handling**: Clear error messages and recovery suggestions
 
-- **Username**: Required, unique identifier
-- **Email**: Required, validated format
-- **Full Name**: Optional, falls back to username if not provided
-- **Password**: Required, with strength assessment
-- **Confirm Password**: Required, must match password
+### Form Validation
 
-#### **Password Strength Indicator**
+The registration form includes comprehensive validation:
 
-- **5-Level Assessment**: Very Weak → Weak → Fair → Good → Strong
-- **Visual Feedback**: Color-coded progress bars
-- **Requirements**: Length, uppercase, lowercase, numbers, special characters
-- **Real-time Updates**: Updates as user types
+- **Username**: 3-20 characters, alphanumeric and underscores only
+- **Email**: Valid email format, must be unique
+- **Password**: Minimum 8 characters, includes complexity requirements
+- **Name**: Optional, 1-50 characters
 
-#### **Validation**
+### Success Flow
 
-- **Client-side**: Immediate feedback for better UX
-- **Server-side**: Security and data integrity
-- **Email Format**: Regex validation `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
-- **Password Matching**: Real-time confirmation validation
+After successful registration:
 
-#### **Error Handling**
+1. **User sees success message** with confirmation
+2. **Automatic redirect** to login page
+3. **User can immediately log in** with new credentials
+4. **Welcome email** sent (future feature)
 
-- **Field-specific Errors**: Displayed in form help text
-- **API Errors**: Parsed and displayed in alerts
-- **Network Errors**: User-friendly connection error messages
-- **Validation Errors**: Clear, actionable feedback
+## Authentication
 
-#### **Success Flow**
+### Login Process
 
-- **Success Message**: Clear confirmation with next steps
-- **Form Clearing**: Automatic reset of all fields
-- **Redirect**: Smooth transition to login page
-- **User Feedback**: Green alert with success icon
+1. **User enters credentials** on login page
+2. **System validates** username/password combination
+3. **JWT token generated** and returned to client
+4. **Token stored** in browser localStorage
+5. **User redirected** to dashboard or intended page
+
+### Session Management
+
+- **JWT Tokens**: Stateless authentication using JSON Web Tokens
+- **Token Expiration**: Configurable expiration time (default: 24 hours)
+- **Automatic Refresh**: Tokens can be refreshed before expiration
+- **Secure Storage**: Tokens stored in localStorage with proper security
+
+### Logout Process
+
+1. **User clicks logout** in UI
+2. **Token invalidated** on server (optional)
+3. **Local storage cleared** of authentication data
+4. **User redirected** to login page
+
+## Security Considerations
+
+### Password Security
+
+- **Strong Hashing**: Passwords hashed using bcrypt with salt
+- **Complexity Requirements**: Minimum 8 characters with mixed case and symbols
+- **Rate Limiting**: Prevents brute force attacks
+- **Account Lockout**: Temporary lockout after failed attempts
+
+### Data Protection
+
+- **HTTPS Required**: All authentication traffic encrypted
+- **Input Sanitization**: All user inputs validated and sanitized
+- **SQL Injection Prevention**: Parameterized queries used throughout
+- **XSS Protection**: Output encoding and CSP headers
+
+### Privacy
+
+- **Minimal Data Collection**: Only necessary user information collected
+- **Data Retention**: Clear policies on data retention and deletion
+- **User Consent**: Clear privacy policy and terms of service
+- **GDPR Compliance**: Right to access, rectification, and deletion
 
 ## Configuration
 
-### Database Configuration
+### Environment Variables
 
-The registration system uses the database configuration from `.civicrc`:
+```bash
+# Authentication
+JWT_SECRET=your-secret-key-here
+JWT_EXPIRES_IN=24h
+BYPASS_AUTH=false
+
+# Registration
+ALLOW_PUBLIC_REGISTRATION=true
+REQUIRE_EMAIL_VERIFICATION=false
+MIN_PASSWORD_LENGTH=8
+
+# Rate Limiting
+REGISTRATION_RATE_LIMIT=10
+LOGIN_RATE_LIMIT=100
+```
+
+### Role Configuration
+
+Roles are configured in `data/.civic/roles.yml`:
 
 ```yaml
-database:
-  type: "sqlite"
-  sqlite:
-    file: ".system-data/civic.db"
+roles:
+  admin:
+    name: Administrator
+    description: Full system access and user management
+    permissions: ["*"]
+    color: red
+    icon: shield
+
+  council:
+    name: Council Member
+    description: Can create, edit, and approve records
+    permissions: ["records:*", "workflows:*"]
+    color: blue
+    icon: users
+
+  clerk:
+    name: City Clerk
+    description: Can create and edit records
+    permissions: ["records:create", "records:edit", "records:view"]
+    color: green
+    icon: file-text
+
+  public:
+    name: Public
+    description: Can view published records
+    permissions: ["records:view"]
+    color: gray
+    icon: eye
 ```
 
-**Important**: The `.civicrc` file must be in YAML format, not JSON. The
-`CentralConfigManager` expects YAML parsing.
+## Testing
 
-### API URL Configuration
+### Manual Testing
 
-The UI uses runtime configuration for API URLs:
+1. **Registration Flow**:
+   - Visit `/auth/register`
+   - Fill out form with valid data
+   - Verify successful registration
+   - Test with invalid data
 
-```typescript
-// In nuxt.config.ts
-runtimeConfig: {
-  public: {
-    civicApiUrl: process.env.API_BASE_URL || 'http://localhost:3000',
-  },
-}
+2. **Login Flow**:
+   - Visit `/auth/login`
+   - Enter credentials
+   - Verify successful login
+   - Test with invalid credentials
 
-// In components
-const config = useRuntimeConfig()
-const response = await $fetch(`${config.public.civicApiUrl}/api/users/register`, {
-  method: 'POST',
-  body: userData
-})
-```
+3. **Admin Management**:
+   - Login as admin
+   - Navigate to Settings → Users
+   - Test user creation, editing, deletion
+   - Verify role assignment
 
-## Security Features
-
-### **Password Security**
-
-- **Minimum Requirements**: 8 characters with uppercase, lowercase, numbers,
-  special characters
-- **Hashing**: bcrypt with 12 salt rounds
-- **Validation**: Both client-side and server-side validation
-- **Strength Assessment**: Visual indicator with real-time feedback
-
-### **Input Validation**
-
-- **Username**: Unique, required
-- **Email**: Format validation, required
-- **Password**: Strength requirements, required
-- **Name**: Optional, falls back to username
-
-### **Error Handling**
-
-- **Secure Messages**: No information disclosure in error messages
-- **Generic Responses**: Use generic messages for security-sensitive operations
-- **Detailed Logging**: Log detailed errors for debugging
-- **User-Friendly**: Show clear, actionable error messages
-
-## Database Schema
-
-### Users Table
-
-```sql
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL DEFAULT 'public',
-  email TEXT,
-  name TEXT,
-  avatar_url TEXT,
-  password_hash TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### Key Features
-
-- **Auto-incrementing ID**: Primary key for user identification
-- **Unique Username**: Enforced uniqueness constraint
-- **Role-based Access**: Default 'public' role for new users
-- **Password Hashing**: Secure bcrypt hashed passwords
-- **Timestamps**: Automatic creation and update tracking
-
-## Usage Examples
-
-### **Register a New User (API)**
+### Automated Testing
 
 ```bash
-curl -X POST http://localhost:3000/api/users/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john_doe",
-    "email": "john@example.com",
-    "password": "SecurePass123!",
-    "name": "John Doe"
-  }'
+# Run authentication tests
+pnpm run test:run -- --grep "auth"
+
+# Run user management tests
+pnpm run test:run -- --grep "users"
+
+# Run registration tests
+pnpm run test:run -- --grep "register"
 ```
-
-### **Register User Without Full Name (API)**
-
-```bash
-curl -X POST http://localhost:3000/api/users/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "jane_smith",
-    "email": "jane@example.com",
-    "password": "SecurePass123!"
-  }'
-```
-
-_Result: User created with `name: "jane_smith"` (username used as name)_
-
-### **Authenticate User (API)**
-
-```bash
-curl -X POST http://localhost:3000/api/users/auth/password \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "john_doe",
-    "password": "SecurePass123!"
-  }'
-```
-
-### **Access Registration Page (UI)**
-
-Navigate to `http://localhost:3030/auth/register` to access the registration
-form.
 
 ## Troubleshooting
 
-### **Common Issues**
+### Common Issues
 
-#### **"Route POST /users/register not found"**
+1. **Registration Fails**:
+   - Check server logs for validation errors
+   - Verify database connection
+   - Check email uniqueness constraints
 
-- **Cause**: API proxy configuration issue
-- **Solution**: Use direct API URL with runtime config
-- **Code**: `$fetch(\`${config.public.civicApiUrl}/api/users/register\`)`
+2. **Login Issues**:
+   - Verify JWT secret configuration
+   - Check token expiration settings
+   - Validate password hashing
 
-#### **Users Not Saved to Database**
+3. **Admin Access Denied**:
+   - Verify user has admin role
+   - Check role configuration file
+   - Validate permission system
 
-- **Cause**: Wrong database path configuration
-- **Solution**: Check `.civicrc` format (YAML) and database path
-- **Verification**: `sqlite3 .system-data/civic.db "SELECT * FROM users;"`
+### Debug Mode
 
-#### **Configuration Not Loading**
+Enable debug logging for authentication issues:
 
-- **Cause**: `.civicrc` in JSON format instead of YAML
-- **Solution**: Convert to YAML format
-- **Example**: Use `yaml.stringify()` instead of `JSON.stringify()`
-
-#### **Authentication Errors**
-
-- **Cause**: Route ordering in Express.js
-- **Solution**: Ensure public routes registered before auth middleware
-- **Order**: Public routes → Public middleware → Auth middleware → Protected
-  routes
-
-### **Debugging Steps**
-
-1. **Check API Server**: `curl http://localhost:3000/health`
-2. **Test Registration**:
-   `curl -X POST http://localhost:3000/api/users/register ...`
-3. **Verify Database**: `sqlite3 .system-data/civic.db "SELECT * FROM users;"`
-4. **Check Configuration**: Verify `.civicrc` is in YAML format
-5. **Monitor Logs**: Check API server logs for detailed error information
-
-## Integration with Other Systems
-
-### **Authentication System**
-
-- **JWT Tokens**: Registration doesn't auto-login, redirects to login
-- **Session Management**: Proper token handling and expiration
-- **Role Assignment**: New users get 'public' role by default
-
-### **Notification System**
-
-- **Future Integration**: Email verification on registration
-- **Password Reset**: Email-based password recovery
-- **Security Alerts**: Notifications for account activities
-
-### **Audit System**
-
-- **User Creation**: Track all user registration events
-- **Authentication**: Log login attempts and failures
-- **Security Events**: Monitor suspicious account activities
+```bash
+DEBUG=auth:* pnpm run dev
+```
 
 ## Future Enhancements
 
-### **Planned Features**
+### Planned Features
 
-1. **Email Verification**: Send verification emails on registration
-2. **Password Reset**: Forgot password functionality
-3. **Account Management**: User profile and settings pages
-4. **Admin Dashboard**: User management interface
-5. **Advanced Security**: 2FA, account lockout, security questions
+- **Email Verification**: Required email verification before account activation
+- **Password Reset**: Self-service password reset via email
+- **Two-Factor Authentication**: TOTP-based 2FA support
+- **Social Login**: OAuth integration with Google, GitHub, etc.
+- **Audit Logging**: Comprehensive audit trail for user actions
+- **Bulk Operations**: Import/export user data
+- **Advanced Roles**: Hierarchical role system with inheritance
 
-### **Integration Opportunities**
+### API Enhancements
 
-1. **Notification System**: Email verification and security alerts
-2. **Role Management**: Advanced role assignment and permissions
-3. **Audit Trail**: Comprehensive user activity logging
-4. **Federation**: Multi-node user synchronization
-
-## Best Practices
-
-### **Security**
-
-- Always validate input on both client and server
-- Use secure password hashing (bcrypt)
-- Implement proper error handling without information disclosure
-- Log security events for monitoring
-
-### **User Experience**
-
-- Provide immediate feedback for form validation
-- Show clear, actionable error messages
-- Implement smooth success flows
-- Maintain form data for easy correction
-
-### **Development**
-
-- Test API endpoints independently
-- Verify database persistence
-- Monitor API logs for debugging
-- Use proper configuration management
-
-### **Configuration**
-
-- Use YAML format for `.civicrc`
-- Proper database path specification
-- Runtime configuration for API URLs
-- Secure storage of sensitive data
-
----
-
-**Last Updated**: July 2025  
-**Status**: ✅ Complete and Production Ready  
-**Version**: 1.0.0
+- **GraphQL Support**: GraphQL API for complex queries
+- **Webhook Integration**: Real-time notifications for user events
+- **Rate Limiting**: Advanced rate limiting with Redis
+- **Caching**: Redis-based caching for improved performance

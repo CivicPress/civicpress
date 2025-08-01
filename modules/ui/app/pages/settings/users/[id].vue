@@ -1,232 +1,185 @@
 <script setup lang="ts">
-import type { User } from '~/types/user'
+import type { User } from '~/types/user';
 
-// Composables
-const { $civicApi } = useNuxtApp()
-const toast = useToast()
-const route = useRoute()
+// Page metadata
+definePageMeta({
+    title: 'Edit User',
+    requiresAuth: true,
+    layout: 'default',
+});
 
-// Auth store for permissions
-const authStore = useAuthStore()
+// Route parameters
+const route = useRoute();
+const userId = route.params.id as string;
 
 // Reactive state
-const user = ref<User | null>(null)
-const loading = ref(true)
-const saving = ref(false)
-const error = ref('')
+const user = ref<User | null>(null);
+const loading = ref(true);
+const saving = ref(false);
+const error = ref<string | null>(null);
+const formError = ref<string | null>(null);
+
+// Auth store for permissions
+const authStore = useAuthStore();
+
+// Computed properties
+const pageTitle = computed(() => {
+    return user.value ? `Edit ${user.value.name || user.value.username}` : 'Edit User';
+});
+
+const breadcrumbItems = computed(() => [
+    { label: 'Settings', to: '/settings' },
+    { label: 'Users', to: '/settings/users' },
+    { label: user.value?.name || user.value?.username || 'User' },
+]);
+
+const canDelete = computed(() => {
+    // Only allow deletion if user is admin or clerk and not deleting themselves
+    const userRole = authStore.currentUser?.role;
+    return (userRole === 'admin' || userRole === 'clerk') &&
+        authStore.currentUser?.id !== user.value?.id;
+});
 
 // Fetch user data
 const fetchUser = async () => {
-    try {
-        loading.value = true
-        error.value = ''
+    loading.value = true;
+    error.value = null;
 
-        const userId = route.params.id as string
-        const response = await $civicApi(`/api/users/${userId}`) as any
+    try {
+        const response = await useNuxtApp().$civicApi(`/api/users/${userId}`) as any;
 
         if (response.success) {
-            user.value = response.data.user
+            user.value = response.data.user;
         } else {
-            const errorMsg = response.error || 'Failed to fetch user'
-            error.value = errorMsg
-            toast.add({
-                title: 'Error',
-                description: errorMsg,
-                color: 'error',
-                icon: 'i-lucide-alert-circle'
-            })
+            error.value = response.message || 'Failed to fetch user';
         }
     } catch (err: any) {
-        const errorMsg = err.message || 'Failed to fetch user'
-        error.value = errorMsg
-        toast.add({
-            title: 'Error',
-            description: errorMsg,
-            color: 'error',
-            icon: 'i-lucide-alert-circle'
-        })
-        console.error('Error fetching user:', err)
+        console.error('Error fetching user:', err);
+        error.value = err.message || 'Failed to fetch user';
     } finally {
-        loading.value = false
+        loading.value = false;
     }
-}
+};
 
-// Save user
-const saveUser = async (formData: any) => {
+// Handle form submission
+const handleSubmit = async (userData: any) => {
+    saving.value = true;
+    formError.value = null;
+
     try {
-        saving.value = true
-        error.value = ''
-
-        const userId = route.params.id as string
-
-        const response = await $civicApi(`/api/users/${userId}`, {
+        const response = await useNuxtApp().$civicApi(`/api/users/${userId}`, {
             method: 'PUT',
-            body: formData
-        }) as any
+            body: userData,
+        }) as any;
 
         if (response.success) {
-            user.value = response.data.user
+            // Update local user data
+            user.value = response.data.user;
 
-            toast.add({
+            // Show success message
+            useToast().add({
                 title: 'Success',
                 description: 'User updated successfully',
                 color: 'primary',
-                icon: 'i-lucide-check-circle'
-            })
+            });
         } else {
-            const errorMsg = response.error || 'Failed to update user'
-            error.value = errorMsg
-            toast.add({
-                title: 'Error',
-                description: errorMsg,
-                color: 'error',
-                icon: 'i-lucide-alert-circle'
-            })
+            formError.value = response.message || 'Failed to update user';
         }
     } catch (err: any) {
-        const errorMsg = err.message || 'Failed to update user'
-        error.value = errorMsg
-        toast.add({
-            title: 'Error',
-            description: errorMsg,
-            color: 'error',
-            icon: 'i-lucide-alert-circle'
-        })
-        console.error('Error updating user:', err)
+        console.error('Error updating user:', err);
+        formError.value = err.message || 'Failed to update user';
     } finally {
-        saving.value = false
+        saving.value = false;
     }
-}
+};
 
-// Delete user
-const deleteUser = async () => {
+// Handle user deletion
+const handleDelete = async () => {
+    saving.value = true;
 
     try {
-        saving.value = true
-        const userId = route.params.id as string
-
-        const response = await $civicApi(`/api/users/${userId}`, {
-            method: 'DELETE'
-        }) as any
+        const response = await useNuxtApp().$civicApi(`/api/users/${userId}`, {
+            method: 'DELETE',
+        }) as any;
 
         if (response.success) {
-            toast.add({
+            // Show success message
+            useToast().add({
                 title: 'Success',
                 description: 'User deleted successfully',
                 color: 'primary',
-                icon: 'i-lucide-check-circle'
-            })
+            });
+
             // Navigate back to users list
-            navigateTo('/settings/users')
+            await navigateTo('/settings/users');
         } else {
-            const errorMsg = response.error || 'Failed to delete user'
-            toast.add({
-                title: 'Error',
-                description: errorMsg,
-                color: 'error',
-                icon: 'i-lucide-alert-circle'
-            })
+            formError.value = response.message || 'Failed to delete user';
         }
     } catch (err: any) {
-        const errorMsg = err.message || 'Failed to delete user'
-        toast.add({
-            title: 'Error',
-            description: errorMsg,
-            color: 'error',
-            icon: 'i-lucide-alert-circle'
-        })
-        console.error('Error deleting user:', err)
+        console.error('Error deleting user:', err);
+        formError.value = err.message || 'Failed to delete user';
     } finally {
-        saving.value = false
+        saving.value = false;
     }
-}
+};
 
-// Computed properties
-const canManageUsers = computed(() => {
-    return authStore.currentUser?.role === 'admin'
-})
-
-const canDeleteUser = computed(() => {
-    if (!user.value || !authStore.currentUser) return false
-    // Admin can delete any user except themselves
-    return authStore.currentUser.role === 'admin' && user.value.id !== authStore.currentUser.id
-})
-
-const breadcrumbItems = computed(() => [
-    {
-        label: 'Settings',
-        to: '/settings'
-    },
-    {
-        label: 'Users',
-        to: '/settings/users'
-    },
-    {
-        label: user.value?.name || user.value?.username || 'User'
-    }
-])
-
-// On mounted
-onMounted(async () => {
-    await fetchUser()
-})
+// Fetch user data on mount
+onMounted(() => {
+    fetchUser();
+});
 </script>
 
 <template>
     <UDashboardPanel>
         <template #header>
-            <UDashboardNavbar>
-                <template #title>
-                    <h1 class="text-lg font-semibold">
-                        {{ user ? (user.name || user.username) : 'User' }}
-                    </h1>
-                </template>
-                <template #description>
-                    Manage user settings and role
+            <UDashboardNavbar :title="pageTitle">
+                <template #right>
+                    <UButton to="/settings/users" color="neutral" variant="outline" icon="i-lucide-arrow-left">
+                        Back to Users
+                    </UButton>
                 </template>
             </UDashboardNavbar>
         </template>
 
         <template #body>
-            <UBreadcrumb :items="breadcrumbItems" />
+            <div class="space-y-6">
+                <UBreadcrumb :items="breadcrumbItems" />
 
-            <!-- Loading state -->
-            <div v-if="loading" class="flex justify-center py-12">
-                <!-- <ULoadingBlock /> -->
-            </div>
+                <!-- Loading State -->
+                <div v-if="loading" class="space-y-4">
+                    <UCard>
+                        <div class="flex items-center space-x-3">
+                            <UIcon name="i-lucide-loader-2" class="w-6 h-6 animate-spin text-primary-600" />
+                            <div>
+                                <h2 class="text-xl font-semibold">Loading User</h2>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    Fetching user information...
+                                </p>
+                            </div>
+                        </div>
+                    </UCard>
+                </div>
 
-            <!-- Error state -->
-            <div v-else-if="error && !user" class="text-center py-12">
-                <UIcon name="i-lucide-alert-circle" class="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    Error Loading User
-                </h3>
-                <p class="text-gray-600 dark:text-gray-400 mb-6">
-                    {{ error }}
-                </p>
-                <UButton to="/settings/users" color="primary">
-                    Back to Users
-                </UButton>
-            </div>
+                <!-- Error State -->
+                <UAlert v-else-if="error" color="error" variant="soft" :title="error" icon="i-lucide-alert-circle" />
 
-            <!-- User form -->
-            <div v-else-if="user && canManageUsers" class="w-full">
-                <UserForm :user="user" :is-editing="true" :error="error" :saving="saving" :can-delete="canDeleteUser"
-                    @submit="saveUser" @delete="deleteUser" />
-            </div>
+                <!-- User Form -->
+                <UCard v-else>
+                    <template #header>
+                        <div class="flex items-center space-x-3">
+                            <UIcon name="i-lucide-user" class="w-6 h-6 text-primary-600" />
+                            <div>
+                                <h2 class="text-xl font-semibold">Edit User</h2>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    Update user information and permissions
+                                </p>
+                            </div>
+                        </div>
+                    </template>
 
-            <!-- Access denied -->
-            <div v-else class="text-center py-12">
-                <UIcon name="i-lucide-lock" class="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    Access Denied
-                </h3>
-                <p class="text-gray-600 dark:text-gray-400 mb-6">
-                    You don't have permission to manage users.
-                </p>
-                <UButton to="/settings/users" color="primary">
-                    Back to Users
-                </UButton>
+                    <UserForm :user="user || undefined" :is-editing="true" :error="formError || undefined"
+                        :saving="saving" :can-delete="canDelete" @submit="handleSubmit" @delete="handleDelete" />
+                </UCard>
             </div>
         </template>
     </UDashboardPanel>

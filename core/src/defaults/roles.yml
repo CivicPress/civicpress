@@ -20,13 +20,16 @@ roles:
 
   clerk:
     name: 'Clerk'
-    description: 'Can create and edit records'
+    description: 'Can create and edit records, manage users'
     permissions:
       - 'records:create'
       - 'records:edit'
       - 'records:view'
       - 'records:list'
       - 'users:view'
+      - 'users:edit'
+      - 'users:create'
+      - 'users:delete'
       - 'templates:view'
     status_transitions:
       - 'draft'

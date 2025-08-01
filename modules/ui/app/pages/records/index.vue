@@ -13,7 +13,7 @@ const {
     fetchRecordTypes,
     getRecordTypeIcon,
     getRecordTypeLabel,
-    recordTypeOptions,
+    getRecordTypeOptions,
 } = useRecordTypes()
 
 const {
@@ -268,7 +268,7 @@ const shouldShowLoadMore = computed(() => {
 })
 
 const recordTypeOptionsComputed = computed(() => {
-    return recordTypeOptions().map((option: any) => {
+    return getRecordTypeOptions().map((option: any) => {
         return {
             label: option.label,
             icon: option.icon,
@@ -519,7 +519,7 @@ const breadcrumbItems = [
                                                             <span>Type: {{ item.data.typeLabel }}</span>
                                                             <span>Created: {{ item.data.formattedDate }}</span>
                                                             <span v-if="item.data.author">By: {{ item.data.author
-                                                                }}</span>
+                                                            }}</span>
                                                         </div>
                                                     </div>
                                                 </div>

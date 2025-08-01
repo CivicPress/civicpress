@@ -8,7 +8,8 @@ const authStore = useAuthStore()
 // User roles composable
 const {
     getRoleDisplayName,
-    getRoleColor
+    getRoleColor,
+    fetchRoles
 } = useUserRoles()
 
 // Reactive state
@@ -39,7 +40,9 @@ const fetchUsers = async () => {
 
 // Computed properties
 const canManageUsers = computed(() => {
-    return authStore.currentUser?.role === 'admin'
+    const userRole = authStore.currentUser?.role;
+    // Allow admin and clerk roles to manage users (based on updated roles.yml)
+    return userRole === 'admin' || userRole === 'clerk';
 })
 
 // Format date utility
@@ -49,8 +52,8 @@ const formatDate = (dateString: string) => {
 }
 
 // Navigation
-const navigateToUser = (userId: string) => {
-    navigateTo(`/settings/users/${userId}`)
+const navigateToUser = (userId: number) => {
+    navigateTo(`/settings/users/${userId.toString()}`)
 }
 
 const breadcrumbItems = [
@@ -65,6 +68,7 @@ const breadcrumbItems = [
 
 // On mounted
 onMounted(() => {
+    fetchRoles()
     fetchUsers()
 })
 </script>
@@ -109,11 +113,7 @@ onMounted(() => {
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <div class="flex-shrink-0">
-                                    <div
-                                        class="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                                        <UIcon name="i-lucide-user"
-                                            class="w-6 h-6 text-primary-600 dark:text-primary-400" />
-                                    </div>
+                                    <UserAvatar :user="user" size="lg" />
                                 </div>
                                 <div class="flex-1">
                                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">

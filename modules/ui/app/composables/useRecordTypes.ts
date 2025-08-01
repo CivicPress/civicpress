@@ -1,11 +1,6 @@
 import { ref, readonly } from 'vue';
 
-// Global cache for record types
-let globalRecordTypes: RecordTypeMetadata[] = [];
-let globalFetched = false;
-let globalLoading = false;
-let globalError: string | null = null;
-
+// Define the interface locally
 export interface RecordTypeMetadata {
   key: string;
   label: string;
@@ -15,139 +10,147 @@ export interface RecordTypeMetadata {
   priority: number;
 }
 
-export interface RecordTypesResponse {
-  success: boolean;
-  data: {
-    record_types: RecordTypeMetadata[];
-    total: number;
-  };
-}
+// Global state to avoid multiple fetches
+let globalRecordTypes: RecordTypeMetadata[] = [];
+let globalError: string | null = null;
+let globalFetched = false;
 
 export function useRecordTypes() {
   const recordTypes = ref<RecordTypeMetadata[]>(globalRecordTypes);
-  const loading = ref(globalLoading);
+  const loading = ref(!globalFetched);
   const error = ref<string | null>(globalError);
   const fetched = ref(globalFetched);
+
+  // Get icons from central registry
+  const { getIcon } = useIcons();
 
   const fetchRecordTypes = async () => {
     // Skip if already fetched globally
     if (globalFetched && globalRecordTypes.length > 0) {
       recordTypes.value = globalRecordTypes;
       loading.value = false;
-      error.value = null;
-      fetched.value = true;
-      return;
-    }
-
-    // Skip if already fetched locally
-    if (fetched.value && recordTypes.value.length > 0) {
+      error.value = globalError;
+      fetched.value = globalFetched;
       return;
     }
 
     loading.value = true;
     error.value = null;
-    globalLoading = true;
-    globalError = null;
 
     try {
       const response = (await useNuxtApp().$civicApi(
         '/api/config/record-types'
-      )) as RecordTypesResponse;
+      )) as {
+        success: boolean;
+        data: {
+          record_types: RecordTypeMetadata[];
+          total: number;
+        };
+      };
 
-      if (response.success && response.data) {
-        const newRecordTypes = response.data.record_types || [];
-        recordTypes.value = newRecordTypes;
-        fetched.value = true;
-
-        // Update global cache
-        globalRecordTypes = newRecordTypes;
-        globalFetched = true;
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to fetch record types';
+      // Extract the record_types from the nested response
+      const recordTypesData = response.data?.record_types || [];
+      recordTypes.value = recordTypesData;
+      globalRecordTypes = recordTypesData;
+      globalError = null;
+      globalFetched = true;
+      fetched.value = true;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to fetch record types';
       error.value = errorMessage;
       globalError = errorMessage;
-      console.error('Error fetching record types:', err);
     } finally {
       loading.value = false;
-      globalLoading = false;
     }
   };
 
-  // Auto-fetch on first access
-  const ensureData = async () => {
-    if (!fetched.value) {
-      await fetchRecordTypes();
-    }
+  const getRecordTypeByKey = (key: string): RecordTypeMetadata | undefined => {
+    return recordTypes.value.find(
+      (type: RecordTypeMetadata) => type.key === key
+    );
   };
 
-  const getRecordTypeByKey = (key: string) => {
-    return recordTypes.value.find((type) => type.key === key);
-  };
-
-  const getRecordTypeLabel = (key: string) => {
+  const getRecordTypeLabel = (key: string): string => {
     const recordType = getRecordTypeByKey(key);
     return recordType?.label || key;
   };
 
-  const getRecordTypeDescription = (key: string) => {
+  const getRecordTypeDescription = (key: string): string => {
     const recordType = getRecordTypeByKey(key);
     return recordType?.description || '';
   };
+
   const getRecordTypeIcon = (key: string) => {
-    // Map record types to icons (UI-specific concern)
-    const iconMap: Record<string, string> = {
-      bylaw: 'i-lucide-file-text',
-      ordinance: 'i-lucide-gavel',
-      policy: 'i-lucide-book-open',
-      proclamation: 'i-lucide-megaphone',
-      resolution: 'i-lucide-vote',
+    // Map record types to icon registry keys
+    const typeIconMap: Record<string, string> = {
+      bylaw: 'bylaw',
+      policy: 'policy',
+      resolution: 'resolution',
+      ordinance: 'ordinance',
+      proclamation: 'proclamation',
+      regulation: 'regulation',
+      directive: 'directive',
+      guideline: 'guideline',
     };
-    return iconMap[key] || 'i-lucide-file';
+
+    const iconKey = typeIconMap[key];
+    return iconKey ? getIcon(iconKey as any) : getIcon('file');
   };
 
   const getRecordTypeColor = (key: string) => {
-    // Map record types to colors (UI-secifi concern)
+    // Map record types to colors (UI-specific concern)
     const colorMap: Record<string, string> = {
       bylaw: 'primary',
       ordinance: 'primary',
-      policy: 'primary',
-      proclamation: 'primary',
-      resolution: 'primary',
+      policy: 'blue',
+      resolution: 'green',
+      proclamation: 'orange',
+      regulation: 'purple',
+      directive: 'indigo',
+      guideline: 'gray',
     };
-    return colorMap[key] || 'neutral';
+
+    return colorMap[key] || 'gray';
   };
 
-  const recordTypeOptions = () => {
-    return recordTypes.value.map((type) => ({
-      label: type.label,
+  const getRecordTypeOptions = () => {
+    return recordTypes.value.map((type: RecordTypeMetadata) => ({
       value: type.key,
-      type: 'item',
+      label: type.label,
+      description: type.description,
       icon: getRecordTypeIcon(type.key),
+      color: getRecordTypeColor(type.key),
     }));
   };
 
-  const sortedRecordTypes = () => {
-    return [...recordTypes.value].sort((a, b) => a.priority - b.priority);
+  const isValidRecordType = (type: string): boolean => {
+    if (!type) return false;
+    return recordTypes.value.some((rt: RecordTypeMetadata) => rt.key === type);
   };
 
-  onMounted(() => {
-    ensureData();
-  });
+  const getAvailableRecordTypes = (): string[] => {
+    return recordTypes.value.map((type: RecordTypeMetadata) => type.key);
+  };
 
   return {
+    // State
     recordTypes: readonly(recordTypes),
     loading: readonly(loading),
     error: readonly(error),
+    fetched: readonly(fetched),
+
+    // Actions
     fetchRecordTypes,
+
+    // Utilities
     getRecordTypeByKey,
     getRecordTypeLabel,
     getRecordTypeDescription,
     getRecordTypeIcon,
     getRecordTypeColor,
-    recordTypeOptions,
-    sortedRecordTypes,
+    getRecordTypeOptions,
+    isValidRecordType,
+    getAvailableRecordTypes,
   };
 }

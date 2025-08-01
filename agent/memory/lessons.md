@@ -1,156 +1,82 @@
 # Lessons Learned
 
-## User Management Interface Implementation Lessons (Latest)
+## Development Patterns
 
-### **API Architecture Lessons**
+### API Development
 
-- **Public Configuration Endpoints**: Making config endpoints public requires
-  careful consideration
-  - **Lesson**: Configuration data that UI needs before authentication should be
-    public
-  - **Implementation**: Direct file system reading avoids authentication
-    dependencies
-  - **Security**: Only expose non-sensitive configuration data publicly
+- Always test API endpoints with curl before implementing UI
+- Use proper error handling and status codes
+- Implement authentication middleware correctly
+- Separate public and protected routes clearly
 
-- **Middleware Ordering**: Express.js middleware order is critical for
-  authentication
-  - **Lesson**: Public routes must be registered before authentication
-    middleware
-  - **Implementation**: Moved config routes before global auth middleware
-  - **Benefit**: Prevents authentication conflicts and redirect loops
+### UI Development
 
-### **UI Architecture Lessons**
+- Use consistent page structure with UDashboardPanel and UDashboardNavbar
+- Implement proper loading states and error handling
+- Use toast notifications for API interactions, inline validation for forms
+- Follow established patterns for navigation and user interaction
 
-- **Template Slots vs Attributes**: Template slots provide better flexibility
-  - **Lesson**: Template slots offer more control than attribute-based
-    configuration
-  - **Implementation**: Use `#title`, `#description`, `#toggle` slots for
-    dynamic content
-  - **Benefit**: Easier customization and better HTML structure control
+### Testing
 
-- **Component Reusability**: Single component for create/edit reduces
-  duplication
-  - **Lesson**: Props and event emitters enable flexible component reuse
-  - **Implementation**: `UserForm` component with `isEditing`, `user`,
-    `canDelete` props
-  - **Benefit**: DRY principle, consistent behavior, easier maintenance
+- Run tests before committing changes
+- Use proper test environment setup
+- Test both API and UI functionality
 
-### **Form Design Lessons**
+### Git Workflow
 
-- **UFormField Components**: Rich metadata improves user experience
-  - **Lesson**: Help text, descriptions, and hints provide better context
-  - **Implementation**: Label, description, hint, help text, and error props
-  - **Benefit**: Professional appearance and better accessibility
+- Commit frequently with clear messages
+- Use feature branches for major changes
+- Test thoroughly before merging
 
-- **Validation Strategy**: Separate inline validation from API feedback
-  - **Lesson**: Form validation errors should be inline, API errors as toasts
-  - **Implementation**: `formErrors` reactive object for inline, toast for API
-  - **Benefit**: Clear distinction between user input and system errors
+## Critical Issues Resolved
 
-- **Password UX**: Unified password visibility control improves usability
-  - **Lesson**: Single eye icon controlling both password fields is more
-    intuitive
-  - **Implementation**: `showPassword` reactive variable, eye icon in first
-    field only
-  - **Benefit**: Less visual clutter, better user experience
+### Infinite Loop in Vue Reactivity System
 
-### **Navigation Lessons**
+**Issue**: `RangeError: Maximum call stack size exceeded` in UI, specifically in
+`@nuxt/ui` Icon component **Root Cause**: Reactive dependency loop between
+custom composables (`useIcons`, `Icon.vue`) and `@nuxt/ui`'s Icon component
+**Solution**: Reverted to stable commit before the problematic changes were
+introduced **Lesson**: When creating custom icon systems or composables that
+interact with UI components, be extremely careful about reactive dependencies.
+The `@nuxt/ui` Icon component has complex internal reactivity that can easily
+create circular dependencies.
 
-- **Reactive Breadcrumbs**: Dynamic breadcrumbs improve navigation context
-  - **Lesson**: Breadcrumbs should update when data loads, not just on mount
-  - **Implementation**: `computed()` breadcrumb items that react to user data
-  - **Benefit**: Better user orientation and navigation context
+### API Port Conflicts
 
-- **Navigation Integration**: Leverage existing navigation structures
-  - **Lesson**: Add new features to existing navigation rather than creating new
-    structures
-  - **Implementation**: Conditional children in existing Settings dropdown
-  - **Benefit**: Clean navigation without adding clutter
+**Issue**: Multiple API instances running on same port **Solution**: Use
+`lsof -ti:3000` to find processes and `kill -9` to terminate them **Lesson**:
+Always check for running processes before starting servers
 
-### **Access Control Lessons**
+### Authentication Middleware
 
-- **Admin-Only Features**: Clear permission boundaries improve security
-  - **Lesson**: Sensitive administrative functions should be clearly restricted
-  - **Implementation**: `canManageUsers` computed property, conditional UI
-    rendering
-  - **Benefit**: Proper security and clear permission boundaries
+**Issue**: Config endpoints requiring authentication when they should be public
+**Solution**: Apply `authMiddleware` only to specific protected routes, not
+globally **Lesson**: Be explicit about which routes need authentication vs which
+should be public
 
-- **Self-Delete Prevention**: Protect against accidental account deletion
-  - **Lesson**: Admins should not be able to delete their own account
-  - **Implementation**: `canDeleteUser` computed property comparing user IDs
-  - **Benefit**: System safety and prevents administrative lockout
+## Best Practices
 
-### **Error Handling Lessons**
+### Composable Development
 
-- **Comprehensive Error States**: Provide feedback for all scenarios
-  - **Lesson**: Users need clear feedback for loading, error, and access denied
-    states
-  - **Implementation**: Conditional rendering with appropriate UI components
-  - **Benefit**: Better user experience and clear system status
+- Avoid circular dependencies between composables
+- Be careful when creating wrappers around UI components
+- Test composables in isolation before integrating
 
-- **Toast Notifications**: Non-intrusive feedback for system operations
-  - **Lesson**: API interaction feedback should not interrupt user flow
-  - **Implementation**: `useToast()` composable for success/error messages
-  - **Benefit**: Consistent feedback without disrupting user experience
+### Error Handling
 
-### **Development Process Lessons**
+- Use proper try-catch blocks
+- Implement meaningful error messages
+- Separate client-side validation from server-side errors
 
-- **Iterative Problem Solving**: Complex features require multiple iterations
-  - **Lesson**: Authentication and UI consistency issues require deep
-    investigation
-  - **Implementation**: Multiple iterations to fix API authentication and UI
-    structure
-  - **Benefit**: Robust, well-tested features
+### Code Organization
 
-- **Component Design**: Reusable components significantly improve development
-  speed
-  - **Lesson**: Creating reusable components pays off in maintenance and
-    consistency
-  - **Implementation**: `UserForm` component used for both create and edit
-  - **Benefit**: Faster development, consistent behavior, easier maintenance
+- Keep related functionality together
+- Use consistent naming conventions
+- Document complex logic
 
-## Roles API Endpoint Implementation Lessons (Previous)
+## Current State
 
-### **API Pattern Consistency**
-
-- **Follow Established Patterns**: New endpoints should match existing API
-  structure
-- **Lesson**: Consistency in response format and error handling improves
-  developer experience
-- **Implementation**: `/api/config/roles` follows same pattern as
-  `/api/config/record-types`
-- **Benefit**: Predictable API behavior and easier integration
-
-### **Core Method Design**
-
-- **Expose Core Services**: Make core functionality available to other modules
-- **Lesson**: Core services should be accessible through well-defined interfaces
-- **Implementation**: Added `getRoleConfig()` to RoleManager and
-  `getRoleManager()` to AuthService
-- **Benefit**: Modular architecture and reusable functionality
-
-### **Configuration-Driven Architecture**
-
-- **Platform Configuration**: UI behavior should be driven by platform
-  configuration
-- **Lesson**: Hardcoded values limit flexibility and platform customization
-- **Implementation**: Roles sourced from `data/.civic/roles.yml` platform
-  configuration
-- **Benefit**: Platform configuration drives UI behavior, no hardcoded values
-
-### **Testing and Validation**
-
-- **Comprehensive Testing**: Test all aspects of new functionality
-- **Lesson**: API endpoints should be tested with real configuration data
-- **Implementation**: Tested with full role configuration including permissions
-  and transitions
-- **Benefit**: Production-ready code with confidence in functionality
-
-### **Security Considerations**
-
-- **Authentication Requirements**: Consider whether endpoints need
-  authentication
-- **Lesson**: Configuration endpoints may need to be public for UI access
-- **Implementation**: Initially required authentication, later made public for
-  UI needs
-- **Benefit**: Proper security while enabling necessary functionality
+- User management interface is working
+- API is stable and running
+- UI infinite loop issue is resolved
+- Ready to proceed with next milestone: Record Creation/Editing Interface

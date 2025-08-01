@@ -2,12 +2,12 @@ import { defineStore } from 'pinia';
 import { validateApiResponse } from '~/utils/api-response';
 
 export interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
   name: string;
   role: string;
-  avatar?: string;
+  avatar_url?: string;
   permissions: string[];
 }
 
@@ -43,6 +43,15 @@ export const useAuthStore = defineStore('auth', {
           const expiresAt = new Date(storedExpiresAt);
           const now = new Date();
 
+          console.log('Auth store initialization:', {
+            storedToken: !!storedToken,
+            storedExpiresAt,
+            storedUser: !!storedUser,
+            expiresAt,
+            now,
+            isValid: expiresAt > now,
+          });
+
           if (expiresAt > now) {
             initialState = {
               ...initialState,
@@ -51,8 +60,10 @@ export const useAuthStore = defineStore('auth', {
               isAuthenticated: true,
               user: JSON.parse(storedUser),
             };
+            console.log('Restored auth state:', initialState);
           } else {
             // Token expired, clear localStorage
+            console.log('Token expired, clearing localStorage');
             localStorage.removeItem('civic_auth_token');
             localStorage.removeItem('civic_auth_expires_at');
             localStorage.removeItem('civic_auth_user');
@@ -110,17 +121,18 @@ export const useAuthStore = defineStore('auth', {
       const { session } = data;
 
       // Update user info
-      this.user = {
-        id: session.user.id.toString(),
+      const user: User = {
+        id: session.user.id,
         username: session.user.username,
         email: session.user.email,
         name: session.user.name,
         role: session.user.role,
-        avatar: session.user.avatar_url,
+        avatar_url: session.user.avatar_url,
         permissions: [], // TODO: Add permissions if available
       };
 
-      // Update token and auth state
+      // Update user, token and auth state
+      this.user = user;
       this.token = session.token;
       this.sessionExpiresAt = session.expiresAt;
       this.isAuthenticated = true;
@@ -229,6 +241,52 @@ export const useAuthStore = defineStore('auth', {
     updateUser(userData: Partial<User>) {
       if (this.user) {
         this.user = { ...this.user, ...userData };
+      }
+    },
+
+    // Validate token and refresh user data
+    async validateToken() {
+      if (!this.token) return false;
+
+      try {
+        const response = (await useNuxtApp().$civicApi('/auth/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+          },
+        })) as any;
+
+        if (response.success) {
+          // Update user data from server
+          this.user = response.data.user;
+          this.isAuthenticated = true;
+          this.saveAuthState();
+          return true;
+        } else {
+          // Token is invalid, clear auth
+          this.clearAuth();
+          return false;
+        }
+      } catch (error) {
+        console.warn('Token validation failed:', error);
+        this.clearAuth();
+        return false;
+      }
+    },
+
+    // Initialize auth state on app load
+    async initializeAuth() {
+      console.log('Initializing auth state...');
+      console.log('Current state:', {
+        token: !!this.token,
+        user: !!this.user,
+        isAuthenticated: this.isAuthenticated
+      });
+
+      // If we have a token but no user, try to validate the token
+      if (this.token && !this.user) {
+        console.log('Token found but no user, validating token...');
+        await this.validateToken();
       }
     },
   },
