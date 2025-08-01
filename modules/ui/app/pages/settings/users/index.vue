@@ -97,8 +97,8 @@ onMounted(() => {
             <UBreadcrumb :items="breadcrumbItems" />
 
             <!-- Loading state -->
-            <div v-if="loading" class="flex justify-center py-12">
-                <!-- <ULoadingBlock /> -->
+            <div v-if="loading" class="space-y-4">
+                <UserCardSkeleton v-for="i in 3" :key="i" />
             </div>
 
             <!-- Error state -->
