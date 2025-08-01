@@ -262,7 +262,13 @@ export const useRecordsStore = defineStore('records', {
       query: string,
       params?: { type?: string; status?: string }
     ) {
-      this.loading = true;
+      // Don't search with empty queries
+      if (!query || !query.trim()) {
+        console.warn('searchRecords called with empty query, using loadInitialRecords instead')
+        return this.loadInitialRecords(params)
+      }
+
+      this.loading = true
       this.loadingMessage = `Searching for "${query}"...`;
       this.error = null;
 
