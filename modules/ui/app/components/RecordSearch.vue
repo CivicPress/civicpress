@@ -11,11 +11,13 @@ interface Props {
     statuses?: string[]
   }
   recordType?: string | null // Pre-select a specific record type
+  disableTypeFilter?: boolean // Disable type filter (for type-specific pages)
 }
 
 const props = withDefaults(defineProps<Props>(), {
   initialFilters: () => ({}),
-  recordType: null
+  recordType: null,
+  disableTypeFilter: false
 })
 
 // Emits
@@ -232,6 +234,7 @@ onUnmounted(() => {
       </div>
 
       <USelectMenu 
+        v-if="!disableTypeFilter"
         v-model="selectedRecordTypes" 
         :items="recordTypeOptionsComputed" 
         multiple
@@ -276,9 +279,17 @@ onUnmounted(() => {
     <div class="text-sm text-gray-600">
       <span v-if="selectedRecordTypes.length > 0 || selectedRecordStatuses.length > 0 || searchQuery">
         Showing filtered records
+        <span v-if="disableTypeFilter && recordType" class="text-gray-500">
+          ({{ recordType }} only)
+        </span>
       </span>
       <span v-else>
-        Showing all records
+        <span v-if="disableTypeFilter && recordType">
+          Showing all {{ recordType }} records
+        </span>
+        <span v-else>
+          Showing all records
+        </span>
       </span>
     </div>
 
