@@ -11,7 +11,7 @@
     "dev:ui": "cd modules/ui && pnpm run dev",
     "dev:serve": "cd modules/serve && pnpm run dev",
     "dev:all": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
-    "dev:all:watch": "concurrently \"pnpm run dev:api:watch\" \"pnpm run dev:ui\"",
+    "dev:all:watch": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
     "dev:parallel": "pnpm -r --parallel run dev",
     "build": "pnpm -r run build",
     "build:cli": "cd cli && pnpm run build",
