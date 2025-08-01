@@ -28,15 +28,12 @@ const recordTypeLabel = computed(() => getRecordTypeLabel(type))
 const fetchRecord = async () => {
   loading.value = true
   error.value = ''
-  console.log('Starting to fetch record:', id)
 
   try {
     const response = await useNuxtApp().$civicApi(`/api/records/${id}`) as any
-    console.log('API response:', response)
 
     if (response && response.success && response.data) {
       const apiRecord = response.data
-      console.log('API record:', apiRecord)
 
       // Transform API response to match CivicRecord interface
       record.value = {
@@ -51,13 +48,10 @@ const fetchRecord = async () => {
         updated_at: apiRecord.updated || apiRecord.updated_at,
         metadata: apiRecord.metadata || {},
       }
-      console.log('Transformed record:', record.value)
     } else {
-      console.error('Invalid response:', response)
       throw new Error('Failed to fetch record')
     }
   } catch (err: any) {
-    console.error('Error fetching record:', err)
     const errorMessage = err.message || 'Failed to load record'
     error.value = errorMessage
     toast.add({
@@ -67,7 +61,6 @@ const fetchRecord = async () => {
     })
   } finally {
     loading.value = false
-    console.log('Fetch completed. Loading:', loading.value, 'Record:', record.value)
   }
 }
 
@@ -148,8 +141,6 @@ const handleDelete = async (recordId: string) => {
 const authStore = useAuthStore()
 const canEditRecords = computed(() => {
   const userRole = authStore.currentUser?.role
-  console.log('Current user:', authStore.currentUser)
-  console.log('User role:', userRole)
   return userRole === 'admin' || userRole === 'clerk'
 })
 
@@ -160,8 +151,6 @@ const canDeleteRecords = computed(() => {
 
 // Fetch record on mount
 onMounted(() => {
-  console.log('Edit page mounted - fetching record:', id)
-  console.log('RecordForm component available:', typeof RecordForm)
   fetchRecord()
 })
 
@@ -203,11 +192,7 @@ const breadcrumbItems = computed(() => [
       <div class="space-y-6">
         <UBreadcrumb :items="breadcrumbItems" />
 
-        <!-- Debug Info -->
-        <div class="text-xs text-gray-500 mb-4">
-          Loading: {{ loading }} | Record: {{ record ? 'Loaded' : 'Not loaded' }} | Error: {{ error || 'None' }} | Can
-          Edit: {{ canEditRecords }}
-        </div>
+
 
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-12">
@@ -220,12 +205,6 @@ const breadcrumbItems = computed(() => [
 
         <!-- Record Form -->
         <div v-else-if="record">
-          <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-            <h4 class="font-semibold text-blue-800">Debug: Record Form Section</h4>
-            <p class="text-sm text-blue-600">Record exists: {{ !!record }}</p>
-            <p class="text-sm text-blue-600">Record title: {{ record?.title }}</p>
-            <p class="text-sm text-blue-600">Can delete: {{ canDeleteRecords }}</p>
-          </div>
           <RecordForm :record="record" :is-editing="true" :saving="saving" :error="error" :can-delete="canDeleteRecords"
             @submit="handleSubmit" @delete="handleDelete" />
         </div>
