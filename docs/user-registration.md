@@ -2,162 +2,267 @@
 
 ## Overview
 
-CivicPress provides a comprehensive user management system with role-based
-access control, allowing administrators to create, edit, and manage user
-accounts through both the API and web interface.
+CivicPress provides a comprehensive user management system with role-based access control. This system allows administrators to create, edit, and manage user accounts with different permission levels.
 
 ## Admin User Management
 
-### UI Navigation
-
-- Navigate to **Settings** → **Users** from the main sidebar
-- Available for users with `admin` or `clerk` roles
-- Provides full CRUD operations for user management
+### Navigation
+1. **Login** as an admin or clerk user
+2. Navigate to **Settings** → **Users** in the sidebar menu
+3. Access the user management interface
 
 ### Features
 
-- **User Listing**: View all users with their roles and basic information
-- **User Creation**: Add new users with role assignment and password generation
-- **User Editing**: Modify user details, roles, and passwords
-- **User Deletion**: Remove users with confirmation modal
-- **Role Management**: Dynamic role selection from system configuration
-- **Password Management**: Generate strong passwords, change passwords, and
-  password strength indicators
+#### User Listing
+- **Complete User List**: View all registered users with their roles
+- **Role Display**: Shows user roles with color-coded badges
+- **Avatar Support**: Displays user avatars or initials
+- **Quick Actions**: Edit and delete buttons for each user
+- **Skeleton Loading**: Loading states during data fetch
+
+#### User Creation
+- **Comprehensive Form**: Username, email, name, role, and password fields
+- **Role Selection**: Dynamic role dropdown from system configuration
+- **Password Generation**: Generate strong random passwords
+- **Password Strength**: Real-time password strength indicator
+- **Form Validation**: Inline validation with API error handling
+- **Security**: Password fields cleared after submission
+
+#### User Editing
+- **Full Edit Capabilities**: Modify all user fields except username
+- **Password Management**: Optional password change with strength validation
+- **Role Updates**: Change user roles with immediate effect
+- **Delete Confirmation**: Modal confirmation for user deletion
+- **Toast Notifications**: API feedback for all operations
+
+### Role System
+
+#### Available Roles
+- **Admin**: Full system access and user management
+- **Clerk**: Record management and user management
+- **Viewer**: Read-only access to records
+
+#### Permissions
+- **Admin**: All permissions including user management
+- **Clerk**: Record management + user management
+- **Viewer**: Read-only access to records
 
 ### Form Features
 
-- **Inline Validation**: Form errors displayed within the form fields
-- **API Feedback**: Toast notifications for API interaction success/errors
-- **Password Strength**: Visual indicator for password strength
-- **Generate Password**: Automatic strong password generation
-- **Show/Hide Password**: Toggle password visibility
-- **Security**: Password fields cleared after submission
+#### Validation
+- **Inline Errors**: Form validation errors displayed with fields
+- **API Errors**: Toast notifications for API interaction errors
+- **Required Fields**: Username, email, and role are mandatory
+- **Email Validation**: Proper email format validation
+- **Password Requirements**: Strong password requirements for new users
 
-## Role System
+#### Security
+- **Password Security**: Strong password generation and validation
+- **Session Management**: Proper token validation and persistence
+- **Input Sanitization**: All inputs validated and sanitized
+- **Access Control**: Role-based access to user management
 
-### Available Roles
+## Record Management Interface
 
-- **Admin**: Full system access, can manage users and all records
-- **Council**: Can view and edit records, limited administrative access
-- **Clerk**: Can create/edit records and manage users
-- **Public**: Read-only access to public records
+### Overview
 
-### Role Permissions
+The record management interface provides comprehensive browsing, searching, and filtering capabilities for all records in the system.
 
-Roles are defined in `data/.civic/roles.yml` and include:
+### Navigation Structure
 
-- `records:create`, `records:edit`, `records:view`, `records:list`
-- `users:view`, `users:edit`, `users:create`, `users:delete`
-- `templates:view`, `workflows:manage`
+#### Main Records Page (`/records`)
+- **All Records**: Browse all records across all types
+- **Search & Filters**: Full search and filter capabilities
+- **Type Filter**: Select specific record types
+- **Status Filter**: Filter by record status
+- **URL State**: Search and filter state persists in URL
 
-## API Endpoints
+#### Type-Specific Pages (`/records/[type]`)
+- **Pre-Selected Type**: Automatically filters to specific record type
+- **Clean Interface**: Type filter disabled for cleaner UX
+- **Context Labels**: Shows "Showing all [type] records"
+- **Navigation**: Breadcrumb navigation with type context
 
-### User Management
+#### Single Record Pages (`/records/[type]/[id]`)
+- **3-Level Breadcrumbs**: Records → Type → Record Name
+- **Full Record Details**: Complete record information and content
+- **Navigation**: Easy navigation back to type-specific lists
 
-- `GET /api/users` - List all users (admin/clerk only)
-- `GET /api/users/:id` - Get specific user details
-- `POST /api/users` - Create new user
-- `PUT /api/users/:id` - Update user
-- `DELETE /api/users/:id` - Delete user
+### Features
 
-### Configuration
+#### Search & Filtering
+- **Smart Search**: Full-text search with suggestions
+- **Type Filtering**: Filter by record types (bylaw, ordinance, policy, etc.)
+- **Status Filtering**: Filter by record status (draft, pending, approved, etc.)
+- **URL Persistence**: Search and filter state saved in URL
+- **Debounced Search**: 300ms delay to prevent excessive API calls
 
-- `GET /api/config/roles` - Get available roles (public)
-- `GET /api/config/record-types` - Get record types (public)
-- `GET /api/config/record-statuses` - Get record statuses (public)
+#### Record Display
+- **Card Layout**: Clean card-based record display
+- **Type Icons**: Visual type indicators for each record
+- **Status Badges**: Color-coded status indicators
+- **Metadata Display**: Creation date, author, tags
+- **Virtual Scrolling**: Performance optimization for large datasets
+
+#### Loading System
+- **Skeleton Loading**: Better perceived performance than spinners
+- **API Delay Testing**: Configurable delays for testing loading states
+- **Loading States**: Different loading states for different operations
+- **Error Handling**: Graceful error handling with user feedback
+
+### Technical Architecture
+
+#### Reusable Components
+- **RecordSearch.vue**: Reusable search and filter component
+- **RecordList.vue**: Reusable record list component with skeleton loading
+- **Component Props**: Well-defined TypeScript interfaces
+- **Event Communication**: Typed emits for parent-child communication
+
+#### API Integration
+- **Smart Query Handling**: Empty searches use `loadInitialRecords`
+- **Error Prevention**: Validation prevents empty queries from reaching API
+- **Fallback Logic**: Graceful degradation when API calls fail
+- **Cursor Pagination**: Efficient loading of large datasets
+
+#### Performance Optimizations
+- **Virtual Scrolling**: For datasets > 50 records
+- **Skeleton Loading**: Immediate display of loading states
+- **Debounced Search**: Prevents excessive API calls
+- **Lazy Loading**: Load more records on demand
+
+### User Experience
+
+#### Consistent Design
+- **UDashboardPanel Pattern**: Consistent header and body structure
+- **Skeleton Components**: Reusable skeleton components for loading states
+- **Toast Notifications**: API feedback for user actions
+- **Breadcrumb Navigation**: Proper navigation hierarchy
+
+#### Accessibility
+- **ARIA Labels**: Proper accessibility labels
+- **Keyboard Navigation**: Full keyboard navigation support
+- **Screen Reader**: Compatible with screen readers
+- **Color Contrast**: Proper color contrast ratios
+
+#### Mobile Responsiveness
+- **Responsive Design**: Mobile-friendly layouts
+- **Touch Targets**: Appropriate touch target sizes
+- **Mobile Navigation**: Optimized for mobile devices
+- **Performance**: Optimized for mobile performance
 
 ## Loading System
 
-### Skeleton Components
+### Architecture
 
-The UI includes comprehensive skeleton loading components for improved user
-experience:
+The loading system provides a comprehensive approach to user experience during data loading operations.
 
-- **UserCardSkeleton**: For user lists and user cards
-- **RecordCardSkeleton**: For record lists and record cards
-- **FormSkeleton**: For forms and input fields
-- **AvatarSkeleton**: For user avatars and profile pictures
-- **DashboardCardSkeleton**: For dashboard cards and quick actions
+#### Skeleton Components
+- **UserCardSkeleton**: Loading state for user cards
+- **RecordCardSkeleton**: Loading state for record cards
+- **FormSkeleton**: Loading state for forms
+- **AvatarSkeleton**: Loading state for avatars
+- **DashboardCardSkeleton**: Loading state for dashboard cards
 
-### Loading States
-
-- **Skeleton Loading**: Shows skeleton components during API calls
-- **Form Loading**: Loading states for form submissions
-- **Navigation Loading**: Smooth transitions between pages
-- **API Delay Testing**: Development mode includes configurable API delays for
-  testing loading states
+#### Delay Middleware
+- **Development Testing**: Configurable API delays for testing
+- **Environment Variables**: `API_DELAY=true` and `API_DELAY_MS=3000`
+- **Development Only**: Delays only applied in development mode
+- **Testing Capabilities**: Test loading states with realistic delays
 
 ### Implementation
 
-- **useLoading Composable**: Centralized loading state management
-- **Delay Middleware**: Configurable API delays for development testing
-- **Hot Reload**: UI updates automatically without server restart
-- **Consistent UX**: All pages follow standardized loading patterns
+#### Skeleton Loading Strategy
+- **Immediate Display**: Show skeletons immediately when loading starts
+- **Consistent Patterns**: Use same skeleton structure as actual content
+- **Loading States**: Different skeletons for different content types
+- **API Delay Testing**: Configurable delays for testing loading states
 
-## Authentication
+#### Performance Considerations
+- **Perceived Performance**: Skeleton components provide better UX than spinners
+- **Virtual Scrolling**: For large datasets to maintain performance
+- **Debounced Search**: 300ms delay to prevent excessive API calls
+- **Lazy Loading**: Load more records on demand with cursor-based pagination
 
-### Login Process
+### Testing
 
-1. User enters credentials on login page
-2. System validates against stored user data
-3. JWT token generated and stored in session
-4. User redirected to dashboard with role-based access
+#### Loading State Testing
+- **API Delays**: Use `API_DELAY=true` for testing loading states
+- **Skeleton Verification**: Visit pages during delays to verify skeleton components
+- **Performance Testing**: Test skeleton loading performance
+- **User Experience**: Verify loading states provide good UX
+
+#### Development Workflow
+- **Hot Reload**: UI changes apply immediately without restart
+- **Delay Configuration**: Easy configuration of API delays
+- **Skeleton Testing**: Comprehensive testing of skeleton components
+- **Error Handling**: Test error states and recovery
+
+## API Integration
+
+### Authentication
+
+#### JWT-Based Authentication
+- **Token Management**: Proper JWT token handling and validation
+- **Session Persistence**: Automatic token validation and session persistence
+- **Security**: Password security, input validation, and proper error handling
+- **Role-Based Access**: Granular permissions with role definitions
+
+#### Public vs Protected Endpoints
+- **Public Endpoints**: Configuration endpoints accessible without authentication
+- **Protected Endpoints**: User management and record operations require authentication
+- **Middleware**: Selective application of auth middleware to specific routes
+- **Error Handling**: Comprehensive error handling with proper HTTP status codes
+
+### Error Handling
+
+#### Client-Side Error Handling
+- **Inline Validation**: Form validation errors displayed with fields
+- **API Error Toasts**: Success/error messages for API interactions
+- **Error Boundaries**: Graceful error handling with user-friendly messages
+- **Fallback Logic**: Graceful degradation when API calls fail
+
+#### Server-Side Error Handling
+- **Validation**: Comprehensive input validation
+- **Error Messages**: User-friendly error messages
+- **Status Codes**: Proper HTTP status codes
+- **Security**: Secure error messages without information disclosure
+
+## Security Features
+
+### Password Security
+- **Strong Passwords**: Generate strong random passwords
+- **Password Strength**: Real-time password strength indicators
+- **Security**: Password fields cleared after submission
+- **Validation**: Strong password requirements for new users
 
 ### Session Management
+- **Token Validation**: Proper JWT token validation
+- **Session Persistence**: Automatic session management
+- **Security**: Secure session handling and timeout management
+- **Access Control**: Role-based access control
 
-- Tokens stored in localStorage for persistence
-- Automatic token validation on app initialization
-- Session expiration handling
-- Secure logout with token cleanup
+### Input Validation
+- **Client-Side**: Validate inputs before sending to API
+- **Server-Side**: API validation for all endpoints
+- **Type Safety**: TypeScript interfaces for all data structures
+- **Error Handling**: Graceful error handling without exposing internals
 
-### Security Features
+## Future Enhancements
 
-- Password strength requirements
-- Role-based access control
-- API endpoint protection
-- Session token validation
-- Secure password handling (cleared after submission)
+### Planned Features
+- **Bulk Operations**: Import/export user data
+- **Advanced Roles**: Hierarchical role system with inheritance
+- **Audit Logging**: Comprehensive audit trail for user actions
+- **Two-Factor Authentication**: TOTP-based 2FA support
 
-## Development Features
+### Technical Improvements
+- **GraphQL Support**: GraphQL API for complex queries
+- **Webhook Integration**: Real-time notifications for user events
+- **Rate Limiting**: Advanced rate limiting with Redis
+- **Caching**: Redis-based caching for improved performance
 
-### Testing Loading States
-
-- **API Delay**: Set `API_DELAY=true` and `API_DELAY_MS=3000` for 3-second
-  delays
-- **Skeleton Testing**: Visit pages during API delays to see skeleton components
-- **Hot Reload**: UI changes apply immediately without restart
-- **Development Mode**: Enhanced logging and debugging features
-
-### Environment Variables
-
-```bash
-# Enable API delays for testing loading states
-API_DELAY=true
-API_DELAY_MS=3000
-
-# Development mode
-NODE_ENV=development
-```
-
-## Best Practices
-
-### User Management
-
-- Always assign appropriate roles to new users
-- Use strong passwords and enable password generation
-- Regularly review and update user permissions
-- Monitor user activity and session management
-
-### Loading UX
-
-- Skeleton components provide better perceived performance
-- Inline validation keeps users informed of form errors
-- Toast notifications provide clear API feedback
-- Consistent loading patterns across all pages
-
-### Security
-
-- Clear password fields after form submission
-- Validate user permissions before operations
-- Use HTTPS in production environments
-- Implement proper session management
+### User Experience Enhancements
+- **Advanced Search**: Full-text search with relevance scoring
+- **Filter Combinations**: Complex filter combinations with saved searches
+- **Search Suggestions**: Intelligent search suggestions and autocomplete
+- **Search Analytics**: Track popular searches and improve results
