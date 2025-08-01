@@ -41,8 +41,8 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const { getRecordTypeOptions, getRecordTypeLabel } = useRecordTypes()
-const { recordStatusOptions, getRecordStatusLabel } = useRecordStatuses()
+const { getRecordTypeOptions, getRecordTypeLabel, fetchRecordTypes } = useRecordTypes()
+const { recordStatusOptions, getRecordStatusLabel, fetchRecordStatuses } = useRecordStatuses()
 const { getTemplateOptions, getTemplateById, processTemplate } = useTemplates()
 
 // Form data
@@ -127,7 +127,7 @@ watch(selectedTemplate, (newValue) => {
                 user: 'Current User', // TODO: Get from auth store
                 timestamp: new Date().toISOString()
             }
-            
+
             const processedContent = processTemplate(template, variables)
             form.content = processedContent
         }
@@ -136,8 +136,10 @@ watch(selectedTemplate, (newValue) => {
 
 // Initialize form
 onMounted(async () => {
+    // Fetch record types and statuses
     await Promise.all([
-        // Fetch record types and statuses
+        fetchRecordTypes(),
+        fetchRecordStatuses()
     ])
 
     if (props.isEditing && props.record) {
@@ -148,13 +150,13 @@ onMounted(async () => {
         form.status = props.record.status
         form.tags = props.record.metadata?.tags || []
         form.description = (props.record.metadata as any)?.description || ''
-        
+
         // Set selected options
         const typeOption = recordTypeOptionsComputed.value.find(option => option.value === props.record?.type)
         if (typeOption) {
             selectedRecordType.value = typeOption
         }
-        
+
         const statusOption = recordStatusOptionsComputed.value.find(option => option.value === props.record?.status)
         if (statusOption) {
             selectedRecordStatus.value = statusOption
@@ -257,40 +259,26 @@ const removeTag = (tag: string) => {
 
             <!-- Record Type -->
             <UFormField label="Record Type" required :error="formErrors.type">
-                <USelectMenu 
-                    v-model="selectedRecordType"
-                    :items="recordTypeOptionsComputed"
-                    placeholder="Select record type"
-                    :disabled="saving || (props.recordType !== null)"
-                    class="w-full"
-                />
+                <USelectMenu v-model="selectedRecordType" :items="recordTypeOptionsComputed"
+                    placeholder="Select record type" :disabled="saving || (props.recordType !== null)" class="w-full" />
             </UFormField>
 
             <!-- Template Selection (only for new records) -->
             <UFormField v-if="!props.isEditing && form.type" label="Template" :error="formErrors.template">
-                <USelectMenu 
-                    v-model="selectedTemplate"
-                    :items="templateOptionsComputed"
-                    placeholder="Select a template (optional)"
-                    :disabled="saving"
-                    class="w-full"
-                />
+                <USelectMenu v-model="selectedTemplate" :items="templateOptionsComputed"
+                    placeholder="Select a template (optional)" :disabled="saving" class="w-full" />
                 <template #help>
                     <p class="text-sm text-gray-600">
-                        Choose a template to pre-populate the record content. You can modify the content after selection.
+                        Choose a template to pre-populate the record content. You can modify the content after
+                        selection.
                     </p>
                 </template>
             </UFormField>
 
             <!-- Status -->
             <UFormField label="Status" required :error="formErrors.status">
-                <USelectMenu 
-                    v-model="selectedRecordStatus"
-                    :items="recordStatusOptionsComputed"
-                    placeholder="Select status"
-                    :disabled="saving"
-                    class="w-full"
-                />
+                <USelectMenu v-model="selectedRecordStatus" :items="recordStatusOptionsComputed"
+                    placeholder="Select status" :disabled="saving" class="w-full" />
             </UFormField>
 
             <!-- Description -->
