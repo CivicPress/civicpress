@@ -44,6 +44,7 @@ const emit = defineEmits<{
 const { getRecordTypeOptions, getRecordTypeLabel, fetchRecordTypes } = useRecordTypes()
 const { recordStatusOptions, getRecordStatusLabel, fetchRecordStatuses } = useRecordStatuses()
 const { getTemplateOptions, getTemplateById, processTemplate } = useTemplates()
+const toast = useToast()
 
 // Form data
 const form = reactive({
@@ -62,6 +63,10 @@ const newTag = ref('')
 const selectedRecordType = ref<any>(null)
 const selectedRecordStatus = ref<any>(null)
 const selectedTemplate = ref<any>(null)
+
+// Delete modal state
+const showDeleteModal = ref(false)
+const deleting = ref(false)
 
 // Form errors
 const formErrors = reactive({
@@ -225,10 +230,23 @@ const handleSubmit = () => {
     emit('submit', recordData)
 }
 
-// Handle delete
-const handleDelete = () => {
-    if (props.record?.id) {
-        emit('delete', props.record.id)
+// Handle delete confirmation
+const confirmDelete = async () => {
+    deleting.value = true
+    try {
+        if (props.record?.id) {
+            emit('delete', props.record.id)
+        }
+        showDeleteModal.value = false
+    } catch (error) {
+        console.error('Error deleting record:', error)
+        toast.add({
+            title: 'Error',
+            description: 'Failed to delete record',
+            color: 'error',
+        })
+    } finally {
+        deleting.value = false
     }
 }
 
@@ -311,6 +329,49 @@ const removeTag = (tag: string) => {
 
         <!-- Form Actions -->
         <div class="flex items-center justify-between pt-6 border-t">
+            <!-- Delete Button (only for editing) -->
+            <UModal v-if="isEditing && canDelete" title="Delete Record"
+                description="Are you sure you want to delete this record? This action cannot be undone.">
+                <UButton color="error" variant="outline" :disabled="saving" @click="showDeleteModal = true">
+                    Delete Record
+                </UButton>
+
+                <template #body>
+                    <div class="space-y-4">
+                        <p class="text-gray-700 dark:text-gray-300">
+                            Are you sure you want to delete <strong>{{ record?.title }}</strong>?
+                            This will permanently remove this record and all associated data.
+                        </p>
+
+                        <div
+                            class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                            <div class="flex items-start space-x-3">
+                                <UIcon name="i-lucide-alert-circle" class="w-5 h-5 text-red-600 mt-0.5" />
+                                <div class="text-sm text-red-700 dark:text-red-300">
+                                    <p class="font-medium">Warning:</p>
+                                    <ul class="mt-1 space-y-1">
+                                        <li>• Record will be permanently deleted</li>
+                                        <li>• All associated data will be lost</li>
+                                        <li>• This action cannot be reversed</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template #footer="{ close }">
+                    <div class="flex justify-end space-x-3">
+                        <UButton color="neutral" variant="outline" @click="close">
+                            Cancel
+                        </UButton>
+                        <UButton color="error" :loading="deleting" @click="confirmDelete">
+                            Delete Record
+                        </UButton>
+                    </div>
+                </template>
+            </UModal>
+
             <div class="flex items-center space-x-4">
                 <UButton type="submit" color="primary" :loading="saving" :disabled="!isFormValid" @click="handleSubmit">
                     {{ isEditing ? 'Update Record' : 'Create Record' }}
@@ -320,12 +381,6 @@ const removeTag = (tag: string) => {
                     Cancel
                 </UButton>
             </div>
-
-            <!-- Delete Button (only for editing) -->
-            <UButton v-if="isEditing && canDelete" color="error" variant="outline" :disabled="saving"
-                @click="handleDelete">
-                Delete Record
-            </UButton>
         </div>
 
         <!-- Error Display -->

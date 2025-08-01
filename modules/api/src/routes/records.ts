@@ -223,8 +223,49 @@ export function createRecordsRouter(recordsService: RecordsService) {
       }
 
       try {
-        const { title, type, content, role, metadata } = req.body;
-        const userRole = req.user?.role || role || 'unknown';
+        const { title, type, content, metadata } = req.body;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        // Extract username correctly - handle case where user.username might be the full object
+        let username = 'unknown';
+        if (typeof user.username === 'string') {
+          username = user.username;
+        } else if (
+          typeof user.username === 'object' &&
+          user.username !== null
+        ) {
+          // If user.username is an object, try to extract the username from it
+          const usernameObj = user.username as any;
+          if (typeof usernameObj.username === 'string') {
+            username = usernameObj.username;
+          } else if (typeof usernameObj === 'object' && usernameObj !== null) {
+            // Try to find any string property that might be the username
+            for (const [key, value] of Object.entries(usernameObj)) {
+              if (
+                typeof value === 'string' &&
+                (key === 'username' || key === 'name' || key === 'id')
+              ) {
+                username = value;
+                break;
+              }
+            }
+          }
+        }
+
+        // Ensure user object has correct structure
+        const cleanUser = {
+          id: user.id,
+          username: username,
+          role: user.role,
+          email: user.email,
+          name: user.name,
+        };
 
         const record = await recordsService.createRecord(
           {
@@ -233,7 +274,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
             content,
             metadata,
           },
-          userRole
+          cleanUser
         );
 
         sendSuccess(record, req, res, {
@@ -278,9 +319,15 @@ export function createRecordsRouter(recordsService: RecordsService) {
       try {
         const { id } = req.params;
         const updates = req.body;
-        const userRole = req.user?.role || 'unknown';
+        const user = req.user;
 
-        const record = await recordsService.updateRecord(id, updates, userRole);
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        const record = await recordsService.updateRecord(id, updates, user);
 
         if (!record) {
           const error = new Error('Record not found');
@@ -323,7 +370,13 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       try {
         const { id } = req.params;
-        const userRole = req.user?.role || 'unknown';
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
 
         // First check if record exists
         const existingRecord = await recordsService.getRecord(id);
@@ -334,7 +387,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
 
-        const result = await recordsService.deleteRecord(id, userRole);
+        const result = await recordsService.deleteRecord(id, user);
 
         if (result) {
           sendSuccess(
@@ -362,6 +415,90 @@ export function createRecordsRouter(recordsService: RecordsService) {
           req,
           res,
           'Failed to delete record'
+        );
+      }
+    }
+  );
+
+  // POST /api/records/:id/status - Change record status with workflow validation
+  router.post(
+    '/:id/status',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    body('status').isString().notEmpty(),
+    body('comment').optional().isString(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'change_record_status' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'change_record_status',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const { status, comment } = req.body;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        // First check if record exists
+        const existingRecord = await recordsService.getRecord(id);
+        if (!existingRecord) {
+          const error = new Error('Record not found');
+          (error as any).statusCode = 404;
+          (error as any).code = 'RECORD_NOT_FOUND';
+          throw error;
+        }
+
+        const result = await recordsService.changeRecordStatus(
+          id,
+          status,
+          user,
+          comment
+        );
+
+        if (result.success) {
+          sendSuccess(
+            {
+              message: `Record status changed to ${status}`,
+              record: result.record,
+              previousStatus: existingRecord.status,
+              newStatus: status,
+              changedBy: user.username,
+              changedAt: new Date().toISOString(),
+              comment: comment || null,
+            },
+            req,
+            res,
+            { operation: 'change_record_status' }
+          );
+        } else {
+          const error = new Error(
+            result.error || 'Failed to change record status'
+          );
+          (error as any).statusCode = 400;
+          (error as any).code = 'STATUS_CHANGE_FAILED';
+          (error as any).details = result.error;
+          throw error;
+        }
+      } catch (error) {
+        handleApiError(
+          'change_record_status',
+          error,
+          req,
+          res,
+          'Failed to change record status'
         );
       }
     }

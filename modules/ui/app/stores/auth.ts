@@ -244,6 +244,33 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    // Development method to set mock user
+    setMockUser() {
+      const mockUser: User = {
+        id: 1,
+        username: 'admin',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: 'admin',
+        permissions: [
+          'records:create',
+          'records:edit',
+          'records:delete',
+          'records:view',
+        ],
+      };
+
+      this.user = mockUser;
+      this.isAuthenticated = true;
+      this.token = 'mock-token';
+      this.sessionExpiresAt = new Date(
+        Date.now() + 24 * 60 * 60 * 1000
+      ).toISOString();
+      this.saveAuthState();
+
+      console.log('Mock user set:', mockUser);
+    },
+
     // Validate token and refresh user data
     async validateToken() {
       if (!this.token) return false;
@@ -280,7 +307,7 @@ export const useAuthStore = defineStore('auth', {
       console.log('Current state:', {
         token: !!this.token,
         user: !!this.user,
-        isAuthenticated: this.isAuthenticated
+        isAuthenticated: this.isAuthenticated,
       });
 
       // If we have a token but no user, try to validate the token

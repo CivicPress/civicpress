@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records'
+import RecordForm from '~/components/RecordForm.vue'
+import FormSkeleton from '~/components/FormSkeleton.vue'
 
 // Route parameters
 const route = useRoute()
@@ -16,7 +18,7 @@ const saving = ref(false)
 const error = ref('')
 
 // Toast notifications
-const { toast } = useToast()
+const toast = useToast()
 
 // Get record type display name
 const { getRecordTypeLabel } = useRecordTypes()
@@ -26,12 +28,15 @@ const recordTypeLabel = computed(() => getRecordTypeLabel(type))
 const fetchRecord = async () => {
   loading.value = true
   error.value = ''
+  console.log('Starting to fetch record:', id)
 
   try {
-    const response = await useNuxtApp().$civicApi(`/api/records/${id}`)
+    const response = await useNuxtApp().$civicApi(`/api/records/${id}`) as any
+    console.log('API response:', response)
 
     if (response && response.success && response.data) {
       const apiRecord = response.data
+      console.log('API record:', apiRecord)
 
       // Transform API response to match CivicRecord interface
       record.value = {
@@ -46,19 +51,23 @@ const fetchRecord = async () => {
         updated_at: apiRecord.updated || apiRecord.updated_at,
         metadata: apiRecord.metadata || {},
       }
+      console.log('Transformed record:', record.value)
     } else {
+      console.error('Invalid response:', response)
       throw new Error('Failed to fetch record')
     }
   } catch (err: any) {
+    console.error('Error fetching record:', err)
     const errorMessage = err.message || 'Failed to load record'
     error.value = errorMessage
     toast.add({
       title: 'Error',
       description: errorMessage,
-      color: 'red'
+      color: 'error'
     })
   } finally {
     loading.value = false
+    console.log('Fetch completed. Loading:', loading.value, 'Record:', record.value)
   }
 }
 
@@ -72,13 +81,13 @@ const handleSubmit = async (recordData: any) => {
     const response = await useNuxtApp().$civicApi(`/api/records/${id}`, {
       method: 'PUT',
       body: recordData
-    })
+    }) as any
 
     if (response && response.success) {
       toast.add({
         title: 'Record Updated',
         description: `Successfully updated "${recordData.title}"`,
-        color: 'green'
+        color: 'primary'
       })
 
       // Navigate back to the record
@@ -92,7 +101,7 @@ const handleSubmit = async (recordData: any) => {
     toast.add({
       title: 'Error',
       description: errorMessage,
-      color: 'red'
+      color: 'error'
     })
   } finally {
     saving.value = false
@@ -101,9 +110,6 @@ const handleSubmit = async (recordData: any) => {
 
 // Handle delete
 const handleDelete = async (recordId: string) => {
-  if (!confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
-    return
-  }
 
   saving.value = true
   error.value = ''
@@ -111,13 +117,13 @@ const handleDelete = async (recordId: string) => {
   try {
     const response = await useNuxtApp().$civicApi(`/api/records/${recordId}`, {
       method: 'DELETE'
-    })
+    }) as any
 
     if (response && response.success) {
       toast.add({
         title: 'Record Deleted',
         description: 'Record has been successfully deleted',
-        color: 'green'
+        color: 'primary'
       })
 
       // Navigate to records list
@@ -131,7 +137,7 @@ const handleDelete = async (recordId: string) => {
     toast.add({
       title: 'Error',
       description: errorMessage,
-      color: 'red'
+      color: 'error'
     })
   } finally {
     saving.value = false
@@ -142,6 +148,8 @@ const handleDelete = async (recordId: string) => {
 const authStore = useAuthStore()
 const canEditRecords = computed(() => {
   const userRole = authStore.currentUser?.role
+  console.log('Current user:', authStore.currentUser)
+  console.log('User role:', userRole)
   return userRole === 'admin' || userRole === 'clerk'
 })
 
@@ -152,6 +160,8 @@ const canDeleteRecords = computed(() => {
 
 // Fetch record on mount
 onMounted(() => {
+  console.log('Edit page mounted - fetching record:', id)
+  console.log('RecordForm component available:', typeof RecordForm)
   fetchRecord()
 })
 
@@ -192,45 +202,45 @@ const breadcrumbItems = computed(() => [
     <template #body>
       <div class="space-y-6">
         <UBreadcrumb :items="breadcrumbItems" />
-        
+
+        <!-- Debug Info -->
+        <div class="text-xs text-gray-500 mb-4">
+          Loading: {{ loading }} | Record: {{ record ? 'Loaded' : 'Not loaded' }} | Error: {{ error || 'None' }} | Can
+          Edit: {{ canEditRecords }}
+        </div>
+
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-12">
           <FormSkeleton />
         </div>
-        
+
         <!-- Access Control -->
-        <UAlert 
-          v-else-if="!canEditRecords" 
-          color="error" 
-          variant="soft" 
-          title="Access Denied"
-          description="You don't have permission to edit records."
-          icon="i-lucide-alert-circle" 
-        />
-        
+        <UAlert v-else-if="!canEditRecords" color="error" variant="soft" title="Access Denied"
+          description="You don't have permission to edit records." icon="i-lucide-alert-circle" />
+
         <!-- Record Form -->
         <div v-else-if="record">
-          <RecordForm 
-            :record="record"
-            :is-editing="true"
-            :saving="saving"
-            :error="error"
-            :can-delete="canDeleteRecords"
-            @submit="handleSubmit"
-            @delete="handleDelete"
-          />
+          <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+            <h4 class="font-semibold text-blue-800">Debug: Record Form Section</h4>
+            <p class="text-sm text-blue-600">Record exists: {{ !!record }}</p>
+            <p class="text-sm text-blue-600">Record title: {{ record?.title }}</p>
+            <p class="text-sm text-blue-600">Can delete: {{ canDeleteRecords }}</p>
+          </div>
+          <RecordForm :record="record" :is-editing="true" :saving="saving" :error="error" :can-delete="canDeleteRecords"
+            @submit="handleSubmit" @delete="handleDelete" />
         </div>
-        
+
         <!-- Error State -->
         <div v-else-if="error" class="text-center py-12">
-          <UAlert 
-            color="error" 
-            variant="soft" 
-            :title="error"
-            icon="i-lucide-alert-circle" 
-          />
+          <UAlert color="error" variant="soft" :title="error" icon="i-lucide-alert-circle" />
+        </div>
+
+        <!-- No Record State -->
+        <div v-else class="text-center py-12">
+          <UAlert color="neutral" variant="soft" title="No Record Found" description="The record could not be loaded."
+            icon="i-lucide-alert-circle" />
         </div>
       </div>
     </template>
   </UDashboardPanel>
-</template> 
+</template>

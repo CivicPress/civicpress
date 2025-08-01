@@ -1,0 +1,39 @@
+entries:
+  - file: bylaw/record-1754060607425.md
+    title: Test Record
+    type: bylaw
+    status: draft
+    tags: []
+    authors: []
+    created: '2025-08-01T15:03:27.425Z'
+    updated: '2025-08-01T15:04:00.074Z'
+    source: file-sync
+    slug: record-1754060607425
+  - file: bylaw/record-1754060649101.md
+    title: Test Record
+    type: bylaw
+    status: draft
+    tags: []
+    authors: []
+    created: '2025-08-01T15:04:09.101Z'
+    slug: record-1754060649101
+  - file: policy/record-1754060326440.md
+    title: Some name
+    type: policy
+    status: draft
+    tags:
+      - noise
+    authors: []
+    created: '2025-08-01T14:58:46.440Z'
+    updated: '2025-08-01T15:04:00.085Z'
+    source: file-sync
+    slug: record-1754060326440
+metadata:
+  generated: '2025-08-01T15:08:12.835Z'
+  totalRecords: 3
+  modules: []
+  types:
+    - bylaw
+    - policy
+  statuses:
+    - draft

@@ -26,9 +26,13 @@ const fetchRecord = async () => {
     error.value = ''
 
     try {
+        console.log('Fetching record:', id)
+
         // Direct API call for now to test
         const { $civicApi } = useNuxtApp()
-        const response = await $civicApi(`/api/records/${id}`)
+        const response = await $civicApi(`/api/records/${id}`) as any
+
+        console.log('API response:', response)
 
         if (response && response.success && response.data) {
             const apiRecord = response.data
@@ -46,6 +50,8 @@ const fetchRecord = async () => {
                 updated_at: apiRecord.updated || apiRecord.updated_at,
                 metadata: apiRecord.metadata || {},
             }
+
+            console.log('Record loaded:', record.value)
         } else {
             throw new Error('Failed to fetch record')
         }
@@ -68,6 +74,13 @@ const goBack = () => {
         router.push('/records')
     }
 }
+
+// Check if user can edit records
+const authStore = useAuthStore()
+const canEditRecords = computed(() => {
+    const userRole = authStore.currentUser?.role
+    return userRole === 'admin' || userRole === 'clerk'
+})
 
 // Fetch record on mount
 onMounted(() => {
@@ -101,13 +114,10 @@ const breadcrumbItems = computed(() => [
                 <template #description>
                     View the details of {{ record?.title || 'this record' }}
                 </template>
-                <template #actions>
-                    <UButton
-                        :to="`/records/${type}/${id}/edit`"
-                        color="primary"
-                        variant="outline"
-                        icon="i-lucide-edit"
-                    >
+                <template #right>
+                    <!-- Edit button (only if user can edit) -->
+                    <UButton v-if="canEditRecords" :to="`/records/${type}/${id}/edit`" color="primary" variant="outline"
+                        icon="i-lucide-edit" :disabled="loading || !record">
                         Edit Record
                     </UButton>
                 </template>

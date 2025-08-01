@@ -131,7 +131,7 @@ const breadcrumbItems = computed(() => [
                 <template #description>
                     Browse and search through {{ recordTypeLabel.toLowerCase() }} records
                 </template>
-                <template #actions>
+                <template #right>
                     <UButton :to="`/records/${type}/new`" color="primary" icon="i-lucide-plus">
                         Create {{ recordTypeLabel }}
                     </UButton>

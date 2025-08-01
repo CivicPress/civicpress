@@ -9,7 +9,7 @@ const saving = ref(false)
 const error = ref('')
 
 // Toast notifications
-const { toast } = useToast()
+const toast = useToast()
 
 // Handle form submission
 const handleSubmit = async (recordData: any) => {
@@ -89,27 +89,16 @@ const breadcrumbItems = [
     <template #body>
       <div class="space-y-6">
         <UBreadcrumb :items="breadcrumbItems" />
-        
+
         <!-- Access Control -->
-        <UAlert 
-          v-if="!canCreateRecords" 
-          color="error" 
-          variant="soft" 
-          title="Access Denied"
-          description="You don't have permission to create records."
-          icon="i-lucide-alert-circle" 
-        />
-        
+        <UAlert v-if="!canCreateRecords" color="error" variant="soft" title="Access Denied"
+          description="You don't have permission to create records." icon="i-lucide-alert-circle" />
+
         <!-- Record Form -->
         <div v-else>
-          <RecordForm 
-            :saving="saving"
-            :error="error"
-            @submit="handleSubmit"
-            @delete="handleDelete"
-          />
+          <RecordForm :saving="saving" :error="error" @submit="handleSubmit" @delete="handleDelete" />
         </div>
       </div>
     </template>
   </UDashboardPanel>
-</template> 
+</template>

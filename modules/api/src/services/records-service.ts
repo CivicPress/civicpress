@@ -51,19 +51,10 @@ export class RecordsService {
       content?: string;
       metadata?: Record<string, any>;
     },
-    userRole: string = 'unknown'
+    user: any
   ): Promise<any> {
-    // Create a mock user object for permission checking
-    const mockUser = {
-      id: 1,
-      username: 'api-user',
-      role: userRole,
-      email: 'api@example.com',
-      name: 'API User',
-    };
-
     // Validate permissions using the same system as API middleware
-    const hasPermission = await userCan(mockUser, 'records:create', {
+    const hasPermission = await userCan(user, 'records:create', {
       recordType: data.type,
       action: 'create',
     });
@@ -80,11 +71,18 @@ export class RecordsService {
       type: data.type,
       content: data.content,
       metadata: data.metadata,
-      role: userRole,
     };
 
+    // Debug: Log the user object
+    console.log('User object in RecordsService:', user);
+    console.log('User username:', user.username);
+    console.log('User type:', typeof user.username);
+
     // Create the record using CivicCore
-    const record = await this.recordManager.createRecord(request, userRole);
+    const record = await this.recordManager.createRecord(request, user);
+
+    console.log('Record from RecordManager:', record);
+    console.log('Record author:', record.author);
 
     return {
       id: record.id,
@@ -132,7 +130,7 @@ export class RecordsService {
       status?: string;
       metadata?: Record<string, any>;
     },
-    userRole: string = 'unknown'
+    user: any
   ): Promise<any | null> {
     // Get the current record to validate permissions
     const currentRecord = await this.recordManager.getRecord(id);
@@ -140,17 +138,8 @@ export class RecordsService {
       return null;
     }
 
-    // Create a mock user object for permission checking
-    const mockUser = {
-      id: 1,
-      username: 'api-user',
-      role: userRole,
-      email: 'api@example.com',
-      name: 'API User',
-    };
-
     // Validate permissions using the same system as API middleware
-    const hasPermission = await userCan(mockUser, 'records:edit', {
+    const hasPermission = await userCan(user, 'records:edit', {
       recordType: currentRecord.type,
       action: 'edit',
     });
@@ -173,7 +162,7 @@ export class RecordsService {
     const updatedRecord = await this.recordManager.updateRecord(
       id,
       request,
-      userRole
+      user
     );
 
     if (!updatedRecord) {
@@ -196,27 +185,15 @@ export class RecordsService {
   /**
    * Delete (archive) a record
    */
-  async deleteRecord(
-    id: string,
-    userRole: string = 'unknown'
-  ): Promise<boolean> {
+  async deleteRecord(id: string, user: any): Promise<boolean> {
     // Get the current record to validate permissions
     const record = await this.recordManager.getRecord(id);
     if (!record) {
       return false;
     }
 
-    // Create a mock user object for permission checking
-    const mockUser = {
-      id: 1,
-      username: 'api-user',
-      role: userRole,
-      email: 'api@example.com',
-      name: 'API User',
-    };
-
     // Validate permissions using the same system as API middleware
-    const hasPermission = await userCan(mockUser, 'records:delete', {
+    const hasPermission = await userCan(user, 'records:delete', {
       recordType: record.type,
       action: 'delete',
     });
@@ -228,7 +205,91 @@ export class RecordsService {
     }
 
     // Archive the record
-    return await this.recordManager.archiveRecord(id, userRole);
+    return await this.recordManager.archiveRecord(id, user);
+  }
+
+  /**
+   * Change record status with workflow validation
+   */
+  async changeRecordStatus(
+    id: string,
+    newStatus: string,
+    user: any,
+    comment?: string
+  ): Promise<{ success: boolean; record?: any; error?: string }> {
+    // Get the current record to validate permissions
+    const record = await this.recordManager.getRecord(id);
+    if (!record) {
+      return { success: false, error: 'Record not found' };
+    }
+
+    // Validate permissions using the same system as API middleware
+    const hasPermission = await userCan(user, 'records:edit', {
+      recordType: record.type,
+      action: 'edit',
+    });
+
+    if (!hasPermission) {
+      return {
+        success: false,
+        error: `Permission denied: Cannot edit records of type '${record.type}'`,
+      };
+    }
+
+    // Validate status transition using workflow engine
+    const currentStatus = record.status;
+    const transitionValidation = await this.workflowManager.validateTransition(
+      currentStatus,
+      newStatus,
+      user.role
+    );
+
+    if (!transitionValidation.valid) {
+      return {
+        success: false,
+        error:
+          transitionValidation.reason ||
+          `Invalid status transition from '${currentStatus}' to '${newStatus}' for role '${user.role}'`,
+      };
+    }
+
+    // Update record with new status
+    const request: UpdateRecordRequest = {
+      status: newStatus,
+      metadata: {
+        ...record.metadata,
+        statusChangedBy: user.username,
+        statusChangedAt: new Date().toISOString(),
+        statusChangeComment: comment,
+        previousStatus: currentStatus,
+      },
+    };
+
+    // Update the record using CivicCore
+    const updatedRecord = await this.recordManager.updateRecord(
+      id,
+      request,
+      user
+    );
+
+    if (!updatedRecord) {
+      return { success: false, error: 'Failed to update record' };
+    }
+
+    return {
+      success: true,
+      record: {
+        id: updatedRecord.id,
+        title: updatedRecord.title,
+        type: updatedRecord.type,
+        status: updatedRecord.status,
+        content: updatedRecord.content,
+        metadata: updatedRecord.metadata || {},
+        path: updatedRecord.path,
+        created: updatedRecord.created_at,
+        author: updatedRecord.author,
+      },
+    };
   }
 
   /**

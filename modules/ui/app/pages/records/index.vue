@@ -127,7 +127,7 @@ const breadcrumbItems = [
                 <template #description>
                     Browse and search through all records
                 </template>
-                <template #actions>
+                <template #right>
                     <UButton to="/records/new" color="primary" icon="i-lucide-plus">
                         Create Record
                     </UButton>
