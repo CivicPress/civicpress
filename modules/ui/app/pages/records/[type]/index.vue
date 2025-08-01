@@ -8,13 +8,13 @@ const route = useRoute()
 const router = useRouter()
 
 // Get the record type from the route
-const recordType = route.params.type as string
+const type = route.params.type as string
 
 // Reactive data
 const searchQuery = ref('')
 const filters = ref({
     search: '',
-    types: [recordType], // Pre-select the record type
+    types: [type], // Pre-select the record type
     statuses: [] as string[]
 })
 
@@ -49,12 +49,12 @@ const debouncedApiSearch = useDebounceFn(async (query: string) => {
     // Only search if there's a query, otherwise load initial records
     if (query && query.trim()) {
         await recordsStore.searchRecords(query, {
-            type: recordType,
+            type: type,
             status: statusFilter,
         })
     } else {
         await recordsStore.loadInitialRecords({
-            type: recordType,
+            type: type,
             status: statusFilter,
         })
     }
@@ -71,7 +71,7 @@ const handleSearch = (query: string) => {
 // Handle filter changes
 const handleFilterChange = (newFilters: { search: string, types: string[], statuses: string[] }) => {
     // Always keep the record type selected
-    newFilters.types = [recordType]
+    newFilters.types = [type]
     filters.value = newFilters
     updateURL()
 
@@ -81,12 +81,12 @@ const handleFilterChange = (newFilters: { search: string, types: string[], statu
     // Only use searchRecords if there's a search query, otherwise use loadInitialRecords
     if (searchQuery.value && searchQuery.value.trim()) {
         recordsStore.searchRecords(searchQuery.value, {
-            type: recordType,
+            type: type,
             status: statusFilter,
         })
     } else {
         recordsStore.loadInitialRecords({
-            type: recordType,
+            type: type,
             status: statusFilter,
         })
     }
@@ -94,7 +94,7 @@ const handleFilterChange = (newFilters: { search: string, types: string[], statu
 
 // Get record type display name
 const { getRecordTypeLabel } = useRecordTypes()
-const recordTypeLabel = computed(() => getRecordTypeLabel(recordType))
+const recordTypeLabel = computed(() => getRecordTypeLabel(type))
 
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
@@ -103,7 +103,7 @@ onMounted(async () => {
 
     // Start fetching records immediately
     await recordsStore.loadInitialRecords({
-        type: recordType,
+        type: type,
         status: filters.value.statuses.length > 0 ? filters.value.statuses.join(',') : undefined
     })
 })
@@ -131,6 +131,15 @@ const breadcrumbItems = computed(() => [
                 <template #description>
                     Browse and search through {{ recordTypeLabel.toLowerCase() }} records
                 </template>
+                <template #actions>
+                    <UButton
+                        :to="`/records/${type}/new`"
+                        color="primary"
+                        icon="i-lucide-plus"
+                    >
+                        Create {{ recordTypeLabel }}
+                    </UButton>
+                </template>
             </UDashboardNavbar>
         </template>
 
@@ -139,11 +148,11 @@ const breadcrumbItems = computed(() => [
                 <UBreadcrumb :items="breadcrumbItems" />
 
                 <!-- Search and Filters Component -->
-                <RecordSearch :initial-filters="filters" :record-type="recordType" :disable-type-filter="true"
+                <RecordSearch :initial-filters="filters" :record-type="type" :disable-type-filter="true"
                     @search="handleSearch" @filter-change="handleFilterChange" />
 
                 <!-- Records List Component -->
-                <RecordList :record-type="recordType" :filters="filters" :search-query="searchQuery" />
+                <RecordList :record-type="type" :filters="filters" :search-query="searchQuery" />
             </div>
         </template>
     </UDashboardPanel>

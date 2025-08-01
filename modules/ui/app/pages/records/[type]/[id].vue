@@ -101,6 +101,16 @@ const breadcrumbItems = computed(() => [
                 <template #description>
                     View the details of {{ record?.title || 'this record' }}
                 </template>
+                <template #actions>
+                    <UButton
+                        :to="`/records/${type}/${id}/edit`"
+                        color="primary"
+                        variant="outline"
+                        icon="i-lucide-edit"
+                    >
+                        Edit Record
+                    </UButton>
+                </template>
             </UDashboardNavbar>
         </template>
 
