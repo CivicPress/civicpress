@@ -182,8 +182,6 @@ export const useIcons = () => {
     lawyer: 'i-lucide-user',
     contract: 'i-lucide-file-text',
     agreement: 'i-lucide-file-text',
-    policy: 'i-lucide-file-text',
-    regulation: 'i-lucide-clipboard-list',
 
     // Development & Debug
     debug: 'i-lucide-bug',
