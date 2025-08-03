@@ -128,6 +128,29 @@
   Profile (user)
 - **Grid Layout**: Responsive grid with `xl:grid-cols-4` for large screens
 - **Clean Design**: Remove empty sections (System Overview) for better focus
+- **Public Records**: Show recent records to all users (including
+  non-authenticated) for transparency
+
+### Responsive Header Actions 🎯
+
+- **Unified Component**: HeaderActions component for consistent responsive
+  behavior
+- **Desktop**: Side-by-side buttons for larger screens
+- **Mobile**: Vertical 3-dot dropdown menu for smaller screens
+- **Flexible Actions**: Support for navigation, functions, conditional display,
+  and styling
+- **Permission-Aware**: Conditional actions based on user roles and permissions
+- **Type Safety**: Full TypeScript support with proper interfaces
+
+### Security & Access Control 🔐
+
+- **Admin-Only Pages**: Settings page restricted to admin users with automatic
+  redirect
+- **Role-Based UI**: Different actions and content based on user permissions
+- **Graceful Handling**: Clear error messages and smooth redirects for
+  unauthorized access
+- **Client-Side Protection**: Immediate feedback and prevention of unauthorized
+  access
 - **Error Boundaries**: Graceful error handling with user-friendly messages
 
 ### Component Communication 🔄
