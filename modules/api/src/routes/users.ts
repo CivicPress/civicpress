@@ -212,6 +212,10 @@ router.get('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'get_user' });
 
   try {
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
     const identifier = req.params.id;
     let userId: number;
     let targetUser: any;
@@ -249,10 +253,6 @@ router.get('/:id', async (req, res) => {
         'Authentication required'
       );
     }
-
-    // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
-    const authService = civicPress.getAuthService();
 
     // Check if user can view this user (admin or self)
     const canManageUsers = await authService.userCan(user, 'users:manage');
@@ -303,6 +303,10 @@ router.put('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'update_user' });
 
   try {
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
     const identifier = req.params.id;
     let userId: number;
     let targetUser: any;
@@ -441,6 +445,10 @@ router.delete('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'delete_user' });
 
   try {
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
     const identifier = req.params.id;
     let userId: number;
     let targetUser: any;
