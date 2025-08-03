@@ -217,7 +217,7 @@ router.get('/:id', async (req, res) => {
     const authService = civicPress.getAuthService();
 
     const identifier = req.params.id;
-    let userId: number;
+    let userId: number | undefined;
     let targetUser: any;
 
     // Check if identifier is numeric (ID) or string (username)
@@ -256,7 +256,7 @@ router.get('/:id', async (req, res) => {
 
     // Check if user can view this user (admin or self)
     const canManageUsers = await authService.userCan(user, 'users:manage');
-    const isSelf = user.id === userId;
+    const isSelf = userId !== undefined && user.id === userId;
 
     if (!canManageUsers && !isSelf) {
       const error = new Error('Insufficient permissions to view user');
@@ -308,7 +308,7 @@ router.put('/:id', async (req, res) => {
     const authService = civicPress.getAuthService();
 
     const identifier = req.params.id;
-    let userId: number;
+    let userId: number | undefined;
     let targetUser: any;
 
     // Check if identifier is numeric (ID) or string (username)
@@ -347,10 +347,6 @@ router.put('/:id', async (req, res) => {
       );
     }
 
-    // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
-    const authService = civicPress.getAuthService();
-
     // Check if user was found
     if (!targetUser) {
       const error = new Error('User not found');
@@ -361,7 +357,7 @@ router.put('/:id', async (req, res) => {
 
     // Check if user can update this user (admin or self)
     const canManageUsers = await authService.userCan(user, 'users:manage');
-    const isSelf = user.id === userId;
+    const isSelf = userId !== undefined && user.id === userId;
 
     if (!canManageUsers && !isSelf) {
       const error = new Error('Insufficient permissions to update user');
@@ -401,6 +397,13 @@ router.put('/:id', async (req, res) => {
     }
 
     // Update user
+    if (!userId) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('update_user', error, req, res);
+    }
+
     const updatedUser = await authService.updateUser(userId, {
       email: userData.email,
       name: userData.name,
@@ -450,7 +453,7 @@ router.delete('/:id', async (req, res) => {
     const authService = civicPress.getAuthService();
 
     const identifier = req.params.id;
-    let userId: number;
+    let userId: number | undefined;
     let targetUser: any;
 
     // Check if identifier is numeric (ID) or string (username)
@@ -487,10 +490,6 @@ router.delete('/:id', async (req, res) => {
       );
     }
 
-    // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
-    const authService = civicPress.getAuthService();
-
     // Check if user was found
     if (!targetUser) {
       const error = new Error('User not found');
@@ -509,7 +508,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     // Prevent self-deletion
-    if (user.id === userId) {
+    if (userId !== undefined && user.id === userId) {
       const error = new Error('Cannot delete your own account');
       (error as any).statusCode = 400;
       (error as any).code = 'SELF_DELETION_NOT_ALLOWED';
@@ -517,6 +516,13 @@ router.delete('/:id', async (req, res) => {
     }
 
     // Delete user
+    if (!userId) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('delete_user', error, req, res);
+    }
+
     const deleted = await authService.deleteUser(userId);
     if (!deleted) {
       const error = new Error('User not found');
