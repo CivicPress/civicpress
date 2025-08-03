@@ -58,11 +58,6 @@ export class RecordManager {
     const recordId = `record-${Date.now()}`;
     const recordPath = `records/${request.type}/${recordId}.md`;
 
-    // Debug: Log the user object
-    logger.debug('User object in RecordManager:', user);
-    logger.debug('User username:', user.username);
-    logger.debug('User username type:', typeof user.username);
-
     // Remove any author property from request.metadata to avoid overwriting
     const safeMetadata = { ...(request.metadata || {}) };
     delete safeMetadata.author;
@@ -87,10 +82,6 @@ export class RecordManager {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-
-    // Debug: Log the record object
-    logger.debug('Record author:', record.author);
-    logger.debug('Record author type:', typeof record.author);
 
     // Save to database
     await this.db.createRecord({

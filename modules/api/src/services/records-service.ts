@@ -73,16 +73,8 @@ export class RecordsService {
       metadata: data.metadata,
     };
 
-    // Debug: Log the user object
-    console.log('User object in RecordsService:', user);
-    console.log('User username:', user.username);
-    console.log('User type:', typeof user.username);
-
     // Create the record using CivicCore
     const record = await this.recordManager.createRecord(request, user);
-
-    console.log('Record from RecordManager:', record);
-    console.log('Record author:', record.author);
 
     return {
       id: record.id,
@@ -90,10 +82,20 @@ export class RecordsService {
       type: record.type,
       status: record.status,
       content: record.content,
-      metadata: record.metadata || {},
+      metadata: {
+        ...record.metadata,
+        author:
+          typeof record.metadata?.author === 'object' &&
+          record.metadata.author?.username
+            ? record.metadata.author.username
+            : record.metadata?.author,
+      },
       path: record.path,
       created: record.created_at,
-      author: record.author,
+      author:
+        typeof record.author === 'object' && record.author.username
+          ? record.author.username
+          : record.author,
     };
   }
 

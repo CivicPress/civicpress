@@ -63,10 +63,10 @@ describe('API Records Integration', () => {
         type: 'bylaw',
         status: 'draft',
         content: '# Test Record\n\nContent here...',
-        author: 'admin',
+        author: 'testuser',
         created: expect.any(String),
         metadata: {
-          author: 'admin',
+          author: 'testuser',
           created: expect.any(String),
           priority: 'high',
         },
