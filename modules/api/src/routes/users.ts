@@ -220,25 +220,17 @@ router.get('/:id', async (req, res) => {
     let userId: number | undefined;
     let targetUser: any;
 
-    // Check if identifier is numeric (ID) or string (username)
-    if (/^\d+$/.test(identifier)) {
-      // Numeric ID
-      userId = parseInt(identifier);
-      if (isNaN(userId)) {
-        return handleApiError(
-          'get_user',
-          new Error('Invalid user ID'),
-          req,
-          res,
-          'Invalid user ID'
-        );
-      }
-      targetUser = await authService.getUserById(userId);
+    // Try username lookup first, then fall back to ID if not found
+    targetUser = await authService.getUserByUsername(identifier);
+    if (targetUser) {
+      userId = targetUser.id;
     } else {
-      // Username
-      targetUser = await authService.getUserByUsername(identifier);
-      if (targetUser) {
-        userId = targetUser.id;
+      // If username not found and identifier is numeric, try as ID
+      if (/^\d+$/.test(identifier)) {
+        userId = parseInt(identifier);
+        if (!isNaN(userId)) {
+          targetUser = await authService.getUserById(userId);
+        }
       }
     }
 
@@ -311,25 +303,17 @@ router.put('/:id', async (req, res) => {
     let userId: number | undefined;
     let targetUser: any;
 
-    // Check if identifier is numeric (ID) or string (username)
-    if (/^\d+$/.test(identifier)) {
-      // Numeric ID
-      userId = parseInt(identifier);
-      if (isNaN(userId)) {
-        return handleApiError(
-          'update_user',
-          new Error('Invalid user ID'),
-          req,
-          res,
-          'Invalid user ID'
-        );
-      }
-      targetUser = await authService.getUserById(userId);
+    // Try username lookup first, then fall back to ID if not found
+    targetUser = await authService.getUserByUsername(identifier);
+    if (targetUser) {
+      userId = targetUser.id;
     } else {
-      // Username
-      targetUser = await authService.getUserByUsername(identifier);
-      if (targetUser) {
-        userId = targetUser.id;
+      // If username not found and identifier is numeric, try as ID
+      if (/^\d+$/.test(identifier)) {
+        userId = parseInt(identifier);
+        if (!isNaN(userId)) {
+          targetUser = await authService.getUserById(userId);
+        }
       }
     }
 
@@ -456,25 +440,17 @@ router.delete('/:id', async (req, res) => {
     let userId: number | undefined;
     let targetUser: any;
 
-    // Check if identifier is numeric (ID) or string (username)
-    if (/^\d+$/.test(identifier)) {
-      // Numeric ID
-      userId = parseInt(identifier);
-      if (isNaN(userId)) {
-        return handleApiError(
-          'delete_user',
-          new Error('Invalid user ID'),
-          req,
-          res,
-          'Invalid user ID'
-        );
-      }
-      targetUser = await authService.getUserById(userId);
+    // Try username lookup first, then fall back to ID if not found
+    targetUser = await authService.getUserByUsername(identifier);
+    if (targetUser) {
+      userId = targetUser.id;
     } else {
-      // Username
-      targetUser = await authService.getUserByUsername(identifier);
-      if (targetUser) {
-        userId = targetUser.id;
+      // If username not found and identifier is numeric, try as ID
+      if (/^\d+$/.test(identifier)) {
+        userId = parseInt(identifier);
+        if (!isNaN(userId)) {
+          targetUser = await authService.getUserById(userId);
+        }
       }
     }
 

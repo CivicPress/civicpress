@@ -10,7 +10,7 @@ definePageMeta({
 
 // Route parameters
 const route = useRoute();
-const username = route.params.id as string;
+const username = route.params.username as string;
 
 // Reactive state
 const user = ref<User | null>(null);

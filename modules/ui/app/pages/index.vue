@@ -11,7 +11,6 @@ const { formatDate, getStatusColor, getTypeIcon } = useRecordUtils()
 
 // Reactive state
 const organizationInfo = ref<any>(null)
-const systemStats = ref<any>(null)
 const recentRecords = ref<CivicRecord[]>([])
 const loading = ref(true)
 const error = ref('')
@@ -19,6 +18,10 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 // Computed properties
 const defaultDescription = computed(() => 'A modern civic technology platform for transparent, accessible, and accountable local government.')
+
+const isAdmin = computed(() => {
+  return authStore.currentUser?.role === 'admin'
+})
 
 // Fetch organization info (public endpoint)
 const fetchOrganizationInfo = async () => {
@@ -33,22 +36,7 @@ const fetchOrganizationInfo = async () => {
   }
 }
 
-// Fetch system statistics (requires authentication)
-const fetchSystemStats = async () => {
-  if (!isAuthenticated.value) {
-    return
-  }
 
-  try {
-    const response = await $civicApi('/api/status') as any
-    if (response.success) {
-      systemStats.value = response.data
-    }
-  } catch (err: any) {
-    console.error('Error fetching system stats:', err)
-    // Don't set error for system stats - it's not critical
-  }
-}
 
 // Fetch recent records (requires authentication)
 const fetchRecentRecords = async () => {
@@ -78,10 +66,7 @@ const loadDashboardData = async () => {
 
     // Only fetch authenticated data if user is logged in
     if (isAuthenticated.value) {
-      await Promise.all([
-        fetchSystemStats(),
-        fetchRecentRecords()
-      ])
+      await fetchRecentRecords()
     }
   } catch (err: any) {
     error.value = err.message || 'Failed to load dashboard data'
@@ -97,11 +82,19 @@ const navigateToRecords = () => {
 }
 
 const navigateToCreate = () => {
-  navigateTo('/records/create')
+  navigateTo('/records/new')
 }
 
 const navigateToLogin = () => {
   navigateTo('/auth/login')
+}
+
+const navigateToSettings = () => {
+  navigateTo('/settings')
+}
+
+const navigateToProfile = () => {
+  navigateTo('/settings/profile')
 }
 
 // Load data on mount
@@ -167,7 +160,7 @@ watch(isAuthenticated, (newValue) => {
         </div>
 
         <!-- Quick Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <UCard class="text-center hover:shadow-lg transition-shadow cursor-pointer" @click="navigateToRecords">
             <UIcon name="i-lucide-file-text" class="w-12 h-12 text-blue-500 mx-auto mb-4" />
             <h3 class="text-lg font-semibold mb-2">Browse Records</h3>
@@ -186,6 +179,20 @@ watch(isAuthenticated, (newValue) => {
             <UIcon name="i-lucide-log-in" class="w-12 h-12 text-purple-500 mx-auto mb-4" />
             <h3 class="text-lg font-semibold mb-2">Sign In</h3>
             <p class="text-gray-600 dark:text-gray-400">Access administrative features and create records.</p>
+          </UCard>
+
+          <UCard v-if="isAdmin" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToSettings">
+            <UIcon name="i-lucide-settings" class="w-12 h-12 text-orange-500 mx-auto mb-4" />
+            <h3 class="text-lg font-semibold mb-2">Settings</h3>
+            <p class="text-gray-600 dark:text-gray-400">Manage system settings, users, and configurations.</p>
+          </UCard>
+
+          <UCard v-if="isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToProfile">
+            <UIcon name="i-lucide-user" class="w-12 h-12 text-indigo-500 mx-auto mb-4" />
+            <h3 class="text-lg font-semibold mb-2">Profile</h3>
+            <p class="text-gray-600 dark:text-gray-400">View and edit your user profile and preferences.</p>
           </UCard>
         </div>
 
@@ -210,30 +217,7 @@ watch(isAuthenticated, (newValue) => {
           </div>
         </div>
 
-        <!-- System Stats (if authenticated) -->
-        <div v-if="isAuthenticated && systemStats" class="space-y-4">
-          <h3 class="text-xl font-semibold">System Overview</h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <UCard>
-              <div class="text-center">
-                <div class="text-2xl font-bold text-blue-600">{{ systemStats.totalRecords || 0 }}</div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">Total Records</div>
-              </div>
-            </UCard>
-            <UCard>
-              <div class="text-center">
-                <div class="text-2xl font-bold text-green-600">{{ systemStats.activeRecords || 0 }}</div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">Active Records</div>
-              </div>
-            </UCard>
-            <UCard>
-              <div class="text-center">
-                <div class="text-2xl font-bold text-purple-600">{{ systemStats.recentUpdates || 0 }}</div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">Recent Updates</div>
-              </div>
-            </UCard>
-          </div>
-        </div>
+
 
         <!-- Public Information -->
         <div v-if="organizationInfo" class="space-y-4">

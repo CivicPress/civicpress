@@ -113,6 +113,9 @@ const breadcrumbItems = [
         label: 'Records',
     }
 ]
+
+// Breadcrumbs ref for scroll-to-top functionality
+const breadcrumbsRef = ref<HTMLElement>()
 </script>
 
 <template>
@@ -137,13 +140,13 @@ const breadcrumbItems = [
 
         <template #body>
             <div class="space-y-6">
-                <UBreadcrumb :items="breadcrumbItems" />
+                <UBreadcrumb ref="breadcrumbsRef" :items="breadcrumbItems" />
 
                 <!-- Search and Filters Component -->
                 <RecordSearch :initial-filters="filters" @search="handleSearch" @filter-change="handleFilterChange" />
 
                 <!-- Records List Component -->
-                <RecordList :filters="filters" :search-query="searchQuery" />
+                <RecordList :filters="filters" :search-query="searchQuery" :breadcrumbs-ref="breadcrumbsRef" />
             </div>
         </template>
     </UDashboardPanel>

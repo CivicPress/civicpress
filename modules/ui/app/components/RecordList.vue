@@ -12,6 +12,7 @@ interface Props {
     statuses?: string[]
   }
   searchQuery?: string
+  breadcrumbsRef?: Ref<HTMLElement | undefined>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -48,7 +49,7 @@ const processedRecords = computed(() => {
     statusColor: getStatusColor(record.status),
     typeIcon: getTypeIcon(record.type),
     typeLabel: getTypeLabel(record.type),
-    statusLabel: getTypeLabel(record.status),
+    statusLabel: getStatusLabel(record.status),
     excerpt: record.content.substring(0, 150) + '...'
   }))
 })
@@ -87,11 +88,38 @@ const navigateToRecord = (record: CivicRecord) => {
   navigateTo(`/records/${record.type}/${record.id}`)
 }
 
-// Virtual list for large datasets
-const virtualListContainer = ref<HTMLElement>()
-const { list: virtualList } = useVirtualList(processedRecords, {
-  itemHeight: 120,
+// Simple pagination for large datasets instead of virtual scrolling
+const itemsPerPage = 50
+const currentPage = ref(1)
+
+const paginatedRecords = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return processedRecords.value.slice(start, end)
 })
+
+const totalPages = computed(() => Math.ceil(displayRecords.value.length / itemsPerPage))
+
+const scrollToTop = () => {
+  // Scroll to the breadcrumbs instead of the very top
+  if (props.breadcrumbsRef?.value) {
+    props.breadcrumbsRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    scrollToTop()
+  }
+}
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    scrollToTop()
+  }
+}
 
 // Initialize records if needed
 onMounted(async () => {
@@ -110,70 +138,74 @@ onMounted(async () => {
     <div class="space-y-4">
       <!-- Show existing records immediately if we have them -->
       <div v-if="displayRecords.length > 0" class="space-y-4">
-        <!-- Virtual Scrolling for Large Lists -->
+        <!-- Pagination for Large Lists -->
         <div v-if="displayRecords.length > 50" class="space-y-4">
           <!-- Performance indicator for large lists -->
           <div class="text-xs text-gray-500 bg-gray-50 p-2 rounded">
             <UIcon name="i-lucide-zap" class="w-4 h-4 inline mr-1" />
-            Showing {{ displayRecords.length }} records (virtual scrolling enabled)
+            Showing {{ displayRecords.length }} records (pagination enabled) - Page {{ currentPage }} of {{ totalPages
+            }}
           </div>
 
-          <!-- Virtual List Container -->
-          <div ref="virtualListContainer" class="h-96 overflow-auto border rounded-lg">
-            <div :style="{ height: `${processedRecords.length * 120}px`, position: 'relative' }">
-              <div v-for="item in virtualList" :key="item.data.id" :style="{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '120px',
-                transform: `translateY(${item.index * 120}px)`
-              }">
-                <UCard class="hover:shadow-md transition-shadow cursor-pointer mx-4 mb-4"
-                  @click="navigateToRecord(item.data)">
-                  <div class="flex items-start justify-between">
-                    <div class="flex items-start space-x-4 flex-1">
-                      <!-- Type Icon -->
-                      <div class="flex-shrink-0">
-                        <UIcon :name="item.data.typeIcon" class="w-8 h-8 text-gray-500" />
-                      </div>
-
-                      <!-- Record Info -->
-                      <div class="flex-1 min-w-0">
-                        <h3 class="text-lg font-semibold mb-1">
-                          {{ item.data.title }}
-                        </h3>
-                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
-                          {{ item.data.excerpt }}
-                        </p>
-                        <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                          <span>Type: {{ item.data.typeLabel }}</span>
-                          <span>Created: {{ item.data.formattedDate }}</span>
-                          <span v-if="item.data.author">By: {{ item.data.author }}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Status Badge -->
-                    <div class="flex-shrink-0">
-                      <UBadge :color="item.data.statusColor as any" variant="soft" size="sm">
-                        {{ item.data.statusLabel }}
-                      </UBadge>
-                    </div>
+          <!-- Paginated Records -->
+          <div class="space-y-4">
+            <UCard v-for="record in paginatedRecords" :key="record.id"
+              class="hover:shadow-md transition-shadow cursor-pointer" @click="navigateToRecord(record)">
+              <div class="flex items-start justify-between">
+                <div class="flex items-start space-x-4 flex-1">
+                  <!-- Type Icon -->
+                  <div class="flex-shrink-0">
+                    <UIcon :name="record.typeIcon" class="w-8 h-8 text-gray-500" />
                   </div>
 
-                  <!-- Tags -->
-                  <div v-if="item.data.metadata?.tags && item.data.metadata.tags.length > 0" class="mt-3 pt-3 border-t">
-                    <div class="flex flex-wrap gap-1">
-                      <UBadge v-for="tag in item.data.metadata.tags" :key="tag" color="neutral" variant="soft"
-                        size="xs">
-                        {{ tag }}
-                      </UBadge>
+                  <!-- Record Info -->
+                  <div class="flex-1 min-w-0">
+                    <h3 class="text-lg font-semibold mb-1">
+                      {{ record.title }}
+                    </h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                      {{ record.excerpt }}
+                    </p>
+                    <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+                      <span>Type: {{ record.typeLabel }}</span>
+                      <span>Created: {{ record.formattedDate }}</span>
+                      <span v-if="record.author">By: {{ record.author }}</span>
                     </div>
                   </div>
-                </UCard>
+                </div>
+
+                <!-- Status Badge -->
+                <div class="flex-shrink-0">
+                  <UBadge :color="record.statusColor as any" variant="soft" size="sm">
+                    {{ record.statusLabel }}
+                  </UBadge>
+                </div>
               </div>
-            </div>
+
+              <!-- Tags -->
+              <div v-if="record.metadata?.tags && record.metadata.tags.length > 0" class="mt-3 pt-3 border-t">
+                <div class="flex flex-wrap gap-1">
+                  <UBadge v-for="tag in record.metadata.tags" :key="tag" color="neutral" variant="soft" size="xs">
+                    {{ tag }}
+                  </UBadge>
+                </div>
+              </div>
+            </UCard>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div class="flex items-center justify-between">
+            <UButton @click="prevPage" :disabled="currentPage === 1" variant="outline" size="sm">
+              <UIcon name="i-lucide-chevron-left" class="w-4 h-4 mr-1" />
+              Previous
+            </UButton>
+            <span class="text-sm text-gray-600 dark:text-gray-400">
+              Page {{ currentPage }} of {{ totalPages }}
+            </span>
+            <UButton @click="nextPage" :disabled="currentPage === totalPages" variant="outline" size="sm">
+              Next
+              <UIcon name="i-lucide-chevron-right" class="w-4 h-4 ml-1" />
+            </UButton>
           </div>
         </div>
 
