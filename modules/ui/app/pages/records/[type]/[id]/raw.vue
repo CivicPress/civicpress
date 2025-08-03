@@ -138,11 +138,9 @@ const breadcrumbItems = computed(() => [
                     View the raw markdown content of this record
                 </template>
                 <template #right>
-                    <!-- Back to record view button -->
-                    <UButton :to="`/records/${type}/${id}`" color="neutral" variant="outline" icon="i-lucide-arrow-left"
-                        :disabled="loading || !record">
-                        Back to Record
-                    </UButton>
+                    <HeaderActions :actions="[
+                        { label: 'Back to Record', icon: 'i-lucide-arrow-left', to: `/records/${type}/${id}`, color: 'neutral', variant: 'outline', disabled: loading || !record }
+                    ]" />
                 </template>
             </UDashboardNavbar>
         </template>

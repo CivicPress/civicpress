@@ -131,9 +131,9 @@ const breadcrumbsRef = ref<HTMLElement>()
                     Browse and search through all records
                 </template>
                 <template #right>
-                    <UButton to="/records/new" color="primary" icon="i-lucide-plus">
-                        Create Record
-                    </UButton>
+                    <HeaderActions :actions="[
+                        { label: 'Create Record', icon: 'i-lucide-plus', to: '/records/new', color: 'primary' }
+                    ]" />
                 </template>
             </UDashboardNavbar>
         </template>

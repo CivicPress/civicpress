@@ -93,6 +93,8 @@ const canEditRecords = computed(() => {
     return userRole === 'admin' || userRole === 'clerk'
 })
 
+
+
 // Fetch record on mount
 onMounted(() => {
     fetchRecord()
@@ -126,16 +128,10 @@ const breadcrumbItems = computed(() => [
                     View the details of {{ record?.title || 'this record' }}
                 </template>
                 <template #right>
-                    <!-- View Raw button -->
-                    <UButton :to="`/records/${type}/${id}/raw`" color="neutral" variant="outline" icon="i-lucide-code"
-                        :disabled="loading || !record">
-                        View Raw
-                    </UButton>
-                    <!-- Edit button (only if user can edit) -->
-                    <UButton v-if="canEditRecords" :to="`/records/${type}/${id}/edit`" color="primary" variant="outline"
-                        icon="i-lucide-edit" :disabled="loading || !record">
-                        Edit Record
-                    </UButton>
+                    <HeaderActions :actions="[
+                        { label: 'View Raw', icon: 'i-lucide-code', to: `/records/${type}/${id}/raw`, color: 'neutral', disabled: loading || !record },
+                        { label: 'Edit Record', icon: 'i-lucide-edit', to: `/records/${type}/${id}/edit`, color: 'primary', show: canEditRecords, disabled: loading || !record }
+                    ]" />
                 </template>
             </UDashboardNavbar>
         </template>

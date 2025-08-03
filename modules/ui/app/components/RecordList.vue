@@ -140,13 +140,6 @@ onMounted(async () => {
       <div v-if="displayRecords.length > 0" class="space-y-4">
         <!-- Pagination for Large Lists -->
         <div v-if="displayRecords.length > 50" class="space-y-4">
-          <!-- Performance indicator for large lists -->
-          <div class="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-            <UIcon name="i-lucide-zap" class="w-4 h-4 inline mr-1" />
-            Showing {{ displayRecords.length }} records (pagination enabled) - Page {{ currentPage }} of {{ totalPages
-            }}
-          </div>
-
           <!-- Paginated Records -->
           <div class="space-y-4">
             <UCard v-for="record in paginatedRecords" :key="record.id"

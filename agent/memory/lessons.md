@@ -98,6 +98,36 @@
 - **Empty Query Errors**: Validate queries before sending to API
 - **400 Bad Request**: Check for required parameters before API calls
 - **Fallback Strategy**: Use `loadInitialRecords` when search fails
+
+### Virtual Scrolling Issues 🔄
+
+- **Library Compatibility**: `useVirtualList` from `@vueuse/core` may not work
+  with all data structures
+- **Reactive Data**: Virtual lists need proper reactive data binding
+- **Alternative Solutions**: Use pagination when virtual scrolling fails
+- **Performance**: 50 records per page provides good balance of performance and
+  UX
+- **Scroll-to-Top**: Implement smooth scrolling to breadcrumbs for better
+  navigation
+
+### Username-Based Routing Security 🔐
+
+- **Security Improvement**: Use usernames instead of numeric IDs in URLs
+- **API Compatibility**: Support both username and ID lookups in backend
+- **Fallback Logic**: Try username first, then fall back to ID if numeric
+- **URL Structure**: `/settings/users/username/` instead of
+  `/settings/users/123/`
+- **Frontend Integration**: Update navigation functions to use username-based
+  paths
+
+### Home Page UX Improvements 🏠
+
+- **Role-Based Cards**: Show different cards based on user role (admin, user,
+  guest)
+- **Quick Actions**: Browse Records, Create Record, Sign In, Settings (admin),
+  Profile (user)
+- **Grid Layout**: Responsive grid with `xl:grid-cols-4` for large screens
+- **Clean Design**: Remove empty sections (System Overview) for better focus
 - **Error Boundaries**: Graceful error handling with user-friendly messages
 
 ### Component Communication 🔄

@@ -31,6 +31,12 @@ const breadcrumbItems = computed(() => [
     { label: user.value?.name || user.value?.username || 'User' },
 ]);
 
+// Check if user can edit users
+const canEditUsers = computed(() => {
+    const userRole = authStore.currentUser?.role;
+    return userRole === 'admin' || userRole === 'clerk';
+});
+
 
 
 // Fetch user data
@@ -67,9 +73,10 @@ onMounted(() => {
         <template #header>
             <UDashboardNavbar :title="pageTitle">
                 <template #right>
-                    <UButton to="/settings/users" color="neutral" variant="outline" icon="i-lucide-arrow-left">
-                        Back to Users
-                    </UButton>
+                    <HeaderActions :actions="[
+                        { label: 'Back to Users', icon: 'i-lucide-arrow-left', to: '/settings/users', color: 'neutral', variant: 'outline' },
+                        { label: 'Edit User', icon: 'i-lucide-edit', to: `/settings/users/${username}/edit`, color: 'primary', show: canEditUsers }
+                    ]" />
                 </template>
             </UDashboardNavbar>
         </template>
@@ -99,21 +106,13 @@ onMounted(() => {
                 <!-- User Details -->
                 <UCard v-else>
                     <template #header>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <UIcon name="i-lucide-user" class="w-6 h-6 text-primary-600" />
-                                <div>
-                                    <h2 class="text-xl font-semibold">User Details</h2>
-                                    <p class="text-sm text-gray-600 dark:text-gray-400">
-                                        View user information and details
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="flex space-x-2">
-                                <UButton :to="`/settings/users/${username}/edit`" color="primary" variant="outline"
-                                    icon="i-lucide-edit">
-                                    Edit User
-                                </UButton>
+                        <div class="flex items-center space-x-3">
+                            <UIcon name="i-lucide-user" class="w-6 h-6 text-primary-600" />
+                            <div>
+                                <h2 class="text-xl font-semibold">User Details</h2>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    View user information and details
+                                </p>
                             </div>
                         </div>
                     </template>

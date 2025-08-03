@@ -38,12 +38,8 @@ const fetchOrganizationInfo = async () => {
 
 
 
-// Fetch recent records (requires authentication)
+// Fetch recent records (public - available to all users)
 const fetchRecentRecords = async () => {
-  if (!isAuthenticated.value) {
-    return
-  }
-
   try {
     const response = await $civicApi('/api/records?limit=5') as any
     if (response.success) {
@@ -64,10 +60,8 @@ const loadDashboardData = async () => {
     // Always fetch organization info (public)
     await fetchOrganizationInfo()
 
-    // Only fetch authenticated data if user is logged in
-    if (isAuthenticated.value) {
-      await fetchRecentRecords()
-    }
+    // Fetch recent records for all users (public data)
+    await fetchRecentRecords()
   } catch (err: any) {
     error.value = err.message || 'Failed to load dashboard data'
     console.error('Error loading dashboard data:', err)
@@ -196,8 +190,8 @@ watch(isAuthenticated, (newValue) => {
           </UCard>
         </div>
 
-        <!-- Recent Records (if authenticated) -->
-        <div v-if="isAuthenticated && recentRecords.length > 0" class="space-y-4">
+        <!-- Recent Records (public - available to all users) -->
+        <div v-if="recentRecords.length > 0" class="space-y-4">
           <h3 class="text-xl font-semibold">Recent Records</h3>
           <div class="grid gap-4">
             <UCard v-for="record in recentRecords" :key="record.id"

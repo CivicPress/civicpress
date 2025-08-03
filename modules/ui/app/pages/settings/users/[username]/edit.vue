@@ -134,9 +134,9 @@ onMounted(() => {
         <template #header>
             <UDashboardNavbar :title="pageTitle">
                 <template #right>
-                    <UButton to="/settings/users" color="neutral" variant="outline" icon="i-lucide-arrow-left">
-                        Back to Users
-                    </UButton>
+                    <HeaderActions :actions="[
+                        { label: 'Back to Users', icon: 'i-lucide-arrow-left', to: '/settings/users', color: 'neutral', variant: 'outline' }
+                    ]" />
                 </template>
             </UDashboardNavbar>
         </template>

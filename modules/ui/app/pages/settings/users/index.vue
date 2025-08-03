@@ -86,9 +86,9 @@ onMounted(() => {
                     Manage system users and their roles
                 </template>
                 <template #right>
-                    <UButton v-if="canManageUsers" to="/settings/users/new" icon="i-lucide-plus" color="primary">
-                        Add User
-                    </UButton>
+                    <HeaderActions :actions="[
+                        { label: 'Add User', icon: 'i-lucide-plus', to: '/settings/users/new', color: 'primary', show: canManageUsers }
+                    ]" />
                 </template>
             </UDashboardNavbar>
         </template>
