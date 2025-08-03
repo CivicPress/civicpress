@@ -13,16 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.11.1'
-          cache: 'npm'
-
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 10.12.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.1'
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install
