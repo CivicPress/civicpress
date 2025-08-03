@@ -14,7 +14,7 @@ body {
 
 :root {
   --ui-container: var(--container-4xl);
-  --ui-primary: #000000;
+  --ui-primary: #2563eb;
 
   ::selection {
     color: #282a30;

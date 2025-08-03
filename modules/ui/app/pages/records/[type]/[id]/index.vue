@@ -164,7 +164,7 @@ const breadcrumbItems = computed(() => [
             <!-- Record Content -->
             <div v-else-if="record" class="space-y-6">
                 <!-- Record Header -->
-                <div class="bg-white rounded-lg border p-6">
+                <div class="rounded-lg border p-6">
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
@@ -181,7 +181,7 @@ const breadcrumbItems = computed(() => [
                             </h1>
                             <p class="text-gray-600 dark:text-gray-400">
                                 Record ID: <code class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm">{{ record.id
-                        }}</code>
+                                }}</code>
                             </p>
                         </div>
                     </div>
@@ -189,21 +189,24 @@ const breadcrumbItems = computed(() => [
                     <!-- Metadata -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                         <div class="space-y-2">
-                            <div class="flex items-center gap-2 text-sm text-gray-600">
+                            <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <UIcon name="i-lucide-calendar" class="w-4 h-4" />
                                 <span>Created: {{ formatDate(record.created_at) }}</span>
                             </div>
-                            <div v-if="record.author" class="flex items-center gap-2 text-sm text-gray-600">
+                            <div v-if="record.author"
+                                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <UIcon name="i-lucide-user" class="w-4 h-4" />
                                 <span>Author: {{ record.author }}</span>
                             </div>
                         </div>
                         <div class="space-y-2">
-                            <div v-if="record.metadata?.updated" class="flex items-center gap-2 text-sm text-gray-600">
+                            <div v-if="record.metadata?.updated"
+                                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <UIcon name="i-lucide-edit" class="w-4 h-4" />
                                 <span>Updated: {{ formatDate(record.metadata.updated) }}</span>
                             </div>
-                            <div v-if="record.metadata?.updated" class="flex items-center gap-2 text-sm text-gray-600">
+                            <div v-if="record.metadata?.updated"
+                                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <UIcon name="i-lucide-edit" class="w-4 h-4" />
                                 <span>Updated: {{ formatDate(record.metadata.updated) }}</span>
                             </div>
@@ -212,7 +215,7 @@ const breadcrumbItems = computed(() => [
 
                     <!-- Tags -->
                     <div v-if="record.metadata?.tags && record.metadata.tags.length > 0" class="pt-4 border-t mt-4">
-                        <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
                             <UIcon name="i-lucide-tags" class="w-4 h-4" />
                             <span>Tags:</span>
                         </div>
@@ -226,25 +229,24 @@ const breadcrumbItems = computed(() => [
                 </div>
 
                 <!-- Record Content -->
-                <div class="bg-white rounded-lg border">
+                <div class="rounded-lg border">
                     <div class="border-b px-6 py-4">
                         <h2 class="text-lg font-semibold">Content</h2>
                     </div>
                     <div class="p-6">
                         <div v-if="record.content" class="markdown-content">
                             <!-- Render markdown content -->
-                            <div class="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-gray-900 prose-code:text-gray-800 prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
+                            <div class="prose prose-sm max-w-none prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
                                 v-html="renderMarkdown(record.content)" />
                         </div>
-                        <div v-else class="text-gray-500 italic">
+                        <div v-else class="text-gray-500 dark:text-gray-400 italic">
                             No content available for this record.
                         </div>
                     </div>
                 </div>
 
                 <!-- Additional Metadata -->
-                <div v-if="record.metadata && Object.keys(record.metadata).length > 0"
-                    class="bg-white rounded-lg border">
+                <div v-if="record.metadata && Object.keys(record.metadata).length > 0" class="rounded-lg border">
                     <div class="border-b px-6 py-4">
                         <h2 class="text-lg font-semibold">Additional Information</h2>
                     </div>

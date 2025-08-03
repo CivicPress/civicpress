@@ -243,7 +243,7 @@ watch(isAuthenticated, (newValue) => {
               <div v-if="organizationInfo.city && organizationInfo.state" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-map-pin" class="w-4 h-4 text-gray-500" />
                 <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.city }}, {{ organizationInfo.state
-                  }}</span>
+                }}</span>
               </div>
               <div v-if="organizationInfo.country" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />
