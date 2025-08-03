@@ -117,6 +117,21 @@ civic auth:login --token <your_github_token>
 civic auth:password --username <username> --password <password>
 ```
 
+### Authentication
+
+CivicPress supports multiple authentication methods:
+
+```bash
+# GitHub OAuth (recommended for development)
+civic auth:login --token <your_github_token>
+
+# Username/Password (traditional authentication)
+civic auth:password --username <username> --password <password>
+
+# Interactive login (prompts for credentials)
+civic auth:password
+```
+
 ### Basic Usage
 
 ```bash
@@ -156,7 +171,7 @@ pnpm dev:ui
 # Simulated authentication (development)
 curl -X POST http://localhost:3000/auth/simulated \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "role": "admin"}'
+  -d '{"token": "your_github_token", "provider": "github"}'
 
 # GitHub OAuth authentication
 curl -X POST http://localhost:3000/auth/login \
@@ -167,6 +182,11 @@ curl -X POST http://localhost:3000/auth/login \
 curl -X POST http://localhost:3000/auth/password \
   -H "Content-Type: application/json" \
   -d '{"username": "user", "password": "password"}'
+
+# Simulated authentication (for testing)
+curl -X POST http://localhost:3000/api/auth/simulated \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "role": "admin"}'
 ```
 
 ### Records API
