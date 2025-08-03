@@ -1,26 +1,17 @@
 # 📈 CivicPress Spec: `metrics.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive metrics documentation
 - performance tracking
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
   - 'observability.md: >=1.0.0'
-  - 'api.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'api.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

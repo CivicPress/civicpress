@@ -1,34 +1,22 @@
 # 🔐 CivicPress Spec: `permissions.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive testing examples
 - security testing patterns
 - performance testing
 - compliance testing
 - CLI testing
-- detailed YAML field definitions
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- detailed YAML field definitions fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
   - 'roles.yml.md: >=1.0.0'
   - 'workflows.md: >=1.0.0'
-  - 'git-policy.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'git-policy.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -64,21 +52,21 @@ approvals.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| User identities          | Git commit authors and role assignments |
-| Role definitions         | Role permissions from `.civic/roles.yml` |
-| Permission requests      | User actions requiring authorization |
-| Approval workflows       | Multi-role approval processes |
-| Role assignments         | User-to-role mappings and changes |
+| Input               | Description                              |
+| ------------------- | ---------------------------------------- |
+| User identities     | Git commit authors and role assignments  |
+| Role definitions    | Role permissions from `.civic/roles.yml` |
+| Permission requests | User actions requiring authorization     |
+| Approval workflows  | Multi-role approval processes            |
+| Role assignments    | User-to-role mappings and changes        |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Authorization decisions  | Allow/deny responses for user actions |
-| Role validations         | Role verification and permission checks |
-| Approval status          | Multi-role approval workflow status |
-| Audit logs              | Permission checks and role changes |
-| Access control lists     | Computed permissions for users and resources |
+| Output                  | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| Authorization decisions | Allow/deny responses for user actions        |
+| Role validations        | Role verification and permission checks      |
+| Approval status         | Multi-role approval workflow status          |
+| Audit logs              | Permission checks and role changes           |
+| Access control lists    | Computed permissions for users and resources |
 
 ---
 

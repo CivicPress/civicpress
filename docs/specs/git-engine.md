@@ -1,29 +1,17 @@
 # ⚙️ CivicPress Spec: `git-engine.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - detailed YAML examples
 - comprehensive field definitions
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -35,7 +23,8 @@ reviewers:
 
 ## 🎯 Purpose
 
-Provide a built-in Git engine for CivicPress to enable local-first civic record keeping, audit logging, and offline publishing.
+Provide a built-in Git engine for CivicPress to enable local-first civic record
+keeping, audit logging, and offline publishing.
 
 CivicPress treats Git as the **canonical ledger** for all civic records.
 
@@ -89,39 +78,39 @@ git:
     path: './records'
     remote: 'origin'
     branch: 'main'
-  
+
   # Commit settings
   commits:
     require_signature: true
     role_prefix: true
     conventional_format: true
     max_message_length: 72
-  
+
   # Role-based commit patterns
   roles:
     clerk:
       pattern: 'feat(clerk): {message}'
       allowed_actions: ['create', 'update', 'publish']
-    
+
     council:
       pattern: 'feat(council): {message}'
       allowed_actions: ['approve', 'reject', 'amend']
-    
+
     mayor:
       pattern: 'feat(mayor): {message}'
       allowed_actions: ['approve', 'veto', 'sign']
-    
+
     public:
       pattern: 'feat(public): {message}'
       allowed_actions: ['comment', 'propose']
-  
+
   # Audit logging
   audit:
     enabled: true
     log_file: '.civic/git-audit.log'
     include_payload: true
     retention_days: 365
-  
+
   # Security settings
   security:
     require_authentication: true

@@ -1,28 +1,16 @@
 # 🗃️ CivicPress Spec: `database.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive database documentation
 - data modeling
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'storage.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+  - 'storage.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -36,8 +24,8 @@ Database Layer & Data Management
 
 Introduce an optional database layer to enable persistent, queryable, structured
 data support beyond Git.  
-Used for performance, flexibility, and real-time features while maintaining
-data integrity, security, and compliance with civic governance requirements.
+Used for performance, flexibility, and real-time features while maintaining data
+integrity, security, and compliance with civic governance requirements.
 
 This spec defines secure database architecture, data modeling, and comprehensive
 testing strategies for civic data management.
@@ -66,21 +54,21 @@ testing strategies for civic data management.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Git Markdown files       | Synced into DB (optional)             |
-| API POST requests        | Writes into DB tables                 |
-| CLI commands            | May query DB if available             |
-| User authentication      | Session and role data                 |
-| Audit events            | System and user action logs           |
+| Input               | Description                 |
+| ------------------- | --------------------------- |
+| Git Markdown files  | Synced into DB (optional)   |
+| API POST requests   | Writes into DB tables       |
+| CLI commands        | May query DB if available   |
+| User authentication | Session and role data       |
+| Audit events        | System and user action logs |
 
-| Output                   | Description                           |
-| ----------------------- | ------------------------------------- |
-| Structured data         | Queryable civic information           |
-| Audit trails            | Immutable action records              |
-| User sessions           | Authentication and authorization data  |
-| Search results          | Indexed civic record queries          |
-| Backup files            | Encrypted database backups            |
+| Output          | Description                           |
+| --------------- | ------------------------------------- |
+| Structured data | Queryable civic information           |
+| Audit trails    | Immutable action records              |
+| User sessions   | Authentication and authorization data |
+| Search results  | Indexed civic record queries          |
+| Backup files    | Encrypted database backups            |
 
 ---
 
@@ -224,15 +212,15 @@ class DatabaseEncryption {
   async encryptSensitiveData(data: string): Promise<string> {
     const key = Buffer.from(process.env.DB_ENCRYPTION_KEY!, 'hex');
     const iv = randomBytes(this.config.ivLength);
-    
+
     const cipher = createCipher(this.config.algorithm, key);
     cipher.setAAD(Buffer.from('civicpress', 'utf8'));
-    
+
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     const tag = cipher.getAuthTag();
-    
+
     return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted}`;
   }
 
@@ -241,14 +229,14 @@ class DatabaseEncryption {
     const key = Buffer.from(process.env.DB_ENCRYPTION_KEY!, 'hex');
     const iv = Buffer.from(ivHex, 'hex');
     const tag = Buffer.from(tagHex, 'hex');
-    
+
     const decipher = createDecipher(this.config.algorithm, key);
     decipher.setAuthTag(tag);
     decipher.setAAD(Buffer.from('civicpress', 'utf8'));
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 }
@@ -299,17 +287,17 @@ class DatabaseAccessControl {
 
   async checkPermission(user: DatabaseUser, action: string, resource: string): Promise<boolean> {
     const userPermissions = this.rolePermissions[user.role] || [];
-    
+
     // Check specific permission
     if (userPermissions.includes(`${action}:${resource}`)) {
       return true;
     }
-    
+
     // Check wildcard permissions
     if (userPermissions.includes(`${action}:all`)) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -318,7 +306,7 @@ class DatabaseAccessControl {
     if (user.role === 'admin') {
       return query; // No restrictions for admins
     }
-    
+
     // Add user-specific conditions
     return query.replace(
       'WHERE',
@@ -379,7 +367,7 @@ class DataPrivacyManager {
         votes: true,
       },
     });
-    
+
     return {
       exported_at: new Date(),
       user_data: userData,
@@ -688,7 +676,8 @@ describe('Database Performance', () => {
 - [`storage.md`](./storage.md) — Data storage and file management
 - [`security.md`](./security.md) — Security architecture and threat modeling
 - [`auth.md`](./auth.md) — Authentication and user management
-- [`testing-framework.md`](./testing-framework.md) — Testing standards and patterns
+- [`testing-framework.md`](./testing-framework.md) — Testing standards and
+  patterns
 
 ---
 

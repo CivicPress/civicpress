@@ -1,29 +1,17 @@
 # 📦 CivicPress Spec: `archive-policy.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive archive policy documentation
 - data retention
-- authenticity preservation
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- authenticity preservation fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'public-data-structure.md: >=1.0.0'
-  - 'storage.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'storage.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -58,19 +46,19 @@ CivicPress, ensuring transparency, compliance, and historical continuity.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Records to be archived (bylaws, resolutions, etc.) |
-| Retention policies       | Rules determining when records expire |
-| Archive metadata         | Information about the archival process |
-| Audit logs               | Records of archive operations |
+| Input              | Description                                        |
+| ------------------ | -------------------------------------------------- |
+| Civic records      | Records to be archived (bylaws, resolutions, etc.) |
+| Retention policies | Rules determining when records expire              |
+| Archive metadata   | Information about the archival process             |
+| Audit logs         | Records of archive operations                      |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Archived records         | Records moved to archive structure |
-| Archive metadata         | Documentation of archival process |
-| Audit trail              | Logs of archive operations |
-| Archive index            | Searchable index of archived content |
+| Output           | Description                          |
+| ---------------- | ------------------------------------ |
+| Archived records | Records moved to archive structure   |
+| Archive metadata | Documentation of archival process    |
+| Audit trail      | Logs of archive operations           |
+| Archive index    | Searchable index of archived content |
 
 ---
 
@@ -223,7 +211,8 @@ This includes:
 
 ## 🔗 Related Specs
 
-- [`public-data-structure.md`](./public-data-structure.md) — Data organization and structure
+- [`public-data-structure.md`](./public-data-structure.md) — Data organization
+  and structure
 - [`storage.md`](./storage.md) — Storage systems and data persistence
 - [`audit.md`](./audit.md) — Audit logging and transparency
 - [`security.md`](./security.md) — Security considerations and compliance

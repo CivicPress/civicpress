@@ -1,25 +1,16 @@
 # 📊 CivicPress Spec: `public-data-structure.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive data structure documentation
 - organization patterns
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'manifest.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
+  - 'manifest.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -54,21 +45,21 @@ traceability and thematic organization.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Markdown files with YAML frontmatter |
-| Record metadata          | Title, status, authors, dates, tags |
-| File system structure    | Directory organization and naming |
-| Git commits              | Version history and change tracking |
-| Record relationships      | Links between related records |
+| Input                 | Description                          |
+| --------------------- | ------------------------------------ |
+| Civic records         | Markdown files with YAML frontmatter |
+| Record metadata       | Title, status, authors, dates, tags  |
+| File system structure | Directory organization and naming    |
+| Git commits           | Version history and change tracking  |
+| Record relationships  | Links between related records        |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Structured records       | Organized civic documents in folders |
-| Timeline entries         | Chronological civic activity records |
-| Record indexes           | Searchable indexes of civic records |
-| Archive entries          | Finalized records moved to archive |
-| Relationship maps        | Links and references between records |
+| Output             | Description                          |
+| ------------------ | ------------------------------------ |
+| Structured records | Organized civic documents in folders |
+| Timeline entries   | Chronological civic activity records |
+| Record indexes     | Searchable indexes of civic records  |
+| Archive entries    | Finalized records moved to archive   |
+| Relationship maps  | Links and references between records |
 
 ---
 

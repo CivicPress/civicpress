@@ -105,16 +105,22 @@
 
 - **Organization Config**: Use `.system-data/.civic/org-config.yml` for branding
 - **API Static Serving**: Serve brand assets via `/brand-assets` endpoint
-- **Path Resolution**: Convert relative paths to API endpoints (`brand-assets/logo.svg` → `/brand-assets/logo.svg`)
+- **Path Resolution**: Convert relative paths to API endpoints
+  (`brand-assets/logo.svg` → `/brand-assets/logo.svg`)
 - **Fallback Strategy**: Default to `/logo.svg` if config logo not available
-- **Theme Compatibility**: Use `dark:invert` CSS for automatic light/dark theme switching
+- **Theme Compatibility**: Use `dark:invert` CSS for automatic light/dark theme
+  switching
 
 ### Logo Design Best Practices 🖼️
 
-- **Transparent Background**: Remove colored backgrounds for better UI integration
-- **Monochrome Design**: Use black geometric elements that invert to white in dark theme
-- **Scalable Sizing**: Multiple size options (`sm`, `md`, `lg`, `xl`, `2xl`) for different contexts
-- **Consistent Branding**: Always show "CivicPress" text regardless of organization config
+- **Transparent Background**: Remove colored backgrounds for better UI
+  integration
+- **Monochrome Design**: Use black geometric elements that invert to white in
+  dark theme
+- **Scalable Sizing**: Multiple size options (`sm`, `md`, `lg`, `xl`, `2xl`) for
+  different contexts
+- **Consistent Branding**: Always show "CivicPress" text regardless of
+  organization config
 - **SVG Format**: Vector graphics for crisp display at any size
 
 ### Component Architecture 🧩

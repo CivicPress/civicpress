@@ -1,25 +1,16 @@
 # 🔍 CivicPress Spec: `indexing.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive indexing documentation
 - search optimization
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'public-data-structure.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
+  - 'public-data-structure.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -55,21 +46,21 @@ full database.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Markdown files from `records/` directory |
-| Frontmatter metadata     | YAML metadata from civic record headers |
-| File system structure    | Directory organization and file paths |
-| Index configuration      | Index generation rules and schemas |
-| Search queries           | User search requests and filters |
+| Input                 | Description                              |
+| --------------------- | ---------------------------------------- |
+| Civic records         | Markdown files from `records/` directory |
+| Frontmatter metadata  | YAML metadata from civic record headers  |
+| File system structure | Directory organization and file paths    |
+| Index configuration   | Index generation rules and schemas       |
+| Search queries        | User search requests and filters         |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Index files              | YAML index files for record discovery |
-| Search results           | Filtered and sorted record listings |
-| Module indexes           | Module-specific index files |
-| Index metadata           | Index generation timestamps and stats |
-| Cache files              | Pre-computed search indexes |
+| Output         | Description                           |
+| -------------- | ------------------------------------- |
+| Index files    | YAML index files for record discovery |
+| Search results | Filtered and sorted record listings   |
+| Module indexes | Module-specific index files           |
+| Index metadata | Index generation timestamps and stats |
+| Cache files    | Pre-computed search indexes           |
 
 ---
 

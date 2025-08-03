@@ -1,26 +1,17 @@
 # 🔌 CivicPress Spec: `api.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive API documentation
 - security considerations
-- testing patterns
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
+- testing patterns compatibility: min_civicpress: 1.0.0 max_civicpress: 'null'
   dependencies:
   - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.1.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -35,9 +26,9 @@ reviewers:
 Provide a standalone, framework-agnostic API layer for reading, writing, and
 orchestrating civic records through clean, stateless, role-aware REST endpoints.
 
-This API serves as the secure gateway between civic data and all client applications,
-ensuring proper authentication, authorization, and data integrity across all
-civic operations.
+This API serves as the secure gateway between civic data and all client
+applications, ensuring proper authentication, authorization, and data integrity
+across all civic operations.
 
 ---
 
@@ -64,21 +55,21 @@ civic operations.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| HTTP requests            | REST API calls with authentication    |
-| Authentication tokens    | GitHub tokens, JWT, signed URLs       |
-| Civic records           | Markdown files, YAML configs          |
-| User permissions        | Role-based access control data        |
-| Audit events            | User actions, system events           |
+| Input                 | Description                        |
+| --------------------- | ---------------------------------- |
+| HTTP requests         | REST API calls with authentication |
+| Authentication tokens | GitHub tokens, JWT, signed URLs    |
+| Civic records         | Markdown files, YAML configs       |
+| User permissions      | Role-based access control data     |
+| Audit events          | User actions, system events        |
 
-| Output                   | Description                           |
-| ----------------------- | ------------------------------------- |
-| JSON responses          | Civic data, metadata, status info     |
-| HTTP status codes       | Success, error, and redirect responses |
-| Audit logs              | Immutable action records               |
-| Webhooks                | Event notifications to subscribers     |
-| Error messages          | Structured error responses             |
+| Output            | Description                            |
+| ----------------- | -------------------------------------- |
+| JSON responses    | Civic data, metadata, status info      |
+| HTTP status codes | Success, error, and redirect responses |
+| Audit logs        | Immutable action records               |
+| Webhooks          | Event notifications to subscribers     |
+| Error messages    | Structured error responses             |
 
 ---
 
@@ -177,17 +168,17 @@ class APIAuthMiddleware {
     if (req.headers.authorization?.startsWith('Bearer ghp_')) {
       return this.validateGitHubToken(req.headers.authorization);
     }
-    
+
     // JWT token validation
     if (req.headers.authorization?.startsWith('Bearer eyJ')) {
       return this.validateJWTToken(req.headers.authorization);
     }
-    
+
     // Signed URL validation
     if (req.query.sig) {
       return this.validateSignedURL(req.url, req.query.sig as string);
     }
-    
+
     throw new UnauthorizedError('No valid authentication provided');
   }
 }
@@ -281,10 +272,10 @@ class AuditLogger {
       ...event,
       hash: this.generateHash(event), // Immutable audit trail
     };
-    
+
     // Write to audit log
     await this.writeToAuditLog(auditEntry);
-    
+
     // Send to monitoring system
     await this.sendToMonitoring(auditEntry);
   }
@@ -356,7 +347,7 @@ describe('CivicPress API Integration', () => {
   describe('Rate Limiting', () => {
     it('should enforce rate limits', async () => {
       // Arrange
-      const requests = Array(101).fill(null).map(() => 
+      const requests = Array(101).fill(null).map(() =>
         server.get('/api/bylaws').set('Authorization', 'Bearer valid_token')
       );
 
@@ -366,7 +357,7 @@ describe('CivicPress API Integration', () => {
       // Assert
       const successfulRequests = responses.filter(r => r.status === 200);
       const rateLimitedRequests = responses.filter(r => r.status === 429);
-      
+
       expect(successfulRequests).toHaveLength(100);
       expect(rateLimitedRequests).toHaveLength(1);
     });
@@ -398,7 +389,7 @@ describe('API Security Testing', () => {
       for (const query of maliciousQueries) {
         const response = await request(app)
           .get(`/api/search?q=${encodeURIComponent(query)}`);
-        
+
         expect(response.status).not.toBe(500);
         expect(response.body.error).toBeDefined();
       }
@@ -417,7 +408,7 @@ describe('API Security Testing', () => {
         const response = await request(app)
           .post('/api/feedback')
           .send({ content, recordSlug: 'test' });
-        
+
         expect(response.status).toBe(400);
         expect(response.body.error).toContain('Invalid content');
       }
@@ -438,7 +429,7 @@ describe('API Security Testing', () => {
         const response = await request(app)
           .post(testCase.endpoint)
           .set('Authorization', `Bearer ${generateToken(testCase.role)}`);
-        
+
         expect(response.status).toBe(testCase.expectedStatus);
       }
     });
@@ -566,7 +557,8 @@ GET /v1/bylaws/:slug
 - [`auth.md`](./auth.md) — Authentication and identity management
 - [`permissions.md`](./permissions.md) — Role-based access control
 - [`security.md`](./security.md) — Security architecture and threat modeling
-- [`testing-framework.md`](./testing-framework.md) — Testing standards and patterns
+- [`testing-framework.md`](./testing-framework.md) — Testing standards and
+  patterns
 
 ---
 

@@ -249,9 +249,12 @@ export class CivicPressAPI {
     this.app.use('/api/status', createStatusRouter());
     this.app.use('/api/validation', createValidationRouter());
     this.app.use('/api/config', configRouter);
-    
+
     // Serve brand assets (logos, favicons, etc.)
-    this.app.use('/brand-assets', express.static(path.join(this.dataDir, '.civic', 'brand-assets')));
+    this.app.use(
+      '/brand-assets',
+      express.static(path.join(this.dataDir, '.civic', 'brand-assets'))
+    );
 
     // Protected routes that require authentication
     this.app.use('/api/export', authMiddleware(this.civicPress), exportRouter);

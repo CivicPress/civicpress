@@ -1,29 +1,17 @@
 # 🎨 CivicPress Spec: `ui.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive UI documentation
 - accessibility considerations
-- testing patterns
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- testing patterns fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -56,21 +44,21 @@ CivicPress's public-facing UI and admin/editor tools.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| CivicPress data          | Records, bylaws, feedback, and civic data |
-| User authentication       | GitHub OAuth and role-based access |
-| UI components            | Reusable Vue components and layouts |
-| Design system            | Tailwind CSS and design tokens |
-| Accessibility requirements | WCAG compliance and responsive design |
+| Input                      | Description                               |
+| -------------------------- | ----------------------------------------- |
+| CivicPress data            | Records, bylaws, feedback, and civic data |
+| User authentication        | GitHub OAuth and role-based access        |
+| UI components              | Reusable Vue components and layouts       |
+| Design system              | Tailwind CSS and design tokens            |
+| Accessibility requirements | WCAG compliance and responsive design     |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Public UI                | Static-exportable civic portal |
-| Admin interface          | Authenticated management tools |
-| Responsive layouts       | Mobile and desktop optimized views |
-| Accessible components    | WCAG compliant UI elements |
-| Static exports           | Deployable public-facing sites |
+| Output                | Description                        |
+| --------------------- | ---------------------------------- |
+| Public UI             | Static-exportable civic portal     |
+| Admin interface       | Authenticated management tools     |
+| Responsive layouts    | Mobile and desktop optimized views |
+| Accessible components | WCAG compliant UI elements         |
+| Static exports        | Deployable public-facing sites     |
 
 ---
 

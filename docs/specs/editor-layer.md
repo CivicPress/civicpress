@@ -1,26 +1,17 @@
 # ✏️ CivicPress Spec: `editor-layer.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive editor layer documentation
 - editing patterns
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
   - 'ui.md: >=1.0.0'
-  - 'frontend.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'frontend.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

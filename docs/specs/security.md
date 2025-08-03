@@ -1,26 +1,17 @@
 # 🔒 CivicPress Spec: `security.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive security documentation
 - threat modeling
-- testing patterns
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
+- testing patterns compatibility: min_civicpress: 1.0.0 max_civicpress: 'null'
   dependencies:
   - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.1.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -63,19 +54,19 @@ data and maintain public trust.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| User authentication data | GitHub tokens, session information    |
-| Civic records           | Bylaws, policies, public documents    |
-| System logs             | Access logs, error logs, audit trails |
-| External threats        | Vulnerability reports, security alerts |
+| Input                    | Description                            |
+| ------------------------ | -------------------------------------- |
+| User authentication data | GitHub tokens, session information     |
+| Civic records            | Bylaws, policies, public documents     |
+| System logs              | Access logs, error logs, audit trails  |
+| External threats         | Vulnerability reports, security alerts |
 
-| Output                   | Description                           |
-| ----------------------- | ------------------------------------- |
-| Security assessments    | Threat model reports, risk analyses   |
-| Compliance reports      | SOC 2, GDPR, accessibility audits    |
-| Incident responses      | Security alerts, mitigation strategies |
-| Security monitoring     | Real-time threat detection, alerts    |
+| Output               | Description                            |
+| -------------------- | -------------------------------------- |
+| Security assessments | Threat model reports, risk analyses    |
+| Compliance reports   | SOC 2, GDPR, accessibility audits      |
+| Incident responses   | Security alerts, mitigation strategies |
+| Security monitoring  | Real-time threat detection, alerts     |
 
 ---
 
@@ -107,14 +98,14 @@ data and maintain public trust.
 
 #### STRIDE Methodology
 
-| Threat Category | Description                    | Mitigation Strategy              |
-| --------------- | ------------------------------ | ------------------------------- |
-| **Spoofing**    | Fake identity or credentials   | Multi-factor authentication      |
-| **Tampering**   | Unauthorized data modification | Digital signatures, Git commits  |
-| **Repudiation** | Denial of actions taken        | Audit logs, immutable records   |
-| **Information Disclosure** | Unauthorized data access | Encryption, access controls      |
-| **Denial of Service** | System unavailability        | Rate limiting, redundancy       |
-| **Elevation of Privilege** | Unauthorized access | Role-based access control       |
+| Threat Category            | Description                    | Mitigation Strategy             |
+| -------------------------- | ------------------------------ | ------------------------------- |
+| **Spoofing**               | Fake identity or credentials   | Multi-factor authentication     |
+| **Tampering**              | Unauthorized data modification | Digital signatures, Git commits |
+| **Repudiation**            | Denial of actions taken        | Audit logs, immutable records   |
+| **Information Disclosure** | Unauthorized data access       | Encryption, access controls     |
+| **Denial of Service**      | System unavailability          | Rate limiting, redundancy       |
+| **Elevation of Privilege** | Unauthorized access            | Role-based access control       |
 
 ### Security Architecture Principles
 
@@ -128,19 +119,19 @@ layers:
       - "HTTPS/TLS encryption"
       - "Rate limiting"
       - "DDoS protection"
-  
+
   - name: "Application Security"
     controls:
       - "Input validation"
       - "SQL injection prevention"
       - "XSS protection"
-  
+
   - name: "Data Security"
     controls:
       - "Encryption at rest"
       - "Encryption in transit"
       - "Access controls"
-  
+
   - name: "Identity & Access"
     controls:
       - "Multi-factor authentication"
@@ -167,13 +158,13 @@ security_controls:
     - "Role-based access control"
     - "Session timeout policies"
     - "Privileged access management"
-  
+
   data_protection:
     - "Encryption at rest (AES-256)"
     - "Encryption in transit (TLS 1.3)"
     - "Data classification and handling"
     - "Secure data disposal"
-  
+
   audit_logging:
     - "Comprehensive audit trails"
     - "Immutable log storage"

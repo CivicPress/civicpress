@@ -1,17 +1,17 @@
-import { ref, computed } from 'vue'
+import { ref, computed } from 'vue';
 
 export interface Template {
-  id: string
-  name: string
-  type: string
-  content: string
-  description?: string
+  id: string;
+  name: string;
+  type: string;
+  content: string;
+  description?: string;
 }
 
 export function useTemplates() {
-  const templates = ref<Template[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
+  const templates = ref<Template[]>([]);
+  const loading = ref(false);
+  const error = ref<string | null>(null);
 
   // Default templates for each record type
   const defaultTemplates = {
@@ -91,7 +91,8 @@ shall remain in full force and effect.
 ---
 
 _This bylaw was created using CivicPress on {{timestamp}}_`,
-      description: 'Standard bylaw template with sections for purpose, definitions, requirements, and enforcement'
+      description:
+        'Standard bylaw template with sections for purpose, definitions, requirements, and enforcement',
     },
     ordinance: {
       id: 'ordinance-default',
@@ -169,7 +170,8 @@ shall remain in full force and effect.
 ---
 
 _This ordinance was created using CivicPress on {{timestamp}}_`,
-      description: 'Standard ordinance template with sections for purpose, definitions, requirements, and enforcement'
+      description:
+        'Standard ordinance template with sections for purpose, definitions, requirements, and enforcement',
     },
     policy: {
       id: 'policy-default',
@@ -244,7 +246,8 @@ This policy shall become effective [date] upon approval.
 ---
 
 _This policy was created using CivicPress on {{timestamp}}_`,
-      description: 'Standard policy template with sections for purpose, scope, implementation, and compliance'
+      description:
+        'Standard policy template with sections for purpose, scope, implementation, and compliance',
     },
     resolution: {
       id: 'resolution-default',
@@ -309,7 +312,8 @@ This resolution shall become effective [date] upon adoption.
 ---
 
 _This resolution was created using CivicPress on {{timestamp}}_`,
-      description: 'Standard resolution template with sections for background, findings, and resolutions'
+      description:
+        'Standard resolution template with sections for background, findings, and resolutions',
     },
     proclamation: {
       id: 'proclamation-default',
@@ -364,54 +368,62 @@ This proclamation shall become effective [date] upon issuance.
 ---
 
 _This proclamation was created using CivicPress on {{timestamp}}_`,
-      description: 'Standard proclamation template with sections for background, recognition, and calls to action'
-    }
-  }
+      description:
+        'Standard proclamation template with sections for background, recognition, and calls to action',
+    },
+  };
 
   // Get templates for a specific record type
   const getTemplatesForType = (recordType: string): Template[] => {
-    const defaultTemplate = defaultTemplates[recordType as keyof typeof defaultTemplates]
+    const defaultTemplate =
+      defaultTemplates[recordType as keyof typeof defaultTemplates];
     if (defaultTemplate) {
-      return [defaultTemplate]
+      return [defaultTemplate];
     }
-    return []
-  }
+    return [];
+  };
 
   // Get a specific template by ID
   const getTemplateById = (templateId: string): Template | null => {
     // Search through all default templates
     for (const type in defaultTemplates) {
-      const template = defaultTemplates[type as keyof typeof defaultTemplates]
+      const template = defaultTemplates[type as keyof typeof defaultTemplates];
       if (template.id === templateId) {
-        return template
+        return template;
       }
     }
-    return null
-  }
+    return null;
+  };
 
   // Process template content with variables
-  const processTemplate = (template: Template, variables: Record<string, string>): string => {
-    let processedContent = template.content
+  const processTemplate = (
+    template: Template,
+    variables: Record<string, string>
+  ): string => {
+    let processedContent = template.content;
 
     // Replace variables in the template
     for (const [key, value] of Object.entries(variables)) {
-      const placeholder = `{{${key}}}`
-      processedContent = processedContent.replace(new RegExp(placeholder, 'g'), value)
+      const placeholder = `{{${key}}}`;
+      processedContent = processedContent.replace(
+        new RegExp(placeholder, 'g'),
+        value
+      );
     }
 
-    return processedContent
-  }
+    return processedContent;
+  };
 
   // Get template options for select menu
   const getTemplateOptions = (recordType: string) => {
-    const templates = getTemplatesForType(recordType)
-    return templates.map(template => ({
+    const templates = getTemplatesForType(recordType);
+    return templates.map((template) => ({
       label: template.name,
       value: template.id,
       description: template.description,
-      icon: 'i-lucide-file-text'
-    }))
-  }
+      icon: 'i-lucide-file-text',
+    }));
+  };
 
   return {
     templates,
@@ -420,6 +432,6 @@ _This proclamation was created using CivicPress on {{timestamp}}_`,
     getTemplatesForType,
     getTemplateById,
     processTemplate,
-    getTemplateOptions
-  }
-} 
+    getTemplateOptions,
+  };
+}

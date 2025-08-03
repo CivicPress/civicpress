@@ -104,9 +104,9 @@ router.get('/roles', async (req, res) => {
     // Get the data directory from central config
     const dataDir = CentralConfigManager.getDataDir();
     const rolesConfigPath = path.join(dataDir, '.civic', 'roles.yml');
-    
+
     let rolesConfig: any = {};
-    
+
     // Try to read the roles configuration file
     if (fs.existsSync(rolesConfigPath)) {
       try {
@@ -116,7 +116,7 @@ router.get('/roles', async (req, res) => {
         console.error('Error reading roles config file:', error);
       }
     }
-    
+
     // If no roles config found, use default roles
     if (!rolesConfig.roles) {
       rolesConfig = {
@@ -125,33 +125,46 @@ router.get('/roles', async (req, res) => {
             name: 'Administrator',
             description: 'Full system access',
             permissions: ['*'],
-            status_transitions: ['draft', 'review', 'approved', 'rejected', 'archived']
+            status_transitions: [
+              'draft',
+              'review',
+              'approved',
+              'rejected',
+              'archived',
+            ],
           },
           clerk: {
             name: 'Clerk',
             description: 'Can create and edit records',
-            permissions: ['records:create', 'records:edit', 'records:view', 'records:list'],
-            status_transitions: ['draft', 'review']
+            permissions: [
+              'records:create',
+              'records:edit',
+              'records:view',
+              'records:list',
+            ],
+            status_transitions: ['draft', 'review'],
           },
           public: {
             name: 'Public',
             description: 'Read-only access',
             permissions: ['records:view', 'records:list'],
-            status_transitions: []
-          }
-        }
+            status_transitions: [],
+          },
+        },
       };
     }
-    
+
     // Transform roles to the expected format
-    const rolesWithMetadata = Object.entries(rolesConfig.roles).map(([key, role]: [string, any]) => ({
-      key,
-      name: role.name || key,
-      description: role.description || '',
-      permissions: role.permissions || [],
-      record_types: role.record_types || {},
-      status_transitions: role.status_transitions || []
-    }));
+    const rolesWithMetadata = Object.entries(rolesConfig.roles).map(
+      ([key, role]: [string, any]) => ({
+        key,
+        name: role.name || key,
+        description: role.description || '',
+        permissions: role.permissions || [],
+        record_types: role.record_types || {},
+        status_transitions: role.status_transitions || [],
+      })
+    );
 
     res.json({
       success: true,

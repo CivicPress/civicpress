@@ -1,29 +1,17 @@
 # 💻 CivicPress Spec: `cli.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive CLI documentation
 - security considerations
-- testing patterns
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- testing patterns fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -83,21 +71,21 @@ This model ensures CivicPress is **transparent by design**, not by exception.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Markdown files in `records/` directory |
-| Git repository           | CivicPress Git repository with history |
-| Configuration files      | `.civic/` folder with policies and roles |
-| User authentication      | Git commit author and role permissions |
-| Command arguments        | CLI flags, file paths, and options |
+| Input               | Description                              |
+| ------------------- | ---------------------------------------- |
+| Civic records       | Markdown files in `records/` directory   |
+| Git repository      | CivicPress Git repository with history   |
+| Configuration files | `.civic/` folder with policies and roles |
+| User authentication | Git commit author and role permissions   |
+| Command arguments   | CLI flags, file paths, and options       |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Git commits              | Immutable record changes with metadata |
-| Validation reports       | Linting results and error messages |
-| Workflow triggers        | Automated processes and notifications |
-| Updated metadata         | Frontmatter and status changes |
-| Audit logs              | CLI operation history and traces |
+| Output             | Description                            |
+| ------------------ | -------------------------------------- |
+| Git commits        | Immutable record changes with metadata |
+| Validation reports | Linting results and error messages     |
+| Workflow triggers  | Automated processes and notifications  |
+| Updated metadata   | Frontmatter and status changes         |
+| Audit logs         | CLI operation history and traces       |
 
 ---
 

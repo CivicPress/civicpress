@@ -1,13 +1,9 @@
 # 🧪 CivicPress Spec: `testing-framework.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-15'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-15' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive testing standards
 - tools
@@ -17,17 +13,12 @@ additions:
 - E2E
 - security
 - performance
-- and accessibility testing
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- and accessibility testing compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
   - 'plugins.md: >=1.5.0'
   - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.1.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -65,21 +56,21 @@ CivicPress modules.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
+| Input                    | Description                               |
+| ------------------------ | ----------------------------------------- |
 | Source code              | CivicPress modules and components to test |
-| Test configurations       | Testing framework settings and rules |
-| Test data                | Mock data and test fixtures |
-| Test scenarios           | User workflows and edge cases |
-| Performance requirements  | Load and stress testing parameters |
+| Test configurations      | Testing framework settings and rules      |
+| Test data                | Mock data and test fixtures               |
+| Test scenarios           | User workflows and edge cases             |
+| Performance requirements | Load and stress testing parameters        |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Test results             | Pass/fail status and detailed reports |
-| Coverage reports         | Code coverage metrics and analysis |
-| Performance metrics      | Response times and throughput data |
-| Security assessments     | Vulnerability and compliance reports |
-| Quality metrics          | Code quality and reliability scores |
+| Output               | Description                           |
+| -------------------- | ------------------------------------- |
+| Test results         | Pass/fail status and detailed reports |
+| Coverage reports     | Code coverage metrics and analysis    |
+| Performance metrics  | Response times and throughput data    |
+| Security assessments | Vulnerability and compliance reports  |
+| Quality metrics      | Code quality and reliability scores   |
 
 ---
 
@@ -190,7 +181,7 @@ export class TestingFrameworkTests {
     );
 
     const passed = results.every((r, i) => r.passed === testCases[i].expected);
-    
+
     return {
       test: 'Test Execution',
       passed,
@@ -201,7 +192,7 @@ export class TestingFrameworkTests {
   private async testResultAccuracy(): Promise<TestResult> {
     const knownPassingTest = 'expect(true).toBe(true)';
     const knownFailingTest = 'expect(true).toBe(false)';
-    
+
     const passingResult = await this.executeTest(knownPassingTest);
     const failingResult = await this.executeTest(knownFailingTest);
 
@@ -266,7 +257,7 @@ export class CoverageValidationTests {
     const thresholds = { statements: 80, branches: 70, functions: 80, lines: 80 };
     const coverage = { statements: 85, branches: 75, functions: 90, lines: 85 };
 
-    const passed = Object.entries(thresholds).every(([key, threshold]) => 
+    const passed = Object.entries(thresholds).every(([key, threshold]) =>
       coverage[key] >= threshold
     );
 
@@ -309,7 +300,7 @@ export class MockSystemTests {
 
   private async testMockBehavior(): Promise<TestResult> {
     const mockAPI = this.createMockAPI();
-    
+
     // Test mock behavior
     const result = await mockAPI.users.find({ id: 'test-user' });
     const expectedBehavior = result && result.id === 'test-user';
@@ -358,7 +349,7 @@ export class PerformanceFrameworkTests {
     const metrics = await this.collectPerformanceMetrics();
     const requiredMetrics = ['responseTime', 'throughput', 'errorRate', 'cpuUsage'];
 
-    const allMetricsPresent = requiredMetrics.every(metric => 
+    const allMetricsPresent = requiredMetrics.every(metric =>
       metrics.hasOwnProperty(metric)
     );
 
@@ -1644,6 +1635,4 @@ export interface E2ETestResult {
 
 - Drafted: 2025-07-04
 
-breaking_changes: []
-fixes: []
-migration_guide: null
+breaking_changes: [] fixes: [] migration_guide: null

@@ -1,37 +1,25 @@
 # 🔐 CivicPress Spec: `auth.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-04'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive testing examples
 - security testing patterns
 - performance testing
 - accessibility testing
 - compliance testing
-- CLI testing
-fixes:
+- CLI testing fixes:
 - testing section enhancement
 - code examples
-- validation patterns
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: null
-  dependencies:
+- validation patterns migration_guide: null compatibility: min_civicpress: 1.0.0
+  max_civicpress: null dependencies:
   - 'permissions.md: >=1.0.0'
   - 'roles.yml.md: >=1.0.0'
   - 'signatures.md: >=1.0.0'
-  - 'git-policy.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'git-policy.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

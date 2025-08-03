@@ -1,28 +1,19 @@
 # 🛠️ CivicPress Spec: `plugin-development.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-04'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive plugin development documentation
 - security testing patterns
 - testing frameworks
-- development workflows
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- development workflows compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
   - 'plugins.md: >=1.5.0'
   - 'plugin-api.md: >=1.0.0'
-  - 'testing-framework.md: >=1.0.0'
-authors:
-- 'Sophie Germain <sophie@civic-press.org>'
-reviewers:
+  - 'testing-framework.md: >=1.0.0' authors:
+- 'Sophie Germain <sophie@civic-press.org>' reviewers:
 - 'Ada Lovelace'
 - 'Irène Joliot-Curie'
 
@@ -61,19 +52,19 @@ strategies, and enterprise-grade plugin security validation.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Plugin source code       | TypeScript/JavaScript plugin files    |
-| Plugin configuration     | YAML configuration and metadata       |
-| Security requirements    | Plugin security and compliance rules  |
-| Testing requirements     | Quality assurance and validation      |
+| Input                 | Description                          |
+| --------------------- | ------------------------------------ |
+| Plugin source code    | TypeScript/JavaScript plugin files   |
+| Plugin configuration  | YAML configuration and metadata      |
+| Security requirements | Plugin security and compliance rules |
+| Testing requirements  | Quality assurance and validation     |
 
-| Output                   | Description                           |
-| ----------------------- | ------------------------------------- |
-| Validated plugins        | Security-tested and approved plugins  |
-| Test reports            | Comprehensive testing documentation   |
-| Security assessments     | Plugin security validation reports    |
-| Deployment packages      | Ready-to-deploy plugin artifacts      |
+| Output               | Description                          |
+| -------------------- | ------------------------------------ |
+| Validated plugins    | Security-tested and approved plugins |
+| Test reports         | Comprehensive testing documentation  |
+| Security assessments | Plugin security validation reports   |
+| Deployment packages  | Ready-to-deploy plugin artifacts     |
 
 ---
 
@@ -150,7 +141,7 @@ class PluginValidator {
       'tests/',
     ];
 
-    const missingFiles = requiredFiles.filter(file => 
+    const missingFiles = requiredFiles.filter(file =>
       !this.fileExists(`${pluginPath}/${file}`)
     );
 
@@ -661,4 +652,5 @@ describe('Plugin Security Testing', () => {
 ## 📅 History
 
 - Drafted: 2025-07-04
-- Enhanced: 2025-07-15 (added comprehensive testing framework and security patterns)
+- Enhanced: 2025-07-15 (added comprehensive testing framework and security
+  patterns)

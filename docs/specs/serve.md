@@ -1,26 +1,17 @@
 # 🌐 CivicPress Spec: `serve.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive serve documentation
 - hosting patterns
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
   - 'deployment.md: >=1.0.0'
-  - 'static-export.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'static-export.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -59,21 +50,21 @@ using static HTML or local Nuxt rendering.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Markdown files from `records/` directory |
-| Git repository           | Local Git repo with civic history |
-| Configuration files      | `.civic/index.yml` and theme settings |
-| HTTP requests            | Browser requests for civic content |
-| Authentication data      | Optional user authentication info |
+| Input               | Description                              |
+| ------------------- | ---------------------------------------- |
+| Civic records       | Markdown files from `records/` directory |
+| Git repository      | Local Git repo with civic history        |
+| Configuration files | `.civic/index.yml` and theme settings    |
+| HTTP requests       | Browser requests for civic content       |
+| Authentication data | Optional user authentication info        |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Rendered HTML            | Civic records rendered as web pages |
-| API responses            | JSON data for civic records and metadata |
-| Static assets            | CSS, JavaScript, and theme files |
-| Navigation data          | Index and search results |
-| Audit logs              | Server access and request logs |
+| Output          | Description                              |
+| --------------- | ---------------------------------------- |
+| Rendered HTML   | Civic records rendered as web pages      |
+| API responses   | JSON data for civic records and metadata |
+| Static assets   | CSS, JavaScript, and theme files         |
+| Navigation data | Index and search results                 |
+| Audit logs      | Server access and request logs           |
 
 ---
 
@@ -254,6 +245,4 @@ Options:
 
 - Drafted: 2025-07-03
 
-breaking_changes: []
-fixes: []
-migration_guide: null
+breaking_changes: [] fixes: [] migration_guide: null

@@ -1,30 +1,18 @@
 # 🔄 CivicPress Spec: `workflows.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive security considerations
 - detailed workflow examples
-- enhanced testing patterns
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- enhanced testing patterns fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
   - 'permissions.md: >=1.0.0'
-  - 'hooks.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'hooks.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -128,7 +116,8 @@ tests/
 
 ### Workflow Security
 
-- All workflow files must be cryptographically signed or approved based on `workflow.policy.yml`
+- All workflow files must be cryptographically signed or approved based on
+  `workflow.policy.yml`
 - Workflows must run in a secure sandbox environment (e.g., `vm2`)
 - File system and network access must be explicitly permitted in policy
 - Only authorized roles defined in policy can execute workflows

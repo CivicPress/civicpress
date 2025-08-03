@@ -1,27 +1,15 @@
 # 📄 CivicPress Spec: `spec-guidelines.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-04'
-updated: '2025-07-04'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-04'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - standardized spec format
 - metadata fields
-- authorship tracking
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: null
-  dependencies: []
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- authorship tracking fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: null dependencies: [] authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Tim Berners-Lee
 
@@ -62,21 +50,21 @@ traceability.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Spec content             | Raw specification content and metadata |
-| Format requirements       | Structure and formatting rules |
-| Validation rules         | Compliance and quality standards |
-| Template definitions      | Boilerplate and structure templates |
-| Author information        | Contributor and reviewer details |
+| Input                | Description                            |
+| -------------------- | -------------------------------------- |
+| Spec content         | Raw specification content and metadata |
+| Format requirements  | Structure and formatting rules         |
+| Validation rules     | Compliance and quality standards       |
+| Template definitions | Boilerplate and structure templates    |
+| Author information   | Contributor and reviewer details       |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Formatted specs          | Properly structured specification files |
-| Validation reports       | Compliance and quality assessment |
-| Template files           | Reusable spec templates and boilerplates |
-| Style guides             | Formatting and documentation standards |
-| Compliance checkers      | Automated validation tools |
+| Output              | Description                              |
+| ------------------- | ---------------------------------------- |
+| Formatted specs     | Properly structured specification files  |
+| Validation reports  | Compliance and quality assessment        |
+| Template files      | Reusable spec templates and boilerplates |
+| Style guides        | Formatting and documentation standards   |
+| Compliance checkers | Automated validation tools               |
 
 ---
 
@@ -159,7 +147,7 @@ export class SpecFormatValidationTests {
     );
 
     const passed = results.every((r, i) => r.valid === testSpecs[i].expected);
-    
+
     return {
       test: 'YAML Frontmatter Validation',
       passed,
@@ -169,13 +157,13 @@ export class SpecFormatValidationTests {
 
   private async testRequiredSections(): Promise<TestResult> {
     const requiredSections = [
-      'Name', 'Purpose', 'Scope & Responsibilities', 
-      'Inputs & Outputs', 'File/Folder Location', 
+      'Name', 'Purpose', 'Scope & Responsibilities',
+      'Inputs & Outputs', 'File/Folder Location',
       'Security & Trust Considerations'
     ];
 
     const specContent = this.getTestSpecContent();
-    const missingSections = requiredSections.filter(section => 
+    const missingSections = requiredSections.filter(section =>
       !specContent.includes(`## ${section}`)
     );
 
@@ -503,7 +491,8 @@ guidelines:
 
 ## 🔗 Related Specs
 
-- [`spec-versioning.md`](./spec-versioning.md) — Versioning and change management
+- [`spec-versioning.md`](./spec-versioning.md) — Versioning and change
+  management
 - [`manifest.md`](./manifest.md) — CivicPress manifest structure
 - [`git-policy.md`](./git-policy.md) — Git-based documentation workflow
 - [`workflows.md`](./workflows.md) — Documentation workflows
