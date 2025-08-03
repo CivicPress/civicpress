@@ -158,6 +158,71 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   );
 
+  // GET /api/records/:id/raw - Get raw file content for a record (including frontmatter)
+  router.get(
+    '/:id/raw',
+    param('id').isString().notEmpty(),
+    async (req: any, res: Response) => {
+      const isAuthenticated = (req as any).user !== undefined;
+      const operation = isAuthenticated
+        ? 'get_raw_record_authenticated'
+        : 'get_raw_record_public';
+
+      logApiRequest(req, { operation });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'get_raw_record',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+
+        logger.info(
+          `Getting raw record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
+        const record = await recordsService.getRawRecord(id);
+
+        if (!record) {
+          const error = new Error('Record not found');
+          (error as any).statusCode = 404;
+          (error as any).code = 'RECORD_NOT_FOUND';
+          throw error;
+        }
+
+        logger.info(
+          `Raw record ${id} retrieved successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            recordType: record.type,
+            recordStatus: record.status,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
+        sendSuccess(record, req, res, { operation });
+      } catch (error) {
+        handleApiError(operation, error, req, res, 'Failed to get raw record');
+      }
+    }
+  );
+
   // GET /api/records/drafts - Get user's draft records (authenticated only)
   router.get(
     '/drafts',

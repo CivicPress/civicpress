@@ -37,12 +37,23 @@ const fetchRecord = async () => {
         if (response && response.success && response.data) {
             const apiRecord = response.data
 
+            // Extract content body from full markdown (remove YAML frontmatter)
+            let contentBody = apiRecord.content || ''
+            if (contentBody) {
+                // Remove YAML frontmatter if present
+                const frontmatterMatch = contentBody.match(/^---\s*\n([\s\S]*?)\n---\s*\n/)
+                if (frontmatterMatch) {
+                    // Extract only the content after the frontmatter
+                    contentBody = contentBody.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '').trim()
+                }
+            }
+
             // Transform API response to match CivicRecord interface
             record.value = {
                 id: apiRecord.id,
                 title: apiRecord.title,
                 type: apiRecord.type,
-                content: apiRecord.content || '',
+                content: contentBody, // Use only the content body, not the full markdown
                 status: apiRecord.status,
                 path: apiRecord.path,
                 author: apiRecord.author,
@@ -115,6 +126,11 @@ const breadcrumbItems = computed(() => [
                     View the details of {{ record?.title || 'this record' }}
                 </template>
                 <template #right>
+                    <!-- View Raw button -->
+                    <UButton :to="`/records/${type}/${id}/raw`" color="neutral" variant="outline" icon="i-lucide-code"
+                        :disabled="loading || !record">
+                        View Raw
+                    </UButton>
                     <!-- Edit button (only if user can edit) -->
                     <UButton v-if="canEditRecords" :to="`/records/${type}/${id}/edit`" color="primary" variant="outline"
                         icon="i-lucide-edit" :disabled="loading || !record">

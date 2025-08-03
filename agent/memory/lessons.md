@@ -54,6 +54,38 @@
 - **Toast Notifications**: API feedback for user actions
 - **Breadcrumb Navigation**: 3-level hierarchy for proper navigation context
 
+## Raw Record View Implementation
+
+### File System vs Database Content 📄
+
+- **Raw Content Requirement**: Users need complete markdown files including YAML frontmatter
+- **API Endpoint Design**: Created `/api/records/:id/raw` for raw file content
+- **File System Access**: Use `fs.readFileSync()` to read complete files from disk
+- **Fallback Strategy**: Return database content if file read fails
+- **Path Construction**: Proper path joining for cross-platform compatibility
+
+### Clipboard API Best Practices 📋
+
+- **HTTPS Requirement**: Modern clipboard API requires secure context
+- **Production-First**: Design for production (HTTPS) rather than development (HTTP)
+- **User Experience**: Clear error messages when clipboard operations fail
+- **Manual Fallback**: Guide users to manual copy (Ctrl+C / Cmd+C) when needed
+- **Clean Implementation**: Avoid hacky workarounds, use standard APIs
+
+### Navigation Integration 🧭
+
+- **UNavigationMenu Usage**: Proper implementation with computed items array
+- **Button Placement**: Strategic placement of "View Raw" button in record view
+- **Access Control**: Allow all users (including guests) to view raw content
+- **Consistent UX**: Follow existing UI patterns for navigation elements
+
+### Auto-Indexing Optimization 🔄
+
+- **Startup Performance**: Made auto-indexing optional to prevent Git lock conflicts
+- **Environment Control**: Use `ENABLE_AUTO_INDEXING=true` for development
+- **Error Prevention**: Avoid `.git/index.lock` conflicts during concurrent operations
+- **CLI Alternative**: Separate `civic auto-index` command for manual indexing
+
 ## Common Issues & Solutions
 
 ### API Error Prevention 🛡️
@@ -83,6 +115,20 @@
 - **Context Labels**: Show appropriate labels based on current context
 - **Navigation Flow**: Clear breadcrumb hierarchy for user orientation
 - **State Persistence**: Maintain filter state across navigation
+
+### Vue Template Debugging 🔧
+
+- **v-if/v-else-if/v-else Chain**: Ensure proper conditional rendering structure
+- **Component Props**: Pass computed properties correctly to components
+- **Missing Elements**: Check for proper opening/closing tags
+- **Script Variables**: Define all variables and functions used in template
+
+### Git Operations & Concurrency 🔄
+
+- **Lock File Conflicts**: `.git/index.lock` errors during concurrent operations
+- **Auto-Indexing Timing**: Avoid Git operations during API startup
+- **Environment Variables**: Use flags to control optional startup processes
+- **Error Handling**: Graceful fallback when Git operations fail
 
 ## Performance Considerations
 

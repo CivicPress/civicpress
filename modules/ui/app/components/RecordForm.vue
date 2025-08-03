@@ -79,6 +79,9 @@ const formErrors = reactive({
     template: ''
 })
 
+// Track if form has been submitted to avoid showing errors on initial load
+const hasSubmitted = ref(false)
+
 // Computed properties
 const isFormValid = computed(() => {
     return form.title && form.type && form.content && form.status
@@ -151,10 +154,21 @@ onMounted(async () => {
         // Populate form with existing record data
         form.title = props.record.title
         form.type = props.record.type
-        form.content = props.record.content
         form.status = props.record.status
         form.tags = props.record.metadata?.tags || []
         form.description = (props.record.metadata as any)?.description || ''
+
+        // Extract content body from full markdown (remove YAML frontmatter)
+        let contentBody = props.record.content || ''
+        if (contentBody) {
+            // Remove YAML frontmatter if present
+            const frontmatterMatch = contentBody.match(/^---\s*\n([\s\S]*?)\n---\s*\n/)
+            if (frontmatterMatch) {
+                // Extract only the content after the frontmatter
+                contentBody = contentBody.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '').trim()
+            }
+        }
+        form.content = contentBody
 
         // Set selected options
         const typeOption = recordTypeOptionsComputed.value.find(option => option.value === props.record?.type)
@@ -201,6 +215,8 @@ const validateForm = () => {
 
 // Handle form submission
 const handleSubmit = () => {
+    hasSubmitted.value = true
+
     // Clear previous errors
     Object.keys(formErrors).forEach(key => {
         formErrors[key as keyof typeof formErrors] = ''
@@ -271,18 +287,20 @@ const removeTag = (tag: string) => {
         <!-- Form Fields -->
         <div class="grid grid-cols-1 gap-6">
             <!-- Title -->
-            <UFormField label="Title" required :error="formErrors.title">
-                <UInput v-model="form.title" placeholder="Enter record title" :disabled="saving" />
+            <UFormField label="Title" required :error="hasSubmitted && formErrors.title ? formErrors.title : undefined">
+                <UInput v-model="form.title" placeholder="Enter record title" :disabled="saving" class="w-full" />
             </UFormField>
 
             <!-- Record Type -->
-            <UFormField label="Record Type" required :error="formErrors.type">
+            <UFormField label="Record Type" required
+                :error="hasSubmitted && formErrors.type ? formErrors.type : undefined">
                 <USelectMenu v-model="selectedRecordType" :items="recordTypeOptionsComputed"
                     placeholder="Select record type" :disabled="saving || (props.recordType !== null)" class="w-full" />
             </UFormField>
 
             <!-- Template Selection (only for new records) -->
-            <UFormField v-if="!props.isEditing && form.type" label="Template" :error="formErrors.template">
+            <UFormField v-if="!props.isEditing && form.type" label="Template"
+                :error="hasSubmitted && formErrors.template ? formErrors.template : undefined">
                 <USelectMenu v-model="selectedTemplate" :items="templateOptionsComputed"
                     placeholder="Select a template (optional)" :disabled="saving" class="w-full" />
                 <template #help>
@@ -294,22 +312,24 @@ const removeTag = (tag: string) => {
             </UFormField>
 
             <!-- Status -->
-            <UFormField label="Status" required :error="formErrors.status">
+            <UFormField label="Status" required
+                :error="hasSubmitted && formErrors.status ? formErrors.status : undefined">
                 <USelectMenu v-model="selectedRecordStatus" :items="recordStatusOptionsComputed"
                     placeholder="Select status" :disabled="saving" class="w-full" />
             </UFormField>
 
             <!-- Description -->
-            <UFormField label="Description" :error="formErrors.description">
+            <UFormField label="Description"
+                :error="hasSubmitted && formErrors.description ? formErrors.description : undefined">
                 <UTextarea v-model="form.description" placeholder="Enter record description (optional)"
-                    :disabled="saving" :rows="3" />
+                    :disabled="saving" :rows="3" class="w-full" />
             </UFormField>
 
             <!-- Tags -->
-            <UFormField label="Tags" :error="formErrors.tags">
-                <div class="space-y-2">
+            <UFormField label="Tags" :error="hasSubmitted && formErrors.tags ? formErrors.tags : undefined">
+                <div class="space-y-2 w-full">
                     <UInput v-model="newTag" placeholder="Add a tag and press Enter" :disabled="saving"
-                        @keyup.enter="addTag(newTag); newTag = ''" />
+                        @keyup.enter="addTag(newTag); newTag = ''" class="w-full" />
                     <div v-if="form.tags.length > 0" class="flex flex-wrap gap-2">
                         <UBadge v-for="tag in form.tags" :key="tag" color="primary" variant="soft" size="sm">
                             {{ tag }}
@@ -321,9 +341,10 @@ const removeTag = (tag: string) => {
             </UFormField>
 
             <!-- Content -->
-            <UFormField label="Content" required :error="formErrors.content">
-                <UTextarea v-model="form.content" placeholder="Enter record content" :disabled="saving" :rows="12"
-                    class="font-mono" />
+            <UFormField label="Content" required
+                :error="hasSubmitted && formErrors.content ? formErrors.content : undefined">
+                <UTextarea v-model="form.content" placeholder="Enter the record content" :disabled="saving" :rows="12"
+                    class="font-mono w-full" />
             </UFormField>
         </div>
 

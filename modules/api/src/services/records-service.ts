@@ -120,6 +120,53 @@ export class RecordsService {
   }
 
   /**
+   * Get raw file content for a record (including frontmatter)
+   */
+  async getRawRecord(id: string): Promise<any | null> {
+    const record = await this.recordManager.getRecord(id);
+    if (!record) {
+      return null;
+    }
+
+    // Read the raw file content from the filesystem
+    const fs = require('fs');
+    const path = require('path');
+
+    try {
+      // The record.path already includes 'records/', so we need to construct the path correctly
+      const filePath = path.join(this.dataDir!, record.path);
+
+      const rawContent = fs.readFileSync(filePath, 'utf8');
+
+      return {
+        id: record.id,
+        title: record.title,
+        type: record.type,
+        status: record.status,
+        content: rawContent, // Return the complete file content including frontmatter
+        metadata: record.metadata || {},
+        path: record.path,
+        created: record.created_at,
+        author: record.author,
+      };
+    } catch (error) {
+      console.error(`Failed to read raw file for record ${id}:`, error);
+      // Fall back to database content if file read fails
+      return {
+        id: record.id,
+        title: record.title,
+        type: record.type,
+        status: record.status,
+        content: record.content,
+        metadata: record.metadata || {},
+        path: record.path,
+        created: record.created_at,
+        author: record.author,
+      };
+    }
+  }
+
+  /**
    * Update a record
    */
   async updateRecord(

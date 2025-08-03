@@ -15,8 +15,6 @@ const props = defineProps<Props>();
 
 const { getIcon } = useIcons();
 
-// Use a simple computed to avoid reactive loops
-const resolvedIconName = computed(() => {
-  return getIcon(props.name);
-});
+// Use computed to get the resolved icon name
+const resolvedIconName = computed(() => getIcon(props.name));
 </script>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records'
 import { useVirtualList } from '@vueuse/core'
+import { useRecordsStore } from '~/stores/records'
 
 // Props
 interface Props {
@@ -65,7 +66,7 @@ const shouldShowLoadMore = computed(() => {
 // Load more records
 const loadMoreRecords = async () => {
   if (!recordsStore.hasMore || recordsStore.isLoading) return
-  
+
   loading.value = true
   try {
     await recordsStore.loadMoreRecords({
@@ -120,22 +121,16 @@ onMounted(async () => {
           <!-- Virtual List Container -->
           <div ref="virtualListContainer" class="h-96 overflow-auto border rounded-lg">
             <div :style="{ height: `${processedRecords.length * 120}px`, position: 'relative' }">
-              <div 
-                v-for="item in virtualList" 
-                :key="item.data.id" 
-                :style="{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '120px',
-                  transform: `translateY(${item.index * 120}px)`
-                }"
-              >
-                <UCard 
-                  class="hover:shadow-md transition-shadow cursor-pointer mx-4 mb-4"
-                  @click="navigateToRecord(item.data)"
-                >
+              <div v-for="item in virtualList" :key="item.data.id" :style="{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '120px',
+                transform: `translateY(${item.index * 120}px)`
+              }">
+                <UCard class="hover:shadow-md transition-shadow cursor-pointer mx-4 mb-4"
+                  @click="navigateToRecord(item.data)">
                   <div class="flex items-start justify-between">
                     <div class="flex items-start space-x-4 flex-1">
                       <!-- Type Icon -->
@@ -168,18 +163,10 @@ onMounted(async () => {
                   </div>
 
                   <!-- Tags -->
-                  <div 
-                    v-if="item.data.metadata?.tags && item.data.metadata.tags.length > 0"
-                    class="mt-3 pt-3 border-t"
-                  >
+                  <div v-if="item.data.metadata?.tags && item.data.metadata.tags.length > 0" class="mt-3 pt-3 border-t">
                     <div class="flex flex-wrap gap-1">
-                      <UBadge 
-                        v-for="tag in item.data.metadata.tags" 
-                        :key="tag" 
-                        color="neutral"
-                        variant="soft" 
-                        size="xs"
-                      >
+                      <UBadge v-for="tag in item.data.metadata.tags" :key="tag" color="neutral" variant="soft"
+                        size="xs">
                         {{ tag }}
                       </UBadge>
                     </div>
@@ -192,12 +179,8 @@ onMounted(async () => {
 
         <!-- Regular List for Smaller Datasets -->
         <div v-else class="space-y-4">
-          <UCard 
-            v-for="record in processedRecords" 
-            :key="record.id"
-            class="hover:shadow-md transition-shadow cursor-pointer"
-            @click="navigateToRecord(record)"
-          >
+          <UCard v-for="record in processedRecords" :key="record.id"
+            class="hover:shadow-md transition-shadow cursor-pointer" @click="navigateToRecord(record)">
             <div class="flex items-start justify-between">
               <div class="flex items-start space-x-4 flex-1">
                 <!-- Type Icon -->
@@ -230,18 +213,9 @@ onMounted(async () => {
             </div>
 
             <!-- Tags -->
-            <div 
-              v-if="record.metadata?.tags && record.metadata.tags.length > 0"
-              class="mt-3 pt-3 border-t"
-            >
+            <div v-if="record.metadata?.tags && record.metadata.tags.length > 0" class="mt-3 pt-3 border-t">
               <div class="flex flex-wrap gap-1">
-                <UBadge 
-                  v-for="tag in record.metadata.tags" 
-                  :key="tag" 
-                  color="neutral"
-                  variant="soft" 
-                  size="xs"
-                >
+                <UBadge v-for="tag in record.metadata.tags" :key="tag" color="neutral" variant="soft" size="xs">
                   {{ tag }}
                 </UBadge>
               </div>
@@ -251,20 +225,14 @@ onMounted(async () => {
       </div>
 
       <!-- Show loading only when no existing records -->
-      <div 
-        v-else-if="shouldShowLoading && displayRecords.length === 0" 
-        class="text-center py-12"
-      >
+      <div v-else-if="shouldShowLoading && displayRecords.length === 0" class="text-center py-12">
         <div class="space-y-4">
           <RecordCardSkeleton v-for="i in 3" :key="i" />
         </div>
       </div>
 
       <!-- Show no results when not loading and no records -->
-      <div 
-        v-else-if="displayRecords.length === 0 && !shouldShowLoading" 
-        class="text-center py-12"
-      >
+      <div v-else-if="displayRecords.length === 0 && !shouldShowLoading" class="text-center py-12">
         <UIcon name="i-lucide-file-text" size="4xl" class="mx-auto mb-4 text-gray-400" />
         <h3 class="text-lg font-medium text-gray-900 mb-2">
           {{ searchQuery ? 'No search results found' : 'No records found' }}
@@ -292,12 +260,7 @@ onMounted(async () => {
     </div>
 
     <!-- Error Display -->
-    <UAlert 
-      v-if="recordsStore.recordsError" 
-      color="error" 
-      variant="soft" 
-      :title="recordsStore.recordsError"
-      icon="i-lucide-alert-circle" 
-    />
+    <UAlert v-if="recordsStore.recordsError" color="error" variant="soft" :title="recordsStore.recordsError"
+      icon="i-lucide-alert-circle" />
   </div>
-</template> 
+</template>

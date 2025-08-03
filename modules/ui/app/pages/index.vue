@@ -197,7 +197,7 @@ watch(isAuthenticated, (newValue) => {
               class="hover:shadow-md transition-shadow cursor-pointer"
               @click="navigateTo(`/records/${record.type}/${record.id}`)">
               <div class="flex items-start space-x-4">
-                <UIcon :name="getTypeIcon(record.type)" class="w-8 h-8 text-gray-500 flex-shrink-0" />
+                <UIcon name="i-heroicons-document-text" class="w-8 h-8 text-gray-500 flex-shrink-0" />
                 <div class="flex-1 min-w-0">
                   <h4 class="text-sm font-medium text-gray-900 truncate">{{ record.title }}</h4>
                   <p class="text-sm text-gray-500">{{ formatDate(record.created_at) }}</p>

@@ -122,21 +122,28 @@ export class CivicPressAPI {
       await this.civicPress.initialize();
       logger.info('CivicPress core initialized');
 
-      // Auto-index records on startup
-      logger.info('Auto-indexing records on startup...');
-      try {
-        const indexingService = this.civicPress.getIndexingService();
-        if (indexingService) {
-          await indexingService.generateIndexes({
-            syncDatabase: true,
-            conflictResolution: 'file-wins',
-          });
-          logger.info('Auto-indexing completed successfully');
-        } else {
-          logger.warn('IndexingService not available for auto-indexing');
+      // Auto-index records on startup (optional)
+      const enableAutoIndexing = process.env.ENABLE_AUTO_INDEXING === 'true';
+      if (enableAutoIndexing) {
+        logger.info('Auto-indexing records on startup...');
+        try {
+          const indexingService = this.civicPress.getIndexingService();
+          if (indexingService) {
+            await indexingService.generateIndexes({
+              syncDatabase: true,
+              conflictResolution: 'file-wins',
+            });
+            logger.info('Auto-indexing completed successfully');
+          } else {
+            logger.warn('IndexingService not available for auto-indexing');
+          }
+        } catch (error) {
+          logger.warn('Auto-indexing failed, continuing without sync:', error);
         }
-      } catch (error) {
-        logger.warn('Auto-indexing failed, continuing without sync:', error);
+      } else {
+        logger.info(
+          'Auto-indexing disabled on startup (use ENABLE_AUTO_INDEXING=true to enable)'
+        );
       }
 
       // Setup routes after CivicPress is initialized
