@@ -212,15 +212,30 @@ router.get('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'get_user' });
 
   try {
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId)) {
-      return handleApiError(
-        'get_user',
-        new Error('Invalid user ID'),
-        req,
-        res,
-        'Invalid user ID'
-      );
+    const identifier = req.params.id;
+    let userId: number;
+    let targetUser: any;
+
+    // Check if identifier is numeric (ID) or string (username)
+    if (/^\d+$/.test(identifier)) {
+      // Numeric ID
+      userId = parseInt(identifier);
+      if (isNaN(userId)) {
+        return handleApiError(
+          'get_user',
+          new Error('Invalid user ID'),
+          req,
+          res,
+          'Invalid user ID'
+        );
+      }
+      targetUser = await authService.getUserById(userId);
+    } else {
+      // Username
+      targetUser = await authService.getUserByUsername(identifier);
+      if (targetUser) {
+        userId = targetUser.id;
+      }
     }
 
     // Check authentication
@@ -250,8 +265,7 @@ router.get('/:id', async (req, res) => {
       return handleApiError('get_user', error, req, res);
     }
 
-    // Get user
-    const targetUser = await authService.getUserById(userId);
+    // Check if user was found
     if (!targetUser) {
       const error = new Error('User not found');
       (error as any).statusCode = 404;
@@ -289,15 +303,30 @@ router.put('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'update_user' });
 
   try {
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId)) {
-      return handleApiError(
-        'update_user',
-        new Error('Invalid user ID'),
-        req,
-        res,
-        'Invalid user ID'
-      );
+    const identifier = req.params.id;
+    let userId: number;
+    let targetUser: any;
+
+    // Check if identifier is numeric (ID) or string (username)
+    if (/^\d+$/.test(identifier)) {
+      // Numeric ID
+      userId = parseInt(identifier);
+      if (isNaN(userId)) {
+        return handleApiError(
+          'update_user',
+          new Error('Invalid user ID'),
+          req,
+          res,
+          'Invalid user ID'
+        );
+      }
+      targetUser = await authService.getUserById(userId);
+    } else {
+      // Username
+      targetUser = await authService.getUserByUsername(identifier);
+      if (targetUser) {
+        userId = targetUser.id;
+      }
     }
 
     const userData: UpdateUserRequest = req.body;
@@ -317,6 +346,14 @@ router.put('/:id', async (req, res) => {
     // Get CivicPress instance from request
     const civicPress = (req as any).civicPress as CivicPress;
     const authService = civicPress.getAuthService();
+
+    // Check if user was found
+    if (!targetUser) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('update_user', error, req, res);
+    }
 
     // Check if user can update this user (admin or self)
     const canManageUsers = await authService.userCan(user, 'users:manage');
@@ -404,15 +441,30 @@ router.delete('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'delete_user' });
 
   try {
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId)) {
-      return handleApiError(
-        'delete_user',
-        new Error('Invalid user ID'),
-        req,
-        res,
-        'Invalid user ID'
-      );
+    const identifier = req.params.id;
+    let userId: number;
+    let targetUser: any;
+
+    // Check if identifier is numeric (ID) or string (username)
+    if (/^\d+$/.test(identifier)) {
+      // Numeric ID
+      userId = parseInt(identifier);
+      if (isNaN(userId)) {
+        return handleApiError(
+          'delete_user',
+          new Error('Invalid user ID'),
+          req,
+          res,
+          'Invalid user ID'
+        );
+      }
+      targetUser = await authService.getUserById(userId);
+    } else {
+      // Username
+      targetUser = await authService.getUserByUsername(identifier);
+      if (targetUser) {
+        userId = targetUser.id;
+      }
     }
 
     // Check authentication
@@ -430,6 +482,14 @@ router.delete('/:id', async (req, res) => {
     // Get CivicPress instance from request
     const civicPress = (req as any).civicPress as CivicPress;
     const authService = civicPress.getAuthService();
+
+    // Check if user was found
+    if (!targetUser) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('delete_user', error, req, res);
+    }
 
     // Check if user can manage users
     const canManageUsers = await authService.userCan(user, 'users:manage');

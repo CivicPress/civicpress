@@ -10,7 +10,7 @@ definePageMeta({
 
 // Route parameters
 const route = useRoute();
-const userId = route.params.id as string;
+const username = route.params.id as string;
 
 // Reactive state
 const user = ref<User | null>(null);
@@ -46,7 +46,7 @@ const fetchUser = async () => {
     error.value = null;
 
     try {
-        const response = await useNuxtApp().$civicApi(`/api/users/${userId}`) as any;
+        const response = await useNuxtApp().$civicApi(`/api/users/${username}`) as any;
 
         if (response.success) {
             user.value = response.data.user;
@@ -67,7 +67,7 @@ const handleSubmit = async (userData: any) => {
     formError.value = null;
 
     try {
-        const response = await useNuxtApp().$civicApi(`/api/users/${userId}`, {
+        const response = await useNuxtApp().$civicApi(`/api/users/${username}`, {
             method: 'PUT',
             body: userData,
         }) as any;
@@ -98,7 +98,7 @@ const handleDelete = async () => {
     saving.value = true;
 
     try {
-        const response = await useNuxtApp().$civicApi(`/api/users/${userId}`, {
+        const response = await useNuxtApp().$civicApi(`/api/users/${username}`, {
             method: 'DELETE',
         }) as any;
 

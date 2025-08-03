@@ -52,8 +52,8 @@ const formatDate = (dateString: string) => {
 }
 
 // Navigation
-const navigateToUser = (userId: number) => {
-    navigateTo(`/settings/users/${userId.toString()}`)
+const navigateToUser = (user: User) => {
+    navigateTo(`/settings/users/${user.username}`)
 }
 
 const breadcrumbItems = [
@@ -108,7 +108,7 @@ onMounted(() => {
             <div v-else-if="users.length > 0" class="space-y-4">
                 <UCard v-for="user in users" :key="user.id"
                     class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    @click="navigateToUser(user.id)">
+                    @click="navigateToUser(user)">
                     <div class="p-6">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-4">
