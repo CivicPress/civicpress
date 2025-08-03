@@ -166,29 +166,29 @@ const breadcrumbItems = [
             <!-- Profile Content -->
             <div v-else-if="userInfo" class="space-y-6">
                 <!-- User Information -->
-                <div class="bg-white rounded-lg border p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">User Information</h2>
+                <div class="rounded-lg border p-6">
+                    <h2 class="text-lg font-semibold mb-4">User Information</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-500">Username</label>
-                                <p class="mt-1 text-sm text-gray-900">{{ userInfo.username }}</p>
+                                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Username</label>
+                                <p class="mt-1 text-sm">{{ userInfo.username }}</p>
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-500">Display Name</label>
-                                <p class="mt-1 text-sm text-gray-900">{{ userInfo.name || 'Not provided' }}</p>
+                                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Display Name</label>
+                                <p class="mt-1 text-sm">{{ userInfo.name || 'Not provided' }}</p>
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-500">Email</label>
-                                <p class="mt-1 text-sm text-gray-900">{{ userInfo.email || 'Not provided' }}</p>
+                                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
+                                <p class="mt-1 text-sm">{{ userInfo.email || 'Not provided' }}</p>
                             </div>
                         </div>
 
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-500">Role</label>
+                                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Role</label>
                                 <div class="mt-1">
                                     <UBadge :color="getRoleColor(userInfo.role) as any" variant="soft">
                                         {{ getRoleDisplayName(userInfo.role) }}
@@ -197,12 +197,12 @@ const breadcrumbItems = [
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-500">User ID</label>
-                                <p class="mt-1 text-sm text-gray-900 font-mono">{{ userInfo.id }}</p>
+                                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">User ID</label>
+                                <p class="mt-1 text-sm font-mono">{{ userInfo.id }}</p>
                             </div>
 
                             <div v-if="userInfo.avatar">
-                                <label class="block text-sm font-medium text-gray-500">Avatar</label>
+                                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Avatar</label>
                                 <div class="mt-1">
                                     <img :src="userInfo.avatar" alt="User avatar" class="w-8 h-8 rounded-full" />
                                 </div>
@@ -212,16 +212,16 @@ const breadcrumbItems = [
                 </div>
 
                 <!-- Authentication Token -->
-                <div class="bg-white rounded-lg border p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Authentication Token</h2>
-                    <p class="text-sm text-gray-600 mb-4">
+                <div class="rounded-lg border p-6">
+                    <h2 class="text-lg font-semibold mb-4">Authentication Token</h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         Use this token for API testing in Postman or other tools. Keep it secure and don't share it
                         publicly.
                     </p>
 
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-500 mb-2">Bearer Token</label>
+                            <label class="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Bearer Token</label>
                             <div class="flex items-center space-x-2">
                                 <UInput :model-value="authStore.token || 'No token available'" readonly
                                     class="flex-1 font-mono text-xs" size="sm" />
@@ -237,7 +237,7 @@ const breadcrumbItems = [
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-500 mb-2">Authorization Header</label>
+                            <label class="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Authorization Header</label>
                             <div class="flex items-center space-x-2">
                                 <UInput :model-value="`Bearer ${authStore.token || 'your-token-here'}`" readonly
                                     class="flex-1 font-mono text-xs" size="sm" />
@@ -266,11 +266,11 @@ const breadcrumbItems = [
                 </div>
 
                 <!-- Session Information -->
-                <div class="bg-white rounded-lg border p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Session Information</h2>
+                <div class="rounded-lg border p-6">
+                    <h2 class="text-lg font-semibold mb-4">Session Information</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-500">Session Status</label>
+                            <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Session Status</label>
                             <div class="mt-1">
                                 <UBadge :color="'green' as any" variant="soft">
                                     <template #leading>
@@ -282,16 +282,16 @@ const breadcrumbItems = [
                         </div>
 
                         <div v-if="authStore.sessionExpiresAt">
-                            <label class="block text-sm font-medium text-gray-500">Expires At</label>
-                            <p class="mt-1 text-sm text-gray-900">{{ formatDate(authStore.sessionExpiresAt) }}</p>
+                            <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Expires At</label>
+                            <p class="mt-1 text-sm">{{ formatDate(authStore.sessionExpiresAt) }}</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Permissions -->
                 <div v-if="userInfo.permissions && userInfo.permissions.length > 0"
-                    class="bg-white rounded-lg border p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Permissions</h2>
+                    class="rounded-lg border p-6">
+                    <h2 class="text-lg font-semibold mb-4">Permissions</h2>
                     <div class="flex flex-wrap gap-2">
                         <UBadge v-for="permission in userInfo.permissions" :key="permission" :color="'blue' as any"
                             variant="soft" size="sm">
@@ -301,8 +301,8 @@ const breadcrumbItems = [
                 </div>
 
                 <!-- Actions -->
-                <div class="bg-white rounded-lg border p-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Account Actions</h2>
+                <div class="rounded-lg border p-6">
+                    <h2 class="text-lg font-semibold mb-4">Account Actions</h2>
                     <div class="flex flex-wrap gap-4">
                         <UButton v-if="authStore.currentUser?.role === 'admin'" color="primary" variant="soft"
                             @click="navigateTo(`/settings/users/${userInfo?.id}`)">
@@ -326,8 +326,8 @@ const breadcrumbItems = [
             <div v-else class="flex justify-center items-center h-64">
                 <div class="text-center">
                     <UIcon name="i-lucide-user-x" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">No User Information</h3>
-                    <p class="text-gray-600 mb-4">
+                    <h3 class="text-lg font-medium mb-2">No User Information</h3>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
                         Unable to load user information. Please try again or contact support.
                     </p>
                     <UButton @click="fetchUserInfo" color="primary" variant="soft">
