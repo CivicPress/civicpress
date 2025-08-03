@@ -56,9 +56,8 @@ onMounted(async () => {
         class: 'rounded-full'
       }" :ui="{ footer: 'lg:border-t lg:border-default' }">
       <template #header="{ collapsed }">
-        <div class="flex items-center gap-2 px-3 py-3 font-bold">
-          <UIcon name="i-lucide-badge-check" size="2xl" />
-          <span v-if="!collapsed" class="font-bold tracking-wide">CivicPress</span>
+        <div class="flex items-center gap-2 px-3 py-3">
+          <Logo :size="collapsed ? 'sm' : 'md'" :show-text="!collapsed" />
         </div>
       </template>
 

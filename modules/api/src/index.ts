@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { CivicPress, Logger, CentralConfigManager } from '@civicpress/core';
 
 const logger = new Logger();
@@ -45,6 +46,7 @@ export class CivicPressAPI {
   private app: express.Application;
   private civicPress: CivicPress | null = null;
   private port: number;
+  private dataDir: string = '';
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -247,6 +249,9 @@ export class CivicPressAPI {
     this.app.use('/api/status', createStatusRouter());
     this.app.use('/api/validation', createValidationRouter());
     this.app.use('/api/config', configRouter);
+    
+    // Serve brand assets (logos, favicons, etc.)
+    this.app.use('/brand-assets', express.static(path.join(this.dataDir, '.civic', 'brand-assets')));
 
     // Protected routes that require authentication
     this.app.use('/api/export', authMiddleware(this.civicPress), exportRouter);

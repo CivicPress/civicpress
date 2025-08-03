@@ -107,20 +107,7 @@ watch(isAuthenticated, (newValue) => {
 
 <template>
   <UDashboardPanel>
-    <template #header>
-      <UDashboardNavbar>
-        <template #center>
-          <div class="text-center">
-            <h1 class="text-2xl font-bold">
-              Welcome to {{ organizationInfo?.name || 'CivicPress' }}
-            </h1>
-            <p v-if="organizationInfo?.city && organizationInfo?.state" class="text-gray-600 dark:text-gray-400 mt-1">
-              {{ organizationInfo.city }}, {{ organizationInfo.state }}
-            </p>
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+
 
     <template #body>
       <!-- Loading State -->
@@ -143,12 +130,14 @@ watch(isAuthenticated, (newValue) => {
       <!-- Dashboard Content -->
       <div v-else class="space-y-8">
         <!-- Welcome Section -->
-        <div class="text-center py-8">
-          <UIcon name="i-lucide-building-2" class="w-16 h-16 text-primary-500 mx-auto mb-4" />
-          <h2 class="text-3xl font-bold mb-2">
+        <div class="text-center py-12">
+          <div class="flex justify-center items-center">
+            <Logo size="2xl" class="my-16" />
+          </div>
+          <h2 class="text-4xl font-bold mb-4">
             {{ organizationInfo?.name || 'CivicPress' }}
           </h2>
-          <p class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-lg">
             {{ organizationInfo?.description || defaultDescription }}
           </p>
         </div>
@@ -221,7 +210,7 @@ watch(isAuthenticated, (newValue) => {
               <div v-if="organizationInfo.city && organizationInfo.state" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-map-pin" class="w-4 h-4 text-gray-500" />
                 <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.city }}, {{ organizationInfo.state
-                }}</span>
+                  }}</span>
               </div>
               <div v-if="organizationInfo.country" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />

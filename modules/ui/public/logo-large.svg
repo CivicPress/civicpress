@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #000000;
+      }
+      .text {
+        font-family: Arial, sans-serif;
+        font-weight: bold;
+        fill: #000000;
+      }
+      .subtitle {
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        fill: #6b7280;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <!-- Logo icon (scaled down) -->
+    <g transform="translate(0, 0) scale(0.4)">
+      <g>
+        <path class="cls-1" d="M55.96,81.53h0v24.07h-9.96v-24.07l-23.99,13.66-4.8-8.49,23.99-14.02"/>
+        <path class="cls-1" d="M36.65,68.33h0l-20.51,12.61-5.22-8.49,20.51-12.61-24.2-13.28,4.72-8.53,24.51,13.09"/>
+        <path class="cls-1" d="M34.34,42.93h0l-20.76-12.18,5.04-8.6,20.76,12.18.35-27.6,9.75.15-.04,27.79"/>
+        <path class="cls-1" d="M56.38,30.8h0V6.73h9.96v24.07l23.99-13.66,4.8,8.49-23.99,14.02"/>
+        <path class="cls-1" d="M75.68,44h0l20.51-12.61,5.22,8.49-20.51,12.61,24.2,13.28-4.72,8.53-24.51-13.09"/>
+        <path class="cls-1" d="M77.99,69.41h0l20.76,12.18-5.04,8.6-20.76-12.18-.35,27.6-9.75-.15.04-27.79"/>
+      </g>
+    </g>
+    
+    <!-- Text -->
+    <text x="60" y="25" class="text" font-size="24">CivicPress</text>
+    <text x="60" y="40" class="subtitle">Civic Records Management</text>
+  </g>
+</svg> 

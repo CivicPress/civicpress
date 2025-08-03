@@ -99,6 +99,40 @@
 - **400 Bad Request**: Check for required parameters before API calls
 - **Fallback Strategy**: Use `loadInitialRecords` when search fails
 
+## Logo & Branding Implementation
+
+### Configurable Logo System 🎨
+
+- **Organization Config**: Use `.system-data/.civic/org-config.yml` for branding
+- **API Static Serving**: Serve brand assets via `/brand-assets` endpoint
+- **Path Resolution**: Convert relative paths to API endpoints (`brand-assets/logo.svg` → `/brand-assets/logo.svg`)
+- **Fallback Strategy**: Default to `/logo.svg` if config logo not available
+- **Theme Compatibility**: Use `dark:invert` CSS for automatic light/dark theme switching
+
+### Logo Design Best Practices 🖼️
+
+- **Transparent Background**: Remove colored backgrounds for better UI integration
+- **Monochrome Design**: Use black geometric elements that invert to white in dark theme
+- **Scalable Sizing**: Multiple size options (`sm`, `md`, `lg`, `xl`, `2xl`) for different contexts
+- **Consistent Branding**: Always show "CivicPress" text regardless of organization config
+- **SVG Format**: Vector graphics for crisp display at any size
+
+### Component Architecture 🧩
+
+- **Smart Logo Component**: Fetches organization config via `/info` API
+- **Theme Awareness**: Automatic dark/light theme adaptation
+- **Responsive Sizing**: Context-aware sizing (sidebar vs home page)
+- **Organization Name**: Configurable organization name for other UI elements
+- **Error Handling**: Graceful fallbacks when API calls fail
+
+### Home Page Branding 🏠
+
+- **Prominent Logo**: Use `2xl` size (96px) for home page hero section
+- **Centered Layout**: Proper spacing and centering for maximum impact
+- **Consistent Title**: Always show "CivicPress" as brand name
+- **Organization Info**: Show organization details in separate section
+- **Responsive Design**: Logo scales appropriately on different screen sizes
+
 ### Virtual Scrolling Issues 🔄
 
 - **Library Compatibility**: `useVirtualList` from `@vueuse/core` may not work
