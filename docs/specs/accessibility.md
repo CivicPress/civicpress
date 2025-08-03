@@ -1,29 +1,20 @@
 # ♿ CivicPress Spec: `accessibility.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive accessibility documentation
 - WCAG compliance
 - testing patterns
 - security considerations
-- automated testing frameworks
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- automated testing frameworks compatibility: min_civicpress: 1.0.0
+  max_civicpress: 'null' dependencies:
   - 'ui.md: >=1.0.0'
   - 'themes.md: >=1.0.0'
-  - 'translations.md: >=1.0.0'
-authors:
-- 'Sophie Germain <sophie@civic-press.org>'
-reviewers:
+  - 'translations.md: >=1.0.0' authors:
+- 'Sophie Germain <sophie@civic-press.org>' reviewers:
 - 'Ada Lovelace'
 - 'Irène Joliot-Curie'
 
@@ -36,10 +27,10 @@ Accessibility & Inclusive Design Framework
 ## 🎯 Purpose
 
 Ensure that all interfaces and content within CivicPress are fully accessible to
-people with disabilities, across devices, platforms, and assistive
-technologies. This spec establishes comprehensive accessibility testing,
-security considerations, and compliance frameworks to support legal
-compliance (e.g. WCAG, ADA) and civic inclusion for all citizens.
+people with disabilities, across devices, platforms, and assistive technologies.
+This spec establishes comprehensive accessibility testing, security
+considerations, and compliance frameworks to support legal compliance (e.g.
+WCAG, ADA) and civic inclusion for all citizens.
 
 ---
 
@@ -66,19 +57,19 @@ compliance (e.g. WCAG, ADA) and civic inclusion for all citizens.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| User accessibility needs | Screen readers, keyboard navigation   |
+| Input                    | Description                          |
+| ------------------------ | ------------------------------------ |
+| User accessibility needs | Screen readers, keyboard navigation  |
 | WCAG compliance rules    | WCAG 2.2 AA standards and guidelines |
 | User system preferences  | Contrast, motion, font size settings |
-| Multilingual content     | Translated accessibility content       |
+| Multilingual content     | Translated accessibility content     |
 
-| Output                   | Description                           |
-| ----------------------- | ------------------------------------- |
-| Accessible interfaces    | WCAG-compliant UI components          |
-| Accessibility reports    | Automated and manual testing results   |
-| Compliance documentation | WCAG compliance validation reports    |
-| User feedback systems    | Accessibility issue reporting tools   |
+| Output                   | Description                          |
+| ------------------------ | ------------------------------------ |
+| Accessible interfaces    | WCAG-compliant UI components         |
+| Accessibility reports    | Automated and manual testing results |
+| Compliance documentation | WCAG compliance validation reports   |
+| User feedback systems    | Accessibility issue reporting tools  |
 
 ---
 
@@ -145,10 +136,10 @@ class AccessibilityPrivacyManager {
   async handleAccessibilityData(userData: AccessibilityUserData): Promise<void> {
     // Anonymize sensitive accessibility data
     const anonymizedData = this.anonymizeAccessibilityData(userData);
-    
+
     // Store with appropriate retention
     await this.storeWithRetention(anonymizedData);
-    
+
     // Log for compliance
     await this.logForCompliance(userData);
   }
@@ -181,10 +172,10 @@ class AccessibilitySecurityScanner {
 
     // Check for information disclosure through accessibility features
     threats.push(...await this.scanForInformationDisclosure());
-    
+
     // Check for privilege escalation through accessibility bypasses
     threats.push(...await this.scanForPrivilegeEscalation());
-    
+
     // Check for data tampering through accessibility APIs
     threats.push(...await this.scanForDataTampering());
 
@@ -193,10 +184,10 @@ class AccessibilitySecurityScanner {
 
   private async scanForInformationDisclosure(): Promise<AccessibilitySecurityThreat[]> {
     const threats: AccessibilitySecurityThreat[] = [];
-    
+
     // Check if accessibility features expose sensitive data
     const accessibilityAPIs = await this.getAccessibilityAPIs();
-    
+
     for (const api of accessibilityAPIs) {
       if (api.exposesSensitiveData) {
         threats.push({
@@ -222,7 +213,7 @@ class AccessibilitySecurityScanner {
 wcag_compliance:
   version: '2.2'
   level: 'AA'
-  
+
   success_criteria:
     perceivable:
       - '1.1.1': 'Non-text content has text alternatives'
@@ -230,7 +221,7 @@ wcag_compliance:
       - '1.3.1': 'Information and relationships are preserved'
       - '1.4.1': 'Color is not the only way to convey information'
       - '1.4.3': 'Contrast ratio meets minimum requirements'
-    
+
     operable:
       - '2.1.1': 'All functionality available via keyboard'
       - '2.1.2': 'No keyboard traps'
@@ -240,14 +231,14 @@ wcag_compliance:
       - '2.4.2': 'Page titles are descriptive'
       - '2.4.3': 'Focus order is logical'
       - '2.4.4': 'Link purpose is clear from context'
-    
+
     understandable:
       - '3.1.1': 'Language of page is identified'
       - '3.2.1': 'Focus changes do not trigger unexpected actions'
       - '3.2.2': 'Input changes do not trigger unexpected actions'
       - '3.3.1': 'Error identification is provided'
       - '3.3.2': 'Labels or instructions are provided'
-    
+
     robust:
       - '4.1.1': 'Markup is valid'
       - '4.1.2': 'Name, role, value are programmatically determined'
@@ -257,7 +248,7 @@ wcag_compliance:
       - 'axe-core'
       - 'lighthouse'
       - 'wave'
-    
+
     manual:
       - 'keyboard_navigation'
       - 'screen_reader_testing'
@@ -319,7 +310,7 @@ describe('Automated Accessibility Testing', () => {
 
       // Act
       const results = await Promise.all(
-        colorPairs.map(pair => 
+        colorPairs.map(pair =>
           accessibilityTester.testColorContrast(pair.foreground, pair.background)
         )
       );
@@ -347,7 +338,7 @@ describe('Automated Accessibility Testing', () => {
 
       // Act
       const results = await Promise.all(
-        testSelectors.map(selector => 
+        testSelectors.map(selector =>
           accessibilityTester.testSemanticHTML(selector)
         )
       );
@@ -621,7 +612,8 @@ testing:
 - [`themes.md`](./themes.md) — Theme accessibility compliance
 - [`translations.md`](./translations.md) — Multilingual accessibility support
 - [`ui.md`](./ui.md) — User interface accessibility patterns
-- [`testing-framework.md`](./testing-framework.md) — Testing standards and patterns
+- [`testing-framework.md`](./testing-framework.md) — Testing standards and
+  patterns
 
 ---
 

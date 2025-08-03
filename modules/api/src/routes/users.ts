@@ -1,14 +1,19 @@
-import { Router } from 'express';
+import express from 'express';
 import { CivicPress } from '@civicpress/core';
 import {
+  logApiRequest,
   sendSuccess,
   handleApiError,
-  logApiRequest,
 } from '../utils/api-logger';
 
-const router = Router();
+const router = express.Router();
 
-// Types for user management
+// Create a separate router for registration
+const registrationRouter = express.Router();
+
+// Create a separate router for authentication
+const authenticationRouter = express.Router();
+
 interface CreateUserRequest {
   username: string;
   email?: string;
@@ -207,15 +212,26 @@ router.get('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'get_user' });
 
   try {
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId)) {
-      return handleApiError(
-        'get_user',
-        new Error('Invalid user ID'),
-        req,
-        res,
-        'Invalid user ID'
-      );
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    const identifier = req.params.id;
+    let userId: number | undefined;
+    let targetUser: any;
+
+    // Try username lookup first, then fall back to ID if not found
+    targetUser = await authService.getUserByUsername(identifier);
+    if (targetUser) {
+      userId = targetUser.id;
+    } else {
+      // If username not found and identifier is numeric, try as ID
+      if (/^\d+$/.test(identifier)) {
+        userId = parseInt(identifier);
+        if (!isNaN(userId)) {
+          targetUser = await authService.getUserById(userId);
+        }
+      }
     }
 
     // Check authentication
@@ -230,13 +246,9 @@ router.get('/:id', async (req, res) => {
       );
     }
 
-    // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
-    const authService = civicPress.getAuthService();
-
     // Check if user can view this user (admin or self)
     const canManageUsers = await authService.userCan(user, 'users:manage');
-    const isSelf = user.id === userId;
+    const isSelf = userId !== undefined && user.id === userId;
 
     if (!canManageUsers && !isSelf) {
       const error = new Error('Insufficient permissions to view user');
@@ -245,8 +257,7 @@ router.get('/:id', async (req, res) => {
       return handleApiError('get_user', error, req, res);
     }
 
-    // Get user
-    const targetUser = await authService.getUserById(userId);
+    // Check if user was found
     if (!targetUser) {
       const error = new Error('User not found');
       (error as any).statusCode = 404;
@@ -284,15 +295,26 @@ router.put('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'update_user' });
 
   try {
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId)) {
-      return handleApiError(
-        'update_user',
-        new Error('Invalid user ID'),
-        req,
-        res,
-        'Invalid user ID'
-      );
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    const identifier = req.params.id;
+    let userId: number | undefined;
+    let targetUser: any;
+
+    // Try username lookup first, then fall back to ID if not found
+    targetUser = await authService.getUserByUsername(identifier);
+    if (targetUser) {
+      userId = targetUser.id;
+    } else {
+      // If username not found and identifier is numeric, try as ID
+      if (/^\d+$/.test(identifier)) {
+        userId = parseInt(identifier);
+        if (!isNaN(userId)) {
+          targetUser = await authService.getUserById(userId);
+        }
+      }
     }
 
     const userData: UpdateUserRequest = req.body;
@@ -309,13 +331,17 @@ router.put('/:id', async (req, res) => {
       );
     }
 
-    // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
-    const authService = civicPress.getAuthService();
+    // Check if user was found
+    if (!targetUser) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('update_user', error, req, res);
+    }
 
     // Check if user can update this user (admin or self)
     const canManageUsers = await authService.userCan(user, 'users:manage');
-    const isSelf = user.id === userId;
+    const isSelf = userId !== undefined && user.id === userId;
 
     if (!canManageUsers && !isSelf) {
       const error = new Error('Insufficient permissions to update user');
@@ -355,6 +381,13 @@ router.put('/:id', async (req, res) => {
     }
 
     // Update user
+    if (!userId) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('update_user', error, req, res);
+    }
+
     const updatedUser = await authService.updateUser(userId, {
       email: userData.email,
       name: userData.name,
@@ -399,15 +432,26 @@ router.delete('/:id', async (req, res) => {
   logApiRequest(req, { operation: 'delete_user' });
 
   try {
-    const userId = parseInt(req.params.id);
-    if (isNaN(userId)) {
-      return handleApiError(
-        'delete_user',
-        new Error('Invalid user ID'),
-        req,
-        res,
-        'Invalid user ID'
-      );
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    const identifier = req.params.id;
+    let userId: number | undefined;
+    let targetUser: any;
+
+    // Try username lookup first, then fall back to ID if not found
+    targetUser = await authService.getUserByUsername(identifier);
+    if (targetUser) {
+      userId = targetUser.id;
+    } else {
+      // If username not found and identifier is numeric, try as ID
+      if (/^\d+$/.test(identifier)) {
+        userId = parseInt(identifier);
+        if (!isNaN(userId)) {
+          targetUser = await authService.getUserById(userId);
+        }
+      }
     }
 
     // Check authentication
@@ -422,9 +466,13 @@ router.delete('/:id', async (req, res) => {
       );
     }
 
-    // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
-    const authService = civicPress.getAuthService();
+    // Check if user was found
+    if (!targetUser) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('delete_user', error, req, res);
+    }
 
     // Check if user can manage users
     const canManageUsers = await authService.userCan(user, 'users:manage');
@@ -436,7 +484,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     // Prevent self-deletion
-    if (user.id === userId) {
+    if (userId !== undefined && user.id === userId) {
       const error = new Error('Cannot delete your own account');
       (error as any).statusCode = 400;
       (error as any).code = 'SELF_DELETION_NOT_ALLOWED';
@@ -444,6 +492,13 @@ router.delete('/:id', async (req, res) => {
     }
 
     // Delete user
+    if (!userId) {
+      const error = new Error('User not found');
+      (error as any).statusCode = 404;
+      (error as any).code = 'USER_NOT_FOUND';
+      return handleApiError('delete_user', error, req, res);
+    }
+
     const deleted = await authService.deleteUser(userId);
     if (!deleted) {
       const error = new Error('User not found');
@@ -467,19 +522,121 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
- * POST /api/users/auth/password
- * Authenticate with username and password
+ * POST /register
+ * Public user registration (no authentication required)
  */
-router.post('/auth/password', async (req, res) => {
+registrationRouter.post('/', async (req, res) => {
+  logApiRequest(req, { operation: 'register_user' });
+
+  try {
+    const userData: CreateUserRequest = req.body;
+
+    // Validate required fields
+    if (!userData.username) {
+      const error = new Error('Username is required');
+      (error as any).statusCode = 400;
+      return handleApiError(
+        'register_user',
+        error,
+        req,
+        res,
+        'Username is required'
+      );
+    }
+
+    if (!userData.password) {
+      const error = new Error('Password is required');
+      (error as any).statusCode = 400;
+      return handleApiError(
+        'register_user',
+        error,
+        req,
+        res,
+        'Password is required'
+      );
+    }
+
+    if (!userData.email) {
+      const error = new Error('Email is required');
+      (error as any).statusCode = 400;
+      return handleApiError(
+        'register_user',
+        error,
+        req,
+        res,
+        'Email is required'
+      );
+    }
+
+    // Get CivicPress instance from request
+    const civicPress = (req as any).civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+
+    // Check if username already exists
+    const existingUser = await authService.getUserByUsername(userData.username);
+    if (existingUser) {
+      const error = new Error('Username already exists');
+      (error as any).statusCode = 409;
+      (error as any).code = 'USERNAME_EXISTS';
+      return handleApiError('register_user', error, req, res);
+    }
+
+    // Hash password
+    const bcrypt = await import('bcrypt');
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(userData.password, saltRounds);
+
+    // Create user with default role (usually 'public')
+    // Use username as name if no name is provided
+    const userName = userData.name || userData.username;
+    const newUser = await authService.createUserWithPassword({
+      username: userData.username,
+      email: userData.email,
+      name: userName,
+      role: userData.role || 'public', // Default to 'public' role
+      passwordHash,
+      avatar_url: userData.avatar_url,
+    });
+
+    sendSuccess(
+      {
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          role: newUser.role,
+          email: newUser.email,
+          name: newUser.name,
+          avatar_url: newUser.avatar_url,
+          created_at: newUser.created_at,
+        },
+        message:
+          'User registered successfully. Please log in with your credentials.',
+      },
+      req,
+      res,
+      { operation: 'register_user' }
+    );
+  } catch (error) {
+    handleApiError('register_user', error, req, res, 'Failed to register user');
+  }
+});
+
+/**
+ * POST /auth/password
+ * Authenticate with username and password (no authentication required)
+ */
+authenticationRouter.post('/password', async (req, res) => {
   logApiRequest(req, { operation: 'password_auth' });
 
   try {
     const { username, password }: PasswordAuthRequest = req.body;
 
     if (!username || !password) {
+      const error = new Error('Username and password are required');
+      (error as any).statusCode = 400;
       return handleApiError(
         'password_auth',
-        new Error('Username and password are required'),
+        error,
         req,
         res,
         'Username and password are required'
@@ -509,9 +666,14 @@ router.post('/auth/password', async (req, res) => {
       { operation: 'password_auth' }
     );
   } catch (error) {
+    // Set 401 status code for authentication failures
+    const authError = new Error(
+      error instanceof Error ? error.message : 'Password authentication failed'
+    );
+    (authError as any).statusCode = 401;
     handleApiError(
       'password_auth',
-      error,
+      authError,
       req,
       res,
       'Password authentication failed'
@@ -519,4 +681,4 @@ router.post('/auth/password', async (req, res) => {
   }
 });
 
-export default router;
+export { router, registrationRouter, authenticationRouter };

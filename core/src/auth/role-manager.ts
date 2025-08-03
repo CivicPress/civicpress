@@ -137,6 +137,31 @@ export class RoleManager {
   }
 
   /**
+   * Get detailed configuration for a specific role
+   * @param role - The role to get configuration for
+   * @returns RoleConfig or null if role doesn't exist
+   */
+  async getRoleConfig(role: string): Promise<RoleConfig | null> {
+    try {
+      const config = await this.loadConfig();
+      const roleConfig = config.roles[role];
+
+      if (!roleConfig) {
+        logger.debug(`[RoleManager] Role '${role}' not found in configuration`);
+        return null;
+      }
+
+      return roleConfig;
+    } catch (error) {
+      logger.error(
+        `[RoleManager] Failed to get role config for '${role}':`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
    * Validate a role exists
    * @param role - The role to validate
    * @returns boolean indicating if the role exists

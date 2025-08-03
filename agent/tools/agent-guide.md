@@ -15,6 +15,18 @@ agent/memory/project-state.md      # Current implementation status
 agent/context/goals.md             # Development goals and priorities
 agent/memory/architecture.md       # System architecture and patterns
 agent/context/blockers.md          # Current blockers and issues
+
+# Critical specifications (read as needed for specific work)
+docs/specs/README.md               # Specifications overview and index
+docs/specs/manifest.md             # Platform configuration and core principles
+docs/specs/api.md                  # REST API design and endpoints
+docs/specs/cli.md                  # Command-line interface design
+docs/specs/auth.md                 # Authentication and authorization
+docs/specs/permissions.md          # Role-based access control
+docs/specs/security.md             # Security architecture and requirements
+docs/specs/testing-framework.md    # Testing standards and patterns
+docs/specs/accessibility.md        # Accessibility requirements
+docs/specs/ui.md                   # User interface design patterns
 ```
 
 ### 2. **Session Context**
@@ -43,6 +55,7 @@ agent/knowledge/examples.md        # Code examples
 2. **Check Goals**: Review current development priorities
 3. **Review Architecture**: Understand system design patterns
 4. **Check Blockers**: Be aware of current issues
+5. **Reference Specifications**: Read relevant specs for the work area
 
 ### **During Work**
 
@@ -131,10 +144,16 @@ When switching between AI agents:
 
 ### **Specification-Driven Development**
 
-- Always reference relevant specs before implementation
-- Follow specification patterns and conventions
-- Update specs if implementation reveals gaps
-- Ensure security and accessibility compliance
+- **Always reference relevant specs before implementation** - The 50+ specs in
+  `docs/specs/` are the authoritative source for all design decisions
+- **Read specs for your work area** - Check `docs/specs/README.md` for the
+  complete index of available specifications
+- **Follow specification patterns and conventions** - All implementations should
+  align with the comprehensive spec system
+- **Update specs if implementation reveals gaps** - Keep specifications current
+  with implementation learnings
+- **Ensure security and accessibility compliance** - Reference
+  `docs/specs/security.md` and `docs/specs/accessibility.md` for all work
 
 ### **Git-Native Workflow**
 
@@ -163,7 +182,7 @@ When switching between AI agents:
 
 1. **Read**: `agent/memory/architecture.md` for patterns
 2. **Check**: `agent/context/goals.md` for priorities
-3. **Reference**: Relevant specifications
+3. **Reference**: Relevant specifications from `docs/specs/`
 4. **Update**: `agent/memory/project-state.md` with progress
 5. **Document**: Decisions in `agent/memory/decisions.md`
 
@@ -251,7 +270,8 @@ If priorities seem conflicting:
 
 ## 📚 **Additional Resources**
 
-- **Specifications**: `.civic/specs/` - Detailed technical specifications
+- **Specifications**: `docs/specs/` - 50+ detailed technical specifications
+  (authoritative source)
 - **Documentation**: `README.md` - Project overview
 - **Contributing**: `CONTRIBUTING.md` - Development guidelines
 - **Manifesto**: `agent/manifesto-slim.md` - Core principles

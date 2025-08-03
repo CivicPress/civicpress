@@ -1,25 +1,16 @@
 # 📋 CivicPress Spec: `add-version-headers.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive version header documentation
 - maintenance guidelines
-- validation standards
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'spec-versioning.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- validation standards compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
+  - 'spec-versioning.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -31,9 +22,9 @@ Version Header Maintenance & Standards
 
 ## 🎯 Purpose
 
-Define standards and guidelines for maintaining version headers across all CivicPress
-specifications, ensuring consistency and proper version tracking throughout the
-specification ecosystem.
+Define standards and guidelines for maintaining version headers across all
+CivicPress specifications, ensuring consistency and proper version tracking
+throughout the specification ecosystem.
 
 ## 🧩 Scope & Responsibilities
 
@@ -66,13 +57,13 @@ All CivicPress specifications now use standardized YAML frontmatter with:
 
 ### 📈 Version Distribution
 
-| Version | Count | Status |
-|---------|-------|--------|
-| 1.5.0   | 1     | plugins.md |
-| 1.3.0   | 1     | workflows.md |
+| Version | Count | Status                                |
+| ------- | ----- | ------------------------------------- |
+| 1.5.0   | 1     | plugins.md                            |
+| 1.3.0   | 1     | workflows.md                          |
 | 1.2.0   | 3     | auth.md, hooks.md, spec-versioning.md |
-| 1.1.0   | 2     | permissions.md, git-policy.md |
-| 1.0.0   | 53    | All other specs |
+| 1.1.0   | 2     | permissions.md, git-policy.md         |
+| 1.0.0   | 53    | All other specs                       |
 
 ---
 

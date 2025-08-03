@@ -1,25 +1,16 @@
 # 🚀 CivicPress Spec: `deployment.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive deployment documentation
 - infrastructure patterns
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'manifest.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
+  - 'manifest.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -32,9 +23,9 @@ Deployment Architecture & Infrastructure Security
 ## 🎯 Purpose
 
 Define secure deployment patterns, infrastructure security, and comprehensive
-testing strategies for CivicPress across local, demo, and production environments.
-This spec establishes security-first deployment practices, infrastructure
-hardening, and deployment validation frameworks.
+testing strategies for CivicPress across local, demo, and production
+environments. This spec establishes security-first deployment practices,
+infrastructure hardening, and deployment validation frameworks.
 
 ---
 
@@ -59,21 +50,21 @@ hardening, and deployment validation frameworks.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Application code         | Built and tested CivicPress artifacts |
-| Configuration files      | Environment-specific settings         |
-| SSL certificates         | TLS certificates for HTTPS            |
-| Infrastructure config    | Server and network configuration      |
-| Security policies        | Access control and security rules     |
+| Input                 | Description                           |
+| --------------------- | ------------------------------------- |
+| Application code      | Built and tested CivicPress artifacts |
+| Configuration files   | Environment-specific settings         |
+| SSL certificates      | TLS certificates for HTTPS            |
+| Infrastructure config | Server and network configuration      |
+| Security policies     | Access control and security rules     |
 
-| Output                   | Description                           |
-| ----------------------- | ------------------------------------- |
-| Deployed services        | Running CivicPress instances          |
-| Health checks           | Service availability monitoring        |
-| Security monitoring     | Threat detection and alerting         |
-| Backup systems          | Data protection and recovery          |
-| Audit logs              | Deployment and access audit trails    |
+| Output              | Description                        |
+| ------------------- | ---------------------------------- |
+| Deployed services   | Running CivicPress instances       |
+| Health checks       | Service availability monitoring    |
+| Security monitoring | Threat detection and alerting      |
+| Backup systems      | Data protection and recovery       |
+| Audit logs          | Deployment and access audit trails |
 
 ---
 
@@ -209,7 +200,7 @@ network_security:
         - "allow http from internet"
         - "allow https from internet"
         - "deny all other traffic"
-    
+
     - name: "civicpress-admin"
       rules:
         - "allow ssh from trusted ips"
@@ -343,9 +334,9 @@ class DeploymentSecurityChecker implements SecurityCheck {
     ];
 
     const activeRules = await this.getActiveFirewallRules();
-    const missingRules = requiredRules.filter(rule => 
-      !activeRules.some(active => 
-        active.port === rule.port && 
+    const missingRules = requiredRules.filter(rule =>
+      !activeRules.some(active =>
+        active.port === rule.port &&
         active.protocol === rule.protocol
       )
     );
@@ -394,13 +385,13 @@ monitoring:
       interval: "30s"
       timeout: "10s"
       expected_status: 200
-    
+
     - name: "api-health"
       url: "https://api.town.ca/health"
       interval: "30s"
       timeout: "10s"
       expected_status: 200
-    
+
     - name: "admin-health"
       url: "https://admin.town.ca/health"
       interval: "30s"
@@ -412,12 +403,12 @@ monitoring:
       check: "ssl_cert_expiry"
       threshold: "30 days"
       alert: "critical"
-    
+
     - name: "failed-login-attempts"
       check: "auth_failed_logins"
       threshold: "10 per minute"
       alert: "warning"
-    
+
     - name: "suspicious-requests"
       check: "suspicious_http_requests"
       threshold: "100 per minute"
@@ -428,7 +419,7 @@ monitoring:
       metric: "http_response_time"
       threshold: "2 seconds"
       alert: "warning"
-    
+
     - name: "error-rate"
       metric: "http_error_rate"
       threshold: "5%"
@@ -446,13 +437,13 @@ data_sovereignty:
   backup_location: "local"
   encryption_at_rest: true
   encryption_in_transit: true
-  
+
   data_retention:
     civic_records: "permanent"
     user_sessions: "30 days"
     audit_logs: "7 years"
     backup_files: "90 days"
-  
+
   access_logging:
     enabled: true
     retention: "1 year"
@@ -567,7 +558,7 @@ describe('Deployment Security', () => {
 
       // Act
       const results = await Promise.all(
-        unauthorizedPorts.map(port => 
+        unauthorizedPorts.map(port =>
           infrastructureTester.testPortAccessibility(port)
         )
       );
@@ -652,7 +643,7 @@ describe('Deployment Performance', () => {
       // Act & Assert
       for (const service of services) {
         const result = await performanceTester.testServiceFailover(service);
-        
+
         expect(result.failoverTime).toBeLessThan(30); // < 30 seconds
         expect(result.dataLoss).toBe(0);
         expect(result.serviceRecovery).toBe(true);
@@ -686,7 +677,7 @@ describe('Deployment Security Testing', () => {
 
       // Act
       const results = await Promise.all(
-        attackVectors.map(vector => 
+        attackVectors.map(vector =>
           securityTester.testAttackVector(vector)
         )
       );
@@ -721,7 +712,7 @@ describe('Deployment Security Testing', () => {
 
       // Act
       const results = await Promise.all(
-        accessTests.map(test => 
+        accessTests.map(test =>
           securityTester.testAccessControl(test.role, test.resource)
         )
       );
@@ -811,7 +802,8 @@ This strategy:
 - [`security.md`](./security.md) — Security architecture and threat modeling
 - [`database.md`](./database.md) — Database deployment and security
 - [`api.md`](./api.md) — API deployment and security
-- [`testing-framework.md`](./testing-framework.md) — Testing standards and patterns
+- [`testing-framework.md`](./testing-framework.md) — Testing standards and
+  patterns
 
 ---
 

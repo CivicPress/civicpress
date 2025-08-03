@@ -1,24 +1,54 @@
-# CivicPress API Documentation
+# API Documentation
 
 ## Overview
 
-The CivicPress API provides a RESTful interface for managing civic governance
-records, workflows, and system administration. The API is built with Express.js
-and supports OAuth authentication.
-
-**Base URL**: `http://localhost:3000` (development)
+The CivicPress API provides RESTful endpoints for managing civic records, users,
+and system configuration. The API uses JWT-based authentication and follows
+standard HTTP status codes.
 
 ## Authentication
 
-The API uses OAuth-based authentication with JWT tokens. Most endpoints require
-authentication via the `Authorization` header.
+### JWT Token Flow
 
-### Authentication Flow
+1. **Login**: POST `/auth/login` with credentials
+2. **Get Token**: Receive JWT token in response
+3. **Use Bearer Token**: Include token in `Authorization: Bearer <token>` header
 
-1. **Get OAuth Token**: Obtain an OAuth token from a supported provider (GitHub)
-2. **Login**: POST to `/auth/login` with the token
-3. **Use Bearer Token**: Include the returned token in
-   `Authorization: Bearer <token>` header
+### Public vs Protected Endpoints
+
+#### **Public Endpoints** (No Authentication Required)
+
+These endpoints are accessible without authentication and are used by the UI for
+initial configuration:
+
+- `GET /api/config/roles` - Get available user roles
+- `GET /api/config/record-types` - Get available record types
+- `GET /api/config/record-statuses` - Get available record statuses
+- `GET /api/status` - Get system status
+- `GET /api/status/git` - Get Git repository status
+- `GET /api/status/records` - Get records statistics
+- `GET /api/records` - List records (read-only)
+- `GET /api/records/:id` - Get specific record (read-only)
+- `GET /api/search` - Search records (read-only)
+
+#### **Protected Endpoints** (Authentication Required)
+
+These endpoints require valid authentication and appropriate permissions:
+
+- **User Management**: All `/api/users/*` endpoints (admin only)
+- **Record Management**: POST, PUT, DELETE on `/api/records/*`
+  (permission-based)
+- **Authentication**: `/auth/*` endpoints for login/logout
+- **System Operations**: Export, import, hooks, etc. (role-based)
+
+#### **Permission-Based Access**
+
+Protected endpoints use role-based permissions:
+
+- **Admin**: Full access to all endpoints
+- **Council**: Can create, edit, and approve records
+- **Clerk**: Can create and edit records
+- **Public**: Can only view published records
 
 ## Endpoints
 
@@ -26,14 +56,14 @@ authentication via the `Authorization` header.
 
 #### POST /auth/login
 
-Authenticate with an OAuth provider token.
+Authenticate user and receive JWT token.
 
 **Request Body:**
 
 ```json
 {
-  "token": "github_oauth_token",
-  "provider": "github"
+  "username": "string",
+  "password": "string"
 }
 ```
 
@@ -42,60 +72,59 @@ Authenticate with an OAuth provider token.
 ```json
 {
   "success": true,
-  "session": {
-    "token": "jwt_token_here",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "user": {
-      "id": "user_id",
-      "username": "username",
-      "role": "council",
-      "email": "user@example.com",
-      "name": "User Name",
-      "avatar_url": "https://..."
+      "id": 1,
+      "username": "admin",
+      "email": "admin@example.com",
+      "name": "Administrator",
+      "role": "admin",
+      "avatar_url": null
     },
-    "expiresAt": "2024-01-01T12:00:00Z"
+    "expiresAt": "2025-07-31T21:33:40.000Z"
   }
 }
 ```
 
-#### GET /auth/providers
+#### POST /auth/register
 
-Get available OAuth providers.
+Register a new user account (public endpoint).
 
-**Response:**
+**Request Body:**
 
 ```json
 {
-  "success": true,
-  "providers": ["github"]
+  "username": "string (required)",
+  "email": "string (required)",
+  "password": "string (required)",
+  "name": "string (optional)"
 }
 ```
 
-#### GET /auth/me
-
-Get current authenticated user information.
-
-**Headers:** `Authorization: Bearer <token>`
-
 **Response:**
 
 ```json
 {
   "success": true,
-  "user": {
-    "id": "user_id",
-    "username": "username",
-    "role": "council",
-    "email": "user@example.com",
-    "name": "User Name",
-    "avatar_url": "https://...",
-    "permissions": []
+  "data": {
+    "user": {
+      "id": 2,
+      "username": "newuser",
+      "email": "newuser@example.com",
+      "name": "New User",
+      "role": "public",
+      "avatar_url": null,
+      "created_at": "2025-07-30T21:33:40.000Z"
+    },
+    "message": "User registered successfully"
   }
 }
 ```
 
 #### POST /auth/logout
 
-Logout (stateless - client should delete token).
+Logout and invalidate current session.
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -104,7 +133,9 @@ Logout (stateless - client should delete token).
 ```json
 {
   "success": true,
-  "message": "Logged out successfully"
+  "data": {
+    "message": "Logged out successfully"
+  }
 }
 ```
 
@@ -112,73 +143,81 @@ Logout (stateless - client should delete token).
 
 #### GET /api/records
 
-List all records with optional filtering.
-
-**Headers:** `Authorization: Bearer <token>`
+List all records (public endpoint).
 
 **Query Parameters:**
 
-- `type` (optional): Filter by record type (`bylaw`, `policy`, `proposal`,
-  `resolution`)
-- `status` (optional): Filter by status (`draft`, `proposed`, `reviewed`,
-  `approved`, `archived`)
-- `limit` (optional): Number of records to return (default: 10)
+- `type` (optional): Filter by record type
+- `status` (optional): Filter by record status
+- `limit` (optional): Number of records per page (default: 10, max: 100)
 - `offset` (optional): Number of records to skip (default: 0)
 
 **Response:**
 
 ```json
 {
-  "records": [
-    {
-      "id": "article-001",
-      "title": "Article 001 - Animal Control",
-      "type": "bylaw",
-      "status": "active",
-      "content": "All dogs must be leashed in public parks...",
-      "metadata": {
-        "author": "City Council",
-        "created": "2024-01-01T00:00:00Z",
-        "updated": "2024-01-01T00:00:00Z",
-        "version": "1.0.0"
-      },
-      "path": "records/bylaw/article-001---animal-control.md"
-    }
-  ],
-  "total": 41,
-  "page": 1,
-  "limit": 10
+  "success": true,
+  "data": {
+    "records": [
+      {
+        "id": 1,
+        "title": "Noise Restrictions Ordinance",
+        "type": "bylaw",
+        "status": "approved",
+        "content": "# Règlement sur les restrictions de bruit\n\n...",
+        "metadata": {
+          "author": "admin",
+          "created": "2025-07-18T20:50:14.489Z",
+          "updated": "2025-07-23T21:15:08.491Z",
+          "tags": ["noise", "nighttime", "curfew"]
+        },
+        "path": "records/bylaw/noise-restrictions.md",
+        "author": "admin",
+        "created_at": "2025-07-18 20:50:14",
+        "updated_at": "2025-07-23 21:15:08"
+      }
+    ],
+    "total": 1,
+    "limit": 10,
+    "offset": 0
+  }
 }
 ```
 
 #### GET /api/records/:id
 
-Get a specific record by ID.
-
-**Headers:** `Authorization: Bearer <token>`
+Get a specific record by ID (public endpoint).
 
 **Response:**
 
 ```json
 {
-  "id": "article-001",
-  "title": "Article 001 - Animal Control",
-  "type": "bylaw",
-  "status": "active",
-  "content": "All dogs must be leashed in public parks...",
-  "metadata": {
-    "author": "City Council",
-    "created": "2024-01-01T00:00:00Z",
-    "updated": "2024-01-01T00:00:00Z",
-    "version": "1.0.0"
-  },
-  "path": "records/bylaw/article-001---animal-control.md"
+  "success": true,
+  "data": {
+    "record": {
+      "id": 1,
+      "title": "Noise Restrictions Ordinance",
+      "type": "bylaw",
+      "status": "approved",
+      "content": "# Règlement sur les restrictions de bruit\n\n...",
+      "metadata": {
+        "author": "admin",
+        "created": "2025-07-18T20:50:14.489Z",
+        "updated": "2025-07-23T21:15:08.491Z",
+        "tags": ["noise", "nighttime", "curfew"]
+      },
+      "path": "records/bylaw/noise-restrictions.md",
+      "author": "admin",
+      "created_at": "2025-07-18 20:50:14",
+      "updated_at": "2025-07-23 21:15:08"
+    }
+  }
 }
 ```
 
 #### POST /api/records
 
-Create a new record.
+Create a new record (requires authentication).
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -186,38 +225,44 @@ Create a new record.
 
 ```json
 {
-  "title": "New Bylaw",
-  "type": "bylaw",
-  "content": "Content of the new bylaw...",
-  "role": "council",
-  "metadata": {
-    "author": "City Council",
-    "version": "1.0.0"
-  }
+  "title": "string (required)",
+  "type": "string (required)",
+  "content": "string (required)",
+  "status": "string (optional, default: draft)"
 }
 ```
 
-**Response:** `201 Created`
+**Response:**
 
 ```json
 {
-  "id": "new-record-id",
-  "title": "New Bylaw",
-  "type": "bylaw",
-  "status": "draft",
-  "content": "Content of the new bylaw...",
-  "metadata": {
-    "author": "City Council",
-    "created": "2024-01-01T00:00:00Z",
-    "version": "1.0.0"
-  },
-  "path": "records/bylaw/new-bylaw.md"
+  "success": true,
+  "data": {
+    "record": {
+      "id": 2,
+      "title": "New Policy Document",
+      "type": "policy",
+      "status": "draft",
+      "content": "# New Policy\n\n...",
+      "metadata": {
+        "author": "admin",
+        "created": "2025-07-30T21:33:40.000Z",
+        "updated": "2025-07-30T21:33:40.000Z",
+        "tags": []
+      },
+      "path": "records/policy/new-policy-document.md",
+      "author": "admin",
+      "created_at": "2025-07-30 21:33:40",
+      "updated_at": "2025-07-30 21:33:40"
+    },
+    "message": "Record created successfully"
+  }
 }
 ```
 
 #### PUT /api/records/:id
 
-Update an existing record.
+Update an existing record (requires authentication).
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -225,12 +270,9 @@ Update an existing record.
 
 ```json
 {
-  "title": "Updated Bylaw Title",
-  "content": "Updated content...",
-  "status": "proposed",
-  "metadata": {
-    "updated": "2024-01-01T00:00:00Z"
-  }
+  "title": "string (optional)",
+  "content": "string (optional)",
+  "status": "string (optional)"
 }
 ```
 
@@ -238,24 +280,33 @@ Update an existing record.
 
 ```json
 {
-  "id": "article-001",
-  "title": "Updated Bylaw Title",
-  "type": "bylaw",
-  "status": "proposed",
-  "content": "Updated content...",
-  "metadata": {
-    "author": "City Council",
-    "created": "2024-01-01T00:00:00Z",
-    "updated": "2024-01-01T00:00:00Z",
-    "version": "1.0.0"
-  },
-  "path": "records/bylaw/article-001---animal-control.md"
+  "success": true,
+  "data": {
+    "record": {
+      "id": 1,
+      "title": "Updated Noise Restrictions Ordinance",
+      "type": "bylaw",
+      "status": "approved",
+      "content": "# Updated Règlement sur les restrictions de bruit\n\n...",
+      "metadata": {
+        "author": "admin",
+        "created": "2025-07-18T20:50:14.489Z",
+        "updated": "2025-07-30T21:35:20.000Z",
+        "tags": ["noise", "nighttime", "curfew", "updated"]
+      },
+      "path": "records/bylaw/noise-restrictions.md",
+      "author": "admin",
+      "created_at": "2025-07-18 20:50:14",
+      "updated_at": "2025-07-30 21:35:20"
+    },
+    "message": "Record updated successfully"
+  }
 }
 ```
 
 #### DELETE /api/records/:id
 
-Archive a record (moves to archive, doesn't delete).
+Delete a record (requires authentication).
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -263,10 +314,11 @@ Archive a record (moves to archive, doesn't delete).
 
 ```json
 {
-  "message": "Record article-001 archived successfully",
-  "archivedAt": "2024-01-01T00:00:00Z",
-  "archiveLocation": "archive/bylaw/article-001.md",
-  "note": "Record has been moved to archive and is no longer active"
+  "success": true,
+  "data": {
+    "message": "Record deleted successfully",
+    "deletedAt": "2025-07-30T21:35:20.000Z"
+  }
 }
 ```
 
@@ -274,330 +326,409 @@ Archive a record (moves to archive, doesn't delete).
 
 #### GET /api/search
 
-Search records (placeholder implementation).
+Search records with full-text search capabilities.
+
+**Query Parameters:**
+
+- `q` (required): Search query
+- `type` (optional): Filter by record type
+- `status` (optional): Filter by record status
+- `limit` (optional): Number of results per page (default: 10, max: 100)
+- `offset` (optional): Number of results to skip (default: 0)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "id": 1,
+        "title": "Règlement sur les restrictions de bruit",
+        "type": "bylaw",
+        "status": "draft",
+        "content": "# Règlement sur les restrictions de bruit\n\n...",
+        "score": 0.85,
+        "highlights": {
+          "title": ["<mark>Règlement</mark> sur les restrictions de bruit"],
+          "content": ["...<mark>règlement</mark> sur le bruit..."]
+        }
+      }
+    ],
+    "total": 1,
+    "limit": 10,
+    "offset": 0
+  }
+}
+```
+
+### User Management
+
+#### GET /api/users
+
+List all users (admin only).
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Query Parameters:**
 
-- `q` (optional): Search query
+- `limit` (optional): Number of users per page (default: 10, max: 100)
+- `offset` (optional): Number of users to skip (default: 0)
 
 **Response:**
 
 ```json
 {
-  "results": [],
-  "total": 0,
-  "query": "search term"
-}
-```
-
-### Export/Import
-
-#### GET /api/export
-
-Export data (placeholder implementation).
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Export functionality",
-  "formats": ["json", "csv", "markdown"]
-}
-```
-
-#### POST /api/import
-
-Import data (placeholder implementation).
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Import functionality",
-  "formats": ["json", "csv", "markdown"]
-}
-```
-
-### Hooks
-
-#### GET /api/hooks
-
-List all hooks.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "hooks": [],
-  "total": 0
-}
-```
-
-#### GET /api/hooks/:id
-
-Get a specific hook.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "id": "hook-id",
-  "name": "Sample Hook",
-  "event": "record:created"
-}
-```
-
-#### POST /api/hooks
-
-Create a new hook.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:** `201 Created`
-
-```json
-{
-  "message": "Hook created successfully"
-}
-```
-
-#### PUT /api/hooks/:id
-
-Update a hook.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Hook hook-id updated successfully"
-}
-```
-
-#### DELETE /api/hooks/:id
-
-Delete a hook.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Hook hook-id deleted successfully"
-}
-```
-
-### Templates
-
-#### GET /api/templates
-
-List all templates.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "templates": [],
-  "total": 0
-}
-```
-
-#### GET /api/templates/:id
-
-Get a specific template.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "id": "template-id",
-  "name": "Sample Template",
-  "content": "Template content here"
-}
-```
-
-#### POST /api/templates
-
-Create a new template.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:** `201 Created`
-
-```json
-{
-  "message": "Template created successfully"
-}
-```
-
-#### PUT /api/templates/:id
-
-Update a template.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Template template-id updated successfully"
-}
-```
-
-#### DELETE /api/templates/:id
-
-Delete a template.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Template template-id deleted successfully"
-}
-```
-
-### Workflows
-
-#### GET /api/workflows
-
-List all workflows.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "workflows": [],
-  "total": 0
-}
-```
-
-#### GET /api/workflows/:id
-
-Get a specific workflow.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "id": "workflow-id",
-  "name": "Sample Workflow",
-  "status": "active"
-}
-```
-
-#### POST /api/workflows
-
-Create a new workflow.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:** `201 Created`
-
-```json
-{
-  "message": "Workflow created successfully"
-}
-```
-
-#### PUT /api/workflows/:id
-
-Update a workflow.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Workflow workflow-id updated successfully"
-}
-```
-
-#### DELETE /api/workflows/:id
-
-Delete a workflow.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "message": "Workflow workflow-id deleted successfully"
-}
-```
-
-### System
-
-#### GET /health
-
-Basic health check.
-
-**Response:**
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "uptime": 12345.67,
-  "version": "1.0.0",
-  "environment": "development"
-}
-```
-
-#### GET /health/detailed
-
-Detailed health check with system information.
-
-**Response:**
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "uptime": 12345.67,
-  "version": "1.0.0",
-  "environment": "development",
-  "memory": {
-    "used": 12345678,
-    "total": 23456789,
-    "external": 3456789
-  },
-  "platform": {
-    "node": "v18.0.0",
-    "arch": "x64",
-    "platform": "darwin"
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": 1,
+        "username": "admin",
+        "email": "admin@example.com",
+        "name": "Administrator",
+        "role": "admin",
+        "avatar_url": null,
+        "created_at": "2025-07-30T21:33:40.000Z",
+        "updated_at": "2025-07-30T21:33:40.000Z"
+      }
+    ],
+    "total": 1,
+    "limit": 10,
+    "offset": 0
   }
 }
 ```
 
-#### GET /docs
+#### GET /api/users/:id
 
-API documentation (Swagger UI).
+Get a specific user by ID (admin only).
 
-**Response:** HTML page with interactive API documentation.
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@example.com",
+      "name": "Administrator",
+      "role": "admin",
+      "avatar_url": null,
+      "created_at": "2025-07-30T21:33:40.000Z",
+      "updated_at": "2025-07-30T21:33:40.000Z"
+    }
+  }
+}
+```
+
+#### POST /api/users
+
+Create a new user (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "username": "string (required)",
+  "email": "string (required)",
+  "password": "string (required)",
+  "name": "string (optional)",
+  "role": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 2,
+      "username": "clerk",
+      "email": "clerk@example.com",
+      "name": "City Clerk",
+      "role": "clerk",
+      "avatar_url": null,
+      "created_at": "2025-07-30T21:33:40.000Z",
+      "updated_at": "2025-07-30T21:33:40.000Z"
+    },
+    "message": "User created successfully"
+  }
+}
+```
+
+#### PUT /api/users/:id
+
+Update an existing user (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "username": "string (optional)",
+  "email": "string (optional)",
+  "name": "string (optional)",
+  "role": "string (optional)",
+  "password": "string (optional)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 2,
+      "username": "clerk_updated",
+      "email": "clerk@example.com",
+      "name": "Senior City Clerk",
+      "role": "clerk",
+      "avatar_url": null,
+      "created_at": "2025-07-30T21:33:40.000Z",
+      "updated_at": "2025-07-30T21:35:20.000Z"
+    },
+    "message": "User updated successfully"
+  }
+}
+```
+
+#### DELETE /api/users/:id
+
+Delete a user (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "User deleted successfully",
+    "deletedAt": "2025-07-30T21:35:20.000Z"
+  }
+}
+```
+
+### Configuration
+
+#### GET /api/config/roles
+
+Get available user roles (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "roles": [
+      {
+        "key": "admin",
+        "name": "Administrator",
+        "description": "Full system access and user management",
+        "permissions": ["*"],
+        "color": "red",
+        "icon": "shield"
+      },
+      {
+        "key": "council",
+        "name": "Council Member",
+        "description": "Can create, edit, and approve records",
+        "permissions": ["records:*", "workflows:*"],
+        "color": "blue",
+        "icon": "users"
+      },
+      {
+        "key": "clerk",
+        "name": "City Clerk",
+        "description": "Can create and edit records",
+        "permissions": ["records:create", "records:edit", "records:view"],
+        "color": "green",
+        "icon": "file-text"
+      },
+      {
+        "key": "public",
+        "name": "Public",
+        "description": "Can view published records",
+        "permissions": ["records:view"],
+        "color": "gray",
+        "icon": "eye"
+      }
+    ]
+  }
+}
+```
+
+#### GET /api/config/record-types
+
+Get available record types (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "recordTypes": [
+      {
+        "key": "bylaw",
+        "label": "Bylaw",
+        "description": "Municipal bylaws and regulations",
+        "icon": "gavel",
+        "color": "blue"
+      },
+      {
+        "key": "policy",
+        "label": "Policy",
+        "description": "Administrative policies and procedures",
+        "icon": "file-text",
+        "color": "green"
+      },
+      {
+        "key": "resolution",
+        "label": "Resolution",
+        "description": "Council resolutions and decisions",
+        "icon": "check-circle",
+        "color": "purple"
+      }
+    ]
+  }
+}
+```
+
+#### GET /api/config/record-statuses
+
+Get available record statuses (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "statuses": [
+      {
+        "key": "draft",
+        "label": "Draft",
+        "description": "Initial draft stage",
+        "color": "gray",
+        "icon": "edit"
+      },
+      {
+        "key": "proposed",
+        "label": "Proposed",
+        "description": "Under review and discussion",
+        "color": "yellow",
+        "icon": "clock"
+      },
+      {
+        "key": "approved",
+        "label": "Approved",
+        "description": "Officially approved and active",
+        "color": "green",
+        "icon": "check-circle"
+      },
+      {
+        "key": "archived",
+        "label": "Archived",
+        "description": "No longer active",
+        "color": "gray",
+        "icon": "archive"
+      }
+    ]
+  }
+}
+```
+
+### Status
+
+#### GET /api/status
+
+Get system status (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2025-07-30T21:35:20.000Z",
+    "version": "1.0.0",
+    "uptime": 3600,
+    "services": {
+      "database": "connected",
+      "git": "connected",
+      "indexing": "active"
+    }
+  }
+}
+```
+
+#### GET /api/status/git
+
+Get Git repository status (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "currentBranch": "main",
+    "lastCommit": {
+      "hash": "abc123...",
+      "message": "Update user management interface",
+      "author": "admin",
+      "date": "2025-07-30T21:35:20.000Z"
+    },
+    "status": "clean",
+    "ahead": 0,
+    "behind": 0
+  }
+}
+```
+
+#### GET /api/status/records
+
+Get records statistics (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 15,
+    "byType": {
+      "bylaw": 8,
+      "policy": 4,
+      "resolution": 3
+    },
+    "byStatus": {
+      "draft": 5,
+      "proposed": 3,
+      "approved": 6,
+      "archived": 1
+    },
+    "lastUpdated": "2025-07-30T21:35:20.000Z"
+  }
+}
+```
 
 ## Error Responses
 
@@ -605,103 +736,55 @@ All endpoints return consistent error responses:
 
 ```json
 {
+  "success": false,
   "error": {
-    "message": "Error description",
-    "code": "ERROR_CODE",
-    "details": "Additional error details"
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid input data",
+    "details": {
+      "field": "username",
+      "issue": "Username is required"
+    }
   }
 }
 ```
 
-### Common HTTP Status Codes
+### Common Error Codes
 
-- `200 OK`: Successful request
-- `201 Created`: Resource created successfully
-- `400 Bad Request`: Invalid request data
-- `401 Unauthorized`: Authentication required or failed
-- `404 Not Found`: Resource not found
-- `500 Internal Server Error`: Server error
+- `AUTHENTICATION_ERROR`: Invalid or missing authentication
+- `AUTHORIZATION_ERROR`: Insufficient permissions
+- `VALIDATION_ERROR`: Invalid input data
+- `NOT_FOUND`: Resource not found
+- `INTERNAL_ERROR`: Server error
 
 ## Rate Limiting
 
-Currently, no rate limiting is implemented. This may be added in future
-versions.
+API requests are rate-limited to prevent abuse:
 
-## CORS
+- **Public endpoints**: 100 requests per minute
+- **Protected endpoints**: 1000 requests per minute per user
+- **Authentication endpoints**: 10 requests per minute per IP
 
-CORS is enabled with the following configuration:
+## Versioning
 
-- Origin: Configurable via `CORS_ORIGIN` environment variable (defaults to `*`)
-- Credentials: `true`
-- Methods: All standard HTTP methods
-- Headers: Standard headers including `Authorization`
+The API version is included in the response headers:
 
-## Development
-
-### Running the API Server
-
-```bash
-# From project root
-pnpm run dev
-
-# Or directly from API module
-cd modules/api
-pnpm run dev
+```
+X-API-Version: 1.0.0
 ```
 
-### Environment Variables
+## SDKs and Libraries
 
-- `PORT`: Server port (default: 3000)
-- `CORS_ORIGIN`: CORS origin (default: `*`)
-- `CIVIC_DATA_DIR`: Data directory path
-- `NODE_ENV`: Environment (development/production)
+Official SDKs are available for:
 
-### Testing
+- **JavaScript/TypeScript**: `@civicpress/sdk`
+- **Python**: `civicpress-python`
+- **Ruby**: `civicpress-ruby`
 
-```bash
-# Run all tests
-pnpm run test:run
+## Support
 
-# Run API tests only
-cd modules/api && pnpm test
-```
+For API support and questions:
 
-## Examples
-
-### Complete Authentication Flow
-
-```bash
-# 1. Get OAuth token from GitHub
-# 2. Login with token
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"token": "github_oauth_token", "provider": "github"}'
-
-# 3. Use returned token for authenticated requests
-curl -X GET http://localhost:3000/api/records \
-  -H "Authorization: Bearer <jwt_token>"
-```
-
-### Creating a Record
-
-```bash
-curl -X POST http://localhost:3000/api/records \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "New Bylaw",
-    "type": "bylaw",
-    "content": "This is a new bylaw...",
-    "metadata": {
-      "author": "City Council",
-      "version": "1.0.0"
-    }
-  }'
-```
-
-### Searching Records
-
-```bash
-curl -X GET "http://localhost:3000/api/records?type=bylaw&status=active&limit=5" \
-  -H "Authorization: Bearer <token>"
-```
+- **Documentation**: [docs.civicpress.org](https://docs.civicpress.org)
+- **Community**: [community.civicpress.org](https://community.civicpress.org)
+- **Issues**:
+  [github.com/civicpress/civicpress/issues](https://github.com/civicpress/civicpress/issues)

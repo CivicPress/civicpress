@@ -1,29 +1,17 @@
 # 🖥️ CivicPress Spec: `frontend.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive frontend documentation
 - UI patterns
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'ui.md: >=1.0.0'
-  - 'api.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'api.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -59,21 +47,21 @@ records through a modern, web-accessible interface.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Markdown files from `records/` directory |
-| User authentication      | Role and permission data from auth system |
-| Brand configuration      | Logo, colors, and branding from `.civic/branding.yml` |
-| Theme settings           | UI theme and styling configuration |
-| Search queries           | User search requests and filters |
+| Input               | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| Civic records       | Markdown files from `records/` directory              |
+| User authentication | Role and permission data from auth system             |
+| Brand configuration | Logo, colors, and branding from `.civic/branding.yml` |
+| Theme settings      | UI theme and styling configuration                    |
+| Search queries      | User search requests and filters                      |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Rendered pages           | HTML pages with civic content |
-| User interactions        | Form submissions, navigation events |
-| API requests            | Calls to backend services and APIs |
-| Client-side state       | User session and UI state management |
-| Analytics data          | User behavior and interaction metrics |
+| Output            | Description                           |
+| ----------------- | ------------------------------------- |
+| Rendered pages    | HTML pages with civic content         |
+| User interactions | Form submissions, navigation events   |
+| API requests      | Calls to backend services and APIs    |
+| Client-side state | User session and UI state management  |
+| Analytics data    | User behavior and interaction metrics |
 
 ---
 

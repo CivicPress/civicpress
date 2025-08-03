@@ -3,6 +3,7 @@ import { body, param, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
   requireRecordPermission,
+  authMiddleware,
 } from '../middleware/auth';
 import { RecordsService } from '../services/records-service';
 import { Logger } from '@civicpress/core';
@@ -38,59 +39,76 @@ function handleRecordsValidationError(
   });
 }
 
-export function createPublicRecordsRouter(recordsService: RecordsService) {
+export function createRecordsRouter(recordsService: RecordsService) {
   const router = Router();
 
-  // GET /public/records - List all records (public access, no auth required)
+  // GET /api/records - List records (handles both public and authenticated access)
   router.get('/', async (req: any, res: Response) => {
-    logApiRequest(req, { operation: 'list_records_public' });
+    const isAuthenticated = (req as any).user !== undefined;
+    const operation = isAuthenticated
+      ? 'list_records_authenticated'
+      : 'list_records_public';
+
+    logApiRequest(req, { operation });
 
     try {
-      const { type, status, limit, offset } = req.query;
+      const { type, status, limit, cursor } = req.query;
 
-      logger.info('Listing records (public)', {
-        type,
-        status,
-        limit,
-        offset,
-        requestId: (req as any).requestId,
-      });
+      logger.info(
+        `Listing records (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          type,
+          status,
+          limit,
+          cursor: cursor ? '***' : undefined, // Don't log the actual cursor
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
+      );
 
       const result = await recordsService.listRecords({
         type: type as string,
         status: status as string,
-        limit: limit ? parseInt(limit as string) : undefined,
-        offset: offset ? parseInt(offset as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 20,
+        cursor: cursor as string,
       });
 
-      logger.info('Records listed successfully (public)', {
-        totalRecords: result.records?.length || 0,
-        requestId: (req as any).requestId,
-      });
-
-      sendSuccess(result, req, res, { operation: 'list_records_public' });
-    } catch (error) {
-      handleApiError(
-        'list_records_public',
-        error,
-        req,
-        res,
-        'Failed to list records'
+      logger.info(
+        `Records listed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          totalRecords: result.records?.length || 0,
+          hasMore: result.hasMore,
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
       );
+
+      sendSuccess(result, req, res, { operation });
+    } catch (error) {
+      handleApiError(operation, error, req, res, 'Failed to list records');
     }
   });
 
-  // GET /public/records/:id - Get a specific record (public access)
+  // GET /api/records/:id - Get a specific record (handles both public and authenticated access)
   router.get(
     '/:id',
     param('id').isString().notEmpty(),
     async (req: any, res: Response) => {
-      logApiRequest(req, { operation: 'get_record_public' });
+      const isAuthenticated = (req as any).user !== undefined;
+      const operation = isAuthenticated
+        ? 'get_record_authenticated'
+        : 'get_record_public';
+
+      logApiRequest(req, { operation });
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return handleRecordsValidationError(
-          'get_record_public',
+          'get_record',
           errors.array(),
           req,
           res
@@ -99,6 +117,17 @@ export function createPublicRecordsRouter(recordsService: RecordsService) {
 
       try {
         const { id } = req.params;
+
+        logger.info(
+          `Getting record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
 
         const record = await recordsService.getRecord(id);
 
@@ -109,114 +138,136 @@ export function createPublicRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
 
-        sendSuccess(record, req, res, { operation: 'get_record_public' });
-      } catch (error) {
-        handleApiError(
-          'get_record_public',
-          error,
-          req,
-          res,
-          'Failed to retrieve record'
+        logger.info(
+          `Record ${id} retrieved successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            recordType: record.type,
+            recordStatus: record.status,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
         );
+
+        sendSuccess(record, req, res, { operation });
+      } catch (error) {
+        handleApiError(operation, error, req, res, 'Failed to get record');
       }
     }
   );
 
-  return router;
-}
-
-export function createRecordsRouter(recordsService: RecordsService) {
-  const router = Router();
-
-  // GET /api/v1/records - List all records
+  // GET /api/records/:id/raw - Get raw file content for a record (including frontmatter)
   router.get(
-    '/',
-    requireRecordPermission('view'),
-    async (req: AuthenticatedRequest, res: Response) => {
-      logApiRequest(req, { operation: 'list_records' });
+    '/:id/raw',
+    param('id').isString().notEmpty(),
+    async (req: any, res: Response) => {
+      const isAuthenticated = (req as any).user !== undefined;
+      const operation = isAuthenticated
+        ? 'get_raw_record_authenticated'
+        : 'get_raw_record_public';
+
+      logApiRequest(req, { operation });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'get_raw_record',
+          errors.array(),
+          req,
+          res
+        );
+      }
 
       try {
-        const { type, status, limit, offset } = req.query;
+        const { id } = req.params;
 
-        logger.info('Listing records', {
+        logger.info(
+          `Getting raw record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
+        const record = await recordsService.getRawRecord(id);
+
+        if (!record) {
+          const error = new Error('Record not found');
+          (error as any).statusCode = 404;
+          (error as any).code = 'RECORD_NOT_FOUND';
+          throw error;
+        }
+
+        logger.info(
+          `Raw record ${id} retrieved successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            recordType: record.type,
+            recordStatus: record.status,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
+        sendSuccess(record, req, res, { operation });
+      } catch (error) {
+        handleApiError(operation, error, req, res, 'Failed to get raw record');
+      }
+    }
+  );
+
+  // GET /api/records/drafts - Get user's draft records (authenticated only)
+  router.get(
+    '/drafts',
+    requireRecordPermission('view'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'list_drafts' });
+
+      try {
+        const { type, limit, offset } = req.query;
+
+        logger.info('Listing user drafts', {
           type,
-          status,
           limit,
           offset,
           requestId: (req as any).requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
         });
 
+        // For now, return all records with status 'draft'
+        // In the future, this could be filtered by user ownership
         const result = await recordsService.listRecords({
           type: type as string,
-          status: status as string,
+          status: 'draft',
           limit: limit ? parseInt(limit as string) : undefined,
-          offset: offset ? parseInt(offset as string) : undefined,
         });
 
-        logger.info('Records listed successfully', {
+        logger.info('User drafts listed successfully', {
           totalRecords: result.records?.length || 0,
           requestId: (req as any).requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
         });
 
-        sendSuccess(result, req, res, { operation: 'list_records' });
+        sendSuccess(result, req, res, { operation: 'list_drafts' });
       } catch (error) {
-        handleApiError(
-          'list_records',
-          error,
-          req,
-          res,
-          'Failed to list records'
-        );
+        handleApiError('list_drafts', error, req, res, 'Failed to list drafts');
       }
     }
   );
 
-  // GET /api/v1/records/:id - Get a specific record
-  router.get(
-    '/:id',
-    requireRecordPermission('view'),
-    param('id').isString().notEmpty(),
-    async (req: AuthenticatedRequest, res: Response) => {
-      logApiRequest(req, { operation: 'get_record' });
-
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return handleRecordsValidationError(
-          'get_record',
-          errors.array(),
-          req,
-          res
-        );
-      }
-
-      try {
-        const { id } = req.params;
-
-        const record = await recordsService.getRecord(id);
-
-        if (!record) {
-          const error = new Error('Record not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'RECORD_NOT_FOUND';
-          throw error;
-        }
-
-        sendSuccess(record, req, res, { operation: 'get_record' });
-      } catch (error) {
-        handleApiError(
-          'get_record',
-          error,
-          req,
-          res,
-          'Failed to retrieve record'
-        );
-      }
-    }
-  );
-
-  // POST /api/v1/records - Create a new record
+  // POST /api/records - Create a new record (authenticated only)
   router.post(
     '/',
+    authMiddleware(recordsService.getCivicPress()),
     requireRecordPermission('create'),
     body('title').isString().notEmpty(),
     body('type').isString().notEmpty(),
@@ -237,8 +288,49 @@ export function createRecordsRouter(recordsService: RecordsService) {
       }
 
       try {
-        const { title, type, content, role, metadata } = req.body;
-        const userRole = req.user?.role || role || 'unknown';
+        const { title, type, content, metadata } = req.body;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        // Extract username correctly - handle case where user.username might be the full object
+        let username = 'unknown';
+        if (typeof user.username === 'string') {
+          username = user.username;
+        } else if (
+          typeof user.username === 'object' &&
+          user.username !== null
+        ) {
+          // If user.username is an object, try to extract the username from it
+          const usernameObj = user.username as any;
+          if (typeof usernameObj.username === 'string') {
+            username = usernameObj.username;
+          } else if (typeof usernameObj === 'object' && usernameObj !== null) {
+            // Try to find any string property that might be the username
+            for (const [key, value] of Object.entries(usernameObj)) {
+              if (
+                typeof value === 'string' &&
+                (key === 'username' || key === 'name' || key === 'id')
+              ) {
+                username = value;
+                break;
+              }
+            }
+          }
+        }
+
+        // Ensure user object has correct structure
+        const cleanUser = {
+          id: user.id,
+          username: username,
+          role: user.role,
+          email: user.email,
+          name: user.name,
+        };
 
         const record = await recordsService.createRecord(
           {
@@ -247,7 +339,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
             content,
             metadata,
           },
-          userRole
+          cleanUser
         );
 
         sendSuccess(record, req, res, {
@@ -266,9 +358,10 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   );
 
-  // PUT /api/v1/records/:id - Update a record
+  // PUT /api/records/:id - Update a record (authenticated only)
   router.put(
     '/:id',
+    authMiddleware(recordsService.getCivicPress()),
     requireRecordPermission('edit'),
     param('id').isString().notEmpty(),
     body('title').optional().isString(),
@@ -291,9 +384,15 @@ export function createRecordsRouter(recordsService: RecordsService) {
       try {
         const { id } = req.params;
         const updates = req.body;
-        const userRole = req.user?.role || 'unknown';
+        const user = req.user;
 
-        const record = await recordsService.updateRecord(id, updates, userRole);
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        const record = await recordsService.updateRecord(id, updates, user);
 
         if (!record) {
           const error = new Error('Record not found');
@@ -315,9 +414,10 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   );
 
-  // DELETE /api/v1/records/:id - Archive a record
+  // DELETE /api/records/:id - Archive a record (authenticated only)
   router.delete(
     '/:id',
+    authMiddleware(recordsService.getCivicPress()),
     requireRecordPermission('delete'),
     param('id').isString().notEmpty(),
     async (req: AuthenticatedRequest, res: Response) => {
@@ -335,7 +435,13 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       try {
         const { id } = req.params;
-        const userRole = req.user?.role || 'unknown';
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
 
         // First check if record exists
         const existingRecord = await recordsService.getRecord(id);
@@ -346,7 +452,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
 
-        const result = await recordsService.deleteRecord(id, userRole);
+        const result = await recordsService.deleteRecord(id, user);
 
         if (result) {
           sendSuccess(
@@ -374,6 +480,90 @@ export function createRecordsRouter(recordsService: RecordsService) {
           req,
           res,
           'Failed to delete record'
+        );
+      }
+    }
+  );
+
+  // POST /api/records/:id/status - Change record status with workflow validation
+  router.post(
+    '/:id/status',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    body('status').isString().notEmpty(),
+    body('comment').optional().isString(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'change_record_status' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'change_record_status',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const { status, comment } = req.body;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        // First check if record exists
+        const existingRecord = await recordsService.getRecord(id);
+        if (!existingRecord) {
+          const error = new Error('Record not found');
+          (error as any).statusCode = 404;
+          (error as any).code = 'RECORD_NOT_FOUND';
+          throw error;
+        }
+
+        const result = await recordsService.changeRecordStatus(
+          id,
+          status,
+          user,
+          comment
+        );
+
+        if (result.success) {
+          sendSuccess(
+            {
+              message: `Record status changed to ${status}`,
+              record: result.record,
+              previousStatus: existingRecord.status,
+              newStatus: status,
+              changedBy: user.username,
+              changedAt: new Date().toISOString(),
+              comment: comment || null,
+            },
+            req,
+            res,
+            { operation: 'change_record_status' }
+          );
+        } else {
+          const error = new Error(
+            result.error || 'Failed to change record status'
+          );
+          (error as any).statusCode = 400;
+          (error as any).code = 'STATUS_CHANGE_FAILED';
+          (error as any).details = result.error;
+          throw error;
+        }
+      } catch (error) {
+        handleApiError(
+          'change_record_status',
+          error,
+          req,
+          res,
+          'Failed to change record status'
         );
       }
     }

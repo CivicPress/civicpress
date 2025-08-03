@@ -1,30 +1,18 @@
 # 📚 CivicPress Spec: `glossary.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive glossary documentation
 - key terms
-- definitions
-fixes:
+- definitions fixes:
 - glossary documentation
 - term definitions
-- validation patterns
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: null
-  dependencies: []
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- validation patterns migration_guide: null compatibility: min_civicpress: 1.0.0
+  max_civicpress: null dependencies: [] authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

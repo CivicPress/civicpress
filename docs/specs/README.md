@@ -1,7 +1,9 @@
 # 🗂️ `.civic/` Directory
 
-This folder contains all CivicPress internal configuration, specifications, and governance scaffolding.  
-It is **not part of the user-facing platform**, but rather the internal **blueprint for maintainers and contributors**.
+This folder contains all CivicPress internal configuration, specifications, and
+governance scaffolding.  
+It is **not part of the user-facing platform**, but rather the internal
+**blueprint for maintainers and contributors**.
 
 ## 📁 Folder Structure
 
@@ -18,7 +20,8 @@ It is **not part of the user-facing platform**, but rather the internal **bluepr
 
 - Provide a shared technical vision for the CivicPress platform
 - Enable safe and transparent evolution of the project
-- Act as onboarding documentation for contributors, collaborators, and future maintainers
+- Act as onboarding documentation for contributors, collaborators, and future
+  maintainers
 
 ## ✍️ How to Contribute Specs
 
@@ -36,7 +39,8 @@ It is **not part of the user-facing platform**, but rather the internal **bluepr
 
 ## 🔒 Security & Trust
 
-All customization logic (like workflows) must follow `.civic/workflow.policy.yml`  
+All customization logic (like workflows) must follow
+`.civic/workflow.policy.yml`  
 This ensures only trusted logic is executed and all events are auditable.
 
 ---

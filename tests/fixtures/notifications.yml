@@ -1,0 +1,73 @@
+channels:
+  email:
+    enabled: true
+    provider: 'nodemailer'
+    
+    # SendGrid Configuration (disabled for tests)
+    sendgrid:
+      apiKey: ''
+      from: 'test@example.com'
+    
+    # AWS SES Configuration (disabled for tests)
+    ses:
+      accessKeyId: ''
+      secretAccessKey: ''
+      region: 'us-east-1'
+      from: 'test@example.com'
+    
+    # SMTP Configuration (Gmail, Outlook, etc.)
+    smtp:
+      host: 'smtp.test.com'
+      port: 587
+      secure: false
+      auth:
+        user: 'test@example.com'
+        pass: 'password'
+      from: 'test@example.com'
+    
+    # Nodemailer Configuration (Generic SMTP) - used for tests
+    nodemailer:
+      host: 'smtp.test.com'
+      port: 587
+      secure: false
+      auth:
+        user: 'test@example.com'
+        pass: 'password'
+      from: 'test@example.com'
+    
+    replyTo: null
+  sms:
+    enabled: false
+    provider: 'twilio'
+    credentials: {}
+  slack:
+    enabled: false
+    webhook_url: ''
+    channel: null
+    username: null
+auth_templates:
+  email_verification:
+    subject: 'Verify your CivicPress account'
+    body:
+      'Please click the following link to verify your account:
+      {{verification_url}}'
+  password_reset:
+    subject: 'Reset your CivicPress password'
+    body: 'Click here to reset your password: {{reset_url}}'
+  two_factor_auth:
+    subject: 'Your CivicPress verification code'
+    body: 'Your verification code is: {{code}}'
+  security_alert:
+    subject: 'Security alert for your account'
+    body: 'Suspicious activity detected: {{details}}'
+rules:
+  rate_limits:
+    email_per_hour: 100
+    sms_per_hour: 50
+    slack_per_hour: 200
+  retry_attempts: 3
+  retry_delay: 5000
+security:
+  encrypt_sensitive_data: true
+  audit_all_notifications: true
+  filter_pii: true

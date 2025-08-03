@@ -1,300 +1,292 @@
-# Agent Memory: Lessons Learned
-
-## Test Infrastructure Lessons
-
-### Test Setup Patterns
-
-- **Centralized Fixtures:** Use shared test fixtures for consistent setup across
-  all tests
-- **Database Isolation:** Each test should use isolated database with unique
-  temp directories
-- **Git Repository Setup:** Initialize Git repos in test directories for history
-  API tests
-- **Role Configuration:** Create standardized role configs for all test
-  scenarios
-- **Authentication Bypass:** Use BYPASS_AUTH=true for test environments
+# Lessons Learned
 
-### Test Execution Patterns
+## Record Management Interface Architecture
 
-- **Parallel Execution:** Tests should run in parallel without interference
-- **Proper Cleanup:** Always clean up test artifacts and temporary files
-- **Isolation:** Each test should be completely independent
-- **Mocking Strategy:** Use real implementations over mocks when possible
+### Component Reusability Patterns 🧩
 
-### API Testing Patterns
+- **DRY Principle**: Created `RecordSearch.vue` and `RecordList.vue` for reuse
+  across pages
+- **Props Interface**: Well-defined props with TypeScript interfaces for type
+  safety
+- **Event Communication**: Used emits for parent-child communication (`@search`,
+  `@filter-change`)
+- **Conditional Rendering**: `v-if="!disableTypeFilter"` for context-aware UI
+  elements
 
-- **Response Structure:** All API responses should follow
-  `{ success: true/false, data: ... }` format
-- **Status Codes:** Use consistent HTTP status codes across all endpoints
-- **Error Handling:** Include proper error messages and details
-- **Authentication:** Test both authenticated and unauthenticated scenarios
+### API Integration Best Practices 📡
 
-### CLI Testing Patterns
+- **Smart Query Handling**: Empty searches use `loadInitialRecords`, non-empty
+  use `searchRecords`
+- **Validation**: Added store-level validation to prevent empty queries from
+  reaching API
+- **Error Prevention**: Check for empty queries before calling search endpoints
+- **Fallback Logic**: Graceful degradation when API calls fail
+
+### URL State Management 🔗
+
+- **Query Parameters**: Maintain search and filter state in URL for bookmarking
+- **State Restoration**: `restoreFromURL()` function to rebuild state from URL
+- **Navigation**: Use `navigateTo({ query }, { replace: true })` for clean URLs
+- **Breadcrumb Integration**: Dynamic breadcrumbs that reflect current state
+
+### Type-Specific Page Patterns 🎯
+
+- **Pre-Selection**: Automatically filter by record type on `/records/[type]`
+  pages
+- **Disabled Filters**: Hide type filter when type is pre-selected for cleaner
+  UX
+- **Context Awareness**: Show "Showing all bylaw records" instead of generic
+  text
+- **Navigation Hierarchy**: Proper breadcrumb structure (Records → Type →
+  Record)
+
+### Performance Optimizations ⚡
 
-- **JSON Output:** All CLI commands should support --json flag for
-  machine-readable output
-- **Silent Mode:** Implement --silent flag to suppress output
-- **Exit Codes:** Use proper exit codes (0 for success, non-zero for errors)
-- **Error Messages:** Provide clear, actionable error messages
-
-### CLI Authentication Testing (Latest Lessons)
-
-- **Mixed Output Handling:** CLI commands may output initialization messages
-  before JSON
-- **JSON Extraction:** Implement robust JSON extraction from mixed CLI output
-- **Simulated Authentication:** Use simulated auth for testing instead of
-  password auth
-- **Brace Counting:** Use brace counting to find complete JSON objects in output
-- **Error Recovery:** Handle JSON parsing failures gracefully with clear error
-  messages
-
-## Debugging Lessons
-
-### Common Issues and Solutions
-
-1. **Database Constraint Errors:** Ensure unique constraints are respected in
-   test data
-2. **Permission System:** Role configurations must match API permission strings
-   exactly
-3. **Git History:** Tests requiring Git history need proper repo initialization
-4. **Response Structure:** API tests must expect correct response format
-5. **Authentication:** Mock user setup must work with real permission system
-6. **JSON Parsing:** CLI commands with mixed output require proper JSON
-   extraction
-7. **Test Authentication:** Use simulated auth for tests, password auth for real
-   usage
-
-### Test Environment Setup
-
-- **NODE_ENV=test:** Essential for test-specific behavior
-- **BYPASS_AUTH=true:** Required for authentication bypass in tests
-- **Temporary Directories:** Use unique temp dirs for each test
-- **Database Paths:** Ensure consistent database paths between setup and
-  execution
-
-### Build and Rebuild Process
-
-- **Clean Rebuild:** Always clean and rebuild after major changes
-- **Dependency Management:** Fix peer dependency issues before testing
-- **Artifact Cleanup:** Remove temporary files and build artifacts
-- **Package Installation:** Use pnpm for consistent dependency management
-
-## Code Quality Lessons
-
-### Error Handling
-
-- **Graceful Degradation:** Handle errors without crashing
-- **User-Friendly Messages:** Provide clear error messages
-- **Logging:** Use appropriate log levels for debugging
-- **Validation:** Validate inputs and provide helpful feedback
-
-### Performance Optimization
-
-- **Test Isolation:** Prevent test interference for faster execution
-- **Resource Cleanup:** Proper cleanup prevents resource leaks
-- **Parallel Execution:** Design tests to run efficiently in parallel
-- **Setup Optimization:** Minimize setup time with shared fixtures
-
-### Maintainability
-
-- **Consistent Patterns:** Use consistent patterns across all modules
-- **Documentation:** Document test setup and expected behavior
-- **Modular Design:** Keep tests modular and focused
-- **Version Control:** Commit test fixes with clear commit messages
-
-## Project-Specific Lessons
-
-### CivicPress Architecture
-
-- **Core Module:** Handles business logic and data management
-- **API Module:** Provides RESTful endpoints with authentication
-- **CLI Module:** Command-line interface with JSON output support
-- **Test Infrastructure:** Centralized setup with shared fixtures
-
-### Authentication System
-
-- **Role-Based Access:** Uses role configurations for permission checking
-- **Simulated Authentication:** Supports simulated auth for testing
-- **Password Authentication:** Traditional username/password auth for real usage
-- **Token Management:** Handles JWT tokens for API authentication
-- **Permission Strings:** Must match exactly between roles and API endpoints
-
-### Database Management
-
-- **SQLite:** Primary database with in-memory option for tests
-- **Record Management:** CRUD operations with proper error handling
-- **Schema Management:** Automatic schema creation and migration
-- **Constraint Handling:** Proper handling of unique constraints
-
-### Git Integration
-
-- **History Tracking:** Tracks changes to records over time
-- **Commit Management:** Handles commits and metadata
-- **Repository Setup:** Proper initialization for history API
-- **Conflict Resolution:** Multiple strategies for handling conflicts
-
-## Best Practices Established
-
-### Test Organization
-
-- **File Structure:** Organize tests by module (core, api, cli)
-- **Naming Conventions:** Use descriptive test names
-- **Setup Functions:** Centralize common setup logic
-- **Cleanup Functions:** Ensure proper cleanup after tests
-
-### Code Standards
-
-- **TypeScript:** Use strict typing throughout
-- **Error Handling:** Comprehensive error handling
-- **Logging:** Appropriate logging levels
-- **Documentation:** Clear inline documentation
-
-### Development Workflow
-
-- **Test-First:** Write tests before implementing features
-- **Continuous Testing:** Run tests frequently during development
-- **Debugging Tools:** Use proper debugging tools and techniques
-- **Version Control:** Commit frequently with clear messages
-
-## Configuration Management Lessons
-
-### Configuration Architecture
-
-- **Separation of Concerns:** Keep system config (`.civicrc`) separate from
-  organization config (`org-config.yml`)
-- **Default Centralization:** Centralize all defaults in `core/src/defaults/`
-  for consistency
-- **Template Standardization:** Create standardized templates for all record
-  types
-- **Configuration Evolution:** Design configs to evolve independently
-
-### Initialization Workflow
-
-- **Automatic Indexing:** Always index and sync records after initialization for
-  immediate availability
-- **Git Integration:** Initialize Git repository and create initial commit
-  during setup
-- **Interactive Flexibility:** Support both interactive and non-interactive
-  modes
-- **Error Handling:** Gracefully handle indexing and sync failures
-
-### CLI Command Design
-
-- **Info Commands:** Provide easy access to configuration details
-- **Debug Commands:** Include development and troubleshooting tools
-- **Cleanup Commands:** Support testing and development scenarios
-- **Consistent Output:** Maintain JSON and human-readable output formats
-
-## Platform Vision and Specifications (Latest Lessons)
-
-### Comprehensive Platform Understanding
-
-- **Complete Civic Technology Platform:** CivicPress is designed as a
-  comprehensive platform, not just a simple record management system
-- **50+ Detailed Specifications:** Recovered specifications provide complete
-  technical blueprints for all planned features
-- **Core Principles:** Transparency by default, trust through traceability,
-  open-source auditable, equity and accessibility
-- **Modular Architecture:** Plugin system, federation, enterprise features,
-  civic modules
-- **Enterprise-Grade Security:** Cryptographic verification, audit logs,
-  compliance, multi-tenant support
-
-### Development with Specifications
-
-- **Reference Specifications:** Always consult `docs/specs/` for implementation
-  guidance
-- **Follow Core Principles:** Ensure all development aligns with transparency,
-  trust, and accessibility principles
-- **Consider Platform Vision:** Think beyond current features to the complete
-  civic technology platform
-- **Security First:** Implement features with security and compliance in mind
-  from the start
-- **Scalability Planning:** Design features to support federation and
-  multi-tenant deployments
-
-### Specification-Driven Development
-
-- **Technical Blueprints:** Use specifications as implementation guides
-- **Quality Standards:** Follow testing and quality standards from
-  specifications
-- **Security Requirements:** Implement security features based on specification
-  requirements
-- **Compliance Considerations:** Ensure features meet civic and legal
-  requirements
-- **Future-Proofing:** Design features to support advanced platform capabilities
-
-### Platform Architecture Awareness
-
-- **Current Foundation:** Solid CLI, API, and database foundation with
-  comprehensive testing
-- **Planned Features:** Plugin system, workflow engine, civic modules,
-  federation
-- **Enterprise Features:** Multi-tenant support, advanced security, audit trails
-- **Civic Modules:** Legal register, voting systems, feedback systems, audit
-  trails
-- **Frontend Evolution:** Migration from Astro to Nuxt PWA with advanced
-  features
-
-## Recent Test Stabilization Lessons
-
-### JSON Parsing Challenges
-
-- **Mixed Output:** CLI commands often output initialization messages before
-  JSON
-- **Brace Counting:** Use brace counting algorithm to find complete JSON objects
-- **Robust Extraction:** Implement fallback mechanisms for JSON extraction
-- **Error Handling:** Provide clear error messages when JSON parsing fails
-
-### Authentication Testing Strategy
-
-- **Simulated vs Password Auth:** Use simulated auth for tests, password auth
-  for real usage
-- **Test Isolation:** Each test should create its own authentication context
-- **Token Management:** Properly manage and pass tokens between test steps
-- **Permission Testing:** Test both positive and negative permission scenarios
-
-### Test Suite Health
-
-- **Comprehensive Coverage:** 391 tests provide confidence in system stability
-- **Zero Failures:** All tests passing indicates system health
-- **Parallel Execution:** Tests run efficiently without interference
-- **Maintenance:** Regular test maintenance prevents technical debt
+- **Virtual Scrolling**: For datasets > 50 records to maintain performance
+- **Skeleton Loading**: Better perceived performance than spinners
+- **Debounced Search**: 300ms delay to prevent excessive API calls
+- **Lazy Loading**: Load more records on demand with cursor-based pagination
+
+### UX/UI Consistency Standards 🎨
+
+- **UDashboardPanel Pattern**: Consistent header and body structure across pages
+- **Skeleton Components**: Reusable skeleton components for loading states
+- **Toast Notifications**: API feedback for user actions
+- **Breadcrumb Navigation**: 3-level hierarchy for proper navigation context
+
+## Raw Record View Implementation
+
+### File System vs Database Content 📄
+
+- **Raw Content Requirement**: Users need complete markdown files including YAML
+  frontmatter
+- **API Endpoint Design**: Created `/api/records/:id/raw` for raw file content
+- **File System Access**: Use `fs.readFileSync()` to read complete files from
+  disk
+- **Fallback Strategy**: Return database content if file read fails
+- **Path Construction**: Proper path joining for cross-platform compatibility
+
+### Clipboard API Best Practices 📋
+
+- **HTTPS Requirement**: Modern clipboard API requires secure context
+- **Production-First**: Design for production (HTTPS) rather than development
+  (HTTP)
+- **User Experience**: Clear error messages when clipboard operations fail
+- **Manual Fallback**: Guide users to manual copy (Ctrl+C / Cmd+C) when needed
+- **Clean Implementation**: Avoid hacky workarounds, use standard APIs
+
+### Navigation Integration 🧭
+
+- **UNavigationMenu Usage**: Proper implementation with computed items array
+- **Button Placement**: Strategic placement of "View Raw" button in record view
+- **Access Control**: Allow all users (including guests) to view raw content
+- **Consistent UX**: Follow existing UI patterns for navigation elements
+
+### Auto-Indexing Optimization 🔄
+
+- **Startup Performance**: Made auto-indexing optional to prevent Git lock
+  conflicts
+- **Environment Control**: Use `ENABLE_AUTO_INDEXING=true` for development
+- **Error Prevention**: Avoid `.git/index.lock` conflicts during concurrent
+  operations
+- **CLI Alternative**: Separate `civic auto-index` command for manual indexing
+
+## Common Issues & Solutions
+
+### API Error Prevention 🛡️
+
+- **Empty Query Errors**: Validate queries before sending to API
+- **400 Bad Request**: Check for required parameters before API calls
+- **Fallback Strategy**: Use `loadInitialRecords` when search fails
+
+## Logo & Branding Implementation
+
+### Configurable Logo System 🎨
+
+- **Organization Config**: Use `.system-data/.civic/org-config.yml` for branding
+- **API Static Serving**: Serve brand assets via `/brand-assets` endpoint
+- **Path Resolution**: Convert relative paths to API endpoints
+  (`brand-assets/logo.svg` → `/brand-assets/logo.svg`)
+- **Fallback Strategy**: Default to `/logo.svg` if config logo not available
+- **Theme Compatibility**: Use `dark:invert` CSS for automatic light/dark theme
+  switching
+
+### Logo Design Best Practices 🖼️
+
+- **Transparent Background**: Remove colored backgrounds for better UI
+  integration
+- **Monochrome Design**: Use black geometric elements that invert to white in
+  dark theme
+- **Scalable Sizing**: Multiple size options (`sm`, `md`, `lg`, `xl`, `2xl`) for
+  different contexts
+- **Consistent Branding**: Always show "CivicPress" text regardless of
+  organization config
+- **SVG Format**: Vector graphics for crisp display at any size
+
+### Component Architecture 🧩
+
+- **Smart Logo Component**: Fetches organization config via `/info` API
+- **Theme Awareness**: Automatic dark/light theme adaptation
+- **Responsive Sizing**: Context-aware sizing (sidebar vs home page)
+- **Organization Name**: Configurable organization name for other UI elements
+- **Error Handling**: Graceful fallbacks when API calls fail
+
+### Home Page Branding 🏠
+
+- **Prominent Logo**: Use `2xl` size (96px) for home page hero section
+- **Centered Layout**: Proper spacing and centering for maximum impact
+- **Consistent Title**: Always show "CivicPress" as brand name
+- **Organization Info**: Show organization details in separate section
+- **Responsive Design**: Logo scales appropriately on different screen sizes
+
+### Virtual Scrolling Issues 🔄
+
+- **Library Compatibility**: `useVirtualList` from `@vueuse/core` may not work
+  with all data structures
+- **Reactive Data**: Virtual lists need proper reactive data binding
+- **Alternative Solutions**: Use pagination when virtual scrolling fails
+- **Performance**: 50 records per page provides good balance of performance and
+  UX
+- **Scroll-to-Top**: Implement smooth scrolling to breadcrumbs for better
+  navigation
+
+### Username-Based Routing Security 🔐
+
+- **Security Improvement**: Use usernames instead of numeric IDs in URLs
+- **API Compatibility**: Support both username and ID lookups in backend
+- **Fallback Logic**: Try username first, then fall back to ID if numeric
+- **URL Structure**: `/settings/users/username/` instead of
+  `/settings/users/123/`
+- **Frontend Integration**: Update navigation functions to use username-based
+  paths
+
+### Home Page UX Improvements 🏠
+
+- **Role-Based Cards**: Show different cards based on user role (admin, user,
+  guest)
+- **Quick Actions**: Browse Records, Create Record, Sign In, Settings (admin),
+  Profile (user)
+- **Grid Layout**: Responsive grid with `xl:grid-cols-4` for large screens
+- **Clean Design**: Remove empty sections (System Overview) for better focus
+- **Public Records**: Show recent records to all users (including
+  non-authenticated) for transparency
+
+### Responsive Header Actions 🎯
+
+- **Unified Component**: HeaderActions component for consistent responsive
+  behavior
+- **Desktop**: Side-by-side buttons for larger screens
+- **Mobile**: Vertical 3-dot dropdown menu for smaller screens
+- **Flexible Actions**: Support for navigation, functions, conditional display,
+  and styling
+- **Permission-Aware**: Conditional actions based on user roles and permissions
+- **Type Safety**: Full TypeScript support with proper interfaces
+
+### Security & Access Control 🔐
+
+- **Admin-Only Pages**: Settings page restricted to admin users with automatic
+  redirect
+- **Role-Based UI**: Different actions and content based on user permissions
+- **Graceful Handling**: Clear error messages and smooth redirects for
+  unauthorized access
+- **Client-Side Protection**: Immediate feedback and prevention of unauthorized
+  access
+- **Error Boundaries**: Graceful error handling with user-friendly messages
+
+### Component Communication 🔄
+
+- **Event Emits**: Use typed emits for parent-child communication
+- **Props Validation**: TypeScript interfaces for prop validation
+- **Reactive Updates**: Watch for prop changes and emit events accordingly
+- **State Synchronization**: Keep parent and child state in sync
+
+### URL State Management 🔧
+
+- **Query Parameter Handling**: Proper encoding/decoding of URL parameters
+- **State Restoration**: Rebuild component state from URL on page load
+- **Navigation Updates**: Update URL when filters change
+- **Browser History**: Preserve navigation history with proper state management
+
+### Type-Specific Page UX 🎯
+
+- **Filter Disabling**: Hide irrelevant filters when type is pre-selected
+- **Context Labels**: Show appropriate labels based on current context
+- **Navigation Flow**: Clear breadcrumb hierarchy for user orientation
+- **State Persistence**: Maintain filter state across navigation
+
+### Vue Template Debugging 🔧
+
+- **v-if/v-else-if/v-else Chain**: Ensure proper conditional rendering structure
+- **Component Props**: Pass computed properties correctly to components
+- **Missing Elements**: Check for proper opening/closing tags
+- **Script Variables**: Define all variables and functions used in template
+
+### Git Operations & Concurrency 🔄
+
+- **Lock File Conflicts**: `.git/index.lock` errors during concurrent operations
+- **Auto-Indexing Timing**: Avoid Git operations during API startup
+- **Environment Variables**: Use flags to control optional startup processes
+- **Error Handling**: Graceful fallback when Git operations fail
+
+## Performance Considerations
+
+### Virtual Scrolling Implementation 📊
+
+- **Threshold**: Enable virtual scrolling for lists > 50 items
+- **Item Height**: Fixed height (120px) for consistent rendering
+- **Performance Indicator**: Show when virtual scrolling is active
+- **Memory Management**: Only render visible items to reduce DOM size
+
+### Skeleton Loading Strategy 💀
+
+- **Immediate Display**: Show skeletons immediately when loading starts
+- **Consistent Patterns**: Use same skeleton structure as actual content
+- **Loading States**: Different skeletons for different content types
+- **API Delay Testing**: Configurable delays for testing loading states
+
+### Search Optimization 🔍
+
+- **Debouncing**: 300ms delay to prevent excessive API calls
+- **Query Validation**: Check for empty queries before API calls
+- **Fallback Logic**: Use appropriate endpoints based on query content
+- **Caching**: Leverage existing data when possible
+
+## Security Best Practices
+
+### Input Validation 🛡️
+
+- **Client-Side**: Validate inputs before sending to API
+- **Server-Side**: API validation for all endpoints
+- **Type Safety**: TypeScript interfaces for all data structures
+- **Error Handling**: Graceful error handling without exposing internals
+
+### Authentication & Authorization 🔐
+
+- **Role-Based Access**: Different permissions for different user roles
+- **Public vs Protected**: Clear distinction between public and protected
+  endpoints
+- **Token Management**: Proper JWT token handling and validation
+- **Session Security**: Secure session management and timeout handling
 
 ## Future Considerations
 
-### Scalability
+### Scalability Planning 📈
 
-- **Performance Testing:** Add performance benchmarks
-- **Load Testing:** Test with realistic data volumes
-- **Integration Testing:** Test with external services
-- **Monitoring:** Add comprehensive monitoring and alerting
+- **Component Architecture**: Reusable components for easy scaling
+- **API Design**: RESTful endpoints with proper pagination
+- **Performance Monitoring**: Track loading times and user experience
+- **Caching Strategy**: Implement caching for frequently accessed data
 
-### Quality Assurance
+### Maintainability Standards 🛠️
 
-- **Code Coverage:** Maintain high test coverage
-- **Static Analysis:** Use linting and type checking
-- **Security Testing:** Add security-focused tests
-- **Accessibility Testing:** Test for accessibility compliance
+- **Code Organization**: Clear separation of concerns
+- **Documentation**: Comprehensive documentation for all components
+- **Testing Strategy**: Unit tests for components and utilities
+- **Error Handling**: Consistent error handling patterns
 
-### Maintenance
+### User Experience Evolution 🚀
 
-- **Regular Updates:** Keep dependencies updated
-- **Test Maintenance:** Regularly review and update tests
-- **Documentation Updates:** Keep documentation current
-- **Performance Monitoring:** Monitor test performance over time
-
-### Platform Evolution
-
-- **Specification Alignment:** Ensure all development aligns with platform
-  specifications
-- **Feature Planning:** Plan features based on comprehensive platform vision
-- **Security Implementation:** Implement security features from the start
-- **Scalability Design:** Design for federation and multi-tenant support
-- **Civic Focus:** Maintain focus on civic technology and governance needs
-
----
-
-**Last Updated:** Current  
-**Status:** ✅ ACTIVE LEARNING  
-**Confidence:** HIGH
+- **Feedback Loops**: User feedback for continuous improvement
+- **Accessibility**: WCAG compliance for inclusive design
+- **Mobile Optimization**: Responsive design for all screen sizes
+- **Performance Monitoring**: Track and optimize user experience metrics

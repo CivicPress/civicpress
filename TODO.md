@@ -17,6 +17,16 @@
 
 ### **Immediate Tasks (Next 1-2 weeks)**
 
+#### **🐛 UI Pagination Bug Fix**
+
+- [ ] **Fix client-side pagination in UI**
+      (`modules/ui/app/pages/records/index.vue`)
+  - **Issue**: Pagination and "records per page" not working correctly
+  - **Problem**: Mixing client-side and server-side pagination logic
+  - **Impact**: Users can't navigate pages or change page size properly
+  - **Priority**: High - affects core UI functionality
+  - **Status**: Server-side pagination works, client-side needs fixing
+
 #### **Diff API Implementation**
 
 - [ ] **Design Diff API endpoints**

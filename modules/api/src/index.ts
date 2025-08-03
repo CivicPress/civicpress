@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { CivicPress, Logger, CentralConfigManager } from '@civicpress/core';
 
 const logger = new Logger();
@@ -7,10 +8,7 @@ const logger = new Logger();
 // Import routes
 import authRouter from './routes/auth';
 import { healthRouter } from './routes/health';
-import {
-  createRecordsRouter,
-  createPublicRecordsRouter,
-} from './routes/records';
+import { createRecordsRouter } from './routes/records';
 import { RecordsService } from './services/records-service';
 import { searchRouter } from './routes/search';
 import { exportRouter } from './routes/export';
@@ -24,24 +22,31 @@ import { createStatusRouter } from './routes/status';
 import docsRouter from './routes/docs';
 import { createValidationRouter } from './routes/validation';
 import { createDiffRouter } from './routes/diff';
-import usersRouter from './routes/users';
+import {
+  router as usersRouter,
+  registrationRouter,
+  authenticationRouter,
+} from './routes/users';
 import infoRouter from './routes/info';
+import configRouter from './routes/config';
 
 // Import middleware
 import { errorHandler, requestIdMiddleware } from './middleware/error-handler';
 import { notFoundHandler } from './middleware/not-found';
-import { authMiddleware } from './middleware/auth';
 import {
   apiLoggingMiddleware,
   authLoggingMiddleware,
   performanceMonitoringMiddleware,
   requestContextMiddleware,
 } from './middleware/logging';
+import { authMiddleware } from './middleware/auth';
+import { delayMiddleware } from './middleware/delay';
 
 export class CivicPressAPI {
   private app: express.Application;
   private civicPress: CivicPress | null = null;
   private port: number;
+  private dataDir: string = '';
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -57,12 +62,6 @@ export class CivicPressAPI {
         next: express.NextFunction
       ) => {
         if (err instanceof SyntaxError && 'body' in err) {
-          // DEBUG: Log when JSON parse error is caught
-          // eslint-disable-next-line no-console
-          console.error(
-            '[DEBUG] JSON parse error middleware triggered:',
-            err.message
-          );
           (err as any).statusCode = 400;
           (err as any).message = 'Malformed JSON';
           return errorHandler(err, req, res, next);
@@ -93,6 +92,9 @@ export class CivicPressAPI {
     this.app.use(performanceMonitoringMiddleware);
     this.app.use(apiLoggingMiddleware);
     this.app.use(authLoggingMiddleware);
+
+    // Add delay middleware for testing loading states (development only)
+    this.app.use(delayMiddleware(2000));
   }
 
   async initialize(dataDir: string): Promise<void> {
@@ -122,21 +124,28 @@ export class CivicPressAPI {
       await this.civicPress.initialize();
       logger.info('CivicPress core initialized');
 
-      // Auto-index records on startup
-      logger.info('Auto-indexing records on startup...');
-      try {
-        const indexingService = this.civicPress.getIndexingService();
-        if (indexingService) {
-          await indexingService.generateIndexes({
-            syncDatabase: true,
-            conflictResolution: 'file-wins',
-          });
-          logger.info('Auto-indexing completed successfully');
-        } else {
-          logger.warn('IndexingService not available for auto-indexing');
+      // Auto-index records on startup (optional)
+      const enableAutoIndexing = process.env.ENABLE_AUTO_INDEXING === 'true';
+      if (enableAutoIndexing) {
+        logger.info('Auto-indexing records on startup...');
+        try {
+          const indexingService = this.civicPress.getIndexingService();
+          if (indexingService) {
+            await indexingService.generateIndexes({
+              syncDatabase: true,
+              conflictResolution: 'file-wins',
+            });
+            logger.info('Auto-indexing completed successfully');
+          } else {
+            logger.warn('IndexingService not available for auto-indexing');
+          }
+        } catch (error) {
+          logger.warn('Auto-indexing failed, continuing without sync:', error);
         }
-      } catch (error) {
-        logger.warn('Auto-indexing failed, continuing without sync:', error);
+      } else {
+        logger.info(
+          'Auto-indexing disabled on startup (use ENABLE_AUTO_INDEXING=true to enable)'
+        );
       }
 
       // Setup routes after CivicPress is initialized
@@ -197,16 +206,6 @@ export class CivicPressAPI {
     // Info endpoint (no auth required)
     this.app.use('/info', infoRouter);
 
-    // Public records endpoint (no auth required)
-    this.app.use(
-      '/public/records',
-      (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
-        next();
-      },
-      createPublicRecordsRouter(recordsService)
-    );
-
     // Auth routes (no auth required) - these need CivicPress instance
     this.app.use(
       '/auth',
@@ -217,26 +216,76 @@ export class CivicPressAPI {
       authRouter
     );
 
-    // Protected routes (require authentication)
-    this.app.use('/api', authMiddleware(this.civicPress), (req, res, next) => {
+    // Public user registration endpoint (no auth required) - must come before general API middleware
+    this.app.use(
+      '/api/users/register',
+      (req, res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      registrationRouter
+    );
+
+    // Public authentication endpoint (no auth required) - must come before general API middleware
+    this.app.use(
+      '/api/users/auth',
+      (req, res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      authenticationRouter
+    );
+
+    // Public API routes (no authentication required)
+    this.app.use('/api', (req, res, next) => {
       // Add CivicPress instance to request for route handlers
       (req as any).civicPress = this.civicPress;
       next();
     });
 
+    // Public routes that should be accessible to guests
     this.app.use('/api/records', createRecordsRouter(recordsService));
     this.app.use('/api/search', searchRouter);
-    this.app.use('/api/export', exportRouter);
-    this.app.use('/api/import', importRouter);
-    this.app.use('/api/hooks', hooksRouter);
-    this.app.use('/api/templates', templatesRouter);
-    this.app.use('/api/workflows', workflowsRouter);
-    this.app.use('/api/indexing', createIndexingRouter());
-    this.app.use('/api/history', createHistoryRouter());
     this.app.use('/api/status', createStatusRouter());
     this.app.use('/api/validation', createValidationRouter());
-    this.app.use('/api/diff', createDiffRouter());
-    this.app.use('/api/users', usersRouter);
+    this.app.use('/api/config', configRouter);
+
+    // Serve brand assets (logos, favicons, etc.)
+    this.app.use(
+      '/brand-assets',
+      express.static(path.join(this.dataDir, '.civic', 'brand-assets'))
+    );
+
+    // Protected routes that require authentication
+    this.app.use('/api/export', authMiddleware(this.civicPress), exportRouter);
+    this.app.use('/api/import', authMiddleware(this.civicPress), importRouter);
+    this.app.use('/api/hooks', authMiddleware(this.civicPress), hooksRouter);
+    this.app.use(
+      '/api/templates',
+      authMiddleware(this.civicPress),
+      templatesRouter
+    );
+    this.app.use(
+      '/api/workflows',
+      authMiddleware(this.civicPress),
+      workflowsRouter
+    );
+    this.app.use(
+      '/api/indexing',
+      authMiddleware(this.civicPress),
+      createIndexingRouter()
+    );
+    this.app.use(
+      '/api/history',
+      authMiddleware(this.civicPress),
+      createHistoryRouter()
+    );
+    this.app.use(
+      '/api/diff',
+      authMiddleware(this.civicPress),
+      createDiffRouter()
+    );
+    this.app.use('/api/users', authMiddleware(this.civicPress), usersRouter);
   }
 
   async start(): Promise<void> {
@@ -303,3 +352,4 @@ if (require.main === module) {
     process.exit(0);
   });
 }
+// Test comment for watch

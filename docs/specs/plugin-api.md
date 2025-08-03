@@ -1,13 +1,9 @@
 # 🧩 CivicPress Spec: `plugin-api.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-15'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-15' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive API interfaces
 - lifecycle hooks
@@ -16,17 +12,12 @@ additions:
 - route API
 - CLI API
 - testing frameworks
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
   - 'plugins.md: >=1.5.0'
   - 'hooks.md: >=1.2.0'
-  - 'testing-framework.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'testing-framework.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -64,21 +55,21 @@ practices.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Plugin code              | JavaScript/TypeScript plugin source files |
-| Plugin manifests         | Plugin configuration and metadata |
-| API requests             | Plugin API calls and method invocations |
-| Hook events              | System events and plugin-triggered hooks |
-| Plugin configuration      | User settings and plugin options |
+| Input                | Description                               |
+| -------------------- | ----------------------------------------- |
+| Plugin code          | JavaScript/TypeScript plugin source files |
+| Plugin manifests     | Plugin configuration and metadata         |
+| API requests         | Plugin API calls and method invocations   |
+| Hook events          | System events and plugin-triggered hooks  |
+| Plugin configuration | User settings and plugin options          |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| API responses            | Data returned from plugin API calls |
-| Hook handlers            | Event handlers registered by plugins |
-| UI components            | Vue components and widgets rendered |
-| CLI commands             | Command-line tools registered by plugins |
-| Route handlers           | HTTP endpoints and middleware |
+| Output         | Description                              |
+| -------------- | ---------------------------------------- |
+| API responses  | Data returned from plugin API calls      |
+| Hook handlers  | Event handlers registered by plugins     |
+| UI components  | Vue components and widgets rendered      |
+| CLI commands   | Command-line tools registered by plugins |
+| Route handlers | HTTP endpoints and middleware            |
 
 ---
 

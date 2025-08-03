@@ -10,6 +10,10 @@ import { IndexingService } from './indexing/indexing-service.js';
 import { Logger } from './utils/logger.js';
 import { initializeRoleManager } from './auth/role-utils.js';
 import { coreOutput } from './utils/core-output.js';
+import {
+  NotificationService,
+  NotificationConfig,
+} from './notifications/index.js';
 
 export interface CivicPressConfig {
   dataDir: string;
@@ -57,6 +61,8 @@ export class CivicPress {
   private recordManager: RecordManager;
   private templateEngine: TemplateEngine;
   private indexingService: IndexingService;
+  private notificationService: NotificationService;
+  private notificationConfig: NotificationConfig;
   private logger: Logger;
 
   constructor(config: CivicPressConfig) {
@@ -115,6 +121,10 @@ export class CivicPress {
       this.templateEngine,
       config.dataDir
     );
+
+    // Initialize notification system
+    this.notificationConfig = new NotificationConfig(config.dataDir);
+    this.notificationService = new NotificationService(this.notificationConfig);
   }
 
   async initialize(): Promise<void> {
@@ -183,6 +193,14 @@ export class CivicPress {
 
   getHookSystem(): HookSystem {
     return this.hookSystem;
+  }
+
+  getNotificationService(): NotificationService {
+    return this.notificationService;
+  }
+
+  getNotificationConfig(): NotificationConfig {
+    return this.notificationConfig;
   }
 
   getDataDir(): string {

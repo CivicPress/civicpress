@@ -1,28 +1,16 @@
 # ✅ CivicPress Spec: `records-validation.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive validation documentation
 - integrity patterns
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'public-data-structure.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+  - 'public-data-structure.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -59,21 +47,21 @@ before they can be published or approved.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Markdown files to be validated |
-| Validation rules         | Configuration from `.civic/validation.yml` |
-| Role definitions         | User roles from `.civic/roles.yml` |
-| File system structure    | Directory organization and naming |
-| Validation schemas       | Frontmatter and metadata schemas |
+| Input                 | Description                                |
+| --------------------- | ------------------------------------------ |
+| Civic records         | Markdown files to be validated             |
+| Validation rules      | Configuration from `.civic/validation.yml` |
+| Role definitions      | User roles from `.civic/roles.yml`         |
+| File system structure | Directory organization and naming          |
+| Validation schemas    | Frontmatter and metadata schemas           |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Validation results       | Pass/fail status for each record |
-| Error reports            | Detailed error messages and locations |
-| Validation logs          | Audit trail of validation operations |
-| Compliance reports       | Summary of validation compliance |
-| Fix suggestions          | Automated suggestions for fixes |
+| Output             | Description                           |
+| ------------------ | ------------------------------------- |
+| Validation results | Pass/fail status for each record      |
+| Error reports      | Detailed error messages and locations |
+| Validation logs    | Audit trail of validation operations  |
+| Compliance reports | Summary of validation compliance      |
+| Fix suggestions    | Automated suggestions for fixes       |
 
 ---
 

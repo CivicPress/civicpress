@@ -59,6 +59,90 @@ export const initCommand = (cli: CAC) => {
             repo_url: null,
             modules: ['legal-register'],
             record_types: ['bylaw', 'policy'],
+            record_types_config: {
+              bylaw: {
+                label: 'Bylaws',
+                description: 'Municipal bylaws and regulations',
+                source: 'core',
+                priority: 1,
+              },
+              ordinance: {
+                label: 'Ordinances',
+                description: 'Local ordinances and laws',
+                source: 'core',
+                priority: 2,
+              },
+              policy: {
+                label: 'Policies',
+                description: 'Administrative policies',
+                source: 'core',
+                priority: 3,
+              },
+              proclamation: {
+                label: 'Proclamations',
+                description: 'Official proclamations',
+                source: 'core',
+                priority: 4,
+              },
+              resolution: {
+                label: 'Resolutions',
+                description: 'Council resolutions',
+                source: 'core',
+                priority: 5,
+              },
+            },
+            record_statuses_config: {
+              draft: {
+                label: 'Draft',
+                description:
+                  'Initial working version, not yet ready for review',
+                source: 'core',
+                priority: 1,
+              },
+              pending_review: {
+                label: 'Pending Review',
+                description: 'Submitted for review and awaiting approval',
+                source: 'core',
+                priority: 2,
+              },
+              under_review: {
+                label: 'Under Review',
+                description:
+                  'Currently under active review by authorized personnel',
+                source: 'core',
+                priority: 3,
+              },
+              approved: {
+                label: 'Approved',
+                description: 'Approved and currently in effect',
+                source: 'core',
+                priority: 4,
+              },
+              published: {
+                label: 'Published',
+                description: 'Publicly available and in effect',
+                source: 'core',
+                priority: 5,
+              },
+              rejected: {
+                label: 'Rejected',
+                description: 'Rejected and not approved',
+                source: 'core',
+                priority: 6,
+              },
+              archived: {
+                label: 'Archived',
+                description: 'No longer active but preserved for reference',
+                source: 'core',
+                priority: 7,
+              },
+              expired: {
+                label: 'Expired',
+                description: 'Past its effective date and no longer in force',
+                source: 'core',
+                priority: 8,
+              },
+            },
             default_role: 'clerk',
             hooks: { enabled: true },
             workflows: { enabled: true },
@@ -298,6 +382,13 @@ export const initCommand = (cli: CAC) => {
         if (!shouldOutputJson) {
           logger.success('🔧 Initialized CivicPress core');
         }
+
+        // Setup notifications configuration
+        await setupNotifications(
+          systemDataDir,
+          logger,
+          shouldOutputJson || false
+        );
 
         // Create admin user if not already specified
         if (!skipPrompts && !options.config && !options.dataDir) {
@@ -1160,4 +1251,130 @@ async function setupCivicrc(
   const orgConfigYaml = yaml.stringify(orgConfig);
   fs.writeFileSync(orgConfigPath, orgConfigYaml);
   logger.success('🏢 org-config.yml saved (organization configuration)');
+}
+
+async function setupNotifications(
+  systemDataDir: string,
+  logger: any,
+  shouldOutputJson: boolean
+): Promise<void> {
+  try {
+    // Create notifications.yml file in .system-data directory
+    const notificationsPath = path.join(systemDataDir, 'notifications.yml');
+
+    // Check if notifications.yml already exists
+    if (fs.existsSync(notificationsPath)) {
+      if (!shouldOutputJson) {
+        logger.info('📧 Notifications configuration already exists');
+      }
+      return;
+    }
+
+    // Load default notifications configuration
+    const __filename = fileURLToPath(import.meta.url);
+    const projectRoot = path.resolve(path.dirname(__filename), '../../../');
+    const defaultNotificationsPath = path.join(
+      projectRoot,
+      'core',
+      'src',
+      'defaults',
+      'notifications.yml'
+    );
+
+    if (fs.existsSync(defaultNotificationsPath)) {
+      // Copy default notifications configuration
+      const defaultConfig = fs.readFileSync(defaultNotificationsPath, 'utf8');
+      fs.writeFileSync(notificationsPath, defaultConfig);
+
+      if (!shouldOutputJson) {
+        logger.success('📧 Created notifications.yml (disabled by default)');
+        logger.info(
+          '💡 Configure email providers in .system-data/notifications.yml'
+        );
+        logger.info(
+          '💡 Test with: civic notify:test --to your-email@domain.com --provider smtp'
+        );
+      }
+    } else {
+      // Create basic notifications configuration if default doesn't exist
+      const basicNotificationsConfig = {
+        channels: {
+          email: {
+            enabled: false,
+            provider: 'smtp',
+            smtp: {
+              host: 'localhost',
+              port: 587,
+              secure: false,
+              auth: {
+                user: '',
+                pass: '',
+              },
+              from: 'noreply@civicpress.local',
+              tls: {
+                rejectUnauthorized: false,
+              },
+            },
+            sendgrid: {
+              apiKey: '',
+              from: 'noreply@civicpress.local',
+              sandboxMode: true,
+            },
+          },
+        },
+        auth_templates: {
+          email_verification: {
+            subject: 'Verify your CivicPress account',
+            body: 'Please click the following link to verify your account: {{verification_url}}',
+          },
+          password_reset: {
+            subject: 'Reset your CivicPress password',
+            body: 'Click here to reset your password: {{reset_url}}',
+          },
+          two_factor_auth: {
+            subject: 'Your CivicPress verification code',
+            body: 'Your verification code is: {{code}}',
+          },
+          security_alert: {
+            subject: 'Security alert for your account',
+            body: 'Suspicious activity detected: {{details}}',
+          },
+        },
+        rules: {
+          rate_limits: {
+            email_per_hour: 100,
+            sms_per_hour: 50,
+            slack_per_hour: 200,
+          },
+          retry_attempts: 3,
+          retry_delay: 5000,
+        },
+        security: {
+          encrypt_sensitive_data: true,
+          audit_all_notifications: true,
+          filter_pii: true,
+        },
+      };
+
+      const notificationsYaml = yaml.stringify(basicNotificationsConfig);
+      fs.writeFileSync(notificationsPath, notificationsYaml);
+
+      if (!shouldOutputJson) {
+        logger.success('📧 Created notifications.yml (disabled by default)');
+        logger.info(
+          '💡 Configure email providers in .system-data/notifications.yml'
+        );
+        logger.info(
+          '💡 Test with: civic notify:test --to your-email@domain.com --provider smtp'
+        );
+      }
+    }
+  } catch (error: any) {
+    if (!shouldOutputJson) {
+      logger.warn(`⚠️  Failed to setup notifications: ${error.message}`);
+      logger.info(
+        '💡 You can configure notifications later in .system-data/notifications.yml'
+      );
+    }
+  }
 }

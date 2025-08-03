@@ -1105,24 +1105,24 @@ This regulation has been archived.`;
   try {
     // Initialize CivicPress core first, then force reload role config before setting up routes
     await api.initialize(config.dataDir);
+
+    // Force reload role configuration after CivicPress initialization but before routes are fully set up
+    const civicPress = api.getCivicPress();
+    if (civicPress && typeof civicPress.getAuthService === 'function') {
+      await civicPress.getAuthService().reloadRoleConfig();
+    }
+
+    // Generate the index after creating sample records and initializing the API
+    if (civicPress && typeof civicPress.getIndexingService === 'function') {
+      await civicPress.getIndexingService().generateIndexes({
+        rebuild: true,
+        syncDatabase: true,
+        conflictResolution: 'file-wins',
+      });
+    }
   } finally {
     // Restore original working directory
     process.chdir(originalCwd);
-  }
-
-  // Generate the index after creating sample records and initializing the API
-  const civicPress = api.getCivicPress();
-  if (civicPress && typeof civicPress.getIndexingService === 'function') {
-    await civicPress.getIndexingService().generateIndexes({
-      rebuild: true,
-      syncDatabase: true,
-      conflictResolution: 'file-wins',
-    });
-  }
-
-  // Force reload role configuration after CivicPress initialization but before routes are fully set up
-  if (civicPress && typeof civicPress.getAuthService === 'function') {
-    await civicPress.getAuthService().reloadRoleConfig();
   }
 
   return {

@@ -3,6 +3,7 @@ import { GitEngine } from '../git/git-engine.js';
 import { HookSystem } from '../hooks/hook-system.js';
 import { WorkflowEngine } from '../workflows/workflow-engine.js';
 import { TemplateEngine } from '../utils/template-engine.js';
+import { AuthUser } from '../auth/auth-service.js';
 import { Logger } from '../utils/logger.js';
 import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
 import * as fs from 'fs/promises';
@@ -52,10 +53,14 @@ export class RecordManager {
    */
   async createRecord(
     request: CreateRecordRequest,
-    userRole: string
+    user: AuthUser
   ): Promise<RecordData> {
     const recordId = `record-${Date.now()}`;
     const recordPath = `records/${request.type}/${recordId}.md`;
+
+    // Remove any author property from request.metadata to avoid overwriting
+    const safeMetadata = { ...(request.metadata || {}) };
+    delete safeMetadata.author;
 
     // Create the record object
     const record: RecordData = {
@@ -65,12 +70,15 @@ export class RecordManager {
       status: 'draft',
       content: request.content,
       metadata: {
-        ...request.metadata,
-        author: userRole,
+        ...safeMetadata,
+        author: user.username, // Always set as string
+        authorId: user.id,
+        authorName: user.name || user.username,
+        authorEmail: user.email,
         created: new Date().toISOString(),
       },
       path: recordPath,
-      author: userRole,
+      author: user.username, // Always set as string
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -101,7 +109,7 @@ export class RecordManager {
     // Trigger hooks
     await this.hooks.emit('record:created', {
       record,
-      user: userRole,
+      user: user,
       action: 'create',
     });
 
@@ -114,9 +122,13 @@ export class RecordManager {
   async createRecordWithId(
     recordId: string,
     request: CreateRecordRequest,
-    userRole: string
+    user: AuthUser
   ): Promise<RecordData> {
     const recordPath = `records/${request.type}/${recordId}.md`;
+
+    // Remove any author property from request.metadata to avoid overwriting
+    const safeMetadata2 = { ...(request.metadata || {}) };
+    delete safeMetadata2.author;
 
     // Create the record object
     const record: RecordData = {
@@ -126,12 +138,15 @@ export class RecordManager {
       status: 'draft',
       content: request.content,
       metadata: {
-        ...request.metadata,
-        author: userRole,
+        ...safeMetadata2,
+        author: user.username, // Always set as string
+        authorId: user.id,
+        authorName: user.name || user.username,
+        authorEmail: user.email,
         created: new Date().toISOString(),
       },
       path: recordPath,
-      author: userRole,
+      author: user.username, // Always set as string
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -162,7 +177,7 @@ export class RecordManager {
     // Trigger hooks
     await this.hooks.emit('record:created', {
       record,
-      user: userRole,
+      user: user,
       action: 'create',
     });
 
@@ -197,7 +212,7 @@ export class RecordManager {
   async updateRecord(
     id: string,
     request: UpdateRecordRequest,
-    userRole: string
+    user: AuthUser
   ): Promise<RecordData | null> {
     const existingRecord = await this.getRecord(id);
     if (!existingRecord) {
@@ -213,7 +228,9 @@ export class RecordManager {
       updates.metadata = JSON.stringify({
         ...existingRecord.metadata,
         ...request.metadata,
-        updated_by: userRole,
+        updated_by: user.username,
+        updated_by_id: user.id,
+        updated_by_name: user.name || user.username,
         updated: new Date().toISOString(),
       });
     }
@@ -238,7 +255,7 @@ export class RecordManager {
     // Trigger hooks
     await this.hooks.emit('record:updated', {
       record: updatedRecord,
-      user: userRole,
+      user: user,
       action: 'update',
     });
 
@@ -248,7 +265,7 @@ export class RecordManager {
   /**
    * Archive a record (soft delete)
    */
-  async archiveRecord(id: string, userRole: string): Promise<boolean> {
+  async archiveRecord(id: string, user: AuthUser): Promise<boolean> {
     const record = await this.getRecord(id);
     if (!record) {
       return false;
@@ -259,7 +276,9 @@ export class RecordManager {
       status: 'archived',
       metadata: JSON.stringify({
         ...record.metadata,
-        archived_by: userRole,
+        archived_by: user.username,
+        archived_by_id: user.id,
+        archived_by_name: user.name || user.username,
         archived_at: new Date().toISOString(),
       }),
     });
@@ -278,7 +297,7 @@ export class RecordManager {
     // Trigger hooks
     await this.hooks.emit('record:archived', {
       record,
-      user: userRole,
+      user: user,
       action: 'archive',
     });
 
@@ -286,7 +305,7 @@ export class RecordManager {
   }
 
   /**
-   * List records with filtering and pagination
+   * List records with optional filtering
    */
   async listRecords(
     options: {
@@ -295,30 +314,17 @@ export class RecordManager {
       limit?: number;
       offset?: number;
     } = {}
-  ): Promise<{ records: RecordData[]; total: number }> {
+  ): Promise<{ records: any[]; total: number }> {
     const result = await this.db.listRecords(options);
 
-    // Parse metadata for each record
-    const records = result.records.map((record) => {
-      if (record.metadata) {
-        try {
-          record.metadata = JSON.parse(record.metadata);
-        } catch (error) {
-          logger.warn(
-            `Failed to parse metadata for record ${record.id}:`,
-            error
-          );
-          record.metadata = {};
-        }
-      }
-      return record;
-    });
-
-    return { records, total: result.total };
+    return {
+      records: result.records,
+      total: result.total,
+    };
   }
 
   /**
-   * Search records
+   * Search records with pagination and filtering
    */
   async searchRecords(
     query: string,
@@ -328,14 +334,23 @@ export class RecordManager {
       limit?: number;
       offset?: number;
     } = {}
-  ): Promise<{ records: RecordData[]; total: number }> {
-    const searchResults = await this.db.searchRecords(query, options.type);
+  ): Promise<{ records: any[]; total: number }> {
+    // Use the recordType parameter for type filtering
+    const recordType = options.type;
+    const searchResults = await this.db.searchRecords(query, recordType);
 
     // Get full record details for search results
-    const records: RecordData[] = [];
+    const records: any[] = [];
     for (const searchResult of searchResults) {
       const record = await this.getRecord(searchResult.record_id);
-      if (record && (!options.status || record.status === options.status)) {
+      if (record) {
+        // Handle comma-separated status filters
+        if (options.status) {
+          const statusFilters = options.status.split(',').map((s) => s.trim());
+          if (!statusFilters.includes(record.status)) {
+            continue;
+          }
+        }
         records.push(record);
       }
     }
@@ -347,6 +362,62 @@ export class RecordManager {
     const paginatedRecords = records.slice(offset, offset + limit);
 
     return { records: paginatedRecords, total };
+  }
+
+  /**
+   * Get search suggestions based on record titles and content
+   */
+  async getSearchSuggestions(
+    query: string,
+    options: {
+      limit?: number;
+    } = {}
+  ): Promise<string[]> {
+    const limit = options.limit || 10;
+
+    // Get search results from database
+    const searchResults = await this.db.searchRecords(query);
+
+    // Extract unique suggestions from titles and content
+    const suggestions = new Set<string>();
+
+    for (const result of searchResults.slice(0, limit * 2)) {
+      // Get more results to filter
+      const record = await this.getRecord(result.record_id);
+      if (record) {
+        // Add title as suggestion
+        if (record.title.toLowerCase().includes(query.toLowerCase())) {
+          suggestions.add(record.title);
+        }
+
+        // Extract words from content that match the query
+        if (record.content) {
+          const words = record.content
+            .split(/\s+/)
+            .filter(
+              (word) =>
+                word.length > 2 &&
+                word.toLowerCase().includes(query.toLowerCase()) &&
+                !suggestions.has(word)
+            );
+
+          words.slice(0, 3).forEach((word) => suggestions.add(word));
+        }
+
+        // Add record type as suggestion if it matches
+        if (record.type.toLowerCase().includes(query.toLowerCase())) {
+          suggestions.add(record.type);
+        }
+      }
+
+      // Stop if we have enough suggestions
+      if (suggestions.size >= limit) {
+        break;
+      }
+    }
+
+    // Convert to array and limit results
+    return Array.from(suggestions).slice(0, limit);
   }
 
   /**
@@ -416,20 +487,43 @@ export class RecordManager {
    * Create markdown content for a record
    */
   private createMarkdownContent(record: RecordData): string {
+    // Extract metadata but exclude author to avoid overwriting the string author
+    const otherMetadata = { ...record.metadata };
+    delete otherMetadata.author;
+
     const frontmatter = {
       id: record.id,
       title: record.title,
       type: record.type,
       status: record.status,
-      author: record.author,
+      author: record.author, // Keep the string author from record.author
       created_at: record.created_at,
       updated_at: record.updated_at,
-      ...record.metadata,
+      ...otherMetadata, // Spread other metadata but not author
     };
 
     const frontmatterYaml = Object.entries(frontmatter)
       .filter(([, value]) => value !== undefined && value !== null)
-      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+      .map(([key, value]) => {
+        // Handle different value types appropriately
+        if (typeof value === 'string') {
+          return `${key}: "${value}"`;
+        } else if (typeof value === 'number' || typeof value === 'boolean') {
+          return `${key}: ${value}`;
+        } else if (Array.isArray(value)) {
+          return `${key}: ${JSON.stringify(value)}`;
+        } else if (typeof value === 'object' && value !== null) {
+          // For objects, use JSON.stringify but handle special cases
+          if (key === 'author' && typeof value === 'object') {
+            // If author is an object, extract the username
+            const authorObj = value as any;
+            return `${key}: "${authorObj.username || authorObj.name || 'Unknown'}"`;
+          }
+          return `${key}: ${JSON.stringify(value)}`;
+        } else {
+          return `${key}: ${JSON.stringify(value)}`;
+        }
+      })
       .join('\n');
 
     return `---

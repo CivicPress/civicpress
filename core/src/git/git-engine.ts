@@ -63,6 +63,12 @@ export class GitEngine {
    * Create a role-based commit
    */
   async commit(message: string, files?: string[]): Promise<string> {
+    // Skip Git commits if DISABLE_GIT_COMMITS is set (for development)
+    if (process.env.DISABLE_GIT_COMMITS === 'true') {
+      console.log(`[DEV] Skipping Git commit: ${message}`);
+      return 'dev-skip-commit';
+    }
+
     try {
       const git = this.getGit();
 

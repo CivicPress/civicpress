@@ -1,15 +1,14 @@
 import { Router, Response } from 'express';
+import { param, query, validationResult } from 'express-validator';
 import { simpleGit, SimpleGit } from 'simple-git';
-import * as diff from 'diff';
-
 import {
   sendSuccess,
-  handleApiError,
   logApiRequest,
-} from '../utils/api-logger.js';
-import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
+  handleApiError,
+} from '../utils/api-logger';
+import { requirePermission } from '../middleware/auth';
+import { AuthenticatedRequest } from '../middleware/auth';
 
-// Types for diff API
 interface DiffOptions {
   commit1?: string;
   commit2?: string;
@@ -100,22 +99,69 @@ export function createDiffRouter() {
   router.get(
     '/:recordId',
     requirePermission('records:view'),
+    [
+      param('recordId')
+        .isString()
+        .notEmpty()
+        .withMessage('Record ID is required'),
+      query('commit1')
+        .isString()
+        .notEmpty()
+        .withMessage('Commit 1 is required'),
+      query('commit2')
+        .isString()
+        .notEmpty()
+        .withMessage('Commit 2 is required'),
+      query('format')
+        .optional()
+        .isIn(['unified', 'side-by-side', 'json'])
+        .withMessage('Format must be unified, side-by-side, or json'),
+      query('context')
+        .optional()
+        .isInt({ min: 0, max: 10 })
+        .withMessage('Context must be between 0 and 10'),
+      query('showMetadata')
+        .optional()
+        .isBoolean()
+        .withMessage('showMetadata must be a boolean'),
+      query('showContent')
+        .optional()
+        .isBoolean()
+        .withMessage('showContent must be a boolean'),
+      query('wordLevel')
+        .optional()
+        .isBoolean()
+        .withMessage('wordLevel must be a boolean'),
+      query('includeStats')
+        .optional()
+        .isBoolean()
+        .withMessage('includeStats must be a boolean'),
+    ],
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'compare_record_versions' });
 
       try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({
+            error: {
+              message: 'Validation failed',
+              details: errors.array(),
+            },
+          });
+        }
+
         const { recordId } = req.params;
-        const commit1 = (req.query.commit1 as string) || 'HEAD~1';
-        const commit2 = (req.query.commit2 as string) || 'HEAD';
-        const format = ((req.query.format as string) || 'unified') as
-          | 'unified'
-          | 'side-by-side'
-          | 'json';
-        const context = parseInt((req.query.context as string) || '3');
-        const showMetadata = req.query.showMetadata !== 'false';
-        const showContent = req.query.showContent !== 'false';
-        const wordLevel = req.query.wordLevel === 'true';
-        const includeStats = req.query.includeStats !== 'false';
+        const {
+          commit1,
+          commit2,
+          format = 'unified',
+          context = 3,
+          showMetadata = true,
+          showContent = true,
+          wordLevel = false,
+          includeStats = true,
+        } = req.query;
 
         const civicPress = (req as any).civicPress;
         if (!civicPress) {
@@ -126,16 +172,13 @@ export function createDiffRouter() {
         const recordPath = recordId.endsWith('.md')
           ? recordId
           : `${recordId}.md`;
-        // DEBUG LOGGING
-        console.log('[DIFF DEBUG] dataDir:', dataDir);
-        console.log('[DIFF DEBUG] recordPath:', recordPath);
 
         const git = simpleGit(dataDir);
 
         // Validate commits exist
         try {
-          await git.show([commit1]);
-          await git.show([commit2]);
+          await git.show([commit1 as string]);
+          await git.show([commit2 as string]);
         } catch (error) {
           const err = new Error('One or both commits not found');
           (err as any).statusCode = 400;
@@ -146,15 +189,15 @@ export function createDiffRouter() {
         const result = await compareRecordVersions(
           git,
           recordPath,
-          commit1,
-          commit2,
+          commit1 as string,
+          commit2 as string,
           {
-            format,
+            format: format as 'unified' | 'side-by-side' | 'json' | undefined,
             context: parseInt(context.toString()),
-            showMetadata,
-            showContent,
-            wordLevel,
-            includeStats,
+            showMetadata: showMetadata === 'true',
+            showContent: showContent === 'true',
+            wordLevel: wordLevel === 'true',
+            includeStats: includeStats === 'true',
           }
         );
 
@@ -206,9 +249,6 @@ export function createDiffRouter() {
         const recordPath = recordId.endsWith('.md')
           ? recordId
           : `${recordId}.md`;
-        // DEBUG LOGGING
-        console.log('[DIFF DEBUG] dataDir:', dataDir);
-        console.log('[DIFF DEBUG] recordPath:', recordPath);
 
         const git = simpleGit(dataDir);
 
@@ -222,11 +262,7 @@ export function createDiffRouter() {
           {
             recordId,
             commits,
-            summary: {
-              totalCommits: commits.length,
-              firstCommit: commits[commits.length - 1]?.hash,
-              lastCommit: commits[0]?.hash,
-            },
+            total: commits.length,
           },
           req,
           res,
@@ -244,116 +280,22 @@ export function createDiffRouter() {
           error,
           req,
           res,
-          'Failed to get commit history'
+          'Failed to get record history'
         );
       }
     }
   );
 
-  // POST /api/diff/bulk - Bulk diff operations
-  router.post(
-    '/bulk',
-    requirePermission('records:view'),
-    async (req: AuthenticatedRequest, res: Response) => {
-      logApiRequest(req, { operation: 'bulk_diff' });
-
-      try {
-        const { records, options = {} } = req.body;
-
-        if (!Array.isArray(records)) {
-          const err = new Error('Records must be an array');
-          (err as any).statusCode = 400;
-          (err as any).code = 'INVALID_INPUT';
-          throw err;
-        }
-
-        const civicPress = (req as any).civicPress;
-        if (!civicPress) {
-          throw new Error('CivicPress not initialized');
-        }
-
-        const dataDir = civicPress.getDataDir();
-        // DEBUG LOGGING
-        console.log('[DIFF DEBUG] dataDir:', dataDir);
-        // Each record will log its own path in the loop below
-
-        const git = simpleGit(dataDir);
-        const results: DiffResult[] = [];
-
-        for (const record of records) {
-          const { recordId, commit1 = 'HEAD~1', commit2 = 'HEAD' } = record;
-          const recordPath = recordId.endsWith('.md')
-            ? recordId
-            : `${recordId}.md`;
-          // DEBUG LOGGING
-          console.log('[DIFF DEBUG] recordPath:', recordPath);
-
-          try {
-            const result = await compareRecordVersions(
-              git,
-              recordPath,
-              commit1,
-              commit2,
-              options
-            );
-            if (result) {
-              results.push(result);
-            }
-          } catch (error) {
-            // Continue with other records even if one fails
-            console.warn(`Failed to diff record ${recordId}:`, error);
-          }
-        }
-
-        sendSuccess(
-          {
-            results,
-            summary: {
-              totalRecords: records.length,
-              successfulDiffs: results.length,
-              failedDiffs: records.length - results.length,
-            },
-          },
-          req,
-          res,
-          {
-            operation: 'bulk_diff',
-            meta: {
-              totalRecords: records.length,
-              successfulDiffs: results.length,
-              failedDiffs: records.length - results.length,
-            },
-          }
-        );
-      } catch (error) {
-        handleApiError(
-          'bulk_diff',
-          error,
-          req,
-          res,
-          'Failed to perform bulk diff'
-        );
-      }
-    }
-  );
-
-  // GET /api/diff/commits/:commit1/:commit2 - Compare all records between commits
+  // GET /api/diff/:recordId/commits - Get commits that modified the record
   router.get(
-    '/commits/:commit1/:commit2',
+    '/:recordId/commits',
     requirePermission('records:view'),
     async (req: AuthenticatedRequest, res: Response) => {
-      logApiRequest(req, { operation: 'compare_commits' });
+      logApiRequest(req, { operation: 'get_record_commits' });
 
       try {
-        const { commit1, commit2 } = req.params;
-        const format = ((req.query.format as string) || 'unified') as
-          | 'unified'
-          | 'side-by-side'
-          | 'json';
-        const context = parseInt((req.query.context as string) || '3');
-        const showMetadata = req.query.showMetadata !== 'false';
-        const showContent = req.query.showContent !== 'false';
-        const wordLevel = req.query.wordLevel === 'true';
+        const { recordId } = req.params;
+        const { limit = 20, author, since } = req.query;
 
         const civicPress = (req as any).civicPress;
         if (!civicPress) {
@@ -361,88 +303,128 @@ export function createDiffRouter() {
         }
 
         const dataDir = civicPress.getDataDir();
-        // DEBUG LOGGING
-        console.log('[DIFF DEBUG] dataDir:', dataDir);
+        const recordPath = recordId.endsWith('.md')
+          ? recordId
+          : `${recordId}.md`;
 
         const git = simpleGit(dataDir);
 
-        // Validate commits exist
-        try {
-          await git.show([commit1]);
-          await git.show([commit2]);
-        } catch (error) {
-          const err = new Error('One or both commits not found');
-          (err as any).statusCode = 400;
-          (err as any).code = 'COMMIT_NOT_FOUND';
-          throw err;
-        }
+        // Get commits that modified this file
+        const log = await git.log({
+          file: recordPath,
+          maxCount: parseInt(limit.toString()),
+          author: author as string,
+          since: since as string,
+        });
 
-        const changedFiles = await getChangedFiles(git, commit1, commit2);
-        const recordFiles = changedFiles.filter((file) => file.endsWith('.md'));
-
-        if (req.query.type) {
-          const recordType = req.query.type as string;
-          const filteredFiles = recordFiles.filter((file) =>
-            file.startsWith(`records/${recordType}/`)
-          );
-          recordFiles.splice(0, recordFiles.length, ...filteredFiles);
-        }
-
-        const results: DiffResult[] = [];
-
-        for (const file of recordFiles) {
-          try {
-            const result = await compareRecordVersions(
-              git,
-              file,
-              commit1,
-              commit2,
-              {
-                format,
-                context: parseInt(context.toString()),
-                showMetadata,
-                showContent,
-                wordLevel,
-              }
-            );
-            if (result) {
-              results.push(result);
-            }
-          } catch (error) {
-            console.warn(`Failed to diff file ${file}:`, error);
-          }
-        }
+        const commits = log.all.map((commit) => ({
+          hash: commit.hash,
+          shortHash: commit.hash.substring(0, 7),
+          date: commit.date,
+          author: commit.author_name,
+          message: commit.message,
+          changes: commit.diff?.files?.map((file) => file.file) || [],
+        }));
 
         sendSuccess(
           {
-            commit1,
-            commit2,
-            results,
-            summary: {
-              totalFiles: recordFiles.length,
-              changedFiles: results.length,
-              unchangedFiles: recordFiles.length - results.length,
-            },
+            recordId,
+            commits,
+            total: commits.length,
           },
           req,
           res,
           {
-            operation: 'compare_commits',
+            operation: 'get_record_commits',
             meta: {
-              commit1,
-              commit2,
-              totalFiles: recordFiles.length,
-              changedFiles: results.length,
+              recordId,
+              totalCommits: commits.length,
             },
           }
         );
       } catch (error) {
         handleApiError(
-          'compare_commits',
+          'get_record_commits',
           error,
           req,
           res,
-          'Failed to compare commits'
+          'Failed to get record commits'
+        );
+      }
+    }
+  );
+
+  // GET /api/diff/:recordId/versions - Get all versions of a record
+  router.get(
+    '/:recordId/versions',
+    requirePermission('records:view'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'get_record_versions' });
+
+      try {
+        const { recordId } = req.params;
+        const { limit = 20 } = req.query;
+
+        const civicPress = (req as any).civicPress;
+        if (!civicPress) {
+          throw new Error('CivicPress not initialized');
+        }
+
+        const dataDir = civicPress.getDataDir();
+        const recordPath = recordId.endsWith('.md')
+          ? recordId
+          : `${recordId}.md`;
+
+        const git = simpleGit(dataDir);
+
+        // Get all commits that modified this file
+        const log = await git.log({
+          file: recordPath,
+          maxCount: parseInt(limit.toString()),
+        });
+
+        const versions = await Promise.all(
+          log.all.map(async (commit) => {
+            const content = await getFileContent(git, recordPath, commit.hash);
+            const metadata = content ? parseRecordMetadata(content) : {};
+
+            return {
+              commit: {
+                hash: commit.hash,
+                shortHash: commit.hash.substring(0, 7),
+                date: commit.date,
+                author: commit.author_name,
+                message: commit.message,
+              },
+              content,
+              metadata,
+            };
+          })
+        );
+
+        sendSuccess(
+          {
+            recordId,
+            versions,
+            total: versions.length,
+          },
+          req,
+          res,
+          {
+            operation: 'get_record_versions',
+            meta: {
+              recordId,
+              totalVersions: versions.length,
+            },
+          }
+        );
+      } catch (error) {
+        handleApiError(
+          'get_record_versions',
+          error,
+          req,
+          res,
+          'Failed to get record versions'
         );
       }
     }
@@ -451,7 +433,6 @@ export function createDiffRouter() {
   return router;
 }
 
-// Helper functions
 async function compareRecordVersions(
   git: SimpleGit,
   recordPath: string,
@@ -460,57 +441,56 @@ async function compareRecordVersions(
   options: DiffOptions
 ): Promise<DiffResult | null> {
   try {
+    // Get file content from both commits
     const content1 = await getFileContent(git, recordPath, commit1);
     const content2 = await getFileContent(git, recordPath, commit2);
 
+    // If file doesn't exist in either commit, return null
     if (!content1 && !content2) {
-      return null; // File doesn't exist in either commit
+      return null;
     }
 
-    const recordId = recordPath.replace(/\.md$/, '');
-    const type = recordPath.split('/')[1] || 'unknown';
-    const changes: DiffResult['changes'] = {
-      metadata: [],
-      content: {
-        stats: {
-          linesAdded: 0,
-          linesRemoved: 0,
-          wordsAdded: 0,
-          wordsRemoved: 0,
-          filesChanged: 1,
-        },
-      },
-    };
+    // Parse metadata from both versions
+    const metadata1 = content1 ? parseRecordMetadata(content1) : {};
+    const metadata2 = content2 ? parseRecordMetadata(content2) : {};
 
     // Compare metadata
-    if (options.showMetadata) {
-      const metadata1 = content1 ? parseRecordMetadata(content1) : {};
-      const metadata2 = content2 ? parseRecordMetadata(content2) : {};
-      changes.metadata = compareMetadata(metadata1, metadata2);
-    }
+    const metadataChanges = options.showMetadata
+      ? compareMetadata(metadata1, metadata2)
+      : [];
 
     // Compare content
-    if (options.showContent && content1 !== content2) {
-      changes.content = generateContentDiff(
-        content1,
-        content2,
-        recordPath,
-        options
-      );
-    }
+    const contentDiff = options.showContent
+      ? generateContentDiff(content1, content2, recordPath, options)
+      : {
+          stats: {
+            linesAdded: 0,
+            linesRemoved: 0,
+            wordsAdded: 0,
+            wordsRemoved: 0,
+            filesChanged: 0,
+          },
+        };
 
-    const summary = generateDiffSummary(changes);
+    // Generate summary
+    const summary = generateDiffSummary({
+      metadata: metadataChanges,
+      content: contentDiff,
+    });
 
     return {
-      recordId,
-      type,
+      recordId: recordPath.replace('.md', ''),
+      type: 'record',
       commit1,
       commit2,
-      changes,
+      changes: {
+        metadata: metadataChanges,
+        content: contentDiff,
+      },
       summary,
     };
   } catch (error) {
-    console.warn(`Error comparing ${recordPath}:`, error);
+    console.error('Error comparing record versions:', error);
     return null;
   }
 }
@@ -562,83 +542,78 @@ function generateContentDiff(
   recordPath: string,
   options: DiffOptions
 ): ContentDiff {
-  const contentDiff: ContentDiff = {
+  const content1Clean = content1
+    ? content1.replace(/^---\n[\s\S]*?\n---\n/, '')
+    : '';
+  const content2Clean = content2
+    ? content2.replace(/^---\n[\s\S]*?\n---\n/, '')
+    : '';
+
+  const result: ContentDiff = {
     stats: {
       linesAdded: 0,
       linesRemoved: 0,
       wordsAdded: 0,
       wordsRemoved: 0,
-      filesChanged: 1,
+      filesChanged: 0,
     },
   };
 
-  if (content1 && content2) {
-    // Generate unified diff
-    contentDiff.unified = diff.createPatch(
-      recordPath,
-      content1,
-      content2,
-      `Commit ${options.commit1}`,
-      `Commit ${options.commit2}`,
-      { context: options.context }
+  if (options.format === 'unified') {
+    result.unified = generateUnifiedDiff(
+      content1Clean,
+      content2Clean,
+      options.context || 3
     );
-
-    // Generate side-by-side diff for frontend
-    if (options.format === 'side-by-side') {
-      contentDiff.sideBySide = generateSideBySideDiff(
-        content1,
-        content2,
-        options.context || 3
-      );
-    }
-
-    // Generate word-level diff
-    if (options.wordLevel) {
-      contentDiff.wordLevel = generateWordLevelDiff(content1, content2);
-    }
-
-    // Calculate statistics
-    const diffResult = diff.diffLines(content1, content2);
-
-    let linesAdded = 0;
-    let linesRemoved = 0;
-    let wordsAdded = 0;
-    let wordsRemoved = 0;
-
-    for (const change of diffResult) {
-      if (change.added) {
-        linesAdded += change.count || 0;
-        wordsAdded += (change.value.match(/\S+/g) || []).length;
-      } else if (change.removed) {
-        linesRemoved += change.count || 0;
-        wordsRemoved += (change.value.match(/\S+/g) || []).length;
-      }
-    }
-
-    contentDiff.stats = {
-      linesAdded,
-      linesRemoved,
-      wordsAdded,
-      wordsRemoved,
-      filesChanged: 1,
-    };
-  } else if (content1) {
-    // File was deleted
-    contentDiff.unified = `--- ${recordPath}\n+++ /dev/null\n@@ -1,${content1.split('\n').length} +0,0 @@\n${content1
-      .split('\n')
-      .map((line) => `-${line}`)
-      .join('\n')}`;
-    contentDiff.stats.linesRemoved = content1.split('\n').length;
-  } else if (content2) {
-    // File was created
-    contentDiff.unified = `--- /dev/null\n+++ ${recordPath}\n@@ -0,0 +1,${content2.split('\n').length} @@\n${content2
-      .split('\n')
-      .map((line) => `+${line}`)
-      .join('\n')}`;
-    contentDiff.stats.linesAdded = content2.split('\n').length;
+  } else if (options.format === 'side-by-side') {
+    result.sideBySide = generateSideBySideDiff(
+      content1Clean,
+      content2Clean,
+      options.context || 3
+    );
   }
 
-  return contentDiff;
+  if (options.wordLevel) {
+    result.wordLevel = generateWordLevelDiff(content1Clean, content2Clean);
+  }
+
+  // Calculate basic stats
+  const lines1 = content1Clean.split('\n');
+  const lines2 = content2Clean.split('\n');
+  result.stats.linesAdded = Math.max(0, lines2.length - lines1.length);
+  result.stats.linesRemoved = Math.max(0, lines1.length - lines2.length);
+  result.stats.filesChanged = content1 !== content2 ? 1 : 0;
+
+  return result;
+}
+
+function generateUnifiedDiff(
+  content1: string,
+  content2: string,
+  context: number
+): string {
+  const lines1 = content1.split('\n');
+  const lines2 = content2.split('\n');
+  const diff: string[] = [];
+
+  // Simple unified diff generation
+  diff.push('--- a/record.md');
+  diff.push('+++ b/record.md');
+  diff.push('@@ -1,' + lines1.length + ' +1,' + lines2.length + ' @@');
+
+  for (let i = 0; i < Math.max(lines1.length, lines2.length); i++) {
+    const line1 = lines1[i] || '';
+    const line2 = lines2[i] || '';
+
+    if (line1 === line2) {
+      diff.push(' ' + line1);
+    } else {
+      if (line1) diff.push('-' + line1);
+      if (line2) diff.push('+' + line2);
+    }
+  }
+
+  return diff.join('\n');
 }
 
 function generateSideBySideDiff(
@@ -646,48 +621,41 @@ function generateSideBySideDiff(
   content2: string,
   context: number
 ): { left: DiffLine[]; right: DiffLine[] } {
-  const diffResult = diff.diffLines(content1, content2);
-
+  const lines1 = content1.split('\n');
+  const lines2 = content2.split('\n');
   const left: DiffLine[] = [];
   const right: DiffLine[] = [];
-  let lineNumber1 = 1;
-  let lineNumber2 = 1;
 
-  for (const change of diffResult) {
-    const lines = change.value.split('\n').slice(0, -1); // Remove empty line at end
+  const maxLines = Math.max(lines1.length, lines2.length);
 
-    if (change.added) {
-      // Only in right side
-      for (let i = 0; i < lines.length; i++) {
-        left.push({ lineNumber: 0, content: '', type: 'context' });
-        right.push({
-          lineNumber: lineNumber2++,
-          content: lines[i],
-          type: 'added',
-        });
-      }
-    } else if (change.removed) {
-      // Only in left side
-      for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < maxLines; i++) {
+    const line1 = lines1[i] || '';
+    const line2 = lines2[i] || '';
+
+    if (line1 === line2) {
+      left.push({
+        lineNumber: i + 1,
+        content: line1,
+        type: 'unchanged',
+      });
+      right.push({
+        lineNumber: i + 1,
+        content: line2,
+        type: 'unchanged',
+      });
+    } else {
+      if (line1) {
         left.push({
-          lineNumber: lineNumber1++,
-          content: lines[i],
+          lineNumber: i + 1,
+          content: line1,
           type: 'removed',
         });
-        right.push({ lineNumber: 0, content: '', type: 'context' });
       }
-    } else {
-      // Unchanged in both sides
-      for (let i = 0; i < lines.length; i++) {
-        left.push({
-          lineNumber: lineNumber1++,
-          content: lines[i],
-          type: 'unchanged',
-        });
+      if (line2) {
         right.push({
-          lineNumber: lineNumber2++,
-          content: lines[i],
-          type: 'unchanged',
+          lineNumber: i + 1,
+          content: line2,
+          type: 'added',
         });
       }
     }
@@ -704,43 +672,60 @@ function generateWordLevelDiff(
   const lines2 = content2.split('\n');
   const lines: WordLevelLine[] = [];
 
-  for (let i = 0; i < Math.max(lines1.length, lines2.length); i++) {
+  const maxLines = Math.max(lines1.length, lines2.length);
+
+  for (let i = 0; i < maxLines; i++) {
     const line1 = lines1[i] || '';
     const line2 = lines2[i] || '';
 
-    if (line1 !== line2) {
-      const wordDiff = diff.diffWords(line1, line2);
+    if (line1 === line2) {
+      // No changes in this line
+      lines.push({
+        lineNumber: i + 1,
+        words: line1.split(' ').map((word, index) => ({
+          word,
+          type: 'unchanged' as const,
+          position: index,
+        })),
+      });
+    } else {
+      // Simple word-level diff
+      const words1 = line1.split(' ');
+      const words2 = line2.split(' ');
       const words: WordChange[] = [];
-      let position = 0;
 
-      for (const change of wordDiff) {
-        if (change.added) {
+      const maxWords = Math.max(words1.length, words2.length);
+      for (let j = 0; j < maxWords; j++) {
+        const word1 = words1[j] || '';
+        const word2 = words2[j] || '';
+
+        if (word1 === word2) {
           words.push({
-            word: change.value,
-            type: 'added',
-            position: position++,
-          });
-        } else if (change.removed) {
-          words.push({
-            word: change.value,
-            type: 'removed',
-            position: position++,
+            word: word1,
+            type: 'unchanged',
+            position: j,
           });
         } else {
-          const wordList = change.value.split(/(\s+)/);
-          for (const word of wordList) {
-            if (word.trim()) {
-              words.push({ word, type: 'unchanged', position: position++ });
-            }
+          if (word1) {
+            words.push({
+              word: word1,
+              type: 'removed',
+              position: j,
+            });
+          }
+          if (word2) {
+            words.push({
+              word: word2,
+              type: 'added',
+              position: j,
+            });
           }
         }
       }
 
-      lines.push({ lineNumber: i + 1, words });
-    } else {
       lines.push({
         lineNumber: i + 1,
-        words: [{ word: line1, type: 'unchanged', position: 0 }],
+        words,
       });
     }
   }
@@ -749,23 +734,26 @@ function generateWordLevelDiff(
 }
 
 function generateDiffSummary(changes: DiffResult['changes']): DiffSummary {
-  const hasChanges: boolean =
-    changes.metadata.length > 0 ||
-    (changes.content.unified !== undefined &&
-      changes.content.unified.length > 0);
+  const { metadata, content } = changes;
   const changeTypes: string[] = [];
 
-  if (changes.metadata.length > 0) changeTypes.push('metadata');
-  if (changes.content.unified !== undefined) changeTypes.push('content');
+  if (metadata.length > 0) {
+    changeTypes.push('metadata');
+  }
+
+  if (content.stats.linesAdded > 0 || content.stats.linesRemoved > 0) {
+    changeTypes.push('content');
+  }
+
+  const hasChanges = changeTypes.length > 0;
+  const totalChanges =
+    metadata.length + content.stats.linesAdded + content.stats.linesRemoved;
 
   let severity: 'none' | 'minor' | 'major' = 'none';
-  if (hasChanges) {
-    const totalChanges =
-      changes.metadata.length +
-      (changes.content.stats.linesAdded + changes.content.stats.linesRemoved);
-    if (totalChanges > 10) severity = 'major';
-    else if (totalChanges > 3) severity = 'minor';
-    else severity = 'minor';
+  if (totalChanges > 10) {
+    severity = 'major';
+  } else if (totalChanges > 0) {
+    severity = 'minor';
   }
 
   return {
@@ -773,9 +761,7 @@ function generateDiffSummary(changes: DiffResult['changes']): DiffSummary {
     changeTypes,
     severity,
     totalFiles: 1,
-    totalChanges:
-      changes.metadata.length +
-      (changes.content.stats.linesAdded + changes.content.stats.linesRemoved),
+    totalChanges,
   };
 }
 
@@ -785,38 +771,23 @@ async function getRecordCommitHistory(
   options: { limit: number; author?: string; since?: string }
 ): Promise<CommitInfo[]> {
   try {
-    const logOptions: any = {
+    const log = await git.log({
       file: filePath,
       maxCount: options.limit,
-    };
+      author: options.author,
+      since: options.since,
+    });
 
-    if (options.author) {
-      logOptions.author = options.author;
-    }
-
-    if (options.since) {
-      logOptions.since = options.since;
-    }
-
-    const log = await git.log(logOptions);
-    const commits: CommitInfo[] = [];
-
-    for (const commit of log.all) {
-      const changes = await getCommitChanges(git, commit.hash, filePath);
-
-      commits.push({
-        hash: commit.hash,
-        shortHash: commit.hash.substring(0, 8),
-        date: commit.date,
-        author: commit.author_name,
-        message: commit.message,
-        changes,
-      });
-    }
-
-    return commits;
+    return log.all.map((commit) => ({
+      hash: commit.hash,
+      shortHash: commit.hash.substring(0, 7),
+      date: commit.date,
+      author: commit.author_name,
+      message: commit.message,
+      changes: commit.diff?.files?.map((file) => file.file) || [],
+    }));
   } catch (error) {
-    console.warn('Error getting file commit history:', error);
+    console.error('Error getting commit history:', error);
     return [];
   }
 }
@@ -827,20 +798,12 @@ async function getCommitChanges(
   filePath: string
 ): Promise<string[]> {
   try {
-    const diff = await git.diff([
-      `${commitHash}~1..${commitHash}`,
-      '--name-status',
-      filePath,
-    ]);
-    const changes: string[] = [];
-
-    if (diff.includes('A')) changes.push('created');
-    if (diff.includes('M')) changes.push('modified');
-    if (diff.includes('D')) changes.push('deleted');
-    if (diff.includes('R')) changes.push('renamed');
-
-    return changes;
+    const diff = await git.diff([commitHash, '--', filePath]);
+    return diff
+      .split('\n')
+      .filter((line) => line.startsWith('+') || line.startsWith('-'));
   } catch (error) {
+    console.error('Error getting commit changes:', error);
     return [];
   }
 }
@@ -851,9 +814,9 @@ async function getFileContent(
   commit: string
 ): Promise<string | null> {
   try {
-    const content = await git.show([`${commit}:${filePath}`]);
-    return content || null;
+    return await git.show([`${commit}:${filePath}`]);
   } catch (error) {
+    // File doesn't exist in this commit
     return null;
   }
 }
@@ -864,28 +827,29 @@ async function getChangedFiles(
   commit2: string
 ): Promise<string[]> {
   try {
-    const diff = await git.diff([`${commit1}..${commit2}`, '--name-only']);
+    const diff = await git.diff([commit1, commit2, '--name-only']);
     return diff.split('\n').filter((file) => file.trim());
   } catch (error) {
-    console.warn('Error getting changed files:', error);
+    console.error('Error getting changed files:', error);
     return [];
   }
 }
 
 function parseRecordMetadata(content: string): Record<string, any> {
+  const metadataMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!metadataMatch) {
+    return {};
+  }
+
+  const metadataLines = metadataMatch[1].split('\n');
   const metadata: Record<string, any> = {};
 
-  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  if (frontmatterMatch) {
-    const frontmatter = frontmatterMatch[1];
-    const lines = frontmatter.split('\n');
-
-    for (const line of lines) {
-      const [key, ...valueParts] = line.split(':');
-      if (key && valueParts.length > 0) {
-        const value = valueParts.join(':').trim();
-        metadata[key.trim()] = value;
-      }
+  for (const line of metadataLines) {
+    const colonIndex = line.indexOf(':');
+    if (colonIndex > 0) {
+      const key = line.substring(0, colonIndex).trim();
+      const value = line.substring(colonIndex + 1).trim();
+      metadata[key] = value;
     }
   }
 

@@ -80,12 +80,6 @@ export default function setupUsersCommand(cli: CAC) {
         const dataDir = CentralConfigManager.getDataDir();
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
-        // DEBUG: Print config values (only in non-JSON mode)
-        if (!options.json) {
-          console.log('[DEBUG] dataDir:', dataDir);
-          console.log('[DEBUG] dbConfig:', dbConfig);
-        }
-
         // Initialize CivicPress with database configuration
         const civic = new CivicPress({
           dataDir,

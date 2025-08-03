@@ -1,28 +1,16 @@
 # 📊 CivicPress Spec: `version-tracker.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-15'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-15' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive version tracking documentation
 - dependency management
-- compatibility matrices
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'spec-versioning.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- compatibility matrices fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+  - 'spec-versioning.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -59,21 +47,21 @@ validation, dependency resolution, and change impact analysis.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Spec files               | CivicPress specification markdown files |
-| Version metadata         | Version numbers, status, and dates |
-| Dependency declarations   | Spec-to-spec dependency relationships |
-| Change requests          | Proposed version updates and changes |
-| Compatibility rules       | Version compatibility constraints |
+| Input                   | Description                             |
+| ----------------------- | --------------------------------------- |
+| Spec files              | CivicPress specification markdown files |
+| Version metadata        | Version numbers, status, and dates      |
+| Dependency declarations | Spec-to-spec dependency relationships   |
+| Change requests         | Proposed version updates and changes    |
+| Compatibility rules     | Version compatibility constraints       |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Version matrices         | Comprehensive version tracking tables |
-| Dependency graphs        | Visual dependency relationship maps |
-| Compatibility reports    | Version compatibility analysis |
-| Migration paths          | Breaking change migration guides |
-| Version analytics        | Spec health and adoption metrics |
+| Output                | Description                           |
+| --------------------- | ------------------------------------- |
+| Version matrices      | Comprehensive version tracking tables |
+| Dependency graphs     | Visual dependency relationship maps   |
+| Compatibility reports | Version compatibility analysis        |
+| Migration paths       | Breaking change migration guides      |
+| Version analytics     | Spec health and adoption metrics      |
 
 ---
 
@@ -590,7 +578,7 @@ export class VersionValidationTests {
   private async testBreakingChangeDetection(): Promise<TestResult> {
     const breakingChanges = await this.detectBreakingChanges('auth.md', '1.1.0', '1.2.0');
     const hasBreakingChanges = breakingChanges.length > 0;
-    
+
     return {
       test: 'Breaking Change Detection',
       passed: !hasBreakingChanges, // Should not have breaking changes
@@ -698,7 +686,7 @@ export class IntegrationTests {
 
   private async testSpecValidationIntegration(): Promise<TestResult> {
     const validationResult = await this.validateAllSpecs();
-    
+
     return {
       test: 'Spec Validation Integration',
       passed: validationResult.allValid,

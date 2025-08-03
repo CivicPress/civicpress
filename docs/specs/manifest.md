@@ -1,26 +1,15 @@
 # 📋 CivicPress Spec: `manifest.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - detailed YAML field definitions
-- comprehensive field documentation
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies: []
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+- comprehensive field documentation fixes: [] migration_guide: null
+  compatibility: min_civicpress: 1.0.0 max_civicpress: 'null' dependencies: []
+  authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -57,21 +46,21 @@ acts as the civic identity and initialization anchor for the platform.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Town information         | Municipality name, contact, and metadata |
-| CivicPress configuration | Enabled modules, features, and settings |
-| Branding assets          | Logos, colors, themes, and visual identity |
+| Input                    | Description                                  |
+| ------------------------ | -------------------------------------------- |
+| Town information         | Municipality name, contact, and metadata     |
+| CivicPress configuration | Enabled modules, features, and settings      |
+| Branding assets          | Logos, colors, themes, and visual identity   |
 | Federation settings      | Node ID, public keys, and sync configuration |
-| System metadata          | Population, area, officials, and timestamps |
+| System metadata          | Population, area, officials, and timestamps  |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| CivicPress manifest      | Validated and structured manifest file |
-| System configuration     | Module and feature activation settings |
-| Branding configuration   | Visual identity and theming data |
-| Federation identity      | Node identification and sync settings |
-| Civic metadata          | Town information for UI and API use |
+| Output                 | Description                            |
+| ---------------------- | -------------------------------------- |
+| CivicPress manifest    | Validated and structured manifest file |
+| System configuration   | Module and feature activation settings |
+| Branding configuration | Visual identity and theming data       |
+| Federation identity    | Node identification and sync settings  |
+| Civic metadata         | Town information for UI and API use    |
 
 ---
 

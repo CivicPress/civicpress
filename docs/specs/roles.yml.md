@@ -1,29 +1,17 @@
 # 🧑‍💼 CivicPress Spec: `roles.yml.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive roles documentation
 - YAML schema
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'permissions.md: >=1.0.0'
-  - 'auth.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'auth.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -59,21 +47,21 @@ workflows, approvals, and visual editors.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
+| Input                    | Description                         |
+| ------------------------ | ----------------------------------- |
 | Git usernames            | Commit authors and user identifiers |
-| Role definitions         | Role types from `permissions.md` |
-| User metadata            | Names, emails, departments, titles |
-| Role assignments         | User-to-role mappings and changes |
-| Role validation requests | Permission checks and role lookups |
+| Role definitions         | Role types from `permissions.md`    |
+| User metadata            | Names, emails, departments, titles  |
+| Role assignments         | User-to-role mappings and changes   |
+| Role validation requests | Permission checks and role lookups  |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Role mappings            | Validated user-to-role assignments |
-| Permission decisions     | Allow/deny responses based on roles |
-| Role validation results  | Role verification and status checks |
+| Output                  | Description                           |
+| ----------------------- | ------------------------------------- |
+| Role mappings           | Validated user-to-role assignments    |
+| Permission decisions    | Allow/deny responses based on roles   |
+| Role validation results | Role verification and status checks   |
 | User metadata           | Display names and contact information |
-| Audit logs              | Role assignment and change history |
+| Audit logs              | Role assignment and change history    |
 
 ---
 

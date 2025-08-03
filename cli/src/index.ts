@@ -20,11 +20,12 @@ import { loginCommand } from './commands/login.js';
 import { indexCommand } from './commands/index.js';
 import { autoIndexCommand } from './commands/auto-index.js';
 import { cleanupCommand } from './commands/cleanup.js';
-import { debugCommand } from './commands/debug.js';
+
 import setupAuthCommand from './commands/auth.js';
 import setupUsersCommand from './commands/users.js';
 import { CentralConfigManager } from '@civicpress/core';
 import { infoCommand } from './commands/info.js';
+import notifyCommand from './commands/notify.js';
 
 // Set logger options immediately to prevent warnings during config loading
 CentralConfigManager.setLoggerOptions({
@@ -66,7 +67,7 @@ loginCommand(cli);
 indexCommand(cli);
 autoIndexCommand(cli);
 cleanupCommand(cli);
-debugCommand(cli);
+
 infoCommand(cli);
 
 // Setup auth commands
@@ -74,6 +75,9 @@ setupAuthCommand(cli);
 
 // Setup users commands
 setupUsersCommand(cli);
+
+// Setup notification commands
+notifyCommand(cli);
 
 // Parse and run
 cli.parse();

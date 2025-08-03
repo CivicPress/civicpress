@@ -1,29 +1,17 @@
 # ⚖️ CivicPress Spec: `legal-register.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive legal register documentation
 - document integrity
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'public-data-structure.md: >=1.0.0'
-  - 'records-validation.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'records-validation.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -59,21 +47,21 @@ ordinances, and resolutions in a structured, Markdown-native format.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Legal documents          | Markdown files for bylaws, motions, resolutions |
-| Document metadata        | Title, number, status, authors, approval info |
-| Approval workflows       | Multi-role approval processes and signatures |
-| Legal templates          | Pre-defined templates for different document types |
-| Version history          | Document versioning and change tracking |
+| Input              | Description                                        |
+| ------------------ | -------------------------------------------------- |
+| Legal documents    | Markdown files for bylaws, motions, resolutions    |
+| Document metadata  | Title, number, status, authors, approval info      |
+| Approval workflows | Multi-role approval processes and signatures       |
+| Legal templates    | Pre-defined templates for different document types |
+| Version history    | Document versioning and change tracking            |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Legal records            | Structured legal documents in `records/` |
-| Legal indexes            | Searchable indexes of legal documents |
-| Approval logs            | Audit trails of document approvals |
-| Version snapshots        | Immutable versions of legal documents |
-| Publication notices      | Notifications of legal document changes |
+| Output              | Description                              |
+| ------------------- | ---------------------------------------- |
+| Legal records       | Structured legal documents in `records/` |
+| Legal indexes       | Searchable indexes of legal documents    |
+| Approval logs       | Audit trails of document approvals       |
+| Version snapshots   | Immutable versions of legal documents    |
+| Publication notices | Notifications of legal document changes  |
 
 ---
 

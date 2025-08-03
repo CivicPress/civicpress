@@ -1,29 +1,17 @@
 # 🔧 CivicPress Spec: `git-policy.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - detailed YAML examples
 - comprehensive field definitions
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -58,21 +46,21 @@ civic editing flows using Git.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Git commits              | Commit messages, metadata, and changes |
-| Branch operations        | Branch creation, merging, and protection |
-| User roles              | Role-based permissions from `.civic/roles.yml` |
-| Pull requests           | PR metadata, reviews, and approval status |
-| Policy configuration     | Git policy rules from `.civic/git-policy.yml` |
+| Input                | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| Git commits          | Commit messages, metadata, and changes         |
+| Branch operations    | Branch creation, merging, and protection       |
+| User roles           | Role-based permissions from `.civic/roles.yml` |
+| Pull requests        | PR metadata, reviews, and approval status      |
+| Policy configuration | Git policy rules from `.civic/git-policy.yml`  |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Validated commits        | Git commits that pass policy validation |
-| Protected branches       | Branches with enforced protection rules |
-| Approval workflows       | Multi-role approval processes and status |
-| Audit logs              | Git operation history and policy enforcement |
-| Rejected operations      | Blocked commits, merges, or branch operations |
+| Output              | Description                                   |
+| ------------------- | --------------------------------------------- |
+| Validated commits   | Git commits that pass policy validation       |
+| Protected branches  | Branches with enforced protection rules       |
+| Approval workflows  | Multi-role approval processes and status      |
+| Audit logs          | Git operation history and policy enforcement  |
+| Rejected operations | Blocked commits, merges, or branch operations |
 
 ---
 

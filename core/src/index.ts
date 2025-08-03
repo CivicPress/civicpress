@@ -20,6 +20,7 @@ export {
   OAuthProviderManager,
 } from './auth/oauth-provider.js';
 export { AuthConfigManager } from './auth/auth-config.js';
+export { RoleManager } from './auth/role-manager.js';
 
 // Export role-based authorization utilities
 export {
@@ -57,6 +58,32 @@ export async function loadConfig() {
 export { CentralConfigManager } from './config/central-config.js';
 export type { CentralConfig } from './config/central-config.js';
 
+// Export record types configuration
+export {
+  DEFAULT_RECORD_TYPES,
+  validateRecordTypeConfig,
+  mergeRecordTypes,
+  getRecordTypesWithMetadata,
+} from './config/record-types.js';
+export type {
+  RecordTypeConfig,
+  RecordTypesConfig,
+  RecordTypeMetadata,
+} from './config/record-types.js';
+
+// Export record statuses configuration
+export {
+  DEFAULT_RECORD_STATUSES,
+  validateRecordStatusConfig,
+  mergeRecordStatuses,
+  getRecordStatusesWithMetadata,
+} from './config/record-statuses.js';
+export type {
+  RecordStatusConfig,
+  RecordStatusesConfig,
+  RecordStatusMetadata,
+} from './config/record-statuses.js';
+
 // Export indexing services
 export { IndexingService } from './indexing/indexing-service.js';
 export type {
@@ -64,3 +91,32 @@ export type {
   CivicIndexEntry,
   IndexingOptions,
 } from './indexing/indexing-service.js';
+
+// Export notification services
+export {
+  NotificationService,
+  NotificationConfig,
+  NotificationChannel,
+  NotificationTemplate,
+  NotificationAudit,
+  NotificationQueue,
+  NotificationSecurity,
+  NotificationRateLimiter,
+  NotificationLogger,
+  AuthTemplate,
+} from './notifications/index.js';
+export type {
+  NotificationRequest,
+  NotificationResponse,
+  ChannelRequest,
+  ChannelResponse,
+  ChannelConfig,
+  TemplateData,
+  ProcessedTemplate,
+  AuditEntry,
+  QueuedNotification,
+  RateLimitConfig,
+  RateLimitResult,
+  SecurityValidationResult,
+  LogEntry,
+} from './notifications/index.js';

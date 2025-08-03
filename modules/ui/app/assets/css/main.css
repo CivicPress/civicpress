@@ -1,0 +1,83 @@
+@import "tailwindcss";
+@import "@nuxt/ui-pro";
+
+/* @theme static {
+  --font-sans: 'Public Sans', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+} */
+
+/* html,
+body {
+  height: 100vh;
+  width: 100vw;
+} */
+
+:root {
+  --ui-container: var(--container-4xl);
+  --ui-primary: #2563eb;
+
+  ::selection {
+    color: #282a30;
+    background-color: #c8c8c8;
+  }
+}
+
+.dark {
+  ::selection {
+    color: #ffffff;
+    background-color: #474747;
+  }
+}
+
+/* Markdown content styling */
+.markdown-content {
+  /* Ensure proper spacing and typography */
+  line-height: 1.6;
+}
+
+.markdown-content .prose {
+  /* Override any conflicting styles */
+  color: inherit;
+}
+
+.markdown-content .prose h1 {
+  /* Ensure h1 in content doesn't conflict with page h1 */
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-content .prose h2 {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content .prose h3 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content .prose ul,
+.markdown-content .prose ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content .prose li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content .prose blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: #6b7280;
+} 

@@ -21,7 +21,7 @@ export class DatabaseService {
       await this.adapter.initialize();
       this.isConnected = true;
       // Suppress database messages in test environment
-      if (process.env.NODE_ENV !== 'test') {
+      if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
         this.logger.info('Database initialized successfully');
       }
     } catch (error) {
@@ -303,8 +303,15 @@ export class DatabaseService {
     const params = [`%${query}%`, `%${query}%`, `%${query}%`];
 
     if (recordType) {
-      sql += ' AND record_type = ?';
-      params.push(recordType);
+      const typeFilters = recordType.split(',').map((t) => t.trim());
+      if (typeFilters.length === 1) {
+        sql += ' AND record_type = ?';
+        params.push(typeFilters[0]);
+      } else {
+        const placeholders = typeFilters.map(() => '?').join(',');
+        sql += ` AND record_type IN (${placeholders})`;
+        params.push(...typeFilters);
+      }
     }
 
     sql += ' ORDER BY updated_at DESC';
@@ -422,6 +429,9 @@ export class DatabaseService {
     await this.removeRecordFromIndex(id, '');
   }
 
+  /**
+   * List records with optional filtering
+   */
   async listRecords(
     options: {
       type?: string;
@@ -431,36 +441,58 @@ export class DatabaseService {
     } = {}
   ): Promise<{ records: any[]; total: number }> {
     let sql = 'SELECT * FROM records WHERE 1=1';
-    const params = [];
+    const params: any[] = [];
 
+    // Apply type filter (handle comma-separated values)
     if (options.type) {
-      sql += ' AND type = ?';
-      params.push(options.type);
+      const typeFilters = options.type.split(',').map((t) => t.trim());
+      if (typeFilters.length === 1) {
+        sql += ' AND type = ?';
+        params.push(typeFilters[0]);
+      } else {
+        const placeholders = typeFilters.map(() => '?').join(',');
+        sql += ` AND type IN (${placeholders})`;
+        params.push(...typeFilters);
+      }
     }
+
+    // Apply status filter (handle comma-separated values)
     if (options.status) {
-      sql += ' AND status = ?';
-      params.push(options.status);
+      const statusFilters = options.status.split(',').map((s) => s.trim());
+      if (statusFilters.length === 1) {
+        sql += ' AND status = ?';
+        params.push(statusFilters[0]);
+      } else {
+        const placeholders = statusFilters.map(() => '?').join(',');
+        sql += ` AND status IN (${placeholders})`;
+        params.push(...statusFilters);
+      }
     }
 
     // Get total count
     const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as count');
-    const countRows = await this.adapter.query(countSql, params);
-    const total = countRows[0].count;
+    const countResult = await this.adapter.query(countSql, params);
+    const total = countResult[0].count;
 
-    // Get records with pagination
+    // Apply ordering and pagination
     sql += ' ORDER BY created_at DESC';
-    if (options.limit) {
-      sql += ' LIMIT ?';
-      params.push(options.limit);
-      if (options.offset) {
-        sql += ' OFFSET ?';
-        params.push(options.offset);
-      }
+
+    // Always apply limit (default to 10 if not provided)
+    const limit = options.limit || 10;
+    sql += ' LIMIT ?';
+    params.push(limit);
+
+    if (options.offset) {
+      sql += ' OFFSET ?';
+      params.push(options.offset);
     }
 
     const records = await this.adapter.query(sql, params);
 
-    return { records, total };
+    return {
+      records,
+      total,
+    };
   }
 
   // Audit logging

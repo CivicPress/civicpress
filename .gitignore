@@ -24,27 +24,22 @@ build/
 *.d.ts
 *.d.ts.map
 
-# CivicPress
-.system-data/civic.db
-.civic/state/
-.civic/hooks.log.jsonl
-records/**/*.bak
-records/**/*.tmp
+# CivicPress Private System Data (never in Git)
+.system-data/
+*.db
+*.log
 
-# CivicPress Data (separate Git repo)
+# CivicPress Public Data (separate Git repository)
+# data/ folder has its own Git repository and should not be tracked here
 data/
 
 # pnpm
 # Note: pnpm-lock.yaml should be committed for reproducible builds
 .pnpm-store/
 
-# Hook logs (operational data, not configuration)
-.system-data/hooks.log.jsonl
-
 # Mac system files
 Icon?
 ._*
 
 # backup exports
-.system-data/backup/
 *.zip

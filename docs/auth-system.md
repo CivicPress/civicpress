@@ -1,140 +1,112 @@
-# 🔐 CivicPress Authentication System
-
-> **Note:**
->
-> **Simulated account authentication is only available in development mode.**
->
-> - The `/api/auth/simulated` endpoint and the `civic auth:simulated` CLI
->   command are **strictly disabled in production**
->   (`NODE_ENV === 'production'`).
-> - In production, these will return a clear error and cannot be used for
->   authentication.
+# CivicPress Authentication System
 
 The CivicPress authentication system provides secure, role-based access control
-with support for multiple authentication providers including GitHub OAuth and
-simulated accounts for development.
+with support for multiple authentication methods.
 
-## 🎯 Features
+## Overview
 
-### Core Functionality
+CivicPress supports three authentication methods:
 
-- **GitHub OAuth Integration**: Authenticate users via GitHub OAuth tokens
-- **Simulated Accounts**: Development/testing accounts with configurable roles
-- **Role-Based Access Control**: Granular permissions based on user roles
-- **Session Management**: JWT-based stateless sessions
-- **API Key Support**: Long-lived API keys for automated access
-- **Audit Logging**: Comprehensive authentication event tracking
+1. **GitHub OAuth** (Production) - Authenticate with GitHub Personal Access
+   Tokens
+2. **Username/Password** (Traditional) - Local user accounts with password
+   authentication
+3. **Simulated Accounts** (Development only) - Quick setup for development and
+   testing
 
-### Supported Authentication Methods
+## Authentication Methods
 
-1. **GitHub OAuth** (Production)
-2. **Simulated Accounts** (Development/Testing)
-3. **API Keys** (Automated access)
+### GitHub OAuth (Production)
 
-## 🔧 CLI Commands
+**Getting a GitHub Token:**
 
-### Authentication Methods
+1. Go to GitHub Settings > Developer settings > Personal access tokens
+2. Click "Generate new token (classic)"
+3. Select scopes: `repo`, `read:user`, `user:email`
+4. Copy the generated token
 
-CivicPress supports multiple authentication methods:
-
-#### 1. GitHub OAuth Authentication
-
-**Getting a GitHub Token**:
-
-1. **Create a Personal Access Token**:
-   - Go to GitHub Settings > Developer settings > Personal access tokens
-   - Click "Generate new token (classic)"
-   - Select scopes: `repo`, `read:user`, `user:email`
-   - Copy the generated token (you won't see it again!)
-
-2. **Using the Token**:
+**Using GitHub OAuth:**
 
 ```bash
-# Authenticate with GitHub token
+# CLI Authentication
 civic auth:login --token <github_token>
 
-# Validate GitHub token
-civic auth:validate --token <github_token>
-
-# Interactive login (prompts for token)
-civic auth:login
+# API Authentication
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"token": "your_github_token", "provider": "github"}'
 ```
 
-#### 2. Username/Password Authentication
+### Username/Password (Traditional)
 
 For traditional username/password authentication:
 
 ```bash
-# Login with username and password
+# CLI Authentication
 civic auth:password --username <username> --password <password>
 
-# Interactive password login (prompts for credentials)
-civic auth:password
-
-# Validate password authentication
-civic auth:validate --username <username> --password <password>
+# API Authentication
+curl -X POST http://localhost:3000/auth/password \
+  -H "Content-Type: application/json" \
+  -d '{"username": "user", "password": "password"}'
 ```
 
-**Note**: Both GitHub tokens and username/password are supported. Choose the
-method that works best for your setup!
+### Simulated Accounts (Development Only)
 
-### Simulated Authentication (Development)
+**Important**: Simulated authentication is **strictly disabled in production**
+(`NODE_ENV === 'production'`).
 
 ```bash
-# Create simulated user with default role (public)
-civic auth:simulated --username testuser
-
-# Create simulated user with specific role
-civic auth:simulated --username clerk --role clerk
-
-# Create simulated admin user
+# CLI Authentication
 civic auth:simulated --username admin --role admin
 
-# JSON output for automation
-civic auth:simulated --username testuser --role council --json
+# API Authentication
+curl -X POST http://localhost:3000/auth/simulated \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "role": "admin"}'
 ```
 
-### API Key Management
+## User Roles & Permissions
 
-```bash
-# Create API key
-civic auth:key:create --name "My API Key"
+### Available Roles
 
-# List API keys
-civic auth:key:list
+| Role      | Description        | Permissions                 |
+| --------- | ------------------ | --------------------------- |
+| `admin`   | Full system access | All permissions             |
+| `clerk`   | Municipal clerk    | Create, edit, view records  |
+| `council` | Council member     | Approve, edit, view records |
+| `public`  | Public citizen     | View published records only |
 
-# Delete API key
-civic auth:key:delete --id <key_id>
-```
+### Permission System
 
-## 🌐 API Endpoints
+Permissions are granular and role-based:
 
-### Authentication Endpoints
+- **`records:create`** - Create new civic records
+- **`records:edit`** - Edit existing records
+- **`records:view`** - View records
+- **`records:delete`** - Archive/delete records
+- **`system:admin`** - Administrative access
+- **`workflows:execute`** - Execute workflows
 
-#### POST /api/auth/login
+## API Authentication
+
+### Authentication Flow
+
+1. **Authenticate**: POST to `/auth/login`, `/auth/password`, or
+   `/auth/simulated`
+2. **Get Token**: Receive JWT token in response
+3. **Use Bearer Token**: Include token in `Authorization: Bearer <token>` header
+
+### API Endpoints
+
+#### POST /auth/login
 
 Authenticate with OAuth provider token.
 
-**Request:**
-
-```json
-{
-  "token": "github_oauth_token",
-  "provider": "github"
-}
-```
-
-#### POST /api/auth/password
-
-Authenticate with username and password.
-
-**Request:**
-
-```json
-{
-  "username": "your_username",
-  "password": "your_password"
-}
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"token": "github_oauth_token", "provider": "github"}'
 ```
 
 **Response:**
@@ -142,32 +114,141 @@ Authenticate with username and password.
 ```json
 {
   "success": true,
-  "session": {
-    "token": "jwt_token_here",
+  "data": {
+    "session": {
+      "token": "jwt_token_here",
+      "user": {
+        "id": "user_id",
+        "username": "username",
+        "role": "council",
+        "email": "user@example.com",
+        "name": "User Name",
+        "avatar_url": "https://..."
+      },
+      "expiresAt": "2024-01-01T12:00:00Z"
+    }
+  }
+}
+```
+
+#### POST /auth/password
+
+Authenticate with username and password.
+
+```bash
+curl -X POST http://localhost:3000/auth/password \
+  -H "Content-Type: application/json" \
+  -d '{"username": "user", "password": "password"}'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "session": {
+      "token": "jwt_token_here",
+      "user": {
+        "id": "user_id",
+        "username": "username",
+        "role": "council",
+        "email": "user@example.com",
+        "name": "User Name",
+        "avatar_url": "https://..."
+      },
+      "expiresAt": "2024-01-01T12:00:00Z"
+    }
+  }
+}
+```
+
+#### POST /auth/simulated
+
+Authenticate with simulated account (development only).
+
+```bash
+curl -X POST http://localhost:3000/auth/simulated \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "role": "admin"}'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "session": {
+      "token": "jwt_token_here",
+      "user": {
+        "id": "user_id",
+        "username": "admin",
+        "role": "admin",
+        "email": "admin@simulated.local",
+        "name": "admin",
+        "avatar_url": "https://..."
+      },
+      "expiresAt": "2024-01-01T12:00:00Z"
+    }
+  }
+}
+```
+
+#### GET /auth/providers
+
+Get available OAuth providers.
+
+```bash
+curl -X GET http://localhost:3000/auth/providers
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "providers": ["github"]
+  }
+}
+```
+
+#### GET /auth/me
+
+Get current authenticated user information.
+
+```bash
+curl -X GET http://localhost:3000/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
     "user": {
       "id": "user_id",
       "username": "username",
       "role": "council",
       "email": "user@example.com",
       "name": "User Name",
-      "avatar_url": "https://..."
-    },
-    "expiresAt": "2024-01-01T12:00:00Z"
+      "avatar_url": "https://...",
+      "permissions": ["records:create", "records:edit", "records:view"]
+    }
   }
 }
 ```
 
-#### POST /api/auth/simulated
+#### POST /auth/logout
 
-Authenticate with simulated account (development only).
+Logout (stateless - client should delete token).
 
-**Request:**
-
-```json
-{
-  "username": "testuser",
-  "role": "council"
-}
+```bash
+curl -X POST http://localhost:3000/auth/logout \
+  -H "Authorization: Bearer <token>"
 ```
 
 **Response:**
@@ -175,81 +256,139 @@ Authenticate with simulated account (development only).
 ```json
 {
   "success": true,
-  "session": {
-    "token": "jwt_token_here",
-    "user": {
-      "id": "user_id",
-      "username": "testuser",
-      "role": "council",
-      "email": "testuser@simulated.local",
-      "name": "testuser",
-      "avatar_url": "https://..."
-    },
-    "expiresAt": "2024-01-01T12:00:00Z"
+  "data": {
+    "message": "Logged out successfully"
   }
 }
 ```
 
-#### GET /api/auth/providers
+## CLI Authentication
 
-Get available OAuth providers.
+### Authentication Commands
 
-**Response:**
+#### `auth:simulated`
 
-```json
-{
-  "success": true,
-  "providers": ["github"]
-}
+Create simulated user account (development only).
+
+```bash
+# Create admin user
+civic auth:simulated --username admin --role admin
+
+# Create clerk user
+civic auth:simulated --username clerk --role clerk
+
+# JSON output
+civic auth:simulated --username test --role council --json
 ```
 
-#### GET /api/auth/me
+#### `auth:login`
 
-Get current authenticated user information.
+Authenticate with GitHub OAuth.
 
-**Headers:** `Authorization: Bearer <token>`
+```bash
+# Authenticate with token
+civic auth:login --token <github_token>
 
-**Response:**
+# Interactive login (prompts for token)
+civic auth:login
+```
+
+#### `auth:password`
+
+Authenticate with username/password.
+
+```bash
+# Authenticate with credentials
+civic auth:password --username <username> --password <password>
+
+# Interactive login (prompts for credentials)
+civic auth:password
+```
+
+## Security Considerations
+
+### Production Security
+
+- **Simulated accounts are disabled in production**
+- **GitHub OAuth is recommended for production**
+- **JWT tokens have expiration times**
+- **All authentication events are logged**
+
+### Development Security
+
+- **Simulated accounts are only available in development**
+- **Use strong passwords for local accounts**
+- **Keep GitHub tokens secure**
+- **Regular token rotation recommended**
+
+## Error Handling
+
+### Common Authentication Errors
+
+| Error Code                | Description                  | Solution                                |
+| ------------------------- | ---------------------------- | --------------------------------------- |
+| `MISSING_AUTH`            | No authorization header      | Include `Authorization: Bearer <token>` |
+| `INVALID_TOKEN`           | Token is invalid or expired  | Re-authenticate to get new token        |
+| `INVALID_ROLE`            | Role is not valid            | Use one of the supported roles          |
+| `SIMULATED_AUTH_DISABLED` | Simulated auth in production | Use GitHub OAuth or username/password   |
+
+### Error Response Format
 
 ```json
 {
-  "success": true,
-  "user": {
-    "id": "user_id",
-    "username": "username",
-    "role": "council",
-    "email": "user@example.com",
-    "name": "User Name",
-    "avatar_url": "https://...",
-    "permissions": ["records:create", "records:edit", "records:view"]
+  "success": false,
+  "error": {
+    "message": "Authentication failed",
+    "code": "INVALID_TOKEN",
+    "details": {
+      "reason": "Token expired"
+    }
   }
 }
 ```
 
-## 👥 User Roles & Permissions
+## Examples
 
-### Available Roles
+### Complete Authentication Flow
 
-| Role      | Description        | Permissions                   |
-| --------- | ------------------ | ----------------------------- |
-| `admin`   | Full system access | All permissions               |
-| `clerk`   | Municipal clerk    | Create, edit, view records    |
-| `council` | Council member     | Approve, edit, view records   |
-| `public`  | Public citizen     | View published records only   |
-| `citizen` | Registered citizen | View records, submit feedback |
+```bash
+# 1. Authenticate with simulated account (development)
+civic auth:simulated --username admin --role admin
 
-### Permission System
+# 2. Verify authentication
+civic auth:me
 
-Permissions are granular and role-based:
+# 3. Use authenticated session
+civic list --json
 
-- **`records:create`**: Create new civic records
-- **`records:edit`**: Edit existing records
-- **`records:view`**: View records
-- **`records:delete`**: Archive/delete records
-- **`system:admin`**: Administrative access
-- **`workflows:execute`**: Execute workflows
+# 4. Logout (optional - client should delete token)
+civic auth:logout
+```
 
-## 🔧 Configuration
+### API Authentication Flow
+
+```bash
+# 1. Authenticate
+curl -X POST http://localhost:3000/auth/simulated \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "role": "admin"}'
+
+# 2. Extract token from response
+TOKEN="jwt_token_from_response"
+
+# 3. Use token for authenticated requests
+curl -X GET http://localhost:3000/api/records \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Configuration
+
+### Environment Variables
+
+- `NODE_ENV` - Environment (development/production)
+- `JWT_SECRET` - JWT signing secret
+- `GITHUB_CLIENT_ID` - GitHub OAuth client ID
+- `GITHUB_CLIENT_SECRET` - GitHub OAuth client secret
 
 ### GitHub OAuth Setup
 
@@ -259,211 +398,33 @@ Permissions are granular and role-based:
    - Set callback URL to your CivicPress instance
 
 2. **Environment Variables**:
-
    ```bash
-   export GITHUB_CLIENT_ID=your_client_id
-   export GITHUB_CLIENT_SECRET=your_client_secret
+   export GITHUB_CLIENT_ID="your_client_id"
+   export GITHUB_CLIENT_SECRET="your_client_secret"
+   export JWT_SECRET="your_jwt_secret"
    ```
 
-3. **Role Mapping**: Configure role mapping in `.civic/roles.yml`:
-   ```yaml
-   roles:
-     admin:
-       github_users:
-         - "your-github-username"
-     clerk:
-       github_users:
-         - "clerk-username"
-   ```
+## Troubleshooting
 
-### Simulated Accounts
-
-For development and testing, you can create simulated accounts:
+### Authentication Issues
 
 ```bash
-# Create test users with different roles
+# Check if user exists
 civic auth:simulated --username admin --role admin
-civic auth:simulated --username clerk --role clerk
-civic auth:simulated --username citizen --role citizen
+
+# Verify token
+civic auth:me
+
+# Debug permissions
+civic debug permissions
 ```
 
-## 🧪 Testing
-
-### Test Authentication Flow
+### Production Issues
 
 ```bash
-# 1. Create simulated user
-civic auth:simulated --username testuser --role council
+# Ensure simulated auth is disabled
+export NODE_ENV=production
 
-# 2. Use the returned token for API calls
-curl -H "Authorization: Bearer <token>" \
-     http://localhost:3000/api/auth/me
-
-# 3. Test role-based access
-curl -H "Authorization: Bearer <token>" \
-     http://localhost:3000/api/records
-```
-
-### Test GitHub OAuth
-
-```bash
-# 1. Get GitHub token from GitHub
-# 2. Authenticate
+# Use GitHub OAuth instead
 civic auth:login --token <github_token>
-
-# 3. Verify authentication
-civic auth:validate --token <github_token>
 ```
-
-## 🔐 Security Considerations
-
-### Token Security
-
-- **JWT Tokens**: Stateless, signed tokens with expiration
-- **Token Rotation**: Automatic token refresh
-- **Secure Storage**: Tokens should be stored securely on client
-- **HTTPS Only**: All authentication should use HTTPS in production
-
-### Role-Based Security
-
-- **Principle of Least Privilege**: Users get minimum required permissions
-- **Role Validation**: All roles are validated against configuration
-- **Permission Inheritance**: Roles inherit permissions from parent roles
-- **Audit Logging**: All authentication events are logged
-
-### Development Security
-
-- **Simulated Accounts**: Only available in development mode
-- **Test Data**: Use simulated accounts for testing, not production
-- **Token Expiration**: Short expiration for development tokens
-- **Local Development**: Simulated accounts work offline
-
-## 🚀 Integration Examples
-
-### JavaScript/Node.js
-
-```javascript
-// Authenticate with GitHub
-const response = await fetch('/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    token: githubToken,
-    provider: 'github'
-  })
-});
-
-const { session } = await response.json();
-
-// Use token for API calls
-const recordsResponse = await fetch('/api/records', {
-  headers: {
-    'Authorization': `Bearer ${session.token}`
-  }
-});
-```
-
-### Python
-
-```python
-import requests
-
-# Authenticate with simulated account
-response = requests.post('http://localhost:3000/api/auth/simulated', json={
-    'username': 'testuser',
-    'role': 'council'
-})
-
-session = response.json()['session']
-
-# Use token for API calls
-headers = {'Authorization': f"Bearer {session['token']}"}
-records = requests.get('http://localhost:3000/api/records', headers=headers)
-```
-
-### Shell Script
-
-```bash
-#!/bin/bash
-
-# Authenticate and get token
-TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/simulated \
-  -H "Content-Type: application/json" \
-  -d '{"username": "testuser", "role": "council"}' \
-  | jq -r '.session.token')
-
-# Use token for API calls
-curl -H "Authorization: Bearer $TOKEN" \
-     http://localhost:3000/api/records
-```
-
-## 📊 Monitoring & Logging
-
-### Authentication Events
-
-All authentication events are logged with:
-
-- **User ID**: Who performed the action
-- **Action**: What action was performed
-- **Timestamp**: When the action occurred
-- **IP Address**: Where the action came from
-- **Success/Failure**: Whether the action succeeded
-
-### Audit Trail
-
-Authentication events are stored in the database and can be queried:
-
-```sql
--- View recent authentication events
-SELECT * FROM auth_events
-ORDER BY created_at DESC
-LIMIT 10;
-
--- View failed authentication attempts
-SELECT * FROM auth_events
-WHERE action LIKE '%failed%'
-ORDER BY created_at DESC;
-```
-
-## 🔄 Troubleshooting
-
-### Common Issues
-
-1. **Invalid Token**:
-
-   ```bash
-   # Check token format
-   civic auth:validate --token <token>
-   ```
-
-2. **Role Not Found**:
-
-   ```bash
-   # List available roles
-   civic auth:roles:list
-   ```
-
-3. **Permission Denied**:
-   ```bash
-   # Check user permissions
-   civic auth:permissions --username <username>
-   ```
-
-### Debug Mode
-
-Enable debug logging for authentication:
-
-```bash
-# Set debug environment variable
-export CIVIC_DEBUG=auth
-
-# Run commands with debug output
-civic auth:login --token <token> --verbose
-```
-
-## 📚 Related Documentation
-
-- [API Documentation](api.md)
-- [Role Management](roles.md)
-- [Permission System](permissions.md)
-- [Security Guidelines](security.md)

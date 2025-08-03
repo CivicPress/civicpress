@@ -35,6 +35,13 @@ export class RecordsService {
   }
 
   /**
+   * Get the CivicPress instance
+   */
+  getCivicPress(): CivicPress {
+    return this.civicPress;
+  }
+
+  /**
    * Create a new record
    */
   async createRecord(
@@ -44,19 +51,10 @@ export class RecordsService {
       content?: string;
       metadata?: Record<string, any>;
     },
-    userRole: string = 'unknown'
+    user: any
   ): Promise<any> {
-    // Create a mock user object for permission checking
-    const mockUser = {
-      id: 1,
-      username: 'api-user',
-      role: userRole,
-      email: 'api@example.com',
-      name: 'API User',
-    };
-
     // Validate permissions using the same system as API middleware
-    const hasPermission = await userCan(mockUser, 'records:create', {
+    const hasPermission = await userCan(user, 'records:create', {
       recordType: data.type,
       action: 'create',
     });
@@ -73,11 +71,10 @@ export class RecordsService {
       type: data.type,
       content: data.content,
       metadata: data.metadata,
-      role: userRole,
     };
 
     // Create the record using CivicCore
-    const record = await this.recordManager.createRecord(request, userRole);
+    const record = await this.recordManager.createRecord(request, user);
 
     return {
       id: record.id,
@@ -85,10 +82,20 @@ export class RecordsService {
       type: record.type,
       status: record.status,
       content: record.content,
-      metadata: record.metadata || {},
+      metadata: {
+        ...record.metadata,
+        author:
+          typeof record.metadata?.author === 'object' &&
+          record.metadata.author?.username
+            ? record.metadata.author.username
+            : record.metadata?.author,
+      },
       path: record.path,
       created: record.created_at,
-      author: record.author,
+      author:
+        typeof record.author === 'object' && record.author.username
+          ? record.author.username
+          : record.author,
     };
   }
 
@@ -115,6 +122,53 @@ export class RecordsService {
   }
 
   /**
+   * Get raw file content for a record (including frontmatter)
+   */
+  async getRawRecord(id: string): Promise<any | null> {
+    const record = await this.recordManager.getRecord(id);
+    if (!record) {
+      return null;
+    }
+
+    // Read the raw file content from the filesystem
+    const fs = require('fs');
+    const path = require('path');
+
+    try {
+      // The record.path already includes 'records/', so we need to construct the path correctly
+      const filePath = path.join(this.dataDir!, record.path);
+
+      const rawContent = fs.readFileSync(filePath, 'utf8');
+
+      return {
+        id: record.id,
+        title: record.title,
+        type: record.type,
+        status: record.status,
+        content: rawContent, // Return the complete file content including frontmatter
+        metadata: record.metadata || {},
+        path: record.path,
+        created: record.created_at,
+        author: record.author,
+      };
+    } catch (error) {
+      console.error(`Failed to read raw file for record ${id}:`, error);
+      // Fall back to database content if file read fails
+      return {
+        id: record.id,
+        title: record.title,
+        type: record.type,
+        status: record.status,
+        content: record.content,
+        metadata: record.metadata || {},
+        path: record.path,
+        created: record.created_at,
+        author: record.author,
+      };
+    }
+  }
+
+  /**
    * Update a record
    */
   async updateRecord(
@@ -125,7 +179,7 @@ export class RecordsService {
       status?: string;
       metadata?: Record<string, any>;
     },
-    userRole: string = 'unknown'
+    user: any
   ): Promise<any | null> {
     // Get the current record to validate permissions
     const currentRecord = await this.recordManager.getRecord(id);
@@ -133,17 +187,8 @@ export class RecordsService {
       return null;
     }
 
-    // Create a mock user object for permission checking
-    const mockUser = {
-      id: 1,
-      username: 'api-user',
-      role: userRole,
-      email: 'api@example.com',
-      name: 'API User',
-    };
-
     // Validate permissions using the same system as API middleware
-    const hasPermission = await userCan(mockUser, 'records:edit', {
+    const hasPermission = await userCan(user, 'records:edit', {
       recordType: currentRecord.type,
       action: 'edit',
     });
@@ -166,7 +211,7 @@ export class RecordsService {
     const updatedRecord = await this.recordManager.updateRecord(
       id,
       request,
-      userRole
+      user
     );
 
     if (!updatedRecord) {
@@ -189,27 +234,15 @@ export class RecordsService {
   /**
    * Delete (archive) a record
    */
-  async deleteRecord(
-    id: string,
-    userRole: string = 'unknown'
-  ): Promise<boolean> {
+  async deleteRecord(id: string, user: any): Promise<boolean> {
     // Get the current record to validate permissions
     const record = await this.recordManager.getRecord(id);
     if (!record) {
       return false;
     }
 
-    // Create a mock user object for permission checking
-    const mockUser = {
-      id: 1,
-      username: 'api-user',
-      role: userRole,
-      email: 'api@example.com',
-      name: 'API User',
-    };
-
     // Validate permissions using the same system as API middleware
-    const hasPermission = await userCan(mockUser, 'records:delete', {
+    const hasPermission = await userCan(user, 'records:delete', {
       recordType: record.type,
       action: 'delete',
     });
@@ -221,36 +254,185 @@ export class RecordsService {
     }
 
     // Archive the record
-    return await this.recordManager.archiveRecord(id, userRole);
+    return await this.recordManager.archiveRecord(id, user);
   }
 
   /**
-   * List records
+   * Change record status with workflow validation
+   */
+  async changeRecordStatus(
+    id: string,
+    newStatus: string,
+    user: any,
+    comment?: string
+  ): Promise<{ success: boolean; record?: any; error?: string }> {
+    // Get the current record to validate permissions
+    const record = await this.recordManager.getRecord(id);
+    if (!record) {
+      return { success: false, error: 'Record not found' };
+    }
+
+    // Validate permissions using the same system as API middleware
+    const hasPermission = await userCan(user, 'records:edit', {
+      recordType: record.type,
+      action: 'edit',
+    });
+
+    if (!hasPermission) {
+      return {
+        success: false,
+        error: `Permission denied: Cannot edit records of type '${record.type}'`,
+      };
+    }
+
+    // Validate status transition using workflow engine
+    const currentStatus = record.status;
+    const transitionValidation = await this.workflowManager.validateTransition(
+      currentStatus,
+      newStatus,
+      user.role
+    );
+
+    if (!transitionValidation.valid) {
+      return {
+        success: false,
+        error:
+          transitionValidation.reason ||
+          `Invalid status transition from '${currentStatus}' to '${newStatus}' for role '${user.role}'`,
+      };
+    }
+
+    // Update record with new status
+    const request: UpdateRecordRequest = {
+      status: newStatus,
+      metadata: {
+        ...record.metadata,
+        statusChangedBy: user.username,
+        statusChangedAt: new Date().toISOString(),
+        statusChangeComment: comment,
+        previousStatus: currentStatus,
+      },
+    };
+
+    // Update the record using CivicCore
+    const updatedRecord = await this.recordManager.updateRecord(
+      id,
+      request,
+      user
+    );
+
+    if (!updatedRecord) {
+      return { success: false, error: 'Failed to update record' };
+    }
+
+    return {
+      success: true,
+      record: {
+        id: updatedRecord.id,
+        title: updatedRecord.title,
+        type: updatedRecord.type,
+        status: updatedRecord.status,
+        content: updatedRecord.content,
+        metadata: updatedRecord.metadata || {},
+        path: updatedRecord.path,
+        created: updatedRecord.created_at,
+        author: updatedRecord.author,
+      },
+    };
+  }
+
+  /**
+   * List records with cursor-based pagination
    */
   async listRecords(
     options: {
       type?: string;
       status?: string;
       limit?: number;
-      offset?: number;
+      cursor?: string;
     } = {}
   ): Promise<{
     records: any[];
+    nextCursor: string | null;
+    hasMore: boolean;
     total: number;
-    page: number;
-    limit: number;
   }> {
-    const result = await this.recordManager.listRecords(options);
+    const { type, status, limit = 20, cursor } = options;
+
+    // Get all records from the record manager
+    const result = await this.recordManager.listRecords({
+      type,
+      status,
+      limit: 1000, // Get a large number of records for cursor-based pagination
+      offset: undefined,
+    });
+
+    // Apply filters to the records array
+    let filteredRecords = result.records;
+
+    if (type) {
+      const types = type.split(',').map((t) => t.trim());
+      filteredRecords = filteredRecords.filter((record: any) =>
+        types.includes(record.type)
+      );
+    }
+
+    if (status) {
+      const statuses = status.split(',').map((s) => s.trim());
+      filteredRecords = filteredRecords.filter((record: any) =>
+        statuses.includes(record.status)
+      );
+    }
+
+    // Sort records by creation date (newest first) for consistent cursor behavior
+    filteredRecords.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    // Find the starting index based on cursor
+    let startIndex = 0;
+    if (cursor) {
+      const cursorIndex = filteredRecords.findIndex(
+        (record: any) => record.id === cursor
+      );
+      if (cursorIndex !== -1) {
+        startIndex = cursorIndex + 1; // Start after the cursor
+      }
+    }
+
+    // Get the requested number of records
+    const endIndex = startIndex + limit;
+    const records = filteredRecords.slice(startIndex, endIndex);
+
+    // Determine if there are more records
+    const hasMore = endIndex < filteredRecords.length;
+    const nextCursor = hasMore ? records[records.length - 1]?.id || null : null;
+
+    // Transform records for API response
+    const transformedRecords = records.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      metadata: record.metadata || {},
+      path: record.path,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      author: record.author,
+    }));
+
     return {
-      records: result.records,
-      total: result.total,
-      page: 1,
-      limit: 10,
+      records: transformedRecords,
+      nextCursor,
+      hasMore,
+      total: filteredRecords.length,
     };
   }
 
   /**
-   * Search records
+   * Search records with offset-based pagination (more efficient than cursor-based for search)
    */
   async searchRecords(
     query: string,
@@ -258,20 +440,54 @@ export class RecordsService {
       type?: string;
       status?: string;
       limit?: number;
-      offset?: number;
+      cursor?: string;
     } = {}
   ): Promise<{
     records: any[];
-    total: number;
-    page: number;
-    limit: number;
+    nextCursor: string | null;
+    hasMore: boolean;
   }> {
-    const result = await this.recordManager.searchRecords(query, options);
+    const { type, status, limit = 20, cursor } = options;
+
+    // Convert cursor to offset for simpler pagination
+    let offset = 0;
+    if (cursor) {
+      // For now, we'll use a simple approach: assume cursor is the last record ID
+      // In a real implementation, you'd store cursor->offset mapping or use a different approach
+      offset = parseInt(cursor) || 0;
+    }
+
+    // Get search results with proper pagination
+    const result = await this.recordManager.searchRecords(query, {
+      type,
+      status,
+      limit: limit + 1, // Get one extra to determine if there are more results
+      offset,
+    });
+
+    // Determine if there are more records
+    const hasMore = result.records.length > limit;
+    const records = hasMore ? result.records.slice(0, limit) : result.records;
+    const nextCursor = hasMore ? (offset + limit).toString() : null;
+
+    // Transform records for API response
+    const transformedRecords = records.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      metadata: record.metadata || {},
+      path: record.path,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      author: record.author,
+    }));
+
     return {
-      records: result.records,
-      total: result.total,
-      page: 1,
-      limit: 10,
+      records: transformedRecords,
+      nextCursor,
+      hasMore,
     };
   }
 }

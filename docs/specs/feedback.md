@@ -1,30 +1,18 @@
 # 💬 CivicPress Spec: `feedback.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive feedback documentation
 - feedback workflows
-- security considerations
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations fixes: [] migration_guide: null compatibility:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'ui.md: >=1.0.0'
   - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'permissions.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -60,21 +48,21 @@ reactions on civic matters — in a Git-native, traceable, and auditable way.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| User feedback            | Text submissions from citizens and contributors |
-| Feedback metadata        | Title, tags, related records, submitter info |
-| Review actions           | Status changes, comments, and resolutions |
-| Authentication data      | User identity and role permissions |
-| Related records          | Links to bylaws, resolutions, or other civic records |
+| Input               | Description                                          |
+| ------------------- | ---------------------------------------------------- |
+| User feedback       | Text submissions from citizens and contributors      |
+| Feedback metadata   | Title, tags, related records, submitter info         |
+| Review actions      | Status changes, comments, and resolutions            |
+| Authentication data | User identity and role permissions                   |
+| Related records     | Links to bylaws, resolutions, or other civic records |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Feedback records         | Markdown files in `records/feedback/` |
-| Feedback index           | Searchable index of all feedback items |
-| Notification triggers    | Workflow events for new or updated feedback |
-| Audit logs              | History of feedback submissions and reviews |
-| Status updates          | Feedback lifecycle state changes |
+| Output                | Description                                 |
+| --------------------- | ------------------------------------------- |
+| Feedback records      | Markdown files in `records/feedback/`       |
+| Feedback index        | Searchable index of all feedback items      |
+| Notification triggers | Workflow events for new or updated feedback |
+| Audit logs            | History of feedback submissions and reviews |
+| Status updates        | Feedback lifecycle state changes            |
 
 ---
 

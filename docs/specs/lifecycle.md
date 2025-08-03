@@ -1,26 +1,17 @@
 # 🔄 CivicPress Spec: `lifecycle.md`
 
 ---
-version: 1.0.0
-status: stable
-created: '2025-07-03'
-updated: '2025-07-15'
-deprecated: false
-sunset_date: null
-additions:
+
+version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+deprecated: false sunset_date: null additions:
 
 - comprehensive lifecycle documentation
 - state management
-- security considerations
-compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
+- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+  'null' dependencies:
   - 'workflows.md: >=1.3.0'
-  - 'status-tags.md: >=1.0.0'
-authors:
-- Sophie Germain <sophie@civic-press.org>
-reviewers:
+  - 'status-tags.md: >=1.0.0' authors:
+- Sophie Germain <sophie@civic-press.org> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -60,21 +51,21 @@ This ensures long-term clarity and consistency across all records.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                           |
-| ------------------------ | ------------------------------------- |
-| Civic records            | Markdown files with status metadata |
-| Status transitions       | State change requests and approvals |
-| Lifecycle policies       | Configuration rules from `.civic/lifecycle.yml` |
-| User permissions         | Role-based transition authorization |
-| Related records          | Links to previous versions or amendments |
+| Input              | Description                                     |
+| ------------------ | ----------------------------------------------- |
+| Civic records      | Markdown files with status metadata             |
+| Status transitions | State change requests and approvals             |
+| Lifecycle policies | Configuration rules from `.civic/lifecycle.yml` |
+| User permissions   | Role-based transition authorization             |
+| Related records    | Links to previous versions or amendments        |
 
-| Output                   | Description                           |
-| ------------------------ | ------------------------------------- |
-| Updated records          | Records with new status and metadata |
-| Transition logs          | Audit trail of lifecycle changes |
-| Workflow triggers        | Automated processes for state changes |
-| Archive entries          | Records moved to archive structure |
-| Notification events      | Alerts for status changes and transitions |
+| Output              | Description                               |
+| ------------------- | ----------------------------------------- |
+| Updated records     | Records with new status and metadata      |
+| Transition logs     | Audit trail of lifecycle changes          |
+| Workflow triggers   | Automated processes for state changes     |
+| Archive entries     | Records moved to archive structure        |
+| Notification events | Alerts for status changes and transitions |
 
 ---
 
