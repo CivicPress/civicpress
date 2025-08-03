@@ -182,7 +182,7 @@ const breadcrumbItems = computed(() => [
                     <div class="rounded-lg border p-6">
                         <div class="flex items-start justify-between mb-4">
                             <div class="flex-1">
-                                <h2 class="text-xl font-semibold text-gray-900 mb-2">
+                                <h2 class="text-xl font-semibold mb-2">
                                     {{ record.title }}
                                 </h2>
                                 <div class="flex items-center gap-3 mb-2">
@@ -193,9 +193,9 @@ const breadcrumbItems = computed(() => [
                                         {{ record.status }}
                                     </UBadge>
                                 </div>
-                                <p class="text-gray-600">
+                                <p class="text-gray-600 dark:text-gray-400">
                                     Record ID: <code
-                                        class="bg-gray-100 px-2 py-1 rounded text-sm">{{ record.id }}</code>
+                                        class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm">{{ record.id }}</code>
                                 </p>
                             </div>
                         </div>
@@ -204,8 +204,8 @@ const breadcrumbItems = computed(() => [
                     <!-- Raw Markdown Content -->
                     <div class="rounded-lg border">
                         <div class="border-b px-6 py-4">
-                            <h2 class="text-lg font-semibold text-gray-900">Raw Markdown Content</h2>
-                            <p class="text-sm text-gray-600 mt-1">
+                            <h2 class="text-lg font-semibold">Raw Markdown Content</h2>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                 This is the complete markdown file including frontmatter and content
                             </p>
                         </div>
@@ -221,7 +221,7 @@ const breadcrumbItems = computed(() => [
                                         class="text-sm overflow-x-auto p-4 rounded-lg bg-gray-900 text-gray-100 font-mono whitespace-pre-wrap break-words"><code>{{ record.content }}</code></pre>
                                 </div>
                             </div>
-                            <div v-else class="text-gray-500 italic">
+                            <div v-else class="text-gray-500 dark:text-gray-400 italic">
                                 No content available for this record.
                             </div>
                         </div>
@@ -230,27 +230,29 @@ const breadcrumbItems = computed(() => [
                     <!-- File Information -->
                     <div class="rounded-lg border">
                         <div class="border-b px-6 py-4">
-                            <h2 class="text-lg font-semibold text-gray-900">File Information</h2>
+                            <h2 class="text-lg font-semibold">File Information</h2>
                         </div>
                         <div class="p-6">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div class="space-y-2">
-                                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                         <UIcon name="i-lucide-file-text" class="w-4 h-4" />
                                         <span>File Path: <code
-                                                class="bg-gray-100 px-2 py-1 rounded text-xs">{{ record.path }}</code></span>
+                                                class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs">{{ record.path }}</code></span>
                                     </div>
-                                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                                    <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                         <UIcon name="i-lucide-calendar" class="w-4 h-4" />
                                         <span>Created: {{ new Date(record.created_at).toLocaleString() }}</span>
                                     </div>
                                 </div>
                                 <div class="space-y-2">
-                                    <div v-if="record.author" class="flex items-center gap-2 text-sm text-gray-600">
+                                    <div v-if="record.author"
+                                        class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                         <UIcon name="i-lucide-user" class="w-4 h-4" />
                                         <span>Author: {{ record.author }}</span>
                                     </div>
-                                    <div v-if="record.updated_at" class="flex items-center gap-2 text-sm text-gray-600">
+                                    <div v-if="record.updated_at"
+                                        class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                         <UIcon name="i-lucide-edit" class="w-4 h-4" />
                                         <span>Updated: {{ new Date(record.updated_at).toLocaleString() }}</span>
                                     </div>

@@ -140,13 +140,13 @@ onMounted(async () => {
 
                       <!-- Record Info -->
                       <div class="flex-1 min-w-0">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-1">
+                        <h3 class="text-lg font-semibold mb-1">
                           {{ item.data.title }}
                         </h3>
-                        <p class="text-sm text-gray-600 mb-2 line-clamp-2">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
                           {{ item.data.excerpt }}
                         </p>
-                        <div class="flex items-center space-x-4 text-xs text-gray-500">
+                        <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
                           <span>Type: {{ item.data.typeLabel }}</span>
                           <span>Created: {{ item.data.formattedDate }}</span>
                           <span v-if="item.data.author">By: {{ item.data.author }}</span>
@@ -190,13 +190,13 @@ onMounted(async () => {
 
                 <!-- Record Info -->
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-1">
+                  <h3 class="text-lg font-semibold mb-1">
                     {{ record.title }}
                   </h3>
-                  <p class="text-sm text-gray-600 mb-2 line-clamp-2">
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
                     {{ record.excerpt }}
                   </p>
-                  <div class="flex items-center space-x-4 text-xs text-gray-500">
+                  <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
                     <span>Type: {{ record.typeLabel }}</span>
                     <span>Created: {{ record.formattedDate }}</span>
                     <span v-if="record.author">By: {{ record.author }}</span>
@@ -234,10 +234,10 @@ onMounted(async () => {
       <!-- Show no results when not loading and no records -->
       <div v-else-if="displayRecords.length === 0 && !shouldShowLoading" class="text-center py-12">
         <UIcon name="i-lucide-file-text" size="4xl" class="mx-auto mb-4 text-gray-400" />
-        <h3 class="text-lg font-medium text-gray-900 mb-2">
+        <h3 class="text-lg font-medium mb-2">
           {{ searchQuery ? 'No search results found' : 'No records found' }}
         </h3>
-        <p class="text-gray-600">
+        <p class="text-gray-600 dark:text-gray-400">
           {{ searchQuery ? 'Try adjusting your search terms.' : 'Try adjusting your filters.' }}
         </p>
       </div>
@@ -247,7 +247,7 @@ onMounted(async () => {
     <div v-if="shouldShowLoading && displayRecords.length > 0" class="text-center py-6">
       <div class="flex items-center justify-center space-x-2">
         <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin text-gray-500" />
-        <span class="text-sm text-gray-600">Loading more records...</span>
+        <span class="text-sm text-gray-600 dark:text-gray-400">Loading more records...</span>
       </div>
     </div>
 

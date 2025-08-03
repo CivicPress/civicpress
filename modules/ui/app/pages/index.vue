@@ -124,10 +124,10 @@ watch(isAuthenticated, (newValue) => {
       <UDashboardNavbar>
         <template #center>
           <div class="text-center">
-            <h1 class="text-2xl font-bold text-gray-900">
+            <h1 class="text-2xl font-bold">
               Welcome to {{ organizationInfo?.name || 'CivicPress' }}
             </h1>
-            <p v-if="organizationInfo?.city && organizationInfo?.state" class="text-gray-600 mt-1">
+            <p v-if="organizationInfo?.city && organizationInfo?.state" class="text-gray-600 dark:text-gray-400 mt-1">
               {{ organizationInfo.city }}, {{ organizationInfo.state }}
             </p>
           </div>
@@ -158,10 +158,10 @@ watch(isAuthenticated, (newValue) => {
         <!-- Welcome Section -->
         <div class="text-center py-8">
           <UIcon name="i-lucide-building-2" class="w-16 h-16 text-primary-500 mx-auto mb-4" />
-          <h2 class="text-3xl font-bold text-gray-900 mb-2">
+          <h2 class="text-3xl font-bold mb-2">
             {{ organizationInfo?.name || 'CivicPress' }}
           </h2>
-          <p class="text-gray-600 max-w-2xl mx-auto">
+          <p class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             {{ organizationInfo?.description || defaultDescription }}
           </p>
         </div>
@@ -170,28 +170,28 @@ watch(isAuthenticated, (newValue) => {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <UCard class="text-center hover:shadow-lg transition-shadow cursor-pointer" @click="navigateToRecords">
             <UIcon name="i-lucide-file-text" class="w-12 h-12 text-blue-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Browse Records</h3>
-            <p class="text-gray-600">View and search through civic records, bylaws, and policies.</p>
+            <h3 class="text-lg font-semibold mb-2">Browse Records</h3>
+            <p class="text-gray-600 dark:text-gray-400">View and search through civic records, bylaws, and policies.</p>
           </UCard>
 
           <UCard v-if="isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
             @click="navigateToCreate">
             <UIcon name="i-lucide-plus-circle" class="w-12 h-12 text-green-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Create Record</h3>
-            <p class="text-gray-600">Create new civic records, bylaws, or policies.</p>
+            <h3 class="text-lg font-semibold mb-2">Create Record</h3>
+            <p class="text-gray-600 dark:text-gray-400">Create new civic records, bylaws, or policies.</p>
           </UCard>
 
           <UCard v-if="!isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
             @click="navigateToLogin">
             <UIcon name="i-lucide-log-in" class="w-12 h-12 text-purple-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Sign In</h3>
-            <p class="text-gray-600">Access administrative features and create records.</p>
+            <h3 class="text-lg font-semibold mb-2">Sign In</h3>
+            <p class="text-gray-600 dark:text-gray-400">Access administrative features and create records.</p>
           </UCard>
         </div>
 
         <!-- Recent Records (if authenticated) -->
         <div v-if="isAuthenticated && recentRecords.length > 0" class="space-y-4">
-          <h3 class="text-xl font-semibold text-gray-900">Recent Records</h3>
+          <h3 class="text-xl font-semibold">Recent Records</h3>
           <div class="grid gap-4">
             <UCard v-for="record in recentRecords" :key="record.id"
               class="hover:shadow-md transition-shadow cursor-pointer"
@@ -199,8 +199,8 @@ watch(isAuthenticated, (newValue) => {
               <div class="flex items-start space-x-4">
                 <UIcon name="i-heroicons-document-text" class="w-8 h-8 text-gray-500 flex-shrink-0" />
                 <div class="flex-1 min-w-0">
-                  <h4 class="text-sm font-medium text-gray-900 truncate">{{ record.title }}</h4>
-                  <p class="text-sm text-gray-500">{{ formatDate(record.created_at) }}</p>
+                  <h4 class="text-sm font-medium truncate">{{ record.title }}</h4>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ formatDate(record.created_at) }}</p>
                   <UBadge :color="getStatusColor(record.status) as any" variant="soft" size="sm">
                     {{ record.status }}
                   </UBadge>
@@ -212,24 +212,24 @@ watch(isAuthenticated, (newValue) => {
 
         <!-- System Stats (if authenticated) -->
         <div v-if="isAuthenticated && systemStats" class="space-y-4">
-          <h3 class="text-xl font-semibold text-gray-900">System Overview</h3>
+          <h3 class="text-xl font-semibold">System Overview</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <UCard>
               <div class="text-center">
                 <div class="text-2xl font-bold text-blue-600">{{ systemStats.totalRecords || 0 }}</div>
-                <div class="text-sm text-gray-600">Total Records</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">Total Records</div>
               </div>
             </UCard>
             <UCard>
               <div class="text-center">
                 <div class="text-2xl font-bold text-green-600">{{ systemStats.activeRecords || 0 }}</div>
-                <div class="text-sm text-gray-600">Active Records</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">Active Records</div>
               </div>
             </UCard>
             <UCard>
               <div class="text-center">
                 <div class="text-2xl font-bold text-purple-600">{{ systemStats.recentUpdates || 0 }}</div>
-                <div class="text-sm text-gray-600">Recent Updates</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">Recent Updates</div>
               </div>
             </UCard>
           </div>
@@ -237,20 +237,21 @@ watch(isAuthenticated, (newValue) => {
 
         <!-- Public Information -->
         <div v-if="organizationInfo" class="space-y-4">
-          <h3 class="text-xl font-semibold text-gray-900">About {{ organizationInfo.name }}</h3>
+          <h3 class="text-xl font-semibold">About {{ organizationInfo.name }}</h3>
           <UCard>
             <div class="space-y-2">
               <div v-if="organizationInfo.city && organizationInfo.state" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-map-pin" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700">{{ organizationInfo.city }}, {{ organizationInfo.state }}</span>
+                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.city }}, {{ organizationInfo.state
+                  }}</span>
               </div>
               <div v-if="organizationInfo.country" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700">{{ organizationInfo.country }}</span>
+                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.country }}</span>
               </div>
               <div v-if="organizationInfo.timezone" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-clock" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700">{{ organizationInfo.timezone }}</span>
+                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.timezone }}</span>
               </div>
             </div>
           </UCard>
