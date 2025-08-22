@@ -93,7 +93,10 @@ export class RecordsService {
       path: record.path,
       created: record.created_at,
       author:
-        typeof record.author === 'object' && record.author && typeof record.author === 'object' && 'username' in record.author
+        typeof record.author === 'object' &&
+        record.author &&
+        typeof record.author === 'object' &&
+        'username' in record.author
           ? (record.author as any).username
           : record.author,
     };

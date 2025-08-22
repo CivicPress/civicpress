@@ -63,7 +63,11 @@ router.get('/', async (req, res) => {
     // Check if user can manage users
     const canManageUsers = await authService.userCan(user, 'users:manage');
     if (!canManageUsers) {
-      const error = new Error('Insufficient permissions to list users');
+      // DEBUG: Get user permissions to see what's loaded
+      const userPermissions = await authService.getUserPermissions(user);
+      const error = new Error(
+        `Insufficient permissions to list users. User ${user.username} (${user.role}) has permissions: ${userPermissions.join(', ')}`
+      );
       (error as any).statusCode = 403;
       (error as any).code = 'INSUFFICIENT_PERMISSIONS';
       return handleApiError('list_users', error, req, res);

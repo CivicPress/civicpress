@@ -142,7 +142,7 @@ describe('Authentication API', () => {
       const token = loginResponse.body.data.session.token;
 
       const response = await request(context.api.getApp())
-        .get('/api/records')
+        .get('/api/v1/records')
         .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);

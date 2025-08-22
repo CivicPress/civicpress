@@ -30,7 +30,7 @@ const fetchRecord = async () => {
   error.value = ''
 
   try {
-    const response = await useNuxtApp().$civicApi(`/api/records/${id}`) as any
+    const response = await useNuxtApp().$civicApi(`/api/v1/records/${id}`) as any
 
     if (response && response.success && response.data) {
       const apiRecord = response.data
@@ -71,7 +71,7 @@ const handleSubmit = async (recordData: any) => {
 
   try {
     // Update record via API
-    const response = await useNuxtApp().$civicApi(`/api/records/${id}`, {
+    const response = await useNuxtApp().$civicApi(`/api/v1/records/${id}`, {
       method: 'PUT',
       body: recordData
     }) as any
@@ -108,7 +108,7 @@ const handleDelete = async (recordId: string) => {
   error.value = ''
 
   try {
-    const response = await useNuxtApp().$civicApi(`/api/records/${recordId}`, {
+    const response = await useNuxtApp().$civicApi(`/api/v1/records/${recordId}`, {
       method: 'DELETE'
     }) as any
 

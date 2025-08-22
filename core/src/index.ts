@@ -120,3 +120,14 @@ export type {
   SecurityValidationResult,
   LogEntry,
 } from './notifications/index.js';
+
+// Configuration Management
+export {
+  configurationService,
+  ConfigurationService,
+} from './config/configuration-service.js';
+export type {
+  ConfigurationServiceOptions,
+  ConfigurationMetadata,
+  ConfigurationFile,
+} from './config/configuration-service.js';

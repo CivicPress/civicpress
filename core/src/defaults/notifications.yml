@@ -1,81 +1,285 @@
+# Notifications Configuration
+# This file configures notification channels, providers, and settings
+
+_metadata:
+  name: "Notification System"
+  description: "Configure notification channels, providers, and delivery settings"
+  version: "1.0.0"
+  editable: true
+
+# Notification Channels Configuration
 channels:
   email:
-    enabled: false # Disabled by default for security
-    provider: 'smtp'
+    enabled:
+      value: false
+      type: 'boolean'
+      description: 'Enable email notifications'
+      required: true
+    provider:
+      value: 'smtp'
+      type: 'array'
+      options: [
+        { value: 'smtp', label: 'SMTP Server' },
+        { value: 'sendgrid', label: 'SendGrid' },
+        { value: 'ses', label: 'AWS SES' },
+        { value: 'nodemailer', label: 'Nodemailer' }
+      ]
+      description: 'Email service provider to use'
+      required: true
 
-    # SendGrid Configuration (disabled by default)
+    # SendGrid Configuration
     sendgrid:
-      apiKey: ''
-      from: 'noreply@civicpress.local'
-      sandboxMode: true
+      apiKey:
+        value: ''
+        type: 'string'
+        description: 'SendGrid API key'
+        required: false
+      from:
+        value: 'noreply@civicpress.local'
+        type: 'string:email'
+        description: 'Default sender email address'
+        required: true
+      sandboxMode:
+        value: true
+        type: 'boolean'
+        description: 'Enable sandbox mode for testing'
+        required: true
 
-    # AWS SES Configuration (disabled by default)
+    # AWS SES Configuration
     ses:
-      accessKeyId: ''
-      secretAccessKey: ''
-      region: 'us-east-1'
-      from: 'noreply@civicpress.local'
+      accessKeyId:
+        value: ''
+        type: 'string'
+        description: 'AWS access key ID'
+        required: false
+      secretAccessKey:
+        value: ''
+        type: 'string'
+        description: 'AWS secret access key'
+        required: false
+      region:
+        value: 'us-east-1'
+        type: 'string'
+        description: 'AWS region'
+        required: true
+      from:
+        value: 'noreply@civicpress.local'
+        type: 'string:email'
+        description: 'Default sender email address'
+        required: true
 
-    # SMTP Configuration (disabled by default)
+    # SMTP Configuration
     smtp:
-      host: 'localhost'
-      port: 587
-      secure: false
+      host:
+        value: 'localhost'
+        type: 'string'
+        description: 'SMTP server hostname'
+        required: true
+      port:
+        value: 587
+        type: 'number'
+        description: 'SMTP server port'
+        required: true
+      secure:
+        value: false
+        type: 'boolean'
+        description: 'Use secure connection (TLS)'
+        required: true
       auth:
-        user: ''
-        pass: ''
-      from: 'noreply@civicpress.local'
+        user:
+          value: ''
+          type: 'string'
+          description: 'SMTP username'
+          required: false
+        pass:
+          value: ''
+          type: 'string'
+          description: 'SMTP password'
+          required: false
+      from:
+        value: 'noreply@civicpress.local'
+        type: 'string:email'
+        description: 'Default sender email address'
+        required: true
       tls:
-        rejectUnauthorized: false
+        rejectUnauthorized:
+          value: false
+          type: 'boolean'
+          description: 'Reject unauthorized certificates'
+          required: true
 
-    # Nodemailer Configuration (disabled by default)
+    # Nodemailer Configuration
     nodemailer:
-      host: 'localhost'
-      port: 587
-      secure: false
+      host:
+        value: 'localhost'
+        type: 'string'
+        description: 'Mail server hostname'
+        required: true
+      port:
+        value: 587
+        type: 'number'
+        description: 'Mail server port'
+        required: true
+      secure:
+        value: false
+        type: 'boolean'
+        description: 'Use secure connection'
+        required: true
       auth:
-        user: ''
-        pass: ''
-      from: 'noreply@civicpress.local'
+        user:
+          value: ''
+          type: 'string'
+          description: 'Mail server username'
+          required: false
+        pass:
+          value: ''
+          type: 'string'
+          description: 'Mail server password'
+          required: false
+      from:
+        value: 'noreply@civicpress.local'
+        type: 'string:email'
+        description: 'Default sender email address'
+        required: true
 
-    replyTo: null
+    replyTo:
+      value: null
+      type: 'string:email'
+      description: 'Reply-to email address'
+      required: false
 
   sms:
-    enabled: false
-    provider: 'twilio'
-    credentials: {}
+    enabled:
+      value: false
+      type: 'boolean'
+      description: 'Enable SMS notifications'
+      required: true
+    provider:
+      value: 'twilio'
+      type: 'string'
+      description: 'SMS service provider'
+      required: true
+    credentials:
+      value: {}
+      type: 'object'
+      description: 'Provider-specific credentials'
+      required: false
 
   slack:
-    enabled: false
-    webhook_url: ''
-    channel: null
-    username: null
+    enabled:
+      value: false
+      type: 'boolean'
+      description: 'Enable Slack notifications'
+      required: true
+    webhook_url:
+      value: ''
+      type: 'string:url'
+      description: 'Slack webhook URL'
+      required: false
+    channel:
+      value: null
+      type: 'string'
+      description: 'Default Slack channel'
+      required: false
+    username:
+      value: null
+      type: 'string'
+      description: 'Bot username for Slack messages'
+      required: false
 
+# Authentication Email Templates
 auth_templates:
   email_verification:
-    subject: 'Verify your CivicPress account'
+    subject:
+      value: 'Verify your CivicPress account'
+      type: 'string'
+      description: 'Email verification subject line'
+      required: true
     body:
-      'Please click the following link to verify your account:
-      {{verification_url}}'
-  password_reset:
-    subject: 'Reset your CivicPress password'
-    body: 'Click here to reset your password: {{reset_url}}'
-  two_factor_auth:
-    subject: 'Your CivicPress verification code'
-    body: 'Your verification code is: {{code}}'
-  security_alert:
-    subject: 'Security alert for your account'
-    body: 'Suspicious activity detected: {{details}}'
+      value: 'Please click the following link to verify your account:\n{{verification_url}}'
+      type: 'string:textarea'
+      description: 'Email verification body template'
+      required: true
 
+  password_reset:
+    subject:
+      value: 'Reset your CivicPress password'
+      type: 'string'
+      description: 'Password reset subject line'
+      required: true
+    body:
+      value: 'Click here to reset your password: {{reset_url}}'
+      type: 'string:textarea'
+      description: 'Password reset body template'
+      required: true
+
+  two_factor_auth:
+    subject:
+      value: 'Your CivicPress verification code'
+      type: 'string'
+      description: '2FA verification subject line'
+      required: true
+    body:
+      value: 'Your verification code is: {{code}}'
+      type: 'string:textarea'
+      description: '2FA verification body template'
+      required: true
+
+  security_alert:
+    subject:
+      value: 'Security alert for your account'
+      type: 'string'
+      description: 'Security alert subject line'
+      required: true
+    body:
+      value: 'Suspicious activity detected: {{details}}'
+      type: 'string:textarea'
+      description: 'Security alert body template'
+      required: true
+
+# Notification Rules and Limits
 rules:
   rate_limits:
-    email_per_hour: 100
-    sms_per_hour: 50
-    slack_per_hour: 200
-  retry_attempts: 3
-  retry_delay: 5000
+    email_per_hour:
+      value: 100
+      type: 'number'
+      description: 'Maximum emails per hour'
+      required: true
+    sms_per_hour:
+      value: 50
+      type: 'number'
+      description: 'Maximum SMS per hour'
+      required: true
+    slack_per_hour:
+      value: 200
+      type: 'number'
+      description: 'Maximum Slack messages per hour'
+      required: true
+  retry_attempts:
+    value: 3
+    type: 'number'
+    description: 'Number of retry attempts for failed notifications'
+    required: true
+  retry_delay:
+    value: 5000
+    type: 'number'
+    description: 'Delay between retry attempts in milliseconds'
+    required: true
 
+# Security Settings
 security:
-  encrypt_sensitive_data: true
-  audit_all_notifications: true
-  filter_pii: true
+  encrypt_sensitive_data:
+    value: true
+    type: 'boolean'
+    description: 'Encrypt sensitive notification data'
+    required: true
+  audit_all_notifications:
+    value: true
+    type: 'boolean'
+    description: 'Log all notification attempts for audit'
+    required: true
+  filter_pii:
+    value: true
+    type: 'boolean'
+    description: 'Filter personally identifiable information from logs'
+    required: true

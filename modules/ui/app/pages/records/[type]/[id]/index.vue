@@ -30,7 +30,7 @@ const fetchRecord = async () => {
 
         // Direct API call for now to test
         const { $civicApi } = useNuxtApp()
-        const response = await $civicApi(`/api/records/${id}`) as any
+        const response = await $civicApi(`/api/v1/records/${id}`) as any
 
         console.log('API response:', response)
 

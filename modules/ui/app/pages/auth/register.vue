@@ -70,7 +70,7 @@ const handleRegister = async () => {
     try {
         // Call the registration API
         const config = useRuntimeConfig()
-        const response = await $fetch(`${config.public.civicApiUrl}/api/users/register`, {
+        const response = await $fetch(`${config.public.civicApiUrl}/api/v1/users/register`, {
             method: 'POST',
             body: {
                 username: state.username,

@@ -26,9 +26,9 @@ export interface HookConfig {
 }
 
 export interface HookDefinition {
-  enabled: boolean;
-  workflows: string[];
-  audit: boolean;
+  enabled: boolean | { value: boolean };
+  workflows: string[] | { value: string[] };
+  audit: boolean | { value: boolean };
   description?: string;
 }
 
@@ -266,12 +266,24 @@ export class HookSystem {
 
     // Check if hook is disabled
     const hookConfig = this.config?.hooks[name];
-    if (hookConfig && !hookConfig.enabled) {
-      coreDebug(`Hook '${name}' is disabled, skipping`, {
-        operation: 'hook emission',
-        hookName: name,
-      });
-      return;
+    if (hookConfig) {
+      // Handle both old and new config formats for enabled field
+      let isEnabled = false;
+      if (typeof hookConfig.enabled === 'boolean') {
+        // Old format: enabled: true
+        isEnabled = hookConfig.enabled;
+      } else if (hookConfig.enabled?.value !== undefined) {
+        // New format: enabled: { value: true }
+        isEnabled = hookConfig.enabled.value;
+      }
+
+      if (!isEnabled) {
+        coreDebug(`Hook '${name}' is disabled, skipping`, {
+          operation: 'hook emission',
+          hookName: name,
+        });
+        return;
+      }
     }
 
     // Execute registered handlers
@@ -305,8 +317,20 @@ export class HookSystem {
     }
 
     // Log hook execution
-    if (hookConfig?.audit) {
-      await this.logHook('execution', name, data, fullContext);
+    if (hookConfig) {
+      // Handle both old and new config formats for audit field
+      let shouldAudit = false;
+      if (typeof hookConfig.audit === 'boolean') {
+        // Old format: audit: true
+        shouldAudit = hookConfig.audit;
+      } else if (hookConfig.audit?.value !== undefined) {
+        // New format: audit: { value: true }
+        shouldAudit = hookConfig.audit.value;
+      }
+
+      if (shouldAudit) {
+        await this.logHook('execution', name, data, fullContext);
+      }
     }
   }
 
@@ -321,13 +345,34 @@ export class HookSystem {
     const hookConfig = this.config?.hooks[hookName];
     if (!hookConfig?.workflows) return;
 
+    // Handle both old and new config formats
+    let workflows: string[];
+    if (Array.isArray(hookConfig.workflows)) {
+      // Old format: workflows: ['validate-record', 'notify-council']
+      workflows = hookConfig.workflows;
+    } else if (
+      hookConfig.workflows.value &&
+      Array.isArray(hookConfig.workflows.value)
+    ) {
+      // New format: workflows: { value: ['validate-record', 'notify-council'] }
+      workflows = hookConfig.workflows.value;
+    } else {
+      // Invalid format, skip execution
+      coreWarn(`Invalid workflows format for hook '${hookName}'`, {
+        operation: 'workflow execution',
+        hookName,
+        workflows: hookConfig.workflows,
+      });
+      return;
+    }
+
     coreDebug(`Executing workflows for hook '${hookName}'`, {
       operation: 'workflow execution',
       hookName,
-      workflows: hookConfig.workflows,
+      workflows,
     });
 
-    for (const workflowName of hookConfig.workflows) {
+    for (const workflowName of workflows) {
       try {
         await this.executeWorkflow(workflowName, data, context);
       } catch (error) {

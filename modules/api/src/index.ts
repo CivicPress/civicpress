@@ -6,41 +6,45 @@ import { CivicPress, Logger, CentralConfigManager } from '@civicpress/core';
 const logger = new Logger();
 
 // Import routes
-import authRouter from './routes/auth';
-import { healthRouter } from './routes/health';
-import { createRecordsRouter } from './routes/records';
-import { RecordsService } from './services/records-service';
-import { searchRouter } from './routes/search';
-import { exportRouter } from './routes/export';
-import { importRouter } from './routes/import';
-import { hooksRouter } from './routes/hooks';
-import { templatesRouter } from './routes/templates';
-import { workflowsRouter } from './routes/workflows';
-import { createIndexingRouter } from './routes/indexing';
-import { createHistoryRouter } from './routes/history';
-import { createStatusRouter } from './routes/status';
-import docsRouter from './routes/docs';
-import { createValidationRouter } from './routes/validation';
-import { createDiffRouter } from './routes/diff';
+import authRouter from './routes/auth.js';
+import { healthRouter } from './routes/health.js';
+import { createRecordsRouter } from './routes/records.js';
+import { RecordsService } from './services/records-service.js';
+import { searchRouter } from './routes/search.js';
+import { exportRouter } from './routes/export.js';
+import { importRouter } from './routes/import.js';
+import { hooksRouter } from './routes/hooks.js';
+import { templatesRouter } from './routes/templates.js';
+import { workflowsRouter } from './routes/workflows.js';
+import { createIndexingRouter } from './routes/indexing.js';
+import { createHistoryRouter } from './routes/history.js';
+import { createStatusRouter } from './routes/status.js';
+import docsRouter from './routes/docs.js';
+import { createValidationRouter } from './routes/validation.js';
+import { createDiffRouter } from './routes/diff.js';
 import {
   router as usersRouter,
   registrationRouter,
   authenticationRouter,
-} from './routes/users';
-import infoRouter from './routes/info';
-import configRouter from './routes/config';
+} from './routes/users.js';
+import infoRouter from './routes/info.js';
+import configRouter from './routes/config.js';
+import systemRouter from './routes/system.js';
 
 // Import middleware
-import { errorHandler, requestIdMiddleware } from './middleware/error-handler';
-import { notFoundHandler } from './middleware/not-found';
+import {
+  errorHandler,
+  requestIdMiddleware,
+} from './middleware/error-handler.js';
+import { notFoundHandler } from './middleware/not-found.js';
 import {
   apiLoggingMiddleware,
   authLoggingMiddleware,
   performanceMonitoringMiddleware,
   requestContextMiddleware,
-} from './middleware/logging';
-import { authMiddleware } from './middleware/auth';
-import { delayMiddleware } from './middleware/delay';
+} from './middleware/logging.js';
+import { authMiddleware } from './middleware/auth.js';
+import { delayMiddleware } from './middleware/delay.js';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -236,19 +240,13 @@ export class CivicPressAPI {
       authenticationRouter
     );
 
-    // Public API routes (no authentication required)
-    this.app.use('/api', (req, res, next) => {
-      // Add CivicPress instance to request for route handlers
-      (req as any).civicPress = this.civicPress;
-      next();
-    });
-
     // Public routes that should be accessible to guests
-    this.app.use('/api/records', createRecordsRouter(recordsService));
-    this.app.use('/api/search', searchRouter);
-    this.app.use('/api/status', createStatusRouter());
-    this.app.use('/api/validation', createValidationRouter());
-    this.app.use('/api/config', configRouter);
+    this.app.use('/api/v1/records', createRecordsRouter(recordsService));
+    this.app.use('/api/v1/search', searchRouter);
+    this.app.use('/api/v1/status', createStatusRouter());
+    this.app.use('/api/v1/validation', createValidationRouter());
+    this.app.use('/api/v1/config', configRouter);
+    this.app.use('/api/v1/system', systemRouter);
 
     // Serve brand assets (logos, favicons, etc.)
     this.app.use(
@@ -257,35 +255,43 @@ export class CivicPressAPI {
     );
 
     // Protected routes that require authentication
-    this.app.use('/api/export', authMiddleware(this.civicPress), exportRouter);
-    this.app.use('/api/import', authMiddleware(this.civicPress), importRouter);
-    this.app.use('/api/hooks', authMiddleware(this.civicPress), hooksRouter);
     this.app.use(
-      '/api/templates',
+      '/api/v1/export',
+      authMiddleware(this.civicPress),
+      exportRouter
+    );
+    this.app.use(
+      '/api/v1/import',
+      authMiddleware(this.civicPress),
+      importRouter
+    );
+    this.app.use('/api/v1/hooks', authMiddleware(this.civicPress), hooksRouter);
+    this.app.use(
+      '/api/v1/templates',
       authMiddleware(this.civicPress),
       templatesRouter
     );
     this.app.use(
-      '/api/workflows',
+      '/api/v1/workflows',
       authMiddleware(this.civicPress),
       workflowsRouter
     );
     this.app.use(
-      '/api/indexing',
+      '/api/v1/indexing',
       authMiddleware(this.civicPress),
       createIndexingRouter()
     );
     this.app.use(
-      '/api/history',
+      '/api/v1/history',
       authMiddleware(this.civicPress),
       createHistoryRouter()
     );
     this.app.use(
-      '/api/diff',
+      '/api/v1/diff',
       authMiddleware(this.civicPress),
       createDiffRouter()
     );
-    this.app.use('/api/users', authMiddleware(this.civicPress), usersRouter);
+    this.app.use('/api/v1/users', authMiddleware(this.civicPress), usersRouter);
   }
 
   async start(): Promise<void> {

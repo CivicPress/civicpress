@@ -25,7 +25,7 @@ const handleSubmit = async (userData: any) => {
     error.value = null;
 
     try {
-        const response = await useNuxtApp().$civicApi('/api/users', {
+        const response = await useNuxtApp().$civicApi('/api/v1/users', {
             method: 'POST',
             body: userData,
         }) as any;

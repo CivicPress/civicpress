@@ -39,7 +39,7 @@ export function useRecordTypes() {
 
     try {
       const response = (await useNuxtApp().$civicApi(
-        '/api/config/record-types'
+        '/api/v1/system/record-types'
       )) as {
         success: boolean;
         data: {

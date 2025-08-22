@@ -80,13 +80,17 @@ async function runAutoIndexingDemo(
   // Step 1: Create a test record
   // TODO: Fix type compatibility between CLI and Core API
   if (!globalOpts.silent) {
-    logger.warn('⚠️  Auto-indexing demo temporarily disabled due to type compatibility');
-    logger.info('The demo would create and update records to test auto-indexing workflows');
+    logger.warn(
+      '⚠️  Auto-indexing demo temporarily disabled due to type compatibility'
+    );
+    logger.info(
+      'The demo would create and update records to test auto-indexing workflows'
+    );
   }
-  
+
   // Mock the record for demo purposes
   const record = { id: 'demo-record', title: 'Demo Bylaw for Auto-Indexing' };
-  
+
   if (!globalOpts.silent) {
     logger.info(`✅ Would create record: ${record.title} (ID: ${record.id})`);
   }
@@ -111,7 +115,10 @@ async function runAutoIndexingDemo(
           {
             demo: {
               originalRecord: record,
-              updatedRecord: { id: 'demo-record', title: 'Updated Demo Bylaw for Auto-Indexing' },
+              updatedRecord: {
+                id: 'demo-record',
+                title: 'Updated Demo Bylaw for Auto-Indexing',
+              },
               indexResults: {
                 totalRecords: index.metadata.totalRecords,
                 modules: index.metadata.modules,

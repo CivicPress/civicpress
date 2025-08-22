@@ -700,3 +700,78 @@ notifications:
 - **Permission Display**: Show role permissions in user management interface
 - **Validation**: Ensure selected roles are valid for current user
 - **Dynamic UI**: Adjust interface based on available roles
+
+# Project Decisions
+
+## Configuration Architecture & Folder Structure
+
+### **Critical Decision: Configuration File Organization**
+
+**Date**: 2025-01-27  
+**Context**: Implementing configuration management system for CivicPress
+platform  
+**Decision**: Establish clear separation between public platform configuration
+and private system data
+
+#### **Folder Structure**
+
+**`data/.civic/` - Public Platform Configuration (Version Controlled)**
+
+- **Purpose**: Single source of truth for all non-sensitive platform
+  configuration
+- **Contents**:
+  - `org-config.yml` (organization branding, contact info)
+  - `hooks.yml` (event hooks, workflow automation)
+  - `notifications.yml` (email, SMS, Slack settings)
+  - `roles.yml` (user permissions, access control)
+  - `workflows.yml` (record statuses, transitions)
+  - `templates/` (content templates)
+- **Git Status**: Committed to repository
+- **Usage**: Active runtime configuration
+
+**`core/src/defaults/` - Default Template Files (Reference Only)**
+
+- **Purpose**: Template files that are NEVER used directly by the running system
+- **Usage**:
+  - Copied during `civic init` to bootstrap new projects
+  - Updated when adding new features to provide latest defaults
+  - Reset functionality when users want to restore defaults
+- **Git Status**: Committed to repository
+- **Important**: These are reference templates, not active configuration
+
+**`.system-data/` - Private System Data (Never Committed)**
+
+- **Purpose**: Sensitive system data and operational configuration
+- **Contents**:
+  - `civic.db` (database files)
+  - User sessions and auth tokens
+  - Sensitive operational configs
+  - Internal system settings
+- **Git Status**: Never committed (in .gitignore)
+- **Usage**: Local system operation only
+
+#### **Configuration Inheritance Flow**
+
+```
+civic init → Copy core/src/defaults/ → data/.civic/
+Running system → Only reads from data/.civic/
+New features → Update core/src/defaults/ → Manual migration
+Reset to default → Copy from core/src/defaults/ → data/.civic/
+```
+
+#### **Key Principles**
+
+1. **Public configuration** = version controlled, collaborative
+2. **Private system data** = local only, secure
+3. **Default templates** = reference only, not runtime
+4. **Single source of truth** = `data/.civic/` for all active configuration
+5. **Security first** = sensitive data never committed
+
+#### **Why This Architecture**
+
+- **Version Controlled**: All platform configuration is tracked in Git
+- **Collaborative**: Team members can see and modify configuration
+- **Reproducible**: Deployments will have consistent behavior
+- **Secure**: Sensitive data stays private in `.system-data/`
+- **Maintainable**: Clear separation between defaults, active config, and system
+  data

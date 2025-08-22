@@ -51,8 +51,14 @@ export function useRecordStatuses() {
 
     try {
       const response = (await useNuxtApp().$civicApi(
-        '/api/config/record-statuses'
-      )) as RecordStatusesResponse;
+        '/api/v1/system/record-statuses'
+      )) as {
+        success: boolean;
+        data: {
+          record_statuses: RecordStatusMetadata[];
+          total: number;
+        };
+      };
 
       if (response.success && response.data) {
         const newRecordStatuses = response.data.record_statuses || [];

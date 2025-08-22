@@ -636,6 +636,19 @@ export class AuthService {
     // Check if user already exists
     const existingUser = await this.getUserByUsername(userData.username);
     if (existingUser) {
+      // Update existing user's role if it's different
+      if (existingUser.role !== userData.role) {
+        logger.info(
+          `Updating existing user ${userData.username} role from ${existingUser.role} to ${userData.role}`
+        );
+        const updatedUser = await this.updateUser(existingUser.id, {
+          role: userData.role,
+        });
+        if (!updatedUser) {
+          throw new Error(`Failed to update user ${userData.username} role`);
+        }
+        return updatedUser;
+      }
       return existingUser;
     }
 

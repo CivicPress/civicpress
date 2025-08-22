@@ -679,41 +679,114 @@ export function createWorkflowConfig(config: TestConfig) {
 
 export function createRolesConfig(config: TestConfig) {
   const rolesConfig = {
-    default_role: 'public',
+    _metadata: {
+      name: 'Test User Roles & Permissions',
+      description:
+        'Test configuration for user roles, permissions, and status transitions',
+      version: '1.0.0',
+      editable: true,
+    },
+    default_role: {
+      value: 'public',
+      type: 'string',
+      description: 'Default role assigned to new users',
+      required: true,
+    },
     roles: {
       admin: {
-        name: 'Administrator',
-        description: 'Full system access with all permissions',
-        permissions: [
-          'system:admin',
-          'records:create',
-          'records:edit',
-          'records:delete',
-          'records:view',
-          'users:manage',
-          'workflows:manage',
-          'records:import',
-          'records:export',
-          'templates:manage',
-          'hooks:manage',
-        ],
+        name: {
+          value: 'Administrator',
+          type: 'string',
+          description: 'Role display name',
+          required: true,
+        },
+        description: {
+          value: 'Full system access with all permissions',
+          type: 'string',
+          description: 'Role description',
+          required: true,
+        },
+        permissions: {
+          value: [
+            'system:admin',
+            'records:create',
+            'records:edit',
+            'records:delete',
+            'records:view',
+            'users:manage',
+            'workflows:manage',
+            'records:import',
+            'records:export',
+            'templates:manage',
+            'hooks:manage',
+          ],
+          type: 'array',
+          description: 'List of permissions granted to this role',
+          required: true,
+        },
         status_transitions: {
-          draft: ['proposed'],
-          any: ['archived'],
+          value: {
+            draft: ['proposed'],
+            any: ['archived'],
+          },
+          type: 'object',
+          description: 'Status transitions this role can perform',
+          required: true,
         },
       },
       clerk: {
-        name: 'City Clerk',
-        description: 'Administrative support with document management',
-        permissions: ['records:create', 'records:edit', 'records:view'],
+        name: {
+          value: 'City Clerk',
+          type: 'string',
+          description: 'Role display name',
+          required: true,
+        },
+        description: {
+          value: 'Administrative support with document management',
+          type: 'string',
+          description: 'Role description',
+          required: true,
+        },
+        permissions: {
+          value: ['records:create', 'records:edit', 'records:view'],
+          type: 'array',
+          description: 'List of permissions granted to this role',
+          required: true,
+        },
         status_transitions: {
-          draft: ['proposed'],
+          value: {
+            draft: ['proposed'],
+          },
+          type: 'object',
+          description: 'Status transitions this role can perform',
+          required: true,
         },
       },
       public: {
-        name: 'Public',
-        description: 'Read-only access to published records',
-        permissions: ['records:view'],
+        name: {
+          value: 'Public',
+          type: 'string',
+          description: 'Role display name',
+          required: true,
+        },
+        description: {
+          value: 'Read-only access to published records',
+          type: 'string',
+          description: 'Role description',
+          required: true,
+        },
+        permissions: {
+          value: ['records:view'],
+          type: 'array',
+          description: 'List of permissions granted to this role',
+          required: true,
+        },
+        status_transitions: {
+          value: {},
+          type: 'object',
+          description: 'Status transitions this role can perform',
+          required: true,
+        },
       },
     },
     permissions: {
@@ -763,9 +836,24 @@ export function createRolesConfig(config: TestConfig) {
       },
     },
     role_hierarchy: {
-      admin: ['clerk', 'public'],
-      clerk: ['public'],
-      public: [],
+      admin: {
+        value: ['clerk', 'public'],
+        type: 'array',
+        description: 'Roles that admin can manage',
+        required: true,
+      },
+      clerk: {
+        value: ['public'],
+        type: 'array',
+        description: 'Roles that clerk can manage',
+        required: true,
+      },
+      public: {
+        value: [],
+        type: 'array',
+        description: 'Roles that public users can manage',
+        required: true,
+      },
     },
   };
 
@@ -968,13 +1056,12 @@ export async function createCLITestContext(): Promise<CLITestContext> {
       { encoding: 'utf8' }
     );
 
-    // Extract JSON from the output (it's at the end after initialization messages)
+    // Extract JSON from the output - look for the last JSON object
     const lines = authResult.split('\n');
-
-    // Find the JSON object in the output
+    
+    // Find the last line that starts with '{' (the JSON response)
     let jsonStart = -1;
-    let jsonEnd = -1;
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = lines.length - 1; i >= 0; i--) {
       if (lines[i].trim().startsWith('{')) {
         jsonStart = i;
         break;
@@ -982,29 +1069,17 @@ export async function createCLITestContext(): Promise<CLITestContext> {
     }
 
     if (jsonStart !== -1) {
-      // Find the closing brace
-      let braceCount = 0;
-      for (let i = jsonStart; i < lines.length; i++) {
-        const line = lines[i];
-        for (const char of line) {
-          if (char === '{') braceCount++;
-          if (char === '}') braceCount--;
-          if (braceCount === 0) {
-            jsonEnd = i;
-            break;
-          }
-        }
-        if (jsonEnd !== -1) break;
-      }
-
-      if (jsonEnd !== -1) {
-        const jsonText = lines.slice(jsonStart, jsonEnd + 1).join('\n');
+      // Parse from the start of JSON to the end
+      const jsonText = lines.slice(jsonStart).join('\n');
+      try {
         const authJson = JSON.parse(jsonText);
-        adminToken = authJson.session.token;
-      } else {
-        throw new Error(
-          'Could not find complete JSON object in simulated authentication'
-        );
+        if (authJson.success && authJson.session && authJson.session.token) {
+          adminToken = authJson.session.token;
+        } else {
+          throw new Error('Invalid JSON structure from auth:simulated');
+        }
+      } catch (parseError) {
+        throw new Error(`Failed to parse JSON from auth:simulated: ${parseError}`);
       }
     } else {
       throw new Error('No JSON output found in simulated authentication');
@@ -1048,10 +1123,6 @@ export async function createAPITestContext(): Promise<APITestContext> {
   const dataGit = simpleGit(config.dataDir);
   await dataGit.init();
 
-  // Add some sample commits to the Git repository for testing
-  await dataGit.add('.');
-  await dataGit.commit('Initial commit');
-
   // Add sample record files and commit them
   const bylawDir = join(config.dataDir, 'records', 'bylaw');
   await (await import('fs/promises')).mkdir(bylawDir, { recursive: true });
@@ -1091,8 +1162,23 @@ This regulation has been archived.`;
   ).writeFile(archivedRecordPath, archivedRecordContent);
 
   await dataGit.add(sampleRecordPath);
+  await dataGit.commit('feat(bylaw): Add test-record for API testing');
+
   await dataGit.add(archivedRecordPath);
-  await dataGit.commit('feat(admin): Add test records for API tests');
+  await dataGit.commit('feat(bylaw): Add old-regulation (archived)');
+
+  // Add some additional commits to create more history
+  await dataGit.add(sampleRecordPath);
+  await dataGit.commit('update(bylaw): Update test-record content');
+
+  await dataGit.add(archivedRecordPath);
+  await dataGit.commit('update(bylaw): Update old-regulation metadata');
+
+  // Add a commit that affects both records
+  await dataGit.add('.');
+  await dataGit.commit(
+    'chore(bylaw): Update both test-record and old-regulation'
+  );
 
   // Initialize API with dynamic port
   const { CivicPressAPI } = await import('../../modules/api/src/index.js');

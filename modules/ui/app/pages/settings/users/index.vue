@@ -23,7 +23,7 @@ const fetchUsers = async () => {
         loading.value = true
         error.value = ''
 
-        const response = await $civicApi('/api/users') as any
+        const response = await $civicApi('/api/v1/users') as any
 
         if (response.success) {
             users.value = response.data.users || []

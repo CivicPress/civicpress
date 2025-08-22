@@ -39,6 +39,12 @@ const settingsItems = [
     icon: 'i-lucide-users',
     to: '/settings/users',
     description: 'Manage system users and roles'
+  },
+  {
+    label: 'Configuration',
+    icon: 'i-lucide-settings',
+    to: '/settings/configuration',
+    description: 'Manage system configuration and settings'
   }
 ] satisfies NavigationMenuItem[]
 

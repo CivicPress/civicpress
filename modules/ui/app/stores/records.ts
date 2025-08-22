@@ -174,7 +174,7 @@ export const useRecordsStore = defineStore('records', {
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
 
-        const url = `/api/records?${queryParams.toString()}`;
+        const url = `/api/v1/records?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
         if (
@@ -229,7 +229,7 @@ export const useRecordsStore = defineStore('records', {
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
 
-        const url = `/api/records?${queryParams.toString()}`;
+        const url = `/api/v1/records?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
         const data = validateApiResponse(response);
@@ -282,7 +282,7 @@ export const useRecordsStore = defineStore('records', {
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
 
-        const url = `/api/search?${queryParams.toString()}`;
+        const url = `/api/v1/search?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
         const data = validateApiResponse(response);
@@ -320,7 +320,7 @@ export const useRecordsStore = defineStore('records', {
      */
     async fetchRecord(id: string): Promise<CivicRecord | null> {
       try {
-        const response = await useNuxtApp().$civicApi(`/api/records/${id}`);
+        const response = await useNuxtApp().$civicApi(`/api/v1/records/${id}`);
 
         const apiRecord = validateApiResponse(response);
 

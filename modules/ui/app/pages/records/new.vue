@@ -18,7 +18,7 @@ const handleSubmit = async (recordData: any) => {
 
   try {
     // Create record via API
-    const response = await useNuxtApp().$civicApi('/api/records', {
+    const response = await useNuxtApp().$civicApi('/api/v1/records', {
       method: 'POST',
       body: recordData
     })

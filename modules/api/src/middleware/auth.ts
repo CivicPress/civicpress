@@ -113,6 +113,7 @@ export function authMiddleware(civicPress: CivicPress) {
     } catch (error) {
       logger.error('Auth middleware error:', error);
       return res.status(500).json({
+        success: false,
         error: 'Authentication error',
         message: 'Internal server error during authentication',
       });
@@ -165,6 +166,7 @@ export function requirePermission(permission: string | string[]) {
     } catch (error) {
       logger.error('Authorization error:', error);
       res.status(500).json({
+        success: false,
         error: {
           message: 'Authorization check failed',
           code: 'AUTH_ERROR',
@@ -215,6 +217,7 @@ export function requireRecordPermission(
 
       if (!hasPermission) {
         res.status(403).json({
+          success: false,
           error: {
             message: `Permission denied: Cannot ${action} records${targetRecordType ? ` of type '${targetRecordType}'` : ''}`,
             code: 'INSUFFICIENT_PERMISSIONS',
@@ -234,6 +237,7 @@ export function requireRecordPermission(
     } catch (error) {
       logger.error('Record authorization error:', error);
       res.status(500).json({
+        success: false,
         error: {
           message: 'Authorization check failed',
           code: 'AUTH_ERROR',

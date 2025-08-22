@@ -30,10 +30,10 @@ describe('Config API Endpoints', () => {
     await cleanupAPITestContext(context);
   });
 
-  describe('GET /api/config/record-types', () => {
+  describe('GET /api/v1/system/record-types', () => {
     it('should return record types with correct structure', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/config/record-types')
+        .get('/api/v1/system/record-types')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
@@ -46,7 +46,7 @@ describe('Config API Endpoints', () => {
 
     it('should return all expected record types', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/config/record-types')
+        .get('/api/v1/system/record-types')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
@@ -69,7 +69,7 @@ describe('Config API Endpoints', () => {
 
     it('should return record types with correct metadata', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/config/record-types')
+        .get('/api/v1/system/record-types')
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
@@ -92,53 +92,11 @@ describe('Config API Endpoints', () => {
 
     it('should be accessible without authentication (public endpoint)', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/config/record-types')
+        .get('/api/v1/system/record-types')
         .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('record_types');
-    });
-  });
-
-  describe('GET /api/config/system', () => {
-    it('should return system configuration', async () => {
-      const response = await request(context.api.getApp())
-        .get('/api/config/system')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('modules');
-      expect(response.body.data).toHaveProperty('default_role');
-      expect(response.body.data).toHaveProperty('hooks');
-      expect(response.body.data).toHaveProperty('workflows');
-      expect(response.body.data).toHaveProperty('audit');
-      expect(response.body.data).toHaveProperty('version');
-    });
-
-    it('should return correct system config values', async () => {
-      const response = await request(context.api.getApp())
-        .get('/api/config/system')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-
-      const config = response.body.data;
-
-      expect(Array.isArray(config.modules)).toBe(true);
-      expect(typeof config.default_role).toBe('string');
-      expect(config.hooks).toHaveProperty('enabled');
-      expect(config.workflows).toHaveProperty('enabled');
-      expect(config.audit).toHaveProperty('enabled');
-      expect(typeof config.version).toBe('string');
-    });
-
-    it('should be accessible without authentication (public endpoint)', async () => {
-      const response = await request(context.api.getApp())
-        .get('/api/config/system')
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('modules');
     });
   });
 });

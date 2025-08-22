@@ -59,7 +59,7 @@ const fetchRecord = async () => {
     error.value = ''
 
     try {
-        const response = await useNuxtApp().$civicApi(`/api/records/${id}/raw`) as any
+        const response = await useNuxtApp().$civicApi(`/api/v1/records/${id}/raw`) as any
 
         if (response && response.success && response.data) {
             const apiRecord = response.data

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import bcrypt from 'bcrypt';
-import { AuthService } from '../../core/src/auth/auth-service';
-import { DatabaseService } from '../../core/src/database/database-service';
-import { DatabaseConfig } from '../../core/src/database/database-adapter';
+import { AuthService } from '../../core/src/auth/auth-service.js';
+import { DatabaseService } from '../../core/src/database/database-service.js';
+import { DatabaseConfig } from '../../core/src/database/database-adapter.js';
 import {
   createCoreTestContext,
   cleanupCoreTestContext,
