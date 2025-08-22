@@ -16,9 +16,8 @@
         <template #body>
             <UBreadcrumb :items="breadcrumbItems" />
 
-            <!-- Configuration Categories -->
+            <!-- Dynamic Configuration List -->
             <div class="grid gap-6 mt-8">
-                <!-- System Configuration Section -->
                 <UDashboardPanel>
                     <template #header>
                         <UDashboardNavbar>
@@ -26,10 +25,8 @@
                                 <div class="flex items-center gap-3">
                                     <UIcon name="i-heroicons-cog-6-tooth" class="w-6 h-6 text-primary-500" />
                                     <div>
-                                        <h3 class="text-lg font-semibold">System Configuration</h3>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            Organization settings, branding, and system behavior
-                                        </p>
+                                        <h3 class="text-lg font-semibold">Available Configurations</h3>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Loaded dynamically from the configuration service</p>
                                     </div>
                                 </div>
                             </template>
@@ -37,74 +34,28 @@
                     </template>
 
                     <template #body>
-                        <div class="grid gap-4">
-                            <!-- Organization Configuration -->
-                            <UCard>
+                        <div v-if="loading" class="py-8 text-center text-sm text-gray-600 dark:text-gray-400">Loading configurations…</div>
+                        <div v-else-if="error" class="py-8 text-center text-sm text-red-600 dark:text-red-400">{{ error }}</div>
+                        <div v-else class="grid gap-4">
+                            <UCard v-for="cfg in configurations" :key="cfg.file">
                                 <template #header>
                                     <div class="flex items-center justify-between">
                                         <div>
-                                            <h4 class="font-medium">Organization Configuration</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                                Branding, contact information, and organization details
-                                            </p>
+                                            <h4 class="font-medium">{{ cfg.name }}</h4>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">{{ cfg.description }}</p>
                                         </div>
-                                        <UButton :to="`/settings/configuration/org-config/edit`" variant="outline"
-                                            size="sm">
-                                            Edit Configuration
-                                        </UButton>
+                                        <div class="flex items-center gap-2">
+                                            <UBadge :color="cfg.status === 'user' ? 'primary' : cfg.status === 'default' ? 'neutral' : 'warning'" variant="soft">{{ cfg.status }}</UBadge>
+                                            <UButton :to="`/settings/configuration/${cfg.file}/edit`" variant="outline" size="sm">Edit</UButton>
+                                        </div>
                                     </div>
                                 </template>
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Configure organization name, location, branding assets, and contact information.
-                                    </p>
-                                </div>
-                            </UCard>
-
-                            <!-- Hooks Configuration -->
-                            <UCard>
-                                <template #header>
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <h4 class="font-medium">Hooks & Workflows</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                                Event-driven workflows and automation rules
-                                            </p>
-                                        </div>
-                                        <UButton :to="`/settings/configuration/hooks/edit`" variant="outline" size="sm">
-                                            Edit Configuration
-                                        </UButton>
-                                    </div>
-                                </template>
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Configure event hooks, workflow triggers, and automation settings.</p>
-                                </div>
-                            </UCard>
-
-                            <!-- Notifications Configuration -->
-                            <UCard>
-                                <template #header>
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <h4 class="font-medium">Notifications</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                                Email, SMS, and webhook notification settings
-                                            </p>
-                                        </div>
-                                        <UButton :to="`/settings/configuration/notifications/edit`" variant="outline"
-                                            size="sm">
-                                            Edit Configuration
-                                        </UButton>
-                                    </div>
-                                </template>
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Configure notification channels, providers, and templates.</p>
-                                </div>
                             </UCard>
                         </div>
                     </template>
                 </UDashboardPanel>
 
-                <!-- Platform Configuration Section -->
+                <!-- Configuration Status Section -->
                 <UDashboardPanel>
                     <template #header>
                         <UDashboardNavbar>
@@ -112,10 +63,8 @@
                                 <div class="flex items-center gap-3">
                                     <UIcon name="i-heroicons-squares-2x2" class="w-6 h-6 text-primary-500" />
                                     <div>
-                                        <h3 class="text-lg font-semibold">Platform Configuration</h3>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            Roles, workflows, record types, and templates
-                                        </p>
+                                        <h3 class="text-lg font-semibold">Configuration Status</h3>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">System health and configuration validation</p>
                                     </div>
                                 </div>
                             </template>
@@ -124,85 +73,31 @@
 
                     <template #body>
                         <div class="grid gap-4">
-                            <!-- Roles Configuration -->
                             <UCard>
                                 <template #header>
                                     <div class="flex items-center justify-between">
                                         <div>
-                                            <h4 class="font-medium">User Roles & Permissions</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                                Define user roles and access permissions
-                                            </p>
+                                            <h4 class="font-medium">Configuration Validation</h4>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">Check for configuration errors and warnings</p>
                                         </div>
-                                        <UButton :to="`/settings/configuration/roles/edit`" variant="outline" size="sm">
-                                            Edit Configuration
-                                        </UButton>
+                                        <UButton @click="validateConfiguration" variant="outline" size="sm" :loading="validating">Validate Configuration</UButton>
                                     </div>
                                 </template>
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Configure user roles, permissions, and access control rules.</p>
+                                <div v-if="validationResults" class="space-y-3">
+                                    <div v-for="(result, index) in validationResults" :key="index" class="flex items-start gap-3 p-3 rounded-lg" :class="{
+                                            'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200': result.status === 'success',
+                                            'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200': result.status === 'warning',
+                                            'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200': result.status === 'error'
+                                        }">
+                                        <UIcon :name="getStatusIcon(result.status)" class="w-5 h-5 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p class="font-medium">{{ result.title }}</p>
+                                            <p class="text-sm opacity-80">{{ result.message }}</p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </UCard>
-
-                            <!-- Workflows Configuration -->
-                            <UCard>
-                                <template #header>
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <h4 class="font-medium">Record Workflows</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                                Record statuses and approval workflows
-                                            </p>
-                                        </div>
-                                        <UButton :to="`/settings/configuration/workflows/edit`" variant="outline"
-                                            size="sm">
-                                            Edit Configuration
-                                        </UButton>
-                                    </div>
-                                </template>
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Configure record statuses, transitions, and approval processes.</p>
-                                </div>
-                            </UCard>
-
-                            <!-- Record Types Configuration -->
-                            <UCard>
-                                <template #header>
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <h4 class="font-medium">Record Types</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                                Available record categories and metadata
-                                            </p>
-                                        </div>
-                                        <UButton disabled variant="outline" size="sm">
-                                            View System Data
-                                        </UButton>
-                                    </div>
-                                </template>
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Configure available record types, fields, and validation rules.</p>
-                                </div>
-                            </UCard>
-
-                            <!-- Templates Configuration -->
-                            <UCard>
-                                <template #header>
-                                    <div class="flex items-center justify-between">
-                                        <div>
-                                            <h4 class="font-medium">Content Templates</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                                Default templates for new records
-                                            </p>
-                                        </div>
-                                        <UButton disabled variant="outline" size="sm">
-                                            Coming Soon
-                                        </UButton>
-                                    </div>
-                                </template>
-                                <div class="text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Configure default templates and content structures for different record types.
-                                    </p>
+                                <div v-else class="text-sm text-gray-600 dark:text-gray-400">
+                                    <p>Click "Validate Configuration" to check for any configuration issues.</p>
                                 </div>
                             </UCard>
                         </div>
@@ -322,6 +217,36 @@ const breadcrumbItems = [
         label: 'Configuration',
     }
 ]
+
+// Dynamic configuration list
+const configurations = ref<any[]>([])
+const loading = ref(false)
+const error = ref('')
+
+const fetchConfigurations = async () => {
+    loading.value = true
+    error.value = ''
+    try {
+        const response = await useNuxtApp().$civicApi('/api/v1/config/list') as any
+        if (response.success) {
+            configurations.value = response.data || []
+        } else {
+            error.value = response.message || 'Failed to load configurations'
+        }
+    } catch (err: any) {
+        error.value = err.message || 'Failed to load configurations'
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(() => {
+    if (!canManageConfiguration.value) {
+        navigateTo('/settings')
+        return
+    }
+    fetchConfigurations()
+})
 
 // Configuration validation
 const validating = ref(false)
