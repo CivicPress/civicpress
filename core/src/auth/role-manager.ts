@@ -52,8 +52,8 @@ export class RoleManager {
 
   constructor(dataDir: string) {
     this.configPath = join(dataDir, '.civic', 'roles.yml');
-    logger.info(`[RoleManager] Constructor called with dataDir: ${dataDir}`);
-    logger.info(`[RoleManager] Config path set to: ${this.configPath}`);
+    logger.debug(`[RoleManager] Constructor called with dataDir: ${dataDir}`);
+    logger.debug(`[RoleManager] Config path set to: ${this.configPath}`);
   }
 
   /**
@@ -61,7 +61,7 @@ export class RoleManager {
    */
   clearCache(): void {
     this.config = null;
-    logger.info('[RoleManager] Configuration cache cleared');
+    logger.debug('[RoleManager] Configuration cache cleared');
   }
 
   /**
@@ -82,20 +82,20 @@ export class RoleManager {
     }
   ): Promise<boolean> {
     try {
-      logger.info(
+      logger.debug(
         `[RoleManager] userCan called for user '${user.username}' (role: ${user.role}) with permission: ${JSON.stringify(permission)}`
       );
 
       const config = await this.loadConfig();
       const userRole = user.role;
 
-      logger.info(
+      logger.debug(
         `[RoleManager] Loaded config with roles: ${Object.keys(config.roles).join(', ')}`
       );
 
       // Handle array of permissions (any permission grants access)
       if (Array.isArray(permission)) {
-        logger.info(
+        logger.debug(
           `[RoleManager] Checking array of permissions: ${permission.join(', ')}`
         );
         const results = await Promise.all(
@@ -106,7 +106,7 @@ export class RoleManager {
         return results.some(Boolean);
       }
 
-      logger.info(`[RoleManager] Checking single permission: ${permission}`);
+      logger.debug(`[RoleManager] Checking single permission: ${permission}`);
       return await this.checkPermission(userRole, permission, config, context);
     } catch (error) {
       logger.error('Role check failed:', error);
@@ -245,18 +245,18 @@ export class RoleManager {
 
   private async loadConfig(): Promise<RolesConfig> {
     if (this.config) {
-      logger.info(
+      logger.debug(
         `[RoleManager] Returning cached config for: ${this.configPath}`
       );
       return this.config;
     }
 
     try {
-      logger.info(
+      logger.debug(
         `[RoleManager] Attempting to load roles config from: ${this.configPath}`
       );
       const fileExists = fs.existsSync(this.configPath);
-      logger.info(`[RoleManager] roles.yml exists: ${fileExists}`);
+      logger.debug(`[RoleManager] roles.yml exists: ${fileExists}`);
       if (!fileExists) {
         logger.info(`[RoleManager] roles.yml not found, using default config`);
         this.config = this.getDefaultConfig();
@@ -264,15 +264,13 @@ export class RoleManager {
       }
 
       const content = await readFile(this.configPath, 'utf-8');
-      logger.info(
+      logger.debug(
         `[RoleManager] File content length: ${content.length} characters`
       );
-      logger.info(
-        `[RoleManager] File content preview: ${content.substring(0, 200)}...`
-      );
+      // omit preview for less verbosity
 
       const parsedConfig = yaml.load(content) as RolesConfig;
-      logger.info(
+      logger.debug(
         `[RoleManager] Loaded roles: ${Object.keys(parsedConfig.roles).join(', ')}`
       );
 
@@ -370,16 +368,13 @@ export class RoleManager {
 
     // Get all permissions for the user role (including inherited permissions)
     const userPermissions = await this.getRolePermissions(userRole, config);
-    logger.info(
-      `[RoleManager] User permissions for role '${userRole}':`,
-      userPermissions
-    );
+    logger.debug(`[RoleManager] Computed permissions for role '${userRole}'`);
 
     // Remove verbose debug output of permissions content
 
     // Check if user has the specific permission
     if (userPermissions.includes(permission)) {
-      logger.info(
+      logger.debug(
         `[RoleManager] Permission '${permission}' granted - found in user permissions`
       );
       return true;
@@ -387,7 +382,7 @@ export class RoleManager {
 
     // Check if user has wildcard permission ('*')
     if (userPermissions.includes('*')) {
-      logger.info(
+      logger.debug(
         `[RoleManager] Permission '${permission}' granted - user has wildcard '*' permission`
       );
       return true;
@@ -417,7 +412,7 @@ export class RoleManager {
       }
     }
 
-    logger.info(
+    logger.debug(
       `[RoleManager] Permission '${permission}' denied for role '${userRole}'`
     );
     return false;
@@ -426,17 +421,17 @@ export class RoleManager {
   private getRolePermissions(role: string, config: RolesConfig): string[] {
     const permissions = new Set<string>();
 
-    logger.info(`[RoleManager] Getting permissions for role: ${role}`);
+    logger.debug(`[RoleManager] Getting permissions for role: ${role}`);
 
     // Get direct permissions for the role
     const roleConfig = config.roles[role];
-    logger.info(
+    logger.debug(
       `[RoleManager] Role config for ${role}:`,
       JSON.stringify(roleConfig, null, 2)
     );
 
     if (roleConfig?.permissions) {
-      logger.info(
+      logger.debug(
         `[RoleManager] Role ${role} has permissions field:`,
         roleConfig.permissions
       );
@@ -445,7 +440,7 @@ export class RoleManager {
       let permissionArray: string[] | undefined;
 
       if (Array.isArray(roleConfig.permissions)) {
-        logger.info(
+        logger.debug(
           `[RoleManager] Role ${role} permissions is direct array format`
         );
         // Old format: direct array
@@ -456,7 +451,7 @@ export class RoleManager {
         roleConfig.permissions.value &&
         Array.isArray(roleConfig.permissions.value)
       ) {
-        logger.info(
+        logger.debug(
           `[RoleManager] Role ${role} permissions is metadata format with value:`,
           roleConfig.permissions.value
         );
@@ -465,7 +460,7 @@ export class RoleManager {
 
         // Reduced: no direct dump of permission array
       } else {
-        logger.info(
+        logger.debug(
           `[RoleManager] Role ${role} permissions is neither array nor metadata format:`,
           typeof roleConfig.permissions
         );
@@ -473,19 +468,19 @@ export class RoleManager {
       }
 
       if (Array.isArray(permissionArray)) {
-        logger.info(
+        logger.debug(
           `[RoleManager] Role ${role} permission array:`,
           permissionArray
         );
         permissionArray.forEach((p) => permissions.add(p));
       } else {
-        logger.info(
+        logger.debug(
           `[RoleManager] Role ${role} permission array is not an array:`,
           permissionArray
         );
       }
     } else {
-      logger.info(`[RoleManager] Role ${role} has no permissions field`);
+      logger.debug(`[RoleManager] Role ${role} has no permissions field`);
     }
 
     // Get inherited permissions from role hierarchy (handle missing role_hierarchy)
