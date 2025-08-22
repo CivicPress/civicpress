@@ -568,9 +568,8 @@ export class RoleManager {
     try {
       const finalPermissions = Array.from(permissions);
 
-      logger.info(
-        `[RoleManager] Final permissions for role ${role}:`,
-        finalPermissions
+      logger.debug(
+        `[RoleManager] Final permissions for role ${role}`
       );
 
       return finalPermissions;
