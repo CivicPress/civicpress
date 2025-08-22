@@ -1,18 +1,18 @@
 <template>
-    <div>
-        <h1>Configuration</h1>
-        <div class="flex flex-col gap-4">
-            <div class="flex flex-col gap-2">
-                <h2 class="text-lg font-bold">Configuration File</h2>
-                <p class="text-sm text-gray-500">{{ configurationFile }}</p>
-            </div>
-        </div>
+    <div class="py-12 text-center">
+        <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-primary-600 mx-auto mb-3" />
+        <p class="text-sm text-gray-600 dark:text-gray-400">Loading configuration editor…</p>
     </div>
 </template>
 
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
-
 const route = useRoute()
-const configurationFile = route.params.configurationFile as string
+const router = useRouter()
+
+const configFile = route.params.configFile as string
+
+onMounted(() => {
+    // Redirect bare config route to the edit page
+    router.replace(`/settings/configuration/${configFile}/edit`)
+})
 </script>

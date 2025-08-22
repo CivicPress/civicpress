@@ -27,7 +27,12 @@ export const useUserRoles = () => {
 
         // Handle new metadata format from configuration service
         // Expect shape: { _metadata, default_role, roles: { [key]: { name:{value}, description:{value}, permissions:{value:[]}, status_transitions:{value:Object} } } }
-        if (data && data.roles && typeof data.roles === 'object' && !Array.isArray(data.roles)) {
+        if (
+          data &&
+          data.roles &&
+          typeof data.roles === 'object' &&
+          !Array.isArray(data.roles)
+        ) {
           const result: Role[] = [];
           for (const key of Object.keys(data.roles)) {
             const r = data.roles[key] || {};
@@ -36,15 +41,16 @@ export const useUserRoles = () => {
             const permissions = Array.isArray(r?.permissions)
               ? r.permissions
               : Array.isArray(r?.permissions?.value)
-              ? r.permissions.value
-              : [];
+                ? r.permissions.value
+                : [];
             // Flatten status transitions object into a unique array of destination statuses (optional UI use)
             const stVal = r?.status_transitions?.value ?? r?.status_transitions;
-            const statusTransitions = stVal && typeof stVal === 'object' && !Array.isArray(stVal)
-              ? Array.from(new Set(Object.values(stVal).flat()))
-              : Array.isArray(stVal)
-              ? stVal
-              : [];
+            const statusTransitions =
+              stVal && typeof stVal === 'object' && !Array.isArray(stVal)
+                ? Array.from(new Set(Object.values(stVal).flat()))
+                : Array.isArray(stVal)
+                  ? stVal
+                  : [];
 
             result.push({
               key,
