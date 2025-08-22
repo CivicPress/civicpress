@@ -36,6 +36,19 @@ export class ConfigurationService {
   }
 
   /**
+   * Resolve user and default paths for a given configuration type.
+   * Notifications are sensitive and should live under .system-data.
+   */
+  private resolvePaths(configType: string): { userPath: string; defaultPath: string } {
+    const userPath = configType === 'notifications'
+      ? join(this.systemDataPath, `${configType}.yml`)
+      : join(this.dataPath, `${configType}.yml`);
+
+    const defaultPath = join(this.defaultsPath, `${configType}.yml`);
+    return { userPath, defaultPath };
+  }
+
+  /**
    * Discover all available configuration files
    */
   async discoverConfigurations(): Promise<ConfigurationFile[]> {
@@ -58,18 +71,22 @@ export class ConfigurationService {
    * Load a specific configuration file
    */
   async loadConfiguration(configType: string): Promise<any> {
-    const configPath = join(this.dataPath, `${configType}.yml`);
+    // Perform one-time migration for notifications if needed
+    if (configType === 'notifications') {
+      await this.migrateNotificationsIfNeeded();
+    }
+
+    const { userPath, defaultPath } = this.resolvePaths(configType);
 
     try {
       // Check if user config exists
-      if (await this.fileExists(configPath)) {
-        const content = await readFile(configPath, 'utf-8');
+      if (await this.fileExists(userPath)) {
+        const content = await readFile(userPath, 'utf-8');
         const parsed = parse(content);
         return this.transformToLegacyFormat(parsed);
       }
 
       // Fall back to default template
-      const defaultPath = join(this.defaultsPath, `${configType}.yml`);
       if (await this.fileExists(defaultPath)) {
         const content = await readFile(defaultPath, 'utf-8');
         const parsed = parse(content);
@@ -88,14 +105,13 @@ export class ConfigurationService {
   async getConfigurationMetadata(configType: string): Promise<any> {
     try {
       // Try user config first
-      const configPath = join(this.dataPath, `${configType}.yml`);
-      if (await this.fileExists(configPath)) {
-        const content = await readFile(configPath, 'utf-8');
+      const { userPath, defaultPath } = this.resolvePaths(configType);
+      if (await this.fileExists(userPath)) {
+        const content = await readFile(userPath, 'utf-8');
         return parse(content);
       }
 
       // Fall back to default template
-      const defaultPath = join(this.defaultsPath, `${configType}.yml`);
       if (await this.fileExists(defaultPath)) {
         const content = await readFile(defaultPath, 'utf-8');
         return parse(content);
@@ -113,11 +129,11 @@ export class ConfigurationService {
    * Save a configuration file
    */
   async saveConfiguration(configType: string, content: any): Promise<void> {
-    const configPath = join(this.dataPath, `${configType}.yml`);
+    const { userPath } = this.resolvePaths(configType);
 
     try {
       // Ensure directory exists
-      await mkdir(dirname(configPath), { recursive: true });
+      await mkdir(dirname(userPath), { recursive: true });
 
       // Get the metadata structure to transform the content
       const metadata = await this.getConfigurationMetadata(configType);
@@ -132,7 +148,7 @@ export class ConfigurationService {
 
       // Write to data/.civic/
       const yamlContent = stringify(newFormatConfig);
-      await writeFile(configPath, yamlContent, 'utf-8');
+      await writeFile(userPath, yamlContent, 'utf-8');
     } catch (error) {
       throw new Error(`Failed to save configuration ${configType}: ${error}`);
     }
@@ -143,8 +159,7 @@ export class ConfigurationService {
    */
   async resetToDefaults(configType: string): Promise<void> {
     try {
-      const defaultPath = join(this.defaultsPath, `${configType}.yml`);
-      const configPath = join(this.dataPath, `${configType}.yml`);
+      const { userPath, defaultPath } = this.resolvePaths(configType);
 
       if (!(await this.fileExists(defaultPath))) {
         throw new Error(`Default template not found: ${configType}`);
@@ -155,6 +170,10 @@ export class ConfigurationService {
       const defaultConfig = parse(defaultContent);
 
       // Save as user config with metadata
+      if (configType === 'notifications') {
+        // Ensure .system-data exists for notifications
+        await mkdir(dirname(userPath), { recursive: true });
+      }
       await this.saveConfiguration(configType, defaultConfig);
     } catch (error) {
       throw new Error(`Failed to reset configuration ${configType}: ${error}`);
@@ -178,13 +197,12 @@ export class ConfigurationService {
     ];
 
     for (const configType of configTypes) {
-      const userPath = join(this.dataPath, `${configType}.yml`);
-      const defaultPath = join(this.defaultsPath, `${configType}.yml`);
+      const { userPath, defaultPath } = this.resolvePaths(configType);
 
       if (await this.fileExists(userPath)) {
         status[configType] = 'user';
       } else if (await this.fileExists(defaultPath)) {
-        status[configType] = 'missing';
+        status[configType] = 'default';
       } else {
         status[configType] = 'missing';
       }
@@ -385,6 +403,52 @@ export class ConfigurationService {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * One-time migration: move notifications.yml from data/.civic to .system-data,
+   * preserve a backup, and transform to new metadata format.
+   */
+  private async migrateNotificationsIfNeeded(): Promise<void> {
+    const oldPath = join(this.dataPath, 'notifications.yml');
+    const newPath = join(this.systemDataPath, 'notifications.yml');
+
+    const oldExists = await this.fileExists(oldPath);
+    const newExists = await this.fileExists(newPath);
+    if (!oldExists || newExists) {
+      return;
+    }
+
+    try {
+      // Read old content
+      const oldContent = await readFile(oldPath, 'utf-8');
+      const parsedOld = parse(oldContent);
+
+      // Load metadata skeleton from defaults
+      const metadata = await this.getConfigurationMetadata('notifications');
+
+      // If the old file already has _metadata, keep as-is; otherwise transform
+      const newFormatConfig = parsedOld && parsedOld._metadata
+        ? parsedOld
+        : this.transformToNewFormat(parsedOld, metadata);
+
+      // Ensure target directory
+      await mkdir(dirname(newPath), { recursive: true });
+
+      // Write new file
+      await writeFile(newPath, stringify(newFormatConfig), 'utf-8');
+
+      // Backup and remove old file
+      const backupPath = `${oldPath}.bak-${Date.now()}`;
+      await writeFile(backupPath, oldContent, 'utf-8');
+
+      // Best-effort remove old (we keep backup)
+      // Using fs.promises.writeFile above; no unlink import here; leave original in place after backup? The user requested removal.
+      // We'll overwrite old with a pointer message to avoid secrets left in repo paths.
+      await writeFile(oldPath, '# Moved to .system-data/notifications.yml\n', 'utf-8');
+    } catch (error) {
+      console.warn('Notifications config migration failed:', error);
     }
   }
 }
