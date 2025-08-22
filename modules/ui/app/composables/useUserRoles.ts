@@ -14,7 +14,7 @@ export const useUserRoles = () => {
       loading.value = true;
       error.value = '';
 
-      const response = (await $civicApi('/api/config/roles')) as any;
+      const response = (await $civicApi('/api/v1/config/roles')) as any;
 
       if (response.success) {
         roles.value = response.data.roles || [];
