@@ -276,44 +276,8 @@ export class RoleManager {
         `[RoleManager] Loaded roles: ${Object.keys(parsedConfig.roles).join(', ')}`
       );
 
-      // Debug: Log the raw parsed config structure
-      logger.info(
-        `[RoleManager] Raw parsed config structure:`,
-        JSON.stringify(parsedConfig, null, 2)
-      );
-
-      // Direct output for debugging
-      logger.output('=== DEBUG: Raw parsed config ===');
-      logger.output(JSON.stringify(parsedConfig, null, 2));
-      logger.output('=== DEBUG: Admin role ===');
-      logger.output(JSON.stringify(parsedConfig.roles.admin, null, 2));
-      logger.output('=== DEBUG: Admin permissions ===');
-      logger.output(
-        JSON.stringify(parsedConfig.roles.admin?.permissions, null, 2)
-      );
-      logger.output('=== END DEBUG ===');
-
-      // Debug: Log the admin role structure
-      if (parsedConfig.roles.admin) {
-        logger.info(
-          `[RoleManager] Admin role structure:`,
-          JSON.stringify(parsedConfig.roles.admin, null, 2)
-        );
-        logger.info(
-          `[RoleManager] Admin role permissions field:`,
-          parsedConfig.roles.admin.permissions
-        );
-        if (
-          parsedConfig.roles.admin.permissions &&
-          typeof parsedConfig.roles.admin.permissions === 'object' &&
-          'value' in parsedConfig.roles.admin.permissions
-        ) {
-          logger.info(
-            `[RoleManager] Admin permissions value:`,
-            parsedConfig.roles.admin.permissions.value
-          );
-        }
-      } else {
+      // Reduce verbose debug output: keep only essential info-level logs
+      if (!parsedConfig.roles.admin) {
         logger.warn(`[RoleManager] Admin role not found in parsed config`);
       }
 
@@ -411,19 +375,7 @@ export class RoleManager {
       userPermissions
     );
 
-    // CRITICAL DEBUG: Check what getRolePermissions actually returned
-    logger.output(`=== DEBUG: checkPermission received permissions ===`);
-    logger.output(`userPermissions type: ${typeof userPermissions}`);
-    logger.output(
-      `userPermissions length: ${userPermissions?.length || 'undefined'}`
-    );
-    logger.output(
-      `userPermissions content: ${JSON.stringify(userPermissions, null, 2)}`
-    );
-    logger.output(`=== END DEBUG ===`);
-    logger.info(
-      `[RoleManager] DEBUG: Added timestamp ${new Date().toISOString()}`
-    );
+    // Remove verbose debug output of permissions content
 
     // Check if user has the specific permission
     if (userPermissions.includes(permission)) {
@@ -511,18 +463,13 @@ export class RoleManager {
         // New format: metadata object with value
         permissionArray = roleConfig.permissions.value;
 
-        // Direct debug output
-        logger.output(`=== DEBUG: Extracted permissionArray ===`);
-        logger.output(JSON.stringify(permissionArray, null, 2));
-        logger.output(`=== END DEBUG ===`);
+        // Reduced: no direct dump of permission array
       } else {
         logger.info(
           `[RoleManager] Role ${role} permissions is neither array nor metadata format:`,
           typeof roleConfig.permissions
         );
-        logger.output(
-          `[RoleManager] Role ${role} permissions object: ${JSON.stringify(roleConfig.permissions, null, 2)}`
-        );
+        // Reduced: no direct dump of permissions object
       }
 
       if (Array.isArray(permissionArray)) {
@@ -530,14 +477,7 @@ export class RoleManager {
           `[RoleManager] Role ${role} permission array:`,
           permissionArray
         );
-        logger.output(`=== DEBUG: Adding permissions to Set ===`);
-        permissionArray.forEach((p) => {
-          logger.output(`Adding permission: ${p}`);
-          permissions.add(p);
-        });
-        logger.output(
-          `=== DEBUG: Set size after adding: ${permissions.size} ===`
-        );
+        permissionArray.forEach((p) => permissions.add(p));
       } else {
         logger.info(
           `[RoleManager] Role ${role} permission array is not an array:`,
@@ -549,10 +489,9 @@ export class RoleManager {
     }
 
     // Get inherited permissions from role hierarchy (handle missing role_hierarchy)
-    logger.output(`=== DEBUG: Processing role hierarchy for ${role} ===`);
     try {
       const roleHierarchy = config.role_hierarchy || {};
-      logger.output(`Role hierarchy exists: ${!!config.role_hierarchy}`);
+      // No verbose output
 
       // Handle both old format (direct array) and new format (metadata with value)
       let inheritedRoles: string[] = [];
@@ -571,37 +510,25 @@ export class RoleManager {
         inheritedRoles = hierarchyEntry.value;
       }
 
-      logger.output(
-        `Inherited roles for ${role}: ${JSON.stringify(inheritedRoles)}`
-      );
+      // No verbose output
 
       for (const inheritedRole of inheritedRoles) {
-        logger.output(`Processing inherited role: ${inheritedRole}`);
         const inheritedPermissions = this.getRolePermissions(
           inheritedRole,
           config
         );
-        logger.output(
-          `Got ${inheritedPermissions.length} inherited permissions from ${inheritedRole}`
-        );
         inheritedPermissions.forEach((p) => permissions.add(p));
       }
-      logger.output(`=== DEBUG: Role hierarchy processing complete ===`);
     } catch (error) {
       logger.error(
         `[RoleManager] CRITICAL: Error in role hierarchy processing:`,
         error
       );
-      logger.output(`=== CRITICAL ERROR: Role hierarchy failed ===`);
-      logger.output(`Error: ${error}`);
-      logger.output(`=== END CRITICAL ERROR ===`);
       throw error;
     }
 
     // If role doesn't exist or has no permissions, fallback to public permissions
-    logger.output(`=== DEBUG: Checking fallback conditions for ${role} ===`);
-    logger.output(`Role config exists: ${!!roleConfig}`);
-    logger.output(`Permissions size: ${permissions.size}`);
+    // No verbose fallback logs
 
     if (!roleConfig || permissions.size === 0) {
       logger.warn(
@@ -627,9 +554,6 @@ export class RoleManager {
           }
 
           if (Array.isArray(publicPermissionArray)) {
-            logger.output(
-              `Adding ${publicPermissionArray.length} public permissions`
-            );
             publicPermissionArray.forEach((p) => permissions.add(p));
           }
         }
@@ -638,61 +562,25 @@ export class RoleManager {
           `[RoleManager] CRITICAL: Error in fallback processing:`,
           error
         );
-        logger.output(`=== CRITICAL ERROR: Fallback failed ===`);
-        logger.output(`Error: ${error}`);
-        logger.output(`=== END CRITICAL ERROR ===`);
         throw error;
       }
     }
-    logger.output(`=== DEBUG: Fallback processing complete ===`);
 
-    // CRITICAL DEBUG: Check if the Set is actually empty
-    if (permissions.size === 0) {
-      logger.error(`[RoleManager] CRITICAL: Set is empty before Array.from!`);
-      logger.output(`=== CRITICAL ERROR: Set is empty ===`);
-      logger.output(`Set size: ${permissions.size}`);
-      logger.output(`Set type: ${typeof permissions}`);
-      logger.output(`Set constructor: ${permissions.constructor.name}`);
-      logger.output(`=== END CRITICAL ERROR ===`);
-    } else {
-      logger.info(
-        `[RoleManager] Set has ${permissions.size} permissions, converting to array`
-      );
-    }
+    // Proceed to conversion without verbose debug
 
-    logger.output(`=== DEBUG: Starting final array conversion for ${role} ===`);
-    logger.output(
-      `Permissions Set size before conversion: ${permissions.size}`
-    );
+    // No verbose conversion logs
 
     try {
-      logger.output(`About to call Array.from(permissions)...`);
       const finalPermissions = Array.from(permissions);
-      logger.output(`Array.from() completed successfully`);
 
       logger.info(
         `[RoleManager] Final permissions for role ${role}:`,
         finalPermissions
       );
 
-      // Debug: Log the final permissions directly
-      logger.output(`=== DEBUG: Final permissions for role ${role} ===`);
-      logger.output(`Set size: ${permissions.size}`);
-      logger.output(`Final array length: ${finalPermissions.length}`);
-      logger.output(
-        `Set contents: ${JSON.stringify(finalPermissions, null, 2)}`
-      );
-      logger.output(`About to return finalPermissions...`);
-      logger.output(`=== END DEBUG ===`);
-
       return finalPermissions;
     } catch (error) {
       logger.error(`[RoleManager] CRITICAL: Error in Array.from:`, error);
-      logger.output(`=== CRITICAL ERROR: Array.from failed ===`);
-      logger.output(`Error: ${error}`);
-      logger.output(`Set size: ${permissions.size}`);
-      logger.output(`Set type: ${typeof permissions}`);
-      logger.output(`=== END CRITICAL ERROR ===`);
       throw error;
     }
   }
