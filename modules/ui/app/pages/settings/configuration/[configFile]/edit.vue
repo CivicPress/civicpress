@@ -95,7 +95,16 @@
                                                         {{ formatFieldLabel(String(nestedKey)) }}
                                                     </h5>
                                                     <div class="space-y-4">
-                                                        <div v-for="(subField, subKey) in nestedField"
+                                                        <!-- If this is a metadata field (has value), render directly -->
+                                                        <ConfigurationField
+                                                            v-if="isMetadataField(nestedField)"
+                                                            :field-key="`${String(key)}.${String(nestedKey)}`"
+                                                            :field="nestedField"
+                                                            :value="getSecondLevelFieldValue(String(key), String(nestedKey))"
+                                                            @update="updateSecondLevelFieldValue" />
+
+                                                        <!-- Otherwise iterate sub-fields inside this group -->
+                                                        <div v-else v-for="(subField, subKey) in nestedField"
                                                             :key="String(subKey)"
                                                             v-show="String(subKey) !== '_metadata'">
                                                             <ConfigurationField
@@ -215,6 +224,11 @@ const isNestedObject = (field: any) => {
         Object.keys(field).some(key => key !== '_metadata' && typeof field[key] === 'object')
 }
 
+// Detect metadata field objects (with value/type/description/required)
+const isMetadataField = (field: any) => {
+    return field && typeof field === 'object' && 'value' in field && 'type' in field
+}
+
 const formatFieldLabel = (key: string) => {
     return key
         .split('_')
@@ -246,6 +260,14 @@ const getNestedFieldValue = (sectionKey: string, nestedKey: string, subKey: stri
     }
 
     return config.value[sectionKey]?.[nestedKey]?.[subKey]
+}
+
+// Get second-level value (for fields like social.twitter where field itself is a metadata object)
+const getSecondLevelFieldValue = (sectionKey: string, nestedKey: string) => {
+    const field = configMetadata.value[sectionKey]?.[nestedKey]
+    if (!field) return null
+    if (typeof field === 'object' && field.value !== undefined) return field.value
+    return config.value[sectionKey]?.[nestedKey]
 }
 
 // Update field value
@@ -293,6 +315,24 @@ const updateNestedFieldValue = (fullKey: string, value: any) => {
         config.value[sectionKey][nestedKey][subKey] = value
     }
 
+    hasChanges.value = true
+}
+
+// Update second-level metadata field (e.g., social.twitter)
+const updateSecondLevelFieldValue = (fullKey: string, value: any) => {
+    const parts = fullKey.split('.')
+    if (parts.length !== 2) return
+    const [sectionKey, nestedKey] = parts
+    const field = configMetadata.value[sectionKey]?.[nestedKey]
+    if (!field) return
+
+    if (!config.value[sectionKey]) config.value[sectionKey] = {}
+
+    if (typeof field === 'object' && field.value !== undefined) {
+        config.value[sectionKey][nestedKey] = { ...field, value }
+    } else {
+        config.value[sectionKey][nestedKey] = value
+    }
     hasChanges.value = true
 }
 
