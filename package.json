@@ -42,7 +42,10 @@
     "gen:page": "plop nuxt:page",
     "gen:cli": "plop cli:command",
     "gen:test": "plop test:spec",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "assist": "node tools/coding-assistant/index.mjs",
+    "assist:local": "cross-env CIVIC_LLM_BASE=http://localhost:1234/v1 CIVIC_LLM_KEY=lm-studio CIVIC_LLM_MODEL=local-model pnpm run assist --",
+    "assist:openai": "cross-env CIVIC_LLM_BASE=https://api.openai.com/v1 CIVIC_LLM_MODEL=gpt-4.1-mini pnpm run assist --"
   },
   "license": "MIT",
   "devDependencies": {
@@ -51,10 +54,12 @@
     "@vitest/ui": "3.2.4",
     "change-case": "5.4.4",
     "concurrently": "^8.2.2",
+    "cross-env": "10.0.0",
     "husky": "^8.0.0",
     "js-yaml": "4.1.0",
     "lint-staged": "16.1.5",
     "markdownlint-cli": "^0.37.0",
+    "openai": "5.15.0",
     "plop": "4.0.1",
     "prettier": "^3.0.0",
     "vitest": "3.2.4",
