@@ -9,13 +9,43 @@ import {
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 
+// Deep-normalize metadata-shaped values { value, type, ... } -> value
+function normalizeMetadata<T = any>(input: any): T {
+  if (input == null) return input as T;
+  if (Array.isArray(input))
+    return input.map((i) => normalizeMetadata(i)) as any;
+  if (typeof input === 'object') {
+    // If this looks like a metadata field, unwrap its value
+    if (
+      'value' in input &&
+      Object.keys(input).some(
+        (k) =>
+          k === 'type' ||
+          k === 'description' ||
+          k === 'required' ||
+          k === 'options' ||
+          k === 'value'
+      )
+    ) {
+      return normalizeMetadata((input as any).value) as T;
+    }
+    const out: any = {};
+    for (const [k, v] of Object.entries(input)) {
+      out[k] = normalizeMetadata(v);
+    }
+    return out as T;
+  }
+  return input as T;
+}
+
 // We'll create a simple email channel for the CLI that uses SendGrid directly
 class EmailChannel {
   public config: any;
   private name: string = 'email';
 
   constructor(config: any) {
-    this.config = config;
+    // Normalize entire config so provider credentials are plain scalars
+    this.config = normalizeMetadata(config);
   }
 
   getName(): string {
@@ -31,9 +61,9 @@ class EmailChannel {
       const provider = this.config.provider || 'sendgrid';
 
       if (provider === 'smtp') {
-        return await this.sendViaSMTP(request);
+        return await this.sendViaSMTP(normalizeMetadata(request));
       } else {
-        return await this.sendViaSendGrid(request);
+        return await this.sendViaSendGrid(normalizeMetadata(request));
       }
     } catch (error) {
       return {
@@ -72,7 +102,7 @@ class EmailChannel {
       console.log(`  Host: ${this.config.credentials.host}`);
       console.log(`  Port: ${this.config.credentials.port}`);
       console.log(`  Secure: ${this.config.credentials.secure}`);
-      console.log(`  User: ${this.config.credentials.auth.user}`);
+      console.log(`  User: ${this.config.credentials.auth?.user}`);
       console.log(`  From: ${this.config.credentials.from}`);
       console.log(`  To: ${request.to}`);
 
@@ -80,10 +110,7 @@ class EmailChannel {
         host: this.config.credentials.host,
         port: this.config.credentials.port,
         secure: this.config.credentials.secure,
-        auth: {
-          user: this.config.credentials.auth.user,
-          pass: this.config.credentials.auth.pass,
-        },
+        auth: this.config.credentials.auth,
         tls: this.config.credentials.tls || { rejectUnauthorized: false },
         debug: true,
         logger: true,
@@ -141,7 +168,7 @@ class EmailChannel {
   async validateConfig(): Promise<boolean> {
     try {
       const config = this.config.credentials;
-      if (!config.apiKey) {
+      if (!config.apiKey && this.config.provider === 'sendgrid') {
         console.error('❌ SendGrid API key is required');
         return false;
       }
@@ -167,7 +194,7 @@ class EmailChannel {
   }
 
   updateConfig(config: any): void {
-    this.config = config;
+    this.config = normalizeMetadata(config);
   }
 }
 
@@ -229,12 +256,13 @@ export default function notifyCommand(cli: CAC) {
         console.log('🔧 Creating email channel with provider:', provider);
         console.log('🔧 Email config:', JSON.stringify(emailConfig, null, 2));
 
+        const rawCreds =
+          (emailConfig as any)[provider as any] ||
+          (emailConfig as any).sendgrid;
         const emailChannel = new EmailChannel({
           enabled: emailConfig.enabled,
           provider: provider as any,
-          credentials:
-            emailConfig[provider as keyof typeof emailConfig] ||
-            emailConfig.sendgrid,
+          credentials: rawCreds,
           settings: {},
         });
 

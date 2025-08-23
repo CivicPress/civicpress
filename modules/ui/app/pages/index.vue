@@ -1,125 +1,153 @@
 <script setup lang="ts">
-import type { CivicRecord } from '~/stores/records'
+import type { CivicRecord } from '~/stores/records';
+import { getFieldValue as normalizeValue } from '~/utils/config';
 
 // Store
-const recordsStore = useRecordsStore()
-const authStore = useAuthStore()
+const recordsStore = useRecordsStore();
+const authStore = useAuthStore();
 
 // Composables
-const { $civicApi } = useNuxtApp()
-const { formatDate, getStatusColor, getTypeIcon } = useRecordUtils()
+const { $civicApi } = useNuxtApp();
+const { formatDate, getStatusColor, getTypeIcon } = useRecordUtils();
 
 // Reactive state
-const organizationInfo = ref<any>(null)
-const recentRecords = ref<CivicRecord[]>([])
-const loading = ref(true)
-const error = ref('')
-const isAuthenticated = computed(() => authStore.isAuthenticated)
+const organizationInfo = ref<any>(null);
+const recentRecords = ref<CivicRecord[]>([]);
+const loading = ref(true);
+const error = ref('');
+const isAuthenticated = computed(() => authStore.isAuthenticated);
 
 // Computed properties
-const defaultDescription = computed(() => 'A modern civic technology platform for transparent, accessible, and accountable local government.')
+const defaultDescription = computed(
+  () =>
+    'A modern civic technology platform for transparent, accessible, and accountable local government.'
+);
 
 const isAdmin = computed(() => {
-  return authStore.currentUser?.role === 'admin'
-})
+  return authStore.currentUser?.role === 'admin';
+});
+
+// Normalized organization fields
+const orgName = computed(
+  () => normalizeValue(organizationInfo.value?.name) || 'CivicPress'
+);
+const orgDescription = computed(
+  () =>
+    normalizeValue(organizationInfo.value?.description) ||
+    defaultDescription.value
+);
+const orgCity = computed(() => normalizeValue(organizationInfo.value?.city));
+const orgState = computed(() => normalizeValue(organizationInfo.value?.state));
+const orgCountry = computed(() =>
+  normalizeValue(organizationInfo.value?.country)
+);
+const orgTimezone = computed(() =>
+  normalizeValue(organizationInfo.value?.timezone)
+);
 
 // Fetch organization info (public endpoint)
 const fetchOrganizationInfo = async () => {
   try {
-    const response = await $civicApi('/info') as any
+    const response = (await $civicApi('/info')) as any;
     if (response.success) {
-      organizationInfo.value = response.organization
+      organizationInfo.value = response.organization;
     }
   } catch (err: any) {
-    console.error('Error fetching organization info:', err)
+    console.error('Error fetching organization info:', err);
     // Don't set error for organization info - it's not critical
   }
-}
-
-
+};
 
 // Fetch recent records (public - available to all users)
 const fetchRecentRecords = async () => {
   try {
-    const response = await $civicApi('/api/v1/records?limit=5') as any
+    const response = (await $civicApi('/api/v1/records?limit=5')) as any;
     if (response.success) {
-      recentRecords.value = response.data.records || []
+      recentRecords.value = response.data.records || [];
     }
   } catch (err: any) {
-    console.error('Error fetching recent records:', err)
+    console.error('Error fetching recent records:', err);
     // Don't set error for recent records - it's not critical
   }
-}
+};
 
 // Load all data
 const loadDashboardData = async () => {
-  loading.value = true
-  error.value = ''
+  loading.value = true;
+  error.value = '';
 
   try {
     // Always fetch organization info (public)
-    await fetchOrganizationInfo()
+    await fetchOrganizationInfo();
 
     // Fetch recent records for all users (public data)
-    await fetchRecentRecords()
+    await fetchRecentRecords();
   } catch (err: any) {
-    error.value = err.message || 'Failed to load dashboard data'
-    console.error('Error loading dashboard data:', err)
+    error.value = err.message || 'Failed to load dashboard data';
+    console.error('Error loading dashboard data:', err);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // Quick actions
 const navigateToRecords = () => {
-  navigateTo('/records')
-}
+  navigateTo('/records');
+};
 
 const navigateToCreate = () => {
-  navigateTo('/records/new')
-}
+  navigateTo('/records/new');
+};
 
 const navigateToLogin = () => {
-  navigateTo('/auth/login')
-}
+  navigateTo('/auth/login');
+};
 
 const navigateToSettings = () => {
-  navigateTo('/settings')
-}
+  navigateTo('/settings');
+};
 
 const navigateToProfile = () => {
-  navigateTo('/settings/profile')
-}
+  navigateTo('/settings/profile');
+};
 
 // Load data on mount
 onMounted(() => {
-  loadDashboardData()
-})
+  loadDashboardData();
+});
 
 // Watch for authentication changes
 watch(isAuthenticated, (newValue) => {
   if (newValue) {
     // User just logged in, reload authenticated data
-    loadDashboardData()
+    loadDashboardData();
   }
-})
+});
 </script>
 
 <template>
   <UDashboardPanel>
-
-
     <template #body>
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center items-center h-64">
         <div class="text-center">
-          <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4"
+          />
           <p class="text-gray-600">Loading dashboard...</p>
         </div>
       </div>
 
       <!-- Error State -->
-      <UAlert v-else-if="error" color="error" variant="soft" :title="error" icon="i-lucide-alert-circle" class="mb-4">
+      <UAlert
+        v-else-if="error"
+        color="error"
+        variant="soft"
+        :title="error"
+        icon="i-lucide-alert-circle"
+        class="mb-4"
+      >
         <template #footer>
           <UButton color="error" variant="soft" @click="loadDashboardData">
             Try Again
@@ -135,47 +163,89 @@ watch(isAuthenticated, (newValue) => {
             <Logo size="2xl" class="my-16" />
           </div>
           <h2 class="text-4xl font-bold mb-4">
-            {{ organizationInfo?.name || 'CivicPress' }}
+            {{ orgName }}
           </h2>
           <p class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-lg">
-            {{ organizationInfo?.description || defaultDescription }}
+            {{ orgDescription }}
           </p>
         </div>
 
         <!-- Quick Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          <UCard class="text-center hover:shadow-lg transition-shadow cursor-pointer" @click="navigateToRecords">
-            <UIcon name="i-lucide-file-text" class="w-12 h-12 text-blue-500 mx-auto mb-4" />
+        <div
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+        >
+          <UCard
+            class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToRecords"
+          >
+            <UIcon
+              name="i-lucide-file-text"
+              class="w-12 h-12 text-blue-500 mx-auto mb-4"
+            />
             <h3 class="text-lg font-semibold mb-2">Browse Records</h3>
-            <p class="text-gray-600 dark:text-gray-400">View and search through civic records, bylaws, and policies.</p>
+            <p class="text-gray-600 dark:text-gray-400">
+              View and search through civic records, bylaws, and policies.
+            </p>
           </UCard>
 
-          <UCard v-if="isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToCreate">
-            <UIcon name="i-lucide-plus-circle" class="w-12 h-12 text-green-500 mx-auto mb-4" />
+          <UCard
+            v-if="isAuthenticated"
+            class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToCreate"
+          >
+            <UIcon
+              name="i-lucide-plus-circle"
+              class="w-12 h-12 text-green-500 mx-auto mb-4"
+            />
             <h3 class="text-lg font-semibold mb-2">Create Record</h3>
-            <p class="text-gray-600 dark:text-gray-400">Create new civic records, bylaws, or policies.</p>
+            <p class="text-gray-600 dark:text-gray-400">
+              Create new civic records, bylaws, or policies.
+            </p>
           </UCard>
 
-          <UCard v-if="!isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToLogin">
-            <UIcon name="i-lucide-log-in" class="w-12 h-12 text-purple-500 mx-auto mb-4" />
+          <UCard
+            v-if="!isAuthenticated"
+            class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToLogin"
+          >
+            <UIcon
+              name="i-lucide-log-in"
+              class="w-12 h-12 text-purple-500 mx-auto mb-4"
+            />
             <h3 class="text-lg font-semibold mb-2">Sign In</h3>
-            <p class="text-gray-600 dark:text-gray-400">Access administrative features and create records.</p>
+            <p class="text-gray-600 dark:text-gray-400">
+              Access administrative features and create records.
+            </p>
           </UCard>
 
-          <UCard v-if="isAdmin" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToSettings">
-            <UIcon name="i-lucide-settings" class="w-12 h-12 text-orange-500 mx-auto mb-4" />
+          <UCard
+            v-if="isAdmin"
+            class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToSettings"
+          >
+            <UIcon
+              name="i-lucide-settings"
+              class="w-12 h-12 text-orange-500 mx-auto mb-4"
+            />
             <h3 class="text-lg font-semibold mb-2">Settings</h3>
-            <p class="text-gray-600 dark:text-gray-400">Manage system settings, users, and configurations.</p>
+            <p class="text-gray-600 dark:text-gray-400">
+              Manage system settings, users, and configurations.
+            </p>
           </UCard>
 
-          <UCard v-if="isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToProfile">
-            <UIcon name="i-lucide-user" class="w-12 h-12 text-indigo-500 mx-auto mb-4" />
+          <UCard
+            v-if="isAuthenticated"
+            class="text-center hover:shadow-lg transition-shadow cursor-pointer"
+            @click="navigateToProfile"
+          >
+            <UIcon
+              name="i-lucide-user"
+              class="w-12 h-12 text-indigo-500 mx-auto mb-4"
+            />
             <h3 class="text-lg font-semibold mb-2">Profile</h3>
-            <p class="text-gray-600 dark:text-gray-400">View and edit your user profile and preferences.</p>
+            <p class="text-gray-600 dark:text-gray-400">
+              View and edit your user profile and preferences.
+            </p>
           </UCard>
         </div>
 
@@ -183,15 +253,29 @@ watch(isAuthenticated, (newValue) => {
         <div v-if="recentRecords.length > 0" class="space-y-4">
           <h3 class="text-xl font-semibold">Recent Records</h3>
           <div class="grid gap-4">
-            <UCard v-for="record in recentRecords" :key="record.id"
+            <UCard
+              v-for="record in recentRecords"
+              :key="record.id"
               class="hover:shadow-md transition-shadow cursor-pointer"
-              @click="navigateTo(`/records/${record.type}/${record.id}`)">
+              @click="navigateTo(`/records/${record.type}/${record.id}`)"
+            >
               <div class="flex items-start space-x-4">
-                <UIcon name="i-heroicons-document-text" class="w-8 h-8 text-gray-500 flex-shrink-0" />
+                <UIcon
+                  name="i-heroicons-document-text"
+                  class="w-8 h-8 text-gray-500 flex-shrink-0"
+                />
                 <div class="flex-1 min-w-0">
-                  <h4 class="text-sm font-medium truncate">{{ record.title }}</h4>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ formatDate(record.created_at) }}</p>
-                  <UBadge :color="getStatusColor(record.status) as any" variant="soft" size="sm">
+                  <h4 class="text-sm font-medium truncate">
+                    {{ record.title }}
+                  </h4>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ formatDate(record.created_at) }}
+                  </p>
+                  <UBadge
+                    :color="getStatusColor(record.status) as any"
+                    variant="soft"
+                    size="sm"
+                  >
                     {{ record.status }}
                   </UBadge>
                 </div>
@@ -200,25 +284,31 @@ watch(isAuthenticated, (newValue) => {
           </div>
         </div>
 
-
-
         <!-- Public Information -->
         <div v-if="organizationInfo" class="space-y-4">
-          <h3 class="text-xl font-semibold">About {{ organizationInfo.name }}</h3>
+          <h3 class="text-xl font-semibold">About {{ orgName }}</h3>
           <UCard>
             <div class="space-y-2">
-              <div v-if="organizationInfo.city && organizationInfo.state" class="flex items-center space-x-2">
+              <div
+                v-if="orgCity && orgState"
+                class="flex items-center space-x-2"
+              >
                 <UIcon name="i-lucide-map-pin" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.city }}, {{ organizationInfo.state
+                <span class="text-gray-700 dark:text-gray-300"
+                  >{{ orgCity }}, {{ orgState }}</span
+                >
+              </div>
+              <div v-if="orgCountry" class="flex items-center space-x-2">
+                <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700 dark:text-gray-300">{{
+                  orgCountry
                 }}</span>
               </div>
-              <div v-if="organizationInfo.country" class="flex items-center space-x-2">
-                <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.country }}</span>
-              </div>
-              <div v-if="organizationInfo.timezone" class="flex items-center space-x-2">
+              <div v-if="orgTimezone" class="flex items-center space-x-2">
                 <UIcon name="i-lucide-clock" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.timezone }}</span>
+                <span class="text-gray-700 dark:text-gray-300">{{
+                  orgTimezone
+                }}</span>
               </div>
             </div>
           </UCard>

@@ -6,13 +6,13 @@
           {{ fieldLabel }}
         </h4>
         <p
-          v-if="field?.description"
+          v-if="meta.description"
           class="text-sm text-gray-600 dark:text-gray-400"
         >
-          {{ field?.description }}
+          {{ meta.description }}
         </p>
       </div>
-      <UBadge v-if="field?.required" color="error" variant="soft" size="sm">
+      <UBadge v-if="meta.required" color="error" variant="soft" size="sm">
         Required
       </UBadge>
     </div>
@@ -25,7 +25,7 @@
       <UFormField
         v-if="fieldType === 'string'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <UInput
           :model-value="value"
@@ -39,7 +39,7 @@
       <UFormField
         v-else-if="fieldType === 'textarea'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <UTextarea
           :model-value="value"
@@ -53,7 +53,7 @@
       <UFormField
         v-else-if="fieldType === 'number'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <UInput
           :model-value="value"
@@ -67,7 +67,7 @@
       <UFormField
         v-else-if="fieldType === 'boolean'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <UCheckbox :model-value="value" @update:model-value="updateValue" />
       </UFormField>
@@ -76,7 +76,7 @@
       <UFormField
         v-else-if="fieldType === 'array'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <USelect
           :model-value="value"
@@ -90,7 +90,7 @@
       <UFormField
         v-else-if="fieldType === 'url'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <UInput
           :model-value="value"
@@ -104,7 +104,7 @@
       <UFormField
         v-else-if="fieldType === 'email'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <UInput
           :model-value="value"
@@ -118,7 +118,7 @@
       <UFormField
         v-else-if="fieldType === 'phone'"
         :label="fieldLabel"
-        :description="field?.description"
+        :description="meta.description"
       >
         <UInput
           :model-value="value"
@@ -129,7 +129,7 @@
       </UFormField>
 
       <!-- Default to string input -->
-      <UFormField v-else :label="fieldLabel" :description="field?.description">
+      <UFormField v-else :label="fieldLabel" :description="meta.description">
         <UInput
           :model-value="value"
           :placeholder="getPlaceholder(field)"
@@ -154,6 +154,7 @@
 </template>
 
 <script setup lang="ts">
+import { getFieldMeta } from '~/utils/config';
 interface Props {
   fieldKey: string;
   field: any;
@@ -173,6 +174,8 @@ const fieldLabel = computed(() => {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 });
+
+const meta = computed(() => getFieldMeta(props.field));
 
 const fieldType = computed(() => {
   const f: any = props.field || {};

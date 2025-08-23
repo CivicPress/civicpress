@@ -280,18 +280,18 @@ export class CentralConfigManager {
         return yaml.parse(configContent) as OrgConfig;
       } catch (error) {
         this.logger.warn(`Warning: Could not parse ${orgConfigPath}:`, error);
+        throw new Error(
+          `Invalid org-config.yml. Fix ${orgConfigPath} or copy from core/src/defaults/org-config.yml`
+        );
       }
     }
 
-    // Return default values if org config doesn't exist
-    return {
-      name: 'Civic Records',
-      city: 'Richmond',
-      state: 'Quebec',
-      country: 'Canada',
-      timezone: 'America/Montreal',
-      repo_url: null,
-    };
+    // Do not run from defaults silently; require explicit user config
+    const msg =
+      `Organization config not found at ${orgConfigPath}. ` +
+      `Please create it (e.g., copy core/src/defaults/org-config.yml to data/.civic/org-config.yml).`;
+    this.logger.warn(msg);
+    throw new Error(msg);
   }
 
   /**
@@ -323,41 +323,31 @@ export class CentralConfigManager {
     const config = this.getConfig();
     const dataDir = this.getDataDir();
 
-    // Start with library defaults
-    let recordTypes: RecordTypesConfig = { ...DEFAULT_RECORD_TYPES };
-
-    // Merge defaults/config.yml if present
-    const defaultsConfigPath = path.resolve(
-      process.cwd(),
-      'core',
-      'src',
-      'defaults',
-      'config.yml'
-    );
-    const defaultsConfig = this.loadYamlIfExists(defaultsConfigPath);
-    if (defaultsConfig && defaultsConfig.record_types_config) {
-      recordTypes = mergeRecordTypes(
-        recordTypes,
-        defaultsConfig.record_types_config as RecordTypesConfig
-      );
-    }
-
-    // Merge user data/.civic/config.yml if present
+    // Prefer user data/.civic/config.yml
     const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
     const userConfig = this.loadYamlIfExists(userConfigPath);
+
+    // If user config present, use it
     if (userConfig && userConfig.record_types_config) {
-      recordTypes = mergeRecordTypes(
-        recordTypes,
+      return mergeRecordTypes(
+        { ...DEFAULT_RECORD_TYPES },
         userConfig.record_types_config as RecordTypesConfig
       );
     }
 
-    // Finally, merge deprecated .civicrc fields (with warning already emitted)
+    // Accept deprecated .civicrc fields as last resort (with prior warning)
     if (config.record_types_config) {
-      recordTypes = mergeRecordTypes(recordTypes, config.record_types_config);
+      return mergeRecordTypes(
+        { ...DEFAULT_RECORD_TYPES },
+        config.record_types_config
+      );
     }
 
-    return recordTypes;
+    const msg =
+      `Record types config not found at ${userConfigPath}. ` +
+      `Please create it (copy from core/src/defaults/config.yml → record_types_config) or migrate from .civicrc.`;
+    this.logger.warn(msg);
+    throw new Error(msg);
   }
 
   /**
@@ -383,40 +373,28 @@ export class CentralConfigManager {
     const config = this.getConfig();
     const dataDir = this.getDataDir();
 
-    let recordStatuses: RecordStatusesConfig = { ...DEFAULT_RECORD_STATUSES };
-
-    const defaultsConfigPath = path.resolve(
-      process.cwd(),
-      'core',
-      'src',
-      'defaults',
-      'config.yml'
-    );
-    const defaultsConfig = this.loadYamlIfExists(defaultsConfigPath);
-    if (defaultsConfig && defaultsConfig.record_statuses_config) {
-      recordStatuses = mergeRecordStatuses(
-        recordStatuses,
-        defaultsConfig.record_statuses_config as RecordStatusesConfig
-      );
-    }
-
     const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
     const userConfig = this.loadYamlIfExists(userConfigPath);
+
     if (userConfig && userConfig.record_statuses_config) {
-      recordStatuses = mergeRecordStatuses(
-        recordStatuses,
+      return mergeRecordStatuses(
+        { ...DEFAULT_RECORD_STATUSES },
         userConfig.record_statuses_config as RecordStatusesConfig
       );
     }
 
     if (config.record_statuses_config) {
-      recordStatuses = mergeRecordStatuses(
-        recordStatuses,
+      return mergeRecordStatuses(
+        { ...DEFAULT_RECORD_STATUSES },
         config.record_statuses_config
       );
     }
 
-    return recordStatuses;
+    const msg =
+      `Record statuses config not found at ${userConfigPath}. ` +
+      `Please create it (copy from core/src/defaults/config.yml → record_statuses_config) or migrate from .civicrc.`;
+    this.logger.warn(msg);
+    throw new Error(msg);
   }
 
   /**

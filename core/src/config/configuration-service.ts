@@ -258,6 +258,37 @@ export class ConfigurationService {
   }
 
   /**
+   * RAW: Load configuration YAML as-is (no transforms)
+   */
+  async loadRawConfigurationYAML(configType: string): Promise<string> {
+    const { userPath, defaultPath } = this.resolvePaths(configType);
+
+    // Prefer user file
+    if (await this.fileExists(userPath)) {
+      return await readFile(userPath, 'utf-8');
+    }
+
+    // Fallback to default template
+    if (await this.fileExists(defaultPath)) {
+      return await readFile(defaultPath, 'utf-8');
+    }
+
+    throw new Error(`Configuration file not found: ${configType}`);
+  }
+
+  /**
+   * RAW: Save configuration YAML as-is (no transforms)
+   */
+  async saveRawConfigurationYAML(
+    configType: string,
+    yamlContent: string
+  ): Promise<void> {
+    const { userPath } = this.resolvePaths(configType);
+    await mkdir(dirname(userPath), { recursive: true });
+    await writeFile(userPath, yamlContent, 'utf-8');
+  }
+
+  /**
    * Validate configuration structure
    */
   async validateConfiguration(
@@ -350,36 +381,82 @@ export class ConfigurationService {
   /**
    * Transform legacy format to new metadata format
    */
-  private transformToNewFormat(config: any, metadata: any): any {
-    const newConfig: any = {
-      _metadata: metadata,
-    };
+  private transformToNewFormat(
+    config: any,
+    metadata: any,
+    includeHeader: boolean = true
+  ): any {
+    // Only store the header metadata at top level
+    const newConfig: any = includeHeader
+      ? { _metadata: metadata && metadata._metadata ? metadata._metadata : {} }
+      : {};
 
-    // Transform fields based on metadata structure
-    for (const [key, field] of Object.entries(config)) {
+    // Transform fields based on metadata structure (supports nested objects)
+    for (const [key, fieldValue] of Object.entries(config)) {
       if (
         key === '_metadata' ||
         key === 'version' ||
         key === 'created' ||
         key === 'updated'
-      )
+      ) {
         continue;
-
-      if (metadata[key]) {
-        // Field has metadata - use it
-        newConfig[key] = {
-          ...metadata[key],
-          value: field,
-        };
-      } else {
-        // Field has no metadata - create default
-        newConfig[key] = {
-          value: field,
-          type: 'string',
-          description: key,
-          required: false,
-        };
       }
+
+      const metaForKey = metadata ? (metadata as any)[key] : undefined;
+      const normalizedValue =
+        fieldValue &&
+        typeof fieldValue === 'object' &&
+        'value' in (fieldValue as any)
+          ? (fieldValue as any).value
+          : fieldValue;
+
+      // Leaf field with metadata
+      if (
+        metaForKey &&
+        typeof metaForKey === 'object' &&
+        metaForKey !== null &&
+        'value' in metaForKey
+      ) {
+        newConfig[key] = {
+          ...metaForKey,
+          value: normalizedValue,
+        };
+        continue;
+      }
+
+      // Nested object: recurse using corresponding metadata subtree
+      if (
+        metaForKey &&
+        typeof metaForKey === 'object' &&
+        metaForKey !== null &&
+        !('value' in metaForKey) &&
+        fieldValue &&
+        typeof fieldValue === 'object' &&
+        !Array.isArray(fieldValue)
+      ) {
+        newConfig[key] = this.transformToNewFormat(
+          fieldValue,
+          metaForKey,
+          /* includeHeader */ false
+        );
+        continue;
+      }
+
+      // No metadata: synthesize a default leaf
+      const inferredType = Array.isArray(normalizedValue)
+        ? 'array'
+        : typeof normalizedValue === 'boolean'
+          ? 'boolean'
+          : typeof normalizedValue === 'number'
+            ? 'number'
+            : 'string';
+
+      newConfig[key] = {
+        value: normalizedValue,
+        type: inferredType,
+        description: key,
+        required: false,
+      };
     }
 
     return newConfig;

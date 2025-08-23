@@ -86,10 +86,6 @@
             <div v-else-if="configMetadata" class="space-y-8">
               <!-- Render form fields based on metadata -->
               <div v-for="(field, key) in configMetadata" :key="String(key)">
-                <pre
-                  class="text-xs text-gray-500 dark:text-gray-400 p-4 bg-amber-200"
-                  >{{ field }} ??</pre
-                >
                 <div v-show="String(key) !== '_metadata'">
                   <!-- Handle nested objects (like roles) -->
                   <div v-if="isNestedObject(field)" class="space-y-6">
@@ -111,8 +107,7 @@
                                 >
                                   {{
                                     field.description ||
-                                    `Manage
-                                                                    ${formatFieldLabel(String(key)).toLowerCase()}`
+                                    `Manage ${formatFieldLabel(String(key)).toLowerCase()}`
                                   }}
                                 </p>
                               </div>
@@ -140,7 +135,7 @@
                                 :field-key="`${String(key)}.${String(nestedKey)}`"
                                 :field="nestedField"
                                 :value="
-                                  getSecondLevelFieldValue(
+                                  getSecondLevelValue(
                                     String(key),
                                     String(nestedKey)
                                   )
@@ -162,7 +157,7 @@
                                   >
                                     <UInput
                                       :model-value="
-                                        getNestedFieldValue(
+                                        getNestedValue(
                                           String(key),
                                           String(nestedKey),
                                           String(idx)
@@ -193,7 +188,7 @@
                                   :field-key="`${String(key)}.${String(nestedKey)}.${String(subKey)}`"
                                   :field="subField"
                                   :value="
-                                    getNestedFieldValue(
+                                    getNestedValue(
                                       String(key),
                                       String(nestedKey),
                                       String(subKey)
@@ -207,7 +202,7 @@
                                   >
                                     <UInput
                                       :model-value="
-                                        getNestedFieldValue(
+                                        getNestedValue(
                                           String(key),
                                           String(nestedKey),
                                           String(subKey)
@@ -236,7 +231,7 @@
                     <ConfigurationField
                       :field-key="String(key)"
                       :field="field"
-                      :value="getFieldValue(String(key))"
+                      :value="getTopLevelValue(String(key))"
                       @update="updateFieldValue"
                     />
                   </div>
@@ -257,6 +252,11 @@
 </template>
 
 <script setup lang="ts">
+import {
+  getFieldValue as normalizeValue,
+  isMetadataField,
+} from '~/utils/config';
+
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
@@ -351,17 +351,10 @@ const isNestedObject = (field: any) => {
     typeof field === 'object' &&
     field !== null &&
     !Array.isArray(field) &&
-    field.value === undefined &&
+    (field as any).value === undefined &&
     Object.keys(field).some(
-      (key) => key !== '_metadata' && typeof field[key] === 'object'
+      (key) => key !== '_metadata' && typeof (field as any)[key] === 'object'
     )
-  );
-};
-
-// Detect metadata field objects (with value/type/description/required)
-const isMetadataField = (field: any) => {
-  return (
-    field && typeof field === 'object' && 'value' in field && 'type' in field
   );
 };
 
@@ -372,61 +365,36 @@ const formatFieldLabel = (key: string) => {
     .join(' ');
 };
 
-// Get field value from config
-const getFieldValue = (key: string) => {
-  const field = configMetadata.value[key];
-  if (!field) return null;
-
-  // Handle nested objects
-  if (typeof field === 'object' && field.value !== undefined) {
-    return field.value;
-  }
-
-  // Handle direct values
-  return config.value[key];
+// Normalized getters
+const getTopLevelValue = (key: string) => {
+  const cfg = config.value?.[key];
+  if (cfg !== undefined) return normalizeValue(cfg);
+  const metaField = configMetadata.value?.[key];
+  return normalizeValue(metaField);
 };
 
-// Get nested field value
-const getNestedFieldValue = (
+const getNestedValue = (
   sectionKey: string,
   nestedKey: string,
   subKey: string
 ) => {
-  const field = configMetadata.value[sectionKey]?.[nestedKey]?.[subKey];
-  if (!field) return null;
-
-  if (typeof field === 'object' && field.value !== undefined) {
-    return field.value;
-  }
-
-  return config.value[sectionKey]?.[nestedKey]?.[subKey];
+  const cfg = config.value?.[sectionKey]?.[nestedKey]?.[subKey];
+  if (cfg !== undefined) return normalizeValue(cfg);
+  const metaField = configMetadata.value?.[sectionKey]?.[nestedKey]?.[subKey];
+  return normalizeValue(metaField);
 };
 
 // Get second-level value (for fields like social.twitter where field itself is a metadata object)
-const getSecondLevelFieldValue = (sectionKey: string, nestedKey: string) => {
-  const field = configMetadata.value[sectionKey]?.[nestedKey];
-  if (!field) return null;
-  if (typeof field === 'object' && field.value !== undefined)
-    return field.value;
-  return config.value[sectionKey]?.[nestedKey];
+const getSecondLevelValue = (sectionKey: string, nestedKey: string) => {
+  const cfg = config.value?.[sectionKey]?.[nestedKey];
+  if (cfg !== undefined) return normalizeValue(cfg);
+  const metaField = configMetadata.value?.[sectionKey]?.[nestedKey];
+  return normalizeValue(metaField);
 };
 
-// Update field value
+// Update field value (store as scalar in config)
 const updateFieldValue = (key: string, value: any) => {
-  const field = configMetadata.value[key];
-  if (!field) return;
-
-  // Handle nested objects
-  if (typeof field === 'object' && field.value !== undefined) {
-    if (!config.value[key]) {
-      config.value[key] = {};
-    }
-    config.value[key].value = value;
-  } else {
-    // Handle direct values
-    config.value[key] = value;
-  }
-
+  config.value[key] = value;
   hasChanges.value = true;
 };
 
@@ -438,9 +406,6 @@ const updateNestedFieldValue = (fullKey: string, value: any) => {
   const [sectionKey, nestedKey, subKey] = parts;
   if (!sectionKey || !nestedKey || !subKey) return;
 
-  const field = configMetadata.value[sectionKey]?.[nestedKey]?.[subKey];
-  if (!field) return;
-
   // Ensure nested structure exists
   if (!config.value[sectionKey]) {
     config.value[sectionKey] = {};
@@ -449,13 +414,7 @@ const updateNestedFieldValue = (fullKey: string, value: any) => {
     config.value[sectionKey][nestedKey] = {};
   }
 
-  // Handle nested objects with value property
-  if (typeof field === 'object' && field.value !== undefined) {
-    config.value[sectionKey][nestedKey][subKey] = { ...field, value };
-  } else {
-    config.value[sectionKey][nestedKey][subKey] = value;
-  }
-
+  config.value[sectionKey][nestedKey][subKey] = value;
   hasChanges.value = true;
 };
 
@@ -464,16 +423,8 @@ const updateSecondLevelFieldValue = (fullKey: string, value: any) => {
   const parts = fullKey.split('.');
   if (parts.length !== 2) return;
   const [sectionKey, nestedKey] = parts;
-  const field = configMetadata.value[sectionKey]?.[nestedKey];
-  if (!field) return;
-
   if (!config.value[sectionKey]) config.value[sectionKey] = {};
-
-  if (typeof field === 'object' && field.value !== undefined) {
-    config.value[sectionKey][nestedKey] = { ...field, value };
-  } else {
-    config.value[sectionKey][nestedKey] = value;
-  }
+  config.value[sectionKey][nestedKey] = value;
   hasChanges.value = true;
 };
 

@@ -1,5 +1,7 @@
-import { Router } from 'express';
-import { configurationService } from '@civicpress/core';
+import express, { Router } from 'express';
+import { configurationService, CentralConfigManager } from '@civicpress/core';
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
 
 const router = Router();
 
@@ -45,6 +47,80 @@ router.get('/metadata/:type', async (req, res) => {
     });
   }
 });
+
+function resolveRawPaths(type: string) {
+  const key = (type || '').toLowerCase().trim();
+  const canonical = key.startsWith('notif') ? 'notifications' : key;
+  const dataDir = CentralConfigManager.getDataDir();
+  const userPath =
+    canonical === 'notifications'
+      ? join('.system-data', `${canonical}.yml`)
+      : join(dataDir, '.civic', `${canonical}.yml`);
+  const defaultPath = join('core', 'src', 'defaults', `${canonical}.yml`);
+  return { userPath, defaultPath };
+}
+
+/**
+ * RAW: GET /api/config/raw/:type
+ * Return raw YAML content without transforms
+ */
+router.get('/raw/:type', async (req, res) => {
+  try {
+    const { type } = req.params;
+    const { userPath, defaultPath } = resolveRawPaths(type);
+
+    // Prefer user file, fallback to defaults
+    let yaml: string | null = null;
+    try {
+      yaml = await readFile(userPath, 'utf-8');
+    } catch {}
+    if (!yaml) {
+      yaml = await readFile(defaultPath, 'utf-8');
+    }
+
+    res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
+    res.status(200).send(yaml);
+  } catch (error) {
+    res.status(404).json({
+      success: false,
+      error: `Raw configuration not found: ${error}`,
+    });
+  }
+});
+
+/**
+ * RAW: PUT /api/config/raw/:type
+ * Accept raw YAML and write as-is (no transforms)
+ */
+router.put(
+  '/raw/:type',
+  express.text({ type: '*/*', limit: '5mb' }),
+  async (req, res) => {
+    try {
+      const { type } = req.params;
+      const yamlContent = typeof req.body === 'string' ? req.body : '';
+      if (!yamlContent) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'YAML content is required' });
+      }
+
+      const { userPath } = resolveRawPaths(type);
+      await mkdir(dirname(userPath), { recursive: true });
+      await writeFile(userPath, yamlContent, 'utf-8');
+
+      res.json({
+        success: true,
+        message: `Raw configuration ${type} saved successfully`,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: `Failed to save raw configuration: ${error}`,
+      });
+    }
+  }
+);
 
 /**
  * GET /api/config/status
