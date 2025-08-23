@@ -117,21 +117,6 @@ civic auth:login --token <your_github_token>
 civic auth:password --username <username> --password <password>
 ```
 
-### Authentication
-
-CivicPress supports multiple authentication methods:
-
-```bash
-# GitHub OAuth (recommended for development)
-civic auth:login --token <your_github_token>
-
-# Username/Password (traditional authentication)
-civic auth:password --username <username> --password <password>
-
-# Interactive login (prompts for credentials)
-civic auth:password
-```
-
 ### Basic Usage
 
 ```bash
@@ -289,6 +274,10 @@ CivicPress
   authorization
 - **[Specifications](docs/specs-index.md)** - Complete platform specifications
   (50+ specs)
+- **[Project Status](docs/project-status.md)** - Current status overview
+- **[Roadmap](docs/roadmap.md)** - Development roadmap
+- **[Milestones](docs/milestones.md)** - Milestone checklist
+- **[Root TODO](docs/todo.md)** - General TODO list
 
 ### 🔧 Development Resources
 
@@ -329,7 +318,11 @@ CivicPress
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development guidelines.
+
+## Code of Conduct
+
+Please read our [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 ## License
 

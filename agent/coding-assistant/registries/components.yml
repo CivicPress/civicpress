@@ -1,16 +1,6 @@
 # Canonical registry of shared/reusable Vue components.
 
 components:
-  - name: MinutesTable
-    file: modules/public-sessions/components/MinutesTable.vue
-    purpose: Render a tabular list of minutes with pagination
-    status: stable
-
-  - name: SessionCard
-    file: modules/public-sessions/components/SessionCard.vue
-    purpose: Compact card view of a single session
-    status: planned
-
   # UI components from modules/ui/app/components
   - name: AvatarSkeleton
     file: modules/ui/app/components/AvatarSkeleton.vue

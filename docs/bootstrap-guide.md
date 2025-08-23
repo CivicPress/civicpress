@@ -92,7 +92,7 @@ database:
 - **Database is a performance layer**: Used for fast search, user sessions, API
   keys, and caching. The database can always be rebuilt from the files.
 
-For more details, see [database.md](../.civic/specs/database.md) and the
+For more details, see [database.md](specs/database.md) and the
 [architecture decision](../agent/memory/decisions.md).
 
 ---
@@ -603,10 +603,10 @@ You've successfully set up and used CivicPress! You now have:
 
 ### Resources
 
-- [CLI Documentation](docs/cli.md)
-- [Template System Guide](docs/templates.md)
-- [Validation Guide](docs/validation.md)
-- [Workflow Configuration](docs/workflows.md)
-- [Contributing Guide](CONTRIBUTING.md)
+- [CLI Documentation](cli.md)
+- [Template System Guide](templates.md)
+- [Validation Guide](validation.md)
+- [Workflow Configuration](workflows.md)
+- [Contributing Guide](../.github/CONTRIBUTING.md)
 
 Happy governing! 🌱

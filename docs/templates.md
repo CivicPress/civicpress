@@ -440,5 +440,5 @@ civic create bylaw "Test Bylaw" --template advanced
 
 - [Validation System Guide](validation.md)
 - [CLI Usage Guide](cli.md)
-- [Template Examples](../.civic/templates/)
+- For template files location, see ../core/src/defaults/templates/
 - [Validation Rules](../core/src/utils/template-engine.ts)

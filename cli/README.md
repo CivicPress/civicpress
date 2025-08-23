@@ -319,7 +319,8 @@ pnpm run test:watch
 - **[Authentication Guide](../docs/auth-system.md)** - Authentication and
   authorization
 - **[API Documentation](../docs/api.md)** - REST API reference
-- **[Project Status](../PROJECT_STATUS.md)** - Current implementation status
+- **[Project Status](../docs/project-status.md)** - Current implementation
+  status
 
 ---
 

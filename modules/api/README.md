@@ -93,7 +93,7 @@ graph TD
 
 - [CivicCore RecordManager Documentation](../../core/README.md)
 - [Workflow Configuration](../../data/.civic/workflows.yml)
-- [Hooks & Workflows](../core/src/hooks/hook-system.ts)
+- See [Hook System Spec](../../docs/specs/hooks.md) for details.
 
 ---
 

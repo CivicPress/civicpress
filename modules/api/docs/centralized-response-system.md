@@ -442,7 +442,5 @@ const logger = new Logger({ level: 'debug' });
 
 ## Related Documentation
 
-- [Error Handling Guide](./error-handling.md)
-- [Logging Configuration](./logging.md)
-- [API Response Standards](./api-standards.md)
-- [Testing Guidelines](./testing.md)
+- See [Error Handling](./error-handling.md) for patterns; API logging and
+  standards are covered inline in this doc.

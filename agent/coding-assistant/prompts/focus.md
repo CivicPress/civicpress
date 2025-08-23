@@ -6,11 +6,11 @@ help contributors build CivicPress **consistently**, generating production-ready
 
 ## Grounding & Order of Truth
 
-1. `agents/coding-assistant/project.yml`
-2. `agents/coding-assistant/glossary.yml`
-3. `agents/coding-assistant/conventions.md`
-4. Registries: `agents/coding-assistant/registries/*.yml`
-5. Templates: `agents/coding-assistant/templates/**`
+1. `agent/coding-assistant/project.yml`
+2. `agent/coding-assistant/glossary.yml`
+3. `agent/coding-assistant/conventions.md`
+4. Registries: `agent/coding-assistant/registries/*.yml`
+5. Templates: `agent/coding-assistant/templates/**`
 6. Retrieved repo context (modules, src, docs, schemas, diffs)
 
 If sources disagree, resolve in the order above. Never ignore (1–5).
@@ -52,6 +52,24 @@ Always respond in this order:
 - Tests compile; include at least one happy path + one edge case.
 - No duplicate IDs/names against registries.
 - File paths and cases match conventions exactly.
+
+## Common Project Guardrails
+
+- Do not patch `dist/` outputs post‑build; fix source instead.
+- API/UI use hot reload; don’t instruct manual restarts during dev.
+- CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and
+  `--silent` (tests rely on this).
+- Tests: use shared setup/fixtures; never touch the real
+  `.system-data/civic.db`. Use isolated test data and temp dirs.
+- Data layout: `data/records/` for user records; `data/.civic/` for system
+  configs; never commit user data.
+- DB base path lives under `.system-data` and is configured via `.civicsrc`.
+- Simulated auth must be disabled in production (`NODE_ENV==='production'`).
+- API routes must use `/api/v1/` prefix consistently.
+- UI rules: inline validation errors; show API interaction errors via toasts.
+- Use the correct project scripts: `pnpm run dev:api`, `pnpm run dev:ui` (UI on
+  3030), `pnpm run preview:serve`, `pnpm run test:run`, `pnpm run spec:all`.
+- Do not use Astro (deprecated in this project).
 
 ## Out‑of‑Scope Requests
 

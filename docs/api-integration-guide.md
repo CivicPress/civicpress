@@ -644,10 +644,10 @@ services:
 
 ## 📚 Additional Resources
 
-- [API Reference Documentation](./api-reference.md)
+- [API Reference Documentation](api.md)
 - [CivicPress Core Documentation](../core/README.md)
 - [CLI Documentation](../cli/README.md)
-- [Workflow Configuration Guide](../docs/workflows.md)
+- [Workflow Configuration Guide](workflows.md)
 
 ## 🤝 Support
 

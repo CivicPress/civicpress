@@ -1,37 +1,51 @@
 <script setup lang="ts">
     // Page: {{ properCase name }}
     definePageMeta({ layout: 'default' })
-    
-    
+
     // Composables
-    const { $civicApi } = useNuxtApp();
+    const { t } = useI18n()
+    const { $civicApi } = useNuxtApp()
 
-    // Reactive state
-    const data = ref<any[]>([]);
-    const loading = ref(true);
-    const error = ref('');
+    // Route & simple state (swap for your actual permission system)
+    const page = ref(1)
+    const pageSize = ref(20)
+    const canManage = computed(() => true) // TODO: wire permissions
 
-    // Fetch data
-    const fetchData = async () => {
-        try {
-            loading.value = true;
-            error.value = '';
-            const response = await $civicApi('/api/v1/{{ kebabCase name }}') as any;
-            if (response.success) {
-                data.value = response.data;
-            } else {
-                error.value = response.error || 'Failed to fetch data';
-            }
-        } catch (err: any) {
-            error.value = err.message || 'Failed to fetch data';
-            console.error('Error fetching data:', err);
-        } finally {
-            loading.value = false;
-        }
-    };
+    // Data loading (SSR-friendly)
+    type Item = { id: string | number; name?: string; username?: string; email?: string; role?: string; created_at?: string }
+    const { data, pending: loading, error, refresh } = await useAsyncData(
+        'list-{{ kebabCase name }}',
+        () => $civicApi('/api/v1/{{ kebabCase name }}', { params: { page: page.value, pageSize: pageSize.value } }) as Promise<{ success: boolean; data: Item[]; error?: string }>,
+        { default: () => ({ success: true, data: [] }) }
+    )
 
-    // Fetch data on mount
-    onMounted(fetchData);
+    // Normalized list + error text
+    const items = computed < Item[] > (() => (data.value?.data ?? []))
+    const errorText = computed(() => (data.value && 'success' in data.value && !data.value.success ? (data.value.error ?? t('common.errors.fetchFailed')) : (error.value as any)?.message))
+
+    // Refresh when page changes
+    watch([page, pageSize], () => refresh())
+
+    // UI helpers (provide safe fallbacks if your project lacks these utilities)
+    function navigateToItem(item: Item) {
+        return navigateTo(`/{{ kebabCase name }}/${item.id}`)
+    }
+    function getRoleColor(role?: string) {
+        return role === 'admin' ? 'primary' : role === 'editor' ? 'amber' : 'gray'
+    }
+    function getRoleDisplayName(role?: string) {
+        return role ? role.charAt(0).toUpperCase() + role.slice(1) : t('common.labels.unknown')
+    }
+    function formatDate(iso: string) {
+        try { return new Date(iso).toLocaleDateString() } catch { return '' }
+    }
+
+    // Breadcrumbs (customize as needed)
+    const breadcrumbItems = computed(() => [
+        { label: t('nav.home'), to: '/' },
+        { label: t('nav.admin'), to: '/admin' },
+        { label: t('entities.{{ kebabCase name }}'), to: '/{{ kebabCase name }}' }
+    ])
 </script>
 
 <template>
@@ -41,55 +55,60 @@
             <UDashboardNavbar id="{{ kebabCase name }}">
                 <template #title>
                     <h1 class="text-lg font-semibold">
-                        {{ properCase name }}
+                        {{ t('entities.{{ kebabCase name }}') }}
                     </h1>
                 </template>
                 <template #description>
-                    Manage {{ properCase name }} records
+                    {{ t('entities.manageRecords', { entity: t('entities.{{ kebabCase name }}') }) }}
                 </template>
                 <template #right>
-                    <HeaderActions :actions="[
-            { label: '{{ properCase name }}', color: 'primary', show: canManage{{ properCase name }} }
-          ]" />
+                    <!-- Guard slot if HeaderActions not present -->
+                    <HeaderActions v-if="canManage"
+                        :actions="[{ label: t('actions.newEntity', { entity: t('entities.{{ kebabCase name }}') }), color: 'primary' }]" />
                 </template>
             </UDashboardNavbar>
         </template>
 
         <template #body>
-            <UBreadcrumb :items="breadcrumbItems" />
+            <UBreadcrumb :items="breadcrumbItems" class="mb-4" />
 
             <!-- Loading state -->
-            <div v-if="loading" class="space-y-4">
+            <div v-if="loading" class="space-y-4" aria-busy="true" aria-live="polite">
+                <!-- Fallback skeletons; render generic blocks if your project lacks UserCardSkeleton -->
                 <UserCardSkeleton v-for="i in 3" :key="i" />
             </div>
 
             <!-- Error state -->
-            <UAlert v-else-if="error" :title="error" color="error" variant="soft" class="mb-6" />
+            <UAlert v-else-if="errorText" :title="errorText" color="error" variant="soft" class="mb-6"
+                aria-live="assertive" />
 
             <!-- Data list -->
-            <div v-else-if="data.length > 0" class="space-y-4">
-                <UCard v-for="item in data" :key="item.id"
+            <div v-else-if="items.length > 0" class="space-y-4">
+                <UCard v-for="item in items" :key="item.id"
                     class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                     @click="navigateToItem(item)">
                     <div class="p-6">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-4">
                                 <div class="flex-shrink-0">
-                                    <UserAvatar :user="item" size="lg" />
+                                    <!-- Fallback if UserAvatar is absent -->
+                                    <UserAvatar v-if="$components?.UserAvatar" :user="item" size="lg" />
+                                    <div v-else class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" />
                                 </div>
                                 <div class="flex-1">
                                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                        {{ item.name || item.username }}
+                                        {{ item.name || item.username || t('common.labels.untitled') }}
                                     </h3>
                                     <p class="text-sm text-gray-600 dark:text-gray-400">
-                                        {{ item.email || item.username }}
+                                        {{ item.email || item.username || '—' }}
                                     </p>
                                     <div class="flex items-center gap-2 mt-2">
                                         <UBadge :color="getRoleColor(item.role) as any" variant="soft" size="sm">
                                             {{ getRoleDisplayName(item.role) }}
                                         </UBadge>
                                         <span class="text-xs text-gray-500">
-                                            Created {{ formatDate(item.created_at || '') }}
+                                            {{ t('common.labels.createdOn', { date: formatDate(item.created_at || '') })
+                                            }}
                                         </span>
                                     </div>
                                 </div>
@@ -98,20 +117,25 @@
                         </div>
                     </div>
                 </UCard>
+
+                <!-- Basic pagination (optional) -->
+                <div class="flex items-center justify-end gap-2 pt-2">
+                    <UButton :disabled="page <= 1" @click="page--">{{ t('common.actions.prev') }}</UButton>
+                    <UButton variant="soft" @click="page++">{{ t('common.actions.next') }}</UButton>
+                </div>
             </div>
 
             <!-- Empty state -->
             <div v-else class="text-center py-12">
                 <UIcon name="i-lucide-users" class="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    No {{ properCase name }} found
+                    {{ t('empty.noEntities', { entity: t('entities.{{ kebabCase name }}') }) }}
                 </h3>
                 <p class="text-gray-600 dark:text-gray-400 mb-6">
-                    No {{ properCase name }} have been created yet.
+                    {{ t('empty.noneCreatedYet', { entity: t('entities.{{ kebabCase name }}') }) }}
                 </p>
-                <UButton v-if="canManage{{ properCase name }}" to="/{{ kebabCase name }}/new" icon="i-lucide-plus"
-                    color="primary">
-                    Add First {{ properCase name }}
+                <UButton v-if="canManage" :to="`/{{ kebabCase name }}/new`" icon="i-lucide-plus" color="primary">
+                    {{ t('actions.addFirst', { entity: t('entities.{{ kebabCase name }}') }) }}
                 </UButton>
             </div>
         </template>

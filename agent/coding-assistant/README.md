@@ -14,7 +14,6 @@ across sessions and contributors.
 - `templates/` — scaffolding blueprints (Nuxt/CLI/tests/docs)
 - `registries/` — lists of existing endpoints/CLI/components to prevent
   duplicates
-- `decisions/` — ADRs (Architecture Decision Records) for dev choices
 - `retrieval.config.json` — which paths the assistant indexes for context
 
 ## Important
@@ -26,4 +25,4 @@ across sessions and contributors.
   checks).
 
 **Audience** Developers only. The clerk-facing civic assistant will live
-separately (e.g., `agents/civic-assistant/`).
+separately (e.g., `agent/civic-assistant/`).

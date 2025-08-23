@@ -45,7 +45,7 @@ legal document management, including:
 ### Current Status: 📋 Planned
 
 - **Implementation**: Not yet started
-- **Specification**: [Legal Register Spec](../docs/specs/legal-register.md)
+- **Specification**: [Legal Register Spec](../../docs/specs/legal-register.md)
 - **Priority**: Phase 3 - Advanced Features
 - **Dependencies**: Core platform, API module, UI module
 
@@ -220,11 +220,12 @@ modules/legal-register/
 
 ## Related Documentation
 
-- **[Legal Register Specification](../docs/specs/legal-register.md)** - Detailed
-  specification
-- **[API Documentation](../docs/api.md)** - REST API reference
-- **[CLI Documentation](../docs/cli.md)** - Command-line interface
-- **[Project Status](../PROJECT_STATUS.md)** - Current implementation status
+- **[Legal Register Specification](../../docs/specs/legal-register.md)** -
+  Detailed specification
+- **[API Documentation](../../docs/api.md)** - REST API reference
+- **[CLI Documentation](../../docs/cli.md)** - Command-line interface
+- **[Project Status](../../docs/project-status.md)** - Current implementation
+  status
 
 ## Legal Considerations
 

@@ -49,7 +49,7 @@ humans and the AI coding assistant.
 
 ## 🌍 Internationalization
 
-- To be implemeted in the future.
+- To be implemented in the future.
 - No hard-coded strings in Vue files.
 - All text must be wrapped in i18n functions or loaded from locale files.
 
@@ -116,6 +116,32 @@ humans and the AI coding assistant.
 
 ---
 
+## 🗂 Filesystem & Paths (Project-Specific)
+
+- `.system-data/` — Private, never committed. Holds sensitive/system runtime
+  data: local database (e.g., `civic.db`), machine-local server config, caches.
+  The database default path is under `.system-data/` and is configured via
+  `.civicrc`. Tests must never use the real DB here; they must create their own
+  isolated DB under a temp directory.
+- `data/` — Working content checked out locally. User-owned files:
+  - `data/records/` — Markdown records with YAML frontmatter.
+  - `data/.civic/` — Editable project configuration (roles.yml, workflows.yml,
+    hooks.yml, etc.). These files are managed via the configuration service.
+- `.civicrc` — Central configuration file at the repo root that defines
+  `dataDir` and database settings (driver and file path). Use this instead of
+  hard‑coding paths in code/tests.
+
+### Configuration Service (core)
+
+- Located under `core/src/config/` (e.g., `central-config.ts`,
+  `configuration-service.ts`). Responsibilities:
+  - Discover and load configuration from `data/.civic/`.
+  - Merge with defaults in `core/src/defaults/` when files are missing.
+  - Validate and persist configuration updates.
+  - Support the new metadata-rich YAML format and backward compatibility.
+
+---
+
 ## ✅ Enforcement
 
 These rules are enforced by:
@@ -127,3 +153,13 @@ These rules are enforced by:
 - AI assistant system prompts.
 
 The assistant must **refuse** to generate code that violates these conventions.
+
+---
+
+## 🧩 Project Constants (Quick Reference)
+
+- API dev: `pnpm run dev:api` (Express)
+- UI dev: `pnpm run dev:ui` (Nuxt, port 3030)
+- Tests: `pnpm run test:run`
+- Preview server: `pnpm run preview:serve`
+- Specs: `pnpm run spec:all`

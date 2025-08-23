@@ -56,9 +56,9 @@ cat agent/sessions/current-session.md
 
 ### **Project State**
 
-- `PROJECT_STATUS.md` - Current project health and roadmap
+- `docs/project-status.md` - Current project health and roadmap
 - `README.md` - Platform overview and getting started
-- `TODO.md` - Current priorities and next steps
+- `docs/todo.md` - Current priorities and next steps
 
 ### **Agent Memory**
 
@@ -101,7 +101,7 @@ cat agent/sessions/current-session.md
 
 ## 🆘 **Need Help?**
 
-- **Project Status**: Check `PROJECT_STATUS.md`
+- **Project Status**: Check `docs/project-status.md`
 - **Technical Decisions**: Review `agent/memory/decisions.md`
 - **Lessons Learned**: See `agent/memory/lessons.md`
 - **Specifications**: Browse `docs/specs-index.md`

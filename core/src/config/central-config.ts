@@ -213,6 +213,23 @@ export class CentralConfigManager {
       };
     }
 
+    // Deprecation notices for legacy fields
+    const deprecated: Array<keyof CentralConfig> = [
+      'modules',
+      'record_types',
+      'record_types_config',
+      'record_statuses_config',
+    ];
+    for (const key of deprecated) {
+      if ((mergedConfig as any)[key] && process.env.NODE_ENV !== 'test') {
+        this.logger.warn(
+          `Deprecated: '${String(
+            key
+          )}' in .civicrc is deprecated. Prefer data/.civic/config.yml.`
+        );
+      }
+    }
+
     this.config = mergedConfig;
     return this.config;
   }
@@ -226,6 +243,21 @@ export class CentralConfigManager {
       throw new Error('dataDir is not configured');
     }
     return config.dataDir;
+  }
+
+  /**
+   * Load YAML if it exists; otherwise return null
+   */
+  private static loadYamlIfExists(filePath: string): any | null {
+    try {
+      if (fs.existsSync(filePath)) {
+        const txt = fs.readFileSync(filePath, 'utf8');
+        return yaml.parse(txt);
+      }
+    } catch (err) {
+      this.logger.warn(`Warning: Could not parse ${filePath}:`, err);
+    }
+    return null;
   }
 
   /**
@@ -285,38 +317,42 @@ export class CentralConfigManager {
   }
 
   /**
-   * Get organization name
-   */
-  static getOrganizationName(): string | undefined {
-    return this.getOrgConfig().name;
-  }
-
-  /**
-   * Get organization location (city, state, country)
-   */
-  static getOrganizationLocation(): {
-    city?: string;
-    state?: string;
-    country?: string;
-  } {
-    const orgConfig = this.getOrgConfig();
-    return {
-      city: orgConfig.city,
-      state: orgConfig.state,
-      country: orgConfig.country,
-    };
-  }
-
-  /**
-   * Get record types configuration
+   * Get record types configuration (prefers data/.civic/config.yml, then defaults, then deprecated .civicrc)
    */
   static getRecordTypesConfig(): RecordTypesConfig {
     const config = this.getConfig();
+    const dataDir = this.getDataDir();
 
-    // Start with default record types
-    let recordTypes = { ...DEFAULT_RECORD_TYPES };
+    // Start with library defaults
+    let recordTypes: RecordTypesConfig = { ...DEFAULT_RECORD_TYPES };
 
-    // Merge with config if present
+    // Merge defaults/config.yml if present
+    const defaultsConfigPath = path.resolve(
+      process.cwd(),
+      'core',
+      'src',
+      'defaults',
+      'config.yml'
+    );
+    const defaultsConfig = this.loadYamlIfExists(defaultsConfigPath);
+    if (defaultsConfig && defaultsConfig.record_types_config) {
+      recordTypes = mergeRecordTypes(
+        recordTypes,
+        defaultsConfig.record_types_config as RecordTypesConfig
+      );
+    }
+
+    // Merge user data/.civic/config.yml if present
+    const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
+    const userConfig = this.loadYamlIfExists(userConfigPath);
+    if (userConfig && userConfig.record_types_config) {
+      recordTypes = mergeRecordTypes(
+        recordTypes,
+        userConfig.record_types_config as RecordTypesConfig
+      );
+    }
+
+    // Finally, merge deprecated .civicrc fields (with warning already emitted)
     if (config.record_types_config) {
       recordTypes = mergeRecordTypes(recordTypes, config.record_types_config);
     }
@@ -341,17 +377,45 @@ export class CentralConfigManager {
   }
 
   /**
-   * Get record statuses configuration
+   * Get record statuses configuration (prefers data/.civic/config.yml, then defaults, then deprecated .civicrc)
    */
   static getRecordStatusesConfig(): RecordStatusesConfig {
     const config = this.getConfig();
-    let recordStatuses = { ...DEFAULT_RECORD_STATUSES };
+    const dataDir = this.getDataDir();
+
+    let recordStatuses: RecordStatusesConfig = { ...DEFAULT_RECORD_STATUSES };
+
+    const defaultsConfigPath = path.resolve(
+      process.cwd(),
+      'core',
+      'src',
+      'defaults',
+      'config.yml'
+    );
+    const defaultsConfig = this.loadYamlIfExists(defaultsConfigPath);
+    if (defaultsConfig && defaultsConfig.record_statuses_config) {
+      recordStatuses = mergeRecordStatuses(
+        recordStatuses,
+        defaultsConfig.record_statuses_config as RecordStatusesConfig
+      );
+    }
+
+    const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
+    const userConfig = this.loadYamlIfExists(userConfigPath);
+    if (userConfig && userConfig.record_statuses_config) {
+      recordStatuses = mergeRecordStatuses(
+        recordStatuses,
+        userConfig.record_statuses_config as RecordStatusesConfig
+      );
+    }
+
     if (config.record_statuses_config) {
       recordStatuses = mergeRecordStatuses(
         recordStatuses,
         config.record_statuses_config
       );
     }
+
     return recordStatuses;
   }
 
