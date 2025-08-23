@@ -2,11 +2,17 @@ import express, { Router } from 'express';
 import { configurationService, CentralConfigManager } from '@civicpress/core';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
+import { authMiddleware, requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
-// TODO: Add proper authentication middleware
-// For now, allow all requests (will be secured later)
+// Secured configuration routes: require authenticated admin permission
+router.use((req, res, next) => {
+  const civicPress = (req as any).civicPress;
+  if (!civicPress) return next();
+  return authMiddleware(civicPress)(req as any, res as any, next as any);
+});
+router.use(requirePermission('config:manage'));
 
 /**
  * GET /api/config/list
