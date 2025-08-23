@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+pnpm exec lint-staged
+pnpm run build:cli
+pnpm run test:run
+pnpm run registry:check

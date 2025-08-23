@@ -1,0 +1,116 @@
+<script setup lang="ts">
+// Component: {{ properCase name }}
+
+/**
+ * Props
+ * Keep props minimal and typed. Add defaults with withDefaults when sensible.
+ */
+type Size = 'sm' | 'md' | 'lg'
+const props = withDefaults(defineProps<{
+  items?: Array<Record<string, any>>
+  loading?: boolean
+  error?: string
+  size?: Size
+  ariaLabel?: string
+}>(), {
+  items: () => [],
+  loading: false,
+  error: '',
+  size: 'md',
+  ariaLabel: '{{ properCase name }}'
+})
+
+/**
+ * Emits
+ * Name events in kebab-case for DOM consumers; TS infers payload types here.
+ */
+const emit = defineEmits<{
+  (e: 'select', item: Record<string, any>): void
+  (e: 'retry'): void
+}>()
+
+// i18n (fallback-safe)
+const { t } = useI18n ? useI18n() : ({ t: (s: string) => s } as any)
+
+// Computed helpers
+const isEmpty = computed(() => !props.loading && !props.error && (props.items?.length ?? 0) === 0)
+const rootClass = computed(() => [
+  '{{ kebabCase name }}',
+  props.size === 'sm' ? 'text-sm' : props.size === 'lg' ? 'text-base' : 'text-[15px]'
+])
+
+function onSelect(item: Record<string, any>) {
+  emit('select', item)
+}
+</script>
+
+<template>
+  <section :aria-label="ariaLabel" :class="rootClass">
+    <!-- Loading -->
+    <div v-if="loading" class="space-y-3" aria-busy="true" aria-live="polite">
+      <USkeleton v-for="i in 3" :key="i" class="h-10 rounded-lg" />
+    </div>
+
+    <!-- Error -->
+    <UAlert
+      v-else-if="error"
+      :title="error"
+      color="error"
+      variant="soft"
+      class="mb-4"
+    >
+      <template #actions>
+        <UButton size="sm" color="primary" @click="$emit('retry')">
+          {{ t('common.actions.retry') }}
+        </UButton>
+      </template>
+    </UAlert>
+
+    <!-- Empty -->
+    <div v-else-if="isEmpty" class="text-center py-10">
+      <UIcon name="i-lucide-info" class="w-8 h-8 text-gray-400 mx-auto mb-2" />
+      <p class="text-gray-600 dark:text-gray-400">
+        {{ t('empty.noEntities', { entity: t('entities.{{ kebabCase name }}') }) }}
+      </p>
+      <slot name="empty-actions" />
+    </div>
+
+    <!-- List -->
+    <div v-else class="space-y-3">
+      <UCard
+        v-for="(item, idx) in items"
+        :key="item.id ?? idx"
+        class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        @click="onSelect(item)"
+      >
+        <div class="p-4 flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <slot name="avatar" :item="item">
+              <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" />
+            </slot>
+            <div>
+              <h3 class="font-semibold text-gray-900 dark:text-white">
+                <slot name="title" :item="item">
+                  {{ item.name || item.title || t('common.labels.untitled') }}
+                </slot>
+              </h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                <slot name="subtitle" :item="item">
+                  {{ item.email || item.username || '—' }}
+                </slot>
+              </p>
+            </div>
+          </div>
+          <slot name="right" :item="item">
+            <UIcon name="i-lucide-chevron-right" class="w-5 h-5 text-gray-400" />
+          </slot>
+        </div>
+      </UCard>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+/* Component-scoped hooks for quick theming */
+.{{ kebabCase name }} { }
+</style>

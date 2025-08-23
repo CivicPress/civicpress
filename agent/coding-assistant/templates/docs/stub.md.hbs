@@ -1,0 +1,97 @@
+# {{ properCase name }}
+
+> Purpose: Briefly explain what this does in the CivicPress context.
+
+Status: **{{ status || 'draft' }}** · Module: **{{ module || '<module>' }}** · Owner: **{{ owner || 'CivicPress Team' }}**
+
+---
+
+## Quick start
+
+### CLI
+```bash
+pnpm civic {{ kebabCase name }} [--json] [--silent] [--dry-run]
+```
+
+### API
+```bash
+# Replace with the actual endpoint when applicable
+curl -X GET 'http://localhost:3000/api/v1/<endpoint>' \
+  -H 'Authorization: Bearer <TOKEN>'
+```
+
+---
+
+## Configuration
+- Location: values typically stored under `data/.civic/` or `.system-data/`.
+- Files involved: `{{ configFiles || 'roles.yml, workflows.yml, notifications.yml' }}`.
+- Schema style: new metadata format
+  - Each field is an object with: `value`, `type`, `description`, `required`.
+
+---
+
+## Permissions
+- RBAC enforced via roles and permissions.
+- Required permission(s): `{{ permission || 'records:view' }}`.
+
+---
+
+## Inputs
+- _List inputs/props/params_
+- Example:
+  - `--json` (boolean): machine-readable output
+  - `--silent` (boolean): suppress non-error logs
+  - `--dry-run` (boolean): print actions without side effects
+
+## Outputs
+- Standard result shape
+```json
+{ "success": true, "data": { /* payload */ } }
+```
+
+## Errors
+- Standard error shape (see `docs/error-handling.md`)
+```json
+{ "success": false, "error": { "message": "...", "code": "...", "details": {} } }
+```
+
+---
+
+## Examples
+### Programmatic
+```ts
+// Replace with real import/call
+const result = await do{{ properCase name }}({/* params */})
+```
+
+### CLI
+```bash
+pnpm civic {{ kebabCase name }} --json
+```
+
+---
+
+## Testing
+- Follow suite conventions in `tests/fixtures/test-setup.ts`.
+- Each feature ships with at least one happy path and one edge case.
+- Use:
+  - `beforeAll(setupGlobalTestEnvironment)`
+  - `TEST_CONFIG.DEFAULT_TIMEOUT` for async tests
+  - `createTestDirectory`/`cleanupTestDirectory` for FS isolation
+  - `createAPITestContext`/`cleanupAPITestContext` for API
+  - `createCLITestContext`/`cleanupCLITestContext` for CLI (prefer `--json`)
+
+Tests: {{ testsPath || 'tests/<area>/<kebab-case-name>.spec.ts' }}
+
+---
+
+## Related
+- `docs/api.md`
+- `docs/error-handling.md`
+- `docs/notifications.md`
+- `docs/cli.md`
+
+---
+
+## Changelog
+- {{ date || 'YYYY-MM-DD' }}: Initial stub created.

@@ -1,0 +1,36 @@
+terms:
+  public-sessions: >
+    CivicPress module for agendas, livestreams, recordings, minutes, and
+    archives.
+  legal-register: >
+    Module for bylaws, policies, motions, and legal documents (Markdown + YAML
+    frontmatter).
+  ADR: >
+    Architecture Decision Record. One decision per file under decisions/.
+  record: >
+    A Markdown file with YAML frontmatter representing a civic artifact (e.g.,
+    minutes, bylaw, budget).
+  civic-values: >
+    Transparency, Trust, Open-source, Public Good, Ease of Use, Equity.
+
+style:
+  tone: calm, civic, clear, bilingual-ready
+  naming:
+    - kebab-case for files and folders
+    - PascalCase for Vue components
+    - camelCase for variables and functions
+  folder_structure:
+    - All Nuxt pages must use `app/layouts/default.vue`.
+    - Components live under `modules/<name>/components/`.
+    - CLI commands live under `tools/cli/commands/`.
+    - Tests live under `modules/<name>/tests/`.
+  commit_conventions:
+    - feat: new feature
+    - fix: bug fix
+    - docs: documentation only
+    - test: add or refactor tests
+    - chore: tooling or misc
+
+reserved:
+  - civic-assist: reserved for clerk-facing AI (not dev use).
+  - coding-assistant: dev-only AI for building CivicPress.

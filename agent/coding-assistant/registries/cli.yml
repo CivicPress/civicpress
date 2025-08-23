@@ -1,0 +1,158 @@
+# Canonical registry of CLI commands for CivicPress.
+# The assistant MUST check here before creating new commands.
+
+commands:
+  - id: init
+    file: cli/src/commands/init.ts
+    desc: Initialize a new CivicPress project
+    status: stable
+
+  - id: login
+    file: cli/src/commands/login.ts
+    desc: Authenticate with CivicPress
+    status: stable
+
+  - id: auth:login
+    file: cli/src/commands/auth.ts
+    desc: Authenticate with OAuth provider
+    status: stable
+
+  - id: auth:me
+    file: cli/src/commands/auth.ts
+    desc: Show current user information
+    status: stable
+
+  - id: auth:providers
+    file: cli/src/commands/auth.ts
+    desc: List available OAuth providers
+    status: stable
+
+  - id: auth:validate
+    file: cli/src/commands/auth.ts
+    desc: Validate OAuth token
+    status: stable
+
+  - id: auth:password
+    file: cli/src/commands/auth.ts
+    desc: Authenticate with username and password
+    status: stable
+
+  - id: users:create
+    file: cli/src/commands/users.ts
+    desc: Create a new user account
+    status: stable
+
+  - id: users:list
+    file: cli/src/commands/users.ts
+    desc: List all users
+    status: stable
+
+  - id: users:update
+    file: cli/src/commands/users.ts
+    desc: Update a user account
+    status: stable
+
+  - id: users:delete
+    file: cli/src/commands/users.ts
+    desc: Delete a user account
+    status: stable
+
+  - id: notify:test
+    file: cli/src/commands/notify.ts
+    desc: Test notification system
+    status: stable
+
+  - id: notify:config
+    file: cli/src/commands/notify.ts
+    desc: Show notification configuration
+    status: stable
+
+  - id: notify:queue
+    file: cli/src/commands/notify.ts
+    desc: List notification queue status
+    status: stable
+
+  - id: notify:retry
+    file: cli/src/commands/notify.ts
+    desc: Retry failed notifications
+    status: stable
+
+  - id: index
+    file: cli/src/commands/index.ts
+    desc: Generate and manage civic record indexes
+    status: stable
+
+  - id: auto-index
+    file: cli/src/commands/auto-index.ts
+    desc: Test and demonstrate auto-indexing workflow
+    status: draft
+
+  - id: list
+    file: cli/src/commands/list.ts
+    desc: List civic records
+    status: stable
+
+  - id: view
+    file: cli/src/commands/view.ts
+    desc: View a specific civic record
+    status: stable
+
+  - id: validate
+    file: cli/src/commands/validate.ts
+    desc: Validate records against their templates
+    status: stable
+
+  - id: template
+    file: cli/src/commands/template.ts
+    desc: Manage record templates
+    status: stable
+
+  - id: status
+    file: cli/src/commands/status.ts
+    desc: Change the status of a civic record
+    status: stable
+
+  - id: info
+    file: cli/src/commands/info.ts
+    desc: Show organization and system configuration info
+    status: stable
+
+  - id: import
+    file: cli/src/commands/import.ts
+    desc: Import records from various formats
+    status: stable
+
+  - id: export
+    file: cli/src/commands/export.ts
+    desc: Export records in various formats
+    status: stable
+
+  - id: history
+    file: cli/src/commands/history.ts
+    desc: View civic record history
+    status: stable
+
+  - id: edit
+    file: cli/src/commands/edit.ts
+    desc: Edit a specific civic record
+    status: stable
+
+  - id: create
+    file: cli/src/commands/create.ts
+    desc: Create a new civic record
+    status: stable
+
+  - id: commit
+    file: cli/src/commands/commit.ts
+    desc: Commit civic records with role-based messages
+    status: stable
+
+  - id: cleanup
+    file: cli/src/commands/cleanup.ts
+    desc: Remove all data and reset to clean default state
+    status: stable
+
+  - id: hook
+    file: cli/src/commands/hook.ts
+    desc: Manage CivicPress hooks and workflows
+    status: stable

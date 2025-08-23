@@ -25,6 +25,7 @@
     "start:serve": "cd modules/serve && pnpm run start",
     "format": "prettier --write \"**/*.{md,json,js,ts,jsx,tsx}\"",
     "format:check": "prettier --check \"**/*.{md,json,js,ts,jsx,tsx}\"",
+    "registry:check": "node scripts/registry-check.mjs",
     "spec:format": "markdownlint --fix .civic/specs/*.md && prettier --write .civic/specs/*.md --prose-wrap always",
     "spec:format:check": "markdownlint .civic/specs/*.md && prettier --check .civic/specs/*.md",
     "spec:validate": "node .civic/tools/validate-specs.js",
@@ -36,17 +37,39 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "gen": "plop",
+    "gen:page": "plop nuxt:page",
+    "gen:cli": "plop cli:command",
+    "gen:test": "plop test:spec",
+    "prepare": "husky install"
   },
   "license": "MIT",
   "devDependencies": {
     "@types/nodemailer": "6.4.17",
     "@vitest/coverage-v8": "3.2.4",
     "@vitest/ui": "3.2.4",
+    "change-case": "5.4.4",
     "concurrently": "^8.2.2",
+    "husky": "^8.0.0",
     "js-yaml": "4.1.0",
+    "lint-staged": "16.1.5",
     "markdownlint-cli": "^0.37.0",
+    "plop": "4.0.1",
     "prettier": "^3.0.0",
-    "vitest": "3.2.4"
+    "vitest": "3.2.4",
+    "yaml": "2.8.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,vue}": [
+      "prettier --write"
+    ],
+    "*.{json,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.md": [
+      "markdownlint --fix",
+      "prettier --write"
+    ]
   }
 }

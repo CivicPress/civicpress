@@ -1,0 +1,119 @@
+<script setup lang="ts">
+    // Page: {{ properCase name }}
+    definePageMeta({ layout: 'default' })
+    
+    
+    // Composables
+    const { $civicApi } = useNuxtApp();
+
+    // Reactive state
+    const data = ref<any[]>([]);
+    const loading = ref(true);
+    const error = ref('');
+
+    // Fetch data
+    const fetchData = async () => {
+        try {
+            loading.value = true;
+            error.value = '';
+            const response = await $civicApi('/api/v1/{{ kebabCase name }}') as any;
+            if (response.success) {
+                data.value = response.data;
+            } else {
+                error.value = response.error || 'Failed to fetch data';
+            }
+        } catch (err: any) {
+            error.value = err.message || 'Failed to fetch data';
+            console.error('Error fetching data:', err);
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    // Fetch data on mount
+    onMounted(fetchData);
+</script>
+
+<template>
+    <!-- CivicPress standard page layout with dashboard and accessible landmarks -->
+    <UDashboardPanel>
+        <template #header>
+            <UDashboardNavbar id="{{ kebabCase name }}">
+                <template #title>
+                    <h1 class="text-lg font-semibold">
+                        {{ properCase name }}
+                    </h1>
+                </template>
+                <template #description>
+                    Manage {{ properCase name }} records
+                </template>
+                <template #right>
+                    <HeaderActions :actions="[
+            { label: '{{ properCase name }}', color: 'primary', show: canManage{{ properCase name }} }
+          ]" />
+                </template>
+            </UDashboardNavbar>
+        </template>
+
+        <template #body>
+            <UBreadcrumb :items="breadcrumbItems" />
+
+            <!-- Loading state -->
+            <div v-if="loading" class="space-y-4">
+                <UserCardSkeleton v-for="i in 3" :key="i" />
+            </div>
+
+            <!-- Error state -->
+            <UAlert v-else-if="error" :title="error" color="error" variant="soft" class="mb-6" />
+
+            <!-- Data list -->
+            <div v-else-if="data.length > 0" class="space-y-4">
+                <UCard v-for="item in data" :key="item.id"
+                    class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    @click="navigateToItem(item)">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="flex-shrink-0">
+                                    <UserAvatar :user="item" size="lg" />
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                        {{ item.name || item.username }}
+                                    </h3>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                                        {{ item.email || item.username }}
+                                    </p>
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <UBadge :color="getRoleColor(item.role) as any" variant="soft" size="sm">
+                                            {{ getRoleDisplayName(item.role) }}
+                                        </UBadge>
+                                        <span class="text-xs text-gray-500">
+                                            Created {{ formatDate(item.created_at || '') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <UIcon name="i-lucide-chevron-right" class="w-5 h-5 text-gray-400" />
+                        </div>
+                    </div>
+                </UCard>
+            </div>
+
+            <!-- Empty state -->
+            <div v-else class="text-center py-12">
+                <UIcon name="i-lucide-users" class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    No {{ properCase name }} found
+                </h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">
+                    No {{ properCase name }} have been created yet.
+                </p>
+                <UButton v-if="canManage{{ properCase name }}" to="/{{ kebabCase name }}/new" icon="i-lucide-plus"
+                    color="primary">
+                    Add First {{ properCase name }}
+                </UButton>
+            </div>
+        </template>
+    </UDashboardPanel>
+</template>

@@ -1,0 +1,40 @@
+import { CAC } from 'cac'
+import { initializeLogger, getGlobalOptionsFromArgs } from '../utils/global-options.js'
+
+/**
+ * Command: {{kebabCase name}}
+ * Description: {{desc}}
+ *
+ * Usage:
+ *   civic {{kebabCase name}} [--json] [--silent] [--dry-run]
+ */
+export const {{camelCase name}}Command = (cli: CAC) => {
+  cli
+    .command('{{kebabCase name}}', '{{desc}}')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress non-error output')
+    .option('--dry-run', 'Print actions without writing files', { default: false })
+    .action(async (options: any) => {
+      const globals = getGlobalOptionsFromArgs()
+      const logger = initializeLogger()
+
+      try {
+        // TODO: implement command logic here
+        const result = { success: true }
+
+        if (globals.json) {
+          console.log(JSON.stringify(result, null, 2))
+        } else if (!globals.silent) {
+          logger.success('✔ {{kebabCase name}} completed')
+        }
+      } catch (err: any) {
+        const message = err?.message ?? String(err)
+        if (globals.json) {
+          console.log(JSON.stringify({ error: message }, null, 2))
+        } else if (!globals.silent) {
+          logger.error(`✖ {{kebabCase name}} failed: ${message}`)
+        }
+        process.exit(1)
+      }
+    })
+}

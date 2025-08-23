@@ -1,0 +1,30 @@
+{
+  "include": [
+    "agents/coding-assistant/project.yml",
+    "agents/coding-assistant/glossary.yml",
+    "agents/coding-assistant/conventions.md",
+    "agents/coding-assistant/prompts/**/*.md",
+    "agents/coding-assistant/registries/**/*.yml",
+    "modules/**/{components,composables,pages,server,docs,tests}/**/*",
+    "tools/cli/**/*",
+    "README*.md",
+    "roadmap*.md",
+    "manifesto*.md"
+  ],
+  "exclude": [
+    "node_modules/**",
+    ".git/**",
+    "**/*.map",
+    "**/dist/**",
+    "**/.nuxt/**",
+    "**/.output/**"
+  ],
+  "ranking": {
+    "boost_exact_paths": [
+      "agents/coding-assistant/project.yml",
+      "agents/coding-assistant/glossary.yml",
+      "agents/coding-assistant/conventions.md"
+    ],
+    "deboost_dirs": ["modules/**/tests/**", "modules/**/docs/**"]
+  }
+}

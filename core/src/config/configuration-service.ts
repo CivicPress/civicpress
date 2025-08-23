@@ -39,12 +39,20 @@ export class ConfigurationService {
    * Resolve user and default paths for a given configuration type.
    * Notifications are sensitive and should live under .system-data.
    */
-  private resolvePaths(configType: string): { userPath: string; defaultPath: string } {
-    const userPath = configType === 'notifications'
-      ? join(this.systemDataPath, `${configType}.yml`)
-      : join(this.dataPath, `${configType}.yml`);
+  private resolvePaths(configType: string): {
+    userPath: string;
+    defaultPath: string;
+  } {
+    // Canonicalize type (handle typos like "motifications", "notification", etc.)
+    const key = (configType || '').toLowerCase().trim();
+    const canonical = key.startsWith('notif') ? 'notifications' : configType;
 
-    const defaultPath = join(this.defaultsPath, `${configType}.yml`);
+    const userPath =
+      canonical === 'notifications'
+        ? join(this.systemDataPath, `${canonical}.yml`)
+        : join(this.dataPath, `${canonical}.yml`);
+
+    const defaultPath = join(this.defaultsPath, `${canonical}.yml`);
     return { userPath, defaultPath };
   }
 
@@ -429,9 +437,10 @@ export class ConfigurationService {
       const metadata = await this.getConfigurationMetadata('notifications');
 
       // If the old file already has _metadata, keep as-is; otherwise transform
-      const newFormatConfig = parsedOld && parsedOld._metadata
-        ? parsedOld
-        : this.transformToNewFormat(parsedOld, metadata);
+      const newFormatConfig =
+        parsedOld && parsedOld._metadata
+          ? parsedOld
+          : this.transformToNewFormat(parsedOld, metadata);
 
       // Ensure target directory
       await mkdir(dirname(newPath), { recursive: true });
@@ -446,7 +455,11 @@ export class ConfigurationService {
       // Best-effort remove old (we keep backup)
       // Using fs.promises.writeFile above; no unlink import here; leave original in place after backup? The user requested removal.
       // We'll overwrite old with a pointer message to avoid secrets left in repo paths.
-      await writeFile(oldPath, '# Moved to .system-data/notifications.yml\n', 'utf-8');
+      await writeFile(
+        oldPath,
+        '# Moved to .system-data/notifications.yml\n',
+        'utf-8'
+      );
     } catch (error) {
       console.warn('Notifications config migration failed:', error);
     }
