@@ -30,7 +30,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         }
       }
     },
-    async onResponseError({ response, error }) {
+    async onResponseError({ request, options, response, error }) {
       // Enhanced error handling with automatic user feedback
       const { handleError } = useErrorHandler();
 
@@ -46,21 +46,46 @@ export default defineNuxtPlugin((nuxtApp) => {
           'Request failed',
       };
 
+      // Determine if the request attempted authenticated access
+      const headers = options?.headers as any;
+      const hasAuthHeader = (() => {
+        if (!headers) return false;
+        if (headers instanceof Headers) return headers.has('Authorization');
+        if (Array.isArray(headers))
+          return headers.some(
+            (h) =>
+              Array.isArray(h) && String(h[0]).toLowerCase() === 'authorization'
+          );
+        if (typeof headers === 'object')
+          return Object.keys(headers).some(
+            (k) => k.toLowerCase() === 'authorization'
+          );
+        return false;
+      })();
+
       // Handle specific HTTP status codes
       switch (response.status) {
         case 401:
-          // Unauthorized - clear auth state and redirect to login
-          console.log('Unauthorized request, clearing auth state');
-          const authStore = useAuthStore();
-          authStore.clearAuth();
-          await navigateTo('/auth/login');
-
-          // Show authentication error toast
-          handleError(apiError, {
-            title: 'Session Expired',
-            showToast: true,
-            logToConsole: false, // Don't log auth errors to console
-          });
+          // Only clear auth if this was an authenticated request (had Authorization header)
+          if (hasAuthHeader) {
+            console.log(
+              'Unauthorized authenticated request, clearing auth state'
+            );
+            const authStore = useAuthStore();
+            authStore.clearAuth();
+            await navigateTo('/auth/login');
+            handleError(apiError, {
+              title: 'Session Expired',
+              showToast: true,
+              logToConsole: false,
+            });
+          } else {
+            // For unauthenticated requests, do not clear persisted auth
+            handleError(apiError, {
+              title: 'Authentication Required',
+              showToast: true,
+            });
+          }
           break;
 
         case 403:

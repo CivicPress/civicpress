@@ -48,10 +48,23 @@ export function useRecordTypes() {
         };
       };
 
-      // Extract the record_types from the nested response
-      const recordTypesData = response.data?.record_types || [];
-      recordTypes.value = recordTypesData;
-      globalRecordTypes = recordTypesData;
+      // Helper to unwrap metadata objects { value, ... } to scalars
+      const unwrap = (v: any) =>
+        v && typeof v === 'object' && 'value' in v ? v.value : v;
+
+      // Extract and normalize the record_types from the nested response
+      const recordTypesData = (response.data?.record_types || []).map(
+        (rt: any) => ({
+          ...rt,
+          label: unwrap(rt?.label),
+          description: unwrap(rt?.description),
+          source_name: unwrap(rt?.source_name),
+          priority: unwrap(rt?.priority),
+        })
+      );
+
+      recordTypes.value = recordTypesData as RecordTypeMetadata[];
+      globalRecordTypes = recordTypesData as RecordTypeMetadata[];
       globalError = null;
       globalFetched = true;
       fetched.value = true;

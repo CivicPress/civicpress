@@ -61,7 +61,17 @@ export function useRecordStatuses() {
       };
 
       if (response.success && response.data) {
-        const newRecordStatuses = response.data.record_statuses || [];
+        const unwrap = (v: any) =>
+          v && typeof v === 'object' && 'value' in v ? v.value : v;
+        const newRecordStatuses = (response.data.record_statuses || []).map(
+          (rs: any) => ({
+            ...rs,
+            label: unwrap(rs?.label),
+            description: unwrap(rs?.description),
+            source_name: unwrap(rs?.source_name),
+            priority: unwrap(rs?.priority),
+          })
+        ) as RecordStatusMetadata[];
         recordStatuses.value = newRecordStatuses;
         fetched.value = true;
 

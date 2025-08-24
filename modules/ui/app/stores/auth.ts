@@ -296,10 +296,16 @@ export const useAuthStore = defineStore('auth', {
           this.clearAuth();
           return false;
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn('Token validation failed:', error);
-        this.clearAuth();
-        return false;
+        // Only clear auth for explicit invalid token responses; keep session on network/other errors
+        const status = error?.status ?? error?.response?.status;
+        if (status === 401) {
+          this.clearAuth();
+          return false;
+        }
+        // Preserve current state on transient errors
+        return !!this.user;
       }
     },
 
