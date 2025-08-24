@@ -3,7 +3,7 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">System Configuration</h1>
+          <h1 class="text-lg font-semibold">Configurations</h1>
         </template>
         <template #description>
           Manage system settings, roles, workflows, and organization
@@ -15,274 +15,155 @@
     <template #body>
       <UBreadcrumb :items="breadcrumbItems" />
 
-      <!-- Dynamic Configuration List -->
+      <!-- Available Configurations Section -->
       <div class="grid gap-6 mt-8">
-        <UDashboardPanel>
+        <UCard>
           <template #header>
-            <UDashboardNavbar>
-              <template #title>
-                <div class="flex items-center gap-3">
-                  <UIcon
-                    name="i-heroicons-cog-6-tooth"
-                    class="w-6 h-6 text-primary-500"
-                  />
+            <h3 class="text-lg font-semibold">Available Configurations</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Loaded dynamically from the configuration service
+            </p>
+          </template>
+
+          <div
+            v-if="loading"
+            class="py-8 text-center text-sm text-gray-600 dark:text-gray-400"
+          >
+            Loading configurations…
+          </div>
+          <div
+            v-else-if="error"
+            class="py-8 text-center text-sm text-red-600 dark:text-red-400"
+          >
+            {{ error }}
+          </div>
+          <div v-else class="grid gap-4">
+            <UCard
+              v-for="cfg in configurations"
+              :key="cfg.file"
+              class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <template #header>
+                <div class="flex items-center justify-between">
                   <div>
-                    <h3 class="text-lg font-semibold">
-                      Available Configurations
-                    </h3>
+                    <h4 class="font-medium">{{ cfg.name }}</h4>
                     <p class="text-sm text-gray-600 dark:text-gray-400">
-                      Loaded dynamically from the configuration service
+                      {{ cfg.description }}
                     </p>
                   </div>
-                </div>
-              </template>
-            </UDashboardNavbar>
-          </template>
-
-          <template #body>
-            <div
-              v-if="loading"
-              class="py-8 text-center text-sm text-gray-600 dark:text-gray-400"
-            >
-              Loading configurations…
-            </div>
-            <div
-              v-else-if="error"
-              class="py-8 text-center text-sm text-red-600 dark:text-red-400"
-            >
-              {{ error }}
-            </div>
-            <div v-else class="grid gap-4">
-              <UCard v-for="cfg in configurations" :key="cfg.file">
-                <template #header>
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <h4 class="font-medium">{{ cfg.name }}</h4>
-                      <p class="text-sm text-gray-600 dark:text-gray-400">
-                        {{ cfg.description }}
-                      </p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <UBadge
-                        :color="
-                          cfg.status === 'user'
-                            ? 'primary'
-                            : cfg.status === 'default'
-                              ? 'neutral'
-                              : 'warning'
-                        "
-                        variant="soft"
-                        >{{ cfg.status }}</UBadge
-                      >
-                      <UButton
-                        :to="`/settings/configuration/${cfg.file}/edit`"
-                        variant="outline"
-                        size="sm"
-                        >Edit</UButton
-                      >
-                      <UButton
-                        :to="`/settings/configuration/${cfg.file}/raw`"
-                        variant="ghost"
-                        size="sm"
-                        >Edit Raw</UButton
-                      >
-                    </div>
-                  </div>
-                </template>
-              </UCard>
-            </div>
-          </template>
-        </UDashboardPanel>
-
-        <!-- Configuration Status Section -->
-        <UDashboardPanel>
-          <template #header>
-            <UDashboardNavbar>
-              <template #title>
-                <div class="flex items-center gap-3">
-                  <UIcon
-                    name="i-heroicons-squares-2x2"
-                    class="w-6 h-6 text-primary-500"
-                  />
-                  <div>
-                    <h3 class="text-lg font-semibold">Configuration Status</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">
-                      System health and configuration validation
-                    </p>
-                  </div>
-                </div>
-              </template>
-            </UDashboardNavbar>
-          </template>
-
-          <template #body>
-            <div class="grid gap-4">
-              <UCard>
-                <template #header>
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <h4 class="font-medium">Configuration Validation</h4>
-                      <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Check for configuration errors and warnings
-                      </p>
-                    </div>
+                  <div class="flex items-center gap-2">
                     <UButton
-                      @click="validateConfiguration"
+                      :to="`/settings/configuration/${cfg.file}/raw`"
                       variant="outline"
                       size="sm"
-                      :loading="validating"
-                      >Validate Configuration</UButton
-                    >
-                  </div>
-                </template>
-                <div v-if="validationResults" class="space-y-3">
-                  <div
-                    v-for="(result, index) in validationResults"
-                    :key="index"
-                    class="flex items-start gap-3 p-3 rounded-lg"
-                    :class="{
-                      'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200':
-                        result.status === 'success',
-                      'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200':
-                        result.status === 'warning',
-                      'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200':
-                        result.status === 'error',
-                    }"
-                  >
-                    <UIcon
-                      :name="getStatusIcon(result.status)"
-                      class="w-5 h-5 mt-0.5 flex-shrink-0"
-                    />
-                    <div>
-                      <p class="font-medium">{{ result.title }}</p>
-                      <p class="text-sm opacity-80">{{ result.message }}</p>
-                    </div>
-                  </div>
-                </div>
-                <div v-else class="text-sm text-gray-600 dark:text-gray-400">
-                  <p>
-                    Click "Validate Configuration" to check for any
-                    configuration issues.
-                  </p>
-                </div>
-              </UCard>
-            </div>
-          </template>
-        </UDashboardPanel>
-
-        <!-- Configuration Status Section -->
-        <UDashboardPanel>
-          <template #header>
-            <UDashboardNavbar>
-              <template #title>
-                <div class="flex items-center gap-3">
-                  <UIcon
-                    name="i-heroicons-information-circle"
-                    class="w-6 h-6 text-primary-500"
-                  />
-                  <div>
-                    <h3 class="text-lg font-semibold">Configuration Status</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">
-                      System health and configuration validation
-                    </p>
-                  </div>
-                </div>
-              </template>
-            </UDashboardNavbar>
-          </template>
-
-          <template #body>
-            <div class="grid gap-4">
-              <!-- Configuration Validation -->
-              <UCard>
-                <template #header>
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <h4 class="font-medium">Configuration Validation</h4>
-                      <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Check for configuration errors and warnings
-                      </p>
-                    </div>
-                    <UButton
-                      @click="validateConfiguration"
-                      variant="outline"
-                      size="sm"
-                      :loading="validating"
-                    >
-                      Validate Configuration
+                      >Edit Raw
                     </UButton>
                   </div>
-                </template>
-                <div v-if="validationResults" class="space-y-3">
-                  <div
-                    v-for="(result, index) in validationResults"
-                    :key="index"
-                    class="flex items-start gap-3 p-3 rounded-lg"
-                    :class="{
-                      'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200':
-                        result.status === 'success',
-                      'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200':
-                        result.status === 'warning',
-                      'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200':
-                        result.status === 'error',
-                    }"
-                  >
-                    <UIcon
-                      :name="getStatusIcon(result.status)"
-                      class="w-5 h-5 mt-0.5 flex-shrink-0"
-                    />
-                    <div>
-                      <p class="font-medium">{{ result.title }}</p>
-                      <p class="text-sm opacity-80">{{ result.message }}</p>
-                    </div>
-                  </div>
                 </div>
-                <div v-else class="text-sm text-gray-600 dark:text-gray-400">
-                  <p>
-                    Click "Validate Configuration" to check for any
-                    configuration issues.
-                  </p>
-                </div>
-              </UCard>
+              </template>
+            </UCard>
+          </div>
+        </UCard>
 
-              <!-- Configuration Backup -->
-              <UCard>
-                <template #header>
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <h4 class="font-medium">Configuration Backup</h4>
-                      <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Export and import configuration files
-                      </p>
-                    </div>
-                    <div class="flex gap-2">
-                      <UButton
-                        @click="exportConfiguration"
-                        variant="outline"
-                        size="sm"
-                      >
-                        Export All
-                      </UButton>
-                      <UButton
-                        @click="importConfiguration"
-                        variant="outline"
-                        size="sm"
-                      >
-                        Import
-                      </UButton>
-                    </div>
-                  </div>
-                </template>
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                  <p>
-                    Export current configuration for backup or import
-                    configuration from another instance.
-                  </p>
-                </div>
-              </UCard>
-            </div>
+        <!-- Configuration Status Section -->
+        <UCard>
+          <template #header>
+            <h3 class="text-lg font-semibold">Configuration Status</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              System health and configuration validation
+            </p>
           </template>
-        </UDashboardPanel>
+
+          <div class="grid gap-4">
+            <!-- Configuration Validation -->
+            <UCard>
+              <template #header>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="font-medium">Configuration Validation</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      Check for configuration errors and warnings
+                    </p>
+                  </div>
+                  <UButton
+                    @click="validateConfiguration"
+                    variant="outline"
+                    size="sm"
+                    :loading="validating"
+                  >
+                    Validate Configuration
+                  </UButton>
+                </div>
+              </template>
+              <div v-if="validationResults" class="space-y-3">
+                <div
+                  v-for="(result, index) in validationResults"
+                  :key="index"
+                  class="flex items-start gap-3 p-3 rounded-lg"
+                  :class="{
+                    'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200':
+                      result.status === 'success',
+                    'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200':
+                      result.status === 'warning',
+                    'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200':
+                      result.status === 'error',
+                  }"
+                >
+                  <UIcon
+                    :name="getStatusIcon(result.status)"
+                    class="w-5 h-5 mt-0.5 flex-shrink-0"
+                  />
+                  <div>
+                    <p class="font-medium">{{ result.title }}</p>
+                    <p class="text-sm opacity-80">{{ result.message }}</p>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-sm text-gray-600 dark:text-gray-400">
+                <p>
+                  Click "Validate Configuration" to check for any configuration
+                  issues.
+                </p>
+              </div>
+            </UCard>
+
+            <!-- Configuration Backup -->
+            <UCard>
+              <template #header>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="font-medium">Configuration Backup</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      Export and import configuration files
+                    </p>
+                  </div>
+                  <div class="flex gap-2">
+                    <UButton
+                      @click="exportConfiguration"
+                      variant="outline"
+                      size="sm"
+                    >
+                      Export All
+                    </UButton>
+                    <UButton
+                      @click="importConfiguration"
+                      variant="outline"
+                      size="sm"
+                    >
+                      Import
+                    </UButton>
+                  </div>
+                </div>
+              </template>
+              <div class="text-sm text-gray-600 dark:text-gray-400">
+                <p>
+                  Export current configuration for backup or import
+                  configuration from another instance.
+                </p>
+              </div>
+            </UCard>
+          </div>
+        </UCard>
       </div>
     </template>
   </UDashboardPanel>
@@ -294,7 +175,6 @@ definePageMeta({
   layout: 'default',
 });
 
-const { $api } = useNuxtApp();
 const authStore = useAuthStore();
 
 // Check if user can manage configuration
@@ -434,10 +314,5 @@ const importConfiguration = async () => {
   }
 };
 
-// Redirect if user cannot manage configuration
-onMounted(() => {
-  if (!canManageConfiguration.value) {
-    navigateTo('/settings');
-  }
-});
+// Redirect handled in initial onMounted
 </script>
