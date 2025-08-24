@@ -260,6 +260,7 @@ import {
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
+  middleware: ['require-config-manage'],
 });
 
 const authStore = useAuthStore();
@@ -268,10 +269,10 @@ const route = useRoute();
 // Get configuration file from route
 const configFile = computed(() => route.params.configFile as string);
 
-// Check if user can manage configuration
-const canManageConfiguration = computed(() => {
-  return authStore.currentUser?.role === 'admin';
-});
+// Check permission via store
+const canManageConfiguration = computed(() =>
+  authStore.hasPermission('config:manage')
+);
 
 // Configuration state
 const loading = ref(true);
@@ -477,11 +478,6 @@ const resetToOriginal = () => {
 
 // Load configuration on mount
 onMounted(async () => {
-  if (!canManageConfiguration.value) {
-    navigateTo('/settings');
-    return;
-  }
-
   await loadConfiguration();
 });
 

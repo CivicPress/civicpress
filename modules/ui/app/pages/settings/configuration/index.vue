@@ -173,14 +173,15 @@
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
+  middleware: ['require-config-manage'],
 });
 
 const authStore = useAuthStore();
 
-// Check if user can manage configuration
-const canManageConfiguration = computed(() => {
-  return authStore.currentUser?.role === 'admin';
-});
+// Permission check via store
+const canManageConfiguration = computed(() =>
+  authStore.hasPermission('config:manage')
+);
 
 // Breadcrumb navigation
 const breadcrumbItems = [
@@ -218,10 +219,6 @@ const fetchConfigurations = async () => {
 };
 
 onMounted(() => {
-  if (!canManageConfiguration.value) {
-    navigateTo('/settings');
-    return;
-  }
   fetchConfigurations();
 });
 

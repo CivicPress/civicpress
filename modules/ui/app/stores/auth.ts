@@ -85,7 +85,7 @@ export const useAuthStore = defineStore('auth', {
     currentUser: (state) => state.user,
     isLoggedIn: (state) => state.isAuthenticated && !!state.token,
     hasPermission: (state) => (permission: string) => {
-      return state.user?.permissions.includes(permission) || false;
+      return state.user?.permissions?.includes(permission) || false;
     },
     hasRole: (state) => (role: string) => {
       return state.user?.role === role;
@@ -128,7 +128,9 @@ export const useAuthStore = defineStore('auth', {
         name: session.user.name,
         role: session.user.role,
         avatar_url: session.user.avatar_url,
-        permissions: [], // TODO: Add permissions if available
+        permissions: Array.isArray(session.user.permissions)
+          ? session.user.permissions
+          : [],
       };
 
       // Update user, token and auth state
@@ -310,9 +312,11 @@ export const useAuthStore = defineStore('auth', {
         isAuthenticated: this.isAuthenticated,
       });
 
-      // If we have a token but no user, try to validate the token
-      if (this.token && !this.user) {
-        console.log('Token found but no user, validating token...');
+      // Always validate if we have a token to refresh permissions/user
+      if (this.token) {
+        console.log(
+          'Token found, validating token to refresh user/permissions...'
+        );
         await this.validateToken();
       }
     },

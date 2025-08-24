@@ -100,7 +100,11 @@
 <script setup lang="ts">
 import { CentralConfigManager } from '@civicpress/core';
 
-definePageMeta({ requiresAuth: true, layout: 'default' });
+definePageMeta({
+  requiresAuth: true,
+  layout: 'default',
+  middleware: ['require-config-manage'],
+});
 
 const route = useRoute();
 const configFile = computed(() => route.params.configFile as string);
