@@ -245,7 +245,14 @@ export class CivicPressAPI {
     this.app.use('/api/v1/search', searchRouter);
     this.app.use('/api/v1/status', createStatusRouter());
     this.app.use('/api/v1/validation', createValidationRouter());
-    this.app.use('/api/v1/config', configRouter);
+    this.app.use(
+      '/api/v1/config',
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      configRouter
+    );
     this.app.use('/api/v1/system', systemRouter);
 
     // Serve brand assets (logos, favicons, etc.)

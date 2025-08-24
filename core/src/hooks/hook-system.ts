@@ -143,7 +143,10 @@ export class HookSystem {
         await mkdir(configDir, { recursive: true });
       }
 
-      const configContent = yaml.stringify(this.config);
+      const configContent = yaml.stringify(this.config, {
+        aliasDuplicateObjects: false,
+        lineWidth: 0,
+      });
       await writeFile(this.configPath, configContent, 'utf-8');
       coreDebug('Saved hook configuration to file', {
         operation: 'hook configuration saving',

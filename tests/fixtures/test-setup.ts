@@ -719,6 +719,7 @@ export function createRolesConfig(config: TestConfig) {
             'records:export',
             'templates:manage',
             'hooks:manage',
+            'config:manage',
           ],
           type: 'array',
           description: 'List of permissions granted to this role',
@@ -792,6 +793,10 @@ export function createRolesConfig(config: TestConfig) {
     permissions: {
       'system:admin': {
         description: 'Full system administration access',
+        level: 'system',
+      },
+      'config:manage': {
+        description: 'Manage configuration files and settings',
         level: 'system',
       },
       'records:create': {
@@ -1058,7 +1063,7 @@ export async function createCLITestContext(): Promise<CLITestContext> {
 
     // Extract JSON from the output - look for the last JSON object
     const lines = authResult.split('\n');
-    
+
     // Find the last line that starts with '{' (the JSON response)
     let jsonStart = -1;
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -1079,7 +1084,9 @@ export async function createCLITestContext(): Promise<CLITestContext> {
           throw new Error('Invalid JSON structure from auth:simulated');
         }
       } catch (parseError) {
-        throw new Error(`Failed to parse JSON from auth:simulated: ${parseError}`);
+        throw new Error(
+          `Failed to parse JSON from auth:simulated: ${parseError}`
+        );
       }
     } else {
       throw new Error('No JSON output found in simulated authentication');

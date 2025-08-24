@@ -156,3 +156,38 @@ commands:
     file: cli/src/commands/hook.ts
     desc: Manage CivicPress hooks and workflows
     status: stable
+
+  - id: config:list
+    file: cli/src/commands/config.ts
+    desc: List available configuration files
+    status: stable
+
+  - id: config:get
+    file: cli/src/commands/config.ts
+    desc: Get a configuration file (JSON or raw YAML)
+    status: stable
+
+  - id: config:put
+    file: cli/src/commands/config.ts
+    desc: Save a configuration file (raw YAML)
+    status: stable
+
+  - id: config:validate
+    file: cli/src/commands/config.ts
+    desc: Validate configuration (one or all)
+    status: stable
+
+  - id: config:reset
+    file: cli/src/commands/config.ts
+    desc: Reset a configuration to defaults
+    status: stable
+
+  - id: config:export
+    file: cli/src/commands/config.ts
+    desc: Export configurations to a directory
+    status: stable
+
+  - id: config:import
+    file: cli/src/commands/config.ts
+    desc: Import configurations from a directory
+    status: stable

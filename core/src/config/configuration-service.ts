@@ -155,7 +155,10 @@ export class ConfigurationService {
       }
 
       // Write to data/.civic/
-      const yamlContent = stringify(newFormatConfig);
+      const yamlContent = stringify(newFormatConfig, {
+        aliasDuplicateObjects: false,
+        lineWidth: 0,
+      });
       await writeFile(userPath, yamlContent, 'utf-8');
     } catch (error) {
       throw new Error(`Failed to save configuration ${configType}: ${error}`);
@@ -523,7 +526,14 @@ export class ConfigurationService {
       await mkdir(dirname(newPath), { recursive: true });
 
       // Write new file
-      await writeFile(newPath, stringify(newFormatConfig), 'utf-8');
+      await writeFile(
+        newPath,
+        stringify(newFormatConfig, {
+          aliasDuplicateObjects: false,
+          lineWidth: 0,
+        }),
+        'utf-8'
+      );
 
       // Backup and remove old file
       const backupPath = `${oldPath}.bak-${Date.now()}`;
