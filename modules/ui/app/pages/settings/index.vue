@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui';
+import { ref, onMounted, computed } from 'vue';
 
 const route = useRoute();
 const router = useRouter();
+const { $civicApi } = useNuxtApp();
 
 // Auth store for permissions
 const authStore = useAuthStore();
@@ -74,6 +76,31 @@ const breadcrumbItems = [
     to: '/settings',
   },
 ];
+
+// Setup banner: show when any config is not a user file (missing or default-only)
+const configStatus = ref<Record<string, 'default' | 'user' | 'missing'> | null>(
+  null
+);
+const needsSetup = computed(() => {
+  if (!configStatus.value) return false;
+  return Object.values(configStatus.value).some((s) => s !== 'user');
+});
+
+async function loadConfigStatus() {
+  if (!authStore.hasPermission('system:admin')) return;
+  try {
+    const res: any = await $civicApi('/api/v1/config/status');
+    if (res?.success) {
+      configStatus.value = res.data || {};
+    }
+  } catch (e) {
+    // Non-blocking
+  }
+}
+
+onMounted(() => {
+  loadConfigStatus();
+});
 </script>
 
 <template>
@@ -90,6 +117,26 @@ const breadcrumbItems = [
       <!-- Authenticated content; cards filtered by permissions -->
       <div class="space-y-6">
         <UBreadcrumb :items="breadcrumbItems" />
+
+        <!-- Admin-only setup banner when configs need initialization -->
+        <UAlert
+          v-if="authStore.hasPermission('system:admin') && needsSetup"
+          color="primary"
+          variant="subtle"
+          icon="i-lucide-wrench"
+          title="Setup recommended"
+          description="Some configuration files are not initialized. Run the setup to create user copies from defaults and validate."
+        >
+          <template #actions>
+            <UButton
+              color="primary"
+              variant="outline"
+              icon="i-lucide-play-circle"
+              @click="navigateTo('/settings/setup')"
+              >Open setup</UButton
+            >
+          </template>
+        </UAlert>
 
         <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <UCard

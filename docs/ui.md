@@ -23,6 +23,19 @@ For detailed UI docs and structure, see `modules/ui/README.md`.
   fields).
 - Configuration: edit via metadata form and raw YAML editor; validation surfaced
   via toasts.
+- Notifications: test email sender at `Settings > Notifications` (admin-only),
+  uses `POST /api/v1/notifications/test` with SendGrid/SMTP from config.
+
+### Setup Wizard
+
+- Banner on `/settings` (admin-only) appears when any required config in
+  `data/.civic/*.yml` is missing.
+- Wizard page: `/settings/setup` (admin-only)
+  - Lists configuration status via `GET /api/v1/config/status`.
+  - “Create from defaults” uses `POST /api/v1/config/:type/reset`.
+  - “Validate” uses `POST /api/v1/config/:type/validate` and
+    `GET /api/v1/config/validate/all`.
+  - All actions show inline toasts and are audit-logged by the API.
 
 ## Activity Log (Audit)
 

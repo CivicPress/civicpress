@@ -1,7 +1,8 @@
 # CivicPress CLI Usage Guide
 
-The CivicPress CLI provides a comprehensive command-line interface for managing
-civic records, workflows, and system administration.
+This document provides a high-level overview of the CivicPress CLI layer.
+
+- Location: `cli/`
 
 ## Quick Start
 
@@ -399,6 +400,13 @@ Manage system configuration files (parity with UI/API). Supports raw YAML and
 normalized JSON.
 
 ```bash
+# Show status (user/default/missing)
+civic config:status
+
+# Initialize configs from defaults (no overwrite)
+civic config:init --all
+civic config:init roles
+
 # List available configs
 civic config:list
 

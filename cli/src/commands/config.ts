@@ -7,6 +7,7 @@ import {
   CentralConfigManager,
   Logger,
 } from '@civicpress/core';
+import { createRequire } from 'module';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -16,15 +17,65 @@ import { AuthUtils } from '../utils/auth-utils.js';
 function createConfigService(): ConfigurationService {
   const central = CentralConfigManager.getConfig();
   const dataDir = central.dataDir || 'data';
+  const require = createRequire(import.meta.url);
+
+  // Resolve defaults path via the core package root to work in tests and repo root
+  let defaultsPath = path.join(process.cwd(), 'core', 'src', 'defaults');
+  try {
+    const corePkgPath = require.resolve('@civicpress/core/package.json');
+    const coreRoot = path.dirname(corePkgPath); // .../core
+    const candidate = path.join(coreRoot, 'src', 'defaults');
+    if (fs.existsSync(candidate)) {
+      defaultsPath = candidate;
+    }
+  } catch {
+    // fallback to process.cwd-based path
+  }
 
   return new ConfigurationService({
     dataPath: path.join(dataDir, '.civic'),
-    defaultsPath: path.join(process.cwd(), 'core', 'src', 'defaults'),
+    defaultsPath,
     systemDataPath: path.join(process.cwd(), '.system-data'),
   });
 }
 
 export function registerConfigCommands(cli: CAC) {
+  // Status of configurations (user/default/missing)
+  cli
+    .command(
+      'config:status',
+      'Show configuration status (user/default/missing)'
+    )
+    .action(async () => {
+      const logger = initializeLogger();
+      const { json } = getGlobalOptionsFromArgs();
+      try {
+        const service = createConfigService();
+        const status = await service.getConfigurationStatus();
+        if (json) {
+          console.log(JSON.stringify({ success: true, data: status }, null, 2));
+        } else {
+          logger.info('📊 Configuration status:');
+          for (const [type, state] of Object.entries(status)) {
+            logger.info(`  • ${type}: ${state}`);
+          }
+        }
+      } catch (err: any) {
+        if (json) {
+          console.log(
+            JSON.stringify(
+              { success: false, error: err?.message || String(err) },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Failed to get configuration status:', err);
+        }
+        process.exit(1);
+      }
+    });
+
   // List available configurations
   cli
     .command('config:list', 'List available configuration files')
@@ -536,6 +587,73 @@ export function registerConfigCommands(cli: CAC) {
           );
         } else {
           logger.error('❌ Import failed:', err);
+        }
+        process.exit(1);
+      }
+    });
+
+  // Initialize configurations from defaults if missing
+  cli
+    .command(
+      'config:init [type]',
+      'Create user configs from defaults if missing'
+    )
+    .option('--all', 'Initialize all configurations')
+    .action(async (type: string | undefined, options: any) => {
+      const logger = initializeLogger();
+      const { json } = getGlobalOptionsFromArgs();
+      try {
+        const service = createConfigService();
+        const status = await service.getConfigurationStatus();
+
+        const initOne = async (t: string) => {
+          const state = (status as any)[t];
+          if (state === 'user') return { type: t, created: false };
+          await service.resetToDefaults(t);
+          return { type: t, created: true };
+        };
+
+        const types = options.all ? Object.keys(status) : type ? [type] : [];
+        if (types.length === 0) {
+          if (json) {
+            console.log(
+              JSON.stringify(
+                { success: false, error: 'Specify a type or use --all' },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.info('Usage: civic config:init <type> | --all');
+          }
+          process.exit(1);
+        }
+
+        const results: Array<{ type: string; created: boolean }> = [];
+        for (const t of types) results.push(await initOne(t));
+
+        if (json) {
+          console.log(
+            JSON.stringify({ success: true, data: results }, null, 2)
+          );
+        } else {
+          for (const r of results) {
+            if (r.created)
+              logger.success(`✅ Initialized '${r.type}' from defaults`);
+            else logger.info(`ℹ️  Skipped '${r.type}' (already exists)`);
+          }
+        }
+      } catch (err: any) {
+        if (json) {
+          console.log(
+            JSON.stringify(
+              { success: false, error: err?.message || String(err) },
+              null,
+              2
+            )
+          );
+        } else {
+          logger.error('❌ Initialization failed:', err);
         }
         process.exit(1);
       }
