@@ -43,6 +43,12 @@ const settingsItems = computed<NavigationMenuItem[]>(() => {
       to: '/settings/activity',
       description: 'View system audit trail',
     });
+    items.push({
+      label: 'Notifications',
+      icon: 'i-lucide-mail',
+      to: '/settings/notifications',
+      description: 'Send test email to verify configuration',
+    });
   }
 
   return items;

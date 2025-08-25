@@ -90,6 +90,11 @@ const items = computed<DropdownMenuItem[][]>(() => {
                   icon: 'i-lucide-activity',
                   onClick: () => navigateTo('/settings/activity'),
                 },
+                {
+                  label: 'Notifications',
+                  icon: 'i-lucide-mail',
+                  onClick: () => navigateTo('/settings/notifications'),
+                },
               ]
             : []),
         ],

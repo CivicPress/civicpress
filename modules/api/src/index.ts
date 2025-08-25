@@ -23,6 +23,7 @@ import docsRouter from './routes/docs.js';
 import { createValidationRouter } from './routes/validation.js';
 import { createDiffRouter } from './routes/diff.js';
 import { createAuditRouter } from './routes/audit.js';
+import notificationsRouter from './routes/notifications.js';
 import {
   router as usersRouter,
   registrationRouter,
@@ -261,6 +262,13 @@ export class CivicPressAPI {
       '/api/v1/audit',
       authMiddleware(this.civicPress),
       createAuditRouter()
+    );
+
+    // Notifications (admin-only; behind auth middleware)
+    this.app.use(
+      '/api/v1/notifications',
+      authMiddleware(this.civicPress),
+      notificationsRouter
     );
 
     // Serve brand assets (logos, favicons, etc.)
