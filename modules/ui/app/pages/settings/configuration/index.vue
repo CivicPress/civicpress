@@ -26,7 +26,7 @@
           </template>
 
           <div
-            v-if="loading"
+            v-if="!ready || loading"
             class="py-8 text-center text-sm text-gray-600 dark:text-gray-400"
           >
             Loading configurations…
@@ -177,6 +177,7 @@ definePageMeta({
 });
 
 const authStore = useAuthStore();
+const ready = computed(() => authStore.isInitialized);
 
 // Permission check via store
 const canManageConfiguration = computed(() =>
@@ -236,17 +237,40 @@ const validateConfiguration = async () => {
     )) as any;
 
     if (response.success && response.data) {
-      validationResults.value = response.data.results || [];
+      // response.data is an object keyed by type → { valid, errors[] }
+      const entries = Object.entries(response.data || {});
+      const items = entries.map(([type, result]: any) => ({
+        status: result?.valid ? 'success' : 'error',
+        title: `${type}`,
+        message: result?.valid
+          ? 'Valid'
+          : Array.isArray(result?.errors) && result.errors.length
+            ? result.errors[0]
+            : 'Invalid configuration',
+      }));
+      validationResults.value = items;
+
+      const allValid = items.every((i: any) => i.status === 'success');
+      useToast().add({
+        title: allValid ? 'All configurations valid' : 'Validation completed',
+        description: allValid
+          ? 'No issues found across all configuration files.'
+          : 'Some configurations have issues. See details below.',
+        color: allValid ? 'primary' : 'neutral',
+      });
     } else {
-      // If validation endpoint doesn't exist yet, show a basic status
       validationResults.value = [
         {
-          status: 'success',
-          title: 'Configuration System',
-          message:
-            'Configuration system is operational. Individual file validation coming soon.',
+          status: 'warning',
+          title: 'Configuration Validation',
+          message: 'Validation endpoint returned an unexpected response.',
         },
       ];
+      useToast().add({
+        title: 'Validation error',
+        description: 'Unexpected response from validation endpoint.',
+        color: 'error',
+      });
     }
   } catch (error) {
     console.error('Configuration validation failed:', error);
@@ -259,6 +283,11 @@ const validateConfiguration = async () => {
           'Unable to validate configuration files. API endpoint may not be available yet.',
       },
     ];
+    useToast().add({
+      title: 'Validation failed',
+      description: 'Unable to validate configurations. Check server logs.',
+      color: 'error',
+    });
   } finally {
     validating.value = false;
   }

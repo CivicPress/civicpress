@@ -20,6 +20,7 @@ import { loginCommand } from './commands/login.js';
 import { indexCommand } from './commands/index.js';
 import { autoIndexCommand } from './commands/auto-index.js';
 import { cleanupCommand } from './commands/cleanup.js';
+import { registerConfigCommands } from './commands/config.js';
 
 import setupAuthCommand from './commands/auth.js';
 import setupUsersCommand from './commands/users.js';
@@ -67,6 +68,7 @@ loginCommand(cli);
 indexCommand(cli);
 autoIndexCommand(cli);
 cleanupCommand(cli);
+registerConfigCommands(cli);
 
 infoCommand(cli);
 

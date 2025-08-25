@@ -39,12 +39,12 @@ components:
 
   - name: RecordForm
     file: modules/ui/app/components/RecordForm.vue
-    purpose: Create or edit a record
+    purpose: Create or edit a record (shows save feedback on success/error)
     status: stable
 
   - name: RecordList
     file: modules/ui/app/components/RecordList.vue
-    purpose: Paginated list of records
+    purpose: Paginated list of records with search and basic filters
     status: stable
 
   - name: RecordSearch
@@ -64,7 +64,7 @@ components:
 
   - name: UserForm
     file: modules/ui/app/components/UserForm.vue
-    purpose: Create or edit a user
+    purpose: Create or edit a user (inline validation, role + basic fields)
     status: stable
 
   - name: UserMenu

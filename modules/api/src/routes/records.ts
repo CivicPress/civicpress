@@ -7,6 +7,7 @@ import {
 } from '../middleware/auth';
 import { RecordsService } from '../services/records-service';
 import { Logger } from '@civicpress/core';
+import { AuditLogger } from '../../../../core/src/audit/audit-logger.js';
 import {
   sendSuccess,
   handleApiError,
@@ -14,6 +15,7 @@ import {
 } from '../utils/api-logger';
 
 const logger = new Logger();
+const audit = new AuditLogger();
 
 // Custom validation error handler for records API
 function handleRecordsValidationError(
@@ -346,7 +348,31 @@ export function createRecordsRouter(recordsService: RecordsService) {
           operation: 'create_record',
           statusCode: 201,
         });
+        await audit.log({
+          source: 'api',
+          actor: {
+            id: user.id,
+            username: (user as any).username,
+            role: user.role,
+          },
+          action: 'records:create',
+          target: {
+            type: 'record',
+            id: (record as any)?.id,
+            name: (record as any)?.title,
+          },
+          outcome: 'success',
+        });
       } catch (error) {
+        const user = (req as any).user || {};
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:create',
+          target: { type: 'record' },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'create_record',
           error,
@@ -402,7 +428,28 @@ export function createRecordsRouter(recordsService: RecordsService) {
         }
 
         sendSuccess(record, req, res, { operation: 'update_record' });
+        await audit.log({
+          source: 'api',
+          actor: {
+            id: user.id,
+            username: (user as any).username,
+            role: user.role,
+          },
+          action: 'records:update',
+          target: { type: 'record', id: id },
+          outcome: 'success',
+        });
       } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:update',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'update_record',
           error,
@@ -466,6 +513,17 @@ export function createRecordsRouter(recordsService: RecordsService) {
             res,
             { operation: 'delete_record' }
           );
+          await audit.log({
+            source: 'api',
+            actor: {
+              id: user.id,
+              username: (user as any).username,
+              role: user.role,
+            },
+            action: 'records:delete',
+            target: { type: 'record', id },
+            outcome: 'success',
+          });
         } else {
           const error = new Error('Failed to delete record');
           (error as any).statusCode = 500;
@@ -474,6 +532,16 @@ export function createRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
       } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:delete',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'delete_record',
           error,
@@ -548,6 +616,21 @@ export function createRecordsRouter(recordsService: RecordsService) {
             res,
             { operation: 'change_record_status' }
           );
+          await audit.log({
+            source: 'api',
+            actor: {
+              id: user.id,
+              username: (user as any).username,
+              role: user.role,
+            },
+            action: 'records:status',
+            target: { type: 'record', id },
+            outcome: 'success',
+            metadata: {
+              previousStatus: existingRecord.status,
+              newStatus: status,
+            },
+          });
         } else {
           const error = new Error(
             result.error || 'Failed to change record status'
@@ -558,6 +641,16 @@ export function createRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
       } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:status',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'change_record_status',
           error,

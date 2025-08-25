@@ -26,6 +26,8 @@ export const commitCommand = (cli: CAC) => {
         options.token,
         shouldOutputJson
       );
+      const coreMod: any = await import('@civicpress/core');
+      const audit = new coreMod.AuditLogger();
       const dataDir = civic.getDataDir();
 
       // Check commit permissions
@@ -234,7 +236,23 @@ export const commitCommand = (cli: CAC) => {
         if (!shouldOutputJson) {
           logger.success('✅ Committed successfully!');
         }
+        await audit.log({
+          source: 'cli',
+          actor: { username: user.username, role: user.role },
+          action: 'record_commit',
+          target: { type: 'record', name: recordName || 'multiple' },
+          outcome: 'success',
+          metadata: { files: filesToCommit },
+        });
       } catch (error) {
+        await audit.log({
+          source: 'cli',
+          actor: { username: user.username, role: user.role },
+          action: 'record_commit',
+          target: { type: 'record', name: recordName || 'multiple' },
+          outcome: 'failure',
+          message: error instanceof Error ? error.message : String(error),
+        });
         if (shouldOutputJson) {
           console.log(
             JSON.stringify(

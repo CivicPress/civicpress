@@ -393,6 +393,46 @@ civic debug config
 civic debug permissions
 ```
 
+#### `config` (Configuration Management)
+
+Manage system configuration files (parity with UI/API). Supports raw YAML and
+normalized JSON.
+
+```bash
+# List available configs
+civic config:list
+
+# Get a config (normalized JSON)
+civic config:get org-config
+
+# Get raw YAML
+civic config:get roles --raw
+
+# Save raw YAML from a file
+civic config:put org-config --file ./org-config.yml
+
+# Validate a specific config
+civic config:validate roles
+
+# Validate all configs
+civic config:validate --all
+
+# Reset a config to defaults
+civic config:reset hooks
+
+# Export all configs to a directory
+civic config:export --dir ./backup-configs
+
+# Import configs from a directory
+civic config:import --dir ./backup-configs
+```
+
+Supported config types: `org-config`, `roles`, `workflows`, `hooks`,
+`notifications`.
+
+All commands support global flags: `--json`, `--silent`, `--quiet`, `--verbose`,
+`--no-color`.
+
 ### Templates & Workflows
 
 #### `template`

@@ -3,8 +3,10 @@ import { configurationService, CentralConfigManager } from '@civicpress/core';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { AuditLogger } from '../../../../core/src/audit/audit-logger.js';
 
 const router = Router();
+const audit = new AuditLogger();
 
 // Secured configuration routes: require authenticated admin permission
 router.use((req, res, next) => {
@@ -119,7 +121,27 @@ router.put(
         success: true,
         message: `Raw configuration ${type} saved successfully`,
       });
+
+      // Audit success
+      const actor = (req as any).user || {};
+      await audit.log({
+        source: 'api',
+        actor: { id: actor.id, username: actor.username, role: actor.role },
+        action: 'config:raw:put',
+        target: { type: 'config', id: type, path: userPath },
+        outcome: 'success',
+      });
     } catch (error) {
+      const { type } = req.params || ({} as any);
+      const actor = (req as any).user || {};
+      await audit.log({
+        source: 'api',
+        actor: { id: actor.id, username: actor.username, role: actor.role },
+        action: 'config:raw:put',
+        target: { type: 'config', id: type },
+        outcome: 'failure',
+        message: String(error),
+      });
       res.status(500).json({
         success: false,
         error: `Failed to save raw configuration: ${error}`,
@@ -183,7 +205,26 @@ router.put('/:type', async (req, res) => {
       success: true,
       message: `Configuration ${type} saved successfully`,
     });
+
+    const actor = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'config:save',
+      target: { type: 'config', id: type },
+      outcome: 'success',
+    });
   } catch (error) {
+    const { type } = req.params || ({} as any);
+    const actor = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'config:save',
+      target: { type: 'config', id: type },
+      outcome: 'failure',
+      message: String(error),
+    });
     res.status(500).json({
       success: false,
       error: `Failed to save configuration: ${error}`,
@@ -205,7 +246,26 @@ router.post('/:type/reset', async (req, res) => {
       success: true,
       message: `Configuration ${type} reset to defaults successfully`,
     });
+
+    const actor = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'config:reset',
+      target: { type: 'config', id: type },
+      outcome: 'success',
+    });
   } catch (error) {
+    const { type } = req.params || ({} as any);
+    const actor = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'config:reset',
+      target: { type: 'config', id: type },
+      outcome: 'failure',
+      message: String(error),
+    });
     res.status(500).json({
       success: false,
       error: `Failed to reset configuration: ${error}`,
@@ -226,7 +286,28 @@ router.post('/:type/validate', async (req, res) => {
       success: true,
       data: validation,
     });
+
+    const actor = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'config:validate',
+      target: { type: 'config', id: type },
+      outcome: validation?.valid ? 'success' : 'failure',
+      message: validation?.valid ? undefined : (validation?.errors?.[0] as any),
+      metadata: validation,
+    });
   } catch (error) {
+    const { type } = req.params || ({} as any);
+    const actor = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'config:validate',
+      target: { type: 'config', id: type },
+      outcome: 'failure',
+      message: String(error),
+    });
     res.status(500).json({
       success: false,
       error: `Failed to validate configuration: ${error}`,

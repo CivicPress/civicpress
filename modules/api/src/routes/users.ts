@@ -5,8 +5,10 @@ import {
   sendSuccess,
   handleApiError,
 } from '../utils/api-logger';
+import { AuditLogger } from '../../../../core/src/audit/audit-logger.js';
 
 const router = express.Router();
+const audit = new AuditLogger();
 
 // Create a separate router for registration
 const registrationRouter = express.Router();
@@ -203,7 +205,25 @@ router.post('/', async (req, res) => {
       res,
       { operation: 'create_user' }
     );
+    const actor: any = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'users:create',
+      target: { type: 'user', id: newUser.id, name: newUser.username },
+      outcome: 'success',
+    });
   } catch (error) {
+    const actor: any = (req as any).user || {};
+    const body = (req as any).body || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'users:create',
+      target: { type: 'user', name: body?.username },
+      outcome: 'failure',
+      message: String(error),
+    });
     handleApiError('create_user', error, req, res, 'Failed to create user');
   }
 });
@@ -423,7 +443,25 @@ router.put('/:id', async (req, res) => {
       res,
       { operation: 'update_user' }
     );
+    const actor: any = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'users:update',
+      target: { type: 'user', id: updatedUser.id, name: updatedUser.username },
+      outcome: 'success',
+    });
   } catch (error) {
+    const actor: any = (req as any).user || {};
+    const idParam = (req as any).params?.id;
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'users:update',
+      target: { type: 'user', id: idParam },
+      outcome: 'failure',
+      message: String(error),
+    });
     handleApiError('update_user', error, req, res, 'Failed to update user');
   }
 });
@@ -520,7 +558,25 @@ router.delete('/:id', async (req, res) => {
       res,
       { operation: 'delete_user' }
     );
+    const actor: any = (req as any).user || {};
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'users:delete',
+      target: { type: 'user', id: userId },
+      outcome: 'success',
+    });
   } catch (error) {
+    const actor: any = (req as any).user || {};
+    const idParam = (req as any).params?.id;
+    await audit.log({
+      source: 'api',
+      actor: { id: actor.id, username: actor.username, role: actor.role },
+      action: 'users:delete',
+      target: { type: 'user', id: idParam },
+      outcome: 'failure',
+      message: String(error),
+    });
     handleApiError('delete_user', error, req, res, 'Failed to delete user');
   }
 });

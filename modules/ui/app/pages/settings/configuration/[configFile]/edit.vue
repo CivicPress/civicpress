@@ -67,7 +67,7 @@
               </div>
             </div>
 
-            <div v-else-if="error" class="text-center py-12">
+            <div v-else-if="error && ready" class="text-center py-12">
               <UIcon
                 name="i-heroicons-exclamation-triangle"
                 class="w-12 h-12 text-red-500 mx-auto mb-4"
@@ -239,7 +239,7 @@
               </div>
             </div>
 
-            <div v-else class="text-center py-12">
+            <div v-else-if="ready" class="text-center py-12">
               <p class="text-gray-600 dark:text-gray-400">
                 No configuration metadata available
               </p>
@@ -264,6 +264,7 @@ definePageMeta({
 });
 
 const authStore = useAuthStore();
+const ready = computed(() => authStore.isInitialized);
 const route = useRoute();
 
 // Get configuration file from route

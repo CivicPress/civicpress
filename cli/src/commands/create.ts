@@ -38,6 +38,8 @@ export const createCommand = (cli: CAC) => {
         options.token,
         shouldOutputJson
       );
+      const coreMod: any = await import('@civicpress/core');
+      const audit = new coreMod.AuditLogger();
       // Get data directory from civic instance
       const dataDir = civic.getDataDir();
 
@@ -318,7 +320,27 @@ export const createCommand = (cli: CAC) => {
           logger.info(`📁 Location: ${filePath}`);
           logger.info(`📋 Template: ${type}/${templateName}`);
         }
+        await audit.log({
+          source: 'cli',
+          actor: { username: user.username, role: user.role },
+          action: 'record_create',
+          target: {
+            type: 'record',
+            name: `${type}/${filename}`,
+            path: filePath,
+          },
+          outcome: 'success',
+          metadata: { type, title, dryRun: isCompleteDryRun },
+        });
       } catch (error) {
+        await audit.log({
+          source: 'cli',
+          actor: { username: user.username, role: user.role },
+          action: 'record_create',
+          target: { type: 'record', name: `${type}/${title}` },
+          outcome: 'failure',
+          message: error instanceof Error ? error.message : String(error),
+        });
         if (shouldOutputJson) {
           console.log(
             JSON.stringify(

@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'node',
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
+      '~': join(__dirname, 'modules', 'ui', 'app'),
     },
     // ONLY run CivicPress tests, exclude everything else
     include: [

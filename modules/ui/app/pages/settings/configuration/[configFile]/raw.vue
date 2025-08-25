@@ -17,8 +17,8 @@
               variant="outline"
               @click="resetToDefaults"
               :loading="resetting"
-              >Reset to Defaults</UButton
-            >
+              >Reset to Defaults
+            </UButton>
             <UButton
               color="neutral"
               variant="outline"
@@ -61,37 +61,12 @@
 
           <div>
             <textarea
-              class="w-full font-mono text-sm border rounded p-3 min-h-[480px] bg-white dark:bg-gray-900"
+              class="w-full font-mono text-sm border rounded p-3 min-h-[720px] bg-white dark:bg-gray-900"
               v-model="yaml"
               spellcheck="false"
             />
           </div>
         </UCard>
-
-        <div v-if="validation" class="space-y-2">
-          <UCard>
-            <template #header>
-              <h3 class="font-medium">Validation</h3>
-            </template>
-            <div>
-              <div
-                v-if="validation.valid"
-                class="text-green-700 dark:text-green-300"
-              >
-                Configuration is valid
-              </div>
-              <div v-else class="space-y-1">
-                <div
-                  v-for="(err, idx) in validation.errors"
-                  :key="idx"
-                  class="text-red-700 dark:text-red-300"
-                >
-                  - {{ err }}
-                </div>
-              </div>
-            </div>
-          </UCard>
-        </div>
       </div>
     </template>
   </UDashboardPanel>
@@ -211,8 +186,32 @@ const validate = async () => {
       }
     )) as any;
     validation.value = res?.data || null;
+    if (validation.value) {
+      const isValid = !!validation.value.valid;
+      useToast().add({
+        title: isValid ? 'Configuration is valid' : 'Validation failed',
+        description: isValid
+          ? `${configFile.value} passed validation.`
+          : Array.isArray(validation.value.errors) &&
+              validation.value.errors.length
+            ? String(validation.value.errors[0])
+            : 'There are validation issues in the configuration.',
+        color: isValid ? 'primary' : 'neutral',
+      });
+    } else {
+      useToast().add({
+        title: 'Validation error',
+        description: 'Unexpected response from validation endpoint.',
+        color: 'error',
+      });
+    }
   } catch (e: any) {
     error.value = e.message || 'Failed to validate configuration';
+    useToast().add({
+      title: 'Validation failed',
+      description: error.value,
+      color: 'error',
+    });
   } finally {
     validating.value = false;
   }

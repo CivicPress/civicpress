@@ -4,6 +4,7 @@ import type { User } from '~/types/user';
 // Composables
 const { $civicApi } = useNuxtApp();
 const authStore = useAuthStore();
+const ready = computed(() => authStore.isInitialized);
 
 // User roles composable
 const { getRoleDisplayName, getRoleColor, fetchRoles } = useUserRoles();
@@ -36,9 +37,7 @@ const fetchUsers = async () => {
 
 // Computed properties
 const canManageUsers = computed(() => {
-  const userRole = authStore.currentUser?.role;
-  // Allow admin and clerk roles to manage users (based on updated roles.yml)
-  return userRole === 'admin' || userRole === 'clerk';
+  return authStore.hasPermission('users:manage');
 });
 
 // Format date utility
@@ -61,6 +60,10 @@ const breadcrumbItems = [
     label: 'Users',
   },
 ];
+
+definePageMeta({
+  middleware: ['require-users-manage'],
+});
 
 // On mounted
 onMounted(() => {
@@ -96,8 +99,8 @@ onMounted(() => {
     <template #body>
       <UBreadcrumb :items="breadcrumbItems" />
 
-      <!-- Loading state -->
-      <div v-if="loading" class="space-y-4">
+      <!-- Loading state (gate on auth init) -->
+      <div v-if="!ready || loading" class="space-y-4">
         <UserCardSkeleton v-for="i in 3" :key="i" />
       </div>
 

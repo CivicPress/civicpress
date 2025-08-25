@@ -52,7 +52,7 @@ Protected endpoints use role-based permissions:
 
 ## Endpoints
 
-### Authentication
+### Authentication Endpoints
 
 #### POST /auth/login
 
@@ -771,6 +771,71 @@ The API version is included in the response headers:
 ```
 X-API-Version: 1.0.0
 ```
+
+## Audit Trail
+
+### Audit Trail Overview
+
+The platform records key actions across API and CLI into a JSONL audit log
+stored at `.system-data/activity.log` under the active `dataDir`.
+
+- Sources: `api`, `cli`, `ui`, `system`
+- Typical actions logged: config updates/resets/validations, user
+  create/update/delete, record create/update/delete/status changes
+- Each log line is a JSON object with stable fields for downstream processing
+
+### Log Entry Format
+
+```
+{
+  "id": "uuid",
+  "timestamp": "2025-01-01T12:34:56.789Z",
+  "source": "api|cli|ui|system",
+  "actor": { "id": 1, "username": "admin", "role": "admin", "ip": "127.0.0.1" },
+  "action": "config_put|config_reset|record_create|record_update|record_delete|status_change|user_create|user_update|user_delete|...",
+  "target": { "type": "config|record|user|...", "id": "...", "name": "...", "path": "..." },
+  "outcome": "success|failure|warning",
+  "message": "optional short message",
+  "metadata": { "any": "additional context" }
+}
+```
+
+### Audit Endpoints
+
+#### GET /api/v1/audit
+
+List recent audit entries. Admin-only.
+
+Headers: `Authorization: Bearer <token>`
+
+Query Parameters:
+
+- `limit` (optional, default: 100, max: 1000)
+- `offset` (optional, default: 0)
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "entries": [ { "id": "...", "timestamp": "...", "source": "api", "action": "config_put", "outcome": "success" } ],
+    "pagination": { "total": 123, "limit": 100, "offset": 0 }
+  }
+}
+```
+
+Permissions:
+
+- Requires `system:admin` (enforced by route middleware)
+
+### What Gets Logged (API)
+
+- Configuration routes: raw PUT/save, reset, validate
+- Users routes: create, update, delete
+- Records routes: create, update, delete, status changes
+
+Failures are also logged with `outcome: "failure"` and an error `message`.
 
 ## SDKs and Libraries
 

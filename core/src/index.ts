@@ -43,6 +43,7 @@ export { WorkflowConfigManager } from './config/workflow-config.js';
 export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
+export { AuditLogger } from './audit/audit-logger.js';
 
 // Export utility functions for CLI use
 export async function loadConfig() {

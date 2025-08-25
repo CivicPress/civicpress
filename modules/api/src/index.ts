@@ -22,6 +22,7 @@ import { createStatusRouter } from './routes/status.js';
 import docsRouter from './routes/docs.js';
 import { createValidationRouter } from './routes/validation.js';
 import { createDiffRouter } from './routes/diff.js';
+import { createAuditRouter } from './routes/audit.js';
 import {
   router as usersRouter,
   registrationRouter,
@@ -254,6 +255,13 @@ export class CivicPressAPI {
       configRouter
     );
     this.app.use('/api/v1/system', systemRouter);
+
+    // Activity log (admin-only; behind auth middleware)
+    this.app.use(
+      '/api/v1/audit',
+      authMiddleware(this.civicPress),
+      createAuditRouter()
+    );
 
     // Serve brand assets (logos, favicons, etc.)
     this.app.use(

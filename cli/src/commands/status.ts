@@ -35,6 +35,8 @@ export function statusCommand(cli: CAC) {
       // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
 
+      const coreMod: any = await import('@civicpress/core');
+      const audit = new coreMod.AuditLogger();
       try {
         if (!shouldOutputJson) {
           logger.info(`🔄 Changing status of ${recordName} to ${newStatus}...`);
@@ -446,7 +448,21 @@ export function statusCommand(cli: CAC) {
             )
           );
         }
+        await audit.log({
+          source: 'cli',
+          action: 'record_status_change',
+          target: { type: 'record', name: recordName, path: recordPath },
+          outcome: 'success',
+          metadata: { previousStatus: currentStatus, newStatus },
+        });
       } catch (error) {
+        await audit.log({
+          source: 'cli',
+          action: 'record_status_change',
+          target: { type: 'record', name: recordName },
+          outcome: 'failure',
+          message: error instanceof Error ? error.message : String(error),
+        });
         if (shouldOutputJson) {
           console.log(
             JSON.stringify(

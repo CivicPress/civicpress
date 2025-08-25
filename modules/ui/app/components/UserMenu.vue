@@ -53,13 +53,17 @@ const items = computed<DropdownMenuItem[][]>(() => {
         icon: 'i-lucide-settings',
         children: [
           {
+            label: 'Overview',
+            icon: 'i-lucide-home',
+            onClick: () => navigateTo('/settings'),
+          },
+          {
             label: 'Profile',
             icon: 'i-lucide-user',
             onClick: () => navigateTo('/settings/profile'),
           },
-          // Only show Users link for admin and clerk users
-          ...(authStore.currentUser?.role === 'admin' ||
-          authStore.currentUser?.role === 'clerk'
+          // Show Users when user has users:manage permission
+          ...(authStore.hasPermission('users:manage')
             ? [
                 {
                   label: 'Users',
@@ -68,15 +72,23 @@ const items = computed<DropdownMenuItem[][]>(() => {
                 },
               ]
             : []),
-          // Only show Configuration link when user has config:manage permission
-          ...(authStore.currentUser?.role === 'admin' ||
-          authStore.currentUser?.role === 'clerk' ||
-          authStore.hasPermission('config:manage')
+          // Show Configuration when user has config:manage permission
+          ...(authStore.hasPermission('config:manage')
             ? [
                 {
                   label: 'Configurations',
                   icon: 'i-lucide-sliders-vertical',
                   onClick: () => navigateTo('/settings/configuration'),
+                },
+              ]
+            : []),
+          // Show Activity when user has system:admin permission
+          ...(authStore.hasPermission('system:admin')
+            ? [
+                {
+                  label: 'Activity Log',
+                  icon: 'i-lucide-activity',
+                  onClick: () => navigateTo('/settings/activity'),
                 },
               ]
             : []),

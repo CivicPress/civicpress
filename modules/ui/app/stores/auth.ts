@@ -18,6 +18,7 @@ export interface AuthState {
   sessionExpiresAt: string | null;
   loading: boolean;
   error: string | null;
+  initialized: boolean;
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -30,6 +31,7 @@ export const useAuthStore = defineStore('auth', {
       sessionExpiresAt: null,
       loading: false,
       error: null,
+      initialized: false,
     };
 
     if (process.client) {
@@ -85,12 +87,15 @@ export const useAuthStore = defineStore('auth', {
     currentUser: (state) => state.user,
     isLoggedIn: (state) => state.isAuthenticated && !!state.token,
     hasPermission: (state) => (permission: string) => {
-      return state.user?.permissions?.includes(permission) || false;
+      const perms = state.user?.permissions || [];
+      if (perms.includes('*')) return true;
+      return perms.includes(permission);
     },
     hasRole: (state) => (role: string) => {
       return state.user?.role === role;
     },
     isLoading: (state) => state.loading,
+    isInitialized: (state) => state.initialized,
     authError: (state) => state.error,
   },
 
@@ -325,6 +330,7 @@ export const useAuthStore = defineStore('auth', {
         );
         await this.validateToken();
       }
+      this.initialized = true;
     },
   },
 });
