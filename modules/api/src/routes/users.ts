@@ -5,7 +5,7 @@ import {
   sendSuccess,
   handleApiError,
 } from '../utils/api-logger';
-import { AuditLogger } from '../../../../core/src/audit/audit-logger.js';
+import { AuditLogger } from '@civicpress/core';
 
 const router = express.Router();
 const audit = new AuditLogger();

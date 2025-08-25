@@ -3,7 +3,7 @@ import { configurationService, CentralConfigManager } from '@civicpress/core';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
-import { AuditLogger } from '../../../../core/src/audit/audit-logger.js';
+import { AuditLogger } from '@civicpress/core';
 
 const router = Router();
 const audit = new AuditLogger();

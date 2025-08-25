@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AuditLogger } from '../../../../core/src/audit/audit-logger.js';
+import { AuditLogger } from '@civicpress/core';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
 
 export function createAuditRouter() {

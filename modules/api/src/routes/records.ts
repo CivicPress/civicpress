@@ -7,7 +7,7 @@ import {
 } from '../middleware/auth';
 import { RecordsService } from '../services/records-service';
 import { Logger } from '@civicpress/core';
-import { AuditLogger } from '../../../../core/src/audit/audit-logger.js';
+import { AuditLogger } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
