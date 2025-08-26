@@ -54,6 +54,30 @@ export const useRecordsStore = defineStore('records', {
 
   getters: {
     /**
+     * Facet counts computed from the currently loaded records
+     */
+    facetCounts: (state) => {
+      const counts = {
+        types: {} as Record<string, number>,
+        statuses: {} as Record<string, number>,
+        tags: {} as Record<string, number>,
+      };
+
+      for (const record of state.records) {
+        counts.types[record.type] = (counts.types[record.type] || 0) + 1;
+        counts.statuses[record.status] =
+          (counts.statuses[record.status] || 0) + 1;
+
+        if (Array.isArray(record.metadata?.tags)) {
+          for (const tag of record.metadata.tags) {
+            counts.tags[tag] = (counts.tags[tag] || 0) + 1;
+          }
+        }
+      }
+
+      return counts;
+    },
+    /**
      * Get filtered records (client-side filtering)
      */
     filteredRecords: (state) => {

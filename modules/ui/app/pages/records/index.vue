@@ -1,153 +1,231 @@
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core';
 
-const recordsStore = useRecordsStore()
+const recordsStore = useRecordsStore();
+const { buildQueryFromState, parseQueryToState } = await import(
+  '~/composables/useRecordQueryState'
+);
 
 // Route and router for URL state management
-const route = useRoute()
-const router = useRouter()
+const route = useRoute();
+const router = useRouter();
 
 // Reactive data
-const searchQuery = ref('')
+const searchQuery = ref('');
 const filters = ref({
-    search: '',
-    types: [] as string[],
-    statuses: [] as string[]
-})
+  search: '',
+  types: [] as string[],
+  statuses: [] as string[],
+});
+const sort = ref<
+  'relevance' | 'updated_desc' | 'created_desc' | 'title_asc' | 'title_desc'
+>('relevance');
+const page = ref(1);
 
 // URL state management functions
 const updateURL = () => {
-    const query: any = {}
-
-    if (searchQuery.value) query.search = searchQuery.value
-    if (filters.value.types.length > 0) query.types = filters.value.types.join(',')
-    if (filters.value.statuses.length > 0) query.statuses = filters.value.statuses.join(',')
-
-    navigateTo({ query }, { replace: true })
-}
+  const query = buildQueryFromState({
+    search: searchQuery.value,
+    types: filters.value.types,
+    statuses: filters.value.statuses,
+    page: page.value,
+    sort: sort.value,
+  });
+  navigateTo({ query }, { replace: true });
+};
 
 const restoreFromURL = () => {
-    // Restore search query
-    if (route.query.search) {
-        searchQuery.value = route.query.search as string
-        filters.value.search = route.query.search as string
-    }
-
-    // Restore record types
-    if (route.query.types) {
-        const types = (route.query.types as string).split(',')
-        filters.value.types = types
-    }
-
-    // Restore record statuses
-    if (route.query.statuses) {
-        const statuses = (route.query.statuses as string).split(',')
-        filters.value.statuses = statuses
-    }
-}
+  const state = parseQueryToState(route as any);
+  if (state.search) {
+    searchQuery.value = state.search;
+    filters.value.search = state.search;
+  }
+  if (state.types) filters.value.types = state.types;
+  if (state.statuses) filters.value.statuses = state.statuses;
+  if (state.page) page.value = state.page;
+  if (state.sort) sort.value = state.sort;
+};
 
 // Debounced API search function
 const debouncedApiSearch = useDebounceFn(async (query: string) => {
-    const typeFilter = filters.value.types.length > 0 ? filters.value.types.join(',') : undefined
-    const statusFilter = filters.value.statuses.length > 0 ? filters.value.statuses.join(',') : undefined
+  const typeFilter =
+    filters.value.types.length > 0 ? filters.value.types.join(',') : undefined;
+  const statusFilter =
+    filters.value.statuses.length > 0
+      ? filters.value.statuses.join(',')
+      : undefined;
 
-    // Only search if there's a query, otherwise load initial records
-    if (query && query.trim()) {
-        await recordsStore.searchRecords(query, {
-            type: typeFilter,
-            status: statusFilter,
-        })
-    } else {
-        await recordsStore.loadInitialRecords({
-            type: typeFilter,
-            status: statusFilter,
-        })
-    }
-}, 300)
+  // Only search if there's a query, otherwise load initial records
+  if (query && query.trim()) {
+    await recordsStore.searchRecords(query, {
+      type: typeFilter,
+      status: statusFilter,
+    });
+  } else {
+    await recordsStore.loadInitialRecords({
+      type: typeFilter,
+      status: statusFilter,
+    });
+  }
+}, 300);
 
 // Handle search changes
 const handleSearch = (query: string) => {
-    searchQuery.value = query
-    filters.value.search = query
-    updateURL()
-    debouncedApiSearch(query)
-}
+  searchQuery.value = query;
+  filters.value.search = query;
+  updateURL();
+  debouncedApiSearch(query);
+};
 
 // Handle filter changes
-const handleFilterChange = (newFilters: { search: string, types: string[], statuses: string[] }) => {
-    filters.value = newFilters
-    updateURL()
+const handleFilterChange = (newFilters: {
+  search: string;
+  types: string[];
+  statuses: string[];
+}) => {
+  filters.value = newFilters;
+  page.value = 1;
+  updateURL();
 
-    // Trigger search with new filters
-    const typeFilter = newFilters.types.length > 0 ? newFilters.types.join(',') : undefined
-    const statusFilter = newFilters.statuses.length > 0 ? newFilters.statuses.join(',') : undefined
+  // Trigger search with new filters
+  const typeFilter =
+    newFilters.types.length > 0 ? newFilters.types.join(',') : undefined;
+  const statusFilter =
+    newFilters.statuses.length > 0 ? newFilters.statuses.join(',') : undefined;
 
-    // Only use searchRecords if there's a search query, otherwise use loadInitialRecords
-    if (searchQuery.value && searchQuery.value.trim()) {
-        recordsStore.searchRecords(searchQuery.value, {
-            type: typeFilter,
-            status: statusFilter,
-        })
-    } else {
-        recordsStore.loadInitialRecords({
-            type: typeFilter,
-            status: statusFilter,
-        })
-    }
-}
+  // Only use searchRecords if there's a search query, otherwise use loadInitialRecords
+  if (searchQuery.value && searchQuery.value.trim()) {
+    recordsStore.searchRecords(searchQuery.value, {
+      type: typeFilter,
+      status: statusFilter,
+    });
+  } else {
+    recordsStore.loadInitialRecords({
+      type: typeFilter,
+      status: statusFilter,
+    });
+  }
+};
+
+// Sort handling
+const sortOptions = [
+  { label: 'Relevance', value: 'relevance' },
+  { label: 'Last Updated', value: 'updated_desc' },
+  { label: 'Recently Created', value: 'created_desc' },
+  { label: 'Title A→Z', value: 'title_asc' },
+  { label: 'Title Z→A', value: 'title_desc' },
+];
+
+watch(sort, () => {
+  page.value = 1;
+  updateURL();
+  // Re-run search or load with current filters
+  if (searchQuery.value && searchQuery.value.trim()) {
+    recordsStore.searchRecords(searchQuery.value, {
+      type:
+        filters.value.types.length > 0
+          ? filters.value.types.join(',')
+          : undefined,
+      status:
+        filters.value.statuses.length > 0
+          ? filters.value.statuses.join(',')
+          : undefined,
+    });
+  } else {
+    recordsStore.loadInitialRecords({
+      type:
+        filters.value.types.length > 0
+          ? filters.value.types.join(',')
+          : undefined,
+      status:
+        filters.value.statuses.length > 0
+          ? filters.value.statuses.join(',')
+          : undefined,
+    });
+  }
+});
 
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
-    // Restore state from URL first
-    restoreFromURL()
+  // Restore state from URL first
+  restoreFromURL();
 
-    // Start fetching records immediately
-    await recordsStore.loadInitialRecords({
-        type: filters.value.types.length > 0 ? filters.value.types.join(',') : undefined,
-        status: filters.value.statuses.length > 0 ? filters.value.statuses.join(',') : undefined
-    })
-})
+  // Start fetching records immediately
+  await recordsStore.loadInitialRecords({
+    type:
+      filters.value.types.length > 0
+        ? filters.value.types.join(',')
+        : undefined,
+    status:
+      filters.value.statuses.length > 0
+        ? filters.value.statuses.join(',')
+        : undefined,
+  });
+});
 
 const breadcrumbItems = [
-    {
-        label: 'Records',
-    }
-]
+  {
+    label: 'Records',
+  },
+];
 
 // Breadcrumbs ref for scroll-to-top functionality
-const breadcrumbsRef = ref<HTMLElement>()
+const breadcrumbsRef = ref<HTMLElement>();
 </script>
 
 <template>
-    <UDashboardPanel>
-        <template #header>
-            <UDashboardNavbar>
-                <template #title>
-                    <h1 class="text-lg font-semibold">
-                        Browse Records
-                    </h1>
-                </template>
-                <template #description>
-                    Browse and search through all records
-                </template>
-                <template #right>
-                    <HeaderActions :actions="[
-                        { label: 'Create Record', icon: 'i-lucide-plus', to: '/records/new', color: 'primary' }
-                    ]" />
-                </template>
-            </UDashboardNavbar>
+  <UDashboardPanel>
+    <template #header>
+      <UDashboardNavbar>
+        <template #title>
+          <h1 class="text-lg font-semibold">Browse Records</h1>
         </template>
-
-        <template #body>
-            <div class="space-y-6">
-                <UBreadcrumb ref="breadcrumbsRef" :items="breadcrumbItems" />
-
-                <!-- Search and Filters Component -->
-                <RecordSearch :initial-filters="filters" @search="handleSearch" @filter-change="handleFilterChange" />
-
-                <!-- Records List Component -->
-                <RecordList :filters="filters" :search-query="searchQuery" :breadcrumbs-ref="breadcrumbsRef" />
-            </div>
+        <template #description>
+          Browse and search through all records
         </template>
-    </UDashboardPanel>
+        <template #right>
+          <div class="flex items-center gap-2">
+            <USelectMenu
+              v-model="sort"
+              :items="sortOptions"
+              value-key="value"
+              option-attribute="label"
+              class="w-44"
+            />
+            <HeaderActions
+              :actions="[
+                {
+                  label: 'Create Record',
+                  icon: 'i-lucide-plus',
+                  to: '/records/new',
+                  color: 'primary',
+                },
+              ]"
+            />
+          </div>
+        </template>
+      </UDashboardNavbar>
+    </template>
+
+    <template #body>
+      <div class="space-y-6">
+        <UBreadcrumb ref="breadcrumbsRef" :items="breadcrumbItems" />
+
+        <!-- Search and Filters Component -->
+        <RecordSearch
+          :initial-filters="filters"
+          @search="handleSearch"
+          @filter-change="handleFilterChange"
+        />
+
+        <!-- Records List Component -->
+        <RecordList
+          :filters="filters"
+          :search-query="searchQuery"
+          :breadcrumbs-ref="breadcrumbsRef"
+          :sort="sort"
+        />
+      </div>
+    </template>
+  </UDashboardPanel>
 </template>

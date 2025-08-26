@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'path';
+import { readFileSync, writeFileSync } from 'fs';
+import yaml from 'js-yaml';
 import { CivicPress } from '../../core/src/civic-core.js';
 import { AuthUser } from '../../core/src/auth/auth-service.js';
 import {
@@ -352,6 +354,70 @@ describe('Role-Based Authorization System', () => {
       expect(adminPermissions).toContain('users:manage'); // Admin's own permission
       expect(adminPermissions).toContain('records:view'); // Inherited from public
       expect(adminPermissions.length).toBeGreaterThan(10); // Should have many permissions
+    });
+  });
+
+  describe('Wildcard Permission Handling', () => {
+    it('should grant any permission when role has wildcard "*"', async () => {
+      // Modify roles.yml to add a role with wildcard permission
+      const rolesPath = join(testConfig.civicDir, 'roles.yml');
+      const original = readFileSync(rolesPath, 'utf-8');
+      const doc: any = yaml.load(original);
+
+      doc.roles = doc.roles || {};
+      doc.roles.wildcard = {
+        name: {
+          value: 'Wildcard',
+          type: 'string',
+          description: 'All access',
+          required: true,
+        },
+        description: {
+          value: 'Grants all permissions via *',
+          type: 'string',
+          description: 'All access',
+          required: true,
+        },
+        permissions: {
+          value: ['*'],
+          type: 'array',
+          description: 'All permissions',
+          required: true,
+        },
+        status_transitions: {
+          value: {},
+          type: 'object',
+          description: 'None',
+          required: false,
+        },
+      };
+
+      // Ensure role_hierarchy entry exists (not strictly required, but keeps structure consistent)
+      doc.role_hierarchy = doc.role_hierarchy || {};
+      if (!doc.role_hierarchy.wildcard) {
+        doc.role_hierarchy.wildcard = {
+          value: [],
+          type: 'array',
+          description: 'No inheritance',
+          required: false,
+        };
+      }
+
+      writeFileSync(rolesPath, yaml.dump(doc));
+
+      // Use a user with the wildcard role
+      const wildcardUser: AuthUser = {
+        id: 99,
+        username: 'wildcard-user',
+        role: 'wildcard',
+        email: 'wildcard@example.com',
+        name: 'Wildcard User',
+      };
+
+      // Any arbitrary permission should be granted due to '*'
+      expect(await userCan(wildcardUser, 'nonexistent:permission')).toBe(true);
+      expect(await userCan(wildcardUser, 'templates:manage')).toBe(true);
+      expect(await userCan(wildcardUser, 'records:delete')).toBe(true);
     });
   });
 });
