@@ -662,5 +662,49 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   );
 
+  // GET /api/records/:id/transitions - List allowed transitions for current user
+  router.get(
+    '/:id/transitions',
+    authMiddleware(recordsService.getCivicPress()),
+    param('id').isString().notEmpty(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'list_allowed_transitions' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'list_allowed_transitions',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params as any;
+        const user = req.user as any;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        const allowed = await recordsService.getAllowedTransitions(id, user);
+        sendSuccess({ transitions: allowed }, req, res, {
+          operation: 'list_allowed_transitions',
+        });
+      } catch (error) {
+        handleApiError(
+          'list_allowed_transitions',
+          error,
+          req,
+          res,
+          'Failed to list allowed transitions'
+        );
+      }
+    }
+  );
+
   return router;
 }

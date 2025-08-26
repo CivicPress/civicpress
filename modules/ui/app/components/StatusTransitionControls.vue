@@ -25,14 +25,33 @@ const inlineError = ref<string | null>(null);
 onMounted(async () => {
   try {
     await fetchRecordStatuses();
+    // Fetch allowed transitions for current user/record
+    try {
+      const { $civicApi } = useNuxtApp();
+      const res = (await $civicApi(
+        `/api/v1/records/${props.recordId}/transitions`
+      )) as any;
+      if (res?.success && res?.data?.transitions) {
+        allowedTargets.value = res.data.transitions as string[];
+      }
+    } catch (e) {
+      // Ignore; will fall back to status list
+    }
   } catch (err: any) {
     // handled via statusesError
   }
 });
 
+// Allowed transitions fetched from API, fall back to system status transitions if API call fails
+const allowedTargets = ref<string[] | null>(null);
+
 const availableTargets = computed(() => {
   const options = recordStatusOptions();
-  return options.filter((opt: any) => opt.value !== props.currentStatus);
+  const base = options.filter((opt: any) => opt.value !== props.currentStatus);
+  if (Array.isArray(allowedTargets.value) && allowedTargets.value.length > 0) {
+    return base.filter((opt: any) => allowedTargets.value!.includes(opt.value));
+  }
+  return base;
 });
 
 const openConfirm = (status: string) => {

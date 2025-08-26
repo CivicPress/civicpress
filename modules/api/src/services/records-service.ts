@@ -345,6 +345,26 @@ export class RecordsService {
   }
 
   /**
+   * Get allowed transitions for a record based on current status and user role
+   */
+  async getAllowedTransitions(id: string, user: any): Promise<string[]> {
+    // Get the current record
+    const record = await this.recordManager.getRecord(id);
+    if (!record) {
+      return [];
+    }
+
+    // Compute transitions for the user's role
+    const fromStatus = record.status;
+    const role = user?.role;
+    const allowed = await this.workflowManager.getAvailableTransitions(
+      fromStatus,
+      role
+    );
+    return allowed || [];
+  }
+
+  /**
    * List records with cursor-based pagination
    */
   async listRecords(
