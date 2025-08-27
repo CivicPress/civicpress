@@ -30,6 +30,11 @@ roles:
         - 'hooks:view'
         - 'hooks:manage'
         - 'workflows:manage'
+        - 'storage:upload'
+        - 'storage:download'
+        - 'storage:delete'
+        - 'storage:manage'
+        - 'storage:admin'
       type: 'array'
       description: 'List of permissions granted to this role'
       required: true
@@ -66,6 +71,8 @@ roles:
         - 'users:create'
         - 'users:delete'
         - 'templates:view'
+        - 'storage:upload'
+        - 'storage:download'
       type: 'array'
       description: 'List of permissions granted to this role'
       required: true
@@ -92,6 +99,7 @@ roles:
       value:
         - 'records:view'
         - 'records:list'
+        - 'storage:download'
       type: 'array'
       description: 'List of permissions granted to this role'
       required: true

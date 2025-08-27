@@ -24,6 +24,7 @@ import { createValidationRouter } from './routes/validation.js';
 import { createDiffRouter } from './routes/diff.js';
 import { createAuditRouter } from './routes/audit.js';
 import notificationsRouter from './routes/notifications.js';
+import storageRouter from './routes/storage.js';
 import {
   router as usersRouter,
   registrationRouter,
@@ -313,6 +314,11 @@ export class CivicPressAPI {
       '/api/v1/diff',
       authMiddleware(this.civicPress),
       createDiffRouter()
+    );
+    this.app.use(
+      '/api/v1/storage',
+      authMiddleware(this.civicPress),
+      storageRouter
     );
     this.app.use('/api/v1/users', authMiddleware(this.civicPress), usersRouter);
   }

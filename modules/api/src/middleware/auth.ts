@@ -249,6 +249,71 @@ export function requireRecordPermission(
 }
 
 /**
+ * Storage-specific Authorization Middleware
+ * Checks permissions for storage operations
+ */
+export function requireStoragePermission(
+  action: 'upload' | 'download' | 'delete' | 'manage' | 'admin'
+) {
+  return async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: {
+            message: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+          },
+        });
+        return;
+      }
+
+      // Use our comprehensive userCan() system with context
+      const hasPermission = await userCan(
+        req.user,
+        `storage:${action}` as any,
+        {
+          action: action as any,
+        }
+      );
+
+      if (!hasPermission) {
+        res.status(403).json({
+          success: false,
+          error: {
+            message: `Permission denied: Cannot ${action} storage resources`,
+            code: 'INSUFFICIENT_PERMISSIONS',
+            required: `storage:${action}`,
+            user: {
+              id: req.user.id,
+              username: req.user.username,
+              role: req.user.role,
+            },
+          },
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Storage authorization error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Authorization check failed',
+          code: 'AUTH_ERROR',
+        },
+      });
+      return;
+    }
+  };
+}
+
+/**
  * Optional Authentication Middleware
  * Attaches user if token is valid, but doesn't require it
  */

@@ -163,6 +163,9 @@ importers:
       '@civicpress/core':
         specifier: workspace:*
         version: link:../../core
+      '@civicpress/storage':
+        specifier: workspace:*
+        version: link:../storage
       '@types/bcrypt':
         specifier: 5.0.2
         version: 5.0.2
@@ -196,6 +199,9 @@ importers:
       morgan:
         specifier: ^1.10.0
         version: 1.10.0
+      multer:
+        specifier: ^1.4.5-lts.1
+        version: 1.4.5-lts.2
       swagger-ui-express:
         specifier: 5.0.1
         version: 5.0.1(express@4.21.2)
@@ -215,6 +221,9 @@ importers:
       '@types/morgan':
         specifier: ^1.9.9
         version: 1.9.10
+      '@types/multer':
+        specifier: ^1.4.11
+        version: 1.4.13
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
@@ -5283,7 +5292,7 @@ packages:
       '@vitest/spy': 3.2.4
       estree-walker: 3.0.3
       magic-string: 0.30.17
-      vite: 7.0.4(jiti@2.4.2)(yaml@2.8.1)
+      vite: 7.0.4(tsx@4.20.3)(yaml@2.8.1)
 
   /@vitest/pretty-format@3.2.4:
     resolution: {integrity: sha512-IVNZik8IVRJRTr9fxlitMKeJeXFFFN0JaB9PHPGQ8NKQbGpfjlTx9zO4RefN8gp7eqjNy8nyK3NZmBzOPeIxtA==}
@@ -13947,7 +13956,6 @@ packages:
       get-tsconfig: 4.10.1
     optionalDependencies:
       fsevents: 2.3.3
-    dev: true
 
   /tunnel-agent@0.6.0:
     resolution: {integrity: sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==}
@@ -14762,7 +14770,6 @@ packages:
       yaml: 2.8.1
     optionalDependencies:
       fsevents: 2.3.3
-    dev: true
 
   /vitest-environment-nuxt@1.0.1(@vitest/ui@3.2.4)(typescript@5.8.3)(vitest@3.2.4):
     resolution: {integrity: sha512-eBCwtIQriXW5/M49FjqNKfnlJYlG2LWMSNFsRVKomc8CaMqmhQPBS5LZ9DlgYL9T8xIVsiA6RZn2lk7vxov3Ow==}
