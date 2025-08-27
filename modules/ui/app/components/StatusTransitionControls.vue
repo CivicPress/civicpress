@@ -81,7 +81,9 @@ const confirmChange = async () => {
         newStatus: pendingStatus.value,
         record: response.data?.record,
       });
+      // Close modal and reset state
       showConfirm.value = false;
+      pendingStatus.value = null;
     } else {
       inlineError.value =
         response?.error?.message ||
@@ -122,6 +124,12 @@ const confirmChange = async () => {
       />
 
       <div class="flex flex-wrap gap-2" v-if="!statusesLoading">
+        <!-- Debug info -->
+        <div class="w-full text-xs text-gray-500 mb-2">
+          Debug: {{ availableTargets.length }} available transitions, current:
+          {{ currentStatus }}
+        </div>
+
         <UButton
           v-for="opt in availableTargets"
           :key="opt.value"
