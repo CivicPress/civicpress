@@ -94,11 +94,6 @@ const confirmChange = async () => {
     saving.value = false;
   }
 };
-
-const cancelChange = () => {
-  showConfirm.value = false;
-  pendingStatus.value = null;
-};
 </script>
 
 <template>
@@ -149,22 +144,50 @@ const cancelChange = () => {
       </div>
     </div>
 
-    <UModal v-model="showConfirm" title="Confirm Status Change">
-      <template #default>
-        <p class="text-sm text-gray-600 dark:text-gray-300">
-          Change status to
-          <strong>{{ getStatusLabel(pendingStatus || '') }}</strong
-          >? This will validate the workflow transition.
-        </p>
+    <UModal
+      v-model="showConfirm"
+      title="Confirm Status Change"
+      description="Are you sure you want to change the record status? This will validate the workflow transition."
+    >
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-gray-700 dark:text-gray-300">
+            Change status to
+            <strong>{{ getStatusLabel(pendingStatus || '') }}</strong
+            >?
+          </p>
+
+          <div
+            class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4"
+          >
+            <div class="flex items-start space-x-3">
+              <UIcon
+                name="i-lucide-info"
+                class="w-5 h-5 text-blue-600 mt-0.5"
+              />
+              <div class="text-sm text-blue-700 dark:text-blue-300">
+                <p class="font-medium">Workflow Validation:</p>
+                <ul class="mt-1 space-y-1">
+                  <li>
+                    • Status change will be validated against workflow rules
+                  </li>
+                  <li>• All transitions are logged with user attribution</li>
+                  <li>• Previous status will be preserved in history</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="outline" @click="cancelChange"
-            >Cancel</UButton
-          >
-          <UButton :loading="saving" color="primary" @click="confirmChange"
-            >Confirm</UButton
-          >
+
+      <template #footer="{ close }">
+        <div class="flex justify-end space-x-3">
+          <UButton color="neutral" variant="outline" @click="close">
+            Cancel
+          </UButton>
+          <UButton :loading="saving" color="primary" @click="confirmChange">
+            Confirm Change
+          </UButton>
         </div>
       </template>
     </UModal>
