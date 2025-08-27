@@ -3,8 +3,6 @@
     "target": "ES2022",
     "module": "Node16",
     "lib": ["ES2022"],
-    "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -16,9 +14,15 @@
     "resolveJsonModule": true,
     "moduleResolution": "node16",
     "types": ["node"],
-    "moduleDetection": "force",
-    "composite": true
+    "moduleDetection": "force"
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "references": [
+    { "path": "./core" },
+    { "path": "./cli" },
+    { "path": "./modules/api" },
+    { "path": "./modules/ui" },
+    { "path": "./modules/storage" }
+  ],
+  "files": [],
+  "include": []
 }
