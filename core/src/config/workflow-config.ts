@@ -115,9 +115,27 @@ export class WorkflowConfigManager {
     }
 
     if (!allowedTransitions.includes(toStatus)) {
+      const transitionsText =
+        allowedTransitions.length > 0
+          ? allowedTransitions.join(', ')
+          : 'none (final status)';
+
+      // Check if this might be a typo (e.g., "review" instead of "reviewed")
+      const availableStatuses = await this.getAvailableStatuses();
+      const similarStatus = availableStatuses.find(
+        (status) =>
+          status.toLowerCase().includes(toStatus.toLowerCase()) ||
+          toStatus.toLowerCase().includes(status.toLowerCase())
+      );
+
+      const suggestion =
+        similarStatus && similarStatus !== toStatus
+          ? ` Did you mean '${similarStatus}'?`
+          : '';
+
       return {
         valid: false,
-        reason: `Transition from '${fromStatus}' to '${toStatus}' is not allowed. Allowed transitions: ${allowedTransitions.join(', ')}`,
+        reason: `Transition from '${fromStatus}' to '${toStatus}' is not allowed. Allowed transitions: ${transitionsText}.${suggestion}`,
       };
     }
 
@@ -327,6 +345,12 @@ export class WorkflowConfigManager {
         }
         roleTransitions = [...roleTransitions, ...anyTransitions];
       }
+    }
+
+    // Return the intersection of all possible transitions and role-allowed transitions
+    // If no role restrictions, return all transitions
+    if (roleTransitions.length === 0) {
+      return allTransitions;
     }
 
     return allTransitions.filter((transition) =>
