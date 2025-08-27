@@ -37,6 +37,8 @@ provides:
 
 - **Markdown Schema**: YAML+Markdown with validation
 - **Lifecycle Management**: Draft → Proposed → Approved → Archived flow
+- **Status Transition Controls**: Web UI for managing record status changes with
+  workflow validation
 - **Bulk Operations**: Efficient bulk record operations
 - **Search & Discovery**: Advanced indexing and search
 - **Validation System**: Comprehensive record validation and integrity
@@ -50,6 +52,14 @@ provides:
 - **Civic Modules**: Specialized modules for legal register, voting, feedback
 - **Advanced Security**: Cryptographic signatures and verification
 - **Multi-tenant Support**: Support for multiple municipalities
+
+### ✅ Workflow Features (Implemented)
+
+- **Status Transition Controls**: Web UI for managing record status changes
+- **Role-Based Permissions**: Granular control over who can change record status
+- **Workflow Validation**: Automatic enforcement of status transition rules
+- **Smart Error Handling**: Helpful error messages with typo suggestions
+- **Audit Trail**: Complete logging of all status changes with user attribution
 
 ## Quick Start
 
@@ -84,7 +94,7 @@ civic init --demo-data "Springfield"
 civic init --config config.yml
 ```
 
-### Development
+### Development Commands
 
 CivicPress provides multiple development commands for different workflows:
 
@@ -102,7 +112,7 @@ pnpm run dev:all:watch
 pnpm run dev:parallel
 ```
 
-### Authentication
+### CLI Authentication
 
 CivicPress supports multiple authentication methods:
 
@@ -219,7 +229,7 @@ pnpm run test:run tests/cli/users.test.ts
 pnpm run test:watch
 ```
 
-### Development Commands
+### Build & Development Commands
 
 ```bash
 # Build all packages
@@ -330,4 +340,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Built with ❤️ for better governance**
+Built with ❤️ for better governance
