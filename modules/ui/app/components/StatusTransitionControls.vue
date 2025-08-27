@@ -55,9 +55,13 @@ const availableTargets = computed(() => {
 });
 
 const openConfirm = (status: string) => {
+  console.log('openConfirm called with status:', status);
+  console.log('Current showConfirm value:', showConfirm.value);
   inlineError.value = null;
   pendingStatus.value = status;
   showConfirm.value = true;
+  console.log('New showConfirm value:', showConfirm.value);
+  console.log('New pendingStatus value:', pendingStatus.value);
 };
 
 const confirmChange = async () => {
@@ -127,7 +131,9 @@ const confirmChange = async () => {
         <!-- Debug info -->
         <div class="w-full text-xs text-gray-500 mb-2">
           Debug: {{ availableTargets.length }} available transitions, current:
-          {{ currentStatus }}
+          {{ currentStatus }}<br />
+          showConfirm: {{ showConfirm }}, pendingStatus: {{ pendingStatus }},
+          saving: {{ saving }}
         </div>
 
         <UButton
@@ -158,6 +164,12 @@ const confirmChange = async () => {
       description="Are you sure you want to change the record status? This will validate the workflow transition."
     >
       <template #body>
+        <!-- Debug modal state -->
+        <div class="text-xs text-red-500 mb-2">
+          Modal Debug: showConfirm={{ showConfirm }}, pendingStatus={{
+            pendingStatus
+          }}
+        </div>
         <div class="space-y-4">
           <p class="text-gray-700 dark:text-gray-300">
             Change status to
