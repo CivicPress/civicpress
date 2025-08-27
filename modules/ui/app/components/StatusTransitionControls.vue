@@ -2,6 +2,7 @@
 interface Props {
   recordId: string;
   currentStatus: string;
+  userCanChangeStatus?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -23,6 +24,11 @@ const saving = ref(false);
 const inlineError = ref<string | null>(null);
 
 onMounted(async () => {
+  // Only proceed if user has permission to change status
+  if (!props.userCanChangeStatus) {
+    return;
+  }
+
   try {
     await fetchRecordStatuses();
     // Fetch allowed transitions for current user/record
@@ -54,14 +60,20 @@ const availableTargets = computed(() => {
   return base;
 });
 
+// Only show component if user has permission to change status
+const shouldShowComponent = computed(() => {
+  return props.userCanChangeStatus === true;
+});
+
+// Show different content based on permission
+const showStatusTransitions = computed(() => {
+  return props.userCanChangeStatus === true;
+});
+
 const openConfirm = (status: string) => {
-  console.log('openConfirm called with status:', status);
-  console.log('Current showConfirm value:', showConfirm.value);
   inlineError.value = null;
   pendingStatus.value = status;
   showConfirm.value = true;
-  console.log('New showConfirm value:', showConfirm.value);
-  console.log('New pendingStatus value:', pendingStatus.value);
 };
 
 const confirmChange = async () => {
@@ -103,7 +115,7 @@ const confirmChange = async () => {
 </script>
 
 <template>
-  <div class="rounded-lg border">
+  <div v-if="shouldShowComponent" class="rounded-lg border">
     <div class="border-b px-6 py-4 flex items-center justify-between">
       <h2 class="text-lg font-semibold">Status Transitions</h2>
       <UBadge :color="getStatusColor(currentStatus) as any" variant="soft">
@@ -127,15 +139,10 @@ const confirmChange = async () => {
         icon="i-lucide-alert-triangle"
       />
 
-      <div class="flex flex-wrap gap-2" v-if="!statusesLoading">
-        <!-- Debug info -->
-        <div class="w-full text-xs text-gray-500 mb-2">
-          Debug: {{ availableTargets.length }} available transitions, current:
-          {{ currentStatus }}<br />
-          showConfirm: {{ showConfirm }}, pendingStatus: {{ pendingStatus }},
-          saving: {{ saving }}
-        </div>
-
+      <div
+        v-if="showStatusTransitions && !statusesLoading"
+        class="flex flex-wrap gap-2"
+      >
         <UButton
           v-for="opt in availableTargets"
           :key="opt.value"
@@ -152,24 +159,25 @@ const confirmChange = async () => {
         >
       </div>
 
-      <div v-else class="text-sm text-gray-500 flex items-center gap-2">
+      <div v-else-if="!statusesLoading" class="text-sm text-gray-500">
+        <p>You don't have permission to change record status.</p>
+      </div>
+
+      <div
+        v-else-if="statusesLoading"
+        class="text-sm text-gray-500 flex items-center gap-2"
+      >
         <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" /> Loading
         statuses...
       </div>
     </div>
 
     <UModal
-      v-model="showConfirm"
+      v-model:open="showConfirm"
       title="Confirm Status Change"
       description="Are you sure you want to change the record status? This will validate the workflow transition."
     >
       <template #body>
-        <!-- Debug modal state -->
-        <div class="text-xs text-red-500 mb-2">
-          Modal Debug: showConfirm={{ showConfirm }}, pendingStatus={{
-            pendingStatus
-          }}
-        </div>
         <div class="space-y-4">
           <p class="text-gray-700 dark:text-gray-300">
             Change status to

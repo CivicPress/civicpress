@@ -295,154 +295,158 @@ const removeTag = (tag: string) => {
   <div class="space-y-6">
     <!-- Form + Preview -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Title -->
-      <UFormField
-        label="Title"
-        required
-        :error="hasSubmitted && formErrors.title ? formErrors.title : undefined"
-      >
-        <UInput
-          v-model="form.title"
-          placeholder="Enter record title"
-          :disabled="saving"
-          class="w-full"
-        />
-      </UFormField>
-
-      <!-- Record Type -->
-      <UFormField
-        label="Record Type"
-        required
-        :error="hasSubmitted && formErrors.type ? formErrors.type : undefined"
-      >
-        <USelectMenu
-          v-model="selectedRecordType"
-          :items="recordTypeOptionsComputed"
-          placeholder="Select record type"
-          :disabled="saving || props.recordType !== null"
-          class="w-full"
-        />
-      </UFormField>
-
-      <!-- Template Selection (only for new records) -->
-      <UFormField
-        v-if="!props.isEditing && form.type"
-        label="Template"
-        :error="
-          hasSubmitted && formErrors.template ? formErrors.template : undefined
-        "
-      >
-        <USelectMenu
-          v-model="selectedTemplate"
-          :items="templateOptionsComputed"
-          placeholder="Select a template (optional)"
-          :disabled="saving"
-          class="w-full"
-        />
-        <template #help>
-          <p class="text-sm text-gray-600">
-            Choose a template to pre-populate the record content. You can modify
-            the content after selection.
-          </p>
-        </template>
-      </UFormField>
-
-      <!-- Status -->
-      <UFormField
-        label="Status"
-        required
-        :error="
-          hasSubmitted && formErrors.status ? formErrors.status : undefined
-        "
-      >
-        <USelectMenu
-          v-model="selectedRecordStatus"
-          :items="recordStatusOptionsComputed"
-          placeholder="Select status"
-          :disabled="saving"
-          class="w-full"
-        />
-      </UFormField>
-
-      <!-- Description -->
-      <UFormField
-        label="Description"
-        :error="
-          hasSubmitted && formErrors.description
-            ? formErrors.description
-            : undefined
-        "
-      >
-        <UTextarea
-          v-model="form.description"
-          placeholder="Enter record description (optional)"
-          :disabled="saving"
-          :rows="3"
-          class="w-full"
-        />
-      </UFormField>
-
-      <!-- Tags -->
-      <UFormField
-        label="Tags"
-        :error="hasSubmitted && formErrors.tags ? formErrors.tags : undefined"
-      >
-        <div class="space-y-2 w-full">
-          <UInput
-            v-model="newTag"
-            placeholder="Add a tag and press Enter"
-            :disabled="saving"
-            @keyup.enter="
-              addTag(newTag);
-              newTag = '';
-            "
-            class="w-full"
-          />
-          <div v-if="form.tags.length > 0" class="flex flex-wrap gap-2">
-            <UBadge
-              v-for="tag in form.tags"
-              :key="tag"
-              color="primary"
-              variant="soft"
-              size="sm"
-            >
-              {{ tag }}
-              <UButton
-                icon="i-lucide-x"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                @click="removeTag(tag)"
-              />
-            </UBadge>
-          </div>
-        </div>
-      </UFormField>
-
-      <!-- Content -->
-      <div class="space-y-2">
+      <div>
+        <!-- Title -->
         <UFormField
-          label="Content"
+          label="Title"
           required
           :error="
-            hasSubmitted && formErrors.content ? formErrors.content : undefined
+            hasSubmitted && formErrors.title ? formErrors.title : undefined
+          "
+        >
+          <UInput
+            v-model="form.title"
+            placeholder="Enter record title"
+            :disabled="saving"
+            class="w-full"
+          />
+        </UFormField>
+
+        <!-- Record Type -->
+        <UFormField
+          label="Record Type"
+          required
+          :error="hasSubmitted && formErrors.type ? formErrors.type : undefined"
+        >
+          <USelectMenu
+            v-model="selectedRecordType"
+            :items="recordTypeOptionsComputed"
+            placeholder="Select record type"
+            :disabled="saving || props.recordType !== null"
+            class="w-full"
+          />
+        </UFormField>
+
+        <!-- Template Selection (only for new records) -->
+        <UFormField
+          v-if="!props.isEditing && form.type"
+          label="Template"
+          :error="
+            hasSubmitted && formErrors.template
+              ? formErrors.template
+              : undefined
+          "
+        >
+          <USelectMenu
+            v-model="selectedTemplate"
+            :items="templateOptionsComputed"
+            placeholder="Select a template (optional)"
+            :disabled="saving"
+            class="w-full"
+          />
+          <template #help>
+            <p class="text-sm text-gray-600">
+              Choose a template to pre-populate the record content. You can
+              modify the content after selection.
+            </p>
+          </template>
+        </UFormField>
+
+        <!-- Status -->
+        <UFormField
+          label="Status"
+          required
+          :error="
+            hasSubmitted && formErrors.status ? formErrors.status : undefined
+          "
+        >
+          <USelectMenu
+            v-model="selectedRecordStatus"
+            :items="recordStatusOptionsComputed"
+            placeholder="Select status"
+            :disabled="saving"
+            class="w-full"
+          />
+        </UFormField>
+
+        <!-- Description -->
+        <UFormField
+          label="Description"
+          :error="
+            hasSubmitted && formErrors.description
+              ? formErrors.description
+              : undefined
           "
         >
           <UTextarea
-            v-model="form.content"
-            placeholder="Enter the record content"
+            v-model="form.description"
+            placeholder="Enter record description (optional)"
             :disabled="saving"
-            :rows="18"
-            class="font-mono w-full"
+            :rows="3"
+            class="w-full"
           />
         </UFormField>
-        <div class="flex items-center gap-2">
-          <UBadge color="neutral" variant="subtle">Live Preview</UBadge>
+
+        <!-- Tags -->
+        <UFormField
+          label="Tags"
+          :error="hasSubmitted && formErrors.tags ? formErrors.tags : undefined"
+        >
+          <div class="space-y-2 w-full">
+            <UInput
+              v-model="newTag"
+              placeholder="Add a tag and press Enter"
+              :disabled="saving"
+              @keyup.enter="
+                addTag(newTag);
+                newTag = '';
+              "
+              class="w-full"
+            />
+            <div v-if="form.tags.length > 0" class="flex flex-wrap gap-2">
+              <UBadge
+                v-for="tag in form.tags"
+                :key="tag"
+                color="primary"
+                variant="soft"
+                size="sm"
+              >
+                {{ tag }}
+                <UButton
+                  icon="i-lucide-x"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  @click="removeTag(tag)"
+                />
+              </UBadge>
+            </div>
+          </div>
+        </UFormField>
+
+        <!-- Content -->
+        <div class="space-y-2">
+          <UFormField
+            label="Content"
+            required
+            :error="
+              hasSubmitted && formErrors.content
+                ? formErrors.content
+                : undefined
+            "
+          >
+            <UTextarea
+              v-model="form.content"
+              placeholder="Enter the record content"
+              :disabled="saving"
+              :rows="18"
+              class="font-mono w-full"
+            />
+          </UFormField>
         </div>
       </div>
-
       <!-- Preview Pane (right column on lg+) -->
-      <div class="hidden lg:block">
+      <div class="">
         <UCard>
           <template #header>
             <div class="flex items-center justify-between">
@@ -454,20 +458,6 @@ const removeTag = (tag: string) => {
           </div>
         </UCard>
       </div>
-    </div>
-
-    <!-- Preview Pane (stacked on small screens) -->
-    <div class="lg:hidden">
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-medium">Preview</span>
-          </div>
-        </template>
-        <div class="p-2">
-          <RecordPreview :content="form.content" :wrap="true" />
-        </div>
-      </UCard>
     </div>
 
     <!-- Form Actions -->

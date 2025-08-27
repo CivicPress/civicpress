@@ -348,6 +348,7 @@ const handleStatusChanged = (payload: { newStatus: string; record?: any }) => {
           v-if="record"
           :record-id="record.id"
           :current-status="record.status"
+          :user-can-change-status="authStore.hasPermission('records:status')"
           @changed="handleStatusChanged"
         />
       </div>
