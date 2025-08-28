@@ -1,4 +1,4 @@
-export default defineNuxtPlugin((nuxtApp) => {
+export default defineNuxtPlugin(async (nuxtApp) => {
   // Import auth store for notifications
   const { useAuthStore } = await import('~/stores/auth');
   const civicApi = $fetch.create({
