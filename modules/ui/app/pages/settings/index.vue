@@ -38,6 +38,15 @@ const settingsItems = computed<NavigationMenuItem[]>(() => {
     });
   }
 
+  if (authStore.hasPermission('storage:manage')) {
+    items.push({
+      label: 'Storage',
+      icon: 'i-lucide-hard-drive',
+      to: '/settings/storage',
+      description: 'Manage file storage and media files',
+    });
+  }
+
   if (authStore.hasPermission('system:admin')) {
     items.push({
       label: 'Activity Log',

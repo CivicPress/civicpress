@@ -1,53 +1,147 @@
 <template>
   <div class="media-player">
     <!-- Video Player -->
-    <video
-      v-if="isVideo"
-      ref="videoPlayer"
-      class="w-full rounded-lg"
-      controls
-      preload="metadata"
-      @loadedmetadata="onMediaLoaded"
-      @error="onMediaError"
-    >
-      <source :src="fileUrl" :type="file.mime_type" />
-      Your browser does not support video playback.
-    </video>
+    <div v-if="isVideo" class="video-player">
+      <div v-if="videoData" class="video-container">
+        <video
+          ref="videoPlayer"
+          class="w-full rounded-lg"
+          controls
+          preload="metadata"
+          @loadedmetadata="onMediaLoaded"
+          @error="onMediaError"
+        >
+          <source :src="videoData" :type="file.mime_type" />
+          Your browser does not support video playback.
+        </video>
+      </div>
+      <div v-else-if="loading" class="loading-container">
+        <div class="flex items-center justify-center py-8">
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-8 h-8 text-gray-400 animate-spin mr-3"
+          />
+          <span class="text-gray-500">Loading video...</span>
+        </div>
+      </div>
+      <div v-else-if="error" class="error-container">
+        <div class="text-center py-8">
+          <UIcon
+            name="i-lucide-alert-circle"
+            class="w-12 h-12 text-red-400 mx-auto mb-3"
+          />
+          <p class="text-red-600">{{ error }}</p>
+          <UButton @click="loadVideo" size="sm" variant="outline" class="mt-3">
+            <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
+            Retry
+          </UButton>
+        </div>
+      </div>
+    </div>
 
     <!-- Audio Player -->
-    <audio
-      v-else-if="isAudio"
-      ref="audioPlayer"
-      class="w-full"
-      controls
-      preload="metadata"
-      @loadedmetadata="onMediaLoaded"
-      @error="onMediaError"
-    >
-      <source :src="fileUrl" :type="file.mime_type" />
-      Your browser does not support audio playback.
-    </audio>
+    <div v-else-if="isAudio" class="audio-player">
+      <div v-if="audioData" class="audio-container">
+        <audio
+          ref="audioPlayer"
+          class="w-full"
+          controls
+          preload="metadata"
+          @loadedmetadata="onMediaLoaded"
+          @error="onMediaError"
+        >
+          <source :src="audioData" :type="file.mime_type" />
+          Your browser does not support audio playback.
+        </audio>
+      </div>
+      <div v-else-if="loading" class="loading-container">
+        <div class="flex items-center justify-center py-8">
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-8 h-8 text-gray-400 animate-spin mr-3"
+          />
+          <span class="text-gray-500">Loading audio...</span>
+        </div>
+      </div>
+      <div v-else-if="error" class="error-container">
+        <div class="text-center py-8">
+          <UIcon
+            name="i-lucide-alert-circle"
+            class="w-12 h-12 text-red-400 mx-auto mb-3"
+          />
+          <p class="text-red-600">{{ error }}</p>
+          <UButton @click="loadAudio" size="sm" variant="outline" class="mt-3">
+            <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
+            Retry
+          </UButton>
+        </div>
+      </div>
+    </div>
 
     <!-- PDF Viewer -->
     <div v-else-if="isPDF" class="pdf-viewer">
-      <iframe
-        :src="fileUrl"
-        class="w-full h-96 border rounded-lg"
-        frameborder="0"
-        @load="onMediaLoaded"
-        @error="onMediaError"
-      ></iframe>
+      <div v-if="pdfData" class="pdf-container">
+        <iframe
+          :src="pdfData"
+          class="w-full h-96 border rounded-lg"
+          frameborder="0"
+        />
+      </div>
+      <div v-else-if="loading" class="loading-container">
+        <div class="flex items-center justify-center py-8">
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-8 h-8 text-gray-400 animate-spin mr-3"
+          />
+          <span class="text-gray-500">Loading PDF...</span>
+        </div>
+      </div>
+      <div v-else-if="error" class="error-container">
+        <div class="text-center py-8">
+          <UIcon
+            name="i-lucide-alert-circle"
+            class="w-12 h-12 text-red-400 mx-auto mb-3"
+          />
+          <p class="text-red-600">{{ error }}</p>
+          <UButton @click="loadPDF" size="sm" variant="outline" class="mt-3">
+            <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
+            Retry
+          </UButton>
+        </div>
+      </div>
     </div>
 
     <!-- Image Viewer -->
     <div v-else-if="isImage" class="image-viewer">
-      <img
-        :src="fileUrl"
-        :alt="file.name"
-        class="w-full h-auto max-h-96 object-contain rounded-lg"
-        @load="onMediaLoaded"
-        @error="onMediaError"
-      />
+      <div v-if="computedImageUrl" class="image-container">
+        <img
+          :src="computedImageUrl"
+          :alt="file.name"
+          class="w-full h-auto max-h-96 object-contain rounded-lg"
+        />
+      </div>
+      <div v-else-if="loading" class="loading-container">
+        <div class="flex items-center justify-center py-8">
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-8 h-8 text-gray-400 animate-spin mr-3"
+          />
+          <span class="text-gray-500">Loading image...</span>
+        </div>
+      </div>
+      <div v-else-if="error" class="error-container">
+        <div class="text-center py-8">
+          <UIcon
+            name="i-lucide-alert-circle"
+            class="w-12 h-12 text-red-400 mx-auto mb-3"
+          />
+          <p class="text-red-600">{{ error }}</p>
+          <UButton @click="loadImage" size="sm" variant="outline" class="mt-3">
+            <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
+            Retry
+          </UButton>
+        </div>
+      </div>
     </div>
 
     <!-- Unsupported File Type -->
@@ -63,98 +157,6 @@
         <p class="text-gray-500 mb-4">
           This file type cannot be previewed in the browser.
         </p>
-        <UButton @click="downloadFile" color="primary">
-          <UIcon name="i-lucide-download" class="w-4 h-4 mr-2" />
-          Download to view
-        </UButton>
-      </div>
-    </div>
-
-    <!-- File Information -->
-    <div class="file-info mt-6">
-      <div class="bg-gray-50 rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-gray-900 mb-3">
-          {{ file.name }}
-        </h3>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span class="font-medium text-gray-700">Size:</span>
-            <p class="text-gray-600">{{ formatFileSize(file.size) }}</p>
-          </div>
-
-          <div>
-            <span class="font-medium text-gray-700">Type:</span>
-            <p class="text-gray-600">{{ file.mime_type }}</p>
-          </div>
-
-          <div>
-            <span class="font-medium text-gray-700">Uploaded:</span>
-            <p class="text-gray-600">{{ formatDate(file.created) }}</p>
-          </div>
-
-          <div>
-            <span class="font-medium text-gray-700">Modified:</span>
-            <p class="text-gray-600">{{ formatDate(file.modified) }}</p>
-          </div>
-        </div>
-
-        <!-- Media Controls (for video/audio) -->
-        <div
-          v-if="isVideo || isAudio"
-          class="media-controls mt-4 pt-4 border-t border-gray-200"
-        >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <UButton size="sm" variant="outline" @click="togglePlayPause">
-                <UIcon
-                  :name="isPlaying ? 'i-lucide-pause' : 'i-lucide-play'"
-                  class="w-4 h-4"
-                />
-                {{ isPlaying ? 'Pause' : 'Play' }}
-              </UButton>
-
-              <UButton size="sm" variant="outline" @click="stopMedia">
-                <UIcon name="i-lucide-square" class="w-4 h-4" />
-                Stop
-              </UButton>
-            </div>
-
-            <div class="flex items-center space-x-2">
-              <UButton size="sm" variant="outline" @click="setVolume(0.5)">
-                <UIcon name="i-lucide-volume-2" class="w-4 h-4" />
-                50%
-              </UButton>
-
-              <UButton size="sm" variant="outline" @click="setVolume(1)">
-                <UIcon name="i-lucide-volume-x" class="w-4 h-4" />
-                Mute
-              </UButton>
-            </div>
-          </div>
-
-          <!-- Progress Bar -->
-          <div class="mt-3">
-            <div class="flex items-center space-x-2 text-xs text-gray-500">
-              <span>{{ formatTime(currentTime) }}</span>
-              <div class="flex-1 bg-gray-200 rounded-full h-2">
-                <div
-                  class="bg-blue-500 h-2 rounded-full transition-all duration-100"
-                  :style="{ width: `${progressPercent}%` }"
-                ></div>
-              </div>
-              <span>{{ formatTime(duration) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Download Button -->
-        <div class="mt-4 pt-4 border-t border-gray-200">
-          <UButton @click="downloadFile" color="primary" class="w-full">
-            <UIcon name="i-lucide-download" class="w-4 h-4 mr-2" />
-            Download {{ file.name }}
-          </UButton>
-        </div>
       </div>
     </div>
 
@@ -171,14 +173,14 @@
 
     <!-- Error State -->
     <div v-if="error" class="error-state mt-4">
-      <UAlert color="red" variant="soft">
+      <UAlert color="error" variant="soft">
         <template #title>Failed to load media</template>
         <template #description>
           {{ error }}
           <UButton
             size="sm"
             variant="ghost"
-            color="red"
+            color="error"
             @click="retryLoad"
             class="ml-2"
           >
@@ -191,8 +193,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
-import { useToast } from '@/composables/useToast';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { useAuthStore } from '@/stores/auth';
 
 // Props
 interface Props {
@@ -205,28 +207,20 @@ interface Props {
     created: string;
     modified: string;
   };
+  folder?: string;
 }
 
 const props = defineProps<Props>();
-
-// Composables
-const toast = useToast();
 
 // Refs
 const videoPlayer = ref<HTMLVideoElement>();
 const audioPlayer = ref<HTMLAudioElement>();
 const loading = ref(true);
 const error = ref<string | null>(null);
-const isPlaying = ref(false);
-const currentTime = ref(0);
-const duration = ref(0);
-
-// Computed
-const fileUrl = computed(() => {
-  // In a real implementation, this would be the actual file URL
-  // For now, we'll construct it from the API
-  return `/api/v1/storage/download/${getFolderFromPath(props.file.path)}/${encodeURIComponent(props.file.name)}`;
-});
+const imageData = ref<string | null>(null);
+const pdfData = ref<string | null>(null);
+const videoData = ref<string | null>(null);
+const audioData = ref<string | null>(null);
 
 const isVideo = computed(() => {
   return props.file.mime_type.startsWith('video/');
@@ -244,155 +238,95 @@ const isImage = computed(() => {
   return props.file.mime_type.startsWith('image/');
 });
 
-const progressPercent = computed(() => {
-  if (duration.value === 0) return 0;
-  return (currentTime.value / duration.value) * 100;
+// Computed image URL for better reactivity
+const computedImageUrl = computed(() => {
+  return imageData.value;
 });
 
 // Methods
-const getFolderFromPath = (path: string): string => {
-  // Extract folder from path like "storage/public/filename.ext"
+const extractFolderFromPath = (path: string): string => {
+  // Extract folder from full system path like "/Users/.../data/storage/public/filename.ext"
+  // or from relative path like "storage/public/filename.ext"
   const parts = path.split('/');
-  return parts[1] || 'public';
+
+  // Look for "storage" in the path and get the next part as folder
+  const storageIndex = parts.findIndex((part) => part === 'storage');
+  if (storageIndex !== -1 && storageIndex + 1 < parts.length) {
+    const folder = parts[storageIndex + 1] || 'public';
+    return folder;
+  }
+
+  // Fallback: look for common storage folder names
+  const storageFolders = [
+    'public',
+    'private',
+    'documents',
+    'images',
+    'videos',
+    'audio',
+  ];
+  for (const folder of storageFolders) {
+    if (parts.includes(folder)) {
+      return folder;
+    }
+  }
+
+  // Default fallback
+  return 'public';
 };
 
 const onMediaLoaded = () => {
   loading.value = false;
   error.value = null;
-
-  if (isVideo.value && videoPlayer.value) {
-    duration.value = videoPlayer.value.duration || 0;
-    setupVideoEvents();
-  } else if (isAudio.value && audioPlayer.value) {
-    duration.value = audioPlayer.value.duration || 0;
-    setupAudioEvents();
-  }
 };
 
 const onMediaError = (e: Event) => {
   loading.value = false;
   error.value = 'Failed to load media file';
-  console.error('Media error:', e);
 };
 
-const setupVideoEvents = () => {
-  if (!videoPlayer.value) return;
-
-  const video = videoPlayer.value;
-
-  video.addEventListener('play', () => {
-    isPlaying.value = true;
-  });
-
-  video.addEventListener('pause', () => {
-    isPlaying.value = false;
-  });
-
-  video.addEventListener('ended', () => {
-    isPlaying.value = false;
-    currentTime.value = 0;
-  });
-
-  video.addEventListener('timeupdate', () => {
-    currentTime.value = video.currentTime;
-  });
-
-  video.addEventListener('loadedmetadata', () => {
-    duration.value = video.duration;
-  });
-};
-
-const setupAudioEvents = () => {
-  if (!audioPlayer.value) return;
-
-  const audio = audioPlayer.value;
-
-  audio.addEventListener('play', () => {
-    isPlaying.value = true;
-  });
-
-  audio.addEventListener('pause', () => {
-    isPlaying.value = false;
-  });
-
-  audio.addEventListener('ended', () => {
-    isPlaying.value = false;
-    currentTime.value = 0;
-  });
-
-  audio.addEventListener('timeupdate', () => {
-    currentTime.value = audio.currentTime;
-  });
-
-  audio.addEventListener('loadedmetadata', () => {
-    duration.value = audio.duration;
-  });
-};
-
-const togglePlayPause = () => {
-  if (isVideo.value && videoPlayer.value) {
-    if (isPlaying.value) {
-      videoPlayer.value.pause();
-    } else {
-      videoPlayer.value.play();
-    }
-  } else if (isAudio.value && audioPlayer.value) {
-    if (isPlaying.value) {
-      audioPlayer.value.pause();
-    } else {
-      audioPlayer.value.play();
-    }
+const loadImage = async () => {
+  if (!props.file || !isImage.value) {
+    return;
   }
-};
 
-const stopMedia = () => {
-  if (isVideo.value && videoPlayer.value) {
-    videoPlayer.value.pause();
-    videoPlayer.value.currentTime = 0;
-    isPlaying.value = false;
-    currentTime.value = 0;
-  } else if (isAudio.value && audioPlayer.value) {
-    audioPlayer.value.pause();
-    audioPlayer.value.currentTime = 0;
-    isPlaying.value = false;
-    currentTime.value = 0;
-  }
-};
+  loading.value = true;
+  error.value = null;
+  imageData.value = null;
 
-const setVolume = (volume: number) => {
-  if (isVideo.value && videoPlayer.value) {
-    videoPlayer.value.volume = volume;
-  } else if (isAudio.value && audioPlayer.value) {
-    audioPlayer.value.volume = volume;
-  }
-};
-
-const downloadFile = async () => {
   try {
-    const response = await fetch(fileUrl.value, {
-      headers: {
-        Authorization: `Bearer ${getAuthToken()}`,
-      },
-    });
+    // Use props.folder if provided, otherwise extract from file path
+    const folder = props.folder || extractFolderFromPath(props.file.path);
+
+    // For file downloads, we need to use fetch directly to get the blob
+    const config = useRuntimeConfig();
+    const authStore = useAuthStore();
+
+    const response = await fetch(
+      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${authStore.token}`,
+        },
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Download failed');
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    // Create download link
+    // Get the blob data
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = props.file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
 
-    toast.success('Download started');
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Download failed');
+    // Create blob URL and set it
+    const url = window.URL.createObjectURL(blob);
+
+    imageData.value = url;
+    loading.value = false;
+  } catch (err) {
+    loading.value = false;
+    error.value = err instanceof Error ? err.message : 'Failed to load image';
   }
 };
 
@@ -402,39 +336,145 @@ const retryLoad = () => {
 
   // Force reload of media
   nextTick(() => {
-    if (isVideo.value && videoPlayer.value) {
-      videoPlayer.value.load();
-    } else if (isAudio.value && audioPlayer.value) {
-      audioPlayer.value.load();
+    if (isImage.value) {
+      loadImage();
+    } else if (isPDF.value) {
+      loadPDF();
+    } else if (isVideo.value) {
+      loadVideo();
+    } else if (isAudio.value) {
+      loadAudio();
     }
   });
 };
 
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
+const loadPDF = async () => {
+  if (!props.file || !isPDF.value) return;
 
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  loading.value = true;
+  error.value = null;
+  pdfData.value = null;
 
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  try {
+    // Use props.folder if provided, otherwise extract from file path
+    const folder = props.folder || extractFolderFromPath(props.file.path);
+
+    // For file downloads, we need to use fetch directly to get the blob
+    const config = useRuntimeConfig();
+    const authStore = useAuthStore();
+
+    const response = await fetch(
+      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${authStore.token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Get the blob data
+    const blob = await response.blob();
+
+    // Create blob URL and set it
+    const url = window.URL.createObjectURL(blob);
+
+    pdfData.value = url;
+    loading.value = false;
+  } catch (err) {
+    loading.value = false;
+    error.value = err instanceof Error ? err.message : 'Failed to load PDF';
+  }
 };
 
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString();
+const loadVideo = async () => {
+  if (!props.file || !isVideo.value) return;
+
+  loading.value = true;
+  error.value = null;
+  videoData.value = null;
+
+  try {
+    // Use props.folder if provided, otherwise extract from file path
+    const folder = props.folder || extractFolderFromPath(props.file.path);
+
+    // For file downloads, we need to use fetch directly to get the blob
+    const config = useRuntimeConfig();
+    const authStore = useAuthStore();
+
+    const response = await fetch(
+      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${authStore.token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Get the blob data
+    const blob = await response.blob();
+
+    // Create blob URL and set it
+    const url = window.URL.createObjectURL(blob);
+
+    videoData.value = url;
+    loading.value = false;
+  } catch (err) {
+    loading.value = false;
+    error.value = err instanceof Error ? err.message : 'Failed to load video';
+  }
 };
 
-const formatTime = (seconds: number): string => {
-  if (isNaN(seconds)) return '0:00';
+const loadAudio = async () => {
+  if (!props.file || !isAudio.value) return;
 
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
+  loading.value = true;
+  error.value = null;
+  audioData.value = null;
 
-const getAuthToken = (): string => {
-  // In a real implementation, get this from your auth store
-  return localStorage.getItem('auth_token') || '';
+  try {
+    // Use props.folder if provided, otherwise extract from file path
+    const folder = props.folder || extractFolderFromPath(props.file.path);
+
+    // For file downloads, we need to use fetch directly to get the blob
+    const config = useRuntimeConfig();
+    const authStore = useAuthStore();
+
+    const response = await fetch(
+      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${authStore.token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Get the blob data
+    const blob = await response.blob();
+
+    // Create blob URL and set it
+    const url = window.URL.createObjectURL(blob);
+
+    audioData.value = url;
+    loading.value = false;
+  } catch (err) {
+    loading.value = false;
+    error.value = err instanceof Error ? err.message : 'Failed to load audio';
+  }
 };
 
 // Lifecycle
@@ -442,94 +482,67 @@ onMounted(() => {
   // Set initial loading state
   loading.value = true;
 
+  // For images, PDFs, videos, and audio, load them via API
+  if (isImage.value) {
+    loadImage();
+  } else if (isPDF.value) {
+    loadPDF();
+  } else if (isVideo.value) {
+    loadVideo();
+  } else if (isAudio.value) {
+    loadAudio();
+  }
   // For non-media files, mark as loaded immediately
-  if (!isVideo.value && !isAudio.value) {
+  else {
     loading.value = false;
   }
 });
 
-onUnmounted(() => {
-  // Clean up event listeners
-  if (videoPlayer.value) {
-    videoPlayer.value.removeEventListener('play', () => {});
-    videoPlayer.value.removeEventListener('pause', () => {});
-    videoPlayer.value.removeEventListener('ended', () => {});
-    videoPlayer.value.removeEventListener('timeupdate', () => {});
-    videoPlayer.value.removeEventListener('loadedmetadata', () => {});
-  }
+// Watch for file prop changes and reload media
+watch(
+  () => props.file,
+  (newFile, oldFile) => {
+    if (newFile && newFile !== oldFile) {
+      // Reset state
+      loading.value = true;
+      error.value = null;
+      imageData.value = null;
+      pdfData.value = null;
+      videoData.value = null;
+      audioData.value = null;
 
-  if (audioPlayer.value) {
-    audioPlayer.value.removeEventListener('play', () => {});
-    audioPlayer.value.removeEventListener('pause', () => {});
-    audioPlayer.value.removeEventListener('ended', () => {});
-    audioPlayer.value.removeEventListener('timeupdate', () => {});
-    audioPlayer.value.removeEventListener('loadedmetadata', () => {});
+      // Load new media
+      if (isImage.value) {
+        loadImage();
+      } else if (isPDF.value) {
+        loadPDF();
+      } else if (isVideo.value) {
+        loadVideo();
+      } else if (isAudio.value) {
+        loadAudio();
+      } else {
+        loading.value = false;
+      }
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+onUnmounted(() => {
+  // Clean up blob URLs to prevent memory leaks
+  if (imageData.value) {
+    window.URL.revokeObjectURL(imageData.value);
+  }
+  if (pdfData.value) {
+    window.URL.revokeObjectURL(pdfData.value);
+  }
+  if (videoData.value) {
+    window.URL.revokeObjectURL(videoData.value);
+  }
+  if (audioData.value) {
+    window.URL.revokeObjectURL(audioData.value);
   }
 });
 </script>
 
-<style scoped>
-.media-player {
-  @apply relative;
-}
-
-.loading-overlay {
-  @apply absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center;
-}
-
-.pdf-viewer {
-  @apply w-full;
-}
-
-.image-viewer {
-  @apply w-full;
-}
-
-.unsupported-file {
-  @apply w-full;
-}
-
-.file-info {
-  @apply w-full;
-}
-
-.media-controls {
-  @apply w-full;
-}
-
-/* Video and Audio player styling */
-video,
-audio {
-  @apply w-full;
-}
-
-/* PDF iframe styling */
-.pdf-viewer iframe {
-  @apply w-full;
-}
-
-/* Image styling */
-.image-viewer img {
-  @apply w-full;
-}
-
-/* Progress bar styling */
-.progress-bar {
-  @apply w-full bg-gray-200 rounded-full h-2;
-}
-
-.progress-fill {
-  @apply bg-blue-500 h-2 rounded-full transition-all duration-100;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .file-info .grid {
-    @apply grid-cols-2;
-  }
-
-  .media-controls .flex {
-    @apply flex-col space-y-2;
-  }
-}
-</style>
+<style scoped></style>

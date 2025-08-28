@@ -1,38 +1,46 @@
 <template>
   <div class="file-upload">
-    <!-- Drag & Drop Zone -->
-    <div
-      class="upload-zone"
-      :class="{ 'drag-over': isDragOver, uploading: isUploading }"
-      @drop="handleDrop"
-      @dragover="handleDragOver"
-      @dragleave="handleDragLeave"
-      @click="triggerFileInput"
+    <!-- Official Nuxt UI FileUpload Component -->
+    <UFileUpload
+      v-model="selectedFiles"
+      :accept="acceptedTypes"
+      :multiple="props.multiple"
+      :dropzone="true"
+      :interactive="true"
+      variant="area"
+      size="lg"
+      color="primary"
+      :label="uploadLabel"
+      :description="uploadDescription"
+      icon="i-lucide-upload"
+      class="w-full min-h-48"
+      @change="handleFileChange"
     >
-      <div class="upload-content">
-        <UIcon
-          :name="isUploading ? 'i-lucide-loader-2' : 'i-lucide-upload'"
-          class="w-12 h-12 text-gray-400 animate-spin"
-          :class="{ 'animate-spin': isUploading }"
-        />
-        <p class="text-lg font-medium">
-          {{
-            isUploading ? 'Uploading...' : 'Drop files here or click to browse'
+      <!-- Custom Actions Slot -->
+      <template #actions>
+        <UButton
+          v-if="selectedFiles.length > 0 && !isUploading"
+          color="primary"
+          @click="uploadFiles"
+          :disabled="isUploading"
+        >
+          <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
+          Upload {{ selectedFiles.length }} File{{
+            selectedFiles.length > 1 ? 's' : ''
           }}
-        </p>
-        <p class="text-sm text-gray-500">
-          Supports: {{ allowedTypes.join(', ') }} • Max: {{ maxSize }}
-        </p>
-        <input
-          ref="fileInput"
-          type="file"
-          :accept="acceptedTypes"
-          @change="handleFileSelect"
-          class="hidden"
-          multiple
-        />
-      </div>
-    </div>
+        </UButton>
+
+        <UButton
+          v-if="selectedFiles.length > 0"
+          color="neutral"
+          variant="ghost"
+          @click="clearFiles"
+          :disabled="isUploading"
+        >
+          Clear
+        </UButton>
+      </template>
+    </UFileUpload>
 
     <!-- Upload Progress -->
     <div v-if="uploads.length > 0" class="upload-progress mt-4">
@@ -73,7 +81,7 @@
               <UButton
                 v-if="upload.status === 'error'"
                 size="xs"
-                color="red"
+                color="error"
                 variant="ghost"
                 @click="retryUpload(upload)"
               >
@@ -96,7 +104,7 @@
           <!-- Status Messages -->
           <div v-if="upload.message" class="mt-2">
             <UAlert
-              :color="upload.status === 'error' ? 'red' : 'blue'"
+              :color="upload.status === 'error' ? 'error' : 'primary'"
               variant="soft"
               size="sm"
             >
@@ -110,7 +118,7 @@
     <!-- Upload Summary -->
     <div v-if="completedCount > 0" class="upload-summary mt-4">
       <UAlert
-        :color="hasErrors ? 'yellow' : 'green'"
+        :color="hasErrors ? 'neutral' : 'primary'"
         variant="soft"
         :icon="hasErrors ? 'i-lucide-alert-triangle' : 'i-lucide-check-circle'"
       >
@@ -134,7 +142,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useToast } from '@/composables/useToast';
 
 // Props
 interface Props {
@@ -176,14 +183,22 @@ const emit = defineEmits<{
 const toast = useToast();
 
 // State
-const fileInput = ref<HTMLInputElement>();
-const isDragOver = ref(false);
+const selectedFiles = ref<File[]>([]);
 const isUploading = ref(false);
 const uploads = ref<UploadItem[]>([]);
 
 // Computed
 const acceptedTypes = computed(() => {
   return props.allowedTypes.map((type) => `.${type}`).join(',');
+});
+
+const uploadLabel = computed(() => {
+  if (isUploading.value) return 'Uploading...';
+  return 'Drop files here or click to browse';
+});
+
+const uploadDescription = computed(() => {
+  return `Supports: ${props.allowedTypes.join(', ')} • Max: ${props.maxSize}`;
 });
 
 const completedCount = computed(() => {
@@ -204,7 +219,7 @@ interface UploadItem {
   file: File;
   progress: number;
   status: 'pending' | 'uploading' | 'completed' | 'error';
-  message?: string;
+  message: string | undefined;
 }
 
 interface UploadedFile {
@@ -217,54 +232,47 @@ interface UploadedFile {
 }
 
 // Methods
-const triggerFileInput = () => {
-  if (!isUploading.value) {
-    fileInput.value?.click();
+const handleFileChange = () => {
+  // Files are automatically validated by UFileUpload
+  // Auto-upload if enabled
+  if (props.autoUpload) {
+    uploadFiles();
   }
 };
 
-const handleDragOver = (e: DragEvent) => {
-  e.preventDefault();
-  isDragOver.value = true;
-};
-
-const handleDragLeave = (e: DragEvent) => {
-  e.preventDefault();
-  isDragOver.value = false;
-};
-
-const handleDrop = (e: DragEvent) => {
-  e.preventDefault();
-  isDragOver.value = false;
-
-  const files = Array.from(e.dataTransfer?.files || []);
-  if (files.length > 0) {
-    processFiles(files);
-  }
-};
-
-const handleFileSelect = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  const files = Array.from(target.files || []);
-  if (files.length > 0) {
-    processFiles(files);
+const validateFile = (file: File): boolean => {
+  // Check file type
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (!extension || !props.allowedTypes.includes(extension)) {
+    toast.add({
+      title: 'Invalid File Type',
+      description: `File type '${extension}' not allowed`,
+      color: 'error',
+    });
+    return false;
   }
 
-  // Reset input value to allow selecting the same file again
-  target.value = '';
+  // Check file size
+  const maxSizeBytes = parseSizeString(props.maxSize);
+  if (file.size > maxSizeBytes) {
+    toast.add({
+      title: 'File Too Large',
+      description: `File size exceeds limit of ${props.maxSize}`,
+      color: 'error',
+    });
+    return false;
+  }
+
+  return true;
 };
 
-const processFiles = (files: File[]) => {
-  // Validate files
-  const validFiles = files.filter((file) => validateFile(file));
+const uploadFiles = async () => {
+  if (selectedFiles.value.length === 0) return;
 
-  if (validFiles.length === 0) {
-    toast.error('No valid files selected');
-    return;
-  }
+  isUploading.value = true;
 
   // Create upload items
-  const newUploads = validFiles.map((file) => ({
+  const newUploads = selectedFiles.value.map((file) => ({
     id: generateId(),
     file,
     progress: 0,
@@ -274,36 +282,9 @@ const processFiles = (files: File[]) => {
 
   uploads.value.push(...newUploads);
 
-  // Auto-upload if enabled
-  if (props.autoUpload) {
-    uploadFiles(newUploads);
-  }
-};
-
-const validateFile = (file: File): boolean => {
-  // Check file type
-  const extension = file.name.split('.').pop()?.toLowerCase();
-  if (!extension || !props.allowedTypes.includes(extension)) {
-    toast.error(`File type '${extension}' not allowed`);
-    return false;
-  }
-
-  // Check file size
-  const maxSizeBytes = parseSizeString(props.maxSize);
-  if (file.size > maxSizeBytes) {
-    toast.error(`File size exceeds limit of ${props.maxSize}`);
-    return false;
-  }
-
-  return true;
-};
-
-const uploadFiles = async (items: UploadItem[]) => {
-  isUploading.value = true;
-
-  for (const item of items) {
+  for (const item of newUploads) {
     try {
-      item.status = 'uploading';
+      item.status = 'uploading' as const;
       item.progress = 0;
 
       // Simulate progress (in real implementation, use XMLHttpRequest or fetch with progress)
@@ -317,24 +298,18 @@ const uploadFiles = async (items: UploadItem[]) => {
       const formData = new FormData();
       formData.append('file', item.file);
 
-      const response = await fetch(`/api/v1/storage/upload/${props.folder}`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${getAuthToken()}`,
-        },
-      });
+      const response = (await useNuxtApp().$civicApi(
+        `/api/v1/storage/upload/${props.folder}`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )) as any;
 
       clearInterval(progressInterval);
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        item.status = 'completed';
+      if (response.success) {
+        item.status = 'completed' as const;
         item.progress = 100;
         item.message = 'Upload successful';
 
@@ -345,15 +320,15 @@ const uploadFiles = async (items: UploadItem[]) => {
             name: item.file.name,
             size: item.file.size,
             type: item.file.type,
-            url: result.data.url,
-            path: result.data.path,
+            url: response.data.url,
+            path: response.data.path,
           },
         ]);
       } else {
-        throw new Error(result.error?.message || 'Upload failed');
+        throw new Error(response.error?.message || 'Upload failed');
       }
     } catch (error) {
-      item.status = 'error';
+      item.status = 'error' as const;
       item.progress = 0;
       item.message = error instanceof Error ? error.message : 'Upload failed';
 
@@ -362,14 +337,25 @@ const uploadFiles = async (items: UploadItem[]) => {
   }
 
   isUploading.value = false;
+
+  // Clear selected files after upload
+  if (props.autoUpload) {
+    clearFiles();
+  }
+};
+
+const clearFiles = () => {
+  selectedFiles.value = [];
 };
 
 const retryUpload = (item: UploadItem) => {
-  item.status = 'pending';
+  item.status = 'pending' as const;
   item.progress = 0;
   item.message = undefined;
 
-  uploadFiles([item]);
+  // Add file back to selected files and upload
+  selectedFiles.value = [item.file];
+  uploadFiles();
 };
 
 const getFileIcon = (mimeType: string): string => {
@@ -418,19 +404,14 @@ const parseSizeString = (sizeStr: string): number => {
   const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)$/i);
   if (!match) return 100 * 1024 * 1024; // Default to 100MB
 
-  const value = parseFloat(match[1]);
-  const unit = match[2].toUpperCase();
+  const value = parseFloat(match[1] || '100');
+  const unit = match[2]?.toUpperCase() || 'B';
 
   return value * (units[unit] || 1);
 };
 
 const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
-};
-
-const getAuthToken = (): string => {
-  // In a real implementation, get this from your auth store
-  return localStorage.getItem('auth_token') || '';
 };
 
 // Lifecycle
@@ -440,49 +421,5 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.file-upload {
-  @apply w-full;
-}
-
-.upload-zone {
-  @apply border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer transition-all duration-200;
-}
-
-.upload-zone:hover {
-  @apply border-gray-400 bg-gray-50;
-}
-
-.upload-zone.drag-over {
-  @apply border-blue-500 bg-blue-50;
-}
-
-.upload-zone.uploading {
-  @apply border-gray-400 bg-gray-100 cursor-not-allowed;
-}
-
-.upload-content {
-  @apply flex flex-col items-center space-y-3;
-}
-
-.upload-progress {
-  @apply bg-gray-50 rounded-lg p-4;
-}
-
-.upload-item {
-  @apply transition-all duration-200;
-}
-
-.upload-summary {
-  @apply transition-all duration-200;
-}
-
-/* Animation for drag over */
-.drag-over .upload-content {
-  @apply transform scale-105;
-}
-
-/* Progress bar animation */
-.upload-item .bg-blue-500 {
-  @apply transition-all duration-300 ease-out;
-}
+/* All styles are now handled by Tailwind classes in the template */
 </style>

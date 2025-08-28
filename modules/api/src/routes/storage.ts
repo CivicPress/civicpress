@@ -3,10 +3,7 @@ import multer from 'multer';
 import { body, param, query } from 'express-validator';
 import { StorageService } from '@civicpress/storage';
 import { StorageConfigManager } from '@civicpress/storage';
-import {
-  authMiddleware,
-  requireStoragePermission,
-} from '../middleware/auth.js';
+import { requireStoragePermission } from '../middleware/auth.js';
 import {
   handleStorageSuccess,
   handleStorageError,
@@ -27,18 +24,63 @@ const upload = multer({
     fileSize: 100 * 1024 * 1024, // 100MB default limit
   },
   fileFilter: (req, file, cb) => {
-    // Basic file type validation (will be enhanced in storage service)
-    const allowedTypes =
-      /jpeg|jpg|png|gif|pdf|doc|docx|txt|md|mp4|webm|mp3|wav/;
-    const extname = allowedTypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
-    const mimetype = allowedTypes.test(file.mimetype);
+    // Enhanced file type validation for Office documents and other file types
+    const allowedExtensions = [
+      'jpeg',
+      'jpg',
+      'png',
+      'gif',
+      'pdf',
+      'doc',
+      'docx',
+      'txt',
+      'md',
+      'mp4',
+      'webm',
+      'mp3',
+      'wav',
+      'rtf',
+      'epub',
+      'xls',
+      'xlsx',
+      'ppt',
+      'pptx',
+    ];
 
-    if (mimetype && extname) {
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'text/markdown',
+      'text/rtf',
+      'video/mp4',
+      'video/webm',
+      'audio/mpeg',
+      'audio/wav',
+      'application/epub+zip',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ];
+
+    const fileExtension = path
+      .extname(file.originalname)
+      .toLowerCase()
+      .replace('.', '');
+    const hasValidExtension = allowedExtensions.includes(fileExtension);
+    const hasValidMimeType = allowedMimeTypes.includes(file.mimetype);
+
+    // Allow if either extension or MIME type is valid (more flexible)
+    if (hasValidExtension || hasValidMimeType) {
       return cb(null, true);
     } else {
-      cb(new Error('Invalid file type'));
+      cb(new Error(`Invalid file type: ${file.mimetype} (${fileExtension})`));
     }
   },
 });
@@ -144,9 +186,6 @@ router.post(
       await initializeStorage();
       const folderName = req.params.folder;
       const userId = req.user?.id?.toString();
-      const metadata = req.body.metadata
-        ? JSON.parse(req.body.metadata)
-        : undefined;
 
       const result = await storageService.uploadFile(
         folderName,
