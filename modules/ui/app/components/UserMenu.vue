@@ -82,6 +82,16 @@ const items = computed<DropdownMenuItem[][]>(() => {
                 },
               ]
             : []),
+          // Show Storage when user has storage:manage permission
+          ...(authStore.hasPermission('storage:manage')
+            ? [
+                {
+                  label: 'Storage',
+                  icon: 'i-lucide-folder',
+                  onClick: () => navigateTo('/settings/storage'),
+                },
+              ]
+            : []),
           // Show Activity when user has system:admin permission
           ...(authStore.hasPermission('system:admin')
             ? [
