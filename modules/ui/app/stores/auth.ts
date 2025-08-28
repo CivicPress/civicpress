@@ -338,81 +338,10 @@ export const useAuthStore = defineStore('auth', {
         console.log(
           'Token found, validating token to refresh user/permissions...'
         );
-
-        // Try to validate immediately, but if $civicApi isn't ready, retry after a delay
-        let validationAttempts = 0;
-        const maxAttempts = 10;
-
-        while (validationAttempts < maxAttempts) {
-          try {
-            const nuxtApp = useNuxtApp();
-            if (nuxtApp.$civicApi) {
-              await this.validateToken();
-              break;
-            } else {
-              validationAttempts++;
-              if (validationAttempts < maxAttempts) {
-                console.log(
-                  `$civicApi not ready, attempt ${validationAttempts}/${maxAttempts}, retrying in 100ms...`
-                );
-                await new Promise((resolve) => setTimeout(resolve, 100));
-              }
-            }
-          } catch (error) {
-            console.warn('Token validation attempt failed:', error);
-            break;
-          }
-        }
-
-        if (validationAttempts >= maxAttempts) {
-          console.warn(
-            '$civicApi not available after maximum attempts, preserving current auth state'
-          );
-        }
+        await this.validateToken();
       }
 
       this.initialized = true;
-
-      // Listen for civicApi ready event to retry validation if needed
-      if (process.client && this.token && this.user) {
-        const handleCivicApiReady = () => {
-          console.log(
-            'civicApi ready event received, retrying token validation'
-          );
-          this.retryTokenValidation();
-          // Remove the listener after first use
-          window.removeEventListener('civicApi:ready', handleCivicApiReady);
-        };
-
-        window.addEventListener('civicApi:ready', handleCivicApiReady);
-      }
-    },
-
-    // Retry token validation when civicApi becomes available
-    async retryTokenValidation() {
-      if (!this.token || !this.user) return false;
-
-      try {
-        const nuxtApp = useNuxtApp();
-        if (nuxtApp.$civicApi) {
-          console.log(
-            'Retrying token validation now that $civicApi is available'
-          );
-          return await this.validateToken();
-        }
-        return false;
-      } catch (error) {
-        console.warn('Retry token validation failed:', error);
-        return false;
-      }
-    },
-
-    // Method to be called when civicApi plugin is ready
-    onCivicApiReady() {
-      if (this.token && this.user && !this.initialized) {
-        console.log('civicApi plugin ready, retrying token validation');
-        this.retryTokenValidation();
-      }
     },
   },
 });

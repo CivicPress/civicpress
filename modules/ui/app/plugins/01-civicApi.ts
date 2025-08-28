@@ -1,6 +1,4 @@
-export default defineNuxtPlugin(async (nuxtApp) => {
-  // Import auth store for notifications
-  const { useAuthStore } = await import('~/stores/auth');
+export default defineNuxtPlugin((nuxtApp) => {
   const civicApi = $fetch.create({
     baseURL: useRuntimeConfig().public.civicApiUrl,
     onRequest({ request, options }) {
@@ -126,27 +124,6 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       throw apiError;
     },
   });
-
-  // Emit an event when the plugin is ready and notify auth store
-  if (process.client) {
-    // Use nextTick to ensure the plugin is fully registered
-    nextTick(() => {
-      // Emit custom event
-      const event = new CustomEvent('civicApi:ready');
-      window.dispatchEvent(event);
-
-      // Also notify auth store directly if it's available
-      try {
-        const authStore = useAuthStore();
-        if (authStore && typeof authStore.onCivicApiReady === 'function') {
-          authStore.onCivicApiReady();
-        }
-      } catch (error) {
-        // Auth store might not be ready yet, that's okay
-        console.log('Auth store not ready yet for civicApi notification');
-      }
-    });
-  }
 
   return {
     provide: {
