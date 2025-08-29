@@ -39,7 +39,9 @@ components:
 
   - name: RecordForm
     file: modules/ui/app/components/RecordForm.vue
-    purpose: Create or edit a record (shows save feedback on success/error)
+    purpose:
+      Create or edit a record with geography data, template loading, and
+      validation
     status: stable
 
   - name: RecordList

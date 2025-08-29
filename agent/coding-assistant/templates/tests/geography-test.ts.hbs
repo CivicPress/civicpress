@@ -1,0 +1,31 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { validateGeography, normalizeGeography, isEmptyGeography } from '@civicpress/core';
+
+describe('Geography {{testType}}', () => {
+  let testGeography: any;
+
+  beforeEach(() => {
+    testGeography = {
+      srid: 4326,
+      zone_ref: 'test-zone',
+      bbox: [-73.65, 45.45, -73.52, 45.55],
+      center: { lon: -73.58, lat: 45.50 },
+      attachments: []
+    };
+  });
+
+  it('should {{testDescription}}', () => {
+    // TODO: Implement test logic
+    expect(true).toBe(true);
+  });
+
+  it('should handle {{edgeCase}}', () => {
+    // TODO: Implement edge case test
+    expect(true).toBe(true);
+  });
+
+  it('should validate {{validationType}}', () => {
+    // TODO: Implement validation test
+    expect(true).toBe(true);
+  });
+});

@@ -222,6 +222,76 @@ endpoints:
     path: /api/v1/config/list
     file: modules/api/src/routes/config.ts
     desc: List available configurations
+
+  # Storage (mounted at /api/v1/storage)
+  - id: storage:config
+    method: GET
+    path: /api/v1/storage/config
+    file: modules/api/src/routes/storage.ts
+    desc: Get storage configuration
+    status: stable
+
+  - id: storage:update-config
+    method: PUT
+    path: /api/v1/storage/config
+    file: modules/api/src/routes/storage.ts
+    desc: Update storage configuration
+    status: stable
+
+  - id: storage:upload
+    method: POST
+    path: /api/v1/storage/upload/:folder
+    file: modules/api/src/routes/storage.ts
+    desc: Upload file to storage folder
+    status: stable
+
+  - id: storage:list-files
+    method: GET
+    path: /api/v1/storage/files/:folder
+    file: modules/api/src/routes/storage.ts
+    desc: List files in storage folder
+    status: stable
+
+  - id: storage:download
+    method: GET
+    path: /api/v1/storage/download/:folder/:filename
+    file: modules/api/src/routes/storage.ts
+    desc: Download file from storage
+    status: stable
+
+  - id: storage:delete-file
+    method: DELETE
+    path: /api/v1/storage/files/:folder/:filename
+    file: modules/api/src/routes/storage.ts
+    desc: Delete file from storage
+    status: stable
+
+  - id: storage:file-info
+    method: GET
+    path: /api/v1/storage/files/:folder/:filename/info
+    file: modules/api/src/routes/storage.ts
+    desc: Get file information
+    status: stable
+
+  - id: storage:add-folder
+    method: POST
+    path: /api/v1/storage/folders
+    file: modules/api/src/routes/storage.ts
+    desc: Add new storage folder
+    status: stable
+
+  - id: storage:update-folder
+    method: PUT
+    path: /api/v1/storage/folders/:name
+    file: modules/api/src/routes/storage.ts
+    desc: Update storage folder configuration
+    status: stable
+
+  - id: storage:remove-folder
+    method: DELETE
+    path: /api/v1/storage/folders/:name
+    file: modules/api/src/routes/storage.ts
+    desc: Remove storage folder
     status: stable
 
   - id: config:metadata
