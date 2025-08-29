@@ -55,9 +55,37 @@ export const handleStorageError = (
   error: Error,
   req: Request,
   res: Response,
-  statusCode: number = 500
+  statusCode?: number
 ): Response => {
   const errorCode = getStorageErrorCode(error);
+
+  // Automatically determine status code based on error code if not provided
+  if (!statusCode) {
+    switch (errorCode) {
+      case 'FILE_NOT_FOUND':
+        statusCode = 404;
+        break;
+      case 'ACCESS_DENIED':
+        statusCode = 403;
+        break;
+      case 'FILE_TOO_LARGE':
+        statusCode = 413;
+        break;
+      case 'INVALID_FILE_TYPE':
+      case 'INVALID_OPERATION':
+        statusCode = 400;
+        break;
+      case 'STORAGE_QUOTA_EXCEEDED':
+        statusCode = 507;
+        break;
+      case 'NETWORK_ERROR':
+      case 'OPERATION_TIMEOUT':
+        statusCode = 503;
+        break;
+      default:
+        statusCode = 500;
+    }
+  }
 
   const response: StorageErrorResponse = {
     success: false,
@@ -122,18 +150,29 @@ export const handleStorageValidationError = (
 const getStorageErrorCode = (error: Error): string => {
   const message = error.message.toLowerCase();
 
-  if (message.includes('not found')) return 'FILE_NOT_FOUND';
+  if (
+    message.includes('not found') ||
+    message.includes('storage folder') ||
+    message.includes('file not found')
+  )
+    return 'FILE_NOT_FOUND';
   if (message.includes('permission') || message.includes('access'))
     return 'ACCESS_DENIED';
   if (message.includes('size') || message.includes('limit'))
     return 'FILE_TOO_LARGE';
-  if (message.includes('type') || message.includes('format'))
+  if (
+    message.includes('type') ||
+    message.includes('format') ||
+    message.includes('invalid file type')
+  )
     return 'INVALID_FILE_TYPE';
   if (message.includes('quota') || message.includes('space'))
     return 'STORAGE_QUOTA_EXCEEDED';
   if (message.includes('network') || message.includes('connection'))
     return 'NETWORK_ERROR';
   if (message.includes('timeout')) return 'OPERATION_TIMEOUT';
+  if (message.includes('cannot remove system folder'))
+    return 'INVALID_OPERATION';
 
   return 'STORAGE_ERROR';
 };

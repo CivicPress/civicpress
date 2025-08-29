@@ -157,6 +157,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         status TEXT DEFAULT 'draft',
         content TEXT,
         metadata TEXT,
+        geography TEXT,
         path TEXT,
         author TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -179,6 +180,14 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     for (const table of tables) {
       await this.execute(table);
+    }
+
+    // Add geography column to existing records table if it doesn't exist
+    try {
+      await this.execute('ALTER TABLE records ADD COLUMN geography TEXT');
+    } catch (error) {
+      // Column already exists, ignore error
+      console.log('Geography column already exists or migration not needed');
     }
   }
 }

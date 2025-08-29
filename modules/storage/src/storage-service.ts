@@ -236,6 +236,40 @@ export class StorageService {
   }
 
   /**
+   * Find file by original name in a folder
+   */
+  async findFileByOriginalName(
+    folderName: string,
+    originalName: string
+  ): Promise<string | null> {
+    try {
+      const folder = this.config.folders[folderName];
+      if (!folder) {
+        return null;
+      }
+
+      const folderPath = path.join(this.getStoragePath(), folder.path);
+      const files = await fs.readdir(folderPath);
+
+      for (const fileName of files) {
+        // Check if the file starts with the original name (before the timestamp)
+        if (
+          fileName.startsWith(
+            path.basename(originalName, path.extname(originalName))
+          )
+        ) {
+          return path.join(folderPath, fileName);
+        }
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.error('Failed to find file by original name:', error);
+      return null;
+    }
+  }
+
+  /**
    * Validate file against folder configuration
    */
   private validateFile(

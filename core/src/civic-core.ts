@@ -14,6 +14,7 @@ import {
   NotificationService,
   NotificationConfig,
 } from './notifications/index.js';
+import { Geography } from './types/geography.js';
 
 export interface CivicPressConfig {
   dataDir: string;
@@ -40,6 +41,7 @@ export interface CreateRecordRequest {
   type: string;
   content?: string;
   metadata?: Record<string, any>;
+  geography?: Geography;
   role?: string;
 }
 
@@ -48,6 +50,7 @@ export interface UpdateRecordRequest {
   content?: string;
   status?: string;
   metadata?: Record<string, any>;
+  geography?: Geography;
 }
 
 export class CivicPress {

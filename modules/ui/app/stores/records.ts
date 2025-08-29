@@ -11,6 +11,13 @@ export interface CivicRecord {
   author: string;
   created_at: string;
   updated_at: string;
+  geography?: {
+    srid?: number;
+    zone_ref?: string;
+    bbox?: [number, number, number, number];
+    center?: { lon: number; lat: number };
+    attachments?: Array<{ path: string; role: string; description?: string }>;
+  };
   metadata: {
     author: string;
     created: string;

@@ -5,6 +5,22 @@ export { CreateRecordRequest, UpdateRecordRequest } from './civic-core.js';
 // Export record management
 export { RecordManager, RecordData } from './records/record-manager.js';
 
+// Export geography types and utilities
+export {
+  validateGeography,
+  normalizeGeography,
+  isEmptyGeography,
+  getGeographySummary,
+  GEOGRAPHY_CONSTANTS,
+} from './types/geography.js';
+export type {
+  Geography,
+  GeographyPoint,
+  GeographyBBox,
+  GeographyAttachment,
+  GeographyValidationResult,
+} from './types/geography.js';
+
 // Export database services
 export { DatabaseService } from './database/database-service.js';
 export {

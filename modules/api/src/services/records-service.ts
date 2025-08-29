@@ -50,6 +50,7 @@ export class RecordsService {
       type: string;
       content?: string;
       metadata?: Record<string, any>;
+      geography?: any;
     },
     user: any
   ): Promise<any> {
@@ -71,6 +72,7 @@ export class RecordsService {
       type: data.type,
       content: data.content,
       metadata: data.metadata,
+      geography: data.geography,
     };
 
     // Create the record using CivicCore
@@ -118,6 +120,7 @@ export class RecordsService {
       status: record.status,
       content: record.content,
       metadata: record.metadata || {},
+      geography: record.geography,
       path: record.path,
       created: record.created_at,
       author: record.author,
@@ -181,6 +184,7 @@ export class RecordsService {
       content?: string;
       status?: string;
       metadata?: Record<string, any>;
+      geography?: any;
     },
     user: any
   ): Promise<any | null> {
@@ -208,6 +212,7 @@ export class RecordsService {
       content: data.content,
       status: data.status,
       metadata: data.metadata,
+      geography: data.geography,
     };
 
     // Update the record using CivicCore
@@ -228,6 +233,7 @@ export class RecordsService {
       status: updatedRecord.status,
       content: updatedRecord.content,
       metadata: updatedRecord.metadata || {},
+      geography: updatedRecord.geography,
       path: updatedRecord.path,
       created: updatedRecord.created_at,
       author: updatedRecord.author,

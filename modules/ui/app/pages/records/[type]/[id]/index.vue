@@ -64,6 +64,7 @@ const fetchRecord = async () => {
         author: apiRecord.author,
         created_at: apiRecord.created || apiRecord.created_at,
         updated_at: apiRecord.updated || apiRecord.updated_at,
+        geography: apiRecord.geography,
         metadata: apiRecord.metadata || {},
       };
 
@@ -305,6 +306,122 @@ const handleStatusChanged = (payload: { newStatus: string; record?: any }) => {
             </div>
             <div v-else class="text-gray-500 dark:text-gray-400 italic">
               No content available for this record.
+            </div>
+          </div>
+        </div>
+
+        <!-- Geography Information -->
+        <div class="rounded-lg border">
+          <div class="border-b px-6 py-4">
+            <h2 class="text-lg font-semibold">Geography</h2>
+          </div>
+          <div class="p-6">
+            <div
+              v-if="record.geography"
+              class="grid grid-cols-1 md:grid-cols-2 gap-4"
+            >
+              <!-- SRID -->
+              <div v-if="record.geography.srid" class="space-y-1">
+                <dt
+                  class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                >
+                  Spatial Reference System ID
+                </dt>
+                <dd
+                  class="text-sm font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
+                >
+                  {{ record.geography.srid }}
+                </dd>
+              </div>
+
+              <!-- Zone Reference -->
+              <div v-if="record.geography.zone_ref" class="space-y-1">
+                <dt
+                  class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                >
+                  Zone Reference
+                </dt>
+                <dd class="text-sm">
+                  {{ record.geography.zone_ref }}
+                </dd>
+              </div>
+
+              <!-- Center Coordinates -->
+              <div v-if="record.geography.center" class="space-y-1">
+                <dt
+                  class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                >
+                  Center Coordinates
+                </dt>
+                <dd class="text-sm">
+                  <span
+                    class="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
+                  >
+                    {{ record.geography.center.lon }},
+                    {{ record.geography.center.lat }}
+                  </span>
+                </dd>
+              </div>
+
+              <!-- Bounding Box -->
+              <div v-if="record.geography.bbox" class="space-y-1">
+                <dt
+                  class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                >
+                  Bounding Box
+                </dt>
+                <dd class="text-sm">
+                  <span
+                    class="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
+                  >
+                    [{{ record.geography.bbox.join(', ') }}]
+                  </span>
+                </dd>
+              </div>
+
+              <!-- Attachments -->
+              <div
+                v-if="
+                  record.geography.attachments &&
+                  record.geography.attachments.length > 0
+                "
+                class="space-y-1 md:col-span-2"
+              >
+                <dt
+                  class="text-sm font-medium text-gray-500 dark:text-gray-400"
+                >
+                  Attachments
+                </dt>
+                <dd class="text-sm">
+                  <div class="space-y-2">
+                    <div
+                      v-for="(attachment, index) in record.geography
+                        .attachments"
+                      :key="index"
+                      class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded"
+                    >
+                      <UIcon
+                        name="i-lucide-paperclip"
+                        class="w-4 h-4 text-gray-400"
+                      />
+                      <span class="font-medium">{{ attachment.role }}</span>
+                      <span class="text-gray-600 dark:text-gray-400">:</span>
+                      <span class="font-mono text-xs">{{
+                        attachment.path
+                      }}</span>
+                      <span
+                        v-if="attachment.description"
+                        class="text-gray-500 dark:text-gray-400 text-xs"
+                      >
+                        ({{ attachment.description }})
+                      </span>
+                    </div>
+                  </div>
+                </dd>
+              </div>
+            </div>
+            <div v-else class="text-gray-500 dark:text-gray-400 italic">
+              No geography data available for this record.
             </div>
           </div>
         </div>

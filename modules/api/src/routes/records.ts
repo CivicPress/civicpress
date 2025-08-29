@@ -276,6 +276,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('content').optional().isString(),
     body('role').optional().isString(),
     body('metadata').optional().isObject(),
+    body('geography').optional().isObject(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'create_record' });
 
@@ -290,7 +291,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
       }
 
       try {
-        const { title, type, content, metadata } = req.body;
+        const { title, type, content, metadata, geography } = req.body;
         const user = req.user;
 
         if (!user) {
@@ -340,6 +341,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
             type,
             content,
             metadata,
+            geography,
           },
           cleanUser
         );
@@ -394,6 +396,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('content').optional().isString(),
     body('status').optional().isString(),
     body('metadata').optional().isObject(),
+    body('geography').optional().isObject(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'update_record' });
 

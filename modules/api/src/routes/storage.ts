@@ -14,6 +14,7 @@ import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { Response } from 'express';
 import path from 'path';
+import fs from 'fs-extra';
 
 const router = Router();
 
@@ -160,6 +161,18 @@ router.post(
   param('folder').isString().notEmpty(),
   body('metadata').optional().isObject(),
   upload.single('file'),
+  (error: any, req: AuthenticatedRequest, res: Response, next: any) => {
+    if (error) {
+      return handleStorageError(
+        'upload_file',
+        new Error(`Invalid file type: ${error.message}`),
+        req,
+        res,
+        400
+      );
+    }
+    next();
+  },
   async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, { operation: 'upload_file', folder: req.params.folder });
 
@@ -318,13 +331,21 @@ router.get(
       const folderName = req.params.folder;
       const fileName = req.params.filename;
 
-      // Get file info first to check if it exists
-      const filePath = path.join(
-        '.system-data',
-        'storage',
+      // Find the actual file path using the original filename
+      const filePath = await storageService.findFileByOriginalName(
         folderName,
         fileName
       );
+
+      if (!filePath) {
+        return handleStorageError(
+          'download_file',
+          new Error(`File '${fileName}' not found in folder '${folderName}'`),
+          req,
+          res
+        );
+      }
+
       const fileInfo = await storageService.getFileInfo(filePath);
 
       // Set appropriate headers
@@ -336,7 +357,6 @@ router.get(
       res.setHeader('Content-Length', fileInfo.size.toString());
 
       // Stream the file
-      const fs = require('fs');
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);
     } catch (error: any) {
@@ -374,12 +394,21 @@ router.delete(
       const fileName = req.params.filename;
       const userId = req.user?.id?.toString();
 
-      const filePath = path.join(
-        '.system-data',
-        'storage',
+      // Find the actual file path using the original filename
+      const filePath = await storageService.findFileByOriginalName(
         folderName,
         fileName
       );
+
+      if (!filePath) {
+        return handleStorageError(
+          'delete_file',
+          new Error(`File '${fileName}' not found in folder '${folderName}'`),
+          req,
+          res
+        );
+      }
+
       const success = await storageService.deleteFile(filePath, userId);
 
       if (success) {
@@ -431,12 +460,21 @@ router.get(
       const folderName = req.params.folder;
       const fileName = req.params.filename;
 
-      const filePath = path.join(
-        '.system-data',
-        'storage',
+      // Find the actual file path using the original filename
+      const filePath = await storageService.findFileByOriginalName(
         folderName,
         fileName
       );
+
+      if (!filePath) {
+        return handleStorageError(
+          'get_file_info',
+          new Error(`File '${fileName}' not found in folder '${folderName}'`),
+          req,
+          res
+        );
+      }
+
       const fileInfo = await storageService.getFileInfo(filePath);
 
       return handleStorageSuccess(

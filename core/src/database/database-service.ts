@@ -337,11 +337,12 @@ export class DatabaseService {
     status?: string;
     content?: string;
     metadata?: string;
+    geography?: string;
     path?: string;
     author: string;
   }): Promise<void> {
     await this.adapter.execute(
-      'INSERT INTO records (id, title, type, status, content, metadata, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO records (id, title, type, status, content, metadata, geography, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         recordData.id,
         recordData.title,
@@ -349,6 +350,7 @@ export class DatabaseService {
         recordData.status || 'draft',
         recordData.content,
         recordData.metadata,
+        recordData.geography,
         recordData.path,
         recordData.author,
       ]
@@ -380,6 +382,7 @@ export class DatabaseService {
       status?: string;
       content?: string;
       metadata?: string;
+      geography?: string;
     }
   ): Promise<void> {
     const fields = [];
@@ -400,6 +403,10 @@ export class DatabaseService {
     if (updates.metadata !== undefined) {
       fields.push('metadata = ?');
       values.push(updates.metadata);
+    }
+    if (updates.geography !== undefined) {
+      fields.push('geography = ?');
+      values.push(updates.geography);
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');

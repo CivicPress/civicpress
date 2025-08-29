@@ -11,6 +11,8 @@ import * as path from 'path';
 
 const logger = new Logger();
 
+import { Geography } from '../types/geography.js';
+
 export interface RecordData {
   id: string;
   title: string;
@@ -18,6 +20,7 @@ export interface RecordData {
   status: string;
   content?: string;
   metadata?: Record<string, any>;
+  geography?: Geography;
   path?: string;
   author: string;
   created_at: string;
@@ -69,6 +72,7 @@ export class RecordManager {
       type: request.type,
       status: 'draft',
       content: request.content,
+      geography: request.geography,
       metadata: {
         ...safeMetadata,
         author: user.username, // Always set as string
@@ -91,6 +95,9 @@ export class RecordManager {
       status: record.status,
       content: record.content,
       metadata: JSON.stringify(record.metadata),
+      geography: record.geography
+        ? JSON.stringify(record.geography)
+        : undefined,
       path: record.path,
       author: record.author,
     });
@@ -137,6 +144,7 @@ export class RecordManager {
       type: request.type,
       status: 'draft',
       content: request.content,
+      geography: request.geography,
       metadata: {
         ...safeMetadata2,
         author: user.username, // Always set as string
@@ -159,6 +167,9 @@ export class RecordManager {
       status: record.status,
       content: record.content,
       metadata: JSON.stringify(record.metadata),
+      geography: record.geography
+        ? JSON.stringify(record.geography)
+        : undefined,
       path: record.path,
       author: record.author,
     });
@@ -203,6 +214,54 @@ export class RecordManager {
       }
     }
 
+    // Parse geography
+    if (record.geography) {
+      try {
+        record.geography = JSON.parse(record.geography);
+      } catch (error) {
+        logger.warn(`Failed to parse geography for record ${id}:`, error);
+        record.geography = undefined;
+      }
+    }
+
+    // Try to read geography from Markdown file if not in database
+    if (!record.geography && record.path) {
+      try {
+        const filePath = path.join(this.dataDir, record.path);
+        const fileContent = await fs.readFile(filePath, 'utf8');
+
+        // Extract frontmatter
+        const frontmatterMatch = fileContent.match(
+          /^---\s*\n([\s\S]*?)\n---\s*\n/
+        );
+        if (frontmatterMatch) {
+          const frontmatterYaml = frontmatterMatch[1];
+          const lines = frontmatterYaml.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('geography:')) {
+              const geographyValue = line.substring('geography:'.length).trim();
+              try {
+                record.geography = JSON.parse(geographyValue);
+                logger.info(`Loaded geography from file for record ${id}`);
+                break;
+              } catch (error) {
+                logger.warn(
+                  `Failed to parse geography from file for record ${id}:`,
+                  error
+                );
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logger.warn(
+          `Failed to read geography from file for record ${id}:`,
+          error
+        );
+      }
+    }
+
     return record;
   }
 
@@ -224,6 +283,8 @@ export class RecordManager {
     if (request.title !== undefined) updates.title = request.title;
     if (request.content !== undefined) updates.content = request.content;
     if (request.status !== undefined) updates.status = request.status;
+    if (request.geography !== undefined)
+      updates.geography = JSON.stringify(request.geography);
     if (request.metadata !== undefined) {
       updates.metadata = JSON.stringify({
         ...existingRecord.metadata,
@@ -499,6 +560,7 @@ export class RecordManager {
       author: record.author, // Keep the string author from record.author
       created_at: record.created_at,
       updated_at: record.updated_at,
+      geography: record.geography, // Include geography data
       ...otherMetadata, // Spread other metadata but not author
     };
 
