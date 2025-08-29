@@ -29,11 +29,7 @@ title: "Noise Control — Residential Zones"
 geography:
   srid: 4326
   zone_ref: "mtl:zone:res-R1"
-  bbox:
-    minLon: -73.65
-    minLat: 45.45
-    maxLon: -73.52
-    maxLat: 45.55
+  bbox: [-73.65, 45.45, -73.52, 45.55]
 ---
 Content here
 `;
