@@ -176,6 +176,22 @@ export class SQLiteAdapter implements DatabaseAdapter {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
       )`,
+
+      // Storage files table for UUID-based file tracking
+      `CREATE TABLE IF NOT EXISTS storage_files (
+        id TEXT PRIMARY KEY, -- UUID
+        original_name TEXT NOT NULL,
+        stored_filename TEXT NOT NULL,
+        folder TEXT NOT NULL,
+        relative_path TEXT NOT NULL, -- folder/stored_filename
+        provider_path TEXT NOT NULL, -- full path in storage provider
+        size INTEGER NOT NULL,
+        mime_type TEXT NOT NULL,
+        description TEXT,
+        uploaded_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
     ];
 
     for (const table of tables) {

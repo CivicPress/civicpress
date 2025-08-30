@@ -26,6 +26,7 @@ import setupAuthCommand from './commands/auth.js';
 import setupUsersCommand from './commands/users.js';
 import setupStorageCommand from './commands/storage.js';
 import { registerGeographyCommand } from './commands/geography.js';
+// import { registerStorageConfigCommand } from './commands/storage-config.js';
 import { CentralConfigManager } from '@civicpress/core';
 import { infoCommand } from './commands/info.js';
 import notifyCommand from './commands/notify.js';
@@ -85,6 +86,9 @@ setupStorageCommand(cli);
 
 // Setup geography commands
 registerGeographyCommand(cli);
+
+// Setup storage configuration commands
+// registerStorageConfigCommand(cli); // Temporarily disabled due to import issues
 
 // Setup notification commands
 notifyCommand(cli);

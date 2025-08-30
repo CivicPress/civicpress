@@ -268,7 +268,16 @@ export class StorageConfigManager {
    */
   private mergeWithDefaults(config: Partial<StorageConfig>): StorageConfig {
     return {
+      // Legacy backend (for backward compatibility)
       backend: { ...this.defaultConfig.backend, ...config.backend },
+
+      // New multi-provider configuration
+      providers: config.providers || undefined,
+      active_provider: config.active_provider || undefined,
+      failover_providers: config.failover_providers || undefined,
+      global: config.global || undefined,
+
+      // Existing fields
       folders: { ...this.defaultConfig.folders, ...config.folders },
       metadata: { ...this.defaultConfig.metadata, ...config.metadata },
     };

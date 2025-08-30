@@ -297,14 +297,15 @@ const uploadFiles = async () => {
       // Upload file
       const formData = new FormData();
       formData.append('file', item.file);
+      formData.append('folder', props.folder);
+      if (item.description) {
+        formData.append('description', item.description);
+      }
 
-      const response = (await useNuxtApp().$civicApi(
-        `/api/v1/storage/upload/${props.folder}`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      )) as any;
+      const response = (await useNuxtApp().$civicApi(`/api/v1/storage/files`, {
+        method: 'POST',
+        body: formData,
+      })) as any;
 
       clearInterval(progressInterval);
 
@@ -316,12 +317,15 @@ const uploadFiles = async () => {
         // Emit success
         emit('upload-complete', [
           {
-            id: item.id,
-            name: item.file.name,
-            size: item.file.size,
-            type: item.file.type,
+            id: response.data.id, // UUID from storage system
+            name: response.data.original_name || item.file.name,
+            size: response.data.size || item.file.size,
+            type: response.data.mime_type || item.file.type,
             url: response.data.url,
             path: response.data.path,
+            folder: response.data.folder,
+            description: response.data.description,
+            created_at: response.data.created_at,
           },
         ]);
       } else {

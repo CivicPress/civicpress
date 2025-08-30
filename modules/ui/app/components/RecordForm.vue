@@ -14,7 +14,12 @@ interface RecordFormData {
     zone_ref?: string;
     bbox?: [number, number, number, number];
     center?: { lon: number; lat: number };
-    attachments?: Array<{ path: string; role: string; description?: string }>;
+    attachments?: Array<{
+      id?: string; // UUID reference (preferred)
+      path: string; // Display path
+      role: string;
+      description?: string;
+    }>;
   };
   metadata: {
     tags: string[];
@@ -69,7 +74,8 @@ const form = reactive({
     bbox: [0, 0, 0, 0] as [number, number, number, number],
     center: { lon: 0, lat: 0 },
     attachments: [] as Array<{
-      path: string;
+      id?: string; // UUID reference
+      path: string; // Display path
       role: string;
       description?: string;
     }>,
@@ -81,10 +87,15 @@ const newTag = ref('');
 
 // New attachment inputs
 const newAttachment = reactive({
+  file: null as File | null,
   path: '',
   role: '',
   description: '',
 });
+
+// File upload state
+const uploading = ref(false);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 // Selected options for select menus
 const selectedRecordType = ref<any>(null);
@@ -420,19 +431,112 @@ const removeTag = (tag: string) => {
   }
 };
 
-// Add attachment
-const addAttachment = () => {
-  if (newAttachment.path.trim() && newAttachment.role.trim()) {
-    form.geography.attachments.push({
+// Handle file selection
+const handleFileSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (file) {
+    newAttachment.file = file;
+    newAttachment.path = file.name; // Show filename in path field
+  }
+};
+
+// Upload file to storage
+const uploadFile = async (
+  file: File,
+  folder: string = 'public'
+): Promise<{ id: string; path: string } | null> => {
+  try {
+    uploading.value = true;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    formData.append('description', `Geography attachment: ${file.name}`);
+
+    const response = await $fetch('/api/v1/storage/files', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (response.success && response.data) {
+      return {
+        id: response.data.id,
+        path: response.data.path, // This is the relative path for display
+      };
+    } else {
+      throw new Error(response.error || 'Upload failed');
+    }
+  } catch (error) {
+    console.error('File upload failed:', error);
+    toast.add({
+      title: 'Upload Failed',
+      description:
+        error instanceof Error ? error.message : 'Failed to upload file',
+      color: 'red',
+    });
+    return null;
+  } finally {
+    uploading.value = false;
+  }
+};
+
+// Add attachment (with file upload if file is selected)
+const addAttachment = async () => {
+  if (!newAttachment.role.trim()) {
+    toast.add({
+      title: 'Validation Error',
+      description: 'Role is required for attachments',
+      color: 'red',
+    });
+    return;
+  }
+
+  let attachmentData: {
+    id?: string;
+    path: string;
+    role: string;
+    description?: string;
+  };
+
+  // If file is selected, upload it first
+  if (newAttachment.file) {
+    const uploadResult = await uploadFile(newAttachment.file);
+    if (!uploadResult) {
+      return; // Upload failed, error already shown
+    }
+
+    attachmentData = {
+      id: uploadResult.id,
+      path: uploadResult.path,
+      role: newAttachment.role.trim(),
+      description: newAttachment.description.trim() || undefined,
+    };
+  } else if (newAttachment.path.trim()) {
+    // Manual path entry (legacy support)
+    attachmentData = {
       path: newAttachment.path.trim(),
       role: newAttachment.role.trim(),
       description: newAttachment.description.trim() || undefined,
+    };
+  } else {
+    toast.add({
+      title: 'Validation Error',
+      description: 'Please select a file or enter a path',
+      color: 'red',
     });
+    return;
+  }
 
-    // Clear form
-    newAttachment.path = '';
-    newAttachment.role = '';
-    newAttachment.description = '';
+  form.geography.attachments.push(attachmentData);
+
+  // Clear form
+  newAttachment.file = null;
+  newAttachment.path = '';
+  newAttachment.role = '';
+  newAttachment.description = '';
+  if (fileInput.value) {
+    fileInput.value.value = '';
   }
 };
 
@@ -818,28 +922,74 @@ const loadTemplate = () => {
 
             <!-- Add new attachment -->
             <div
-              class="space-y-2 p-3 border rounded-lg bg-white dark:bg-gray-700"
+              class="space-y-3 p-4 border rounded-lg bg-white dark:bg-gray-700"
             >
-              <div class="grid grid-cols-1 gap-2">
+              <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                Add Geography File
+              </h4>
+
+              <!-- File Upload Option -->
+              <div class="space-y-2">
+                <label
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Upload File
+                </label>
+                <input
+                  ref="fileInput"
+                  type="file"
+                  @change="handleFileSelect"
+                  :disabled="saving || uploading"
+                  accept=".geojson,.kml,.gpx,.json,.csv,.pdf,.jpg,.jpeg,.png,.gif"
+                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300"
+                />
+                <p class="text-xs text-gray-500">
+                  Supports geographic files (.geojson, .kml, .gpx), images, and
+                  documents
+                </p>
+              </div>
+
+              <!-- OR separator -->
+              <div class="flex items-center">
+                <div class="flex-1 border-t border-gray-300"></div>
+                <span
+                  class="px-3 text-xs text-gray-500 bg-white dark:bg-gray-700"
+                  >OR</span
+                >
+                <div class="flex-1 border-t border-gray-300"></div>
+              </div>
+
+              <!-- Manual Path Entry -->
+              <div class="space-y-2">
+                <label
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Manual Path Entry
+                </label>
                 <UInput
                   v-model="newAttachment.path"
                   placeholder="File path or URL"
-                  :disabled="saving"
+                  :disabled="saving || uploading || !!newAttachment.file"
                   class="w-full"
                 />
+              </div>
+
+              <!-- Role and Description -->
+              <div class="grid grid-cols-1 gap-2">
                 <UInput
                   v-model="newAttachment.role"
-                  placeholder="Role (e.g., map, data, document)"
-                  :disabled="saving"
+                  placeholder="Role (e.g., map, data, context, document)"
+                  :disabled="saving || uploading"
                   class="w-full"
                 />
                 <UInput
                   v-model="newAttachment.description"
                   placeholder="Description (optional)"
-                  :disabled="saving"
+                  :disabled="saving || uploading"
                   class="w-full"
                 />
               </div>
+
               <UButton
                 color="primary"
                 variant="outline"
@@ -847,43 +997,81 @@ const loadTemplate = () => {
                 @click="addAttachment"
                 :disabled="
                   saving ||
-                  !newAttachment.path.trim() ||
-                  !newAttachment.role.trim()
+                  uploading ||
+                  !newAttachment.role.trim() ||
+                  (!newAttachment.file && !newAttachment.path.trim())
                 "
+                :loading="uploading"
                 class="w-full"
               >
-                Add Attachment
+                {{ uploading ? 'Uploading...' : 'Add Attachment' }}
               </UButton>
             </div>
 
             <!-- Existing attachments -->
             <div v-if="form.geography.attachments.length > 0" class="space-y-2">
+              <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                Attached Files
+              </h4>
               <div
                 v-for="(attachment, index) in form.geography.attachments"
                 :key="index"
-                class="flex items-center justify-between p-2 border rounded-lg bg-white dark:bg-gray-700"
+                class="flex items-center justify-between p-3 border rounded-lg bg-white dark:bg-gray-700"
               >
                 <div class="flex-1 min-w-0">
-                  <p
-                    class="text-sm font-medium text-gray-900 dark:text-white truncate"
-                  >
-                    {{ attachment.path }}
-                  </p>
+                  <div class="flex items-center gap-2">
+                    <p
+                      class="text-sm font-medium text-gray-900 dark:text-white truncate"
+                    >
+                      {{ attachment.path }}
+                    </p>
+                    <span
+                      v-if="attachment.id"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                    >
+                      UUID
+                    </span>
+                  </div>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     Role: {{ attachment.role }}
                     <span v-if="attachment.description">
-                      - {{ attachment.description }}</span
-                    >
+                      - {{ attachment.description }}
+                    </span>
+                  </p>
+                  <p
+                    v-if="attachment.id"
+                    class="text-xs text-gray-400 font-mono"
+                  >
+                    ID: {{ attachment.id }}
                   </p>
                 </div>
-                <UButton
-                  icon="i-lucide-x"
-                  color="error"
-                  variant="ghost"
-                  size="xs"
-                  @click="removeAttachment(index)"
-                  :disabled="saving"
-                />
+                <div class="flex items-center gap-1">
+                  <UButton
+                    v-if="attachment.id"
+                    icon="i-lucide-external-link"
+                    color="blue"
+                    variant="ghost"
+                    size="xs"
+                    @click="
+                      () =>
+                        window.open(
+                          `/api/v1/storage/files/${attachment.id}`,
+                          '_blank'
+                        )
+                    "
+                    :disabled="saving"
+                    title="Download file"
+                  />
+                  <UButton
+                    icon="i-lucide-x"
+                    color="red"
+                    variant="ghost"
+                    size="xs"
+                    @click="removeAttachment(index)"
+                    :disabled="saving"
+                    title="Remove attachment"
+                  />
+                </div>
               </div>
             </div>
           </div>

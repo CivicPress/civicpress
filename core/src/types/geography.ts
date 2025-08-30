@@ -11,7 +11,8 @@ export interface GeographyPoint {
 export type GeographyBBox = [number, number, number, number]; // [minLon, minLat, maxLon, maxLat]
 
 export interface GeographyAttachment {
-  path: string; // File path reference
+  id?: string; // UUID reference to storage file (preferred)
+  path: string; // File path reference (for display/legacy)
   role: string; // Context, map, data, etc.
   description?: string; // Optional description
 }

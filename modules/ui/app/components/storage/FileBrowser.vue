@@ -427,7 +427,7 @@ const loading = ref(false);
 const files = ref<FileInfo[]>([]);
 const searchQuery = ref('');
 const selectedType = ref<{ label: string; id: string }[]>([]);
-const sortBy = ref<{ label: string; id: string } | null>(null);
+const sortBy = ref<{ label: string; id: string } | undefined>(undefined);
 const currentPage = ref(1);
 const perPage = ref(20);
 const selectedFiles = ref<string[]>([]);
@@ -572,10 +572,11 @@ const canDelete = computed(() => {
 
 // Types
 interface FileInfo {
-  name: string;
+  id: string; // UUID from storage system
+  name: string; // original_name from API
   size: number;
   mime_type: string;
-  path: string;
+  path: string; // relative_path from API
   url: string;
   created: string;
   modified: string;
@@ -587,11 +588,21 @@ const loadFiles = async () => {
 
   try {
     const response = (await useNuxtApp().$civicApi(
-      `/api/v1/storage/files/${props.folder}`
+      `/api/v1/storage/folders/${props.folder}/files`
     )) as any;
 
     if (response.success) {
-      files.value = response.data.files;
+      // Map API response to FileInfo interface
+      files.value = response.data.files.map((apiFile: any) => ({
+        id: apiFile.id,
+        name: apiFile.original_name,
+        size: apiFile.size,
+        mime_type: apiFile.mime_type,
+        path: apiFile.relative_path,
+        url: apiFile.url || `/api/v1/storage/files/${apiFile.id}`,
+        created: apiFile.created_at,
+        modified: apiFile.updated_at,
+      }));
     } else {
       throw new Error(response.error?.message || 'Failed to load files');
     }
@@ -645,7 +656,7 @@ const downloadFile = async (file: FileInfo) => {
     const authStore = useAuthStore();
 
     const response = await fetch(
-      `${config.public.civicApiUrl}/api/v1/storage/download/${props.folder}/${encodeURIComponent(file.name)}`,
+      `${config.public.civicApiUrl}/api/v1/storage/files/${file.id}`,
       {
         method: 'GET',
         headers: {
@@ -696,7 +707,7 @@ const confirmDeleteFile = async () => {
   deleting.value = true;
   try {
     const response = (await useNuxtApp().$civicApi(
-      `/api/v1/storage/files/${props.folder}/${encodeURIComponent(fileToDelete.value.name)}`,
+      `/api/v1/storage/files/${fileToDelete.value.id}`,
       {
         method: 'DELETE',
       }
@@ -758,7 +769,7 @@ const confirmBulkDelete = async () => {
       const file = files.value.find((f) => f.path === path);
       if (file) {
         const response = (await useNuxtApp().$civicApi(
-          `/api/v1/storage/files/${props.folder}/${encodeURIComponent(file.name)}`,
+          `/api/v1/storage/files/${file.id}`,
           {
             method: 'DELETE',
           }
@@ -862,6 +873,12 @@ const formatDate = (dateString: string): string => {
 const getAuthToken = (): string => {
   return authStore.token || '';
 };
+
+// Expose methods to parent
+defineExpose({
+  refreshFiles,
+  loadFiles,
+});
 
 // Lifecycle
 onMounted(() => {

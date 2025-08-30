@@ -199,6 +199,7 @@ import { useAuthStore } from '@/stores/auth';
 // Props
 interface Props {
   file: {
+    id: string; // UUID from storage system
     name: string;
     size: number;
     mime_type: string;
@@ -303,7 +304,7 @@ const loadImage = async () => {
     const authStore = useAuthStore();
 
     const response = await fetch(
-      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
         headers: {
@@ -364,7 +365,7 @@ const loadPDF = async () => {
     const authStore = useAuthStore();
 
     const response = await fetch(
-      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
         headers: {
@@ -407,7 +408,7 @@ const loadVideo = async () => {
     const authStore = useAuthStore();
 
     const response = await fetch(
-      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
         headers: {
@@ -450,7 +451,7 @@ const loadAudio = async () => {
     const authStore = useAuthStore();
 
     const response = await fetch(
-      `${config.public.civicApiUrl}/api/v1/storage/download/${folder}/${encodeURIComponent(props.file.name)}`,
+      `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
         headers: {

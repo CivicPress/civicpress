@@ -24,7 +24,7 @@ import { createValidationRouter } from './routes/validation.js';
 import { createDiffRouter } from './routes/diff.js';
 import { createAuditRouter } from './routes/audit.js';
 import notificationsRouter from './routes/notifications.js';
-import storageRouter from './routes/storage.js';
+import uuidStorageRouter from './routes/uuid-storage.js';
 import {
   router as usersRouter,
   registrationRouter,
@@ -45,6 +45,7 @@ import {
   authLoggingMiddleware,
   performanceMonitoringMiddleware,
   requestContextMiddleware,
+  createDatabaseContextMiddleware,
 } from './middleware/logging.js';
 import { authMiddleware } from './middleware/auth.js';
 import { delayMiddleware } from './middleware/delay.js';
@@ -318,7 +319,8 @@ export class CivicPressAPI {
     this.app.use(
       '/api/v1/storage',
       authMiddleware(this.civicPress),
-      storageRouter
+      createDatabaseContextMiddleware(this.civicPress),
+      uuidStorageRouter
     );
     this.app.use('/api/v1/users', authMiddleware(this.civicPress), usersRouter);
   }

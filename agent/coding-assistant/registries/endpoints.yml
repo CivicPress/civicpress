@@ -294,6 +294,42 @@ endpoints:
     desc: Remove storage folder
     status: stable
 
+  # UUID Storage System (New Multi-Cloud Implementation)
+  - id: storage:upload:uuid
+    method: POST
+    path: /api/v1/storage/files
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Upload file with UUID tracking (supports local, S3, Azure)
+    status: stable
+
+  - id: storage:download:uuid
+    method: GET
+    path: /api/v1/storage/files/:id
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Download file by UUID
+    status: stable
+
+  - id: storage:info:uuid
+    method: GET
+    path: /api/v1/storage/files/:id/info
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Get file metadata by UUID
+    status: stable
+
+  - id: storage:delete:uuid
+    method: DELETE
+    path: /api/v1/storage/files/:id
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Delete file by UUID
+    status: stable
+
+  - id: storage:list:folder:uuid
+    method: GET
+    path: /api/v1/storage/folders/:folder/files
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: List files in folder with UUID metadata
+    status: stable
+
   - id: config:metadata
     method: GET
     path: /api/v1/config/metadata/:type

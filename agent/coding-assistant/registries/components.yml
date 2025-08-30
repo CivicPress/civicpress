@@ -73,3 +73,20 @@ components:
     file: modules/ui/app/components/UserMenu.vue
     purpose: User profile dropdown and actions
     status: stable
+
+  # Storage Components
+  - name: FileBrowser
+    file: modules/ui/app/components/storage/FileBrowser.vue
+    purpose:
+      Browse, search, upload, and manage files with UUID support and refresh
+    status: stable
+
+  - name: FileUpload
+    file: modules/ui/app/components/storage/FileUpload.vue
+    purpose: Upload files to multi-cloud storage with UUID tracking
+    status: stable
+
+  - name: MediaPlayer
+    file: modules/ui/app/components/storage/MediaPlayer.vue
+    purpose: Preview and play various media types from UUID storage
+    status: stable

@@ -124,6 +124,7 @@
           </div>
 
           <FileBrowser
+            ref="fileBrowserRef"
             :folder="selectedFolder"
             :allowed-types="getFolderAllowedTypes(selectedFolder)"
             :max-size="getFolderMaxSize(selectedFolder)"
@@ -278,6 +279,7 @@ const authStore = useAuthStore();
 
 // State
 const selectedFolder = ref<string | null>(null);
+const fileBrowserRef = ref<InstanceType<typeof FileBrowser> | null>(null);
 const storageStats = ref({
   totalFiles: 0,
   totalSize: '0 B',
@@ -424,7 +426,17 @@ const refreshFolderFiles = async () => {
 
   refreshing.value = true;
   try {
+    // Refresh the FileBrowser component's file list
+    if (
+      fileBrowserRef.value &&
+      typeof fileBrowserRef.value.refreshFiles === 'function'
+    ) {
+      await fileBrowserRef.value.refreshFiles();
+    }
+
+    // Also refresh storage stats
     await loadStorageStats();
+
     toast.add({
       title: 'Success',
       description: 'Storage information refreshed',
@@ -465,9 +477,9 @@ const loadStorageStats = async () => {
     // Load stats for each folder
     for (const folder of storageFolders.value) {
       if (folder.enabled) {
-        const response = await useNuxtApp().$civicApi(
-          `/api/v1/storage/files/${folder.name}`
-        );
+        const response = (await useNuxtApp().$civicApi(
+          `/api/v1/storage/folders/${folder.name}/files`
+        )) as any;
 
         if (response.success) {
           const files = response.data.files;
@@ -519,7 +531,7 @@ const parseFileSize = (sizeStr: string): number => {
   };
 
   const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)$/i);
-  if (!match) return 0;
+  if (!match || !match[1] || !match[2]) return 0;
 
   const value = parseFloat(match[1]);
   const unit = match[2].toUpperCase();

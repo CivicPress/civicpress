@@ -78,5 +78,8 @@
       "markdownlint --fix",
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.879.0"
   }
 }
