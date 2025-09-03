@@ -98,6 +98,25 @@ describe('UUID Storage API', () => {
         .field('folder', 'public')
         .field('description', 'Test file for download');
 
+      // Debug upload response
+      if (uploadResponse.status !== 200) {
+        console.error(
+          'Upload failed:',
+          uploadResponse.status,
+          uploadResponse.body
+        );
+        throw new Error(
+          `Upload failed with status ${uploadResponse.status}: ${JSON.stringify(uploadResponse.body)}`
+        );
+      }
+
+      if (!uploadResponse.body.data || !uploadResponse.body.data.id) {
+        console.error('Upload response missing data:', uploadResponse.body);
+        throw new Error(
+          `Upload response missing data: ${JSON.stringify(uploadResponse.body)}`
+        );
+      }
+
       uploadedFileId = uploadResponse.body.data.id;
     });
 
@@ -140,6 +159,25 @@ describe('UUID Storage API', () => {
         .attach('file', testFilePath)
         .field('folder', 'public')
         .field('description', 'Test file for info');
+
+      // Debug upload response
+      if (uploadResponse.status !== 200) {
+        console.error(
+          'Upload failed:',
+          uploadResponse.status,
+          uploadResponse.body
+        );
+        throw new Error(
+          `Upload failed with status ${uploadResponse.status}: ${JSON.stringify(uploadResponse.body)}`
+        );
+      }
+
+      if (!uploadResponse.body.data || !uploadResponse.body.data.id) {
+        console.error('Upload response missing data:', uploadResponse.body);
+        throw new Error(
+          `Upload response missing data: ${JSON.stringify(uploadResponse.body)}`
+        );
+      }
 
       uploadedFileId = uploadResponse.body.data.id;
     });
@@ -214,6 +252,25 @@ describe('UUID Storage API', () => {
         .attach('file', testFilePath)
         .field('folder', 'public')
         .field('description', 'Test file for deletion');
+
+      // Debug upload response
+      if (uploadResponse.status !== 200) {
+        console.error(
+          'Upload failed:',
+          uploadResponse.status,
+          uploadResponse.body
+        );
+        throw new Error(
+          `Upload failed with status ${uploadResponse.status}: ${JSON.stringify(uploadResponse.body)}`
+        );
+      }
+
+      if (!uploadResponse.body.data || !uploadResponse.body.data.id) {
+        console.error('Upload response missing data:', uploadResponse.body);
+        throw new Error(
+          `Upload response missing data: ${JSON.stringify(uploadResponse.body)}`
+        );
+      }
 
       uploadedFileId = uploadResponse.body.data.id;
     });

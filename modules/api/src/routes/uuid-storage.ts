@@ -108,9 +108,18 @@ let databaseService: DatabaseService;
 // Initialize storage services (called when routes are first accessed)
 const initializeStorage = async (req: AuthenticatedRequest) => {
   if (!storageService) {
-    configManager = new StorageConfigManager('.system-data');
+    // Get CivicPress instance and data directory from request context
+    const civicPress = (req as any).context?.civicPress;
+    if (!civicPress) {
+      throw new Error('CivicPress instance not available');
+    }
+
+    const dataDir = civicPress.getDataDir();
+    const systemDataDir = `${dataDir}/.system-data`;
+
+    configManager = new StorageConfigManager(systemDataDir);
     const config = await configManager.loadConfig();
-    storageService = new CloudUuidStorageService(config, '.system-data');
+    storageService = new CloudUuidStorageService(config, systemDataDir);
 
     // Get database service from request context (injected by API)
     databaseService = (req as any).context?.databaseService;

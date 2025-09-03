@@ -11,6 +11,7 @@ import {
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { existsSync, rmSync, mkdirSync, writeFileSync, writeFile } from 'fs';
+import { ensureDirSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import yaml from 'js-yaml';
 
@@ -631,6 +632,68 @@ export function createCivicConfig(config: TestConfig, overrides: any = {}) {
   writeFileSync(join(config.testDir, '.civicrc'), yaml.dump(civicConfig));
 }
 
+export function createStorageConfig(config: TestConfig) {
+  const storageConfig = {
+    backend: {
+      type: 'local',
+      path: 'storage',
+    },
+    providers: {
+      local: {
+        type: 'local',
+        path: 'storage',
+        enabled: true,
+      },
+    },
+    active_provider: 'local',
+    failover_providers: ['local'],
+    global: {
+      max_file_size: '100MB',
+      health_checks: false,
+      health_check_interval: 30,
+      retry_attempts: 1,
+      cross_provider_backup: false,
+      backup_providers: [],
+    },
+    folders: {
+      public: {
+        path: 'public',
+        access: 'public',
+        allowed_types: [
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'pdf',
+          'txt',
+          'md',
+          'doc',
+          'docx',
+        ],
+        max_size: '10MB',
+        description: 'Public files for testing',
+      },
+      sessions: {
+        path: 'sessions',
+        access: 'public',
+        allowed_types: ['mp4', 'webm', 'mp3', 'wav', 'pdf', 'md'],
+        max_size: '100MB',
+        description: 'Session files for testing',
+      },
+    },
+    metadata: {
+      auto_generate_thumbnails: false,
+      store_exif: false,
+      compress_images: false,
+      backup_included: false,
+    },
+  };
+
+  const systemDataDir = join(config.testDir, '.system-data');
+  ensureDirSync(systemDataDir);
+  writeFileSync(join(systemDataDir, 'storage.yml'), yaml.dump(storageConfig));
+}
+
 export function createWorkflowConfig(config: TestConfig) {
   const workflowConfig = {
     statuses: ['draft', 'proposed', 'reviewed', 'approved', 'archived'],
@@ -1131,6 +1194,7 @@ export async function createAPITestContext(): Promise<APITestContext> {
   createCivicConfig(config);
   createWorkflowConfig(config);
   createRolesConfig(config);
+  createStorageConfig(config);
   createSampleRecords(config);
 
   // Initialize Git repository for the test directory
@@ -1258,6 +1322,7 @@ export async function createExtendedAPITestContext(): Promise<APITestContext> {
   // Create extended configuration
   createExtendedCivicConfig(config);
   createWorkflowConfig(config);
+  createStorageConfig(config);
   createExtendedSampleRecords(config);
 
   // Initialize API with dynamic port
