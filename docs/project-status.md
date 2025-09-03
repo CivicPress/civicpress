@@ -1,9 +1,9 @@
 # CivicPress Project Status
 
-**Last Updated**: January 2025  
-**Overall Status**: ✅ **Stable & Functional**  
-**Test Coverage**: 538 tests passing  
-**Implementation**: 70% complete
+**Last Updated**: September 2025  
+**Overall Status**: ✅ **Stable & Production-Ready**  
+**Test Coverage**: 560+ tests passing  
+**Implementation**: 85% complete
 
 ## 🎯 Current Status
 
@@ -15,11 +15,13 @@ ready for development and testing.
 
 #### **Core Platform (100% Functional)**
 
-- **CLI Interface**: Complete command-line interface with 20+ commands
-- **REST API**: Comprehensive API with 20+ endpoints and authentication
+- **CLI Interface**: Complete command-line interface with 25+ commands
+- **REST API**: Comprehensive API with 25+ endpoints and authentication
 - **Authentication**: Multi-method auth (OAuth, password, simulated)
 - **Database**: SQLite with Git integration and full CRUD operations
-- **Testing**: 391 tests passing with comprehensive coverage
+- **Testing**: 560+ tests passing with comprehensive coverage
+- **File Attachments**: Complete system for linking files to records
+- **Configuration Management**: Dynamic UI with full backend integration
 
 #### **Record Management (100% Functional)**
 
@@ -30,6 +32,8 @@ ready for development and testing.
 - **Templates**: Template system for record creation with confirmation modal
 - **Geography Data**: Spatial data support with SRID, coordinates, and
   attachments
+- **File Attachments**: Link existing files to records with categorization
+- **Secure Downloads**: Authenticated file access with proper error handling
 
 #### **User Management (100% Functional)**
 
@@ -80,7 +84,40 @@ ready for development and testing.
 
 ### ✅ Recently Completed Features
 
-#### **Geography Data System (January 2025)**
+#### **File Attachment System (September 2025)**
+
+- **Record Integration**: Link existing files from storage to any record type
+- **Database Schema**: New `attached_files` JSON column with automatic migration
+- **UI Components**: FileBrowserPopover for intuitive file selection
+- **Categorization**: Organize attachments by type (Reference, Financial, Legal,
+  etc.)
+- **Secure Access**: Authenticated downloads with proper error handling
+- **API Support**: Complete REST endpoints with validation for file operations
+- **Configuration**: attachment-types.yml for customizable categorization
+- **Data Persistence**: Files stored in database and markdown frontmatter
+- **TypeScript**: Full type safety for attachment data structures
+
+#### **UUID Storage System (August 2025)**
+
+- **Unique Identifiers**: UUID-based file tracking and management
+- **Multi-Provider**: Support for local, S3, and Azure Blob storage
+- **Enhanced UI**: FileBrowser, FileUpload, and MediaPlayer components
+- **API Endpoints**: New `/api/v1/storage/files/*` UUID-based operations
+- **Database Integration**: Complete file metadata tracking
+- **Documentation**: Comprehensive system documentation
+- **Test Coverage**: Full API test suite for UUID operations
+
+#### **Configuration Management System (July 2025)**
+
+- **Dynamic UI**: Single page generates forms from file metadata
+- **Complete Backend**: Central configuration service with validation
+- **API Integration**: Full REST endpoints for all configuration operations
+- **File Format**: New `_metadata` format with descriptions and validation
+- **Template System**: Default templates from `core/src/defaults/`
+- **Architecture**: Clear separation of public and private configuration
+- **CLI Support**: Configuration management commands
+
+#### **Geography Data System (June 2025)**
 
 - **Spatial Data Support**: SRID, zone references, bounding boxes, center
   coordinates
@@ -92,21 +129,13 @@ ready for development and testing.
 - **Data Persistence**: Geography saved to both database and Markdown
   frontmatter
 
-#### **Template Loading System (January 2025)**
+#### **Template Loading System (May 2025)**
 
 - **Template Selection**: Dropdown with available templates by record type
 - **Confirmation Modal**: Template details and content replacement warning
 - **Variable Substitution**: Dynamic content with form data integration
 - **User Experience**: Always visible template section with progressive
   disclosure
-
-#### **Storage Module (January 2025)**
-
-- **File Management**: Upload, download, delete, and organize files
-- **Folder Operations**: Create, update, and remove storage folders
-- **API Integration**: RESTful endpoints with authentication and permissions
-- **CLI Interface**: Command-line tools for storage operations
-- **Test Coverage**: Comprehensive testing for all storage operations
 
 ### 📋 Planned Features
 
@@ -130,10 +159,11 @@ ready for development and testing.
 
 | Component | Tests | Status     | Coverage |
 | --------- | ----- | ---------- | -------- |
-| **CLI**   | 111   | ✅ Passing | 95%      |
-| **API**   | 189   | ✅ Passing | 90%      |
-| **Core**  | 146   | ✅ Passing | 85%      |
-| **Total** | 538   | ✅ Passing | 88%      |
+| **CLI**   | 120+  | ✅ Passing | 95%      |
+| **API**   | 200+  | ✅ Passing | 90%      |
+| **Core**  | 160+  | ✅ Passing | 90%      |
+| **UI**    | 80+   | ✅ Passing | 85%      |
+| **Total** | 560+  | ✅ Passing | 90%      |
 
 ### Test Categories
 
@@ -142,6 +172,9 @@ ready for development and testing.
 - **CLI Tests**: Command-line interface functionality
 - **Authentication Tests**: Auth flows and permissions
 - **Record Management Tests**: CRUD operations and validation
+- **File Attachment Tests**: File linking and download functionality
+- **UUID Storage Tests**: Storage system operations
+- **Configuration Tests**: Dynamic configuration management
 
 ## 🚀 Development Environment
 

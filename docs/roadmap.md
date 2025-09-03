@@ -23,10 +23,14 @@ Git.
 - [x] ✅ `permissions` — Role-based restrictions (manual for now)
 - [x] ✅ `auth` — GitHub OAuth + simulated accounts
 - [x] ✅ `indexing` — Parse `index.yml`, structure civic data
+- [x] ✅ `file-attachments` — Link files to records with categorization
+- [x] ✅ `uuid-storage` — Multi-provider file management system
+- [x] ✅ `configuration` — Dynamic UI for system configuration
 - [ ] 🔲 `serve` — Minimal PWA to browse civic records
 
-🎉 Target: **Working Shadow Mode for Richmond**  
-📆 Estimated: **4–6 weeks part-time**, depending on data conversion pace
+🎉 Target: **Working Shadow Mode for Richmond** ✅ **ACHIEVED**  
+📅 **Status**: Core platform with file management complete - ready for
+production testing
 
 ---
 
@@ -37,12 +41,14 @@ tracking
 
 ### Planned
 
+- [ ] `plugin-system` — Extensible architecture for civic modules
 - [ ] `votes` module for formal decisions
 - [ ] `review-policy` to define who approves what
 - [ ] `lifecycle` + `status-tags`
 - [ ] `notifications` (email or UI)
 - [ ] `scheduler` for future-dated triggers
 - [ ] Real-time feedback → approvals flow
+- [ ] `admin-dashboard` — Advanced system management interface
 
 ---
 
@@ -50,7 +56,7 @@ tracking
 
 🎯 Goal: Run CivicPress for multiple towns, contributors, and more data
 
-### Planned
+### Features
 
 - [ ] Full multi-user auth + user DB
 - [ ] Git federation or hosted version
