@@ -35,9 +35,11 @@ describe('UUID Storage API', () => {
 
   afterEach(async () => {
     // Reset storage services to ensure fresh initialization for each test
-    const { resetStorageServices } = await import('../../modules/api/src/routes/uuid-storage.js');
+    const { resetStorageServices } = await import(
+      '../../modules/api/src/routes/uuid-storage.js'
+    );
     resetStorageServices();
-    
+
     await cleanupAPITestContext(context);
   });
 
@@ -193,13 +195,13 @@ describe('UUID Storage API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.file).toHaveProperty('id', uploadedFileId);
-      expect(response.body.data.file).toHaveProperty(
+      expect(response.body.data).toHaveProperty('id', uploadedFileId);
+      expect(response.body.data).toHaveProperty(
         'original_name',
         'test-file.txt'
       );
-      expect(response.body.data.file).toHaveProperty('folder', 'public');
-      expect(response.body.data.file).toHaveProperty(
+      expect(response.body.data).toHaveProperty('folder', 'public');
+      expect(response.body.data).toHaveProperty(
         'description',
         'Test file for info'
       );

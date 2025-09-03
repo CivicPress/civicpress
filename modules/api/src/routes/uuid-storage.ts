@@ -124,25 +124,8 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
         const dataDir = civicPress.getDataDir();
     const systemDataDir = `${dataDir}/.system-data`;
     
-    console.log('🔧 Storage service initializing with dataDir:', dataDir);
-    console.log('🔧 Storage service systemDataDir:', systemDataDir);
-    
-    // Check if our test config file exists
-    const fs = await import('fs-extra');
-    const path = await import('path');
-    const testConfigPath = path.join(systemDataDir, 'storage.yml');
-    const configExists = await fs.pathExists(testConfigPath);
-    console.log('📁 Test config file exists at', testConfigPath, ':', configExists);
-    
-    if (configExists) {
-      const configContent = await fs.readFile(testConfigPath, 'utf8');
-      console.log('📄 Test config file content:', configContent);
-    }
-    
     configManager = new StorageConfigManager(systemDataDir);
     const config = await configManager.loadConfig();
-    
-    console.log('📋 Loaded storage config:', JSON.stringify(config, null, 2));
     storageService = new CloudUuidStorageService(config, systemDataDir);
 
     // Get database service from request context (injected by API)

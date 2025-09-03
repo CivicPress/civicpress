@@ -693,8 +693,7 @@ export function createStorageConfig(config: TestConfig) {
   ensureDirSync(systemDataDir);
   const storageConfigPath = join(systemDataDir, 'storage.yml');
   
-  console.log('📁 Creating storage config at:', storageConfigPath);
-  console.log('📄 Storage config content:', JSON.stringify(storageConfig, null, 2));
+
   
   writeFileSync(storageConfigPath, yaml.dump(storageConfig));
 }
