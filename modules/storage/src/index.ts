@@ -1,4 +1,3 @@
-export { StorageService } from './storage-service.js';
 export { UuidStorageService } from './uuid-storage-service.js';
 export { CloudUuidStorageService } from './cloud-uuid-storage-service.js';
 export { StorageConfigManager } from './storage-config-manager.js';

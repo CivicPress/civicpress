@@ -316,6 +316,7 @@ export class CivicPressAPI {
       authMiddleware(this.civicPress),
       createDiffRouter()
     );
+    // UUID-based storage API (for file attachments)
     this.app.use(
       '/api/v1/storage',
       authMiddleware(this.civicPress),

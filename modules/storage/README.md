@@ -1,12 +1,14 @@
 # 🗄️ CivicPress Storage Module
 
-A comprehensive file and media storage solution for CivicPress, supporting local
-storage with configurable folders, access control, and file validation.
+A comprehensive UUID-based file and media storage solution for CivicPress,
+supporting multiple storage backends with database tracking, configurable
+folders, access control, and file validation.
 
 ## 🎯 **Purpose**
 
-The Storage Module provides secure, configurable file storage for:
+The Storage Module provides secure, UUID-tracked file storage for:
 
+- **File attachments** linked to civic records
 - **Meeting recordings** (video/audio files)
 - **Document attachments** (PDFs, images)
 - **Public assets** (logos, images)
@@ -16,14 +18,19 @@ The Storage Module provides secure, configurable file storage for:
 
 ### **Core Components**
 
-- **StorageService**: Main file operations (upload, download, delete, list)
+- **CloudUuidStorageService**: Main UUID-based file operations with database
+  tracking
+- **UuidStorageService**: Base UUID storage service
 - **StorageConfigManager**: Configuration management and validation
+- **CredentialManager**: Secure credential management for cloud providers
 - **Type Definitions**: Comprehensive TypeScript interfaces
 
 ### **Storage Backends**
 
 - ✅ **Local Storage**: File system-based storage (implemented)
-- 🔲 **S3/MinIO**: Cloud object storage (planned)
+- ✅ **S3 Compatible**: AWS S3 and S3-compatible storage (implemented)
+- ✅ **Azure Blob**: Microsoft Azure Blob storage (implemented)
+- 🔲 **Google Cloud Storage**: GCS support (planned)
 - 🔲 **IPFS**: Distributed storage (planned)
 
 ## 📂 **Configuration**
@@ -84,14 +91,14 @@ metadata:
 ### **Basic Setup**
 
 ```typescript
-import { StorageService, StorageConfigManager } from '@civicpress/storage';
+import { CloudUuidStorageService, StorageConfigManager } from '@civicpress/storage';
 
 // Load configuration
 const configManager = new StorageConfigManager('.system-data');
 const config = await configManager.loadConfig();
 
-// Initialize storage service
-const storageService = new StorageService(config, '.system-data');
+// Initialize UUID storage service
+const storageService = new CloudUuidStorageService(config, '.system-data');
 await storageService.initialize();
 ```
 
