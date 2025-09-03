@@ -34,6 +34,10 @@ describe('UUID Storage API', () => {
   });
 
   afterEach(async () => {
+    // Reset storage services to ensure fresh initialization for each test
+    const { resetStorageServices } = await import('../../modules/api/src/routes/uuid-storage.js');
+    resetStorageServices();
+    
     await cleanupAPITestContext(context);
   });
 

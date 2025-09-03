@@ -689,9 +689,14 @@ export function createStorageConfig(config: TestConfig) {
     },
   };
 
-  const systemDataDir = join(config.testDir, '.system-data');
+  const systemDataDir = join(config.dataDir, '.system-data');
   ensureDirSync(systemDataDir);
-  writeFileSync(join(systemDataDir, 'storage.yml'), yaml.dump(storageConfig));
+  const storageConfigPath = join(systemDataDir, 'storage.yml');
+  
+  console.log('📁 Creating storage config at:', storageConfigPath);
+  console.log('📄 Storage config content:', JSON.stringify(storageConfig, null, 2));
+  
+  writeFileSync(storageConfigPath, yaml.dump(storageConfig));
 }
 
 export function createWorkflowConfig(config: TestConfig) {
