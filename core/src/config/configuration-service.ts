@@ -232,6 +232,7 @@ export class ConfigurationService {
       'workflows',
       'hooks',
       'notifications',
+      'attachment-types',
     ];
 
     const configs = [];
@@ -331,6 +332,10 @@ export class ConfigurationService {
             errors.push('Notification channels are required');
           if (!config.auth_templates)
             errors.push('Authentication templates are required');
+          break;
+
+        case 'attachment-types':
+          if (!config.types) errors.push('Attachment types are required');
           break;
       }
 

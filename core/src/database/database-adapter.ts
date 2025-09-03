@@ -158,6 +158,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         content TEXT,
         metadata TEXT,
         geography TEXT,
+        attached_files TEXT,
         path TEXT,
         author TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -204,6 +205,16 @@ export class SQLiteAdapter implements DatabaseAdapter {
     } catch (error) {
       // Column already exists, ignore error
       console.log('Geography column already exists or migration not needed');
+    }
+
+    // Add attached_files column to existing records table if it doesn't exist
+    try {
+      await this.execute('ALTER TABLE records ADD COLUMN attached_files TEXT');
+    } catch (error) {
+      // Column already exists, ignore error
+      console.log(
+        'Attached files column already exists or migration not needed'
+      );
     }
   }
 }

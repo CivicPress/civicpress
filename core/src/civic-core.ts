@@ -42,6 +42,19 @@ export interface CreateRecordRequest {
   content?: string;
   metadata?: Record<string, any>;
   geography?: Geography;
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
   role?: string;
 }
 
@@ -51,6 +64,19 @@ export interface UpdateRecordRequest {
   status?: string;
   metadata?: Record<string, any>;
   geography?: Geography;
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
 }
 
 export class CivicPress {

@@ -8,6 +8,8 @@
     "dev": "cd modules/api && pnpm run dev",
     "dev:api": "cd modules/api && pnpm run dev",
     "dev:api:watch": "cd modules/api && pnpm run dev:watch",
+    "dev:core": "cd core && pnpm run dev",
+    "dev:api:full": "concurrently \"cd core && pnpm run dev:build\" \"cd modules/api && pnpm run dev\"",
     "dev:ui": "cd modules/ui && pnpm run dev",
     "dev:storage": "cd modules/storage && pnpm run dev",
     "dev:serve": "cd modules/serve && pnpm run dev",

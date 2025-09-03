@@ -397,6 +397,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('status').optional().isString(),
     body('metadata').optional().isObject(),
     body('geography').optional().isObject(),
+    body('attachedFiles').optional().isArray(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'update_record' });
 

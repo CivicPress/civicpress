@@ -338,11 +338,12 @@ export class DatabaseService {
     content?: string;
     metadata?: string;
     geography?: string;
+    attached_files?: string;
     path?: string;
     author: string;
   }): Promise<void> {
     await this.adapter.execute(
-      'INSERT INTO records (id, title, type, status, content, metadata, geography, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO records (id, title, type, status, content, metadata, geography, attached_files, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         recordData.id,
         recordData.title,
@@ -351,6 +352,7 @@ export class DatabaseService {
         recordData.content,
         recordData.metadata,
         recordData.geography,
+        recordData.attached_files,
         recordData.path,
         recordData.author,
       ]
@@ -369,7 +371,7 @@ export class DatabaseService {
 
   async getRecord(id: string): Promise<any | null> {
     const rows = await this.adapter.query(
-      'SELECT * FROM records WHERE id = ?',
+      'SELECT *, attached_files FROM records WHERE id = ?',
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -383,6 +385,7 @@ export class DatabaseService {
       content?: string;
       metadata?: string;
       geography?: string;
+      attached_files?: string;
     }
   ): Promise<void> {
     const fields = [];
@@ -407,6 +410,10 @@ export class DatabaseService {
     if (updates.geography !== undefined) {
       fields.push('geography = ?');
       values.push(updates.geography);
+    }
+    if (updates.attached_files !== undefined) {
+      fields.push('attached_files = ?');
+      values.push(updates.attached_files);
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');

@@ -21,6 +21,19 @@ export interface RecordData {
   content?: string;
   metadata?: Record<string, any>;
   geography?: Geography;
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
   path?: string;
   author: string;
   created_at: string;
@@ -73,6 +86,7 @@ export class RecordManager {
       status: 'draft',
       content: request.content,
       geography: request.geography,
+      attachedFiles: request.attachedFiles,
       metadata: {
         ...safeMetadata,
         author: user.username, // Always set as string
@@ -97,6 +111,9 @@ export class RecordManager {
       metadata: JSON.stringify(record.metadata),
       geography: record.geography
         ? JSON.stringify(record.geography)
+        : undefined,
+      attached_files: record.attachedFiles
+        ? JSON.stringify(record.attachedFiles)
         : undefined,
       path: record.path,
       author: record.author,
@@ -145,6 +162,7 @@ export class RecordManager {
       status: 'draft',
       content: request.content,
       geography: request.geography,
+      attachedFiles: request.attachedFiles,
       metadata: {
         ...safeMetadata2,
         author: user.username, // Always set as string
@@ -169,6 +187,9 @@ export class RecordManager {
       metadata: JSON.stringify(record.metadata),
       geography: record.geography
         ? JSON.stringify(record.geography)
+        : undefined,
+      attached_files: record.attachedFiles
+        ? JSON.stringify(record.attachedFiles)
         : undefined,
       path: record.path,
       author: record.author,
@@ -224,6 +245,18 @@ export class RecordManager {
       }
     }
 
+    // Parse attached files
+    if (record.attached_files) {
+      try {
+        record.attachedFiles = JSON.parse(record.attached_files);
+      } catch (error) {
+        logger.warn(`Failed to parse attached files for record ${id}:`, error);
+        record.attachedFiles = [];
+      }
+    } else {
+      record.attachedFiles = [];
+    }
+
     // Try to read geography from Markdown file if not in database
     if (!record.geography && record.path) {
       try {
@@ -262,6 +295,11 @@ export class RecordManager {
       }
     }
 
+    // Ensure attachedFiles is always present
+    if (!record.attachedFiles) {
+      record.attachedFiles = [];
+    }
+
     return record;
   }
 
@@ -285,6 +323,8 @@ export class RecordManager {
     if (request.status !== undefined) updates.status = request.status;
     if (request.geography !== undefined)
       updates.geography = JSON.stringify(request.geography);
+    if (request.attachedFiles !== undefined)
+      updates.attached_files = JSON.stringify(request.attachedFiles);
     if (request.metadata !== undefined) {
       updates.metadata = JSON.stringify({
         ...existingRecord.metadata,
@@ -561,6 +601,7 @@ export class RecordManager {
       created_at: record.created_at,
       updated_at: record.updated_at,
       geography: record.geography, // Include geography data
+      attachedFiles: record.attachedFiles, // Include attached files
       ...otherMetadata, // Spread other metadata but not author
     };
 

@@ -66,6 +66,7 @@ const fetchRecord = async () => {
         updated_at: apiRecord.updated || apiRecord.updated_at,
         geography: apiRecord.geography,
         metadata: apiRecord.metadata || {},
+        attachedFiles: apiRecord.attachedFiles || [],
       };
 
       console.log('Record loaded:', record.value);
@@ -128,6 +129,50 @@ const handleStatusChanged = (payload: { newStatus: string; record?: any }) => {
     description: `Record status changed to ${payload.newStatus}`,
     color: 'primary',
   });
+};
+
+// Handle file download
+const downloadFile = async (fileId: string, fileName: string) => {
+  if (!process.client) return;
+
+  try {
+    const config = useRuntimeConfig();
+    const authStore = useAuthStore();
+
+    const response = await fetch(
+      `${config.public.civicApiUrl}/api/v1/storage/files/${fileId}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${authStore.token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Get the blob data
+    const blob = await response.blob();
+
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download failed:', error);
+    useToast().add({
+      title: 'Download Failed',
+      description: 'Failed to download the file. Please try again.',
+      color: 'red',
+    });
+  }
 };
 </script>
 
@@ -422,6 +467,86 @@ const handleStatusChanged = (payload: { newStatus: string; record?: any }) => {
             </div>
             <div v-else class="text-gray-500 dark:text-gray-400 italic">
               No geography data available for this record.
+            </div>
+          </div>
+        </div>
+
+        <!-- File Attachments -->
+        <div class="rounded-lg border">
+          <div class="border-b px-6 py-4">
+            <h2 class="text-lg font-semibold">File Attachments</h2>
+          </div>
+          <div class="p-6">
+            <div
+              v-if="record.attachedFiles && record.attachedFiles.length > 0"
+              class="space-y-4"
+            >
+              <div
+                v-for="(file, index) in record.attachedFiles"
+                :key="file.id"
+                class="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+              >
+                <div class="flex items-start justify-between">
+                  <div class="flex-1 min-w-0">
+                    <!-- File Name and Category -->
+                    <div class="flex items-center gap-3 mb-2">
+                      <h3
+                        class="text-sm font-medium text-gray-900 dark:text-white"
+                      >
+                        {{ file.original_name }}
+                      </h3>
+                      <span
+                        v-if="file.category"
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                      >
+                        {{
+                          typeof file.category === 'object'
+                            ? file.category.label
+                            : file.category
+                        }}
+                      </span>
+                    </div>
+
+                    <!-- File Details -->
+                    <div
+                      class="space-y-1 text-sm text-gray-600 dark:text-gray-400"
+                    >
+                      <div class="flex items-center gap-2">
+                        <UIcon name="i-lucide-link" class="w-4 h-4" />
+                        <span class="font-mono text-xs">{{ file.id }}</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <UIcon name="i-lucide-folder" class="w-4 h-4" />
+                        <span>{{ file.path }}</span>
+                      </div>
+                      <div
+                        v-if="file.description"
+                        class="flex items-center gap-2"
+                      >
+                        <UIcon name="i-lucide-file-text" class="w-4 h-4" />
+                        <span>{{ file.description }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Download Button -->
+                  <div class="ml-4">
+                    <UButton
+                      icon="i-lucide-download"
+                      color="blue"
+                      variant="outline"
+                      size="sm"
+                      @click="downloadFile(file.id, file.original_name)"
+                      title="Download file"
+                    >
+                      Download
+                    </UButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="text-gray-500 dark:text-gray-400 italic">
+              No files attached to this record.
             </div>
           </div>
         </div>

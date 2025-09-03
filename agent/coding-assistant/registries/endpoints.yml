@@ -569,3 +569,10 @@ endpoints:
     file: modules/api/src/routes/diff.ts
     desc: Record diff endpoints
     status: stable
+
+  - id: config:attachment-types
+    method: GET
+    path: /api/v1/config/attachment-types
+    file: modules/api/src/routes/config.ts
+    desc: Get attachment type categories for file attachments
+    status: stable

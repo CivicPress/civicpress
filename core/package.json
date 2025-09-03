@@ -8,6 +8,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "dev:build": "tsc && tsc --watch",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist"

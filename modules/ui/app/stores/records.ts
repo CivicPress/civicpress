@@ -18,6 +18,19 @@ export interface CivicRecord {
     center?: { lon: number; lat: number };
     attachments?: Array<{ path: string; role: string; description?: string }>;
   };
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
   metadata: {
     author: string;
     created: string;

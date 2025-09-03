@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
+import RecordPreview from '~/components/RecordPreview.vue';
 
 // Types
 interface RecordFormData {
@@ -21,6 +23,13 @@ interface RecordFormData {
       description?: string;
     }>;
   };
+  attachedFiles?: Array<{
+    id: string; // UUID reference
+    path: string; // Display path
+    original_name: string; // User-friendly name
+    description?: string; // Optional description
+    category?: string; // e.g., "reference", "supporting", "evidence"
+  }>;
   metadata: {
     tags: string[];
     description: string;
@@ -58,6 +67,7 @@ const { getRecordTypeOptions, getRecordTypeLabel, fetchRecordTypes } =
 const { recordStatusOptions, getRecordStatusLabel, fetchRecordStatuses } =
   useRecordStatuses();
 const { getTemplateOptions, getTemplateById, processTemplate } = useTemplates();
+const { getAttachmentTypeOptions, fetchAttachmentTypes } = useAttachmentTypes();
 const toast = useToast();
 
 // Form data
@@ -80,6 +90,13 @@ const form = reactive({
       description?: string;
     }>,
   },
+  attachedFiles: [] as Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?: string;
+  }>,
 });
 
 // New tag input
@@ -108,6 +125,14 @@ const deleting = ref(false);
 
 // Template modal state
 const showTemplateModal = ref(false);
+
+// File browser popover state
+const showFileBrowser = ref(false);
+
+// Watch for changes to showFileBrowser for debugging
+watch(showFileBrowser, (newValue) => {
+  console.log('showFileBrowser changed:', newValue);
+});
 
 // Form errors
 const formErrors = reactive({
@@ -175,8 +200,12 @@ watch(selectedRecordStatus, (newValue) => {
 
 // Initialize form
 onMounted(async () => {
-  // Fetch record types and statuses
-  await Promise.all([fetchRecordTypes(), fetchRecordStatuses()]);
+  // Fetch record types, statuses, and attachment types
+  await Promise.all([
+    fetchRecordTypes(),
+    fetchRecordStatuses(),
+    fetchAttachmentTypes(),
+  ]);
 
   if (props.isEditing && props.record) {
     // Populate form with existing record data
@@ -212,6 +241,11 @@ onMounted(async () => {
         center: geo.center || { lon: 0, lat: 0 },
         attachments: geo.attachments || [],
       };
+    }
+
+    // Load attached files if they exist
+    if ((props.record as any)?.attachedFiles) {
+      form.attachedFiles = (props.record as any).attachedFiles || [];
     }
 
     // Set selected options
@@ -379,6 +413,8 @@ const handleSubmit = () => {
       (form.geography.attachments && form.geography.attachments.length > 0)
         ? form.geography
         : undefined,
+    attachedFiles:
+      form.attachedFiles.length > 0 ? form.attachedFiles : undefined,
     metadata: {
       tags: form.tags,
       description: form.description.trim(),
@@ -604,6 +640,92 @@ const loadTemplate = () => {
         color: 'primary',
       });
     }
+  }
+};
+
+// Handle file browser selection
+const handleFilesSelected = (files: any[]) => {
+  files.forEach((file) => {
+    // Check if file is already attached
+    const exists = form.attachedFiles.some(
+      (existing) => existing.id === file.id
+    );
+    if (!exists) {
+      form.attachedFiles.push({
+        id: file.id,
+        path: file.relative_path,
+        original_name: file.original_name,
+        description: '',
+        category: 'reference', // Default category
+      });
+    }
+  });
+
+  showFileBrowser.value = false;
+
+  toast.add({
+    title: 'Files Added',
+    description: `${files.length} file${files.length !== 1 ? 's' : ''} attached to record.`,
+    color: 'primary',
+  });
+};
+
+// Remove attached file
+const removeAttachedFile = (index: number) => {
+  form.attachedFiles.splice(index, 1);
+};
+
+// Update attached file category
+const updateFileCategory = (index: number, category: string) => {
+  form.attachedFiles[index].category = category;
+};
+
+// Update attached file description
+const updateFileDescription = (index: number, description: string) => {
+  form.attachedFiles[index].description = description;
+};
+
+// Handle file download
+const downloadFile = async (fileId: string, fileName: string) => {
+  if (!process.client) return;
+
+  try {
+    const config = useRuntimeConfig();
+    const authStore = useAuthStore();
+
+    const response = await fetch(
+      `${config.public.civicApiUrl}/api/v1/storage/files/${fileId}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${authStore.token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Get the blob data
+    const blob = await response.blob();
+
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download failed:', error);
+    useToast().add({
+      title: 'Download Failed',
+      description: 'Failed to download the file. Please try again.',
+      color: 'red',
+    });
   }
 };
 </script>
@@ -1053,11 +1175,7 @@ const loadTemplate = () => {
                     variant="ghost"
                     size="xs"
                     @click="
-                      () =>
-                        window.open(
-                          `/api/v1/storage/files/${attachment.id}`,
-                          '_blank'
-                        )
+                      downloadFile(attachment.id, attachment.original_name)
                     "
                     :disabled="saving"
                     title="Download file"
@@ -1074,6 +1192,136 @@ const loadTemplate = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- File Attachments Section -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+              File Attachments
+            </h3>
+
+            <UPopover>
+              <UButton
+                color="primary"
+                variant="outline"
+                size="sm"
+                :disabled="saving"
+                icon="i-lucide-link"
+              >
+                Link Files
+              </UButton>
+
+              <template #content>
+                <FileBrowserPopover
+                  @files-selected="handleFilesSelected"
+                  @cancel="showFileBrowser = false"
+                />
+              </template>
+            </UPopover>
+          </div>
+
+          <!-- Attached Files List -->
+          <div v-if="form.attachedFiles.length > 0" class="space-y-3">
+            <div
+              v-for="(file, index) in form.attachedFiles"
+              :key="file.id"
+              class="border rounded-lg p-4 bg-white dark:bg-gray-700"
+            >
+              <div class="flex items-start justify-between">
+                <div class="flex-1 min-w-0">
+                  <!-- File Name and Path -->
+                  <div class="flex items-center gap-2 mb-2">
+                    <p
+                      class="text-sm font-medium text-gray-900 dark:text-white truncate"
+                    >
+                      {{ file.original_name }}
+                    </p>
+                    <span
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                    >
+                      UUID
+                    </span>
+                  </div>
+
+                  <!-- File Details -->
+                  <div class="space-y-1">
+                    <p class="text-xs text-gray-500 font-mono">
+                      ID: {{ file.id }}
+                    </p>
+                    <p class="text-xs text-gray-500">Path: {{ file.path }}</p>
+                  </div>
+
+                  <!-- Category and Description -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <UFormField label="Category">
+                      <USelectMenu
+                        :model-value="file.category"
+                        :items="getAttachmentTypeOptions()"
+                        placeholder="Select category"
+                        @update:model-value="
+                          (value) => updateFileCategory(index, value)
+                        "
+                        :disabled="saving"
+                        class="w-full"
+                      />
+                    </UFormField>
+
+                    <UFormField label="Description">
+                      <UInput
+                        :model-value="file.description || ''"
+                        placeholder="Optional description"
+                        @update:model-value="
+                          (value) => updateFileDescription(index, value)
+                        "
+                        :disabled="saving"
+                        class="w-full"
+                      />
+                    </UFormField>
+                  </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-1 ml-4">
+                  <UButton
+                    icon="i-lucide-external-link"
+                    color="blue"
+                    variant="ghost"
+                    size="xs"
+                    @click="downloadFile(file.id, file.original_name)"
+                    :disabled="saving"
+                    title="Download file"
+                  />
+                  <UButton
+                    icon="i-lucide-x"
+                    color="red"
+                    variant="ghost"
+                    size="xs"
+                    @click="removeAttachedFile(index)"
+                    :disabled="saving"
+                    title="Remove attachment"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div
+            v-else
+            class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center"
+          >
+            <UIcon
+              name="i-lucide-paperclip"
+              class="w-8 h-8 text-gray-400 mx-auto mb-2"
+            />
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              No files attached to this record
+            </p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Click "Link Files" above to attach existing files from storage
+            </p>
           </div>
         </div>
 

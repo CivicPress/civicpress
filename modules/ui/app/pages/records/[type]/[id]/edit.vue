@@ -49,6 +49,7 @@ const fetchRecord = async () => {
         created_at: apiRecord.created || apiRecord.created_at,
         updated_at: apiRecord.updated || apiRecord.updated_at,
         geography: apiRecord.geography,
+        attachedFiles: apiRecord.attachedFiles,
         metadata: apiRecord.metadata || {},
       };
     } else {

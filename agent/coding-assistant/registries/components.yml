@@ -40,8 +40,8 @@ components:
   - name: RecordForm
     file: modules/ui/app/components/RecordForm.vue
     purpose:
-      Create or edit a record with geography data, template loading, and
-      validation
+      Create or edit a record with geography data, file attachments, template
+      loading, and validation
     status: stable
 
   - name: RecordList
@@ -89,4 +89,10 @@ components:
   - name: MediaPlayer
     file: modules/ui/app/components/storage/MediaPlayer.vue
     purpose: Preview and play various media types from UUID storage
+    status: stable
+
+  - name: FileBrowserPopover
+    file: modules/ui/app/components/storage/FileBrowserPopover.vue
+    purpose:
+      Minimal file browser in a popover for selecting files to attach to records
     status: stable

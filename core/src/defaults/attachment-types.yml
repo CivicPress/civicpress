@@ -1,0 +1,66 @@
+_metadata:
+  name: 'File Attachment Types'
+  description: 'Define categories for file attachments in records'
+  version: '1.0.0'
+  editable: true
+
+types:
+  reference:
+    value: 'reference'
+    type: 'string'
+    description: 'Reference documents and materials'
+    required: false
+
+  supporting:
+    value: 'supporting'
+    type: 'string'
+    description: 'Supporting evidence and documentation'
+    required: false
+
+  evidence:
+    value: 'evidence'
+    type: 'string'
+    description: 'Legal or procedural evidence'
+    required: false
+
+  correspondence:
+    value: 'correspondence'
+    type: 'string'
+    description: 'Letters, emails, and communications'
+    required: false
+
+  legal:
+    value: 'legal'
+    type: 'string'
+    description: 'Legal documents and contracts'
+    required: false
+
+  financial:
+    value: 'financial'
+    type: 'string'
+    description: 'Financial reports and budgets'
+    required: false
+
+  technical:
+    value: 'technical'
+    type: 'string'
+    description: 'Technical specifications and drawings'
+    required: false
+
+  media:
+    value: 'media'
+    type: 'string'
+    description: 'Photos, videos, and media files'
+    required: false
+
+  archive:
+    value: 'archive'
+    type: 'string'
+    description: 'Archived and historical documents'
+    required: false
+
+  other:
+    value: 'other'
+    type: 'string'
+    description: 'Other miscellaneous attachments'
+    required: false
