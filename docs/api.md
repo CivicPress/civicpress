@@ -523,6 +523,186 @@ Delete a user (admin only).
 }
 ```
 
+### User Security Management
+
+#### POST /api/v1/users/:id/change-password
+
+Change user password (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "currentPassword": "string (required)",
+  "newPassword": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Password changed successfully"
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Invalid password format or incorrect current password
+- `403 Forbidden`: User authenticated via external provider (GitHub, Google,
+  etc.)
+- `401 Unauthorized`: Missing or invalid authentication
+
+#### POST /api/v1/users/:id/set-password
+
+Set user password (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "password": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Password set successfully"
+}
+```
+
+**Error Responses:**
+
+- `403 Forbidden`: User authenticated via external provider or insufficient
+  admin privileges
+- `404 Not Found`: User not found
+
+#### POST /api/v1/users/:id/request-email-change
+
+Request email address change (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "email": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Email change requested successfully",
+  "requiresVerification": true
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Invalid email format or email already in use
+- `403 Forbidden`: Insufficient permissions (can only change own email unless
+  admin)
+
+#### POST /api/v1/users/verify-email-change
+
+Complete email verification (no authentication required).
+
+**Request Body:**
+
+```json
+{
+  "token": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Email address verified successfully"
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Invalid or expired verification token
+
+#### POST /api/v1/users/:id/cancel-email-change
+
+Cancel pending email change (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Email change cancelled successfully"
+}
+```
+
+#### GET /api/v1/users/:id/security-info
+
+Get user security information (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userId": 1,
+    "username": "user123",
+    "email": "user@example.com",
+    "authProvider": "password",
+    "emailVerified": true,
+    "canSetPassword": true,
+    "isExternalAuth": false,
+    "pendingEmailChange": {
+      "email": null,
+      "expiresAt": null
+    }
+  }
+}
+```
+
+**Response for External Auth User:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userId": 2,
+    "username": "githubuser",
+    "email": "user@github.com",
+    "authProvider": "github",
+    "emailVerified": true,
+    "canSetPassword": false,
+    "isExternalAuth": true,
+    "pendingEmailChange": {
+      "email": null,
+      "expiresAt": null
+    }
+  }
+}
+```
+
 ### Configuration
 
 #### GET /api/config/roles

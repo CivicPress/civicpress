@@ -37,6 +37,11 @@ export {
 } from './auth/oauth-provider.js';
 export { AuthConfigManager } from './auth/auth-config.js';
 export { RoleManager } from './auth/role-manager.js';
+export {
+  EmailValidationService,
+  EmailChangeRequest,
+  EmailValidationResult,
+} from './auth/email-validation-service.js';
 
 // Export role-based authorization utilities
 export {

@@ -22,6 +22,8 @@ Git.
 - [x] ✅ `frontend` — Public-facing read-only civic portal
 - [x] ✅ `permissions` — Role-based restrictions (manual for now)
 - [x] ✅ `auth` — GitHub OAuth + simulated accounts
+- [x] ✅ `security-system` — Comprehensive user security with email validation,
+      external auth guards, and multi-layer protection
 - [x] ✅ `indexing` — Parse `index.yml`, structure civic data
 - [x] ✅ `file-attachments` — Link files to records with categorization
 - [x] ✅ `uuid-storage` — Multi-provider file management system
@@ -58,7 +60,7 @@ tracking
 
 ### Features
 
-- [ ] Full multi-user auth + user DB
+- [x] ✅ Full multi-user auth + user DB — **Completed in Phase 1**
 - [ ] Git federation or hosted version
 - [ ] `metrics` module
 - [ ] `themes` + `branding`

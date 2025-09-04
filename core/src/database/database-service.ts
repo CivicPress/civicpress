@@ -4,6 +4,7 @@ import {
   createDatabaseAdapter,
 } from './database-adapter.js';
 import { Logger } from '../utils/logger.js';
+import * as process from 'process';
 
 export class DatabaseService {
   private adapter: DatabaseAdapter;
@@ -41,6 +42,15 @@ export class DatabaseService {
     }
   }
 
+  // Direct database access methods
+  async query(sql: string, params: any[] = []): Promise<any[]> {
+    return await this.adapter.query(sql, params);
+  }
+
+  async execute(sql: string, params: any[] = []): Promise<any> {
+    return await this.adapter.execute(sql, params);
+  }
+
   // User management
   async createUser(userData: {
     username: string;
@@ -48,15 +58,19 @@ export class DatabaseService {
     email?: string;
     name?: string;
     avatar_url?: string;
+    auth_provider?: string;
+    email_verified?: boolean;
   }): Promise<number> {
     await this.adapter.execute(
-      'INSERT INTO users (username, role, email, name, avatar_url) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO users (username, role, email, name, avatar_url, auth_provider, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         userData.username,
         userData.role,
         userData.email,
         userData.name,
         userData.avatar_url,
+        userData.auth_provider || 'password',
+        userData.email_verified || false,
       ]
     );
 
@@ -80,6 +94,14 @@ export class DatabaseService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  async getUserByEmail(email: string): Promise<any | null> {
+    const rows = await this.adapter.query(
+      'SELECT * FROM users WHERE email = ?',
+      [email]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
   async getUserWithPassword(username: string): Promise<any | null> {
     const rows = await this.adapter.query(
       'SELECT * FROM users WHERE username = ?',
@@ -95,9 +117,14 @@ export class DatabaseService {
     name?: string;
     avatar_url?: string;
     passwordHash?: string;
-  }): Promise<number> {
+    auth_provider?: string;
+    email_verified?: boolean;
+    pending_email?: string;
+    pending_email_token?: string;
+    pending_email_expires?: Date;
+  }): Promise<any> {
     await this.adapter.execute(
-      'INSERT INTO users (username, role, email, name, avatar_url, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO users (username, role, email, name, avatar_url, password_hash, auth_provider, email_verified, pending_email, pending_email_token, pending_email_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         userData.username,
         userData.role,
@@ -105,12 +132,20 @@ export class DatabaseService {
         userData.name,
         userData.avatar_url,
         userData.passwordHash,
+        userData.auth_provider || 'password',
+        userData.email_verified || false,
+        userData.pending_email || null,
+        userData.pending_email_token || null,
+        userData.pending_email_expires || null,
       ]
     );
 
     // Get the inserted ID
     const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
-    return rows[0].id;
+    const userId = rows[0].id;
+
+    // Return the full user object
+    return this.getUserById(userId);
   }
 
   async updateUser(
@@ -121,6 +156,11 @@ export class DatabaseService {
       role?: string;
       passwordHash?: string;
       avatar_url?: string;
+      auth_provider?: string;
+      email_verified?: boolean;
+      pending_email?: string;
+      pending_email_token?: string;
+      pending_email_expires?: string;
     }
   ): Promise<boolean> {
     const updates: string[] = [];
@@ -145,6 +185,26 @@ export class DatabaseService {
     if (userData.avatar_url !== undefined) {
       updates.push('avatar_url = ?');
       values.push(userData.avatar_url);
+    }
+    if (userData.auth_provider !== undefined) {
+      updates.push('auth_provider = ?');
+      values.push(userData.auth_provider);
+    }
+    if (userData.email_verified !== undefined) {
+      updates.push('email_verified = ?');
+      values.push(userData.email_verified);
+    }
+    if (userData.pending_email !== undefined) {
+      updates.push('pending_email = ?');
+      values.push(userData.pending_email);
+    }
+    if (userData.pending_email_token !== undefined) {
+      updates.push('pending_email_token = ?');
+      values.push(userData.pending_email_token);
+    }
+    if (userData.pending_email_expires !== undefined) {
+      updates.push('pending_email_expires = ?');
+      values.push(userData.pending_email_expires);
     }
 
     if (updates.length === 0) {

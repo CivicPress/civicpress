@@ -1,6 +1,19 @@
-version: '1.0.0'
-dataDir: 'data'
+version: 1.0.0
+dataDir: data
+modules:
+  - legal-register
+record_types:
+  - bylaw
+  - policy
+default_role: clerk
+hooks:
+  enabled: true
+workflows:
+  enabled: true
+audit:
+  enabled: true
 database:
-  type: 'sqlite'
+  type: sqlite
   sqlite:
-    file: '.system-data/civic.db'
+    file: /Users/stakabo/Work/repos/civicpress/civicpress/.system-data/civic.db
+created: 2025-09-03T20:43:55.073Z

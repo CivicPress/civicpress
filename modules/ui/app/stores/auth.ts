@@ -9,6 +9,13 @@ export interface User {
   role: string;
   avatar_url?: string;
   permissions: string[];
+  // Security fields
+  authProvider?: string;
+  emailVerified?: boolean;
+  canSetPassword?: boolean;
+  isExternalAuth?: boolean;
+  pendingEmail?: string;
+  pendingEmailExpiresAt?: string;
 }
 
 export interface AuthState {
@@ -321,6 +328,37 @@ export const useAuthStore = defineStore('auth', {
         }
         // Preserve current state on transient errors
         return !!this.user;
+      }
+    },
+
+    // Refresh user data from server
+    async refreshUser() {
+      if (!this.token) {
+        console.warn('No token available for user refresh');
+        return false;
+      }
+
+      try {
+        const response = await useNuxtApp().$civicApi('/auth/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+          },
+        });
+
+        if (response.success) {
+          // Update user data from server
+          this.user = response.data.user;
+          this.saveAuthState();
+          console.log('User data refreshed successfully');
+          return true;
+        } else {
+          console.warn('Failed to refresh user data:', response);
+          return false;
+        }
+      } catch (error: any) {
+        console.warn('Failed to refresh user data:', error);
+        return false;
       }
     },
 

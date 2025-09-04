@@ -6,6 +6,7 @@ const authStore = useAuthStore();
 
 // Composables
 const { $civicApi } = useNuxtApp();
+const { refreshUser } = useAuth();
 
 // Reactive state
 const userInfo = ref<User | null>(null);
@@ -28,6 +29,8 @@ const fetchUserInfo = async () => {
       const response = (await $civicApi('/auth/me')) as any;
       if (response.success) {
         userInfo.value = response.data.user;
+        // Also update the auth store with fresh data
+        authStore.updateUser(response.data.user);
       }
     } else {
       error.value =
@@ -105,8 +108,72 @@ const getRoleColor = (role: string) => {
   return colorMap[role] || 'gray';
 };
 
+// Handle email verification token from URL
+const handleEmailVerification = async () => {
+  const route = useRoute();
+  const token = route.query.token as string;
+  const action = route.query.action as string;
+
+  if (action === 'verify-email' && token) {
+    try {
+      loading.value = true;
+      const { $civicApi } = useNuxtApp();
+
+      // Try current email verification first
+      let response = await $civicApi('/api/v1/users/verify-current-email', {
+        method: 'POST',
+        body: { token },
+      });
+
+      // If current email verification fails, try email change verification
+      if (
+        !response.success &&
+        response.error?.message?.includes('Invalid or expired')
+      ) {
+        response = await $civicApi('/api/v1/users/verify-email-change', {
+          method: 'POST',
+          body: { token },
+        });
+      }
+
+      if (response.success) {
+        useToast().add({
+          title: 'Email Verified Successfully',
+          description:
+            response.data?.message || 'Your email address has been verified.',
+          color: 'green',
+        });
+
+        // Clear the URL parameters
+        await navigateTo('/settings/profile', { replace: true });
+
+        // Refresh auth store with updated user data
+        await refreshUser();
+
+        // Also refresh local user info to show updated verification status
+        await fetchUserInfo();
+      } else {
+        throw new Error(
+          response.error?.message || response.message || 'Verification failed'
+        );
+      }
+    } catch (err: any) {
+      useToast().add({
+        title: 'Email Verification Failed',
+        description: err.message || 'Failed to verify email address',
+        color: 'red',
+      });
+
+      // Clear the URL parameters even on error
+      await navigateTo('/settings/profile', { replace: true });
+    } finally {
+      loading.value = false;
+    }
+  }
+};
+
 // Load user info on mount
-onMounted(() => {
+onMounted(async () => {
   // Check if user is authenticated
   if (!authStore.isAuthenticated) {
     error.value =
@@ -115,7 +182,11 @@ onMounted(() => {
     return;
   }
 
-  fetchUserInfo();
+  // Handle email verification if token is present
+  await handleEmailVerification();
+
+  // Fetch user info
+  await fetchUserInfo();
 });
 
 const breadcrumbItems = [
@@ -401,7 +472,7 @@ const breadcrumbItems = [
               "
               color="primary"
               variant="soft"
-              @click="navigateTo(`/settings/users/${userInfo?.username}`)"
+              @click="navigateTo(`/settings/users/${userInfo?.username}/edit`)"
             >
               <template #leading>
                 <UIcon name="i-lucide-edit" class="w-4 h-4" />
@@ -420,6 +491,17 @@ const breadcrumbItems = [
               Logout
             </UButton>
           </div>
+        </div>
+
+        <!-- Security Settings -->
+        <div class="mt-8">
+          <SecuritySettings
+            :user-id="userInfo.id"
+            :user-data="{
+              email: userInfo.email,
+              email_verified: userInfo.email_verified,
+            }"
+          />
         </div>
       </div>
 

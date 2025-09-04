@@ -305,20 +305,29 @@ civic auth:password --username <username> --password <password>
 
 #### `users`
 
-Manage users (admin only).
+Manage users and security settings.
 
 ```bash
 civic users [command] [options]
 ```
 
-**Commands:**
+**User Management Commands:**
 
-- `list` - List all users
-- `create` - Create new user
-- `update` - Update user
-- `delete` - Delete user
+- `list` - List all users (admin only)
+- `create` - Create new user (admin only)
+- `update` - Update user (admin only)
+- `delete` - Delete user (admin only)
 
-**Examples:**
+**Security Management Commands:**
+
+- `change-password <username>` - Change user password (self-service or admin)
+- `set-password <username>` - Set user password (admin only)
+- `request-email-change <username>` - Request email address change
+- `verify-email <token>` - Verify email change with token
+- `cancel-email-change <username>` - Cancel pending email change
+- `security-info <username>` - View user security information
+
+**Basic Examples:**
 
 ```bash
 # List users
@@ -326,6 +335,84 @@ civic users list
 
 # Create user
 civic users create --username clerk --role clerk
+
+# Update user
+civic users update --username clerk --name "City Clerk"
+```
+
+**Security Examples:**
+
+```bash
+# Change own password (interactive prompts)
+civic users:change-password myusername --token $TOKEN
+
+# Change password with command-line options
+civic users:change-password myusername \
+  --token $TOKEN \
+  --current-password "oldpass123" \
+  --new-password "newpass456"
+
+# Admin sets password for user
+civic users:set-password someuser \
+  --token $ADMIN_TOKEN \
+  --password "adminsetpass123"
+
+# Request email change
+civic users:request-email-change myusername \
+  --token $TOKEN \
+  --email "newemail@example.com"
+
+# Verify email change (from email link)
+civic users:verify-email "abc123tokenxyz"
+
+# Cancel pending email change
+civic users:cancel-email-change myusername --token $TOKEN
+
+# View security information
+civic users:security-info myusername --token $TOKEN
+
+# View security info in JSON format
+civic users:security-info myusername --token $TOKEN --json
+```
+
+**Security Guard Examples:**
+
+```bash
+# This will fail for GitHub-authenticated users
+$ civic users:set-password github-user --password "newpass123" --token $ADMIN_TOKEN
+Error: User 'github-user' is authenticated via github
+Password management is handled by the external provider
+
+# This will show external auth status
+$ civic users:security-info github-user --token $ADMIN_TOKEN
+Security Information for 'github-user':
+  User ID: 123
+  Email: user@github.com
+  Email Verified: ✓
+  Auth Provider: github
+  Can Set Password: ✗
+  External Auth: ✓
+  Pending Email: None
+```
+
+**Interactive vs Non-Interactive Usage:**
+
+```bash
+# Interactive mode (prompts for missing values)
+civic users:change-password myuser --token $TOKEN
+# Will prompt for current password and new password
+
+# Non-interactive mode (all values provided)
+civic users:change-password myuser \
+  --token $TOKEN \
+  --current-password "current123" \
+  --new-password "new456"
+
+# Silent mode (no output except errors)
+civic users:security-info myuser --token $TOKEN --silent
+
+# JSON mode (machine-readable output)
+civic users:security-info myuser --token $TOKEN --json
 ```
 
 ### System & Configuration

@@ -183,6 +183,7 @@ router.get('/me', async (req, res) => {
           email: user.email,
           name: user.name,
           avatar_url: user.avatar_url,
+          email_verified: user.email_verified,
           permissions,
         },
       },

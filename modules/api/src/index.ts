@@ -29,6 +29,7 @@ import {
   router as usersRouter,
   registrationRouter,
   authenticationRouter,
+  publicRouter,
 } from './routes/users.js';
 import infoRouter from './routes/info.js';
 import configRouter from './routes/config.js';
@@ -323,6 +324,16 @@ export class CivicPressAPI {
       createDatabaseContextMiddleware(this.civicPress),
       uuidStorageRouter
     );
+    this.app.use(
+      '/api/v1/users/verify-email-change',
+      createDatabaseContextMiddleware(this.civicPress),
+      publicRouter
+    ); // Public endpoints (no auth required)
+    this.app.use(
+      '/api/v1/users/verify-current-email',
+      createDatabaseContextMiddleware(this.civicPress),
+      publicRouter
+    ); // Public endpoints (no auth required)
     this.app.use('/api/v1/users', authMiddleware(this.civicPress), usersRouter);
   }
 
