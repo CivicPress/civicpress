@@ -228,10 +228,7 @@ export class CivicPressAPI {
     // Public user registration endpoint (no auth required) - must come before general API middleware
     this.app.use(
       '/api/users/register',
-      (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
-        next();
-      },
+      createDatabaseContextMiddleware(this.civicPress),
       registrationRouter
     );
 

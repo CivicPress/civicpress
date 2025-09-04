@@ -656,7 +656,7 @@ registrationRouter.post('/', async (req, res) => {
     }
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = (req as any).context?.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Check if username already exists
@@ -704,6 +704,11 @@ registrationRouter.post('/', async (req, res) => {
       { operation: 'register_user' }
     );
   } catch (error) {
+    console.error('🔧 [DEBUG] User registration error:', error);
+    console.error(
+      '🔧 [DEBUG] Error stack:',
+      error instanceof Error ? error.stack : 'No stack'
+    );
     handleApiError('register_user', error, req, res, 'Failed to register user');
   }
 });

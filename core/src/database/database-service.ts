@@ -144,8 +144,8 @@ export class DatabaseService {
     const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
     const userId = rows[0].id;
 
-    // Return the full user object
-    return this.getUserById(userId);
+    // Return just the user ID
+    return userId;
   }
 
   async updateUser(

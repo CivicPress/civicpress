@@ -398,7 +398,9 @@ export class AuthService {
       ...userData,
       role,
     });
+    console.log('🔧 [DEBUG] Created user with ID:', userId);
     const user = await this.db.getUserById(userId);
+    console.log('🔧 [DEBUG] Retrieved user:', user);
 
     if (!user) {
       throw new Error('Failed to create user');
