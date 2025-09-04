@@ -30,6 +30,7 @@ import {
   registrationRouter,
   authenticationRouter,
   publicRouter,
+  emailVerificationRouter,
 } from './routes/users.js';
 import infoRouter from './routes/info.js';
 import configRouter from './routes/config.js';
@@ -329,7 +330,7 @@ export class CivicPressAPI {
     this.app.use(
       '/api/v1/users/verify-current-email',
       createDatabaseContextMiddleware(this.civicPress),
-      publicRouter
+      emailVerificationRouter
     ); // Public endpoints (no auth required)
     this.app.use('/api/v1/users', authMiddleware(this.civicPress), usersRouter);
   }

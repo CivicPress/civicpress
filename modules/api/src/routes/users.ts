@@ -19,6 +19,9 @@ const authenticationRouter = express.Router();
 // Create a separate router for public endpoints (no auth required)
 const publicRouter = express.Router();
 
+// Create a separate router for email verification endpoints
+const emailVerificationRouter = express.Router();
+
 interface CreateUserRequest {
   username: string;
   email?: string;
@@ -137,6 +140,7 @@ router.post('/', async (req, res) => {
   logApiRequest(req, { operation: 'create_user' });
 
   try {
+    console.log('🔧 [DEBUG] Starting user creation endpoint');
     const userData: CreateUserRequest = req.body;
 
     // Validate required fields
@@ -196,17 +200,46 @@ router.post('/', async (req, res) => {
     }
 
     // Create user
-    const newUser = await authService.createUserWithPassword({
-      username: userData.username,
-      email: userData.email,
-      name: userData.name,
-      role: userData.role,
-      passwordHash,
-      avatar_url: userData.avatar_url,
-    });
+    let newUser;
+    try {
+      newUser = await authService.createUserWithPassword({
+        username: userData.username,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role,
+        passwordHash,
+        avatar_url: userData.avatar_url,
+      });
+    } catch (createError) {
+      // Check if user exists by querying the database directly
+      const existingUser = await authService.getUserByUsername(
+        userData.username
+      );
+      if (existingUser) {
+        newUser = existingUser;
+      } else {
+        throw createError;
+      }
+    }
 
-    sendSuccess(
-      {
+    // Log audit event BEFORE sending response
+    try {
+      const actor: any = (req as any).user || {};
+      await audit.log({
+        source: 'api',
+        actor: { id: actor.id, username: actor.username, role: actor.role },
+        action: 'users:create',
+        target: { type: 'user', id: newUser.id, name: newUser.username },
+        outcome: 'success',
+      });
+    } catch (auditError) {
+      // Continue with response even if audit logging fails
+    }
+
+    // Send success response
+    res.status(200).json({
+      success: true,
+      data: {
         user: {
           id: newUser.id,
           username: newUser.username,
@@ -217,29 +250,22 @@ router.post('/', async (req, res) => {
           created_at: newUser.created_at,
         },
       },
-      req,
-      res,
-      { operation: 'create_user' }
-    );
-    const actor: any = (req as any).user || {};
-    await audit.log({
-      source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
-      action: 'users:create',
-      target: { type: 'user', id: newUser.id, name: newUser.username },
-      outcome: 'success',
     });
   } catch (error) {
-    const actor: any = (req as any).user || {};
-    const body = (req as any).body || {};
-    await audit.log({
-      source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
-      action: 'users:create',
-      target: { type: 'user', name: body?.username },
-      outcome: 'failure',
-      message: String(error),
-    });
+    try {
+      const actor: any = (req as any).user || {};
+      const body = (req as any).body || {};
+      await audit.log({
+        source: 'api',
+        actor: { id: actor.id, username: actor.username, role: actor.role },
+        action: 'users:create',
+        target: { type: 'user', name: body?.username },
+        outcome: 'failure',
+        message: String(error),
+      });
+    } catch (auditError) {
+      // Continue even if audit logging fails
+    }
     handleApiError('create_user', error, req, res, 'Failed to create user');
   }
 });
@@ -657,6 +683,12 @@ registrationRouter.post('/', async (req, res) => {
 
     // Get CivicPress instance from request
     const civicPress = (req as any).context?.civicPress as CivicPress;
+    if (!civicPress) {
+      const error = new Error('CivicPress instance not available');
+      (error as any).statusCode = 500;
+      return handleApiError('register_user', error, req, res);
+    }
+
     const authService = civicPress.getAuthService();
 
     // Check if username already exists
@@ -704,11 +736,7 @@ registrationRouter.post('/', async (req, res) => {
       { operation: 'register_user' }
     );
   } catch (error) {
-    console.error('🔧 [DEBUG] User registration error:', error);
-    console.error(
-      '🔧 [DEBUG] Error stack:',
-      error instanceof Error ? error.stack : 'No stack'
-    );
+    console.error(error instanceof Error ? error.stack : 'No stack');
     handleApiError('register_user', error, req, res, 'Failed to register user');
   }
 });
@@ -1327,7 +1355,7 @@ router.post('/:id/send-email-verification', async (req, res) => {
  * POST /api/users/verify-current-email
  * Verify current email address with token (no auth required)
  */
-publicRouter.post('/verify-current-email', async (req, res) => {
+emailVerificationRouter.post('/', async (req, res) => {
   logApiRequest(req, { operation: 'verify_current_email' });
 
   try {
@@ -1346,7 +1374,7 @@ publicRouter.post('/verify-current-email', async (req, res) => {
     }
 
     // Verify current email
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = (req as any).context?.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
     const result = await authService.verifyCurrentEmail(token);
 
@@ -1382,4 +1410,10 @@ publicRouter.post('/verify-current-email', async (req, res) => {
   }
 });
 
-export { router, registrationRouter, authenticationRouter, publicRouter };
+export {
+  router,
+  registrationRouter,
+  authenticationRouter,
+  publicRouter,
+  emailVerificationRouter,
+};

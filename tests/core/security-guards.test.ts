@@ -300,7 +300,7 @@ describe('Security Guards', () => {
       expect(result.success).toBe(true);
       expect(result.user).toBeDefined();
       expect(result.user?.auth_provider).toBe('github');
-      expect(result.user?.email_verified).toBe(true); // OAuth emails are pre-verified
+      expect(result.user?.email_verified).toBe(1); // OAuth emails are pre-verified (SQLite boolean)
       expect(authService.canSetPassword(result.user!)).toBe(false);
       expect(authService.isExternalAuthUser(result.user!)).toBe(true);
     });
@@ -381,13 +381,16 @@ describe('Security Guards', () => {
     it('should handle unknown auth_provider values', async () => {
       // Create user with unknown auth_provider
       const databaseService = civicPress.getDatabaseService();
-      const user = await databaseService.createUser({
+      const userId = await databaseService.createUser({
         username: 'unknownuser',
         email: 'unknown@example.com',
         name: 'Unknown User',
         role: 'public',
         auth_provider: 'unknown-provider',
       });
+
+      // Fetch the full user object
+      const user = await databaseService.getUserById(userId);
 
       // Should be treated as external auth (safe default)
       expect(authService.canSetPassword(user)).toBe(false);

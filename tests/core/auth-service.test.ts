@@ -120,11 +120,13 @@ describe('AuthService', () => {
         role: 'clerk',
       };
 
-      const updatedUser = await authService.updateUser(user.id, updateData);
-      expect(updatedUser).toBeDefined();
-      expect(updatedUser?.email).toBe(updateData.email);
-      expect(updatedUser?.name).toBe(updateData.name);
-      expect(updatedUser?.role).toBe(updateData.role);
+      const result = await authService.updateUser(user.id, updateData);
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.user).toBeDefined();
+      expect(result.user?.email).toBe(updateData.email);
+      expect(result.user?.name).toBe(updateData.name);
+      expect(result.user?.role).toBe(updateData.role);
     });
 
     it('should delete user', async () => {

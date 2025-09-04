@@ -156,25 +156,28 @@ describe('Core User Management', () => {
     });
 
     it('should update user information', async () => {
-      const updatedUser = await authService.updateUser(userId, {
+      const result = await authService.updateUser(userId, {
         name: 'Updated Name',
         email: 'updated@example.com',
         role: 'clerk',
       });
 
-      expect(updatedUser).toBeDefined();
-      expect(updatedUser?.name).toBe('Updated Name');
-      expect(updatedUser?.email).toBe('updated@example.com');
-      expect(updatedUser?.role).toBe('clerk');
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.user).toBeDefined();
+      expect(result.user?.name).toBe('Updated Name');
+      expect(result.user?.email).toBe('updated@example.com');
+      expect(result.user?.role).toBe('clerk');
     });
 
     it('should update user password', async () => {
       const newPasswordHash = await bcrypt.hash('newpass123', 10);
-      const updatedUser = await authService.updateUser(userId, {
+      const result = await authService.updateUser(userId, {
         passwordHash: newPasswordHash,
       });
 
-      expect(updatedUser).toBeDefined();
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
 
       // Verify new password works
       const session = await authService.authenticateWithPassword(
@@ -186,9 +189,11 @@ describe('Core User Management', () => {
     });
 
     it('should fail to update non-existent user', async () => {
-      await expect(
-        authService.updateUser(99999, { name: 'Updated Name' })
-      ).rejects.toThrow();
+      const result = await authService.updateUser(99999, {
+        name: 'Updated Name',
+      });
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('User not found');
     });
   });
 

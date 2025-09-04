@@ -5,7 +5,7 @@ import * as fs from 'fs';
 export interface DatabaseAdapter {
   connect(): Promise<void>;
   query(sql: string, params?: any[]): Promise<any[]>;
-  execute(sql: string, params?: any[]): Promise<void>;
+  execute(sql: string, params?: any[]): Promise<any>;
   close(): Promise<void>;
   initialize(): Promise<void>;
 }
@@ -66,18 +66,18 @@ export class SQLiteAdapter implements DatabaseAdapter {
     });
   }
 
-  async execute(sql: string, params: any[] = []): Promise<void> {
+  async execute(sql: string, params: any[] = []): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not connected'));
         return;
       }
 
-      this.db.run(sql, params, (err) => {
+      this.db.run(sql, params, function (err) {
         if (err) {
           reject(err);
         } else {
-          resolve();
+          resolve(this);
         }
       });
     });
@@ -213,7 +213,13 @@ export class SQLiteAdapter implements DatabaseAdapter {
     ];
 
     for (const table of tables) {
-      await this.execute(table);
+      try {
+        await this.execute(table);
+      } catch (error) {
+        console.error('Error creating table:', error);
+        console.error('Table SQL:', table);
+        throw error;
+      }
     }
 
     // Add geography column to existing records table if it doesn't exist

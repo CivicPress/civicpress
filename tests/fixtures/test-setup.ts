@@ -28,6 +28,7 @@ export interface TestConfig {
 // Test context for API tests
 export interface APITestContext {
   api: any;
+  civic: any;
   testDir: string;
   authToken?: string;
   adminToken?: string;
@@ -692,9 +693,7 @@ export function createStorageConfig(config: TestConfig) {
   const systemDataDir = join(config.dataDir, '.system-data');
   ensureDirSync(systemDataDir);
   const storageConfigPath = join(systemDataDir, 'storage.yml');
-  
 
-  
   writeFileSync(storageConfigPath, yaml.dump(storageConfig));
 }
 
@@ -1300,6 +1299,7 @@ This regulation has been archived.`;
 
   return {
     api,
+    civic: api.getCivicPress(),
     testDir: config.testDir,
     port, // Include port in context for tests that need it
   };

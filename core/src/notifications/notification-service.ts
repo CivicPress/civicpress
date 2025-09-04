@@ -73,7 +73,6 @@ export class NotificationService {
     const notificationId = this.generateNotificationId();
 
     try {
-      console.log(`🔧 [DEBUG] NotificationService.sendNotification called:`);
       console.log(`  - Notification ID: ${notificationId}`);
       console.log(`  - Template: ${request.template}`);
       console.log(`  - Channels: ${request.channels.join(', ')}`);
@@ -171,20 +170,11 @@ export class NotificationService {
 
     // Check if channel is enabled
     const isEnabled = this.config.isChannelEnabled(channelName);
-    console.log(`🔧 [DEBUG] Channel ${channelName} enabled: ${isEnabled}`);
     if (!isEnabled) {
       throw new Error(`Channel disabled: ${channelName}`);
     }
 
     const recipient = this.getChannelRecipient(request, channelName);
-    console.log(`🔧 [DEBUG] Channel recipient: ${recipient}`);
-
-    console.log(`🔧 [DEBUG] About to call channel.send with:`, {
-      to: recipient,
-      content: request.content,
-      data: request.data,
-      priority: request.priority || 'normal',
-    });
 
     // Send via channel
     await channel.send({

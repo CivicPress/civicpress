@@ -22,6 +22,10 @@
         :error="formErrors.username"
         required
       />
+      <!-- Validation error display -->
+      <div v-if="formErrors.username" class="text-red-500 text-sm mt-1">
+        {{ formErrors.username }}
+      </div>
     </UFormField>
 
     <!-- Email Field -->
@@ -38,6 +42,10 @@
         :error="formErrors.email"
         required
       />
+      <!-- Validation error display -->
+      <div v-if="formErrors.email" class="text-red-500 text-sm mt-1">
+        {{ formErrors.email }}
+      </div>
     </UFormField>
 
     <!-- Full Name Field -->
@@ -70,6 +78,10 @@
         required
         class="w-full sm:w-48"
       />
+      <!-- Validation error display -->
+      <div v-if="formErrors.role" class="text-red-500 text-sm mt-1">
+        {{ formErrors.role }}
+      </div>
 
       <!-- <USelectMenu v-model="selectedRecordStatuses" :items="recordStatusOptionsComputed" multiple
                 :loading="recordStatusesLoading" placeholder="Select Record Statuses" class="w-full sm:w-48"> -->
@@ -137,6 +149,10 @@
             :title="showPassword ? 'Hide password' : 'Show password'"
           />
         </div>
+        <!-- Validation error display -->
+        <div v-if="formErrors.password" class="text-red-500 text-sm mt-1">
+          {{ formErrors.password }}
+        </div>
         <!-- Password strength indicator -->
         <template #help>
           <div v-if="form.password" class="space-y-2">
@@ -200,6 +216,13 @@
           :error="formErrors.confirmPassword"
           required
         />
+        <!-- Validation error display -->
+        <div
+          v-if="formErrors.confirmPassword"
+          class="text-red-500 text-sm mt-1"
+        >
+          {{ formErrors.confirmPassword }}
+        </div>
       </UFormField>
     </template>
 
@@ -538,6 +561,7 @@ const handleSubmit = () => {
 
   // Validate form
   const errors = validateForm();
+
   if (Object.keys(errors).length > 0) {
     Object.assign(formErrors, errors);
     return;

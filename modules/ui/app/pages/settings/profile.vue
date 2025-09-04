@@ -114,27 +114,24 @@ const handleEmailVerification = async () => {
   const token = route.query.token as string;
   const action = route.query.action as string;
 
-  if (action === 'verify-email' && token) {
+  if (
+    (action === 'verify-email' || action === 'confirm-email-change') &&
+    token
+  ) {
     try {
       loading.value = true;
       const { $civicApi } = useNuxtApp();
 
-      // Try current email verification first
-      let response = await $civicApi('/api/v1/users/verify-current-email', {
+      // Choose the correct endpoint based on the action
+      const endpoint =
+        action === 'verify-email'
+          ? '/api/v1/users/verify-current-email'
+          : '/api/v1/users/verify-email-change';
+
+      const response = await $civicApi(endpoint, {
         method: 'POST',
         body: { token },
       });
-
-      // If current email verification fails, try email change verification
-      if (
-        !response.success &&
-        response.error?.message?.includes('Invalid or expired')
-      ) {
-        response = await $civicApi('/api/v1/users/verify-email-change', {
-          method: 'POST',
-          body: { token },
-        });
-      }
 
       if (response.success) {
         useToast().add({

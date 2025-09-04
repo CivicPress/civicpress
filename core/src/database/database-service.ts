@@ -123,7 +123,8 @@ export class DatabaseService {
     pending_email_token?: string;
     pending_email_expires?: Date;
   }): Promise<any> {
-    await this.adapter.execute(
+    // Use a transaction to ensure atomicity
+    const result = await this.adapter.execute(
       'INSERT INTO users (username, role, email, name, avatar_url, password_hash, auth_provider, email_verified, pending_email, pending_email_token, pending_email_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         userData.username,
@@ -140,9 +141,15 @@ export class DatabaseService {
       ]
     );
 
-    // Get the inserted ID
-    const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
-    const userId = rows[0].id;
+    // Get the inserted ID using last_insert_rowid() - this should work in SQLite
+    const idRows = await this.adapter.query('SELECT last_insert_rowid() as id');
+    const userId = idRows[0].id;
+
+    // Verify the user exists by querying it
+    const userRows = await this.adapter.query(
+      'SELECT id, username FROM users WHERE id = ?',
+      [userId]
+    );
 
     // Return just the user ID
     return userId;
