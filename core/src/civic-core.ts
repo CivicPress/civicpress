@@ -36,6 +36,14 @@ export interface CivicPressConfig {
   };
 }
 
+export interface LinkedRecord {
+  id: string;
+  type: string;
+  description: string;
+  path?: string;
+  category?: string;
+}
+
 export interface CreateRecordRequest {
   title: string;
   type: string;
@@ -55,6 +63,7 @@ export interface CreateRecordRequest {
           description: string;
         };
   }>;
+  linkedRecords?: LinkedRecord[];
   role?: string;
 }
 
@@ -77,6 +86,7 @@ export interface UpdateRecordRequest {
           description: string;
         };
   }>;
+  linkedRecords?: LinkedRecord[];
 }
 
 export class CivicPress {

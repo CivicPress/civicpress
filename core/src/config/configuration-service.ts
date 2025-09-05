@@ -233,6 +233,7 @@ export class ConfigurationService {
       'hooks',
       'notifications',
       'attachment-types',
+      'link-categories',
     ];
 
     const configs = [];

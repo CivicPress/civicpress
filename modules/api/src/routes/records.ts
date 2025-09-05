@@ -277,6 +277,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('role').optional().isString(),
     body('metadata').optional().isObject(),
     body('geography').optional().isObject(),
+    body('attachedFiles').optional().isArray(),
+    body('linkedRecords').optional().isArray(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'create_record' });
 
@@ -291,7 +293,15 @@ export function createRecordsRouter(recordsService: RecordsService) {
       }
 
       try {
-        const { title, type, content, metadata, geography } = req.body;
+        const {
+          title,
+          type,
+          content,
+          metadata,
+          geography,
+          attachedFiles,
+          linkedRecords,
+        } = req.body;
         const user = req.user;
 
         if (!user) {
@@ -342,6 +352,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
             content,
             metadata,
             geography,
+            attachedFiles,
+            linkedRecords,
           },
           cleanUser
         );
@@ -398,6 +410,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('metadata').optional().isObject(),
     body('geography').optional().isObject(),
     body('attachedFiles').optional().isArray(),
+    body('linkedRecords').optional().isArray(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'update_record' });
 

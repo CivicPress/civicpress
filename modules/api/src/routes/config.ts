@@ -8,6 +8,47 @@ import { AuditLogger } from '@civicpress/core';
 const router = Router();
 const audit = new AuditLogger();
 
+// Public configuration endpoints (no auth required)
+/**
+ * GET /api/v1/config/attachment-types
+ * Get attachment types configuration (public)
+ */
+router.get('/attachment-types', async (req, res) => {
+  try {
+    const config =
+      await configurationService.loadConfiguration('attachment-types');
+    res.json({
+      success: true,
+      data: config,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: `Failed to get attachment types: ${error}`,
+    });
+  }
+});
+
+/**
+ * GET /api/v1/config/link-categories
+ * Get link categories configuration (public)
+ */
+router.get('/link-categories', async (req, res) => {
+  try {
+    const config =
+      await configurationService.loadConfiguration('link-categories');
+    res.json({
+      success: true,
+      data: config,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: `Failed to get link categories: ${error}`,
+    });
+  }
+});
+
 // Secured configuration routes: require authenticated admin permission
 router.use((req, res, next) => {
   const civicPress = (req as any).civicPress;

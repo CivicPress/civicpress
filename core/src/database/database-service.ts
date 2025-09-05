@@ -406,11 +406,12 @@ export class DatabaseService {
     metadata?: string;
     geography?: string;
     attached_files?: string;
+    linked_records?: string;
     path?: string;
     author: string;
   }): Promise<void> {
     await this.adapter.execute(
-      'INSERT INTO records (id, title, type, status, content, metadata, geography, attached_files, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO records (id, title, type, status, content, metadata, geography, attached_files, linked_records, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         recordData.id,
         recordData.title,
@@ -420,6 +421,7 @@ export class DatabaseService {
         recordData.metadata,
         recordData.geography,
         recordData.attached_files,
+        recordData.linked_records,
         recordData.path,
         recordData.author,
       ]
@@ -453,6 +455,7 @@ export class DatabaseService {
       metadata?: string;
       geography?: string;
       attached_files?: string;
+      linked_records?: string;
     }
   ): Promise<void> {
     const fields = [];
@@ -481,6 +484,10 @@ export class DatabaseService {
     if (updates.attached_files !== undefined) {
       fields.push('attached_files = ?');
       values.push(updates.attached_files);
+    }
+    if (updates.linked_records !== undefined) {
+      fields.push('linked_records = ?');
+      values.push(updates.linked_records);
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');

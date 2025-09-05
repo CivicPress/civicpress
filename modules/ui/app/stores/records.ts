@@ -31,6 +31,13 @@ export interface CivicRecord {
           description: string;
         };
   }>;
+  linkedRecords?: Array<{
+    id: string;
+    type: string;
+    description: string;
+    path?: string;
+    category?: string;
+  }>;
   metadata: {
     author: string;
     created: string;

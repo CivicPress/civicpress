@@ -34,6 +34,13 @@ export interface RecordData {
           description: string;
         };
   }>;
+  linkedRecords?: Array<{
+    id: string;
+    type: string;
+    description: string;
+    path?: string;
+    category?: string;
+  }>;
   path?: string;
   author: string;
   created_at: string;
@@ -87,6 +94,7 @@ export class RecordManager {
       content: request.content,
       geography: request.geography,
       attachedFiles: request.attachedFiles,
+      linkedRecords: request.linkedRecords,
       metadata: {
         ...safeMetadata,
         author: user.username, // Always set as string
@@ -114,6 +122,9 @@ export class RecordManager {
         : undefined,
       attached_files: record.attachedFiles
         ? JSON.stringify(record.attachedFiles)
+        : undefined,
+      linked_records: record.linkedRecords
+        ? JSON.stringify(record.linkedRecords)
         : undefined,
       path: record.path,
       author: record.author,
@@ -191,6 +202,9 @@ export class RecordManager {
       attached_files: record.attachedFiles
         ? JSON.stringify(record.attachedFiles)
         : undefined,
+      linked_records: record.linkedRecords
+        ? JSON.stringify(record.linkedRecords)
+        : undefined,
       path: record.path,
       author: record.author,
     });
@@ -255,6 +269,18 @@ export class RecordManager {
       }
     } else {
       record.attachedFiles = [];
+    }
+
+    // Parse linked records
+    if (record.linked_records) {
+      try {
+        record.linkedRecords = JSON.parse(record.linked_records);
+      } catch (error) {
+        logger.warn(`Failed to parse linked records for record ${id}:`, error);
+        record.linkedRecords = [];
+      }
+    } else {
+      record.linkedRecords = [];
     }
 
     // Try to read geography from Markdown file if not in database
@@ -325,6 +351,8 @@ export class RecordManager {
       updates.geography = JSON.stringify(request.geography);
     if (request.attachedFiles !== undefined)
       updates.attached_files = JSON.stringify(request.attachedFiles);
+    if (request.linkedRecords !== undefined)
+      updates.linked_records = JSON.stringify(request.linkedRecords);
     if (request.metadata !== undefined) {
       updates.metadata = JSON.stringify({
         ...existingRecord.metadata,
@@ -602,6 +630,7 @@ export class RecordManager {
       updated_at: record.updated_at,
       geography: record.geography, // Include geography data
       attachedFiles: record.attachedFiles, // Include attached files
+      linkedRecords: record.linkedRecords, // Include linked records
       ...otherMetadata, // Spread other metadata but not author
     };
 

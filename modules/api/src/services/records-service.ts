@@ -51,6 +51,26 @@ export class RecordsService {
       content?: string;
       metadata?: Record<string, any>;
       geography?: any;
+      attachedFiles?: Array<{
+        id: string;
+        path: string;
+        original_name: string;
+        description?: string;
+        category?:
+          | string
+          | {
+              label: string;
+              value: string;
+              description: string;
+            };
+      }>;
+      linkedRecords?: Array<{
+        id: string;
+        type: string;
+        description: string;
+        path?: string;
+        category?: string;
+      }>;
     },
     user: any
   ): Promise<any> {
@@ -73,6 +93,8 @@ export class RecordsService {
       content: data.content,
       metadata: data.metadata,
       geography: data.geography,
+      attachedFiles: data.attachedFiles,
+      linkedRecords: data.linkedRecords,
     };
 
     // Create the record using CivicCore
@@ -92,6 +114,8 @@ export class RecordsService {
             ? record.metadata.author.username
             : record.metadata?.author,
       },
+      attachedFiles: record.attachedFiles || [],
+      linkedRecords: record.linkedRecords || [],
       path: record.path,
       created: record.created_at,
       author:
@@ -122,6 +146,7 @@ export class RecordsService {
       metadata: record.metadata || {},
       geography: record.geography,
       attachedFiles: record.attachedFiles || [],
+      linkedRecords: record.linkedRecords || [],
       path: record.path,
       created: record.created_at,
       author: record.author,
@@ -199,6 +224,13 @@ export class RecordsService {
               description: string;
             };
       }>;
+      linkedRecords?: Array<{
+        id: string;
+        type: string;
+        description: string;
+        path?: string;
+        category?: string;
+      }>;
     },
     user: any
   ): Promise<any | null> {
@@ -228,6 +260,7 @@ export class RecordsService {
       metadata: data.metadata,
       geography: data.geography,
       attachedFiles: data.attachedFiles,
+      linkedRecords: data.linkedRecords,
     };
 
     // Update the record using CivicCore
@@ -249,6 +282,7 @@ export class RecordsService {
       content: updatedRecord.content,
       metadata: updatedRecord.metadata || {},
       attachedFiles: updatedRecord.attachedFiles || [],
+      linkedRecords: updatedRecord.linkedRecords || [],
       geography: updatedRecord.geography,
       path: updatedRecord.path,
       created: updatedRecord.created_at,

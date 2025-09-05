@@ -2,6 +2,7 @@
 import type { CivicRecord } from '~/stores/records';
 import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
 import RecordPreview from '~/components/RecordPreview.vue';
+import LinkedRecordList from '~/components/records/LinkedRecordList.vue';
 
 // Types
 interface RecordFormData {
@@ -29,6 +30,11 @@ interface RecordFormData {
     original_name: string; // User-friendly name
     description?: string; // Optional description
     category?: string; // e.g., "reference", "supporting", "evidence"
+  }>;
+  linkedRecords?: Array<{
+    id: string;
+    type: string;
+    description: string;
   }>;
   metadata: {
     tags: string[];
@@ -96,6 +102,11 @@ const form = reactive({
     original_name: string;
     description?: string;
     category?: string;
+  }>,
+  linkedRecords: [] as Array<{
+    id: string;
+    type: string;
+    description: string;
   }>,
 });
 
@@ -246,6 +257,11 @@ onMounted(async () => {
     // Load attached files if they exist
     if ((props.record as any)?.attachedFiles) {
       form.attachedFiles = (props.record as any).attachedFiles || [];
+    }
+
+    // Load linked records if they exist
+    if ((props.record as any)?.linkedRecords) {
+      form.linkedRecords = (props.record as any).linkedRecords || [];
     }
 
     // Set selected options
@@ -415,6 +431,8 @@ const handleSubmit = () => {
         : undefined,
     attachedFiles:
       form.attachedFiles.length > 0 ? form.attachedFiles : undefined,
+    linkedRecords:
+      form.linkedRecords.length > 0 ? form.linkedRecords : undefined,
     metadata: {
       tags: form.tags,
       description: form.description.trim(),
@@ -1323,6 +1341,42 @@ const downloadFile = async (fileId: string, fileName: string) => {
               Click "Link Files" above to attach existing files from storage
             </p>
           </div>
+        </div>
+
+        <!-- Linked Records Section -->
+        <div
+          class="space-y-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-4"
+        >
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+              Linked Records
+            </h3>
+
+            <UPopover>
+              <UButton
+                color="primary"
+                variant="outline"
+                size="sm"
+                :disabled="saving"
+              >
+                Link Records
+              </UButton>
+
+              <template #content>
+                <recordsRecordLinkSelector
+                  v-model="form.linkedRecords"
+                  :exclude-ids="props.record.id ? [props.record.id] : []"
+                  @close="() => {}"
+                />
+              </template>
+            </UPopover>
+          </div>
+
+          <LinkedRecordList
+            v-model="form.linkedRecords"
+            :editable="true"
+            :exclude-ids="props.record ? [props.record.id] : []"
+          />
         </div>
 
         <!-- Template Loading -->

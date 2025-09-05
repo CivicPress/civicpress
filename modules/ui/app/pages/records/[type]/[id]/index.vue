@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import LinkedRecordList from '~/components/records/LinkedRecordList.vue';
 
 // Route parameters
 const route = useRoute();
@@ -67,6 +68,7 @@ const fetchRecord = async () => {
         geography: apiRecord.geography,
         metadata: apiRecord.metadata || {},
         attachedFiles: apiRecord.attachedFiles || [],
+        linkedRecords: apiRecord.linkedRecords || [],
       };
 
       console.log('Record loaded:', record.value);
@@ -547,6 +549,23 @@ const downloadFile = async (fileId: string, fileName: string) => {
             </div>
             <div v-else class="text-gray-500 dark:text-gray-400 italic">
               No files attached to this record.
+            </div>
+          </div>
+        </div>
+
+        <!-- Linked Records -->
+        <div class="rounded-lg border">
+          <div class="border-b px-6 py-4">
+            <h2 class="text-lg font-semibold">Linked Records</h2>
+          </div>
+          <div class="p-6">
+            <LinkedRecordList
+              v-if="record.linkedRecords && record.linkedRecords.length > 0"
+              :model-value="record.linkedRecords"
+              :editable="false"
+            />
+            <div v-else class="text-gray-500 dark:text-gray-400 italic">
+              No records linked to this record.
             </div>
           </div>
         </div>
