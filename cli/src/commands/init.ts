@@ -49,7 +49,7 @@ export const initCommand = (cli: CAC) => {
 
         if (skipPrompts) {
           // Use all defaults for prompts
-          const config = {
+          config = {
             version: '1.0.0',
             name: 'Civic Records',
             city: 'Richmond',
@@ -176,7 +176,119 @@ export const initCommand = (cli: CAC) => {
         if (options.dataDir) {
           dataDir = options.dataDir;
           // Skip interactive prompts when --data-dir is provided
-          config = { dataDir }; // Create minimal config to skip prompts
+          // Use default config similar to skipPrompts
+          config = {
+            version: '1.0.0',
+            name: 'Civic Records',
+            city: 'Richmond',
+            state: 'Quebec',
+            country: 'Canada',
+            timezone: 'America/Montreal',
+            repo_url: null,
+            modules: ['legal-register'],
+            record_types: ['bylaw', 'policy'],
+            record_types_config: {
+              bylaw: {
+                label: 'Bylaws',
+                description: 'Municipal bylaws and regulations',
+                source: 'core',
+                priority: 1,
+              },
+              ordinance: {
+                label: 'Ordinances',
+                description: 'Local ordinances and laws',
+                source: 'core',
+                priority: 2,
+              },
+              policy: {
+                label: 'Policies',
+                description: 'Administrative policies',
+                source: 'core',
+                priority: 3,
+              },
+              proclamation: {
+                label: 'Proclamations',
+                description: 'Official proclamations',
+                source: 'core',
+                priority: 4,
+              },
+              resolution: {
+                label: 'Resolutions',
+                description: 'Council resolutions',
+                source: 'core',
+                priority: 5,
+              },
+            },
+            record_statuses_config: {
+              draft: {
+                label: 'Draft',
+                description:
+                  'Initial working version, not yet ready for review',
+                source: 'core',
+                priority: 1,
+              },
+              pending_review: {
+                label: 'Pending Review',
+                description: 'Submitted for review and awaiting approval',
+                source: 'core',
+                priority: 2,
+              },
+              under_review: {
+                label: 'Under Review',
+                description:
+                  'Currently under active review by authorized personnel',
+                source: 'core',
+                priority: 3,
+              },
+              approved: {
+                label: 'Approved',
+                description: 'Approved and currently in effect',
+                source: 'core',
+                priority: 4,
+              },
+              published: {
+                label: 'Published',
+                description: 'Publicly available and in effect',
+                source: 'core',
+                priority: 5,
+              },
+              rejected: {
+                label: 'Rejected',
+                description: 'Rejected and not approved',
+                source: 'core',
+                priority: 6,
+              },
+              archived: {
+                label: 'Archived',
+                description: 'No longer active but preserved for reference',
+                source: 'core',
+                priority: 7,
+              },
+              expired: {
+                label: 'Expired',
+                description: 'Past its effective date and no longer in force',
+                source: 'core',
+                priority: 8,
+              },
+            },
+            default_role: 'clerk',
+            hooks: {
+              enabled: true,
+            },
+            workflows: {
+              enabled: true,
+            },
+            audit: {
+              enabled: true,
+            },
+            database: {
+              type: 'sqlite',
+              sqlite: {
+                file: path.join(process.cwd(), '.system-data/civic.db'),
+              },
+            },
+            storage_path: path.join(process.cwd(), 'storage'),
+          };
         } else if (options.config) {
           // Load config from file
           const configPath = path.resolve(options.config);
@@ -362,7 +474,15 @@ export const initCommand = (cli: CAC) => {
           if (!overwrite) {
             logger.warn('⏭️  Skipping .civicrc setup');
           } else {
-            await setupCivicrc(civicrcPath, dataDir, logger);
+            const storagePath = await setupCivicrc(
+              civicrcPath,
+              dataDir,
+              logger
+            );
+            // Update config with storage path for setupStorage
+            if (storagePath) {
+              config = { ...config, storage_path: storagePath };
+            }
           }
         } else if (!civicrcExists || options.config || options.dataDir) {
           if (options.config) {
@@ -372,7 +492,15 @@ export const initCommand = (cli: CAC) => {
             // Use non-interactive setup when --data-dir is provided
             await setupCivicrcNonInteractive(civicrcPath, dataDir, logger);
           } else {
-            await setupCivicrc(civicrcPath, dataDir, logger);
+            const storagePath = await setupCivicrc(
+              civicrcPath,
+              dataDir,
+              logger
+            );
+            // Update config with storage path for setupStorage
+            if (storagePath) {
+              config = { ...config, storage_path: storagePath };
+            }
           }
         }
 
@@ -388,6 +516,14 @@ export const initCommand = (cli: CAC) => {
           systemDataDir,
           logger,
           shouldOutputJson || false
+        );
+
+        // Setup storage configuration
+        await setupStorage(
+          systemDataDir,
+          logger,
+          shouldOutputJson || false,
+          config?.storage_path
         );
 
         // Create admin user if not already specified
@@ -1048,7 +1184,7 @@ async function setupCivicrc(
   civicrcPath: string,
   dataDir: string,
   logger: any
-): Promise<void> {
+): Promise<string | undefined> {
   logger.info('⚙️  Setting up configuration...');
 
   const answers = await inquirer.prompt([
@@ -1134,6 +1270,18 @@ async function setupCivicrc(
       message: 'PostgreSQL connection URL:',
       default: 'postgres://user:password@localhost:5432/civicpress',
       when: (answers: any) => answers.database_type === 'postgres',
+    },
+    {
+      type: 'input',
+      name: 'storage_path',
+      message: 'Where should files be stored?',
+      default: path.join(process.cwd(), 'storage'),
+      validate: (input: string) => {
+        const trimmed = input.trim();
+        if (trimmed.length === 0) return 'Storage path is required';
+        if (trimmed.includes('..')) return 'Storage path cannot contain ".."';
+        return true;
+      },
     },
   ]);
 
@@ -1251,6 +1399,9 @@ async function setupCivicrc(
   const orgConfigYaml = yaml.stringify(orgConfig);
   fs.writeFileSync(orgConfigPath, orgConfigYaml);
   logger.success('🏢 org-config.yml saved (organization configuration)');
+
+  // Return the storage path for use in setupStorage
+  return answers.storage_path;
 }
 
 async function setupNotifications(
@@ -1374,6 +1525,177 @@ async function setupNotifications(
       logger.warn(`⚠️  Failed to setup notifications: ${error.message}`);
       logger.info(
         '💡 You can configure notifications later in .system-data/notifications.yml'
+      );
+    }
+  }
+}
+
+async function setupStorage(
+  systemDataDir: string,
+  logger: any,
+  shouldOutputJson: boolean,
+  storagePath?: string
+): Promise<void> {
+  try {
+    // Create storage.yml file in .system-data directory
+    const storageConfigPath = path.join(systemDataDir, 'storage.yml');
+
+    // Check if storage.yml already exists
+    if (fs.existsSync(storageConfigPath)) {
+      if (!shouldOutputJson) {
+        logger.info('📁 Storage configuration already exists');
+      }
+      return;
+    }
+
+    // Use provided storage path or default to 'storage' in project root
+    const userStoragePath = storagePath || path.join(process.cwd(), 'storage');
+
+    // Load default storage configuration
+    const __filename = fileURLToPath(import.meta.url);
+    const projectRoot = path.resolve(path.dirname(__filename), '../../../');
+    const defaultStorageTemplatePath = path.join(
+      projectRoot,
+      'core',
+      'src',
+      'defaults',
+      'storage.yml'
+    );
+
+    if (fs.existsSync(defaultStorageTemplatePath)) {
+      // Copy default storage configuration and update the storage path
+      const defaultConfig = fs.readFileSync(defaultStorageTemplatePath, 'utf8');
+      const configObj = yaml.parse(defaultConfig);
+
+      // Update the storage path in the configuration
+      // Store absolute path like database configuration
+      const absoluteStoragePath = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      if (configObj.backend) {
+        configObj.backend.path = absoluteStoragePath;
+      }
+      if (configObj.providers?.local) {
+        configObj.providers.local.path = absoluteStoragePath;
+      }
+
+      const updatedConfig = yaml.stringify(configObj);
+      fs.writeFileSync(storageConfigPath, updatedConfig);
+
+      // Create storage directories
+      const storageDir = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+        if (!shouldOutputJson) {
+          logger.success(`📁 Created storage directory: ${storageDir}`);
+        }
+      }
+
+      // Create default storage folders
+      const folders = ['public', 'sessions', 'permits', 'private'];
+      for (const folder of folders) {
+        const folderPath = path.join(storageDir, folder);
+        if (!fs.existsSync(folderPath)) {
+          fs.mkdirSync(folderPath, { recursive: true });
+        }
+      }
+
+      if (!shouldOutputJson) {
+        logger.success('📁 Created storage.yml (local storage enabled)');
+        logger.info(`📁 Created storage directory: ${userStoragePath}`);
+        logger.info(
+          '💡 Configure storage providers in .system-data/storage.yml'
+        );
+        logger.info('💡 Test with: civic storage:list');
+      }
+    } else {
+      // Create basic storage configuration if default doesn't exist
+      // Store absolute path like database configuration
+      const absoluteStoragePath = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      const basicStorageConfig = {
+        backend: {
+          type: 'local',
+          path: absoluteStoragePath,
+        },
+        providers: {
+          local: {
+            type: 'local',
+            path: absoluteStoragePath,
+            enabled: true,
+          },
+        },
+        active_provider: 'local',
+        failover_providers: ['local'],
+        global: {
+          max_file_size: '100MB',
+          health_checks: true,
+          health_check_interval: 5,
+          retry_attempts: 3,
+          cross_provider_backup: false,
+          backup_providers: [],
+        },
+        folders: {
+          public: {
+            path: 'public',
+            access: 'public',
+            allowed_types: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'txt', 'md'],
+            max_size: '10MB',
+            description: 'Public files for testing',
+          },
+        },
+        metadata: {
+          auto_generate_thumbnails: true,
+          store_exif: true,
+          compress_images: true,
+          backup_included: true,
+        },
+      };
+
+      const storageYaml = yaml.stringify(basicStorageConfig);
+      fs.writeFileSync(storageConfigPath, storageYaml);
+
+      // Create storage directories
+      const storageDir = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+        if (!shouldOutputJson) {
+          logger.success(`📁 Created storage directory: ${storageDir}`);
+        }
+      }
+
+      // Create default storage folders
+      const folders = ['public', 'sessions', 'permits', 'private'];
+      for (const folder of folders) {
+        const folderPath = path.join(storageDir, folder);
+        if (!fs.existsSync(folderPath)) {
+          fs.mkdirSync(folderPath, { recursive: true });
+        }
+      }
+
+      if (!shouldOutputJson) {
+        logger.success('📁 Created storage.yml (local storage enabled)');
+        logger.info(`📁 Created storage directory: ${userStoragePath}`);
+        logger.info(
+          '💡 Configure storage providers in .system-data/storage.yml'
+        );
+        logger.info('💡 Test with: civic storage:list');
+      }
+    }
+  } catch (error: any) {
+    if (!shouldOutputJson) {
+      logger.warn(`⚠️  Failed to setup storage: ${error.message}`);
+      logger.info(
+        '💡 You can configure storage later in .system-data/storage.yml'
       );
     }
   }

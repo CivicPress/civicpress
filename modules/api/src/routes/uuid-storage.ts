@@ -121,21 +121,32 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
       throw new Error('CivicPress instance not available');
     }
 
-        const dataDir = civicPress.getDataDir();
-    const systemDataDir = `${dataDir}/.system-data`;
-    
+    // Storage configuration is in project root, not data directory
+    const systemDataDir = path.join(process.cwd(), '.system-data');
+
     configManager = new StorageConfigManager(systemDataDir);
-    const config = await configManager.loadConfig();
-    storageService = new CloudUuidStorageService(config, systemDataDir);
 
-    // Get database service from request context (injected by API)
-    databaseService = (req as any).context?.databaseService;
-    if (!databaseService) {
-      throw new Error('Database service not available');
+    try {
+      const config = await configManager.loadConfig();
+      storageService = new CloudUuidStorageService(config, systemDataDir);
+
+      // Get database service from request context (injected by API)
+      databaseService = (req as any).context?.databaseService;
+      if (!databaseService) {
+        throw new Error('Database service not available');
+      }
+
+      storageService.setDatabaseService(databaseService);
+      await storageService.initialize();
+    } catch (error: any) {
+      // If storage config doesn't exist, return a helpful error
+      if (error.message.includes('Storage configuration not found')) {
+        throw new Error(
+          'Storage configuration not initialized. Please run "civic init" to set up storage.'
+        );
+      }
+      throw error;
     }
-
-    storageService.setDatabaseService(databaseService);
-    await storageService.initialize();
   }
 };
 

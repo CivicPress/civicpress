@@ -73,18 +73,14 @@ export class StorageConfigManager {
         this.logger.info('Storage configuration loaded from:', this.configPath);
         return mergedConfig;
       } else {
-        // Create default configuration
-        await this.saveConfig(this.defaultConfig);
-        this.logger.info(
-          'Created default storage configuration at:',
-          this.configPath
+        // Don't auto-create config files - let the CLI init handle this
+        throw new Error(
+          `Storage configuration not found at: ${this.configPath}. Please run 'civic init' to create the configuration.`
         );
-        return this.defaultConfig;
       }
     } catch (error) {
       this.logger.error('Failed to load storage configuration:', error);
-      this.logger.warn('Using default storage configuration');
-      return this.defaultConfig;
+      throw error; // Re-throw the error instead of returning default config
     }
   }
 

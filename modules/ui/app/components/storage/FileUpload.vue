@@ -1,27 +1,60 @@
 <template>
   <div class="file-upload">
-    <!-- Official Nuxt UI FileUpload Component -->
-    <UFileUpload
-      v-model="selectedFiles"
-      :accept="acceptedTypes"
-      :multiple="props.multiple"
-      :dropzone="true"
-      :interactive="true"
-      variant="area"
-      size="lg"
-      color="primary"
-      :label="uploadLabel"
-      :description="uploadDescription"
-      icon="i-lucide-upload"
-      class="w-full min-h-48"
-      @change="handleFileChange"
+    <!-- Custom File Upload Area -->
+    <div
+      class="file-upload-area"
+      :class="{
+        'border-primary-500 bg-primary-50': isDragOver,
+        'border-gray-300 bg-white': !isDragOver,
+        'border-dashed': true,
+        'border-2': true,
+        'rounded-lg': true,
+        'p-8': true,
+        'text-center': true,
+        'cursor-pointer': true,
+        'hover:border-primary-400': true,
+        'transition-colors': true,
+        'min-h-48': true,
+        flex: true,
+        'flex-col': true,
+        'items-center': true,
+        'justify-center': true,
+        'space-y-4': true,
+      }"
+      @click="triggerFileInput"
+      @dragover.prevent="handleDragOver"
+      @dragleave.prevent="handleDragLeave"
+      @drop.prevent="handleDrop"
     >
-      <!-- Custom Actions Slot -->
-      <template #actions>
+      <!-- Upload Icon -->
+      <UIcon name="i-lucide-upload" class="w-12 h-12 text-gray-400" />
+
+      <!-- Upload Label -->
+      <div class="space-y-2">
+        <h3 class="text-lg font-medium text-gray-900">
+          {{ uploadLabel }}
+        </h3>
+        <p class="text-sm text-gray-600">
+          {{ uploadDescription }}
+        </p>
+      </div>
+
+      <!-- File Input (Hidden) -->
+      <input
+        ref="fileInput"
+        type="file"
+        :accept="acceptedTypes"
+        :multiple="props.multiple"
+        class="hidden"
+        @change="handleFileChange"
+      />
+
+      <!-- Action Buttons -->
+      <div v-if="selectedFiles.length > 0" class="flex space-x-3">
         <UButton
-          v-if="selectedFiles.length > 0 && !isUploading"
+          v-if="!isUploading"
           color="primary"
-          @click="uploadFiles"
+          @click.stop="uploadFiles"
           :disabled="isUploading"
         >
           <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
@@ -31,16 +64,15 @@
         </UButton>
 
         <UButton
-          v-if="selectedFiles.length > 0"
           color="neutral"
           variant="ghost"
-          @click="clearFiles"
+          @click.stop="clearFiles"
           :disabled="isUploading"
         >
           Clear
         </UButton>
-      </template>
-    </UFileUpload>
+      </div>
+    </div>
 
     <!-- Upload Progress -->
     <div v-if="uploads.length > 0" class="upload-progress mt-4">
@@ -186,6 +218,8 @@ const toast = useToast();
 const selectedFiles = ref<File[]>([]);
 const isUploading = ref(false);
 const uploads = ref<UploadItem[]>([]);
+const isDragOver = ref(false);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 // Computed
 const acceptedTypes = computed(() => {
@@ -229,14 +263,55 @@ interface UploadedFile {
   type: string;
   url: string;
   path: string;
+  folder?: string;
+  description?: string;
+  created_at?: string;
 }
 
 // Methods
-const handleFileChange = () => {
-  // Files are automatically validated by UFileUpload
-  // Auto-upload if enabled
-  if (props.autoUpload) {
-    uploadFiles();
+const triggerFileInput = () => {
+  fileInput.value?.click();
+};
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault();
+  isDragOver.value = true;
+};
+
+const handleDragLeave = (event: DragEvent) => {
+  event.preventDefault();
+  isDragOver.value = false;
+};
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault();
+  isDragOver.value = false;
+
+  const files = Array.from(event.dataTransfer?.files || []);
+  if (files.length > 0) {
+    handleFiles(files);
+  }
+};
+
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const files = Array.from(target.files || []);
+  if (files.length > 0) {
+    handleFiles(files);
+  }
+};
+
+const handleFiles = (files: File[]) => {
+  // Validate files
+  const validFiles = files.filter(validateFile);
+
+  if (validFiles.length > 0) {
+    selectedFiles.value = [...selectedFiles.value, ...validFiles];
+
+    // Auto-upload if enabled
+    if (props.autoUpload) {
+      uploadFiles();
+    }
   }
 };
 
@@ -264,6 +339,35 @@ const validateFile = (file: File): boolean => {
   }
 
   return true;
+};
+
+const clearFiles = () => {
+  selectedFiles.value = [];
+  uploads.value = [];
+  if (fileInput.value) {
+    fileInput.value.value = '';
+  }
+};
+
+const parseSizeString = (sizeStr: string): number => {
+  const units: Record<string, number> = {
+    B: 1,
+    KB: 1024,
+    MB: 1024 * 1024,
+    GB: 1024 * 1024 * 1024,
+  };
+
+  const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);
+  if (!match) return 0;
+
+  const value = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+
+  return value * (units[unit] || 1);
+};
+
+const generateId = (): string => {
+  return Math.random().toString(36).substr(2, 9);
 };
 
 const uploadFiles = async () => {
@@ -348,10 +452,6 @@ const uploadFiles = async () => {
   }
 };
 
-const clearFiles = () => {
-  selectedFiles.value = [];
-};
-
 const retryUpload = (item: UploadItem) => {
   item.status = 'pending' as const;
   item.progress = 0;
@@ -395,27 +495,6 @@ const formatFileSize = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-const parseSizeString = (sizeStr: string): number => {
-  const units: Record<string, number> = {
-    B: 1,
-    KB: 1024,
-    MB: 1024 * 1024,
-    GB: 1024 * 1024 * 1024,
-  };
-
-  const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)$/i);
-  if (!match) return 100 * 1024 * 1024; // Default to 100MB
-
-  const value = parseFloat(match[1] || '100');
-  const unit = match[2]?.toUpperCase() || 'B';
-
-  return value * (units[unit] || 1);
-};
-
-const generateId = (): string => {
-  return Math.random().toString(36).substr(2, 9);
 };
 
 // Lifecycle
