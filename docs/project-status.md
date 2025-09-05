@@ -97,6 +97,25 @@ ready for development and testing.
 - **Data Persistence**: Files stored in database and markdown frontmatter
 - **TypeScript**: Full type safety for attachment data structures
 
+#### **Record Linking System (September 2025)**
+
+- **Record Integration**: Link records to other records with relationship
+  categorization
+- **Database Schema**: New `linked_records` JSON column with automatic migration
+- **UI Components**: RecordLinkSelector and LinkedRecordList for intuitive
+  record linking
+- **Categorization**: Organize relationships by type (related, supersedes,
+  amends, references, etc.)
+- **Dynamic Categories**: API-driven category loading with configuration support
+- **API Support**: Complete REST endpoints with validation for linked record
+  operations
+- **Configuration**: link-categories.yml for customizable relationship types
+- **Data Persistence**: Linked records stored in database and markdown
+  frontmatter
+- **TypeScript**: Full type safety for LinkedRecord data structures
+- **Inline Editing**: Edit descriptions and categories directly in the record
+  view
+
 #### **UUID Storage System (August 2025)**
 
 - **Unique Identifiers**: UUID-based file tracking and management

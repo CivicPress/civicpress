@@ -65,6 +65,25 @@
   add descriptions, view in detail pages, edit/remove attachments
 - **Test Coverage**: End-to-end testing and manual validation complete
 
+#### **Record Linking System**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Database Schema**: New `linked_records` JSON column with migration support
+- **Core Integration**: Complete RecordManager serialization/deserialization
+- **API Support**: PUT/GET endpoints with proper validation for linkedRecords
+  arrays
+- **UI Components**: RecordLinkSelector and LinkedRecordList for record
+  selection and management
+- **Configuration**: link-categories.yml with relationship categorization system
+- **Dynamic Categories**: API-driven category loading with fallback support
+- **TypeScript**: Full interface support for LinkedRecord with id, type,
+  description, path, category
+- **Data Persistence**: Stored in both database and markdown frontmatter
+- **Features**: Link records to other records, categorize relationships
+  (related, supersedes, amends, etc.), add descriptions, view in detail pages,
+  inline editing with dynamic categories
+- **Test Coverage**: End-to-end testing and manual validation complete
+
 #### **UUID Storage System**
 
 - **Status**: ✅ **Fully Implemented and Tested**
