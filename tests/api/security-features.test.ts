@@ -26,7 +26,7 @@ describe('API Security Features', () => {
     beforeAll(async () => {
       // Create password-authenticated user
       const passwordUserResponse = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send({
           username: 'passworduser',
           email: 'password@example.com',
@@ -202,7 +202,7 @@ describe('API Security Features', () => {
     beforeAll(async () => {
       // Create test user
       const userResponse = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send({
           username: 'emailtestuser',
           email: 'emailtest@example.com',
@@ -255,12 +255,14 @@ describe('API Security Features', () => {
 
       it('should reject email already in use', async () => {
         // First create another user with target email
-        await request(context.api.getApp()).post('/api/users/register').send({
-          username: 'existinguser',
-          email: 'existing@example.com',
-          password: 'password123',
-          name: 'Existing User',
-        });
+        await request(context.api.getApp())
+          .post('/api/v1/users/register')
+          .send({
+            username: 'existinguser',
+            email: 'existing@example.com',
+            password: 'password123',
+            name: 'Existing User',
+          });
 
         const response = await request(context.api.getApp())
           .post(`/api/v1/users/${testUserId}/request-email-change`)
@@ -288,7 +290,7 @@ describe('API Security Features', () => {
       it('should prevent non-admin from changing other users email', async () => {
         // Create another user
         const otherUserResponse = await request(context.api.getApp())
-          .post('/api/users/register')
+          .post('/api/v1/users/register')
           .send({
             username: 'otheruser',
             email: 'other@example.com',
@@ -451,7 +453,7 @@ describe('API Security Features', () => {
       it('should prevent non-admin from viewing other users security info', async () => {
         // Create another user
         const otherUserResponse = await request(context.api.getApp())
-          .post('/api/users/register')
+          .post('/api/v1/users/register')
           .send({
             username: 'securityother',
             email: 'securityother@example.com',
@@ -488,7 +490,7 @@ describe('API Security Features', () => {
     beforeAll(async () => {
       // Create password user
       const passwordUserResponse = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send({
           username: 'updatepassworduser',
           email: 'updatepassword@example.com',
