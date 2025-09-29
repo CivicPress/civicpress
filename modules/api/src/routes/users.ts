@@ -483,13 +483,13 @@ router.put('/:id', async (req, res) => {
     sendSuccess(
       {
         user: {
-          id: updatedUser.id,
-          username: updatedUser.username,
-          role: updatedUser.role,
-          email: updatedUser.email,
-          name: updatedUser.name,
-          avatar_url: updatedUser.avatar_url,
-          updated_at: updatedUser.updated_at,
+          id: updatedUser.user?.id,
+          username: updatedUser.user?.username,
+          role: updatedUser.user?.role,
+          email: updatedUser.user?.email,
+          name: updatedUser.user?.name,
+          avatar_url: updatedUser.user?.avatar_url,
+          updated_at: updatedUser.user?.updated_at,
         },
       },
       req,
@@ -501,7 +501,11 @@ router.put('/:id', async (req, res) => {
       source: 'api',
       actor: { id: actor.id, username: actor.username, role: actor.role },
       action: 'users:update',
-      target: { type: 'user', id: updatedUser.id, name: updatedUser.username },
+      target: {
+        type: 'user',
+        id: updatedUser.user?.id,
+        name: updatedUser.user?.username,
+      },
       outcome: 'success',
     });
   } catch (error) {

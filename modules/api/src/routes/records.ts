@@ -279,6 +279,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('geography').optional().isObject(),
     body('attachedFiles').optional().isArray(),
     body('linkedRecords').optional().isArray(),
+    body('linkedGeographyFiles').optional().isArray(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'create_record' });
 
@@ -301,6 +302,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
           geography,
           attachedFiles,
           linkedRecords,
+          linkedGeographyFiles,
         } = req.body;
         const user = req.user;
 
@@ -354,6 +356,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
             geography,
             attachedFiles,
             linkedRecords,
+            linkedGeographyFiles,
           },
           cleanUser
         );
@@ -411,6 +414,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('geography').optional().isObject(),
     body('attachedFiles').optional().isArray(),
     body('linkedRecords').optional().isArray(),
+    body('linkedGeographyFiles').optional().isArray(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'update_record' });
 

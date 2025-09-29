@@ -44,6 +44,12 @@ export interface LinkedRecord {
   category?: string;
 }
 
+export interface LinkedGeographyFile {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export interface CreateRecordRequest {
   title: string;
   type: string;
@@ -64,6 +70,7 @@ export interface CreateRecordRequest {
         };
   }>;
   linkedRecords?: LinkedRecord[];
+  linkedGeographyFiles?: LinkedGeographyFile[];
   role?: string;
 }
 
@@ -87,6 +94,7 @@ export interface UpdateRecordRequest {
         };
   }>;
   linkedRecords?: LinkedRecord[];
+  linkedGeographyFiles?: LinkedGeographyFile[];
 }
 
 export class CivicPress {

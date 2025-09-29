@@ -21,6 +21,32 @@ export type {
   GeographyValidationResult,
 } from './types/geography.js';
 
+// Export new geography data system
+export { GeographyManager } from './geography/geography-manager.js';
+export type {
+  GeographyFile,
+  GeographyFileType,
+  GeographyCategory,
+  GeographyRelationshipType,
+  SRID,
+  BoundingBox,
+  CenterCoordinates,
+  GeographyMetadata,
+  GeographyRelationship,
+  LinkedGeography,
+  RecordGeography,
+  CreateGeographyRequest,
+  UpdateGeographyRequest,
+  GeographyValidationResult as NewGeographyValidationResult,
+  ParsedGeographyData,
+  GeographyFormData,
+  GeographyFormErrors,
+  GeographyPreviewData,
+  GeographyError,
+  GeographyValidationError,
+  GeographyNotFoundError,
+} from './types/geography.js';
+
 // Export database services
 export { DatabaseService } from './database/database-service.js';
 export {

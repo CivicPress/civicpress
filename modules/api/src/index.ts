@@ -1,7 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { CivicPress, Logger, CentralConfigManager } from '@civicpress/core';
+import {
+  CivicPress,
+  Logger,
+  CentralConfigManager,
+  GeographyManager,
+} from '@civicpress/core';
 
 const logger = new Logger();
 
@@ -35,6 +40,7 @@ import {
 import infoRouter from './routes/info.js';
 import configRouter from './routes/config.js';
 import systemRouter from './routes/system.js';
+import { createGeographyRouter } from './routes/geography.js';
 
 // Import middleware
 import {
@@ -204,8 +210,9 @@ export class CivicPressAPI {
       throw new Error('CivicPress not initialized');
     }
 
-    // Create RecordsService instance
+    // Create service instances
     const recordsService = new RecordsService(this.civicPress);
+    const geographyManager = new GeographyManager(this.dataDir);
 
     // Health check (no auth required)
     this.app.use('/health', healthRouter);
@@ -245,6 +252,7 @@ export class CivicPressAPI {
 
     // Public routes that should be accessible to guests
     this.app.use('/api/v1/records', createRecordsRouter(recordsService));
+    this.app.use('/api/v1/geography', createGeographyRouter(geographyManager));
     this.app.use('/api/v1/search', searchRouter);
     this.app.use('/api/v1/status', createStatusRouter());
     this.app.use('/api/v1/validation', createValidationRouter());

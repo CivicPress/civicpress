@@ -251,6 +251,18 @@ export class SQLiteAdapter implements DatabaseAdapter {
       );
     }
 
+    // Add linked_geography_files column to existing records table if it doesn't exist
+    try {
+      await this.execute(
+        'ALTER TABLE records ADD COLUMN linked_geography_files TEXT'
+      );
+    } catch (error) {
+      // Column already exists, ignore error
+      console.log(
+        'Linked geography files column already exists or migration not needed'
+      );
+    }
+
     // Security Enhancement Migrations - Add new user security fields
     const userSecurityMigrations = [
       {

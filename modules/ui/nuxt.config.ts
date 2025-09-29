@@ -51,6 +51,7 @@ export default defineNuxtConfig({
       '/api': {
         target: process.env.API_BASE_URL || 'http://localhost:3000',
         changeOrigin: true,
+        rewrite: (path) => path, // Don't rewrite the path, keep /api prefix
       },
     },
   },

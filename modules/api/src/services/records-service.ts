@@ -71,6 +71,11 @@ export class RecordsService {
         path?: string;
         category?: string;
       }>;
+      linkedGeographyFiles?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+      }>;
     },
     user: any
   ): Promise<any> {
@@ -95,6 +100,7 @@ export class RecordsService {
       geography: data.geography,
       attachedFiles: data.attachedFiles,
       linkedRecords: data.linkedRecords,
+      linkedGeographyFiles: data.linkedGeographyFiles,
     };
 
     // Create the record using CivicCore
@@ -116,6 +122,7 @@ export class RecordsService {
       },
       attachedFiles: record.attachedFiles || [],
       linkedRecords: record.linkedRecords || [],
+      linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
       created: record.created_at,
       author:
@@ -147,6 +154,7 @@ export class RecordsService {
       geography: record.geography,
       attachedFiles: record.attachedFiles || [],
       linkedRecords: record.linkedRecords || [],
+      linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
       created: record.created_at,
       author: record.author,
@@ -231,6 +239,11 @@ export class RecordsService {
         path?: string;
         category?: string;
       }>;
+      linkedGeographyFiles?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+      }>;
     },
     user: any
   ): Promise<any | null> {
@@ -261,6 +274,7 @@ export class RecordsService {
       geography: data.geography,
       attachedFiles: data.attachedFiles,
       linkedRecords: data.linkedRecords,
+      linkedGeographyFiles: data.linkedGeographyFiles,
     };
 
     // Update the record using CivicCore
@@ -283,6 +297,7 @@ export class RecordsService {
       metadata: updatedRecord.metadata || {},
       attachedFiles: updatedRecord.attachedFiles || [],
       linkedRecords: updatedRecord.linkedRecords || [],
+      linkedGeographyFiles: updatedRecord.linkedGeographyFiles || [],
       geography: updatedRecord.geography,
       path: updatedRecord.path,
       created: updatedRecord.created_at,

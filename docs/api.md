@@ -980,6 +980,274 @@ stored at `.system-data/activity.log` under the active `dataDir`.
 }
 ```
 
+### Geography Endpoints
+
+#### GET /api/v1/geography
+
+List all geography files (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": [
+      {
+        "id": "geo-001",
+        "name": "Residential Zones",
+        "type": "geojson",
+        "category": "zone",
+        "description": "Residential zoning boundaries for the city",
+        "srid": 4326,
+        "bounds": {
+          "minLon": -73.65,
+          "minLat": 45.45,
+          "maxLon": -73.52,
+          "maxLat": 45.55
+        },
+        "metadata": {
+          "source": "City Planning Department",
+          "created": "2025-01-27T10:00:00.000Z",
+          "updated": "2025-01-27T10:00:00.000Z",
+          "version": "1.0",
+          "accuracy": "high"
+        },
+        "file_path": "data/geography/geojson/zones/residential-zones.geojson",
+        "created_at": "2025-01-27T10:00:00.000Z",
+        "updated_at": "2025-01-27T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+#### POST /api/v1/geography
+
+Create a new geography file (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "name": "string (required)",
+  "type": "geojson|kml|gpx|shapefile (required)",
+  "category": "zone|boundary|district|facility|route (required)",
+  "description": "string (required)",
+  "content": "string (required)",
+  "srid": "number (optional, default: 4326)",
+  "metadata": {
+    "source": "string (optional)",
+    "version": "string (optional)",
+    "accuracy": "string (optional)"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": {
+      "id": "geo-002",
+      "name": "Commercial Zones",
+      "type": "geojson",
+      "category": "zone",
+      "description": "Commercial zoning boundaries",
+      "srid": 4326,
+      "bounds": {
+        "minLon": -73.60,
+        "minLat": 45.40,
+        "maxLon": -73.50,
+        "maxLat": 45.60
+      },
+      "metadata": {
+        "source": "City Planning Department",
+        "created": "2025-01-27T11:00:00.000Z",
+        "updated": "2025-01-27T11:00:00.000Z",
+        "version": "1.0",
+        "accuracy": "high"
+      },
+      "file_path": "data/geography/geojson/zones/commercial-zones.geojson",
+      "created_at": "2025-01-27T11:00:00.000Z",
+      "updated_at": "2025-01-27T11:00:00.000Z"
+    }
+  }
+}
+```
+
+#### GET /api/v1/geography/:id
+
+Get a specific geography file (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": {
+      "id": "geo-001",
+      "name": "Residential Zones",
+      "type": "geojson",
+      "category": "zone",
+      "description": "Residential zoning boundaries for the city",
+      "srid": 4326,
+      "bounds": {
+        "minLon": -73.65,
+        "minLat": 45.45,
+        "maxLon": -73.52,
+        "maxLat": 45.55
+      },
+      "metadata": {
+        "source": "City Planning Department",
+        "created": "2025-01-27T10:00:00.000Z",
+        "updated": "2025-01-27T10:00:00.000Z",
+        "version": "1.0",
+        "accuracy": "high"
+      },
+      "file_path": "data/geography/geojson/zones/residential-zones.geojson",
+      "content": "{\"type\":\"FeatureCollection\",\"features\":[...]}",
+      "created_at": "2025-01-27T10:00:00.000Z",
+      "updated_at": "2025-01-27T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### PUT /api/v1/geography/:id
+
+Update a geography file (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "name": "string (optional)",
+  "category": "zone|boundary|district|facility|route (optional)",
+  "description": "string (optional)",
+  "content": "string (optional)",
+  "metadata": {
+    "source": "string (optional)",
+    "version": "string (optional)",
+    "accuracy": "string (optional)"
+  }
+}
+```
+
+#### DELETE /api/v1/geography/:id
+
+Delete a geography file (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Geography file deleted successfully"
+}
+```
+
+#### POST /api/v1/geography/validate
+
+Validate geography content without saving (public endpoint).
+
+**Request Body:**
+
+```json
+{
+  "content": "string (required)",
+  "type": "geojson|kml|gpx|shapefile (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "metadata": {
+        "featureCount": 3,
+        "bounds": {
+          "minLon": -73.65,
+          "minLat": 45.45,
+          "maxLon": -73.52,
+          "maxLat": 45.55
+        },
+        "srid": 4326,
+        "geometryTypes": ["Polygon"]
+      }
+    }
+  }
+}
+```
+
+#### GET /api/v1/geography/search
+
+Search geography files (public endpoint).
+
+**Query Parameters:**
+
+- `q` - Search query (optional)
+- `category` - Filter by category (optional)
+- `type` - Filter by file type (optional)
+- `limit` - Number of results (optional, default: 20)
+- `offset` - Offset for pagination (optional, default: 0)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": [
+      {
+        "id": "geo-001",
+        "name": "Residential Zones",
+        "type": "geojson",
+        "category": "zone",
+        "description": "Residential zoning boundaries for the city",
+        "srid": 4326,
+        "bounds": {
+          "minLon": -73.65,
+          "minLat": 45.45,
+          "maxLon": -73.52,
+          "maxLat": 45.55
+        },
+        "metadata": {
+          "source": "City Planning Department",
+          "created": "2025-01-27T10:00:00.000Z",
+          "updated": "2025-01-27T10:00:00.000Z",
+          "version": "1.0",
+          "accuracy": "high"
+        },
+        "file_path": "data/geography/geojson/zones/residential-zones.geojson",
+        "created_at": "2025-01-27T10:00:00.000Z",
+        "updated_at": "2025-01-27T10:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "total": 1,
+      "limit": 20,
+      "offset": 0
+    }
+  }
+}
+```
+
 ### Audit Endpoints
 
 #### GET /api/v1/audit

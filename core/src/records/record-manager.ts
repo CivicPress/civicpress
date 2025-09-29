@@ -41,6 +41,11 @@ export interface RecordData {
     path?: string;
     category?: string;
   }>;
+  linkedGeographyFiles?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
   path?: string;
   author: string;
   created_at: string;
@@ -95,6 +100,7 @@ export class RecordManager {
       geography: request.geography,
       attachedFiles: request.attachedFiles,
       linkedRecords: request.linkedRecords,
+      linkedGeographyFiles: request.linkedGeographyFiles,
       metadata: {
         ...safeMetadata,
         author: user.username, // Always set as string
@@ -125,6 +131,9 @@ export class RecordManager {
         : undefined,
       linked_records: record.linkedRecords
         ? JSON.stringify(record.linkedRecords)
+        : undefined,
+      linked_geography_files: record.linkedGeographyFiles
+        ? JSON.stringify(record.linkedGeographyFiles)
         : undefined,
       path: record.path,
       author: record.author,
@@ -174,6 +183,8 @@ export class RecordManager {
       content: request.content,
       geography: request.geography,
       attachedFiles: request.attachedFiles,
+      linkedRecords: request.linkedRecords,
+      linkedGeographyFiles: request.linkedGeographyFiles,
       metadata: {
         ...safeMetadata2,
         author: user.username, // Always set as string
@@ -204,6 +215,9 @@ export class RecordManager {
         : undefined,
       linked_records: record.linkedRecords
         ? JSON.stringify(record.linkedRecords)
+        : undefined,
+      linked_geography_files: record.linkedGeographyFiles
+        ? JSON.stringify(record.linkedGeographyFiles)
         : undefined,
       path: record.path,
       author: record.author,
@@ -283,6 +297,21 @@ export class RecordManager {
       record.linkedRecords = [];
     }
 
+    // Parse linked geography files
+    if (record.linked_geography_files) {
+      try {
+        record.linkedGeographyFiles = JSON.parse(record.linked_geography_files);
+      } catch (error) {
+        logger.warn(
+          `Failed to parse linked geography files for record ${id}:`,
+          error
+        );
+        record.linkedGeographyFiles = [];
+      }
+    } else {
+      record.linkedGeographyFiles = [];
+    }
+
     // Try to read geography from Markdown file if not in database
     if (!record.geography && record.path) {
       try {
@@ -353,6 +382,10 @@ export class RecordManager {
       updates.attached_files = JSON.stringify(request.attachedFiles);
     if (request.linkedRecords !== undefined)
       updates.linked_records = JSON.stringify(request.linkedRecords);
+    if (request.linkedGeographyFiles !== undefined)
+      updates.linked_geography_files = JSON.stringify(
+        request.linkedGeographyFiles
+      );
     if (request.metadata !== undefined) {
       updates.metadata = JSON.stringify({
         ...existingRecord.metadata,
@@ -631,6 +664,7 @@ export class RecordManager {
       geography: record.geography, // Include geography data
       attachedFiles: record.attachedFiles, // Include attached files
       linkedRecords: record.linkedRecords, // Include linked records
+      linkedGeographyFiles: record.linkedGeographyFiles, // Include linked geography files
       ...otherMetadata, // Spread other metadata but not author
     };
 

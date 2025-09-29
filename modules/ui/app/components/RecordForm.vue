@@ -3,6 +3,7 @@ import type { CivicRecord } from '~/stores/records';
 import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
 import RecordPreview from '~/components/RecordPreview.vue';
 import LinkedRecordList from '~/components/records/LinkedRecordList.vue';
+import GeographyLinkForm from '~/components/GeographyLinkForm.vue';
 
 // Types
 interface RecordFormData {
@@ -35,6 +36,11 @@ interface RecordFormData {
     id: string;
     type: string;
     description: string;
+  }>;
+  linkedGeographyFiles?: Array<{
+    id: string;
+    name: string;
+    description?: string;
   }>;
   metadata: {
     tags: string[];
@@ -74,6 +80,13 @@ const { recordStatusOptions, getRecordStatusLabel, fetchRecordStatuses } =
   useRecordStatuses();
 const { getTemplateOptions, getTemplateById, processTemplate } = useTemplates();
 const { getAttachmentTypeOptions, fetchAttachmentTypes } = useAttachmentTypes();
+
+// Helper function to find attachment type by value
+const getAttachmentTypeByValue = (value: string | undefined) => {
+  if (!value) return undefined;
+  const options = getAttachmentTypeOptions();
+  return options.find((option) => option.value === value) || undefined;
+};
 const toast = useToast();
 
 // Form data
@@ -84,18 +97,6 @@ const form = reactive({
   status: '' as string,
   tags: [] as string[],
   description: '',
-  geography: {
-    srid: 4326,
-    zone_ref: '',
-    bbox: [0, 0, 0, 0] as [number, number, number, number],
-    center: { lon: 0, lat: 0 },
-    attachments: [] as Array<{
-      id?: string; // UUID reference
-      path: string; // Display path
-      role: string;
-      description?: string;
-    }>,
-  },
   attachedFiles: [] as Array<{
     id: string;
     path: string;
@@ -108,22 +109,15 @@ const form = reactive({
     type: string;
     description: string;
   }>,
+  linkedGeographyFiles: [] as Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>,
 });
 
 // New tag input
 const newTag = ref('');
-
-// New attachment inputs
-const newAttachment = reactive({
-  file: null as File | null,
-  path: '',
-  role: '',
-  description: '',
-});
-
-// File upload state
-const uploading = ref(false);
-const fileInput = ref<HTMLInputElement | null>(null);
 
 // Selected options for select menus
 const selectedRecordType = ref<any>(null);
@@ -242,16 +236,10 @@ onMounted(async () => {
     }
     form.content = contentBody;
 
-    // Load geography data if it exists
-    if (props.record?.geography) {
-      const geo = props.record.geography;
-      form.geography = {
-        srid: geo.srid || 4326,
-        zone_ref: geo.zone_ref || '',
-        bbox: geo.bbox || [0, 0, 0, 0],
-        center: geo.center || { lon: 0, lat: 0 },
-        attachments: geo.attachments || [],
-      };
+    // Load linked geography files if they exist
+    if ((props.record as any)?.linkedGeographyFiles) {
+      form.linkedGeographyFiles =
+        (props.record as any).linkedGeographyFiles || [];
     }
 
     // Load attached files if they exist
@@ -310,83 +298,6 @@ const validateForm = () => {
     errors.status = 'Status is required';
   }
 
-  // Validate geography data (only if any geography fields are filled)
-  if (
-    form.geography &&
-    (form.geography.zone_ref?.trim() ||
-      (form.geography.center &&
-        (form.geography.center.lon !== 0 || form.geography.center.lat !== 0)) ||
-      (form.geography.bbox &&
-        !form.geography.bbox.every((coord) => coord === 0)) ||
-      (form.geography.attachments && form.geography.attachments.length > 0))
-  ) {
-    const geoErrors: any = {};
-
-    // Validate SRID
-    if (
-      form.geography.srid !== undefined &&
-      !Number.isInteger(form.geography.srid)
-    ) {
-      geoErrors.srid = 'SRID must be an integer';
-    }
-
-    // Validate center coordinates
-    if (
-      form.geography.center &&
-      (form.geography.center.lon !== 0 || form.geography.center.lat !== 0)
-    ) {
-      const { lon, lat } = form.geography.center;
-      if (typeof lon !== 'number' || typeof lat !== 'number') {
-        geoErrors.center = 'Center coordinates must be numbers';
-      } else {
-        if (lon < -180 || lon > 180) {
-          geoErrors.center = 'Longitude must be between -180 and 180';
-        }
-        if (lat < -90 || lat > 90) {
-          geoErrors.center = 'Latitude must be between -90 and 90';
-        }
-      }
-    }
-
-    // Validate bounding box
-    if (
-      form.geography.bbox &&
-      !form.geography.bbox.every((coord) => coord === 0)
-    ) {
-      const [minLon, minLat, maxLon, maxLat] = form.geography.bbox;
-      if (
-        !Array.isArray(form.geography.bbox) ||
-        form.geography.bbox.length !== 4
-      ) {
-        geoErrors.bbox = 'Bounding box must have exactly 4 coordinates';
-      } else if (minLon >= maxLon || minLat >= maxLat) {
-        geoErrors.bbox =
-          'Invalid bounding box: min coordinates must be less than max coordinates';
-      }
-    }
-
-    // Validate zone_ref
-    if (form.geography.zone_ref && form.geography.zone_ref.trim() === '') {
-      geoErrors.zone_ref = 'Zone reference cannot be empty if provided';
-    }
-
-    // Validate attachments
-    if (form.geography.attachments && form.geography.attachments.length > 0) {
-      form.geography.attachments.forEach((attachment, index) => {
-        if (!attachment.path.trim()) {
-          geoErrors.attachments = `Attachment ${index + 1} path is required`;
-        }
-        if (!attachment.role.trim()) {
-          geoErrors.attachments = `Attachment ${index + 1} role is required`;
-        }
-      });
-    }
-
-    if (Object.keys(geoErrors).length > 0) {
-      errors.geography = geoErrors;
-    }
-  }
-
   return errors;
 };
 
@@ -396,13 +307,7 @@ const handleSubmit = () => {
 
   // Clear previous errors
   Object.keys(formErrors).forEach((key) => {
-    if (key === 'geography') {
-      Object.keys(formErrors.geography).forEach((geoKey) => {
-        (formErrors.geography as any)[geoKey] = '';
-      });
-    } else {
-      (formErrors as any)[key] = '';
-    }
+    (formErrors as any)[key] = '';
   });
 
   // Validate form
@@ -420,19 +325,14 @@ const handleSubmit = () => {
     status: form.status,
     tags: form.tags,
     description: form.description.trim(),
-    geography:
-      form.geography.zone_ref?.trim() ||
-      (form.geography.center &&
-        (form.geography.center.lon !== 0 || form.geography.center.lat !== 0)) ||
-      (form.geography.bbox &&
-        !form.geography.bbox.every((coord) => coord === 0)) ||
-      (form.geography.attachments && form.geography.attachments.length > 0)
-        ? form.geography
-        : undefined,
     attachedFiles:
       form.attachedFiles.length > 0 ? form.attachedFiles : undefined,
     linkedRecords:
       form.linkedRecords.length > 0 ? form.linkedRecords : undefined,
+    linkedGeographyFiles:
+      form.linkedGeographyFiles.length > 0
+        ? form.linkedGeographyFiles
+        : undefined,
     metadata: {
       tags: form.tags,
       description: form.description.trim(),
@@ -483,148 +383,6 @@ const removeTag = (tag: string) => {
   if (index > -1) {
     form.tags.splice(index, 1);
   }
-};
-
-// Handle file selection
-const handleFileSelect = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (file) {
-    newAttachment.file = file;
-    newAttachment.path = file.name; // Show filename in path field
-  }
-};
-
-// Upload file to storage
-const uploadFile = async (
-  file: File,
-  folder: string = 'public'
-): Promise<{ id: string; path: string } | null> => {
-  try {
-    uploading.value = true;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folder', folder);
-    formData.append('description', `Geography attachment: ${file.name}`);
-
-    const response = await $fetch('/api/v1/storage/files', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (response.success && response.data) {
-      return {
-        id: response.data.id,
-        path: response.data.path, // This is the relative path for display
-      };
-    } else {
-      throw new Error(response.error || 'Upload failed');
-    }
-  } catch (error) {
-    console.error('File upload failed:', error);
-    toast.add({
-      title: 'Upload Failed',
-      description:
-        error instanceof Error ? error.message : 'Failed to upload file',
-      color: 'red',
-    });
-    return null;
-  } finally {
-    uploading.value = false;
-  }
-};
-
-// Add attachment (with file upload if file is selected)
-const addAttachment = async () => {
-  if (!newAttachment.role.trim()) {
-    toast.add({
-      title: 'Validation Error',
-      description: 'Role is required for attachments',
-      color: 'red',
-    });
-    return;
-  }
-
-  let attachmentData: {
-    id?: string;
-    path: string;
-    role: string;
-    description?: string;
-  };
-
-  // If file is selected, upload it first
-  if (newAttachment.file) {
-    const uploadResult = await uploadFile(newAttachment.file);
-    if (!uploadResult) {
-      return; // Upload failed, error already shown
-    }
-
-    attachmentData = {
-      id: uploadResult.id,
-      path: uploadResult.path,
-      role: newAttachment.role.trim(),
-      description: newAttachment.description.trim() || undefined,
-    };
-  } else if (newAttachment.path.trim()) {
-    // Manual path entry (legacy support)
-    attachmentData = {
-      path: newAttachment.path.trim(),
-      role: newAttachment.role.trim(),
-      description: newAttachment.description.trim() || undefined,
-    };
-  } else {
-    toast.add({
-      title: 'Validation Error',
-      description: 'Please select a file or enter a path',
-      color: 'red',
-    });
-    return;
-  }
-
-  form.geography.attachments.push(attachmentData);
-
-  // Clear form
-  newAttachment.file = null;
-  newAttachment.path = '';
-  newAttachment.role = '';
-  newAttachment.description = '';
-  if (fileInput.value) {
-    fileInput.value.value = '';
-  }
-};
-
-// Remove attachment
-const removeAttachment = (index: number) => {
-  form.geography.attachments.splice(index, 1);
-};
-
-// Methods for updating bounding box coordinates
-const updateBboxMinLon = (value: number) => {
-  form.geography.bbox[0] = value;
-};
-
-const updateBboxMinLat = (value: number) => {
-  form.geography.bbox[1] = value;
-};
-
-const updateBboxMaxLon = (value: number) => {
-  form.geography.bbox[2] = value;
-};
-
-const updateBboxMaxLat = (value: number) => {
-  form.geography.bbox[3] = value;
-};
-
-// Clear geography data
-const clearGeography = () => {
-  form.geography = {
-    srid: 4326,
-    zone_ref: '',
-    bbox: [0, 0, 0, 0],
-    center: { lon: 0, lat: 0 },
-    attachments: [],
-  };
 };
 
 // Open template modal
@@ -694,13 +452,22 @@ const removeAttachedFile = (index: number) => {
 };
 
 // Update attached file category
-const updateFileCategory = (index: number, category: string) => {
-  form.attachedFiles[index].category = category;
+const updateFileCategory = (
+  index: number,
+  category: string | { value: string }
+) => {
+  if (form.attachedFiles[index]) {
+    const categoryValue =
+      typeof category === 'string' ? category : category.value;
+    form.attachedFiles[index].category = categoryValue;
+  }
 };
 
 // Update attached file description
 const updateFileDescription = (index: number, description: string) => {
-  form.attachedFiles[index].description = description;
+  if (form.attachedFiles[index]) {
+    form.attachedFiles[index].description = description;
+  }
 };
 
 // Handle file download
@@ -742,7 +509,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
     useToast().add({
       title: 'Download Failed',
       description: 'Failed to download the file. Please try again.',
-      color: 'red',
+      color: 'error',
     });
   }
 };
@@ -851,366 +618,12 @@ const downloadFile = async (fileId: string, fileName: string) => {
           </div>
         </UFormField>
 
-        <!-- Geography Section -->
-        <div class="">
-          <div class="">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-              Geography
-            </h3>
-            <UButton
-              color="neutral"
-              variant="ghost"
-              size="sm"
-              @click="clearGeography"
-              :disabled="saving"
-            >
-              Clear
-            </UButton>
-          </div>
-
-          <!-- SRID -->
-          <UFormField
-            label="Spatial Reference System ID (SRID)"
-            :error="
-              hasSubmitted && formErrors.geography?.srid
-                ? formErrors.geography.srid
-                : undefined
-            "
-          >
-            <UInput
-              v-model.number="form.geography.srid"
-              type="number"
-              placeholder="4326"
-              :disabled="saving"
-              class="w-full"
-            />
-            <template #help>
-              <p class="text-sm text-gray-600">
-                Default: 4326 (WGS84). Leave empty to use default.
-              </p>
-            </template>
-          </UFormField>
-
-          <!-- Zone Reference -->
-          <UFormField
-            label="Zone Reference"
-            :error="
-              hasSubmitted && formErrors.geography?.zone_ref
-                ? formErrors.geography.zone_ref
-                : undefined
-            "
-          >
-            <UInput
-              v-model="form.geography.zone_ref"
-              placeholder="e.g., city-limits, district-1, ward-a"
-              :disabled="saving"
-              class="w-full"
-            />
-            <template #help>
-              <p class="text-sm text-gray-600">
-                Administrative boundary or zone identifier.
-              </p>
-            </template>
-          </UFormField>
-
-          <!-- Center Coordinates -->
-          <div class="space-y-2">
-            <label
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Center Coordinates
-            </label>
-            <div class="grid grid-cols-2 gap-2">
-              <UFormField
-                label="Longitude"
-                :error="
-                  hasSubmitted && formErrors.geography?.center
-                    ? formErrors.geography.center
-                    : undefined
-                "
-              >
-                <UInput
-                  v-model.number="form.geography.center.lon"
-                  type="number"
-                  step="0.000001"
-                  placeholder="-73.5673"
-                  :disabled="saving"
-                  class="w-full"
-                />
-              </UFormField>
-              <UFormField
-                label="Latitude"
-                :error="
-                  hasSubmitted && formErrors.geography?.center
-                    ? formErrors.geography.center
-                    : undefined
-                "
-              >
-                <UInput
-                  v-model.number="form.geography.center.lat"
-                  type="number"
-                  step="0.000001"
-                  placeholder="45.5017"
-                  :disabled="saving"
-                  class="w-full"
-                />
-              </UFormField>
-            </div>
-            <div>
-              <p class="text-sm text-gray-600">
-                Center point coordinates (longitude: -180 to 180, latitude: -90
-                to 90).
-              </p>
-            </div>
-          </div>
-
-          <!-- Bounding Box -->
-          <div class="space-y-2">
-            <label
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Bounding Box
-            </label>
-            <div class="grid grid-cols-2 gap-2">
-              <UFormField
-                label="Min Longitude"
-                :error="
-                  hasSubmitted && formErrors.geography?.bbox
-                    ? formErrors.geography.bbox
-                    : undefined
-                "
-              >
-                <UInput
-                  :model-value="form.geography.bbox[0]"
-                  type="number"
-                  step="0.000001"
-                  placeholder="-73.6000"
-                  :disabled="saving"
-                  class="w-full"
-                  @update:model-value="updateBboxMinLon"
-                />
-              </UFormField>
-              <UFormField
-                label="Min Latitude"
-                :error="
-                  hasSubmitted && formErrors.geography?.bbox
-                    ? formErrors.geography.bbox
-                    : undefined
-                "
-              >
-                <UInput
-                  :model-value="form.geography.bbox[1]"
-                  type="number"
-                  step="0.000001"
-                  placeholder="45.4800"
-                  :disabled="saving"
-                  class="w-full"
-                  @update:model-value="updateBboxMinLat"
-                />
-              </UFormField>
-              <UFormField
-                label="Max Longitude"
-                :error="
-                  hasSubmitted && formErrors.geography?.bbox
-                    ? formErrors.geography.bbox
-                    : undefined
-                "
-              >
-                <UInput
-                  :model-value="form.geography.bbox[2]"
-                  type="number"
-                  step="0.000001"
-                  placeholder="-73.5300"
-                  :disabled="saving"
-                  class="w-full"
-                  @update:model-value="updateBboxMaxLon"
-                />
-              </UFormField>
-              <UFormField
-                label="Max Latitude"
-                :error="
-                  hasSubmitted && formErrors.geography?.bbox
-                    ? formErrors.geography.bbox
-                    : undefined
-                "
-              >
-                <UInput
-                  :model-value="form.geography.bbox[3]"
-                  type="number"
-                  step="0.000001"
-                  placeholder="45.5200"
-                  :disabled="saving"
-                  class="w-full"
-                  @update:model-value="updateBboxMaxLat"
-                />
-              </UFormField>
-            </div>
-            <div>
-              <p class="text-sm text-gray-600">
-                Bounding box coordinates [minLon, minLat, maxLon, maxLat].
-              </p>
-            </div>
-          </div>
-
-          <!-- Attachments -->
-          <div class="space-y-3">
-            <label
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Attachments
-            </label>
-
-            <!-- Add new attachment -->
-            <div
-              class="space-y-3 p-4 border rounded-lg bg-white dark:bg-gray-700"
-            >
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white">
-                Add Geography File
-              </h4>
-
-              <!-- File Upload Option -->
-              <div class="space-y-2">
-                <label
-                  class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Upload File
-                </label>
-                <input
-                  ref="fileInput"
-                  type="file"
-                  @change="handleFileSelect"
-                  :disabled="saving || uploading"
-                  accept=".geojson,.kml,.gpx,.json,.csv,.pdf,.jpg,.jpeg,.png,.gif"
-                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300"
-                />
-                <p class="text-xs text-gray-500">
-                  Supports geographic files (.geojson, .kml, .gpx), images, and
-                  documents
-                </p>
-              </div>
-
-              <!-- OR separator -->
-              <div class="flex items-center">
-                <div class="flex-1 border-t border-gray-300"></div>
-                <span
-                  class="px-3 text-xs text-gray-500 bg-white dark:bg-gray-700"
-                  >OR</span
-                >
-                <div class="flex-1 border-t border-gray-300"></div>
-              </div>
-
-              <!-- Manual Path Entry -->
-              <div class="space-y-2">
-                <label
-                  class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Manual Path Entry
-                </label>
-                <UInput
-                  v-model="newAttachment.path"
-                  placeholder="File path or URL"
-                  :disabled="saving || uploading || !!newAttachment.file"
-                  class="w-full"
-                />
-              </div>
-
-              <!-- Role and Description -->
-              <div class="grid grid-cols-1 gap-2">
-                <UInput
-                  v-model="newAttachment.role"
-                  placeholder="Role (e.g., map, data, context, document)"
-                  :disabled="saving || uploading"
-                  class="w-full"
-                />
-                <UInput
-                  v-model="newAttachment.description"
-                  placeholder="Description (optional)"
-                  :disabled="saving || uploading"
-                  class="w-full"
-                />
-              </div>
-
-              <UButton
-                color="primary"
-                variant="outline"
-                size="sm"
-                @click="addAttachment"
-                :disabled="
-                  saving ||
-                  uploading ||
-                  !newAttachment.role.trim() ||
-                  (!newAttachment.file && !newAttachment.path.trim())
-                "
-                :loading="uploading"
-                class="w-full"
-              >
-                {{ uploading ? 'Uploading...' : 'Add Attachment' }}
-              </UButton>
-            </div>
-
-            <!-- Existing attachments -->
-            <div v-if="form.geography.attachments.length > 0" class="space-y-2">
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white">
-                Attached Files
-              </h4>
-              <div
-                v-for="(attachment, index) in form.geography.attachments"
-                :key="index"
-                class="flex items-center justify-between p-3 border rounded-lg bg-white dark:bg-gray-700"
-              >
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <p
-                      class="text-sm font-medium text-gray-900 dark:text-white truncate"
-                    >
-                      {{ attachment.path }}
-                    </p>
-                    <span
-                      v-if="attachment.id"
-                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                    >
-                      UUID
-                    </span>
-                  </div>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">
-                    Role: {{ attachment.role }}
-                    <span v-if="attachment.description">
-                      - {{ attachment.description }}
-                    </span>
-                  </p>
-                  <p
-                    v-if="attachment.id"
-                    class="text-xs text-gray-400 font-mono"
-                  >
-                    ID: {{ attachment.id }}
-                  </p>
-                </div>
-                <div class="flex items-center gap-1">
-                  <UButton
-                    v-if="attachment.id"
-                    icon="i-lucide-external-link"
-                    color="blue"
-                    variant="ghost"
-                    size="xs"
-                    @click="
-                      downloadFile(attachment.id, attachment.original_name)
-                    "
-                    :disabled="saving"
-                    title="Download file"
-                  />
-                  <UButton
-                    icon="i-lucide-x"
-                    color="red"
-                    variant="ghost"
-                    size="xs"
-                    @click="removeAttachment(index)"
-                    :disabled="saving"
-                    title="Remove attachment"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- Geography Files Section -->
+        <div class="space-y-4">
+          <GeographyLinkForm
+            v-model="form.linkedGeographyFiles"
+            :disabled="saving"
+          />
         </div>
 
         <!-- File Attachments Section -->
@@ -1275,7 +688,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                     <UFormField label="Category">
                       <USelectMenu
-                        :model-value="file.category"
+                        :model-value="getAttachmentTypeByValue(file.category)"
                         :items="getAttachmentTypeOptions()"
                         placeholder="Select category"
                         @update:model-value="
@@ -1304,7 +717,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                 <div class="flex items-center gap-1 ml-4">
                   <UButton
                     icon="i-lucide-external-link"
-                    color="blue"
+                    color="primary"
                     variant="ghost"
                     size="xs"
                     @click="downloadFile(file.id, file.original_name)"
@@ -1313,7 +726,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                   />
                   <UButton
                     icon="i-lucide-x"
-                    color="red"
+                    color="error"
                     variant="ghost"
                     size="xs"
                     @click="removeAttachedFile(index)"
@@ -1365,7 +778,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
               <template #content>
                 <recordsRecordLinkSelector
                   v-model="form.linkedRecords"
-                  :exclude-ids="props.record.id ? [props.record.id] : []"
+                  :exclude-ids="props.record?.id ? [props.record.id] : []"
                   @close="() => {}"
                 />
               </template>
@@ -1375,7 +788,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
           <LinkedRecordList
             v-model="form.linkedRecords"
             :editable="true"
-            :exclude-ids="props.record ? [props.record.id] : []"
+            :exclude-ids="props.record?.id ? [props.record.id] : []"
           />
         </div>
 

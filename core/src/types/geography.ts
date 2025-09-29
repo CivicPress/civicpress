@@ -282,3 +282,179 @@ export function getGeographySummary(geography: Geography): string {
 
   return parts.join(' | ');
 }
+
+// ============================================================================
+// NEW GEOGRAPHY DATA SYSTEM TYPES
+// ============================================================================
+
+/**
+ * Supported geography file types for the new centralized system
+ */
+export type GeographyFileType = 'geojson' | 'kml' | 'gpx' | 'shapefile';
+export type GeographyCategory =
+  | 'zone'
+  | 'boundary'
+  | 'district'
+  | 'facility'
+  | 'route';
+export type GeographyRelationshipType =
+  | 'contains'
+  | 'overlaps'
+  | 'adjacent'
+  | 'supersedes';
+export type SRID = number;
+
+export interface BoundingBox {
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}
+
+export interface CenterCoordinates {
+  lon: number;
+  lat: number;
+}
+
+export interface GeographyMetadata {
+  source: string;
+  created: string;
+  updated: string;
+  version: string;
+  accuracy: string;
+}
+
+export interface GeographyFile {
+  id: string;
+  name: string;
+  type: GeographyFileType;
+  category: GeographyCategory;
+  description: string;
+  srid: SRID;
+  bounds: BoundingBox;
+  metadata: GeographyMetadata;
+  file_path: string;
+  preview_image?: string;
+  content?: string; // Raw file content for display
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GeographyRelationship {
+  id: string;
+  type: GeographyRelationshipType;
+  source: string;
+  target: string;
+  description: string;
+  created: string;
+  created_by: string;
+}
+
+export interface LinkedGeography {
+  geographyId: string;
+  role: string;
+  description?: string;
+}
+
+export interface RecordGeography {
+  srid: SRID;
+  zone_ref?: string;
+  bbox?: BoundingBox;
+  center?: CenterCoordinates;
+  linkedGeography?: LinkedGeography[];
+}
+
+export interface CreateGeographyRequest {
+  name: string;
+  type: GeographyFileType;
+  category: GeographyCategory;
+  description: string;
+  content: string;
+  srid?: SRID;
+  metadata?: Partial<GeographyMetadata>;
+}
+
+export interface UpdateGeographyRequest {
+  name?: string;
+  category?: GeographyCategory;
+  description?: string;
+  content?: string;
+  metadata?: Partial<GeographyMetadata>;
+}
+
+export interface GeographyValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  metadata?: {
+    featureCount: number;
+    bounds: BoundingBox;
+    srid: SRID;
+    geometryTypes: string[];
+  };
+}
+
+export interface ParsedGeographyData {
+  type: GeographyFileType;
+  content: any;
+  bounds: BoundingBox;
+  srid: SRID;
+  featureCount: number;
+  geometryTypes: string[];
+}
+
+export interface GeographyFormData {
+  name: string;
+  type: GeographyFileType;
+  category: GeographyCategory;
+  description: string;
+  content: string;
+  srid: SRID;
+}
+
+export interface GeographyFormErrors {
+  name?: string;
+  type?: string;
+  category?: string;
+  description?: string;
+  content?: string;
+  srid?: string;
+}
+
+export interface GeographyPreviewData {
+  parsed: ParsedGeographyData | null;
+  validation: GeographyValidationResult;
+  mapBounds?: BoundingBox;
+  isLoading: boolean;
+  error?: string;
+}
+
+export class GeographyError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'GeographyError';
+  }
+}
+
+export class GeographyValidationError extends GeographyError {
+  constructor(
+    message: string,
+    public validationResult: GeographyValidationResult
+  ) {
+    super(message, 'VALIDATION_ERROR', validationResult);
+    this.name = 'GeographyValidationError';
+  }
+}
+
+export class GeographyNotFoundError extends GeographyError {
+  constructor(geographyId: string) {
+    super(`Geography file with ID '${geographyId}' not found`, 'NOT_FOUND', {
+      geographyId,
+    });
+    this.name = 'GeographyNotFoundError';
+  }
+}
