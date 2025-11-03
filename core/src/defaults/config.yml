@@ -38,6 +38,16 @@ record_types_config:
     description: 'Council resolutions'
     source: 'core'
     priority: 5
+  geography:
+    label: 'Geography'
+    description: 'Geographic data files (GeoJSON/KML)'
+    source: 'core'
+    priority: 6
+  session:
+    label: 'Session'
+    description: 'Meeting sessions and minutes'
+    source: 'core'
+    priority: 7
 
 # Record Statuses Configuration
 record_statuses_config:

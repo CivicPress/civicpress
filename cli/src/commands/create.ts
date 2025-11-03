@@ -1,8 +1,12 @@
 import { CAC } from 'cac';
-import { WorkflowConfigManager, userCan } from '@civicpress/core';
+import {
+  WorkflowConfigManager,
+  userCan,
+  RecordParser,
+  RecordData,
+} from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yaml from 'yaml';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -72,7 +76,7 @@ export const createCommand = (cli: CAC) => {
           logger.info(`📝 Creating ${type}: ${title}`);
         }
 
-        // Validate record type
+        // Validate record type (includes new types)
         const validTypes = [
           'bylaw',
           'policy',
@@ -80,6 +84,8 @@ export const createCommand = (cli: CAC) => {
           'resolution',
           'proclamation',
           'ordinance',
+          'geography',
+          'session',
         ];
         if (!validTypes.includes(type)) {
           if (shouldOutputJson) {
@@ -203,19 +209,35 @@ export const createCommand = (cli: CAC) => {
           context
         );
 
-        // Create YAML frontmatter
-        const frontmatter = {
+        // Generate record ID
+        const recordId = `record-${Date.now()}`;
+        const now = new Date().toISOString();
+
+        // Create RecordData object following standard format
+        const recordData: RecordData = {
+          id: recordId,
           title: title,
           type: type,
           status: 'draft',
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
-          author: 'system', // TODO: Get from user context
-          version: '1.0.0',
+          content: processedContent,
+          author: user.username,
+          authors: [
+            {
+              name: user.name || user.username,
+              username: user.username,
+              role: user.role,
+              email: user.email,
+            },
+          ],
+          created_at: now,
+          updated_at: now,
+          metadata: {
+            version: '1.0.0',
+          },
         };
 
-        // Combine frontmatter and processed content
-        const fullContent = `---\n${yaml.stringify(frontmatter)}---\n${processedContent}`;
+        // Use RecordParser to serialize to properly formatted markdown
+        const fullContent = RecordParser.serializeToMarkdown(recordData);
 
         // Handle dry-run modes
         const isCompleteDryRun = options.dryRun;

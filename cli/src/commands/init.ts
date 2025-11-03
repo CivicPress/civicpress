@@ -394,6 +394,16 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
+        // Copy config.yml (contains record_types_config and record_statuses_config)
+        const configSrc = path.join(defaultsDir, 'config.yml');
+        const configDest = path.join(civicDir, 'config.yml');
+        if (!fs.existsSync(configDest) && fs.existsSync(configSrc)) {
+          fs.copyFileSync(configSrc, configDest);
+          if (!shouldOutputJson) {
+            logger.success('📋 Default config.yml created');
+          }
+        }
+
         // Copy default templates
         const templatesSrc = path.join(defaultsDir, 'templates');
         const templatesDest = path.join(civicDir, 'templates');

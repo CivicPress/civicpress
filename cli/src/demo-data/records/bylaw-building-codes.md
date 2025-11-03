@@ -1,17 +1,37 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1704902400000"
 title: 'Building Codes'
 type: bylaw
-status: adopted
-module: legal-register
-tags: ['building', 'construction', 'safety', 'codes']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "drodriguez"
 authors:
   - name: 'David Rodriguez'
+    username: 'drodriguez'
     role: 'building-inspector'
   - name: 'Lisa Thompson'
+    username: 'lthompson'
     role: 'council'
-created: '2024-01-10'
-updated: '2024-11-15'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-01-10T09:00:00Z"
+updated: "2024-11-15T16:45:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['building', 'construction', 'safety', 'codes']
+module: legal-register
 slug: 'building-codes'
+version: "1.0.0"
 ---
 
 # Building Codes

@@ -631,6 +631,41 @@ export function createCivicConfig(config: TestConfig, overrides: any = {}) {
   };
 
   writeFileSync(join(config.testDir, '.civicrc'), yaml.dump(civicConfig));
+  
+  // Also create config.yml in data/.civic/ for CentralConfigManager
+  const configYmlPath = join(config.dataDir, '.civic', 'config.yml');
+  ensureDirSync(join(config.dataDir, '.civic'));
+  
+  // Copy default config.yml structure (record types and statuses)
+  const defaultConfig = {
+    modules: ['legal-register'],
+    default_role: 'clerk',
+    hooks: { enabled: true },
+    workflows: { enabled: true },
+    audit: { enabled: true },
+    record_types_config: {
+      bylaw: { label: 'Bylaws', description: 'Municipal bylaws and regulations', source: 'core', priority: 1 },
+      ordinance: { label: 'Ordinances', description: 'Local ordinances and laws', source: 'core', priority: 2 },
+      policy: { label: 'Policies', description: 'Administrative policies', source: 'core', priority: 3 },
+      proclamation: { label: 'Proclamations', description: 'Official proclamations', source: 'core', priority: 4 },
+      resolution: { label: 'Resolutions', description: 'Council resolutions', source: 'core', priority: 5 },
+      geography: { label: 'Geography', description: 'Geographic data files (GeoJSON/KML)', source: 'core', priority: 6 },
+      session: { label: 'Session', description: 'Meeting sessions and minutes', source: 'core', priority: 7 },
+    },
+    record_statuses_config: {
+      draft: { label: 'Draft', description: 'Initial working version, not yet ready for review', source: 'core', priority: 1 },
+      pending_review: { label: 'Pending Review', description: 'Submitted for review and awaiting approval', source: 'core', priority: 2 },
+      under_review: { label: 'Under Review', description: 'Currently under active review by authorized personnel', source: 'core', priority: 3 },
+      approved: { label: 'Approved', description: 'Approved and currently in effect', source: 'core', priority: 4 },
+      published: { label: 'Published', description: 'Publicly available and in effect', source: 'core', priority: 5 },
+      rejected: { label: 'Rejected', description: 'Rejected and not approved', source: 'core', priority: 6 },
+      archived: { label: 'Archived', description: 'No longer active but preserved for reference', source: 'core', priority: 7 },
+      expired: { label: 'Expired', description: 'Past its effective date and no longer in force', source: 'core', priority: 8 },
+    },
+    version: '1.0.0',
+  };
+  
+  writeFileSync(configYmlPath, yaml.dump(defaultConfig));
 }
 
 export function createStorageConfig(config: TestConfig) {
@@ -1213,14 +1248,31 @@ export async function createAPITestContext(): Promise<APITestContext> {
   const bylawDir = join(config.dataDir, 'records', 'bylaw');
   await (await import('fs/promises')).mkdir(bylawDir, { recursive: true });
 
-  // Add the test record
+  // Add the test record (using new standardized format)
   const sampleRecordPath = join(bylawDir, 'test-record.md');
   const sampleRecordContent = `---
-id: test-record
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "test-record"
 title: Test Record
 type: bylaw
 status: archived
-author: test
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "test"
+authors:
+  - name: 'Test User'
+    username: 'test'
+    role: 'clerk'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2025-01-01T10:00:00Z"
+updated: "2025-01-01T10:00:00Z"
 ---
 
 # Test Record
@@ -1230,14 +1282,31 @@ This is a test record for API testing.`;
     await import('fs/promises')
   ).writeFile(sampleRecordPath, sampleRecordContent);
 
-  // Add an archived record for indexing tests
+  // Add an archived record for indexing tests (using new standardized format)
   const archivedRecordPath = join(bylawDir, 'old-regulation.md');
   const archivedRecordContent = `---
-id: old-regulation
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "old-regulation"
 title: Old Regulation
 type: bylaw
 status: archived
-author: Historical Department
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "historical"
+authors:
+  - name: 'Historical Department'
+    username: 'historical'
+    role: 'clerk'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-01-01T10:00:00Z"
+updated: "2024-01-01T10:00:00Z"
 ---
 
 # Old Regulation

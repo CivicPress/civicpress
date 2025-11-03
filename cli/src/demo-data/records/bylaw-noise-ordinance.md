@@ -1,17 +1,37 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1723248000000"
 title: 'Noise Ordinance'
 type: bylaw
-status: adopted
-module: legal-register
-tags: ['noise', 'public-nuisance', 'enforcement', 'quiet']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "pmartinez"
 authors:
   - name: 'Patricia Martinez'
+    username: 'pmartinez'
     role: 'code-enforcement'
   - name: 'Council Member Robert Wilson'
+    username: 'rwilson'
     role: 'council'
-created: '2024-08-10'
-updated: '2024-09-15'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-08-10T10:00:00Z"
+updated: "2024-09-15T14:30:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['noise', 'public-nuisance', 'enforcement', 'quiet']
+module: legal-register
 slug: 'noise-ordinance'
+version: "1.0.0"
 ---
 
 # Noise Ordinance

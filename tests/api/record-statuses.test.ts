@@ -52,15 +52,16 @@ describe('Record Statuses API Endpoints', () => {
 
       const statuses = response.body.data.record_statuses;
 
-      // Check that all expected statuses are present
+      // Check that all expected statuses are present (new standardized format)
       const expectedStatuses = [
         'draft',
-        'proposed',
-        'review',
+        'pending_review',
+        'under_review',
         'approved',
+        'published',
         'rejected',
-        'adopted',
         'archived',
+        'expired',
       ];
       const actualStatuses = statuses.map((s: any) => s.key);
 

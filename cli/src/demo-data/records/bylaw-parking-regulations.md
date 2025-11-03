@@ -1,15 +1,34 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1704441600000"
 title: 'Règlement sur le stationnement'
 type: bylaw
-status: adopted
-module: legal-register
-tags: ['parking', 'traffic', 'stationnement', 'circulation']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "magagnon"
 authors:
   - name: 'Marc-André Gagnon'
+    username: 'magagnon'
     role: 'clerk'
-created: '2025-01-05'
-updated: '2025-01-20'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2025-01-05T10:00:00Z"
+updated: "2025-01-20T14:00:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['parking', 'traffic', 'stationnement', 'circulation']
+module: legal-register
 slug: 'parking-regulations'
+version: "1.0.0"
 ---
 
 # Règlement sur le stationnement

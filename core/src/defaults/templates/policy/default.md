@@ -1,11 +1,32 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "{{id}}"
 title: "{{title}}"
 type: policy
 status: draft
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
 author: "{{user}}"
-version: "1.0.0"
+authors:
+  - name: "{{user_name}}"
+    username: "{{user}}"
+    role: "{{user_role}}"
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
 created: "{{timestamp}}"
 updated: "{{timestamp}}"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: []
+version: "1.0.0"
 priority: medium
 department: general
 ---

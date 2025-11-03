@@ -52,13 +52,15 @@ describe('Config API Endpoints', () => {
 
       const recordTypes = response.body.data.record_types;
 
-      // Check that all expected record types are present
+      // Check that all expected record types are present (including new types)
       const expectedTypes = [
         'bylaw',
         'ordinance',
         'policy',
         'proclamation',
         'resolution',
+        'geography',
+        'session',
       ];
       const actualTypes = recordTypes.map((rt: any) => rt.key);
 

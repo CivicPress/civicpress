@@ -72,6 +72,25 @@ export interface CreateRecordRequest {
   linkedRecords?: LinkedRecord[];
   linkedGeographyFiles?: LinkedGeographyFile[];
   role?: string;
+  
+  // Authorship - support both formats
+  authors?: Array<{
+    name: string;
+    username: string;
+    role?: string;
+    email?: string;
+  }>;
+  
+  // Source & Origin - for imported/legacy documents
+  source?: {
+    reference: string;
+    original_title?: string;
+    original_filename?: string;
+    url?: string;
+    type?: 'legacy' | 'import' | 'external';
+    imported_at?: string;
+    imported_by?: string;
+  };
 }
 
 export interface UpdateRecordRequest {
@@ -95,6 +114,25 @@ export interface UpdateRecordRequest {
   }>;
   linkedRecords?: LinkedRecord[];
   linkedGeographyFiles?: LinkedGeographyFile[];
+  
+  // Authorship - support both formats
+  authors?: Array<{
+    name: string;
+    username: string;
+    role?: string;
+    email?: string;
+  }>;
+  
+  // Source & Origin - for imported/legacy documents
+  source?: {
+    reference: string;
+    original_title?: string;
+    original_filename?: string;
+    url?: string;
+    type?: 'legacy' | 'import' | 'external';
+    imported_at?: string;
+    imported_by?: string;
+  };
 }
 
 export class CivicPress {

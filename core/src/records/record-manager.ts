@@ -8,6 +8,7 @@ import { Logger } from '../utils/logger.js';
 import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { RecordParser } from './record-parser.js';
 
 const logger = new Logger();
 
@@ -47,9 +48,32 @@ export interface RecordData {
     description?: string;
   }>;
   path?: string;
-  author: string;
-  created_at: string;
-  updated_at: string;
+  
+  // Authorship - support both formats
+  author: string; // Required: primary author username
+  authors?: Array<{
+    // Optional: detailed author info
+    name: string;
+    username: string;
+    role?: string;
+    email?: string;
+  }>;
+  
+  // Timestamps - use ISO 8601
+  created_at: string; // Internal (database)
+  updated_at: string; // Internal (database)
+  // Note: Frontmatter uses 'created' and 'updated'
+  
+  // Source & Origin - for imported/legacy documents
+  source?: {
+    reference: string; // Required: Original document identifier/reference
+    original_title?: string; // Optional: Original title from source system
+    original_filename?: string; // Optional: Original filename from source system
+    url?: string; // Optional: Link to original document
+    type?: 'legacy' | 'import' | 'external'; // Optional: Source type
+    imported_at?: string; // Optional: ISO 8601 import timestamp
+    imported_by?: string; // Optional: Username who imported it
+  };
 }
 
 export class RecordManager {
@@ -103,14 +127,19 @@ export class RecordManager {
       linkedGeographyFiles: request.linkedGeographyFiles,
       metadata: {
         ...safeMetadata,
-        author: user.username, // Always set as string
-        authorId: user.id,
-        authorName: user.name || user.username,
-        authorEmail: user.email,
-        created: new Date().toISOString(),
       },
       path: recordPath,
-      author: user.username, // Always set as string
+      author: user.username, // Required: primary author username
+      authors: request.authors || [
+        // Default to single author from user
+        {
+          name: user.name || user.username,
+          username: user.username,
+          role: user.role,
+          email: user.email,
+        },
+      ],
+      source: request.source,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -246,17 +275,67 @@ export class RecordManager {
 
   /**
    * Get a specific record
+   * Reads from markdown file (source of truth) and merges with database record
    */
   async getRecord(id: string): Promise<RecordData | null> {
-    const record = await this.db.getRecord(id);
-    if (!record) {
+    const dbRecord = await this.db.getRecord(id);
+    if (!dbRecord) {
       return null;
     }
 
-    // Parse metadata
-    if (record.metadata) {
+    // Try to read from markdown file (source of truth)
+    if (dbRecord.path) {
       try {
-        record.metadata = JSON.parse(record.metadata);
+        const filePath = path.join(this.dataDir, dbRecord.path);
+        const fileContent = await fs.readFile(filePath, 'utf8');
+
+        // Use RecordParser for consistent parsing
+        const parsedRecord = RecordParser.parseFromMarkdown(fileContent, dbRecord.path);
+
+        // Merge database record with parsed record
+        // Database has latest sync info, parsed record has accurate frontmatter data
+        const mergedRecord: RecordData = {
+          ...parsedRecord,
+          // Keep database fields for internal tracking
+          path: dbRecord.path,
+          // Ensure timestamps are set (use parsed if available, otherwise database)
+          created_at: parsedRecord.created_at || dbRecord.created_at || new Date().toISOString(),
+          updated_at: parsedRecord.updated_at || dbRecord.updated_at || new Date().toISOString(),
+        };
+
+        return mergedRecord;
+      } catch (error) {
+        logger.warn(`Failed to read record file for ${id}, falling back to database: ${error}`);
+        // Fall through to database-only record
+      }
+    }
+
+    // Fallback to database record if file doesn't exist or can't be read
+    // Parse JSON fields from database
+    const record: RecordData = {
+      id: dbRecord.id,
+      title: dbRecord.title,
+      type: dbRecord.type,
+      status: dbRecord.status || 'draft',
+      content: dbRecord.content || '',
+      path: dbRecord.path,
+      author: dbRecord.author || 'unknown',
+      created_at: dbRecord.created_at || new Date().toISOString(),
+      updated_at: dbRecord.updated_at || new Date().toISOString(),
+    };
+
+    // Parse metadata
+    if (dbRecord.metadata) {
+      try {
+        const parsedMetadata = JSON.parse(dbRecord.metadata);
+        record.metadata = parsedMetadata;
+        // Extract authors and source from metadata if present
+        if (parsedMetadata.authors) {
+          record.authors = parsedMetadata.authors;
+        }
+        if (parsedMetadata.source) {
+          record.source = parsedMetadata.source;
+        }
       } catch (error) {
         logger.warn(`Failed to parse metadata for record ${id}:`, error);
         record.metadata = {};
@@ -264,19 +343,18 @@ export class RecordManager {
     }
 
     // Parse geography
-    if (record.geography) {
+    if (dbRecord.geography) {
       try {
-        record.geography = JSON.parse(record.geography);
+        record.geography = JSON.parse(dbRecord.geography);
       } catch (error) {
         logger.warn(`Failed to parse geography for record ${id}:`, error);
-        record.geography = undefined;
       }
     }
 
     // Parse attached files
-    if (record.attached_files) {
+    if (dbRecord.attached_files) {
       try {
-        record.attachedFiles = JSON.parse(record.attached_files);
+        record.attachedFiles = JSON.parse(dbRecord.attached_files);
       } catch (error) {
         logger.warn(`Failed to parse attached files for record ${id}:`, error);
         record.attachedFiles = [];
@@ -286,9 +364,9 @@ export class RecordManager {
     }
 
     // Parse linked records
-    if (record.linked_records) {
+    if (dbRecord.linked_records) {
       try {
-        record.linkedRecords = JSON.parse(record.linked_records);
+        record.linkedRecords = JSON.parse(dbRecord.linked_records);
       } catch (error) {
         logger.warn(`Failed to parse linked records for record ${id}:`, error);
         record.linkedRecords = [];
@@ -298,61 +376,15 @@ export class RecordManager {
     }
 
     // Parse linked geography files
-    if (record.linked_geography_files) {
+    if (dbRecord.linked_geography_files) {
       try {
-        record.linkedGeographyFiles = JSON.parse(record.linked_geography_files);
+        record.linkedGeographyFiles = JSON.parse(dbRecord.linked_geography_files);
       } catch (error) {
-        logger.warn(
-          `Failed to parse linked geography files for record ${id}:`,
-          error
-        );
+        logger.warn(`Failed to parse linked geography files for record ${id}:`, error);
         record.linkedGeographyFiles = [];
       }
     } else {
       record.linkedGeographyFiles = [];
-    }
-
-    // Try to read geography from Markdown file if not in database
-    if (!record.geography && record.path) {
-      try {
-        const filePath = path.join(this.dataDir, record.path);
-        const fileContent = await fs.readFile(filePath, 'utf8');
-
-        // Extract frontmatter
-        const frontmatterMatch = fileContent.match(
-          /^---\s*\n([\s\S]*?)\n---\s*\n/
-        );
-        if (frontmatterMatch) {
-          const frontmatterYaml = frontmatterMatch[1];
-          const lines = frontmatterYaml.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('geography:')) {
-              const geographyValue = line.substring('geography:'.length).trim();
-              try {
-                record.geography = JSON.parse(geographyValue);
-                logger.info(`Loaded geography from file for record ${id}`);
-                break;
-              } catch (error) {
-                logger.warn(
-                  `Failed to parse geography from file for record ${id}:`,
-                  error
-                );
-              }
-            }
-          }
-        }
-      } catch (error) {
-        logger.warn(
-          `Failed to read geography from file for record ${id}:`,
-          error
-        );
-      }
-    }
-
-    // Ensure attachedFiles is always present
-    if (!record.attachedFiles) {
-      record.attachedFiles = [];
     }
 
     return record;
@@ -372,39 +404,65 @@ export class RecordManager {
     }
 
     // Update the record
-    const updates: any = {};
-    if (request.title !== undefined) updates.title = request.title;
-    if (request.content !== undefined) updates.content = request.content;
-    if (request.status !== undefined) updates.status = request.status;
-    if (request.geography !== undefined)
-      updates.geography = JSON.stringify(request.geography);
-    if (request.attachedFiles !== undefined)
-      updates.attached_files = JSON.stringify(request.attachedFiles);
-    if (request.linkedRecords !== undefined)
-      updates.linked_records = JSON.stringify(request.linkedRecords);
+    const updatedRecord: RecordData = {
+      ...existingRecord,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update basic fields
+    if (request.title !== undefined) updatedRecord.title = request.title;
+    if (request.content !== undefined) updatedRecord.content = request.content;
+    if (request.status !== undefined) updatedRecord.status = request.status;
+    if (request.geography !== undefined) updatedRecord.geography = request.geography;
+    if (request.attachedFiles !== undefined) updatedRecord.attachedFiles = request.attachedFiles;
+    if (request.linkedRecords !== undefined) updatedRecord.linkedRecords = request.linkedRecords;
     if (request.linkedGeographyFiles !== undefined)
-      updates.linked_geography_files = JSON.stringify(
+      updatedRecord.linkedGeographyFiles = request.linkedGeographyFiles;
+    
+    // Update authors if provided
+    if (request.authors !== undefined) {
+      updatedRecord.authors = request.authors;
+    }
+    
+    // Update source if provided
+    if (request.source !== undefined) {
+      updatedRecord.source = request.source;
+    }
+
+    // Update metadata
+    updatedRecord.metadata = {
+      ...existingRecord.metadata,
+      ...(request.metadata || {}),
+    };
+
+    // Prepare database updates
+    const dbUpdates: any = {};
+    if (request.title !== undefined) dbUpdates.title = request.title;
+    if (request.content !== undefined) dbUpdates.content = request.content;
+    if (request.status !== undefined) dbUpdates.status = request.status;
+    if (request.geography !== undefined)
+      dbUpdates.geography = JSON.stringify(request.geography);
+    if (request.attachedFiles !== undefined)
+      dbUpdates.attached_files = JSON.stringify(request.attachedFiles);
+    if (request.linkedRecords !== undefined)
+      dbUpdates.linked_records = JSON.stringify(request.linkedRecords);
+    if (request.linkedGeographyFiles !== undefined)
+      dbUpdates.linked_geography_files = JSON.stringify(
         request.linkedGeographyFiles
       );
-    if (request.metadata !== undefined) {
-      updates.metadata = JSON.stringify({
-        ...existingRecord.metadata,
-        ...request.metadata,
-        updated_by: user.username,
-        updated_by_id: user.id,
-        updated_by_name: user.name || user.username,
-        updated: new Date().toISOString(),
-      });
-    }
+    
+    // Include authors and source in metadata JSON for database storage
+    dbUpdates.metadata = JSON.stringify({
+      ...updatedRecord.metadata,
+      ...(updatedRecord.authors && { authors: updatedRecord.authors }),
+      ...(updatedRecord.source && { source: updatedRecord.source }),
+    });
 
     // Update in database
-    await this.db.updateRecord(id, updates);
+    await this.db.updateRecord(id, dbUpdates);
 
     // Update file in git repository
-    const updatedRecord = await this.getRecord(id);
-    if (updatedRecord) {
-      await this.updateRecordFile(updatedRecord);
-    }
+    await this.updateRecordFile(updatedRecord);
 
     // Log audit event
     await this.db.logAuditEvent({
@@ -647,56 +705,9 @@ export class RecordManager {
 
   /**
    * Create markdown content for a record
+   * Uses RecordParser for standardized formatting
    */
   private createMarkdownContent(record: RecordData): string {
-    // Extract metadata but exclude author to avoid overwriting the string author
-    const otherMetadata = { ...record.metadata };
-    delete otherMetadata.author;
-
-    const frontmatter = {
-      id: record.id,
-      title: record.title,
-      type: record.type,
-      status: record.status,
-      author: record.author, // Keep the string author from record.author
-      created_at: record.created_at,
-      updated_at: record.updated_at,
-      geography: record.geography, // Include geography data
-      attachedFiles: record.attachedFiles, // Include attached files
-      linkedRecords: record.linkedRecords, // Include linked records
-      linkedGeographyFiles: record.linkedGeographyFiles, // Include linked geography files
-      ...otherMetadata, // Spread other metadata but not author
-    };
-
-    const frontmatterYaml = Object.entries(frontmatter)
-      .filter(([, value]) => value !== undefined && value !== null)
-      .map(([key, value]) => {
-        // Handle different value types appropriately
-        if (typeof value === 'string') {
-          return `${key}: "${value}"`;
-        } else if (typeof value === 'number' || typeof value === 'boolean') {
-          return `${key}: ${value}`;
-        } else if (Array.isArray(value)) {
-          return `${key}: ${JSON.stringify(value)}`;
-        } else if (typeof value === 'object' && value !== null) {
-          // For objects, use JSON.stringify but handle special cases
-          if (key === 'author' && typeof value === 'object') {
-            // If author is an object, extract the username
-            const authorObj = value as any;
-            return `${key}: "${authorObj.username || authorObj.name || 'Unknown'}"`;
-          }
-          return `${key}: ${JSON.stringify(value)}`;
-        } else {
-          return `${key}: ${JSON.stringify(value)}`;
-        }
-      })
-      .join('\n');
-
-    return `---
-${frontmatterYaml}
----
-
-${record.content || ''}
-`;
+    return RecordParser.serializeToMarkdown(record);
   }
 }

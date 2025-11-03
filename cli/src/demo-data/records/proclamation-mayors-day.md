@@ -1,15 +1,34 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1734220800000"
 title: 'Mayors Day Proclamation'
 type: proclamation
-status: adopted
-module: legal-register
-tags: ['proclamation', 'recognition', 'mayor', 'civic']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "janderson"
 authors:
   - name: 'Mayor James Anderson'
+    username: 'janderson'
     role: 'mayor'
-created: '2024-12-15'
-updated: '2024-12-15'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-12-15T10:00:00Z"
+updated: "2024-12-15T10:00:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['proclamation', 'recognition', 'mayor', 'civic']
+module: legal-register
 slug: 'mayors-day-proclamation'
+version: "1.0.0"
 ---
 
 # Mayor's Day Proclamation

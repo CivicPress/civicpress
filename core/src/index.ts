@@ -4,6 +4,12 @@ export { CreateRecordRequest, UpdateRecordRequest } from './civic-core.js';
 
 // Export record management
 export { RecordManager, RecordData } from './records/record-manager.js';
+export { RecordParser } from './records/record-parser.js';
+export { RecordValidator } from './records/record-validator.js';
+export type {
+  ValidationError,
+  ValidationResult,
+} from './records/record-validator.js';
 
 // Export geography types and utilities
 export {

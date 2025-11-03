@@ -1,17 +1,37 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1710460800000"
 title: 'Zoning Code'
 type: bylaw
-status: adopted
-module: legal-register
-tags: ['zoning', 'land-use', 'planning', 'development']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "sjohnson"
 authors:
   - name: 'Sarah Johnson'
+    username: 'sjohnson'
     role: 'city-planner'
   - name: 'Michael Chen'
+    username: 'mchen'
     role: 'council'
-created: '2024-03-15'
-updated: '2024-12-01'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-03-15T09:00:00Z"
+updated: "2024-12-01T16:00:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['zoning', 'land-use', 'planning', 'development']
+module: legal-register
 slug: 'zoning-code'
+version: "1.0.0"
 ---
 
 # Zoning Code

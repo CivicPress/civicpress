@@ -4,13 +4,30 @@ import { validateApiResponse } from '~/utils/api-response';
 export interface CivicRecord {
   id: string;
   title: string;
-  type: 'bylaw' | 'ordinance' | 'policy' | 'proclamation' | 'resolution';
+  type: 'bylaw' | 'ordinance' | 'policy' | 'proclamation' | 'resolution' | 'geography' | 'session';
   content: string;
-  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  status: 'draft' | 'pending_review' | 'under_review' | 'approved' | 'published' | 'rejected' | 'archived' | 'expired';
   path: string;
-  author: string;
+  author: string; // Required: primary author username
+  authors?: Array<{
+    // Optional: detailed author info
+    name: string;
+    username: string;
+    role?: string;
+    email?: string;
+  }>;
   created_at: string;
   updated_at: string;
+  source?: {
+    // Optional: for imported/legacy documents
+    reference: string;
+    original_title?: string;
+    original_filename?: string;
+    url?: string;
+    type?: 'legacy' | 'import' | 'external';
+    imported_at?: string;
+    imported_by?: string;
+  };
   geography?: {
     srid?: number;
     zone_ref?: string;
@@ -38,15 +55,21 @@ export interface CivicRecord {
     path?: string;
     category?: string;
   }>;
+  linkedGeographyFiles?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
   metadata: {
-    author: string;
-    created: string;
-    updated: string;
-    tags: string[];
-    module: string;
-    source: string;
-    file_path: string;
-    updated_by: string;
+    author?: string;
+    created?: string;
+    updated?: string;
+    tags?: string[];
+    module?: string;
+    source?: string;
+    file_path?: string;
+    updated_by?: string;
+    [key: string]: any; // Allow additional metadata fields
   };
 }
 
@@ -383,9 +406,15 @@ export const useRecordsStore = defineStore('records', {
           content: apiRecord.content || '',
           status: apiRecord.status,
           path: apiRecord.path,
-          author: apiRecord.author,
-          created_at: apiRecord.created || apiRecord.created_at,
-          updated_at: apiRecord.updated || apiRecord.updated_at,
+          author: apiRecord.author || 'unknown',
+          authors: apiRecord.authors,
+          created_at: apiRecord.created_at || apiRecord.created,
+          updated_at: apiRecord.updated_at || apiRecord.updated,
+          source: apiRecord.source,
+          geography: apiRecord.geography,
+          attachedFiles: apiRecord.attachedFiles,
+          linkedRecords: apiRecord.linkedRecords,
+          linkedGeographyFiles: apiRecord.linkedGeographyFiles,
           metadata: apiRecord.metadata || {},
         };
 

@@ -1,19 +1,40 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1731628800000"
 title: '2025 Budget Resolution'
 type: resolution
-status: adopted
-module: legal-register
-tags: ['budget', 'finance', '2025', 'fiscal-year']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "janderson"
 authors:
   - name: 'Mayor James Anderson'
+    username: 'janderson'
     role: 'mayor'
   - name: 'Council Member Maria Garcia'
+    username: 'mgarcia'
     role: 'council'
   - name: 'Council Member Thomas Lee'
+    username: 'tlee'
     role: 'council'
-created: '2024-11-15'
-updated: '2024-12-20'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-11-15T09:00:00Z"
+updated: "2024-12-20T16:00:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['budget', 'finance', '2025', 'fiscal-year']
+module: legal-register
 slug: 'budget-2025'
+version: "1.0.0"
 ---
 
 # 2025 Budget Resolution

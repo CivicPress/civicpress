@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
-import { Logger } from '@civicpress/core';
+import { Logger, RecordValidator } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -370,110 +370,42 @@ async function validateSingleRecord(
 }
 
 // Helper function to validate record content
+// Uses RecordValidator for comprehensive validation against standard format
 async function validateRecordContent(
   content: string,
-  _recordId: string
+  recordId: string
 ): Promise<any> {
-  const issues: any[] = [];
-  const metadata: any = {};
-
   try {
-    // Check for required frontmatter
-    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
-    if (!frontmatterMatch) {
-      issues.push({
-        severity: 'error' as Severity,
-        code: 'MISSING_FRONTMATTER',
-        message: 'Record must have YAML frontmatter',
-        field: 'frontmatter',
-      });
-      return { issues, metadata };
-    }
+    // Use RecordValidator for comprehensive validation
+    const validationResult = RecordValidator.validateMarkdown(content, recordId, {
+      strict: false,
+      checkFormat: true,
+      checkContent: true,
+    });
 
-    const frontmatter = frontmatterMatch[1];
+    // Convert ValidationResult to API format
+    const issues: any[] = [
+      ...validationResult.errors,
+      ...validationResult.warnings,
+      ...validationResult.info,
+    ];
 
+    // Extract metadata from parsed record (if parsing succeeded)
+    const metadata: any = {};
     try {
-      const parsed = yaml.load(frontmatter) as any;
-
-      // Validate required fields
-      if (!parsed.title) {
-        issues.push({
-          severity: 'error' as Severity,
-          code: 'MISSING_TITLE',
-          message: 'Record must have a title',
-          field: 'title',
-        });
-      }
-
-      if (!parsed.type) {
-        issues.push({
-          severity: 'error' as Severity,
-          code: 'MISSING_TYPE',
-          message: 'Record must have a type',
-          field: 'type',
-        });
-      }
-
-      if (!parsed.status) {
-        issues.push({
-          severity: 'warning' as Severity,
-          code: 'MISSING_STATUS',
-          message: 'Record should have a status',
-          field: 'status',
-        });
-      }
-
-      // Validate status values
-      if (
-        parsed.status &&
-        ![
-          'draft',
-          'proposed',
-          'reviewed',
-          'approved',
-          'active',
-          'archived',
-        ].includes(parsed.status)
-      ) {
-        issues.push({
-          severity: 'warning' as Severity,
-          code: 'INVALID_STATUS',
-          message: `Status '${parsed.status}' is not a standard status`,
-          field: 'status',
-        });
-      }
-
-      // Validate type values
-      if (
-        parsed.type &&
-        !['bylaw', 'policy', 'resolution', 'proposition', 'ordinance'].includes(
-          parsed.type
-        )
-      ) {
-        issues.push({
-          severity: 'warning' as Severity,
-          code: 'INVALID_TYPE',
-          message: `Type '${parsed.type}' is not a standard type`,
-          field: 'type',
-        });
-      }
-
-      metadata.title = parsed.title;
-      metadata.type = parsed.type;
-      metadata.status = parsed.status;
-      metadata.author = parsed.author;
-      metadata.created = parsed.created;
-      metadata.updated = parsed.updated;
-    } catch (yamlError) {
-      issues.push({
-        severity: 'error' as Severity,
-        code: 'INVALID_YAML',
-        message: `Invalid YAML frontmatter: ${(yamlError as Error).message}`,
-        field: 'frontmatter',
-      });
+      const { RecordParser } = await import('@civicpress/core');
+      const record = RecordParser.parseFromMarkdown(content, recordId);
+      metadata.title = record.title;
+      metadata.type = record.type;
+      metadata.status = record.status;
+      metadata.author = record.author;
+      metadata.created = record.created_at;
+      metadata.updated = record.updated_at;
+    } catch {
+      // Metadata extraction failed, will be empty
     }
 
-    // Check content length
+    // Additional content checks (preserve existing behavior)
     const contentWithoutFrontmatter = content.replace(
       /^---\s*\n[\s\S]*?\n---\s*\n/,
       ''
@@ -487,7 +419,6 @@ async function validateRecordContent(
       });
     }
 
-    // Check for common issues
     if (content.includes('TODO') || content.includes('FIXME')) {
       issues.push({
         severity: 'info' as Severity,
@@ -505,16 +436,26 @@ async function validateRecordContent(
         field: 'content',
       });
     }
-  } catch (error) {
-    issues.push({
-      severity: 'error' as Severity,
-      code: 'VALIDATION_ERROR',
-      message: `Validation error: ${(error as Error).message}`,
-      field: 'general',
-    });
-  }
 
-  return { issues, metadata };
+    return {
+      issues,
+      metadata,
+      isValid: validationResult.isValid,
+    };
+  } catch (error) {
+    return {
+      issues: [
+        {
+          severity: 'error' as Severity,
+          code: 'VALIDATION_ERROR',
+          message: `Validation error: ${(error as Error).message}`,
+          field: 'general',
+        },
+      ],
+      metadata: {},
+      isValid: false,
+    };
+  }
 }
 
 // Helper function to validate multiple records

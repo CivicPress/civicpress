@@ -303,6 +303,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
           attachedFiles,
           linkedRecords,
           linkedGeographyFiles,
+          authors,
+          source,
         } = req.body;
         const user = req.user;
 
@@ -357,6 +359,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
             attachedFiles,
             linkedRecords,
             linkedGeographyFiles,
+            authors,
+            source,
           },
           cleanUser
         );

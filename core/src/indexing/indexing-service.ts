@@ -9,6 +9,7 @@ import { join, dirname, basename } from 'path';
 import * as yaml from 'js-yaml';
 import { CivicPress } from '../civic-core.js';
 import { Logger } from '../utils/logger.js';
+import { RecordParser } from '../records/record-parser.js';
 
 export interface CivicIndexEntry {
   file: string;
@@ -151,6 +152,7 @@ export class IndexingService {
 
   /**
    * Extract metadata from a civic record file
+   * Uses RecordParser for consistent parsing
    */
   private extractRecordMetadata(
     filePath: string,
@@ -158,27 +160,35 @@ export class IndexingService {
   ): CivicIndexEntry | null {
     try {
       const content = readFileSync(filePath, 'utf-8');
-      const frontmatter = this.extractFrontmatter(content);
-
-      if (!frontmatter) return null;
+      
+      // Use RecordParser for consistent parsing
+      const record = RecordParser.parseFromMarkdown(content, filePath);
 
       const fileName = basename(filePath, '.md');
       const fileRelativePath = relativePath
         ? `${relativePath}/${fileName}.md`
         : `${fileName}.md`;
 
+      // Extract metadata from RecordData
       const entry: CivicIndexEntry = {
         file: fileRelativePath,
-        title: frontmatter.title || fileName,
-        type: frontmatter.type || 'unknown',
-        status: frontmatter.status || 'draft',
-        module: frontmatter.module,
-        tags: frontmatter.tags || [],
-        authors: frontmatter.authors || [],
-        created: frontmatter.created,
-        updated: frontmatter.updated,
-        source: frontmatter.source,
-        slug: frontmatter.slug || fileName,
+        title: record.title || fileName,
+        type: record.type || 'unknown',
+        status: record.status || 'draft',
+        module: record.metadata?.module,
+        tags: record.metadata?.tags || [],
+        // Map authors to expected format
+        authors: record.authors
+          ? record.authors.map((author) => ({
+              name: author.name,
+              role: author.role || 'unknown',
+            }))
+          : [],
+        created: record.created_at, // Use internal format
+        updated: record.updated_at, // Use internal format
+        // Map source object to string (use reference if available)
+        source: record.source?.reference || record.source?.url || undefined,
+        slug: record.metadata?.slug || fileName,
       };
 
       return entry;
@@ -433,6 +443,7 @@ export class IndexingService {
 
   /**
    * Create a new record from file
+   * Uses RecordParser for consistent parsing
    */
   private async createRecordFromFile(
     entry: CivicIndexEntry,
@@ -442,35 +453,41 @@ export class IndexingService {
     const filePath = join(this.dataDir, 'records', entry.file);
     const fileContent = readFileSync(filePath, 'utf-8');
 
-    // Extract content (everything after frontmatter)
-    const contentMatch = fileContent.match(
-      /^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/
-    );
-    const content = contentMatch ? contentMatch[1].trim() : '';
+    // Use RecordParser for consistent parsing
+    const record = RecordParser.parseFromMarkdown(fileContent, filePath);
 
     // Create record with the specified ID instead of generating a new one
     await recordManager.createRecordWithId(
       recordId,
       {
-        title: entry.title,
-        type: entry.type,
-        content: content,
+        title: record.title,
+        type: record.type,
+        content: record.content,
         metadata: {
-          author: entry.authors?.[0]?.name || 'admin',
-          created: entry.created,
-          updated: entry.updated,
-          tags: entry.tags,
-          module: entry.module,
+          ...record.metadata,
           source: 'file-sync',
           file_path: entry.file,
         },
+        authors: record.authors,
+        source: record.source,
+        geography: record.geography,
+        attachedFiles: record.attachedFiles,
+        linkedRecords: record.linkedRecords,
+        linkedGeographyFiles: record.linkedGeographyFiles,
       },
-      'admin'
+      {
+        id: 'admin',
+        username: record.author || 'admin',
+        name: record.authors?.[0]?.name || 'admin',
+        email: record.authors?.[0]?.email,
+        role: record.authors?.[0]?.role || 'admin',
+      }
     );
   }
 
   /**
    * Update existing record from file
+   * Uses RecordParser for consistent parsing
    */
   private async updateRecordFromFile(
     entry: CivicIndexEntry,
@@ -480,27 +497,35 @@ export class IndexingService {
     const filePath = join(this.dataDir, 'records', entry.file);
     const fileContent = readFileSync(filePath, 'utf-8');
 
-    // Extract content (everything after frontmatter)
-    const contentMatch = fileContent.match(
-      /^---\s*\n[\s\S]*?\n---\s*\n([\s\S]*)$/
-    );
-    const content = contentMatch ? contentMatch[1].trim() : '';
+    // Use RecordParser for consistent parsing
+    const record = RecordParser.parseFromMarkdown(fileContent, filePath);
 
     await recordManager.updateRecord(
       existingRecord.id,
       {
-        title: entry.title,
-        content: content,
+        title: record.title,
+        content: record.content,
+        status: record.status,
         metadata: {
           ...existingRecord.metadata,
-          updated: entry.updated,
-          tags: entry.tags,
-          module: entry.module,
+          ...record.metadata,
           source: 'file-sync',
           file_path: entry.file,
         },
+        authors: record.authors,
+        source: record.source,
+        geography: record.geography,
+        attachedFiles: record.attachedFiles,
+        linkedRecords: record.linkedRecords,
+        linkedGeographyFiles: record.linkedGeographyFiles,
       },
-      'admin'
+      {
+        id: 'admin',
+        username: record.author || 'admin',
+        name: record.authors?.[0]?.name || 'admin',
+        email: record.authors?.[0]?.email,
+        role: record.authors?.[0]?.role || 'admin',
+      }
     );
   }
 

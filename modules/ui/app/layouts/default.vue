@@ -18,6 +18,11 @@ const links = [[{
   to: '/records',
   icon: 'i-lucide-scale',
 
+}, {
+  label: 'Geography',
+  to: '/geography',
+  icon: 'i-lucide-map',
+
 }], []] satisfies NavigationMenuItem[][]
 
 onMounted(async () => {

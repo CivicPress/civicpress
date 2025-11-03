@@ -1,60 +1,32 @@
 import { Router } from 'express';
+import {
+  CentralConfigManager,
+  getRecordTypesWithMetadata,
+  getRecordStatusesWithMetadata,
+} from '@civicpress/core';
 
 const router = Router();
 
 /**
  * GET /api/v1/system/record-types
- * Returns available record types with metadata
+ * Returns available record types with metadata (loaded from config)
  */
 router.get('/record-types', (req, res) => {
   try {
-    const recordTypes = [
-      {
-        key: 'bylaw',
-        label: 'Bylaw',
-        description: 'Municipal bylaws and regulations',
-        source: 'core',
-        priority: 1,
-        fields: ['title', 'content', 'status', 'author'],
-        validation: ['required_title', 'required_content'],
-      },
-      {
-        key: 'ordinance',
-        label: 'Ordinance',
-        description: 'Local ordinances and municipal codes',
-        source: 'core',
-        priority: 2,
-        fields: ['title', 'content', 'status', 'author'],
-        validation: ['required_title', 'required_content'],
-      },
-      {
-        key: 'policy',
-        label: 'Policy',
-        description: 'Organizational policies and procedures',
-        source: 'core',
-        priority: 3,
-        fields: ['title', 'content', 'status', 'author'],
-        validation: ['required_title', 'required_content'],
-      },
-      {
-        key: 'proclamation',
-        label: 'Proclamation',
-        description: 'Official proclamations and declarations',
-        source: 'core',
-        priority: 4,
-        fields: ['title', 'content', 'status', 'author'],
-        validation: ['required_title', 'required_content'],
-      },
-      {
-        key: 'resolution',
-        label: 'Resolution',
-        description: 'Resolutions and formal decisions',
-        source: 'core',
-        priority: 5,
-        fields: ['title', 'content', 'status', 'author'],
-        validation: ['required_title', 'required_content'],
-      },
-    ];
+    // Load record types dynamically from configuration
+    const recordTypesConfig = CentralConfigManager.getRecordTypesConfig();
+    const recordTypesMetadata = getRecordTypesWithMetadata(recordTypesConfig);
+
+    // Transform to API response format
+    const recordTypes = recordTypesMetadata.map((type) => ({
+      key: type.key,
+      label: type.label,
+      description: type.description,
+      source: type.source,
+      priority: type.priority,
+      fields: ['id', 'title', 'content', 'status', 'author', 'created', 'updated'],
+      validation: ['required_title', 'required_type', 'required_status', 'required_author'],
+    }));
 
     res.json({
       success: true,
@@ -69,6 +41,7 @@ router.get('/record-types', (req, res) => {
       error: {
         message: 'Failed to fetch record types',
         code: 'RECORD_TYPES_FETCH_FAILED',
+        details: error instanceof Error ? error.message : String(error),
       },
     });
   }
@@ -76,75 +49,27 @@ router.get('/record-types', (req, res) => {
 
 /**
  * GET /api/v1/system/record-statuses
- * Returns available record statuses with metadata
+ * Returns available record statuses with metadata (loaded from config)
  */
 router.get('/record-statuses', (req, res) => {
   try {
-    const recordStatuses = [
-      {
-        key: 'draft',
-        label: 'Draft',
-        description: 'Initial draft status',
-        color: 'gray',
-        priority: 1,
-        transitions: ['proposed', 'archived'],
-        editable: true,
-      },
-      {
-        key: 'proposed',
-        label: 'Proposed',
-        description: 'Proposed for review',
-        color: 'blue',
-        priority: 2,
-        transitions: ['review', 'draft'],
-        editable: true,
-      },
-      {
-        key: 'review',
-        label: 'Under Review',
-        description: 'Currently under review',
-        color: 'yellow',
-        priority: 3,
-        transitions: ['approved', 'rejected', 'proposed'],
-        editable: false,
-      },
-      {
-        key: 'approved',
-        label: 'Approved',
-        description: 'Approved and active',
-        color: 'green',
-        priority: 4,
-        transitions: ['adopted', 'archived'],
-        editable: false,
-      },
-      {
-        key: 'rejected',
-        label: 'Rejected',
-        description: 'Rejected during review',
-        color: 'red',
-        priority: 5,
-        transitions: ['draft', 'archived'],
-        editable: true,
-      },
-      {
-        key: 'adopted',
-        label: 'Adopted',
-        description: 'Formally adopted',
-        color: 'green',
-        priority: 6,
-        transitions: ['archived'],
-        editable: false,
-      },
-      {
-        key: 'archived',
-        label: 'Archived',
-        description: 'Archived and inactive',
-        color: 'gray',
-        priority: 7,
-        transitions: ['draft'],
-        editable: false,
-      },
-    ];
+    // Load record statuses dynamically from configuration
+    const recordStatusesConfig = CentralConfigManager.getRecordStatusesConfig();
+    const recordStatusesMetadata = getRecordStatusesWithMetadata(recordStatusesConfig);
+
+    // Transform to API response format with additional metadata
+    const recordStatuses = recordStatusesMetadata.map((status) => ({
+      key: status.key,
+      label: status.label,
+      description: status.description,
+      source: status.source,
+      priority: status.priority,
+      // Map status keys to UI colors (can be extended in config later)
+      color: getStatusColor(status.key),
+      // Transitions would come from workflow config (not implemented here)
+      transitions: [],
+      editable: !['published', 'archived', 'expired'].includes(status.key),
+    }));
 
     res.json({
       success: true,
@@ -159,9 +84,27 @@ router.get('/record-statuses', (req, res) => {
       error: {
         message: 'Failed to fetch record statuses',
         code: 'RECORD_STATUSES_FETCH_FAILED',
+        details: error instanceof Error ? error.message : String(error),
       },
     });
   }
 });
+
+/**
+ * Map status key to UI color (can be made configurable later)
+ */
+function getStatusColor(statusKey: string): string {
+  const colorMap: Record<string, string> = {
+    draft: 'gray',
+    pending_review: 'blue',
+    under_review: 'yellow',
+    approved: 'green',
+    published: 'green',
+    rejected: 'red',
+    archived: 'gray',
+    expired: 'orange',
+  };
+  return colorMap[statusKey] || 'gray';
+}
 
 export default router;

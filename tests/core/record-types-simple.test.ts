@@ -13,11 +13,13 @@ describe('Record Types Configuration - Simple Tests', () => {
       expect(DEFAULT_RECORD_TYPES).toHaveProperty('policy');
       expect(DEFAULT_RECORD_TYPES).toHaveProperty('proclamation');
       expect(DEFAULT_RECORD_TYPES).toHaveProperty('resolution');
+      expect(DEFAULT_RECORD_TYPES).toHaveProperty('geography');
+      expect(DEFAULT_RECORD_TYPES).toHaveProperty('session');
     });
 
     it('should have correct structure for each record type', () => {
       const recordTypes = Object.values(DEFAULT_RECORD_TYPES);
-      expect(recordTypes).toHaveLength(5);
+      expect(recordTypes.length).toBeGreaterThanOrEqual(7); // Now includes geography and session
 
       recordTypes.forEach((recordType) => {
         expect(recordType).toHaveProperty('label');

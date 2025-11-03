@@ -4,7 +4,7 @@ import { join, dirname } from 'path';
 import * as fs from 'fs';
 import matter = require('gray-matter');
 import { glob } from 'glob';
-import { userCan } from '@civicpress/core';
+import { userCan, RecordParser } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -149,18 +149,30 @@ async function exportSingleRecord(
     }
 
     const content = await readFile(fullPath, 'utf-8');
-    const { data: metadata, content: markdownContent } = matter(content);
+    
+    // Use RecordParser for consistent parsing (handles both old and new formats)
+    const record = RecordParser.parseFromMarkdown(content, fullPath);
 
     const exportRecord: ExportRecord = {
       path: recordPath,
-      type: metadata.type || recordPath.split('/')[0],
-      title: metadata.title || recordPath.replace(/\.md$/, ''),
-      status: metadata.status || 'draft',
-      created: metadata.created || '',
-      updated: metadata.updated || '',
-      author: metadata.author || 'unknown',
-      content: options.includeContent ? markdownContent : undefined,
-      metadata: options.includeMetadata ? metadata : {},
+      type: record.type || recordPath.split('/')[0],
+      title: record.title || recordPath.replace(/\.md$/, ''),
+      status: record.status || 'draft',
+      created: record.created_at || '',
+      updated: record.updated_at || '',
+      author: record.author || 'unknown',
+      content: options.includeContent ? record.content : undefined,
+      metadata: options.includeMetadata
+        ? {
+            ...record.metadata,
+            authors: record.authors,
+            source: record.source,
+            geography: record.geography,
+            attachedFiles: record.attachedFiles,
+            linkedRecords: record.linkedRecords,
+            linkedGeographyFiles: record.linkedGeographyFiles,
+          }
+        : {},
     };
 
     if (shouldOutputJson) {
@@ -237,28 +249,40 @@ async function exportRecords(
     for (const file of recordFiles) {
       const filePath = join(recordsDir, file);
       const content = await readFile(filePath, 'utf-8');
-      const { data: metadata, content: markdownContent } = matter(content);
+      
+      // Use RecordParser for consistent parsing (handles both old and new formats)
+      const record = RecordParser.parseFromMarkdown(content, filePath);
 
       // Apply filters
-      if (options.type && metadata.type !== options.type) continue;
-      if (options.status && metadata.status !== options.status) continue;
-      if (options.author && metadata.author !== options.author) continue;
+      if (options.type && record.type !== options.type) continue;
+      if (options.status && record.status !== options.status) continue;
+      if (options.author && record.author !== options.author) continue;
       if (options.date) {
-        const recordDate = new Date(metadata.created || metadata.updated || '');
+        const recordDate = new Date(record.created_at || record.updated_at || '');
         const searchDate = parseDateFilter(options.date);
         if (searchDate && recordDate < searchDate) continue;
       }
 
       records.push({
         path: file,
-        type: metadata.type || file.split('/')[0],
-        title: metadata.title || file.replace(/\.md$/, ''),
-        status: metadata.status || 'draft',
-        created: metadata.created || '',
-        updated: metadata.updated || '',
-        author: metadata.author || 'unknown',
-        content: options.includeContent ? markdownContent : undefined,
-        metadata: options.includeMetadata ? metadata : {},
+        type: record.type || file.split('/')[0],
+        title: record.title || file.replace(/\.md$/, ''),
+        status: record.status || 'draft',
+        created: record.created_at || '',
+        updated: record.updated_at || '',
+        author: record.author || 'unknown',
+        content: options.includeContent ? record.content : undefined,
+        metadata: options.includeMetadata
+          ? {
+              ...record.metadata,
+              authors: record.authors,
+              source: record.source,
+              geography: record.geography,
+              attachedFiles: record.attachedFiles,
+              linkedRecords: record.linkedRecords,
+              linkedGeographyFiles: record.linkedGeographyFiles,
+            }
+          : {},
       });
     }
 

@@ -4,14 +4,18 @@ import { join, extname } from 'path';
 import { loadConfig } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
-import matter = require('gray-matter');
 import { glob } from 'glob';
 import * as yaml from 'yaml';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
-import { Logger, TemplateEngine } from '@civicpress/core';
+import {
+  Logger,
+  TemplateEngine,
+  RecordValidator,
+  RecordParser,
+} from '@civicpress/core';
 
 interface ValidationResult {
   record: string;
@@ -187,15 +191,34 @@ async function validateRecord(
   const templateEngine = new TemplateEngine(dataDir);
 
   const content = await readFile(fullPath, 'utf-8');
-  const { data: metadata, content: markdownContent } = matter(content);
 
-  const recordType = metadata.type || recordPath.split('/')[0];
+  // Use RecordParser for consistent parsing
+  let record;
+  try {
+    record = RecordParser.parseFromMarkdown(content, fullPath);
+  } catch (error) {
+    return {
+      record: recordPath,
+      isValid: false,
+      errors: [
+        {
+          field: 'parse',
+          message: `Failed to parse record: ${error instanceof Error ? error.message : String(error)}`,
+          severity: 'error',
+        },
+      ],
+      warnings: [],
+      suggestions: [],
+    };
+  }
+
+  const recordType = record.type || recordPath.split('/')[0];
 
   // Try to load the template using the template engine
   let template: any | null = null;
   try {
     // First try to load the specific template if specified in metadata
-    const templateName = metadata.template || 'default';
+    const templateName = record.metadata?.template || 'default';
     template = await templateEngine.loadTemplate(recordType, templateName);
   } catch (error) {
     // Fall back to default template
@@ -210,34 +233,64 @@ async function validateRecord(
   const warnings: ValidationWarning[] = [];
   const suggestions: string[] = [];
 
-  // Use template engine's advanced validation if template is available
-  if (template) {
-    const validationResult = templateEngine.validateRecord(fullPath, template);
+  // Use RecordValidator for comprehensive validation against standard format
+  const validationResult = RecordValidator.validateRecord(record, {
+    strict: options.strict || false,
+    checkFormat: true,
+    checkContent: true,
+  });
 
-    // Convert template engine validation results to CLI format
-    for (const error of validationResult.errors) {
-      errors.push({
-        field: 'validation',
-        message: String(error),
-        severity: 'error',
-      });
+  // Convert RecordValidator results to CLI format
+  for (const error of validationResult.errors) {
+    errors.push({
+      field: error.field,
+      message: error.message,
+      severity: error.severity === 'error' ? 'error' : 'warning',
+    });
+    if (error.suggestion) {
+      suggestions.push(`${error.field}: ${error.suggestion}`);
     }
-
-    for (const warning of validationResult.warnings) {
-      warnings.push({
-        field: 'validation',
-        message: String(warning),
-      });
-    }
-  } else {
-    // Fall back to basic validation
-    validateBasicMetadata(metadata, errors, warnings);
   }
 
-  // Check for common issues
+  for (const warning of validationResult.warnings) {
+    warnings.push({
+      field: warning.field,
+      message: warning.message,
+    });
+    if (warning.suggestion) {
+      suggestions.push(`${warning.field}: ${warning.suggestion}`);
+    }
+  }
+
+  // Use template engine's additional validation if template is available
+  if (template) {
+    try {
+      const templateValidationResult = templateEngine.validateRecord(fullPath, template);
+
+      // Add template-specific validation results
+      for (const error of templateValidationResult.errors) {
+        errors.push({
+          field: 'template',
+          message: String(error),
+          severity: 'error',
+        });
+      }
+
+      for (const warning of templateValidationResult.warnings) {
+        warnings.push({
+          field: 'template',
+          message: String(warning),
+        });
+      }
+    } catch (templateError) {
+      // Template validation failed, skip it
+    }
+  }
+
+  // Check for common content issues
   validateCommonIssues(
-    metadata,
-    markdownContent,
+    record.metadata || {},
+    record.content || '',
     errors,
     warnings,
     suggestions

@@ -76,6 +76,21 @@ export class RecordsService {
         name: string;
         description?: string;
       }>;
+      authors?: Array<{
+        name: string;
+        username: string;
+        role?: string;
+        email?: string;
+      }>;
+      source?: {
+        reference: string;
+        original_title?: string;
+        original_filename?: string;
+        url?: string;
+        type?: 'legacy' | 'import' | 'external';
+        imported_at?: string;
+        imported_by?: string;
+      };
     },
     user: any
   ): Promise<any> {
@@ -101,6 +116,8 @@ export class RecordsService {
       attachedFiles: data.attachedFiles,
       linkedRecords: data.linkedRecords,
       linkedGeographyFiles: data.linkedGeographyFiles,
+      authors: data.authors,
+      source: data.source,
     };
 
     // Create the record using CivicCore
@@ -112,26 +129,17 @@ export class RecordsService {
       type: record.type,
       status: record.status,
       content: record.content,
-      metadata: {
-        ...record.metadata,
-        author:
-          typeof record.metadata?.author === 'object' &&
-          record.metadata.author?.username
-            ? record.metadata.author.username
-            : record.metadata?.author,
-      },
+      metadata: record.metadata || {},
+      authors: record.authors,
+      source: record.source,
+      geography: record.geography,
       attachedFiles: record.attachedFiles || [],
       linkedRecords: record.linkedRecords || [],
       linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
-      created: record.created_at,
-      author:
-        typeof record.author === 'object' &&
-        record.author &&
-        typeof record.author === 'object' &&
-        'username' in record.author
-          ? (record.author as any).username
-          : record.author,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      author: record.author,
     };
   }
 
@@ -151,12 +159,15 @@ export class RecordsService {
       status: record.status,
       content: record.content,
       metadata: record.metadata || {},
+      authors: record.authors,
+      source: record.source,
       geography: record.geography,
       attachedFiles: record.attachedFiles || [],
       linkedRecords: record.linkedRecords || [],
       linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
-      created: record.created_at,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
       author: record.author,
     };
   }
@@ -244,6 +255,21 @@ export class RecordsService {
         name: string;
         description?: string;
       }>;
+      authors?: Array<{
+        name: string;
+        username: string;
+        role?: string;
+        email?: string;
+      }>;
+      source?: {
+        reference: string;
+        original_title?: string;
+        original_filename?: string;
+        url?: string;
+        type?: 'legacy' | 'import' | 'external';
+        imported_at?: string;
+        imported_by?: string;
+      };
     },
     user: any
   ): Promise<any | null> {
@@ -275,6 +301,8 @@ export class RecordsService {
       attachedFiles: data.attachedFiles,
       linkedRecords: data.linkedRecords,
       linkedGeographyFiles: data.linkedGeographyFiles,
+      authors: data.authors,
+      source: data.source,
     };
 
     // Update the record using CivicCore
@@ -295,12 +323,15 @@ export class RecordsService {
       status: updatedRecord.status,
       content: updatedRecord.content,
       metadata: updatedRecord.metadata || {},
+      authors: updatedRecord.authors,
+      source: updatedRecord.source,
+      geography: updatedRecord.geography,
       attachedFiles: updatedRecord.attachedFiles || [],
       linkedRecords: updatedRecord.linkedRecords || [],
       linkedGeographyFiles: updatedRecord.linkedGeographyFiles || [],
-      geography: updatedRecord.geography,
       path: updatedRecord.path,
-      created: updatedRecord.created_at,
+      created_at: updatedRecord.created_at,
+      updated_at: updatedRecord.updated_at,
       author: updatedRecord.author,
     };
   }
