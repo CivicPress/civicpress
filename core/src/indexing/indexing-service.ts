@@ -160,7 +160,7 @@ export class IndexingService {
   ): CivicIndexEntry | null {
     try {
       const content = readFileSync(filePath, 'utf-8');
-      
+
       // Use RecordParser for consistent parsing
       const record = RecordParser.parseFromMarkdown(content, filePath);
 
@@ -194,21 +194,6 @@ export class IndexingService {
       return entry;
     } catch (error) {
       console.warn(`Failed to extract metadata from ${filePath}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Extract YAML frontmatter from markdown content
-   */
-  private extractFrontmatter(content: string): any {
-    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
-    if (!frontmatterMatch) return null;
-
-    try {
-      return yaml.load(frontmatterMatch[1]) as any;
-    } catch (error) {
-      console.warn('Failed to parse frontmatter:', error);
       return null;
     }
   }
