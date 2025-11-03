@@ -1,6 +1,6 @@
 # Project State
 
-## Current Status: September 2025
+## Current Status: November 2025
 
 ### ✅ **Completed Features**
 
@@ -47,9 +47,44 @@
 - **Package Management**: pnpm workspaces for monorepo management
 - **TypeScript**: Full type safety across the platform
 
-### ✅ **Recently Completed Features (September 2025)**
+### ✅ **Recently Completed Features (November 2025)**
 
-#### **File Attachment System**
+#### **Record Format Standardization**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Comprehensive Standardization**: Unified markdown format across all record
+  types (bylaw, ordinance, policy, proclamation, resolution, geography, session)
+- **Core Infrastructure**:
+  - RecordParser class for consistent markdown parsing/serialization
+  - RecordValidator class with config-driven validation
+  - Updated RecordData interface with authors and source fields
+- **Standardized Format**:
+  - Single frontmatter block with section comments for readability
+  - Required fields: id, title, type, status, author, authors, created, updated
+  - ISO 8601 timestamps throughout
+  - Source field for legacy document tracking (reference, original_title,
+    original_filename, url, type, imported_at, imported_by)
+- **Config-Driven System**:
+  - Record types and statuses loaded dynamically from `data/.civic/config.yml`
+  - Validation rules pulled from configuration (no code changes needed for new
+    types/statuses)
+  - System routes (`/api/v1/system/record-types`,
+    `/api/v1/system/record-statuses`) load from config
+- **Implementation Phases**:
+  - Phase 1: Core Infrastructure (RecordParser, RecordValidator)
+  - Phase 2-3: Record Reading/Writing (RecordManager integration)
+  - Phase 4: Validation & Migration (config-driven validation)
+  - Phase 5: UI & API Updates (interfaces, routes, system endpoints)
+  - Phase 6: Templates & Demo Data (all templates and 12 demo files updated)
+  - Phase 7: Test Suite Updates (test fixtures and records updated)
+- **Documentation**: Complete format specification, implementation plan, and
+  code analysis documents
+- **Backward Compatibility**: Parser handles old format gracefully
+- **New Record Types**: Added geography and session to core types
+- **Standardized Statuses**: Updated to published, pending_review, under_review,
+  approved, rejected, archived, expired
+
+#### **File Attachment System (September 2025)**
 
 - **Status**: ✅ **Fully Implemented and Production-Ready**
 - **Database Schema**: New `attached_files` JSON column with migration support
@@ -133,6 +168,8 @@
   disclosure
 - **Integration**: Seamlessly integrated with existing record creation/editing
   workflow
+- **Format Standardization**: All templates updated to new standardized format
+  with section comments
 
 ### 🔄 **In Progress**
 
@@ -194,6 +231,8 @@
   migration
 - **Template Loading System** - User-friendly template management with
   confirmation workflows
+- **Record Format Standardization** - Unified markdown format with RecordParser,
+  RecordValidator, config-driven validation, and comprehensive documentation
 - **Storage Module** - Comprehensive file management with API and CLI
   integration
 - **Test Coverage Expansion** - Increased from 391 to 560+ passing tests

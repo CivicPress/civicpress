@@ -1,9 +1,9 @@
 # CivicPress Project Status
 
-**Last Updated**: September 2025  
+**Last Updated**: November 2025  
 **Overall Status**: ✅ **Stable & Production-Ready**  
 **Test Coverage**: 600+ tests passing (including 85+ security tests)  
-**Implementation**: 85% complete
+**Implementation**: 90% complete
 
 ## 🎯 Current Status
 
@@ -26,14 +26,21 @@ ready for development and testing.
 #### **Record Management (100% Functional)**
 
 - **Record CRUD**: Create, read, update, delete operations
-- **Lifecycle Management**: Draft → Proposed → Approved → Archived flow
+- **Standardized Format**: Unified markdown format with section comments and ISO
+  8601 timestamps
+- **Lifecycle Management**: Draft → Pending Review → Under Review → Approved →
+  Published → Archived flow
 - **Search System**: Full-text search with filtering and ranking
-- **Validation**: Comprehensive record validation and integrity checks
+- **Validation**: Config-driven validation with dynamic type/status checking
+- **RecordParser**: Central parsing/serialization ensuring format consistency
 - **Templates**: Template system for record creation with confirmation modal
+  (all updated to new format)
 - **Geography Data**: Spatial data support with SRID, coordinates, and
   attachments
 - **File Attachments**: Link existing files to records with categorization
 - **Secure Downloads**: Authenticated file access with proper error handling
+- **Source Tracking**: Legacy document tracking with reference, original_title,
+  original_filename
 
 #### **User Management (100% Functional)**
 
@@ -59,12 +66,14 @@ ready for development and testing.
 - ✅ Frontend search integration
 - 🔄 Advanced search features (fuzzy matching, relevance ranking)
 
-#### **Configuration System (90% Complete)**
+#### **Configuration System (100% Complete)**
 
-- ✅ Record types configuration
-- ✅ Record statuses configuration
+- ✅ Record types configuration (config-driven, dynamic loading)
+- ✅ Record statuses configuration (config-driven, dynamic loading)
 - ✅ API endpoints for configuration
-- 🔄 Frontend configuration management
+- ✅ Frontend configuration management
+- ✅ Config-driven validation (RecordValidator loads from config.yml)
+- ✅ System routes load types/statuses dynamically from config
 
 #### **UI Development (80% Complete)**
 
@@ -83,6 +92,43 @@ ready for development and testing.
 - 🔄 Admin dashboard
 
 ### ✅ Recently Completed Features
+
+#### **Record Format Standardization (November 2025)**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Comprehensive Standardization**: Unified markdown format across all record
+  types
+- **RecordParser Class**: Central parsing/serialization with backward
+  compatibility
+- **RecordValidator Class**: Config-driven validation (no code changes for new
+  types/statuses)
+- **Standardized Frontmatter**: Single block with section comments for
+  readability
+- **ISO 8601 Timestamps**: Consistent date/time format throughout
+- **Authors Field**: Support for both simple `author` (username) and detailed
+  `authors` array
+- **Source Tracking**: New `source` field for legacy document tracking
+  (reference, original_title, original_filename, url, type, imported_at,
+  imported_by)
+- **New Record Types**: Added `geography` and `session` record types
+- **Config-Driven**: Record types and statuses loaded dynamically from
+  `data/.civic/config.yml`
+- **Template Updates**: All 5 template files updated to new format
+- **Demo Data Updates**: All 12 demo data files converted to standardized format
+- **Test Suite Updates**: All test fixtures and test records updated to new
+  format
+- **Documentation**: Complete format specification in
+  `docs/record-format-standard.md`
+- **Implementation Plan**: Detailed 7-phase implementation documented
+- **Backward Compatibility**: Parser handles old format gracefully during
+  transition
+- **Key Features**:
+  - Required fields: id, title, type, status, author, created, updated
+  - Optional fields: authors (array), source (object), tags, metadata,
+    geography, attachedFiles, linkedRecords
+  - Section comments for frontmatter organization
+  - Dynamic validation from configuration
+  - Consistent structure across all record types
 
 #### **File Attachment System (September 2025)**
 
