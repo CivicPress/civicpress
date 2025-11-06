@@ -15,6 +15,7 @@ import matter from 'gray-matter';
 import { stringify } from 'yaml';
 import { RecordData } from './record-manager.js';
 import { Logger } from '../utils/logger.js';
+import { RecordSchemaValidator } from './record-schema-validator.js';
 
 const logger = new Logger();
 
@@ -128,7 +129,28 @@ export class RecordParser {
       // Normalize old format to new format
       const normalized = this.normalizeFormat(frontmatter);
 
-      // Validate required fields
+      // Schema validation (fail fast on schema errors)
+      const recordType = normalized.type;
+      const schemaValidation = RecordSchemaValidator.validate(
+        normalized,
+        recordType,
+        {
+          includeModuleExtensions: true,
+          includeTypeExtensions: true,
+          strict: false, // Allow additional properties
+        }
+      );
+
+      if (!schemaValidation.isValid && schemaValidation.errors.length > 0) {
+        const errorMessages = schemaValidation.errors
+          .map((err) => `${err.field}: ${err.message}`)
+          .join('; ');
+        throw new Error(
+          `Schema validation failed for record${filePath ? ` at ${filePath}` : ''}: ${errorMessages}`
+        );
+      }
+
+      // Validate required fields (backup validation, though schema should catch these)
       this.validateRequiredFields(normalized, filePath);
 
       // Convert frontmatter format to RecordData format

@@ -6,6 +6,8 @@ export { CreateRecordRequest, UpdateRecordRequest } from './civic-core.js';
 export { RecordManager, RecordData } from './records/record-manager.js';
 export { RecordParser } from './records/record-parser.js';
 export { RecordValidator } from './records/record-validator.js';
+export { RecordSchemaBuilder } from './records/record-schema-builder.js';
+export { RecordSchemaValidator } from './records/record-schema-validator.js';
 export type {
   ValidationError,
   ValidationResult,
@@ -97,6 +99,8 @@ export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
 export { AuditLogger } from './audit/audit-logger.js';
+export { DocumentNumberGenerator } from './utils/document-number-generator.js';
+export { ComplianceFieldHelpers } from './utils/compliance-helpers.js';
 
 // Export utility functions for CLI use
 export async function loadConfig() {
@@ -137,6 +141,12 @@ export type {
   RecordStatusesConfig,
   RecordStatusMetadata,
 } from './config/record-statuses.js';
+
+// Export document number format types
+export type {
+  DocumentNumberFormat,
+  DocumentNumberFormats,
+} from './config/central-config.js';
 
 // Export indexing services
 export { IndexingService } from './indexing/indexing-service.js';

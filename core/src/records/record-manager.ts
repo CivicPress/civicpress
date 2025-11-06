@@ -9,6 +9,9 @@ import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { RecordParser } from './record-parser.js';
+import { RecordSchemaValidator } from './record-schema-validator.js';
+import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
+import matter from 'gray-matter';
 
 const logger = new Logger();
 
@@ -114,6 +117,15 @@ export class RecordManager {
     const safeMetadata = { ...(request.metadata || {}) };
     delete safeMetadata.author;
 
+    // Auto-generate document number for legal record types if not provided
+    const legalTypes = ['bylaw', 'ordinance', 'policy', 'proclamation', 'resolution'];
+    let documentNumber = safeMetadata.document_number;
+    if (!documentNumber && legalTypes.includes(request.type)) {
+      const year = new Date().getFullYear();
+      const sequence = await DocumentNumberGenerator.getNextSequence(request.type, year);
+      documentNumber = DocumentNumberGenerator.generate(request.type, year, sequence);
+    }
+
     // Create the record object
     const record: RecordData = {
       id: recordId,
@@ -127,6 +139,7 @@ export class RecordManager {
       linkedGeographyFiles: request.linkedGeographyFiles,
       metadata: {
         ...safeMetadata,
+        ...(documentNumber && { document_number: documentNumber }),
       },
       path: recordPath,
       author: user.username, // Required: primary author username
@@ -650,6 +663,27 @@ export class RecordManager {
     // Create markdown content
     const content = this.createMarkdownContent(record);
 
+    // Validate schema before saving (fail fast)
+    const { data: frontmatter } = matter(content);
+    const schemaValidation = RecordSchemaValidator.validate(
+      frontmatter,
+      record.type,
+      {
+        includeModuleExtensions: true,
+        includeTypeExtensions: true,
+        strict: false,
+      }
+    );
+
+    if (!schemaValidation.isValid && schemaValidation.errors.length > 0) {
+      const errorMessages = schemaValidation.errors
+        .map((err) => `${err.field}: ${err.message}`)
+        .join('; ');
+      throw new Error(
+        `Schema validation failed before saving record ${record.id}: ${errorMessages}`
+      );
+    }
+
     // Ensure directory exists
     const fullPath = path.join(this.dataDir, filePath);
     const dir = path.dirname(fullPath);
@@ -671,6 +705,27 @@ export class RecordManager {
 
     // Create markdown content
     const content = this.createMarkdownContent(record);
+
+    // Validate schema before saving (fail fast)
+    const { data: frontmatter } = matter(content);
+    const schemaValidation = RecordSchemaValidator.validate(
+      frontmatter,
+      record.type,
+      {
+        includeModuleExtensions: true,
+        includeTypeExtensions: true,
+        strict: false,
+      }
+    );
+
+    if (!schemaValidation.isValid && schemaValidation.errors.length > 0) {
+      const errorMessages = schemaValidation.errors
+        .map((err) => `${err.field}: ${err.message}`)
+        .join('; ');
+      throw new Error(
+        `Schema validation failed before updating record ${record.id}: ${errorMessages}`
+      );
+    }
 
     // Write file
     const fullPath = path.join(this.dataDir, filePath);

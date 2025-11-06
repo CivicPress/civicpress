@@ -322,6 +322,202 @@ Delete a record (requires authentication).
 }
 ```
 
+### Validation
+
+CivicPress provides comprehensive validation endpoints for records using JSON Schema validation. All validation endpoints require authentication.
+
+#### POST /api/v1/validation/record
+
+Validate a single record by ID.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "recordId": "record-1234567890",
+  "type": "bylaw"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "recordId": "record-1234567890",
+    "isValid": true,
+    "issues": [],
+    "metadata": {
+      "title": "Noise Restrictions Bylaw",
+      "type": "bylaw",
+      "status": "published",
+      "author": "mctremblay",
+      "created": "2025-01-15T10:00:00Z",
+      "updated": "2025-02-01T14:30:00Z",
+      "schemaValid": true,
+      "schemaErrors": 0,
+      "schemaWarnings": 0
+    }
+  }
+}
+```
+
+**Error Response (Invalid Record):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "recordId": "record-1234567890",
+    "isValid": false,
+    "issues": [
+      {
+        "severity": "error",
+        "code": "MISSING_REQUIRED_FIELD",
+        "message": "Missing required field: author",
+        "field": "author",
+        "suggestion": "Add the \"author\" field to the frontmatter"
+      },
+      {
+        "severity": "warning",
+        "code": "INVALID_FORMAT",
+        "message": "Field \"created\" must be a valid date-time",
+        "field": "created",
+        "suggestion": "Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ"
+      }
+    ],
+    "metadata": {
+      "schemaValid": false,
+      "schemaErrors": 1,
+      "schemaWarnings": 1
+    }
+  }
+}
+```
+
+#### POST /api/v1/validation/bulk
+
+Validate multiple records at once.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "recordIds": ["record-1", "record-2", "record-3"],
+  "types": ["bylaw", "policy", "bylaw"],
+  "includeContent": false
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "recordId": "record-1",
+        "isValid": true,
+        "issues": []
+      },
+      {
+        "recordId": "record-2",
+        "isValid": false,
+        "issues": [
+          {
+            "severity": "error",
+            "code": "MISSING_REQUIRED_FIELD",
+            "message": "Missing required field: title",
+            "field": "title"
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "totalRecords": 3,
+      "validCount": 2,
+      "invalidCount": 1,
+      "bySeverity": {
+        "error": 1,
+        "warning": 0,
+        "info": 0
+      }
+    }
+  }
+}
+```
+
+#### GET /api/v1/validation/record/:recordId
+
+Get validation results for a specific record.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+
+- `type` - Record type (optional, helps locate the record faster)
+
+**Response:** Same format as `POST /api/v1/validation/record`
+
+#### GET /api/v1/validation/status
+
+Get validation status across all records.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+
+- `type` - Filter by record type (optional)
+- `severity` - Filter by severity: `error`, `warning`, or `info` (optional)
+- `limit` - Maximum number of issues to return (optional, default: 50, max: 100)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "issues": [
+      {
+        "severity": "error",
+        "code": "MISSING_REQUIRED_FIELD",
+        "message": "Missing required field: author",
+        "field": "author",
+        "recordId": "record-123",
+        "recordType": "bylaw",
+        "file": "records/bylaw/record-123.md"
+      }
+    ],
+    "summary": {
+      "totalIssues": 5,
+      "bySeverity": {
+        "error": 3,
+        "warning": 2,
+        "info": 0
+      },
+      "byType": {
+        "bylaw": 2,
+        "policy": 3
+      }
+    }
+  }
+}
+```
+
+**Validation Features:**
+
+- **Schema Validation**: Validates frontmatter against JSON Schema (base + type + module + plugin schemas)
+- **Business Rule Validation**: Validates relationships, compliance fields, and business logic
+- **Clear Error Messages**: Field-level errors with suggestions for fixing
+- **Metadata Extraction**: Returns parsed record metadata if validation succeeds
+- **Bulk Operations**: Validate multiple records efficiently
+
 ### Search
 
 #### GET /api/search

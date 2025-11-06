@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://civicpress.org/schemas/record-type-schemas/session-schema.json",
+  "title": "CivicPress Session Record Type Schema",
+  "description": "JSON Schema extension for session-type records. This schema validates type-specific fields for session/minutes records as defined in docs/record-format-standard.md",
+  "type": "object",
+  "properties": {
+    "session_type": {
+      "type": "string",
+      "enum": ["regular", "emergency", "special"],
+      "description": "Type of session: regular (scheduled), emergency (urgent), or special (special purpose)"
+    },
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 date and time of the meeting/session"
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Duration of the session in minutes"
+    },
+    "location": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Physical location where the session took place (e.g., 'Town Hall Council Chamber')"
+    },
+    "attendees": {
+      "type": "array",
+      "description": "Array of attendee objects",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Full name of the attendee"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role of the attendee (e.g., 'Mayor', 'Town Clerk', 'Councilor')"
+          },
+          "present": {
+            "type": "boolean",
+            "description": "Whether the attendee was present"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address of the attendee"
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": true
+      }
+    },
+    "topics": {
+      "type": "array",
+      "description": "Array of topic/discussion items covered in the session",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the topic"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description or summary of the topic"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of decisions made regarding this topic"
+          },
+          "votes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "motion": {
+                  "type": "string",
+                  "description": "The motion being voted on"
+                },
+                "result": {
+                  "type": "string",
+                  "enum": ["passed", "failed", "tabled", "referred"],
+                  "description": "Result of the vote"
+                },
+                "votes_for": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "votes_against": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "abstentions": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            "description": "Array of votes taken on this topic"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "media": {
+      "type": "object",
+      "description": "Media links and resources related to the session",
+      "properties": {
+        "livestream": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to livestream recording (e.g., YouTube link)"
+        },
+        "recording": {
+          "type": "string",
+          "description": "Path or URL to audio/video recording of the session"
+        },
+        "minutes": {
+          "type": "string",
+          "description": "Path or URL to the official minutes document"
+        },
+        "transcript": {
+          "type": "string",
+          "description": "Path or URL to the session transcript"
+        },
+        "agenda": {
+          "type": "string",
+          "description": "Path or URL to the session agenda"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
+

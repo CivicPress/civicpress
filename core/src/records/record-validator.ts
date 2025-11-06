@@ -16,6 +16,9 @@ import { RecordData } from './record-manager.js';
 import { RecordParser } from './record-parser.js';
 import { CentralConfigManager } from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
+import { RecordSchemaValidator } from './record-schema-validator.js';
+import { ComplianceFieldHelpers } from '../utils/compliance-helpers.js';
+import matter from 'gray-matter';
 
 const logger = new Logger();
 
@@ -103,28 +106,64 @@ export class RecordValidator {
     const warnings: ValidationError[] = [];
     const info: ValidationError[] = [];
 
-    // Validate required fields
-    this.validateRequiredFields(record, errors);
+    // STEP 1: Schema validation first (fail fast on schema errors)
+    // Convert RecordData to frontmatter format for schema validation
+    const markdownContent = RecordParser.serializeToMarkdown(record);
+    const { data: frontmatter } = matter(markdownContent);
+    
+    const schemaValidation = RecordSchemaValidator.validate(
+      frontmatter,
+      record.type,
+      {
+        includeModuleExtensions: true,
+        includeTypeExtensions: true,
+        strict: false,
+      }
+    );
 
-    // Validate field types
-    this.validateFieldTypes(record, errors, warnings);
+    // Add schema validation errors
+    errors.push(...schemaValidation.errors);
+    warnings.push(...schemaValidation.warnings);
+    info.push(...schemaValidation.info);
 
-    // Validate field formats
-    this.validateFieldFormats(record, errors, warnings);
+    // STEP 2: Business rule validation (only if schema passed or for additional checks)
+    if (options.checkFormat !== false) {
+      // Validate required fields (backup, though schema should catch these)
+      this.validateRequiredFields(record, errors);
 
-    // Validate status and type values
-    this.validateStatus(record, errors, warnings);
-    this.validateType(record, errors, warnings);
+      // Validate field types
+      this.validateFieldTypes(record, errors, warnings);
 
-    // Validate type-specific fields
-    this.validateTypeSpecificFields(record, errors, warnings);
+      // Validate field formats
+      this.validateFieldFormats(record, errors, warnings);
 
-    // Validate complex fields
-    this.validateAuthors(record, warnings, info);
-    this.validateSource(record, warnings);
-    this.validateLinkedRecords(record, errors, warnings);
-    this.validateAttachedFiles(record, errors, warnings);
-    this.validateLinkedGeography(record, warnings);
+      // Validate status and type values
+      this.validateStatus(record, errors, warnings);
+      this.validateType(record, errors, warnings);
+
+      // Validate type-specific fields
+      this.validateTypeSpecificFields(record, errors, warnings);
+
+      // Validate complex fields
+      this.validateAuthors(record, warnings, info);
+      this.validateSource(record, warnings);
+      this.validateLinkedRecords(record, errors, warnings);
+      this.validateAttachedFiles(record, errors, warnings);
+      this.validateLinkedGeography(record, warnings);
+    }
+
+    // STEP 3: Compliance field validation
+    if (record.metadata) {
+      const complianceErrors = ComplianceFieldHelpers.validateComplianceMetadata(record.metadata);
+      for (const complianceError of complianceErrors) {
+        errors.push({
+          severity: 'error',
+          code: 'COMPLIANCE_VALIDATION_ERROR',
+          message: complianceError.message,
+          field: complianceError.field,
+        });
+      }
+    }
 
     // Categorize issues by severity
     const result: ValidationResult = {

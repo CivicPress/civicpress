@@ -92,6 +92,35 @@ record_statuses_config:
     source: 'core'
     priority: 8
 
+# Document Number Formats Configuration
+# Defines how official document numbers are generated for legal record types
+document_number_formats:
+  bylaw:
+    prefix: 'BYL'
+    year_format: 'full'  # 'full' (2024) or 'short' (24)
+    separator: '-'
+    sequence_padding: 3  # Number of digits for sequence (e.g., 001)
+  ordinance:
+    prefix: 'ORD'
+    year_format: 'full'
+    separator: '-'
+    sequence_padding: 3
+  policy:
+    prefix: 'POL'
+    year_format: 'full'
+    separator: '-'
+    sequence_padding: 3
+  proclamation:
+    prefix: 'PRO'
+    year_format: 'full'
+    separator: '-'
+    sequence_padding: 3
+  resolution:
+    prefix: 'RES'
+    year_format: 'full'
+    separator: '-'
+    sequence_padding: 3
+
 # Metadata
 version: '1.0.0'
 created: null

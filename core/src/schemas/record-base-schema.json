@@ -1,0 +1,579 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://civicpress.org/schemas/record-base-schema.json",
+  "title": "CivicPress Record Base Schema",
+  "description": "JSON Schema for validating CivicPress record frontmatter. This schema validates the base record format as defined in docs/record-format-standard.md",
+  "type": "object",
+  "required": ["id", "title", "type", "status", "author", "created", "updated"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "description": "Unique record identifier (alphanumeric, hyphens, underscores)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Human-readable title"
+    },
+    "type": {
+      "type": "string",
+      "description": "Record type - dynamically loaded from config (bylaw, ordinance, policy, proclamation, resolution, geography, session)"
+    },
+    "status": {
+      "type": "string",
+      "description": "Current status - dynamically loaded from config (draft, pending_review, under_review, approved, published, rejected, archived, expired)"
+    },
+    "author": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Primary author username"
+    },
+    "authors": {
+      "type": "array",
+      "description": "Detailed author information",
+      "items": {
+        "type": "object",
+        "required": ["name", "username"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Full name"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role (e.g., clerk, mayor)"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address"
+          }
+        }
+      }
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp (ISO 8601)"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp (ISO 8601)"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of tag strings"
+    },
+    "module": {
+      "type": "string",
+      "description": "Module identifier (e.g., legal-register)"
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL-friendly identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Version number (semver format)"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Priority level"
+    },
+    "department": {
+      "type": "string",
+      "description": "Department name"
+    },
+    "source": {
+      "type": "object",
+      "required": ["reference"],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "description": "Original document identifier/reference (required)"
+        },
+        "original_title": {
+          "type": "string",
+          "description": "Original title from source system"
+        },
+        "original_filename": {
+          "type": "string",
+          "description": "Original filename from source system"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Link to original document"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["legacy", "import", "external"],
+          "description": "Source type"
+        },
+        "imported_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 import timestamp"
+        },
+        "imported_by": {
+          "type": "string",
+          "description": "Username who imported it"
+        }
+      }
+    },
+    "geography_data": {
+      "type": "object",
+      "description": "GeoJSON/KML content object (for geography type)"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["zone", "boundary", "district", "facility", "route"],
+      "description": "Category (for geography type)"
+    },
+    "session_type": {
+      "type": "string",
+      "enum": ["regular", "emergency", "special"],
+      "description": "Session type (for session type)"
+    },
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 meeting date/time (for session type)"
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Duration in minutes (for session type)"
+    },
+    "location": {
+      "type": "string",
+      "description": "Meeting location (for session type)"
+    },
+    "attendees": {
+      "type": "array",
+      "description": "Array of attendee objects (for session type)",
+      "items": {
+        "type": "object"
+      }
+    },
+    "topics": {
+      "type": "array",
+      "description": "Array of topic/discussion items (for session type)",
+      "items": {
+        "type": "object"
+      }
+    },
+    "media": {
+      "type": "object",
+      "description": "Media links (livestream, recording, etc.) (for session type)"
+    },
+    "linked_records": {
+      "type": "array",
+      "description": "Array of linked record objects",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "description"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "linked_geography_files": {
+      "type": "array",
+      "description": "Array of linked geography file objects",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "geography": {
+      "type": "object",
+      "description": "Geography data object",
+      "properties": {
+        "srid": {
+          "type": "number",
+          "description": "Spatial Reference ID"
+        },
+        "zone_ref": {
+          "type": "string",
+          "description": "Zone reference"
+        },
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "description": "Bounding box [minLon, minLat, maxLon, maxLat]"
+        },
+        "center": {
+          "type": "object",
+          "properties": {
+            "lon": {
+              "type": "number"
+            },
+            "lat": {
+              "type": "number"
+            }
+          },
+          "required": ["lon", "lat"]
+        }
+      }
+    },
+    "attached_files": {
+      "type": "array",
+      "description": "Array of file attachment objects",
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "original_name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "File UUID"
+          },
+          "path": {
+            "type": "string",
+            "description": "Storage path"
+          },
+          "original_name": {
+            "type": "string",
+            "description": "Original filename"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional description"
+          },
+          "category": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": ["label", "value"]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata object",
+      "properties": {
+        "approval_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 approval date"
+        },
+        "effective_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 effective date"
+        },
+        "expiry_date": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ISO 8601 expiry date (null if none)"
+        },
+        "review_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 review date"
+        },
+        "reviewed_by": {
+          "type": "string",
+          "description": "Who reviewed the record"
+        },
+        "document_number": {
+          "type": "string",
+          "description": "Official document number (e.g., BYL-2024-001, ORD-15-42)"
+        },
+        "legal_authority": {
+          "type": "string",
+          "description": "Legal authority/statute (e.g., Municipal Act, Section 15)"
+        },
+        "jurisdiction": {
+          "type": "string",
+          "enum": ["federal", "provincial", "state", "municipal"],
+          "description": "Jurisdictional level"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+          "description": "ISO 639-1 language code (e.g., en, fr, en-CA, fr-CA)"
+        },
+        "translation_of": {
+          "type": "string",
+          "description": "Record ID if this is a translation"
+        },
+        "translations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of record IDs for translated versions"
+        },
+        "supersedes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of record IDs this document replaces"
+        },
+        "superseded_by": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Record ID of document that replaces this (null if current)"
+        },
+        "retention_schedule": {
+          "type": "string",
+          "description": "Retention period (permanent, temporary, or duration like '10 years')"
+        },
+        "disposition_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 date when disposition occurs"
+        },
+        "classification": {
+          "type": "string",
+          "enum": ["public", "confidential", "restricted", "secret"],
+          "description": "Classification level"
+        },
+        "custodian": {
+          "type": "string",
+          "description": "Role/username responsible for the record"
+        },
+        "disposition_action": {
+          "type": "string",
+          "enum": ["archive", "destroy", "transfer"],
+          "description": "Action to take"
+        },
+        "public_access": {
+          "type": "boolean",
+          "description": "Is this publicly accessible?"
+        },
+        "access_level": {
+          "type": "string",
+          "enum": ["public", "restricted", "confidential"],
+          "description": "Access level"
+        },
+        "publication_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 date when made publicly available"
+        },
+        "redaction_applied": {
+          "type": "boolean",
+          "description": "Was content redacted?"
+        },
+        "redaction_reason": {
+          "type": "string",
+          "description": "Why was content redacted?"
+        },
+        "exemption_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of FOIA/ATIP exemption codes if applicable"
+        },
+        "access_restrictions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of access restriction details"
+        },
+        "accessibility": {
+          "type": "object",
+          "description": "Accessibility metadata (WCAG compliance)",
+          "properties": {
+            "wcag_level": {
+              "type": "string",
+              "enum": ["A", "AA", "AAA"],
+              "description": "WCAG compliance level"
+            },
+            "alternative_formats": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "url"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Format type (e.g., pdf, audio, braille)"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL to alternative format"
+                  }
+                }
+              }
+            },
+            "braille_available": {
+              "type": "boolean",
+              "description": "Is braille version available?"
+            },
+            "large_print_available": {
+              "type": "boolean",
+              "description": "Is large print version available?"
+            }
+          }
+        },
+        "subject": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of controlled vocabulary subjects (Dublin Core)"
+        },
+        "coverage": {
+          "type": "object",
+          "description": "Coverage metadata (Dublin Core)",
+          "properties": {
+            "temporal": {
+              "type": "string",
+              "description": "ISO 8601 interval (e.g., 2024-01-01/2025-12-31)"
+            },
+            "spatial": {
+              "type": "string",
+              "description": "Geographic coverage (e.g., Richmond, Quebec, Canada)"
+            }
+          }
+        },
+        "rights": {
+          "type": "string",
+          "description": "Copyright/licensing information (e.g., Public Domain)"
+        },
+        "rights_holder": {
+          "type": "string",
+          "description": "Entity that holds rights (e.g., City of Richmond)"
+        },
+        "approval_chain": {
+          "type": "array",
+          "description": "Array of approval actions",
+          "items": {
+            "type": "object",
+            "required": ["role", "username", "action", "date"],
+            "properties": {
+              "role": {
+                "type": "string",
+                "description": "Role (e.g., clerk, mayor)"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username"
+              },
+              "action": {
+                "type": "string",
+                "description": "Action (e.g., drafted, approved)"
+              },
+              "date": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 date of action"
+              }
+            }
+          }
+        },
+        "change_history": {
+          "type": "array",
+          "description": "Array of change records",
+          "items": {
+            "type": "object",
+            "required": ["date", "user", "reason"],
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 date of change"
+              },
+              "user": {
+                "type": "string",
+                "description": "Username who made the change"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Reason for change"
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array of change descriptions"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
+

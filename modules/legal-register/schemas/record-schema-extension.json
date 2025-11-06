@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://civicpress.org/schemas/modules/legal-register/record-schema-extension.json",
+  "title": "CivicPress Legal-Register Module Schema Extension",
+  "description": "JSON Schema extension for legal-register module. This schema extends base record types (bylaw, ordinance, policy, proclamation, resolution) with legal-specific validation rules. These record types are core types, but this module adds legal-specific requirements and validations.",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Metadata object with legal-specific fields",
+      "properties": {
+        "document_number": {
+          "type": "string",
+          "description": "Official document number (e.g., BYL-2024-001, ORD-15-42). Recommended for all legal documents.",
+          "pattern": "^[A-Z]{2,4}-\\d{2,4}-\\d{1,6}$"
+        },
+        "legal_authority": {
+          "type": "string",
+          "description": "Legal authority or statute governing the document (e.g., 'Municipal Act, Section 15')",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "jurisdiction": {
+          "type": "string",
+          "enum": ["federal", "provincial", "state", "municipal"],
+          "description": "Jurisdictional level of the legal document"
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+          "description": "ISO 639-1 language code (e.g., en, fr, en-CA, fr-CA)"
+        },
+        "translation_of": {
+          "type": "string",
+          "description": "Record ID if this is a translation of another record"
+        },
+        "translations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of record IDs for translated versions of this document"
+        },
+        "supersedes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of record IDs this document replaces"
+        },
+        "superseded_by": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "description": "Record ID of document that replaces this (null if current)"
+        },
+        "approval_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 date when the document was approved"
+        },
+        "effective_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 date when the document becomes effective"
+        },
+        "expiry_date": {
+          "oneOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ],
+          "description": "ISO 8601 date when the document expires (null if permanent)"
+        },
+        "review_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 date when the document should be reviewed"
+        },
+        "reviewed_by": {
+          "type": "string",
+          "description": "Username or role of who reviewed the document"
+        },
+        "retention_schedule": {
+          "type": "string",
+          "description": "Retention period for the record (e.g., permanent, temporary, 10 years)"
+        },
+        "classification": {
+          "type": "string",
+          "enum": ["public", "confidential", "restricted", "secret"],
+          "description": "Classification level of the record"
+        },
+        "public_access": {
+          "type": "boolean",
+          "description": "Indicates if the record is publicly accessible"
+        },
+        "access_level": {
+          "type": "string",
+          "enum": ["public", "restricted", "confidential"],
+          "description": "Specific access level of the record"
+        },
+        "publication_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 date when the record was made publicly available"
+        },
+        "approval_chain": {
+          "type": "array",
+          "description": "Audit trail of approval actions",
+          "items": {
+            "type": "object",
+            "required": ["role", "username", "action", "date"],
+            "properties": {
+              "role": {
+                "type": "string",
+                "description": "Role of the approver (e.g., clerk, mayor, council)"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username of the approver"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["drafted", "reviewed", "approved", "rejected", "published", "archived"],
+                "description": "Action taken by the approver"
+              },
+              "date": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 date when the action was taken"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "change_history": {
+          "type": "array",
+          "description": "Audit trail of changes made to the record",
+          "items": {
+            "type": "object",
+            "required": ["date", "user", "reason"],
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 date when the change was made"
+              },
+              "user": {
+                "type": "string",
+                "description": "Username who made the change"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Reason for the change"
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array of descriptions of what changed"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": ["bylaw", "ordinance", "policy", "proclamation", "resolution"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "document_number": {
+                "description": "Document number is strongly recommended for legal documents"
+              },
+              "legal_authority": {
+                "description": "Legal authority is recommended for legal documents"
+              },
+              "jurisdiction": {
+                "description": "Jurisdiction is recommended for legal documents"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+

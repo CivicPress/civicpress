@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
-import { Logger, RecordValidator } from '@civicpress/core';
+import { Logger, RecordValidator, RecordSchemaValidator } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -11,6 +11,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import matter from 'gray-matter';
 
 type Severity = 'error' | 'warning' | 'info';
 function isSeverity(val: any): val is Severity {
@@ -370,20 +371,36 @@ async function validateSingleRecord(
 }
 
 // Helper function to validate record content
-// Uses RecordValidator for comprehensive validation against standard format
+// Uses schema validation first, then RecordValidator for comprehensive validation
 async function validateRecordContent(
   content: string,
   recordId: string
 ): Promise<any> {
   try {
-    // Use RecordValidator for comprehensive validation
+    // Extract frontmatter for schema validation
+    const { data: frontmatter } = matter(content);
+    const recordType = frontmatter?.type;
+
+    // STEP 1: Schema validation (fail fast)
+    const schemaValidation = RecordSchemaValidator.validate(
+      frontmatter,
+      recordType,
+      {
+        includeModuleExtensions: true,
+        includeTypeExtensions: true,
+        strict: false,
+      }
+    );
+
+    // STEP 2: Use RecordValidator for comprehensive validation (includes schema + business rules)
     const validationResult = RecordValidator.validateMarkdown(content, recordId, {
       strict: false,
       checkFormat: true,
       checkContent: true,
     });
 
-    // Convert ValidationResult to API format
+    // Combine schema and business rule validation results
+    // Schema errors are already included in RecordValidator results, but we track them separately for clarity
     const issues: any[] = [
       ...validationResult.errors,
       ...validationResult.warnings,
@@ -391,7 +408,11 @@ async function validateRecordContent(
     ];
 
     // Extract metadata from parsed record (if parsing succeeded)
-    const metadata: any = {};
+    const metadata: any = {
+      schemaValid: schemaValidation.isValid,
+      schemaErrors: schemaValidation.errors.length,
+      schemaWarnings: schemaValidation.warnings.length,
+    };
     try {
       const { RecordParser } = await import('@civicpress/core');
       const record = RecordParser.parseFromMarkdown(content, recordId);

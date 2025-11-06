@@ -1,6 +1,6 @@
 # 📋 CivicPress Record Format Standard
 
-**Version**: 1.0.0  
+**Version**: 1.2.0  
 **Status**: Official Standard  
 **Last Updated**: January 2025
 
@@ -15,6 +15,36 @@ This document defines the **official standardized format** for all civic record 
 3. **Machine-Parseable**: Valid YAML, consistent data types, standard formats
 4. **Extensible**: Optional fields allow for future needs without breaking changes
 5. **Consistent**: Same structure applies to all record types
+6. **Schema-Validated**: All records are validated against JSON Schema for data integrity
+
+## 🔍 Schema Validation
+
+CivicPress uses **JSON Schema** to validate all record frontmatter, ensuring data integrity and consistency. The validation system:
+
+- **Validates structure**: Required fields, data types, formats
+- **Validates values**: Enums (type, status), patterns (document numbers, language codes)
+- **Supports extensions**: Type-specific schemas (geography, session), module schemas (legal-register), plugin schemas
+- **Provides clear errors**: Field-level validation errors with suggestions
+
+### Validation Layers
+
+1. **Schema Validation** (JSON Schema): Validates frontmatter structure and types
+2. **Business Rule Validation**: Validates relationships, business logic, compliance fields
+3. **Content Validation**: (Future) Validates markdown content structure
+
+### Schema Location
+
+- **Base Schema**: `core/src/schemas/record-base-schema.json`
+- **Type Schemas**: `core/src/schemas/record-type-schemas/{type}-schema.json`
+- **Module Schemas**: `modules/{module}/schemas/record-schema-extension.json`
+
+### Validation Tools
+
+- **CLI**: `civic validate [record]` - Validate records from command line
+- **API**: `POST /api/v1/validation/record` - Validate via API
+- **Automatic**: Records are validated before saving (create/update operations)
+
+See [Schema Validation Guide](./schema-validation-guide.md) for detailed information.
 
 ## 📝 Standard Format Structure
 
@@ -135,11 +165,61 @@ source:
 # ADDITIONAL METADATA (Optional)
 # ============================================
 metadata:
+  # Common metadata
   approval_date: "2025-03-01T00:00:00Z"
   effective_date: "2025-04-01T00:00:00Z"
   expiry_date: null
   review_date: "2026-04-01T00:00:00Z"
   reviewed_by: "council"
+  
+  # Legal/Government metadata (recommended for legal documents)
+  document_number: "BYL-2024-001"
+  legal_authority: "Municipal Act, Section 15"
+  jurisdiction: "municipal"  # federal|provincial|state|municipal
+  language: "en"  # ISO 639-1 code
+  supersedes: ["record-789"]
+  superseded_by: null
+  
+  # Records Management (ISO 15489)
+  retention_schedule: "permanent"  # permanent|temporary|"10 years"
+  classification: "public"  # public|confidential|restricted|secret
+  custodian: "clerk"
+  disposition_action: "archive"  # archive|destroy|transfer
+  
+  # Public Records/FOIA compliance
+  public_access: true
+  access_level: "public"  # public|restricted|confidential
+  publication_date: "2025-01-15T10:00:00Z"
+  redaction_applied: false
+  exemption_codes: []
+  
+  # Accessibility (WCAG)
+  accessibility:
+    wcag_level: "AA"  # A|AA|AAA
+    alternative_formats:
+      - type: "pdf"
+        url: "/storage/records/bylaw-noise-restrictions.pdf"
+    braille_available: false
+    large_print_available: true
+  
+  # Dublin Core metadata
+  subject: ["Noise Control", "Municipal Regulations"]
+  coverage:
+    temporal: "2024-01-01/2025-12-31"
+    spatial: "Richmond, Quebec, Canada"
+  rights: "Public Domain"
+  rights_holder: "City of Richmond"
+  
+  # Audit Trail
+  approval_chain:
+    - role: "clerk"
+      username: "mctremblay"
+      action: "drafted"
+      date: "2025-01-15T10:00:00Z"
+    - role: "mayor"
+      username: "llapointe"
+      action: "approved"
+      date: "2025-02-01T14:00:00Z"
 
 ---
 
@@ -346,13 +426,88 @@ source:
 |-------|------|-------------|
 | `metadata` | object | Additional metadata object |
 
-Common metadata fields:
+**Common metadata fields:**
 - `approval_date`: ISO 8601 approval date
 - `effective_date`: ISO 8601 effective date
 - `expiry_date`: ISO 8601 expiry date (null if none)
 - `review_date`: ISO 8601 review date
 - `reviewed_by`: Who reviewed the record
-- Any other custom fields as needed
+
+**Legal/Government metadata (recommended for legal documents):**
+- `document_number`: Official document number (e.g., "BYL-2024-001", "ORD-15-42")
+- `legal_authority`: Legal authority/statute (e.g., "Municipal Act, Section 15")
+- `jurisdiction`: Jurisdictional level (`federal`, `provincial`, `state`, `municipal`)
+- `language`: ISO 639-1 language code (e.g., `en`, `fr`, `en-CA`, `fr-CA`)
+- `translation_of`: Record ID if this is a translation
+- `translations`: Array of record IDs for translated versions
+- `supersedes`: Array of record IDs this document replaces
+- `superseded_by`: Record ID of document that replaces this (null if current)
+
+**Records Management metadata (ISO 15489 compliance):**
+- `retention_schedule`: Retention period (`permanent`, `temporary`, or duration like `"10 years"`)
+- `disposition_date`: ISO 8601 date when disposition occurs
+- `classification`: Classification level (`public`, `confidential`, `restricted`, `secret`)
+- `custodian`: Role/username responsible for the record
+- `disposition_action`: Action to take (`archive`, `destroy`, `transfer`)
+
+**Public Records/FOIA compliance metadata:**
+- `public_access`: Boolean - Is this publicly accessible?
+- `access_level`: Access level (`public`, `restricted`, `confidential`)
+- `publication_date`: ISO 8601 date when made publicly available
+- `redaction_applied`: Boolean - Was content redacted?
+- `redaction_reason`: String - Why was content redacted?
+- `exemption_codes`: Array of FOIA/ATIP exemption codes if applicable
+- `access_restrictions`: Array of access restriction details
+
+**Accessibility metadata (WCAG compliance):**
+- `accessibility.wcag_level`: WCAG compliance level (`A`, `AA`, `AAA`)
+- `accessibility.alternative_formats`: Array of alternative format objects
+- `accessibility.braille_available`: Boolean
+- `accessibility.large_print_available`: Boolean
+
+**Alternative Format Object:**
+```yaml
+alternative_formats:
+  - type: "pdf"
+    url: "/storage/records/bylaw-noise-restrictions.pdf"
+  - type: "audio"
+    url: "/storage/records/bylaw-noise-restrictions.mp3"
+```
+
+**Dublin Core metadata (for interoperability):**
+- `subject`: Array of controlled vocabulary subjects
+- `coverage.temporal`: ISO 8601 interval (e.g., "2024-01-01/2025-12-31")
+- `coverage.spatial`: Geographic coverage (e.g., "Richmond, Quebec, Canada")
+- `rights`: Copyright/licensing information (e.g., "Public Domain")
+- `rights_holder`: Entity that holds rights (e.g., "City of Richmond")
+
+**Audit Trail metadata:**
+- `approval_chain`: Array of approval actions with role, username, action, date
+- `change_history`: Array of change records with date, user, reason, changes
+
+**Approval Chain Object:**
+```yaml
+approval_chain:
+  - role: "clerk"
+    username: "mctremblay"
+    action: "drafted"
+    date: "2025-01-15T10:00:00Z"
+  - role: "mayor"
+    username: "llapointe"
+    action: "approved"
+    date: "2025-02-01T14:00:00Z"
+```
+
+**Change History Object:**
+```yaml
+change_history:
+  - date: "2025-01-20T09:00:00Z"
+    user: "mctremblay"
+    reason: "Updated noise levels based on public feedback"
+    changes: ["Updated Section 3.2"]
+```
+
+> **Note**: Any other custom fields as needed
 
 ## 📚 Record Types
 
@@ -558,14 +713,85 @@ The system should:
 - Updates to database should be written back to markdown
 - Conflicts should be resolved in favor of markdown file
 
+## 🏛️ Compliance & Standards
+
+This format aligns with established legal, civic, and technical documentation standards:
+
+### Standards Compliance
+
+- ✅ **ISO 8601** - Date and time format (timestamps)
+- ✅ **ISO 639-1** - Language codes (language field)
+- ✅ **ISO 15489:2016** - Records Management (retention, disposition, classification)
+- ⚠️ **Dublin Core** - Metadata Standard (partial - core elements supported)
+- ⚠️ **Akoma Ntoso** - Legal Document Standard (concepts adopted, not full XML implementation)
+- ⚠️ **WCAG 2.1** - Web Content Accessibility Guidelines (accessibility metadata)
+- ⚠️ **FOIA/ATIP** - Public Records Compliance (public access, redaction fields)
+
+### Standards References
+
+1. **ISO 15489:2016** - Information and documentation — Records management
+   - Defines requirements for records management systems
+   - Our format supports: retention schedules, disposition, classification, custody
+
+2. **Dublin Core Metadata Initiative** - Standard metadata vocabulary
+   - Core elements: title, creator, date, subject, coverage, rights
+   - Our format supports: title, author/authors, created/updated, subject (via tags), coverage, rights
+
+3. **Akoma Ntoso** - Legal document standard (concepts)
+   - Work/Expression/Manifestation hierarchy
+   - Our format supports: work_id, expression_id, references, document hierarchy
+
+4. **ISO 8601** - Date and time format
+   - All timestamps use ISO 8601 with timezone
+
+5. **ISO 639-1** - Language codes
+   - Language field uses ISO 639-1 codes (e.g., `en`, `fr`, `en-CA`)
+
+6. **WCAG 2.1** - Web Content Accessibility Guidelines
+   - Accessibility metadata tracks WCAG compliance level
+   - Alternative formats support accessibility requirements
+
+7. **FOIA/ATIP** - Freedom of Information Act / Access to Information
+   - Public access levels, redaction tracking, exemption codes
+
+### Compliance Notes
+
+- **All compliance fields are optional** - Records remain valid without them
+- **Use fields as needed** - Not all records require all fields
+- **Legal documents** should include: document_number, legal_authority, jurisdiction, classification, retention_schedule
+- **Public records** should include: public_access, access_level, publication_date
+- **Bilingual jurisdictions** should include: language, translations
+- **Accessibility** should include: accessibility metadata for public-facing documents
+
 ## 📖 Related Documentation
 
+- [Schema Validation Guide](./schema-validation-guide.md) - Complete guide to schema validation
 - [File Attachment System](./file-attachment-system.md)
 - [Linked Records System](./linked-records-system.md)
 - [Geography System](./geography-system.md)
 - [Validation System](./validation.md)
 
 ## 🔗 Changelog
+
+### Version 1.2.0 (January 2025)
+
+- Added schema validation system (JSON Schema)
+- Added document number format configuration
+- Added schema validation guide documentation
+- Updated API documentation with validation endpoints
+- All records now validated before saving (automatic validation)
+- Schema validation integrated into RecordParser, RecordManager, and RecordValidator
+
+### Version 1.1.0 (November 2025)
+
+- Added legal/government metadata fields (document_number, legal_authority, jurisdiction, etc.)
+- Added records management fields (retention_schedule, classification, disposition)
+- Added public records/FOIA compliance fields (public_access, redaction, exemption_codes)
+- Added accessibility metadata (WCAG compliance, alternative formats)
+- Added Dublin Core metadata elements (subject, coverage, rights)
+- Added audit trail fields (approval_chain, change_history)
+- Added compliance & standards section with references
+- All new fields are optional for backward compatibility
 
 ### Version 1.0.0 (January 2025)
 

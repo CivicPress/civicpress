@@ -61,6 +61,17 @@ export interface OrgConfig {
   updated?: string;
 }
 
+export interface DocumentNumberFormat {
+  prefix: string;
+  year_format: 'full' | 'short';
+  separator: string;
+  sequence_padding: number;
+}
+
+export interface DocumentNumberFormats {
+  [recordType: string]: DocumentNumberFormat;
+}
+
 export interface CentralConfig {
   dataDir?: string;
   // System configuration (from .civicrc)
@@ -68,6 +79,7 @@ export interface CentralConfig {
   record_types?: string[];
   record_types_config?: RecordTypesConfig;
   record_statuses_config?: RecordStatusesConfig;
+  document_number_formats?: DocumentNumberFormats;
   default_role?: string;
   hooks?: {
     enabled?: boolean;
@@ -403,6 +415,51 @@ export class CentralConfigManager {
   static validateRecordStatuses(): string[] {
     const recordStatuses = this.getRecordStatusesConfig();
     return validateRecordStatusConfig(recordStatuses);
+  }
+
+  /**
+   * Get document number formats configuration
+   * Returns formats from config.yml (prefers data/.civic/config.yml, then defaults)
+   */
+  static getDocumentNumberFormats(): DocumentNumberFormats {
+    const config = this.getConfig();
+    const dataDir = this.getDataDir();
+
+    const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
+    const userConfig = this.loadYamlIfExists(userConfigPath);
+
+    if (userConfig && userConfig.document_number_formats) {
+      return userConfig.document_number_formats as DocumentNumberFormats;
+    }
+
+    if (config.document_number_formats) {
+      return config.document_number_formats;
+    }
+
+    // Return empty object if not configured (will use defaults in DocumentNumberGenerator)
+    return {};
+  }
+
+  /**
+   * Validate document number formats configuration
+   */
+  static validateDocumentNumberFormats(): string[] {
+    const formats = this.getDocumentNumberFormats();
+    const errors: string[] = [];
+
+    for (const [recordType, format] of Object.entries(formats)) {
+      if (!format.prefix || typeof format.prefix !== 'string') {
+        errors.push(`Document number format for ${recordType}: missing or invalid prefix`);
+      }
+      if (format.year_format && !['full', 'short'].includes(format.year_format)) {
+        errors.push(`Document number format for ${recordType}: year_format must be 'full' or 'short'`);
+      }
+      if (format.sequence_padding && (typeof format.sequence_padding !== 'number' || format.sequence_padding < 1)) {
+        errors.push(`Document number format for ${recordType}: sequence_padding must be a positive number`);
+      }
+    }
+
+    return errors;
   }
 
   /**

@@ -20,7 +20,7 @@
         "headers": [],
         "endpoint": "<<baseUrl>>/auth/login",
         "responses": {},
-        "testScript": "pw.test(\"Status code is 200\", () => {\n    pw.expect(pw.response.status).toBe(200);\n});\n\npw.test(\"Log response body content\", () => {\n  pw.expect(pw.response.body.session.token).toBeType(\"string\");\n  pw.env.set(\"civicToken\", pw.response.body.session.token);\n});\n",
+        "testScript": "pw.test(\"Status code is 200\", () => {\n    pw.expect(pw.response.status).toBe(200);\n});\n\npw.test(\"Log response body content\", () => {\n  pw.expect(pw.response.body.data.session.token).toBeType(\"string\");\n  pw.env.set(\"civicToken\", pw.response.body.data.session.token);\n});\n",
         "preRequestScript": "",
         "requestVariables": []
       },
@@ -235,13 +235,13 @@
         "v": "14",
         "auth": {
           "authType": "inherit",
-          "authActive": true
+          "authActive": false
         },
         "body": {
           "body": null,
           "contentType": null
         },
-        "name": "List records",
+        "name": "List records (public)",
         "method": "GET",
         "params": [
           {
@@ -252,32 +252,25 @@
           },
           {
             "key": "status",
-            "value": "active",
+            "value": "published",
             "active": false,
             "description": "Filter by status"
           },
           {
             "key": "limit",
-            "value": "10",
+            "value": "20",
             "active": false,
             "description": "Number of records per page"
           },
           {
-            "key": "offset",
-            "value": "0",
+            "key": "cursor",
+            "value": "",
             "active": false,
-            "description": "Number of records to skip"
+            "description": "Pagination cursor"
           }
         ],
-        "headers": [
-          {
-            "key": "Authorization",
-            "value": "Bearer <<civicToken>>",
-            "active": true,
-            "description": ""
-          }
-        ],
-        "endpoint": "<<baseUrl>>/api/records",
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/records",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -290,7 +283,7 @@
           "authActive": true
         },
         "body": {
-          "body": "{\n  \"title\": \"New Policy <<$randomCity>>\",\n  \"type\": \"policy\",\n  \"content\": \"# New Policy\\n\\nContent here <<$randomCity>>...\",\n  \"status\": \"draft\"\n}",
+          "body": "{\n  \"title\": \"New Policy <<$randomCity>>\",\n  \"type\": \"policy\",\n  \"content\": \"# New Policy\\n\\nContent here <<$randomCity>>...\",\n  \"status\": \"draft\",\n  \"authors\": [\n    {\n      \"name\": \"John Doe\",\n      \"username\": \"jdoe\",\n      \"role\": \"clerk\",\n      \"email\": \"jdoe@example.com\"\n    }\n  ],\n  \"source\": {\n    \"reference\": \"LEG-2024-001\",\n    \"original_title\": \"Original Document Title\",\n    \"original_filename\": \"ORD-2024-001.pdf\",\n    \"url\": \"https://legacy.example.com/documents/LEG-2024-001\",\n    \"type\": \"legacy\",\n    \"imported_at\": \"2025-01-15T10:30:00Z\",\n    \"imported_by\": \"admin\"\n  }\n}",
           "contentType": "application/json"
         },
         "name": "Create record",
@@ -304,9 +297,9 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/records",
+        "endpoint": "<<baseUrl>>/api/v1/records",
         "responses": {},
-        "testScript": "pw.test(\"Status code is 201\", () => {\n    pw.expect(pw.response.status).toBe(201);\n});\n\npw.test(\"Log response body content\", () => {\n  pw.expect(pw.response.body.id).toBeType(\"string\");\n  pw.env.set(\"singleRecordId\", pw.response.body.id);\n});\n",
+        "testScript": "pw.test(\"Status code is 201\", () => {\n    pw.expect(pw.response.status).toBe(201);\n});\n\npw.test(\"Log response body content\", () => {\n  pw.expect(pw.response.body.data.id).toBeType(\"string\");\n  pw.env.set(\"singleRecordId\", pw.response.body.data.id);\n});\n",
         "preRequestScript": "",
         "requestVariables": []
       },
@@ -314,24 +307,37 @@
         "v": "14",
         "auth": {
           "authType": "inherit",
-          "authActive": true
+          "authActive": false
         },
         "body": {
           "body": null,
           "contentType": null
         },
-        "name": "Get single record",
+        "name": "Get single record (public)",
         "method": "GET",
         "params": [],
-        "headers": [
-          {
-            "key": "Authorization",
-            "value": "Bearer <<civicToken>>",
-            "active": true,
-            "description": ""
-          }
-        ],
-        "endpoint": "<<baseUrl>>/api/records/<<singleRecordId>>",
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/records/<<singleRecordId>>",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": false
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get raw record content",
+        "method": "GET",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/records/<<singleRecordId>>/raw",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -344,7 +350,7 @@
           "authActive": true
         },
         "body": {
-          "body": "{\n    \"title\": \"Updated Policy <<$randomCity>>\",\n    \"content\": \"# Updated Policy\\n\\nUpdated content <<$randomCity>>...\",\n    \"status\": \"proposed\"\n  }",
+          "body": "{\n    \"title\": \"Updated Policy <<$randomCity>>\",\n    \"content\": \"# Updated Policy\\n\\nUpdated content <<$randomCity>>...\",\n    \"status\": \"pending_review\",\n    \"authors\": [\n      {\n        \"name\": \"Jane Smith\",\n        \"username\": \"jsmith\",\n        \"role\": \"clerk\"\n      }\n    ]\n  }",
           "contentType": "application/json"
         },
         "name": "Update record",
@@ -358,7 +364,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/records/<<singleRecordId>>",
+        "endpoint": "<<baseUrl>>/api/v1/records/<<singleRecordId>>",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -385,7 +391,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/records/<<singleRecordId>>",
+        "endpoint": "<<baseUrl>>/api/v1/records/<<singleRecordId>>",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -395,42 +401,37 @@
         "v": "14",
         "auth": {
           "authType": "inherit",
-          "authActive": false
+          "authActive": true
         },
         "body": {
           "body": null,
           "contentType": null
         },
-        "name": "List public records",
+        "name": "List user drafts",
         "method": "GET",
         "params": [
           {
             "key": "type",
-            "value": "bylaw",
+            "value": "policy",
             "active": false,
             "description": "Filter by record type"
-          },
-          {
-            "key": "status",
-            "value": "active",
-            "active": false,
-            "description": "Filter by status"
           },
           {
             "key": "limit",
             "value": "10",
             "active": false,
-            "description": "Number of records per page"
-          },
-          {
-            "key": "offset",
-            "value": "0",
-            "active": false,
-            "description": "Number of records to skip"
+            "description": "Number of records"
           }
         ],
-        "headers": [],
-        "endpoint": "<<baseUrl>>/public/records",
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/records/drafts",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -446,14 +447,14 @@
   },
   {
     "v": 8,
-    "name": "Configuration",
+    "name": "System Configuration",
     "folders": [],
     "requests": [
       {
         "v": "14",
         "auth": {
           "authType": "inherit",
-          "authActive": true
+          "authActive": false
         },
         "body": {
           "body": null,
@@ -462,15 +463,8 @@
         "name": "Get record types",
         "method": "GET",
         "params": [],
-        "headers": [
-          {
-            "key": "Authorization",
-            "value": "Bearer <<civicToken>>",
-            "active": true,
-            "description": ""
-          }
-        ],
-        "endpoint": "<<baseUrl>>/api/config/record-types",
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/system/record-types",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -480,7 +474,7 @@
         "v": "14",
         "auth": {
           "authType": "inherit",
-          "authActive": true
+          "authActive": false
         },
         "body": {
           "body": null,
@@ -489,15 +483,61 @@
         "name": "Get record statuses",
         "method": "GET",
         "params": [],
-        "headers": [
-          {
-            "key": "Authorization",
-            "value": "Bearer <<civicToken>>",
-            "active": true,
-            "description": ""
-          }
-        ],
-        "endpoint": "<<baseUrl>>/api/config/record-statuses",
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/system/record-statuses",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      }
+    ],
+    "auth": {
+      "authType": "inherit",
+      "authActive": false
+    },
+    "headers": [],
+    "_ref_id": "coll_system_config"
+  },
+  {
+    "v": 8,
+    "name": "Configuration Management",
+    "folders": [],
+    "requests": [
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": false
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get attachment types",
+        "method": "GET",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/config/attachment-types",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": false
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get link categories",
+        "method": "GET",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/config/link-categories",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -513,7 +553,7 @@
           "body": null,
           "contentType": null
         },
-        "name": "Get system configuration",
+        "name": "List configurations",
         "method": "GET",
         "params": [],
         "headers": [
@@ -524,7 +564,196 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/config/system",
+        "endpoint": "<<baseUrl>>/api/v1/config/list",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get configuration metadata",
+        "method": "GET",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/config/metadata/:type",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get configuration status",
+        "method": "GET",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/config/status",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get configuration",
+        "method": "GET",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/config/:type",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": "{}",
+          "contentType": "application/json"
+        },
+        "name": "Update configuration",
+        "method": "PUT",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/config/:type",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Reset configuration to defaults",
+        "method": "POST",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/config/:type/reset",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Validate configuration",
+        "method": "POST",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/config/:type/validate",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Validate all configurations",
+        "method": "GET",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/config/validate/all",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -564,7 +793,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/status",
+        "endpoint": "<<baseUrl>>/api/v1/status",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -591,7 +820,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/status/git",
+        "endpoint": "<<baseUrl>>/api/v1/status/git",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -625,7 +854,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/status/records",
+        "endpoint": "<<baseUrl>>/api/v1/status/records",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -648,7 +877,7 @@
         "v": "14",
         "auth": {
           "authType": "inherit",
-          "authActive": true
+          "authActive": false
         },
         "body": {
           "body": null,
@@ -676,15 +905,8 @@
             "description": "Number of results"
           }
         ],
-        "headers": [
-          {
-            "key": "Authorization",
-            "value": "Bearer <<civicToken>>",
-            "active": true,
-            "description": ""
-          }
-        ],
-        "endpoint": "<<baseUrl>>/api/search",
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/search",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -711,7 +933,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/indexing/status",
+        "endpoint": "<<baseUrl>>/api/v1/indexing/status",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -724,7 +946,7 @@
           "authActive": true
         },
         "body": {
-          "body": "{\n  \"rebuild\": false,\n  \"modules\": [\"legal-register\"],\n  \"types\": [\"bylaw\", \"policy\"],\n  \"statuses\": [\"adopted\", \"draft\"],\n  \"syncDatabase\": false,\n  \"conflictResolution\": \"file-wins\"\n}",
+          "body": "{\n  \"rebuild\": false,\n  \"modules\": [\"legal-register\"],\n  \"types\": [\"bylaw\", \"policy\"],\n  \"statuses\": [\"published\", \"draft\"],\n  \"syncDatabase\": false,\n  \"conflictResolution\": \"file-wins\"\n}",
           "contentType": "application/json"
         },
         "name": "Generate indexes",
@@ -738,7 +960,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/indexing/generate",
+        "endpoint": "<<baseUrl>>/api/v1/indexing/generate",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -751,7 +973,7 @@
           "authActive": true
         },
         "body": {
-          "body": "{\n  \"records\": [\n    {\n      \"title\": \"Imported Policy\",\n      \"type\": \"policy\",\n      \"content\": \"# Imported Policy\\n\\nContent...\",\n      \"status\": \"draft\"\n    }\n  ]\n}",
+          "body": "{\n  \"conflictResolution\": \"file-wins\"\n}",
           "contentType": "application/json"
         },
         "name": "Sync records to database",
@@ -765,7 +987,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/indexing/sync",
+        "endpoint": "<<baseUrl>>/api/v1/indexing/sync",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -792,7 +1014,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/indexing/stats",
+        "endpoint": "<<baseUrl>>/api/v1/indexing/stats",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -819,7 +1041,7 @@
             "description": ""
           }
         ],
-        "endpoint": "<<baseUrl>>/api/indexing/validate",
+        "endpoint": "<<baseUrl>>/api/v1/indexing/validate",
         "responses": {},
         "testScript": "",
         "preRequestScript": "",
@@ -832,5 +1054,398 @@
     },
     "headers": [],
     "_ref_id": "coll_search_indexing_enhanced"
+  },
+  {
+    "v": 8,
+    "name": "Geography",
+    "folders": [],
+    "requests": [
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": false
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "List geography files",
+        "method": "GET",
+        "params": [
+          {
+            "key": "category",
+            "value": "zone",
+            "active": false,
+            "description": "Filter by category (zone, boundary, district, facility, route)"
+          },
+          {
+            "key": "type",
+            "value": "geojson",
+            "active": false,
+            "description": "Filter by file type (geojson, kml, gpx, shapefile)"
+          },
+          {
+            "key": "page",
+            "value": "1",
+            "active": false,
+            "description": "Page number"
+          },
+          {
+            "key": "limit",
+            "value": "10",
+            "active": false,
+            "description": "Items per page"
+          }
+        ],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/geography",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": "{\n  \"name\": \"Test Zone\",\n  \"type\": \"geojson\",\n  \"category\": \"zone\",\n  \"description\": \"Test geographic zone\",\n  \"content\": \"{}\",\n  \"srid\": 4326,\n  \"metadata\": {}\n}",
+          "contentType": "application/json"
+        },
+        "name": "Create geography file",
+        "method": "POST",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/geography",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": false
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get geography file",
+        "method": "GET",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/geography/:id",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": "{\n  \"name\": \"Updated Zone\",\n  \"description\": \"Updated description\"\n}",
+          "contentType": "application/json"
+        },
+        "name": "Update geography file",
+        "method": "PUT",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/geography/:id",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": "",
+          "contentType": "application/json"
+        },
+        "name": "Delete geography file",
+        "method": "DELETE",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/geography/:id",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      }
+    ],
+    "auth": {
+      "authType": "inherit",
+      "authActive": true
+    },
+    "headers": [],
+    "_ref_id": "coll_geography"
+  },
+  {
+    "v": 8,
+    "name": "Storage (UUID-based)",
+    "folders": [],
+    "requests": [
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "List files",
+        "method": "GET",
+        "params": [
+          {
+            "key": "path",
+            "value": "/",
+            "active": false,
+            "description": "Directory path"
+          },
+          {
+            "key": "limit",
+            "value": "50",
+            "active": false,
+            "description": "Number of files"
+          },
+          {
+            "key": "offset",
+            "value": "0",
+            "active": false,
+            "description": "Offset"
+          }
+        ],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/storage/files",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": "multipart/form-data"
+        },
+        "name": "Upload file",
+        "method": "POST",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/storage/files",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Get file by UUID",
+        "method": "GET",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/storage/files/:uuid",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": null,
+          "contentType": null
+        },
+        "name": "Download file",
+        "method": "GET",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/storage/files/:uuid/download",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": "",
+          "contentType": "application/json"
+        },
+        "name": "Delete file",
+        "method": "DELETE",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/storage/files/:uuid",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": "{\n  \"name\": \"New filename.txt\",\n  \"path\": \"/new/path/\"\n}",
+          "contentType": "application/json"
+        },
+        "name": "Update file metadata",
+        "method": "PUT",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/storage/files/:uuid",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      }
+    ],
+    "auth": {
+      "authType": "inherit",
+      "authActive": true
+    },
+    "headers": [],
+    "_ref_id": "coll_storage"
+  },
+  {
+    "v": 8,
+    "name": "Validation",
+    "folders": [],
+    "requests": [
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": true
+        },
+        "body": {
+          "body": "{\n  \"content\": \"---\\nid: record-123\\ntitle: Test\\ntype: bylaw\\nstatus: draft\\n---\\n\\nContent here\"\n}",
+          "contentType": "application/json"
+        },
+        "name": "Validate record content",
+        "method": "POST",
+        "params": [],
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer <<civicToken>>",
+            "active": true,
+            "description": ""
+          }
+        ],
+        "endpoint": "<<baseUrl>>/api/v1/validation/record",
+        "responses": {},
+        "testScript": "",
+        "preRequestScript": "",
+        "requestVariables": []
+      }
+    ],
+    "auth": {
+      "authType": "inherit",
+      "authActive": true
+    },
+    "headers": [],
+    "_ref_id": "coll_validation"
   }
 ]

@@ -15,7 +15,9 @@ import {
   TemplateEngine,
   RecordValidator,
   RecordParser,
+  RecordSchemaValidator,
 } from '@civicpress/core';
+import matter from 'gray-matter';
 
 interface ValidationResult {
   record: string;
@@ -233,7 +235,41 @@ async function validateRecord(
   const warnings: ValidationWarning[] = [];
   const suggestions: string[] = [];
 
-  // Use RecordValidator for comprehensive validation against standard format
+  // STEP 1: Schema validation (explicit for CLI output)
+  const { data: frontmatter } = matter(content);
+  const schemaValidation = RecordSchemaValidator.validate(
+    frontmatter,
+    record.type,
+    {
+      includeModuleExtensions: true,
+      includeTypeExtensions: true,
+      strict: false,
+    }
+  );
+
+  // Add schema validation results
+  for (const error of schemaValidation.errors) {
+    errors.push({
+      field: error.field,
+      message: `[Schema] ${error.message}`,
+      severity: 'error',
+    });
+    if (error.suggestion) {
+      suggestions.push(`${error.field}: ${error.suggestion}`);
+    }
+  }
+
+  for (const warning of schemaValidation.warnings) {
+    warnings.push({
+      field: warning.field,
+      message: `[Schema] ${warning.message}`,
+    });
+    if (warning.suggestion) {
+      suggestions.push(`${warning.field}: ${warning.suggestion}`);
+    }
+  }
+
+  // STEP 2: Use RecordValidator for comprehensive validation (includes schema + business rules)
   const validationResult = RecordValidator.validateRecord(record, {
     strict: options.strict || false,
     checkFormat: true,
@@ -265,7 +301,10 @@ async function validateRecord(
   // Use template engine's additional validation if template is available
   if (template) {
     try {
-      const templateValidationResult = templateEngine.validateRecord(fullPath, template);
+      const templateValidationResult = templateEngine.validateRecord(
+        fullPath,
+        template
+      );
 
       // Add template-specific validation results
       for (const error of templateValidationResult.errors) {

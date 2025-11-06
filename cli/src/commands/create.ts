@@ -4,6 +4,7 @@ import {
   userCan,
   RecordParser,
   RecordData,
+  RecordSchemaValidator,
 } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -12,6 +13,7 @@ import {
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import matter from 'gray-matter';
 
 export const createCommand = (cli: CAC) => {
   cli
@@ -238,6 +240,59 @@ export const createCommand = (cli: CAC) => {
 
         // Use RecordParser to serialize to properly formatted markdown
         const fullContent = RecordParser.serializeToMarkdown(recordData);
+
+        // Validate schema before saving (fail fast)
+        const { data: frontmatter } = matter(fullContent);
+        const schemaValidation = RecordSchemaValidator.validate(
+          frontmatter,
+          type,
+          {
+            includeModuleExtensions: true,
+            includeTypeExtensions: true,
+            strict: false,
+          }
+        );
+
+        if (!schemaValidation.isValid && schemaValidation.errors.length > 0) {
+          const errorMessages = schemaValidation.errors
+            .map((err) => `${err.field}: ${err.message}`)
+            .join('; ');
+          
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Schema validation failed',
+                  details: errorMessages,
+                  errors: schemaValidation.errors,
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error('❌ Schema validation failed:');
+            for (const error of schemaValidation.errors) {
+              logger.error(`  ${error.field}: ${error.message}`);
+              if (error.suggestion) {
+                logger.info(`    💡 ${error.suggestion}`);
+              }
+            }
+          }
+          process.exit(1);
+        }
+
+        // Log schema validation warnings if any
+        if (schemaValidation.warnings.length > 0 && !shouldOutputJson) {
+          logger.warn('⚠️  Schema validation warnings:');
+          for (const warning of schemaValidation.warnings) {
+            logger.warn(`  ${warning.field}: ${warning.message}`);
+            if (warning.suggestion) {
+              logger.info(`    💡 ${warning.suggestion}`);
+            }
+          }
+        }
 
         // Handle dry-run modes
         const isCompleteDryRun = options.dryRun;

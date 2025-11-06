@@ -55,11 +55,13 @@ civicpress/
 │   │   ├── templates/         # Template directory
 │   │   └── workflows/         # Workflow directory
 │   ├── records/               # Civic records (IMPLEMENTED)
-│   │   ├── bylaw/            # Bylaw records
-│   │   ├── policy/           # Policy records
-│   │   ├── resolution/       # Resolution records
-│   │   ├── ordinance/        # Ordinance records
-│   │   └── proclamation/     # Proclamation records
+│   │   ├── bylaw/            # Bylaw records (core type)
+│   │   ├── policy/           # Policy records (core type)
+│   │   ├── resolution/       # Resolution records (core type)
+│   │   ├── ordinance/        # Ordinance records (core type)
+│   │   ├── proclamation/     # Proclamation records (core type)
+│   │   ├── geography/        # Geography records (core type)
+│   │   └── session/          # Session records (core type)
 │   └── .git/                 # Git repository for records
 ├── core/                      # Core platform modules (IMPLEMENTED)
 │   ├── civic-core.ts          # Main CivicPress orchestrator
@@ -76,6 +78,8 @@ civicpress/
 │   ├── cli/                  # CLI module (IMPLEMENTED)
 │   ├── ui/                   # UI module (95% COMPLETE)
 │   └── legal-register/       # Legal document management (PLANNED)
+│                            # Extends core record types (bylaw, ordinance, etc.)
+│                            # with specialized features (digital signatures, compliance)
 ├── docs/specs/               # 50+ detailed specifications
 └── agent/                    # AI agent memory system
     ├── memory/               # Core memory
@@ -214,6 +218,40 @@ civicpress/
   - Search result ranking and relevance
   - Auto-indexing with workflow integration
 
+## 📋 **Record Types Architecture**
+
+### Core Record Types
+
+All record types are defined in **core** and provide base functionality:
+
+1. **`bylaw`** - Municipal bylaws and regulations
+2. **`ordinance`** - Local ordinances and municipal codes
+3. **`policy`** - Organizational policies and procedures
+4. **`proclamation`** - Official proclamations and declarations
+5. **`resolution`** - Resolutions and formal decisions
+6. **`geography`** - Geographic data files (GeoJSON/KML)
+7. **`session`** - Meeting sessions and minutes
+
+**All core record types:**
+- Use the standardized markdown format (defined in `docs/record-format-standard.md`)
+- Support base CRUD operations via `RecordManager`
+- Support validation via `RecordValidator`
+- Support indexing via `IndexingService`
+- Can be extended by modules with specialized fields and functionality
+
+### Module Extensions
+
+**Legal-Register Module:**
+- Extends legal record types (`bylaw`, `ordinance`, `policy`, `proclamation`, `resolution`)
+- Adds specialized features: digital signatures, compliance tracking, legal workflows
+- Provides schema extensions for legal-specific fields
+- Module is optional - can be disabled if not needed
+
+**Sessions:**
+- Stays in core as a fundamental record type
+- No separate module needed (unless specialized features are required later)
+- If specialized features needed (livestream, transcript processing), can create sessions module or use plugins
+
 ## 🧩 **Module Architecture**
 
 ### API Module (`modules/api/`)
@@ -253,7 +291,17 @@ civicpress/
 
 - **Status**: 📋 Planned (only README exists)
 - **Purpose**: Specialized legal document management
+- **Architecture**:
+  - **Record types** (`bylaw`, `ordinance`, `policy`, `proclamation`, `resolution`) are **core record types** (defined in core)
+  - **Legal-register** is a **separate module** that extends these core types with specialized functionality
+  - Module provides: digital signatures, compliance tracking, legal workflows, legal-specific schema extensions
+  - Module is optional and can be disabled if not needed
 - **Features**: Planned for future implementation
+  - Digital signature support
+  - Compliance tracking and reporting
+  - Legal-specific workflows
+  - Legal document versioning
+  - Schema extensions for legal fields
 
 ## 🔌 **Configuration System (IMPLEMENTED)**
 
