@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:copy-schemas",
+    "build:copy-schemas": "mkdir -p dist/schemas/record-type-schemas && cp -r src/schemas/*.json dist/schemas/ 2>/dev/null || true && cp -r src/schemas/record-type-schemas/*.json dist/schemas/record-type-schemas/ 2>/dev/null || true",
     "dev": "tsc --watch",
     "dev:build": "tsc && tsc --watch",
     "test": "jest",
