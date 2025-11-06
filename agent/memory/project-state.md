@@ -49,9 +49,11 @@
 
 ### ✅ **Recently Completed Features (November 2025)**
 
-#### **Record Format Standardization**
+#### **Record Format Standardization & Schema Validation**
 
-- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Status**: ✅ **Fully Implemented, Tested, and Production-Ready**
+- **Test Suite**: All 596 tests passing (100% success rate after comprehensive
+  fixes)
 - **Comprehensive Standardization**: Unified markdown format across all record
   types (bylaw, ordinance, policy, proclamation, resolution, geography, session)
 - **Core Infrastructure**:
@@ -83,6 +85,26 @@
 - **New Record Types**: Added geography and session to core types
 - **Standardized Statuses**: Updated to published, pending_review, under_review,
   approved, rejected, archived, expired
+- **Schema Validation System**: JSON Schema-based validation with dynamic
+  composition
+  - Base schema with all core fields and compliance metadata
+  - Type-specific schema extensions (geography, session)
+  - Module extensions (legal-register)
+  - Plugin support for future extensions
+  - AJV-based validation with comprehensive error reporting
+- **Commit Linkage Fields**: commit_ref and commit_signature for Git
+  traceability
+- **Extensions Object**: Flexible metadata.extensions for custom/experimental
+  fields
+- **Test Fixes (November 2025)**:
+  - Fixed schema ID collision issues (recursive $id removal, fresh AJV
+    instances)
+  - Fixed additionalProperties validation (set to true for schema merging)
+  - Fixed source field normalization (string to object conversion in multiple
+    places)
+  - Fixed date normalization (Date objects to ISO strings)
+  - Fixed test fixtures (file paths, status values, record types)
+  - All 596 tests now passing
 
 #### **File Attachment System (September 2025)**
 

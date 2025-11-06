@@ -6,17 +6,19 @@
 
 ## 🎯 Overview
 
-CivicPress uses **JSON Schema** (draft-07) to validate record frontmatter, ensuring data integrity and consistency across all record types. This guide explains how schema validation works, how to use it, and how to extend it.
+CivicPress uses **JSON Schema** (draft-07) to validate record frontmatter,
+ensuring data integrity and consistency across all record types. This guide
+explains how schema validation works, how to use it, and how to extend it.
 
 ## 📋 Table of Contents
 
-1. [How It Works](#how-it-works)
-2. [Validation Layers](#validation-layers)
-3. [Using Validation](#using-validation)
-4. [Schema Composition](#schema-composition)
-5. [Extending Schemas](#extending-schemas)
-6. [Error Messages](#error-messages)
-7. [Troubleshooting](#troubleshooting)
+1. [How It Works](#-how-it-works)
+2. [Validation Layers](#-validation-layers)
+3. [Using Validation](#️-using-validation)
+4. [Schema Composition](#-schema-composition)
+5. [Extending Schemas](#-extending-schemas)
+6. [Error Messages](#-error-messages)
+7. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -26,9 +28,12 @@ CivicPress uses **JSON Schema** (draft-07) to validate record frontmatter, ensur
 
 The schema validation system consists of three main components:
 
-1. **RecordSchemaBuilder**: Builds dynamic schemas from base + config + modules + plugins
-2. **RecordSchemaValidator**: Validates frontmatter against JSON Schema using `ajv`
-3. **RecordValidator**: Integrates schema validation with business rule validation
+1. **RecordSchemaBuilder**: Builds dynamic schemas from base + config +
+   modules + plugins
+2. **RecordSchemaValidator**: Validates frontmatter against JSON Schema using
+   `ajv`
+3. **RecordValidator**: Integrates schema validation with business rule
+   validation
 
 ### Validation Flow
 
@@ -60,6 +65,7 @@ Validation Result (errors, warnings, info)
 **Purpose**: Validate structure, types, formats, and enums
 
 **Validates**:
+
 - Required fields (id, title, type, status, author, created, updated)
 - Data types (string, number, boolean, array, object)
 - Formats (date-time, email, uri)
@@ -73,6 +79,7 @@ Validation Result (errors, warnings, info)
 **Purpose**: Validate relationships, business logic, compliance
 
 **Validates**:
+
 - Cross-field relationships (created ≤ updated)
 - Compliance fields (ISO 639-1 language codes, retention schedules)
 - Business rules (document number uniqueness, approval chains)
@@ -151,9 +158,11 @@ GET /api/v1/validation/status?type=bylaw&severity=error&limit=50
 
 Records are automatically validated:
 
-- **Before saving**: `RecordManager.createRecord()`, `RecordManager.updateRecord()`
+- **Before saving**: `RecordManager.createRecord()`,
+  `RecordManager.updateRecord()`
 - **During parsing**: `RecordParser.parseFromMarkdown()` (fail fast)
-- **During validation**: `RecordValidator.validateRecord()` (schema first, then business rules)
+- **During validation**: `RecordValidator.validateRecord()` (schema first, then
+  business rules)
 
 ---
 
@@ -166,6 +175,7 @@ Schemas are composed dynamically at runtime:
 **Location**: `core/src/schemas/record-base-schema.json`
 
 **Contains**:
+
 - All required fields (id, title, type, status, author, created, updated)
 - Standard optional fields (tags, slug, version, priority, department)
 - Source & origin fields
@@ -179,6 +189,7 @@ Schemas are composed dynamically at runtime:
 **Source**: Configuration files (`data/.civic/config.yml`)
 
 **Injected**:
+
 - `type` enum: Valid record types from `record_types_config`
 - `status` enum: Valid status values from `record_statuses_config`
 
@@ -189,8 +200,10 @@ Schemas are composed dynamically at runtime:
 **Location**: `core/src/schemas/record-type-schemas/{type}-schema.json`
 
 **Examples**:
+
 - `geography-schema.json`: Validates `geography_data`, `category`
-- `session-schema.json`: Validates `session_type`, `date`, `duration`, `location`, `attendees`, `topics`, `media`
+- `session-schema.json`: Validates `session_type`, `date`, `duration`,
+  `location`, `attendees`, `topics`, `media`
 
 **Applied**: Only when `record.type` matches the schema type
 
@@ -201,16 +214,20 @@ Schemas are composed dynamically at runtime:
 **Example**: `modules/legal-register/schemas/record-schema-extension.json`
 
 **Applied**: When:
+
 - Module is enabled in `config.yml` (`modules: ['legal-register']`)
-- Record type matches module's applicable types (legal-register applies to bylaw, ordinance, policy, proclamation, resolution)
+- Record type matches module's applicable types (legal-register applies to
+  bylaw, ordinance, policy, proclamation, resolution)
 
 ### 5. Plugin Extensions
 
 **Registration**: Runtime via `RecordSchemaBuilder.registerPluginSchema()`
 
-**Applied**: When plugin's `appliesTo()` function returns `true` for the record type
+**Applied**: When plugin's `appliesTo()` function returns `true` for the record
+type
 
 **Example**:
+
 ```typescript
 RecordSchemaBuilder.registerPluginSchema(
   'custom-plugin',
@@ -258,9 +275,11 @@ Schemas are merged in this order (using JSON Schema `allOf`):
 ### Adding a Module Schema Extension
 
 1. Create module directory: `modules/{module-name}/schemas/`
-2. Create schema file: `modules/{module-name}/schemas/record-schema-extension.json`
+2. Create schema file:
+   `modules/{module-name}/schemas/record-schema-extension.json`
 3. Enable module in `config.yml`: `modules: ['{module-name}']`
-4. Update `RecordSchemaBuilder.shouldApplyModuleSchema()` to define which record types the module applies to
+4. Update `RecordSchemaBuilder.shouldApplyModuleSchema()` to define which record
+   types the module applies to
 
 **Example**: See `modules/legal-register/schemas/record-schema-extension.json`
 
@@ -327,18 +346,21 @@ Schema validation provides clear, actionable error messages:
 ### Error Examples
 
 **Missing Required Field**:
+
 ```
 Field "author": Missing required field: author
 💡 Add the "author" field to the frontmatter
 ```
 
 **Invalid Format**:
+
 ```
 Field "created": Field "created" must be a valid date-time
 💡 Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ (e.g., "2025-01-15T10:30:00Z")
 ```
 
 **Invalid Enum**:
+
 ```
 Field "status": Field "status" must be one of: draft, pending_review, approved, published
 💡 Choose one of the allowed values: draft, pending_review, approved, published
@@ -353,8 +375,10 @@ Field "status": Field "status" must be one of: draft, pending_review, approved, 
 **Problem**: Module schema not being applied
 
 **Solutions**:
+
 1. Check module is enabled in `config.yml`: `modules: ['legal-register']`
-2. Verify schema file exists: `modules/{module}/schemas/record-schema-extension.json`
+2. Verify schema file exists:
+   `modules/{module}/schemas/record-schema-extension.json`
 3. Check `shouldApplyModuleSchema()` logic in `RecordSchemaBuilder`
 4. Clear schema cache: `RecordSchemaBuilder.clearCache()`
 
@@ -363,6 +387,7 @@ Field "status": Field "status" must be one of: draft, pending_review, approved, 
 **Problem**: Record appears valid but fails schema validation
 
 **Solutions**:
+
 1. Check for typos in field names (case-sensitive)
 2. Verify date formats are ISO 8601: `YYYY-MM-DDTHH:mm:ssZ`
 3. Check enum values match config (type, status)
@@ -374,6 +399,7 @@ Field "status": Field "status" must be one of: draft, pending_review, approved, 
 **Problem**: Registered plugin schema not being used
 
 **Solutions**:
+
 1. Verify `appliesTo()` function returns `true` for the record type
 2. Check schema is registered before validation
 3. Clear schema cache after registration
@@ -384,6 +410,7 @@ Field "status": Field "status" must be one of: draft, pending_review, approved, 
 **Problem**: Validation is slow
 
 **Solutions**:
+
 1. Schema caching is automatic (schemas are cached after first build)
 2. Check cache stats: `RecordSchemaBuilder.getCacheStats()`
 3. Clear cache if config changes: `RecordSchemaBuilder.clearCache()`
@@ -393,9 +420,11 @@ Field "status": Field "status" must be one of: draft, pending_review, approved, 
 
 ## 📚 Related Documentation
 
-- [Record Format Standard](./record-format-standard.md) - Complete field definitions
+- [Record Format Standard](./record-format-standard.md) - Complete field
+  definitions
 - [API Documentation](./api.md) - API validation endpoints
-- [Configuration Architecture](./configuration-architecture.md) - Config-driven validation
+- [Configuration Architecture](./configuration-architecture.md) - Config-driven
+  validation
 
 ---
 
@@ -464,5 +493,23 @@ RecordSchemaBuilder.registerPluginSchema(
 
 ---
 
-**Note**: This guide covers schema validation for frontmatter only. Content validation will be implemented separately in the future.
+**Note**: This guide covers schema validation for frontmatter only. Content
+validation will be implemented separately in the future.
 
+### New Fields (v1.2.0)
+
+The schema includes the following new optional fields:
+
+- **Commit Linkage Fields** (top-level):
+  - `commit_ref` (string) - Git commit SHA, populated during export/archive
+    operations
+  - `commit_signature` (string) - Cryptographic signature reference, populated
+    during export/archive operations
+
+- **Extensions Object** (inside `metadata`):
+  - `metadata.extensions` (object) - Reserved for future optional fields and
+    experimental extensions
+  - Completely open structure (`additionalProperties: true`) for flexibility
+
+These fields are optional and do not affect normal record operations. See
+`docs/record-format-standard.md` for complete field documentation.

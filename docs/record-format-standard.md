@@ -6,30 +6,40 @@
 
 ## 🎯 Purpose
 
-This document defines the **official standardized format** for all civic record markdown files in CivicPress. Since markdown files are the **source of truth** for all records, this format ensures consistency, machine-readability, and human-readability across all record types.
+This document defines the **official standardized format** for all civic record
+markdown files in CivicPress. Since markdown files are the **source of truth**
+for all records, this format ensures consistency, machine-readability, and
+human-readability across all record types.
 
 ## 📌 Core Principles
 
 1. **Source of Truth**: Markdown files take precedence over database entries
 2. **Human-Readable**: Clear, logical field organization with section comments
 3. **Machine-Parseable**: Valid YAML, consistent data types, standard formats
-4. **Extensible**: Optional fields allow for future needs without breaking changes
+4. **Extensible**: Optional fields allow for future needs without breaking
+   changes
 5. **Consistent**: Same structure applies to all record types
-6. **Schema-Validated**: All records are validated against JSON Schema for data integrity
+6. **Schema-Validated**: All records are validated against JSON Schema for data
+   integrity
 
 ## 🔍 Schema Validation
 
-CivicPress uses **JSON Schema** to validate all record frontmatter, ensuring data integrity and consistency. The validation system:
+CivicPress uses **JSON Schema** to validate all record frontmatter, ensuring
+data integrity and consistency. The validation system:
 
 - **Validates structure**: Required fields, data types, formats
-- **Validates values**: Enums (type, status), patterns (document numbers, language codes)
-- **Supports extensions**: Type-specific schemas (geography, session), module schemas (legal-register), plugin schemas
+- **Validates values**: Enums (type, status), patterns (document numbers,
+  language codes)
+- **Supports extensions**: Type-specific schemas (geography, session), module
+  schemas (legal-register), plugin schemas
 - **Provides clear errors**: Field-level validation errors with suggestions
 
 ### Validation Layers
 
-1. **Schema Validation** (JSON Schema): Validates frontmatter structure and types
-2. **Business Rule Validation**: Validates relationships, business logic, compliance fields
+1. **Schema Validation** (JSON Schema): Validates frontmatter structure and
+   types
+2. **Business Rule Validation**: Validates relationships, business logic,
+   compliance fields
 3. **Content Validation**: (Future) Validates markdown content structure
 
 ### Schema Location
@@ -44,7 +54,8 @@ CivicPress uses **JSON Schema** to validate all record frontmatter, ensuring dat
 - **API**: `POST /api/v1/validation/record` - Validate via API
 - **Automatic**: Records are validated before saving (create/update operations)
 
-See [Schema Validation Guide](./schema-validation-guide.md) for detailed information.
+See [Schema Validation Guide](./schema-validation-guide.md) for detailed
+information.
 
 ## 📝 Standard Format Structure
 
@@ -150,16 +161,10 @@ attached_files:
     category: "reference"
 
 # ============================================
-# SOURCE & ORIGIN (Optional - for imported/legacy documents)
+# COMMIT LINKAGE (Optional - populated during export/archive)
 # ============================================
-source:
-  reference: "LEG-2024-001"  # Required: Original document identifier/reference
-  original_title: "Original Document Title"  # Optional: Original title from source system
-  original_filename: "ORD-2024-001.pdf"  # Optional: Original filename from source system
-  url: "https://legacy.example.com/documents/LEG-2024-001"  # Optional: Link to original document
-  type: legacy|import|external  # Optional: Source type
-  imported_at: "2025-01-15T10:30:00Z"  # Optional: When imported
-  imported_by: "admin"  # Optional: Who imported it
+commit_ref: "abc123def456..."  # Git commit SHA (populated during export/archive)
+commit_signature: "gpg:key-id-12345"  # Cryptographic signature reference (populated during export/archive)
 
 # ============================================
 # ADDITIONAL METADATA (Optional)
@@ -171,7 +176,7 @@ metadata:
   expiry_date: null
   review_date: "2026-04-01T00:00:00Z"
   reviewed_by: "council"
-  
+
   # Legal/Government metadata (recommended for legal documents)
   document_number: "BYL-2024-001"
   legal_authority: "Municipal Act, Section 15"
@@ -179,20 +184,20 @@ metadata:
   language: "en"  # ISO 639-1 code
   supersedes: ["record-789"]
   superseded_by: null
-  
+
   # Records Management (ISO 15489)
   retention_schedule: "permanent"  # permanent|temporary|"10 years"
   classification: "public"  # public|confidential|restricted|secret
   custodian: "clerk"
   disposition_action: "archive"  # archive|destroy|transfer
-  
+
   # Public Records/FOIA compliance
   public_access: true
   access_level: "public"  # public|restricted|confidential
   publication_date: "2025-01-15T10:00:00Z"
   redaction_applied: false
   exemption_codes: []
-  
+
   # Accessibility (WCAG)
   accessibility:
     wcag_level: "AA"  # A|AA|AAA
@@ -201,7 +206,7 @@ metadata:
         url: "/storage/records/bylaw-noise-restrictions.pdf"
     braille_available: false
     large_print_available: true
-  
+
   # Dublin Core metadata
   subject: ["Noise Control", "Municipal Regulations"]
   coverage:
@@ -209,7 +214,7 @@ metadata:
     spatial: "Richmond, Quebec, Canada"
   rights: "Public Domain"
   rights_holder: "City of Richmond"
-  
+
   # Audit Trail
   approval_chain:
     - role: "clerk"
@@ -220,6 +225,11 @@ metadata:
       username: "llapointe"
       action: "approved"
       date: "2025-02-01T14:00:00Z"
+
+  # Extensions (Reserved for future optional fields and experimental extensions)
+  extensions:
+    # Completely open structure - any keys/values allowed
+    # Example: custom_module_field: "value"
 
 ---
 
@@ -232,21 +242,22 @@ The markdown content of the record goes here...
 
 ### Core Identification (Required)
 
-| Field | Type | Required | Description | Validation |
-|-------|------|----------|-------------|------------|
-| `id` | string | ✅ | Unique record identifier | Alphanumeric, hyphens, underscores |
-| `title` | string | ✅ | Human-readable title | Non-empty, max 500 chars |
-| `type` | string | ✅ | Record type | One of: `bylaw`, `ordinance`, `policy`, `proclamation`, `resolution`, `geography`, `session` |
-| `status` | string | ✅ | Current status | One of: `draft`, `pending_review`, `under_review`, `approved`, `published`, `rejected`, `archived`, `expired` |
+| Field    | Type   | Required | Description              | Validation                                                                                                    |
+| -------- | ------ | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `id`     | string | ✅       | Unique record identifier | Alphanumeric, hyphens, underscores                                                                            |
+| `title`  | string | ✅       | Human-readable title     | Non-empty, max 500 chars                                                                                      |
+| `type`   | string | ✅       | Record type              | One of: `bylaw`, `ordinance`, `policy`, `proclamation`, `resolution`, `geography`, `session`                  |
+| `status` | string | ✅       | Current status           | One of: `draft`, `pending_review`, `under_review`, `approved`, `published`, `rejected`, `archived`, `expired` |
 
 ### Authorship & Attribution (Required)
 
-| Field | Type | Required | Description | Validation |
-|-------|------|----------|-------------|------------|
-| `author` | string | ✅ | Primary author username | Non-empty string |
-| `authors` | array | ❌ | Detailed author information | Array of author objects |
+| Field     | Type   | Required | Description                 | Validation              |
+| --------- | ------ | -------- | --------------------------- | ----------------------- |
+| `author`  | string | ✅       | Primary author username     | Non-empty string        |
+| `authors` | array  | ❌       | Detailed author information | Array of author objects |
 
 **Author Object Structure:**
+
 ```yaml
 authors:
   - name: "Full Name"        # Required
@@ -257,31 +268,32 @@ authors:
 
 ### Timestamps (Required)
 
-| Field | Type | Required | Format | Description |
-|-------|------|----------|--------|-------------|
-| `created` | string | ✅ | ISO 8601 | Creation timestamp (e.g., `"2025-01-15T10:30:00Z"`) |
-| `updated` | string | ✅ | ISO 8601 | Last update timestamp (e.g., `"2025-02-01T14:20:00Z"`) |
+| Field     | Type   | Required | Format   | Description                                            |
+| --------- | ------ | -------- | -------- | ------------------------------------------------------ |
+| `created` | string | ✅       | ISO 8601 | Creation timestamp (e.g., `"2025-01-15T10:30:00Z"`)    |
+| `updated` | string | ✅       | ISO 8601 | Last update timestamp (e.g., `"2025-02-01T14:20:00Z"`) |
 
 **Format**: ISO 8601 with timezone (`YYYY-MM-DDTHH:mm:ssZ`)
 
 ### Classification (Optional)
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `tags` | array | ❌ | Array of tag strings | `["noise", "nighttime"]` |
-| `module` | string | ❌ | Module identifier | `"legal-register"` |
-| `slug` | string | ❌ | URL-friendly identifier | `"noise-restrictions"` |
-| `version` | string | ❌ | Version number | `"1.0.0"` |
-| `priority` | string | ❌ | Priority level | `low`, `medium`, `high` |
-| `department` | string | ❌ | Department name | `"planning"` |
+| Field        | Type   | Required | Description             | Example                  |
+| ------------ | ------ | -------- | ----------------------- | ------------------------ |
+| `tags`       | array  | ❌       | Array of tag strings    | `["noise", "nighttime"]` |
+| `module`     | string | ❌       | Module identifier       | `"legal-register"`       |
+| `slug`       | string | ❌       | URL-friendly identifier | `"noise-restrictions"`   |
+| `version`    | string | ❌       | Version number          | `"1.0.0"`                |
+| `priority`   | string | ❌       | Priority level          | `low`, `medium`, `high`  |
+| `department` | string | ❌       | Department name         | `"planning"`             |
 
 ### Source & Origin (Optional - for imported/legacy documents)
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `source` | object | ❌ | Source information for imported/legacy documents | See below |
+| Field    | Type   | Required | Description                                      | Example   |
+| -------- | ------ | -------- | ------------------------------------------------ | --------- |
+| `source` | object | ❌       | Source information for imported/legacy documents | See below |
 
 **Source Object Structure:**
+
 ```yaml
 source:
   reference: "LEG-2024-001"  # Required: Original document identifier/reference
@@ -292,6 +304,7 @@ source:
 ```
 
 **Source Types:**
+
 - `legacy` - Imported from legacy system
 - `import` - Imported from another system
 - `external` - External reference/document
@@ -300,31 +313,32 @@ source:
 
 #### Geography Type
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `geography_data` | object | GeoJSON/KML content object |
-| `category` | string | Category: `zone`, `boundary`, `district`, `facility`, `route` |
+| Field            | Type   | Description                                                   |
+| ---------------- | ------ | ------------------------------------------------------------- |
+| `geography_data` | object | GeoJSON/KML content object                                    |
+| `category`       | string | Category: `zone`, `boundary`, `district`, `facility`, `route` |
 
 #### Session Type
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `session_type` | string | Type: `regular`, `emergency`, `special` |
-| `date` | string | ISO 8601 meeting date/time |
-| `duration` | number | Duration in minutes |
-| `location` | string | Meeting location |
-| `attendees` | array | Array of attendee objects |
-| `topics` | array | Array of topic/discussion items |
-| `media` | object | Media links (livestream, recording, etc.) |
+| Field          | Type   | Description                               |
+| -------------- | ------ | ----------------------------------------- |
+| `session_type` | string | Type: `regular`, `emergency`, `special`   |
+| `date`         | string | ISO 8601 meeting date/time                |
+| `duration`     | number | Duration in minutes                       |
+| `location`     | string | Meeting location                          |
+| `attendees`    | array  | Array of attendee objects                 |
+| `topics`       | array  | Array of topic/discussion items           |
+| `media`        | object | Media links (livestream, recording, etc.) |
 
 ### Relationships (Optional)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `linked_records` | array | Array of linked record objects |
+| Field                    | Type  | Description                            |
+| ------------------------ | ----- | -------------------------------------- |
+| `linked_records`         | array | Array of linked record objects         |
 | `linked_geography_files` | array | Array of linked geography file objects |
 
 **Linked Record Object:**
+
 ```yaml
 linked_records:
   - id: "record-1234567890"      # Required
@@ -334,6 +348,7 @@ linked_records:
 ```
 
 **Linked Geography File Object:**
+
 ```yaml
 linked_geography_files:
   - id: "geo-001"                # Required
@@ -343,11 +358,12 @@ linked_geography_files:
 
 ### Spatial Data (Optional)
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field       | Type   | Description           |
+| ----------- | ------ | --------------------- |
 | `geography` | object | Geography data object |
 
 **Geography Object Structure:**
+
 ```yaml
 geography:
   srid: 4326                     # Spatial Reference ID (number)
@@ -360,11 +376,12 @@ geography:
 
 ### File Attachments (Optional)
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field            | Type  | Description                      |
+| ---------------- | ----- | -------------------------------- |
 | `attached_files` | array | Array of file attachment objects |
 
 **Attachment Object Structure:**
+
 ```yaml
 attached_files:
   - id: "uuid-12345"             # Required: File UUID
@@ -375,6 +392,7 @@ attached_files:
 ```
 
 **Category as Object:**
+
 ```yaml
 category:
   label: "Financial Documents"
@@ -382,13 +400,39 @@ category:
   description: "Budget and financial planning documents"
 ```
 
+### Commit Linkage (Optional - Populated During Export/Archive)
+
+| Field              | Type   | Required | Description                                                                                                                                                                           | Example              |
+| ------------------ | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `commit_ref`       | string | ❌       | Git commit SHA that introduced or last modified this record (for traceability). Populated during export/archive operations, not during normal record operations.                      | `"abc123def456..."`  |
+| `commit_signature` | string | ❌       | Cryptographic or GPG signature reference associated with the commit (for authenticity verification). Populated during export/archive operations, not during normal record operations. | `"gpg:key-id-12345"` |
+
+**Important Notes:**
+
+- These fields are **not auto-populated** during normal record create/update
+  operations to avoid infinite commit loops
+- They are **populated during export/archive operations** by querying Git
+  history
+- They provide **traceability and authenticity verification** for archived
+  records
+- Fields are **read-only** in the UI (auto-generated, not user-editable)
+
+**Use Cases:**
+
+- Tracking which Git commit introduced or last modified a record
+- Verifying authenticity of exported/archived records via cryptographic
+  signatures
+- Enabling audit trail of record changes through Git history
+- Supporting compliance and legal requirements for document authenticity
+
 ### Source & Origin (Optional)
 
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `source` | object | ❌ | Source information for imported/legacy documents | See below |
+| Field    | Type   | Required | Description                                      | Example   |
+| -------- | ------ | -------- | ------------------------------------------------ | --------- |
+| `source` | object | ❌       | Source information for imported/legacy documents | See below |
 
 **Source Object Structure:**
+
 ```yaml
 source:
   reference: "LEG-2024-001"  # Required: Original document identifier/reference
@@ -401,20 +445,26 @@ source:
 ```
 
 **Field Details:**
-- `reference` - Required unique identifier from source system (e.g., document number, case ID)
-- `original_title` - Optional original title (useful when title is changed during import)
-- `original_filename` - Optional original filename (helps locate document in legacy systems)
+
+- `reference` - Required unique identifier from source system (e.g., document
+  number, case ID)
+- `original_title` - Optional original title (useful when title is changed
+  during import)
+- `original_filename` - Optional original filename (helps locate document in
+  legacy systems)
 - `url` - Optional direct link to original document location
 - `type` - Optional categorization of source (`legacy`, `import`, `external`)
 - `imported_at` - Optional timestamp of when import occurred
 - `imported_by` - Optional username of person who performed import
 
 **Source Types:**
+
 - `legacy` - Imported from legacy system
-- `import` - Imported from another system  
+- `import` - Imported from another system
 - `external` - External reference/document
 
 **Use Cases:**
+
 - Tracking original document references when importing legacy documents
 - Linking to external documents
 - Maintaining audit trail of document origin
@@ -422,11 +472,12 @@ source:
 
 ### Additional Metadata (Optional)
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field      | Type   | Description                |
+| ---------- | ------ | -------------------------- |
 | `metadata` | object | Additional metadata object |
 
 **Common metadata fields:**
+
 - `approval_date`: ISO 8601 approval date
 - `effective_date`: ISO 8601 effective date
 - `expiry_date`: ISO 8601 expiry date (null if none)
@@ -434,9 +485,12 @@ source:
 - `reviewed_by`: Who reviewed the record
 
 **Legal/Government metadata (recommended for legal documents):**
-- `document_number`: Official document number (e.g., "BYL-2024-001", "ORD-15-42")
+
+- `document_number`: Official document number (e.g., "BYL-2024-001",
+  "ORD-15-42")
 - `legal_authority`: Legal authority/statute (e.g., "Municipal Act, Section 15")
-- `jurisdiction`: Jurisdictional level (`federal`, `provincial`, `state`, `municipal`)
+- `jurisdiction`: Jurisdictional level (`federal`, `provincial`, `state`,
+  `municipal`)
 - `language`: ISO 639-1 language code (e.g., `en`, `fr`, `en-CA`, `fr-CA`)
 - `translation_of`: Record ID if this is a translation
 - `translations`: Array of record IDs for translated versions
@@ -444,13 +498,17 @@ source:
 - `superseded_by`: Record ID of document that replaces this (null if current)
 
 **Records Management metadata (ISO 15489 compliance):**
-- `retention_schedule`: Retention period (`permanent`, `temporary`, or duration like `"10 years"`)
+
+- `retention_schedule`: Retention period (`permanent`, `temporary`, or duration
+  like `"10 years"`)
 - `disposition_date`: ISO 8601 date when disposition occurs
-- `classification`: Classification level (`public`, `confidential`, `restricted`, `secret`)
+- `classification`: Classification level (`public`, `confidential`,
+  `restricted`, `secret`)
 - `custodian`: Role/username responsible for the record
 - `disposition_action`: Action to take (`archive`, `destroy`, `transfer`)
 
 **Public Records/FOIA compliance metadata:**
+
 - `public_access`: Boolean - Is this publicly accessible?
 - `access_level`: Access level (`public`, `restricted`, `confidential`)
 - `publication_date`: ISO 8601 date when made publicly available
@@ -460,12 +518,14 @@ source:
 - `access_restrictions`: Array of access restriction details
 
 **Accessibility metadata (WCAG compliance):**
+
 - `accessibility.wcag_level`: WCAG compliance level (`A`, `AA`, `AAA`)
 - `accessibility.alternative_formats`: Array of alternative format objects
 - `accessibility.braille_available`: Boolean
 - `accessibility.large_print_available`: Boolean
 
 **Alternative Format Object:**
+
 ```yaml
 alternative_formats:
   - type: "pdf"
@@ -475,6 +535,7 @@ alternative_formats:
 ```
 
 **Dublin Core metadata (for interoperability):**
+
 - `subject`: Array of controlled vocabulary subjects
 - `coverage.temporal`: ISO 8601 interval (e.g., "2024-01-01/2025-12-31")
 - `coverage.spatial`: Geographic coverage (e.g., "Richmond, Quebec, Canada")
@@ -482,10 +543,31 @@ alternative_formats:
 - `rights_holder`: Entity that holds rights (e.g., "City of Richmond")
 
 **Audit Trail metadata:**
+
 - `approval_chain`: Array of approval actions with role, username, action, date
 - `change_history`: Array of change records with date, user, reason, changes
 
+**Extensions metadata (Reserved for future use):**
+
+- `extensions`: Object - Reserved for future optional fields and experimental
+  extensions. Completely open structure (any keys/values allowed) for
+  flexibility. This allows modules, plugins, and future features to add custom
+  metadata without schema changes.
+
+**Extensions Object:**
+
+```yaml
+metadata:
+  extensions:
+    # Completely open structure - any keys/values allowed
+    custom_module_field: "value"
+    experimental_feature_flag: true
+    my_plugin_data:
+      nested: "data"
+```
+
 **Approval Chain Object:**
+
 ```yaml
 approval_chain:
   - role: "clerk"
@@ -499,6 +581,7 @@ approval_chain:
 ```
 
 **Change History Object:**
+
 ```yaml
 change_history:
   - date: "2025-01-20T09:00:00Z"
@@ -570,7 +653,8 @@ Content imported from legacy system...
 
 ### Complete Record Example
 
-See the full format structure above for a complete example with all optional fields.
+See the full format structure above for a complete example with all optional
+fields.
 
 ### Geography Record Example
 
@@ -646,6 +730,7 @@ tags: ["budget", "ordinance", "council-meeting"]
 ### Required Fields
 
 The following fields are **always required**:
+
 - `id`
 - `title`
 - `type`
@@ -676,15 +761,19 @@ The following fields are **always required**:
 
 When migrating existing records:
 
-1. **Date Fields**: Convert `created`/`updated` date strings to ISO 8601 timestamps
-2. **Author Fields**: Normalize `author` to string format, move detailed info to `authors` array
+1. **Date Fields**: Convert `created`/`updated` date strings to ISO 8601
+   timestamps
+2. **Author Fields**: Normalize `author` to string format, move detailed info to
+   `authors` array
 3. **Status Values**: Standardize status values to approved list
 4. **Metadata**: Move custom fields into `metadata` object
-5. **Complex Fields**: Ensure geography, attachments, and linked records are properly structured
+5. **Complex Fields**: Ensure geography, attachments, and linked records are
+   properly structured
 
 ### Backward Compatibility
 
 The system should:
+
 - Accept old formats during transition period
 - Auto-convert old formats to new format when saving
 - Provide migration tools to batch-convert existing records
@@ -715,27 +804,33 @@ The system should:
 
 ## 🏛️ Compliance & Standards
 
-This format aligns with established legal, civic, and technical documentation standards:
+This format aligns with established legal, civic, and technical documentation
+standards:
 
 ### Standards Compliance
 
 - ✅ **ISO 8601** - Date and time format (timestamps)
 - ✅ **ISO 639-1** - Language codes (language field)
-- ✅ **ISO 15489:2016** - Records Management (retention, disposition, classification)
+- ✅ **ISO 15489:2016** - Records Management (retention, disposition,
+  classification)
 - ⚠️ **Dublin Core** - Metadata Standard (partial - core elements supported)
-- ⚠️ **Akoma Ntoso** - Legal Document Standard (concepts adopted, not full XML implementation)
-- ⚠️ **WCAG 2.1** - Web Content Accessibility Guidelines (accessibility metadata)
+- ⚠️ **Akoma Ntoso** - Legal Document Standard (concepts adopted, not full XML
+  implementation)
+- ⚠️ **WCAG 2.1** - Web Content Accessibility Guidelines (accessibility
+  metadata)
 - ⚠️ **FOIA/ATIP** - Public Records Compliance (public access, redaction fields)
 
 ### Standards References
 
 1. **ISO 15489:2016** - Information and documentation — Records management
    - Defines requirements for records management systems
-   - Our format supports: retention schedules, disposition, classification, custody
+   - Our format supports: retention schedules, disposition, classification,
+     custody
 
 2. **Dublin Core Metadata Initiative** - Standard metadata vocabulary
    - Core elements: title, creator, date, subject, coverage, rights
-   - Our format supports: title, author/authors, created/updated, subject (via tags), coverage, rights
+   - Our format supports: title, author/authors, created/updated, subject (via
+     tags), coverage, rights
 
 3. **Akoma Ntoso** - Legal document standard (concepts)
    - Work/Expression/Manifestation hierarchy
@@ -758,14 +853,18 @@ This format aligns with established legal, civic, and technical documentation st
 
 - **All compliance fields are optional** - Records remain valid without them
 - **Use fields as needed** - Not all records require all fields
-- **Legal documents** should include: document_number, legal_authority, jurisdiction, classification, retention_schedule
-- **Public records** should include: public_access, access_level, publication_date
+- **Legal documents** should include: document_number, legal_authority,
+  jurisdiction, classification, retention_schedule
+- **Public records** should include: public_access, access_level,
+  publication_date
 - **Bilingual jurisdictions** should include: language, translations
-- **Accessibility** should include: accessibility metadata for public-facing documents
+- **Accessibility** should include: accessibility metadata for public-facing
+  documents
 
 ## 📖 Related Documentation
 
-- [Schema Validation Guide](./schema-validation-guide.md) - Complete guide to schema validation
+- [Schema Validation Guide](./schema-validation-guide.md) - Complete guide to
+  schema validation
 - [File Attachment System](./file-attachment-system.md)
 - [Linked Records System](./linked-records-system.md)
 - [Geography System](./geography-system.md)
@@ -780,13 +879,21 @@ This format aligns with established legal, civic, and technical documentation st
 - Added schema validation guide documentation
 - Updated API documentation with validation endpoints
 - All records now validated before saving (automatic validation)
-- Schema validation integrated into RecordParser, RecordManager, and RecordValidator
+- Schema validation integrated into RecordParser, RecordManager, and
+  RecordValidator
+- Added commit linkage fields (`commit_ref`, `commit_signature`) - populated
+  during export/archive operations
+- Added `extensions` object in metadata - reserved for future optional fields
+  and experimental extensions
 
 ### Version 1.1.0 (November 2025)
 
-- Added legal/government metadata fields (document_number, legal_authority, jurisdiction, etc.)
-- Added records management fields (retention_schedule, classification, disposition)
-- Added public records/FOIA compliance fields (public_access, redaction, exemption_codes)
+- Added legal/government metadata fields (document_number, legal_authority,
+  jurisdiction, etc.)
+- Added records management fields (retention_schedule, classification,
+  disposition)
+- Added public records/FOIA compliance fields (public_access, redaction,
+  exemption_codes)
 - Added accessibility metadata (WCAG compliance, alternative formats)
 - Added Dublin Core metadata elements (subject, coverage, rights)
 - Added audit trail fields (approval_chain, change_history)
@@ -803,5 +910,5 @@ This format aligns with established legal, civic, and technical documentation st
 
 ---
 
-**Note**: This is the authoritative specification for CivicPress record formats. All code that reads or writes records must conform to this standard.
-
+**Note**: This is the authoritative specification for CivicPress record formats.
+All code that reads or writes records must conform to this standard.

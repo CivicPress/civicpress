@@ -16,6 +16,5 @@
       "description": "Category of the geography data"
     }
   },
-  "additionalProperties": false
+  "additionalProperties": true
 }
-

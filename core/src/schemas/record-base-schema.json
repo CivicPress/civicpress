@@ -306,6 +306,14 @@
         }
       }
     },
+    "commit_ref": {
+      "type": "string",
+      "description": "Git commit SHA that introduced or last modified this record (for traceability). Populated during export/archive operations."
+    },
+    "commit_signature": {
+      "type": "string",
+      "description": "Cryptographic or GPG signature reference associated with the commit (for authenticity verification). Populated during export/archive operations."
+    },
     "metadata": {
       "type": "object",
       "description": "Additional metadata object",
@@ -569,11 +577,15 @@
               }
             }
           }
+        },
+        "extensions": {
+          "type": "object",
+          "description": "Reserved for future optional fields and experimental extensions. Completely open structure for flexibility.",
+          "additionalProperties": true
         }
       },
       "additionalProperties": true
     }
   },
-  "additionalProperties": false
+  "additionalProperties": true
 }
-

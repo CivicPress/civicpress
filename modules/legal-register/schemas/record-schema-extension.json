@@ -49,10 +49,7 @@
           "description": "Array of record IDs this document replaces"
         },
         "superseded_by": {
-          "oneOf": [
-            { "type": "string" },
-            { "type": "null" }
-          ],
+          "oneOf": [{ "type": "string" }, { "type": "null" }],
           "description": "Record ID of document that replaces this (null if current)"
         },
         "approval_date": {
@@ -121,7 +118,14 @@
               },
               "action": {
                 "type": "string",
-                "enum": ["drafted", "reviewed", "approved", "rejected", "published", "archived"],
+                "enum": [
+                  "drafted",
+                  "reviewed",
+                  "approved",
+                  "rejected",
+                  "published",
+                  "archived"
+                ],
                 "description": "Action taken by the approver"
               },
               "date": {
@@ -168,13 +172,19 @@
       "additionalProperties": true
     }
   },
-  "additionalProperties": false,
+  "additionalProperties": true,
   "allOf": [
     {
       "if": {
         "properties": {
           "type": {
-            "enum": ["bylaw", "ordinance", "policy", "proclamation", "resolution"]
+            "enum": [
+              "bylaw",
+              "ordinance",
+              "policy",
+              "proclamation",
+              "resolution"
+            ]
           }
         }
       },
@@ -198,4 +208,3 @@
     }
   ]
 }
-

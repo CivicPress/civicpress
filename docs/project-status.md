@@ -41,6 +41,11 @@ ready for development and testing.
 - **Secure Downloads**: Authenticated file access with proper error handling
 - **Source Tracking**: Legacy document tracking with reference, original_title,
   original_filename
+- **Schema Validation**: JSON Schema-based validation with dynamic schema
+  composition
+- **Commit Linkage**: Git traceability fields (commit_ref, commit_signature) for
+  archival
+- **Extensions Support**: Flexible metadata.extensions object for custom fields
 
 #### **User Management (100% Functional)**
 

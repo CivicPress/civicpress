@@ -358,12 +358,12 @@ function createMockIndexingService() {
           {
             title: 'Noise Restrictions',
             type: 'bylaw',
-            status: 'adopted',
+            status: 'published', // Changed from 'adopted'
             module: 'legal-register',
             tags: ['noise', 'nighttime', 'curfew'],
             authors: [{ name: 'Ada Lovelace', role: 'clerk' }],
-            created: '2025-06-12',
-            updated: '2025-07-01',
+            created: '2025-06-12T10:00:00Z', // ISO 8601 format
+            updated: '2025-07-01T14:30:00Z', // ISO 8601 format
             slug: 'noise-restrictions',
             path: 'records/bylaw-noise-restrictions.md',
           },
@@ -374,8 +374,8 @@ function createMockIndexingService() {
             module: 'legal-register',
             tags: ['archived', 'historical'],
             authors: [{ name: 'Historical Department', role: 'clerk' }],
-            created: '2020-01-01',
-            updated: '2025-01-01',
+            created: '2020-01-01T10:00:00Z', // ISO 8601 format
+            updated: '2025-01-01T10:00:00Z', // ISO 8601 format
             slug: 'old-regulation',
             path: 'records/bylaw-old-regulation.md',
           },
@@ -384,7 +384,7 @@ function createMockIndexingService() {
           totalRecords: 2,
           modules: ['legal-register'],
           types: ['bylaw'],
-          statuses: ['adopted', 'archived'],
+          statuses: ['published', 'archived'], // Changed from 'adopted'
           generatedAt: new Date().toISOString(),
         },
       };
@@ -421,12 +421,12 @@ function createMockIndexingService() {
           {
             title: 'Noise Restrictions',
             type: 'bylaw',
-            status: 'adopted',
+            status: 'published', // Changed from 'adopted'
             module: 'legal-register',
             tags: ['noise', 'nighttime', 'curfew'],
             authors: [{ name: 'Ada Lovelace', role: 'clerk' }],
-            created: '2025-06-12',
-            updated: '2025-07-01',
+            created: '2025-06-12T10:00:00Z', // ISO 8601 format
+            updated: '2025-07-01T14:30:00Z', // ISO 8601 format
             slug: 'noise-restrictions',
             path: 'records/bylaw-noise-restrictions.md',
           },
@@ -435,7 +435,7 @@ function createMockIndexingService() {
           totalRecords: 1,
           modules: ['legal-register'],
           types: ['bylaw'],
-          statuses: ['adopted'],
+          statuses: ['published'], // Changed from 'adopted'
           generatedAt: new Date().toISOString(),
         },
       };
@@ -447,12 +447,12 @@ function createMockIndexingService() {
           {
             title: 'Noise Restrictions',
             type: 'bylaw',
-            status: 'adopted',
+            status: 'published', // Changed from 'adopted'
             module: 'legal-register',
             tags: ['noise', 'nighttime', 'curfew'],
             authors: [{ name: 'Ada Lovelace', role: 'clerk' }],
-            created: '2025-06-12',
-            updated: '2025-07-01',
+            created: '2025-06-12T10:00:00Z', // ISO 8601 format
+            updated: '2025-07-01T14:30:00Z', // ISO 8601 format
             slug: 'noise-restrictions',
             path: 'records/bylaw-noise-restrictions.md',
           },
@@ -631,11 +631,11 @@ export function createCivicConfig(config: TestConfig, overrides: any = {}) {
   };
 
   writeFileSync(join(config.testDir, '.civicrc'), yaml.dump(civicConfig));
-  
+
   // Also create config.yml in data/.civic/ for CentralConfigManager
   const configYmlPath = join(config.dataDir, '.civic', 'config.yml');
   ensureDirSync(join(config.dataDir, '.civic'));
-  
+
   // Copy default config.yml structure (record types and statuses)
   const defaultConfig = {
     modules: ['legal-register'],
@@ -644,27 +644,102 @@ export function createCivicConfig(config: TestConfig, overrides: any = {}) {
     workflows: { enabled: true },
     audit: { enabled: true },
     record_types_config: {
-      bylaw: { label: 'Bylaws', description: 'Municipal bylaws and regulations', source: 'core', priority: 1 },
-      ordinance: { label: 'Ordinances', description: 'Local ordinances and laws', source: 'core', priority: 2 },
-      policy: { label: 'Policies', description: 'Administrative policies', source: 'core', priority: 3 },
-      proclamation: { label: 'Proclamations', description: 'Official proclamations', source: 'core', priority: 4 },
-      resolution: { label: 'Resolutions', description: 'Council resolutions', source: 'core', priority: 5 },
-      geography: { label: 'Geography', description: 'Geographic data files (GeoJSON/KML)', source: 'core', priority: 6 },
-      session: { label: 'Session', description: 'Meeting sessions and minutes', source: 'core', priority: 7 },
+      bylaw: {
+        label: 'Bylaws',
+        description: 'Municipal bylaws and regulations',
+        source: 'core',
+        priority: 1,
+      },
+      ordinance: {
+        label: 'Ordinances',
+        description: 'Local ordinances and laws',
+        source: 'core',
+        priority: 2,
+      },
+      policy: {
+        label: 'Policies',
+        description: 'Administrative policies',
+        source: 'core',
+        priority: 3,
+      },
+      proclamation: {
+        label: 'Proclamations',
+        description: 'Official proclamations',
+        source: 'core',
+        priority: 4,
+      },
+      resolution: {
+        label: 'Resolutions',
+        description: 'Council resolutions',
+        source: 'core',
+        priority: 5,
+      },
+      geography: {
+        label: 'Geography',
+        description: 'Geographic data files (GeoJSON/KML)',
+        source: 'core',
+        priority: 6,
+      },
+      session: {
+        label: 'Session',
+        description: 'Meeting sessions and minutes',
+        source: 'core',
+        priority: 7,
+      },
     },
     record_statuses_config: {
-      draft: { label: 'Draft', description: 'Initial working version, not yet ready for review', source: 'core', priority: 1 },
-      pending_review: { label: 'Pending Review', description: 'Submitted for review and awaiting approval', source: 'core', priority: 2 },
-      under_review: { label: 'Under Review', description: 'Currently under active review by authorized personnel', source: 'core', priority: 3 },
-      approved: { label: 'Approved', description: 'Approved and currently in effect', source: 'core', priority: 4 },
-      published: { label: 'Published', description: 'Publicly available and in effect', source: 'core', priority: 5 },
-      rejected: { label: 'Rejected', description: 'Rejected and not approved', source: 'core', priority: 6 },
-      archived: { label: 'Archived', description: 'No longer active but preserved for reference', source: 'core', priority: 7 },
-      expired: { label: 'Expired', description: 'Past its effective date and no longer in force', source: 'core', priority: 8 },
+      draft: {
+        label: 'Draft',
+        description: 'Initial working version, not yet ready for review',
+        source: 'core',
+        priority: 1,
+      },
+      pending_review: {
+        label: 'Pending Review',
+        description: 'Submitted for review and awaiting approval',
+        source: 'core',
+        priority: 2,
+      },
+      under_review: {
+        label: 'Under Review',
+        description: 'Currently under active review by authorized personnel',
+        source: 'core',
+        priority: 3,
+      },
+      approved: {
+        label: 'Approved',
+        description: 'Approved and currently in effect',
+        source: 'core',
+        priority: 4,
+      },
+      published: {
+        label: 'Published',
+        description: 'Publicly available and in effect',
+        source: 'core',
+        priority: 5,
+      },
+      rejected: {
+        label: 'Rejected',
+        description: 'Rejected and not approved',
+        source: 'core',
+        priority: 6,
+      },
+      archived: {
+        label: 'Archived',
+        description: 'No longer active but preserved for reference',
+        source: 'core',
+        priority: 7,
+      },
+      expired: {
+        label: 'Expired',
+        description: 'Past its effective date and no longer in force',
+        source: 'core',
+        priority: 8,
+      },
     },
     version: '1.0.0',
   };
-  
+
   writeFileSync(configYmlPath, yaml.dump(defaultConfig));
 }
 
@@ -734,7 +809,14 @@ export function createStorageConfig(config: TestConfig) {
 
 export function createWorkflowConfig(config: TestConfig) {
   const workflowConfig = {
-    statuses: ['draft', 'proposed', 'reviewed', 'approved', 'archived'],
+    statuses: [
+      'draft',
+      'pending_review',
+      'under_review',
+      'approved',
+      'published',
+      'archived',
+    ],
     transitions: {
       draft: ['proposed'],
       proposed: ['reviewed', 'archived'],
@@ -985,11 +1067,13 @@ export function createSampleRecords(config: TestConfig) {
       id: 'bylaw-noise-restrictions',
       title: 'Noise Restrictions',
       type: 'bylaw',
-      status: 'adopted',
+      status: 'published', // Changed from 'adopted'
       content: '# Noise Restrictions\n\nQuiet hours from 10 PM to 7 AM.',
       metadata: {
-        author: 'Ada Lovelace',
-        created: '2025-06-12',
+        author: 'alovelace',
+        authorName: 'Ada Lovelace',
+        created: '2025-06-12T10:00:00Z', // ISO 8601 format
+        updated: '2025-07-01T14:30:00Z', // Added required updated field
         tags: ['noise', 'nighttime', 'curfew'],
       },
       path: 'records/bylaw-noise-restrictions.md',
@@ -1001,8 +1085,10 @@ export function createSampleRecords(config: TestConfig) {
       status: 'draft',
       content: '# Data Privacy Policy\n\nProtecting citizen data.',
       metadata: {
-        author: 'Irène Joliot-Curie',
-        created: '2025-07-15',
+        author: 'ijoliot',
+        authorName: 'Irène Joliot-Curie',
+        created: '2025-07-15T10:00:00Z', // ISO 8601 format
+        updated: '2025-07-15T10:00:00Z', // Added required updated field
         tags: ['privacy', 'data', 'technology'],
       },
       path: 'records/policy-data-privacy.md',
@@ -1011,11 +1097,13 @@ export function createSampleRecords(config: TestConfig) {
       id: 'resolution-budget-2025',
       title: 'Budget Resolution 2025',
       type: 'resolution',
-      status: 'proposed',
+      status: 'pending_review', // Changed from 'proposed'
       content: '# Budget Resolution 2025\n\nAnnual budget allocation.',
       metadata: {
-        author: 'Luc Lapointe',
-        created: '2025-07-20',
+        author: 'llapointe',
+        authorName: 'Luc Lapointe',
+        created: '2025-07-20T10:00:00Z', // ISO 8601 format
+        updated: '2025-07-20T10:00:00Z', // Added required updated field
         tags: ['budget', 'finance', '2025'],
         attachments: ['budget.pdf', 'metrics.xlsx'],
       },
@@ -1028,8 +1116,10 @@ export function createSampleRecords(config: TestConfig) {
       status: 'archived',
       content: '# Old Regulation\n\nThis regulation has been archived.',
       metadata: {
-        author: 'Historical Department',
-        created: '2020-01-01',
+        author: 'historical',
+        authorName: 'Historical Department',
+        created: '2020-01-01T10:00:00Z', // ISO 8601 format
+        updated: '2025-01-01T10:00:00Z', // Added required updated field
         tags: ['archived', 'historical', 'old'],
       },
       path: 'records/bylaw-old-regulation.md',
@@ -1037,20 +1127,40 @@ export function createSampleRecords(config: TestConfig) {
   ];
 
   sampleRecords.forEach((record) => {
-    const filePath = join(config.recordsDir, record.path);
+    // record.path already includes 'records/', so join with dataDir, not recordsDir
+    const filePath = join(config.dataDir, record.path);
     const dir = join(filePath, '..');
     mkdirSync(dir, { recursive: true });
 
-    // Create proper frontmatter format
+    // Create proper frontmatter format with new standardized structure
     const frontmatter = `---
-id: ${record.id}
-title: ${record.title}
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "${record.id}"
+title: "${record.title}"
 type: ${record.type}
 status: ${record.status}
-author: ${record.metadata.author}
-created: ${record.metadata.created}
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "${record.metadata.author}"
+authors:
+  - name: "${record.metadata.authorName}"
+    username: "${record.metadata.author}"
+    role: "clerk"
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "${record.metadata.created}"
+updated: "${record.metadata.updated}"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
 ${record.metadata.tags ? `tags: [${record.metadata.tags.map((tag) => `"${tag}"`).join(', ')}]` : ''}
-${record.metadata.attachments ? `attachments: [${record.metadata.attachments.map((att) => `"${att}"`).join(', ')}]` : ''}
 ---
 
 ${record.content}`;

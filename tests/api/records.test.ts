@@ -110,18 +110,19 @@ describe('API Records Integration', () => {
       );
     });
 
-    it('should accept creation with any record type', async () => {
+    it('should accept creation with any valid record type', async () => {
+      // Test with a valid record type (geography is a valid type)
       const response = await request(context.api.getApp())
         .post('/api/v1/records')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          type: 'invalid-type',
-          title: 'Test Record',
+          type: 'geography',
+          title: 'Test Geography Record',
           content: '# Test Record\n\nContent here...',
         });
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.type).toBe('invalid-type');
+      expect(response.body.data.type).toBe('geography');
     });
 
     it('should reject creation with missing required fields', async () => {

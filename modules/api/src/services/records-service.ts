@@ -140,6 +140,8 @@ export class RecordsService {
       created_at: record.created_at,
       updated_at: record.updated_at,
       author: record.author,
+      commit_ref: record.commit_ref,
+      commit_signature: record.commit_signature,
     };
   }
 
@@ -169,6 +171,8 @@ export class RecordsService {
       created_at: record.created_at,
       updated_at: record.updated_at,
       author: record.author,
+      commit_ref: record.commit_ref,
+      commit_signature: record.commit_signature,
     };
   }
 
@@ -333,6 +337,8 @@ export class RecordsService {
       created_at: updatedRecord.created_at,
       updated_at: updatedRecord.updated_at,
       author: updatedRecord.author,
+      commit_ref: updatedRecord.commit_ref,
+      commit_signature: updatedRecord.commit_signature,
     };
   }
 
@@ -546,6 +552,8 @@ export class RecordsService {
       created_at: record.created_at,
       updated_at: record.updated_at,
       author: record.author,
+      commit_ref: record.commit_ref,
+      commit_signature: record.commit_signature,
     }));
 
     return {

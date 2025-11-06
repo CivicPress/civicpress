@@ -51,7 +51,7 @@ export interface RecordData {
     description?: string;
   }>;
   path?: string;
-  
+
   // Authorship - support both formats
   author: string; // Required: primary author username
   authors?: Array<{
@@ -61,12 +61,12 @@ export interface RecordData {
     role?: string;
     email?: string;
   }>;
-  
+
   // Timestamps - use ISO 8601
   created_at: string; // Internal (database)
   updated_at: string; // Internal (database)
   // Note: Frontmatter uses 'created' and 'updated'
-  
+
   // Source & Origin - for imported/legacy documents
   source?: {
     reference: string; // Required: Original document identifier/reference
@@ -77,6 +77,10 @@ export interface RecordData {
     imported_at?: string; // Optional: ISO 8601 import timestamp
     imported_by?: string; // Optional: Username who imported it
   };
+
+  // Commit Linkage - populated during export/archive operations (not during normal operations)
+  commit_ref?: string; // Git commit SHA that introduced or last modified this record
+  commit_signature?: string; // Cryptographic or GPG signature reference associated with the commit
 }
 
 export class RecordManager {
@@ -118,12 +122,25 @@ export class RecordManager {
     delete safeMetadata.author;
 
     // Auto-generate document number for legal record types if not provided
-    const legalTypes = ['bylaw', 'ordinance', 'policy', 'proclamation', 'resolution'];
+    const legalTypes = [
+      'bylaw',
+      'ordinance',
+      'policy',
+      'proclamation',
+      'resolution',
+    ];
     let documentNumber = safeMetadata.document_number;
     if (!documentNumber && legalTypes.includes(request.type)) {
       const year = new Date().getFullYear();
-      const sequence = await DocumentNumberGenerator.getNextSequence(request.type, year);
-      documentNumber = DocumentNumberGenerator.generate(request.type, year, sequence);
+      const sequence = await DocumentNumberGenerator.getNextSequence(
+        request.type,
+        year
+      );
+      documentNumber = DocumentNumberGenerator.generate(
+        request.type,
+        year,
+        sequence
+      );
     }
 
     // Create the record object
@@ -303,7 +320,10 @@ export class RecordManager {
         const fileContent = await fs.readFile(filePath, 'utf8');
 
         // Use RecordParser for consistent parsing
-        const parsedRecord = RecordParser.parseFromMarkdown(fileContent, dbRecord.path);
+        const parsedRecord = RecordParser.parseFromMarkdown(
+          fileContent,
+          dbRecord.path
+        );
 
         // Merge database record with parsed record
         // Database has latest sync info, parsed record has accurate frontmatter data
@@ -312,13 +332,21 @@ export class RecordManager {
           // Keep database fields for internal tracking
           path: dbRecord.path,
           // Ensure timestamps are set (use parsed if available, otherwise database)
-          created_at: parsedRecord.created_at || dbRecord.created_at || new Date().toISOString(),
-          updated_at: parsedRecord.updated_at || dbRecord.updated_at || new Date().toISOString(),
+          created_at:
+            parsedRecord.created_at ||
+            dbRecord.created_at ||
+            new Date().toISOString(),
+          updated_at:
+            parsedRecord.updated_at ||
+            dbRecord.updated_at ||
+            new Date().toISOString(),
         };
 
         return mergedRecord;
       } catch (error) {
-        logger.warn(`Failed to read record file for ${id}, falling back to database: ${error}`);
+        logger.warn(
+          `Failed to read record file for ${id}, falling back to database: ${error}`
+        );
         // Fall through to database-only record
       }
     }
@@ -347,7 +375,14 @@ export class RecordManager {
           record.authors = parsedMetadata.authors;
         }
         if (parsedMetadata.source) {
-          record.source = parsedMetadata.source;
+          // Normalize source: if it's a string (old format), convert to object
+          if (typeof parsedMetadata.source === 'string') {
+            record.source = {
+              reference: parsedMetadata.source,
+            };
+          } else {
+            record.source = parsedMetadata.source;
+          }
         }
       } catch (error) {
         logger.warn(`Failed to parse metadata for record ${id}:`, error);
@@ -391,9 +426,14 @@ export class RecordManager {
     // Parse linked geography files
     if (dbRecord.linked_geography_files) {
       try {
-        record.linkedGeographyFiles = JSON.parse(dbRecord.linked_geography_files);
+        record.linkedGeographyFiles = JSON.parse(
+          dbRecord.linked_geography_files
+        );
       } catch (error) {
-        logger.warn(`Failed to parse linked geography files for record ${id}:`, error);
+        logger.warn(
+          `Failed to parse linked geography files for record ${id}:`,
+          error
+        );
         record.linkedGeographyFiles = [];
       }
     } else {
@@ -422,21 +462,31 @@ export class RecordManager {
       updated_at: new Date().toISOString(),
     };
 
+    // Normalize source field if it's a string (from old database format)
+    if (updatedRecord.source && typeof updatedRecord.source === 'string') {
+      updatedRecord.source = {
+        reference: updatedRecord.source,
+      };
+    }
+
     // Update basic fields
     if (request.title !== undefined) updatedRecord.title = request.title;
     if (request.content !== undefined) updatedRecord.content = request.content;
     if (request.status !== undefined) updatedRecord.status = request.status;
-    if (request.geography !== undefined) updatedRecord.geography = request.geography;
-    if (request.attachedFiles !== undefined) updatedRecord.attachedFiles = request.attachedFiles;
-    if (request.linkedRecords !== undefined) updatedRecord.linkedRecords = request.linkedRecords;
+    if (request.geography !== undefined)
+      updatedRecord.geography = request.geography;
+    if (request.attachedFiles !== undefined)
+      updatedRecord.attachedFiles = request.attachedFiles;
+    if (request.linkedRecords !== undefined)
+      updatedRecord.linkedRecords = request.linkedRecords;
     if (request.linkedGeographyFiles !== undefined)
       updatedRecord.linkedGeographyFiles = request.linkedGeographyFiles;
-    
+
     // Update authors if provided
     if (request.authors !== undefined) {
       updatedRecord.authors = request.authors;
     }
-    
+
     // Update source if provided
     if (request.source !== undefined) {
       updatedRecord.source = request.source;
@@ -447,6 +497,20 @@ export class RecordManager {
       ...existingRecord.metadata,
       ...(request.metadata || {}),
     };
+
+    // Normalize source in metadata if it's a string (from old database format)
+    if (
+      updatedRecord.metadata.source &&
+      typeof updatedRecord.metadata.source === 'string'
+    ) {
+      if (!updatedRecord.source) {
+        updatedRecord.source = {
+          reference: updatedRecord.metadata.source,
+        };
+      }
+      // Remove source from metadata (it should be top-level)
+      delete updatedRecord.metadata.source;
+    }
 
     // Prepare database updates
     const dbUpdates: any = {};
@@ -463,7 +527,7 @@ export class RecordManager {
       dbUpdates.linked_geography_files = JSON.stringify(
         request.linkedGeographyFiles
       );
-    
+
     // Include authors and source in metadata JSON for database storage
     dbUpdates.metadata = JSON.stringify({
       ...updatedRecord.metadata,
@@ -660,13 +724,29 @@ export class RecordManager {
     const filePath = record.path;
     if (!filePath) return;
 
+    // Normalize source field before creating markdown (if it's a string, convert to object)
+    const normalizedRecord = { ...record };
+    if (
+      normalizedRecord.source &&
+      typeof normalizedRecord.source === 'string'
+    ) {
+      normalizedRecord.source = {
+        reference: normalizedRecord.source,
+      };
+    }
+
     // Create markdown content
-    const content = this.createMarkdownContent(record);
+    const content = this.createMarkdownContent(normalizedRecord);
 
     // Validate schema before saving (fail fast)
     const { data: frontmatter } = matter(content);
+
+    // Normalize frontmatter: convert Date objects back to ISO strings (gray-matter parses dates)
+    const normalizedFrontmatter =
+      this.normalizeFrontmatterForValidation(frontmatter);
+
     const schemaValidation = RecordSchemaValidator.validate(
-      frontmatter,
+      normalizedFrontmatter,
       record.type,
       {
         includeModuleExtensions: true,
@@ -703,13 +783,29 @@ export class RecordManager {
     const filePath = record.path;
     if (!filePath) return;
 
+    // Normalize source field before creating markdown (if it's a string, convert to object)
+    const normalizedRecord = { ...record };
+    if (
+      normalizedRecord.source &&
+      typeof normalizedRecord.source === 'string'
+    ) {
+      normalizedRecord.source = {
+        reference: normalizedRecord.source,
+      };
+    }
+
     // Create markdown content
-    const content = this.createMarkdownContent(record);
+    const content = this.createMarkdownContent(normalizedRecord);
 
     // Validate schema before saving (fail fast)
     const { data: frontmatter } = matter(content);
+
+    // Normalize frontmatter: convert Date objects back to ISO strings (gray-matter parses dates)
+    const normalizedFrontmatter =
+      this.normalizeFrontmatterForValidation(frontmatter);
+
     const schemaValidation = RecordSchemaValidator.validate(
-      frontmatter,
+      normalizedFrontmatter,
       record.type,
       {
         includeModuleExtensions: true,
@@ -764,5 +860,66 @@ export class RecordManager {
    */
   private createMarkdownContent(record: RecordData): string {
     return RecordParser.serializeToMarkdown(record);
+  }
+
+  /**
+   * Normalize frontmatter for validation: convert Date objects to ISO strings
+   * gray-matter automatically parses ISO 8601 dates as Date objects, but schema expects strings
+   */
+  private normalizeFrontmatterForValidation(frontmatter: any): any {
+    const normalized = { ...frontmatter };
+
+    // Convert Date objects to ISO strings
+    if (normalized.created instanceof Date) {
+      normalized.created = normalized.created.toISOString();
+    }
+    if (normalized.updated instanceof Date) {
+      normalized.updated = normalized.updated.toISOString();
+    }
+
+    // Normalize source: if it's a string (old format), convert to object
+    if (normalized.source) {
+      if (typeof normalized.source === 'string') {
+        normalized.source = {
+          reference: normalized.source,
+        };
+      } else if (typeof normalized.source === 'object') {
+        normalized.source = this.normalizeDatesInObject(normalized.source);
+      }
+    }
+
+    // Recursively normalize nested objects (e.g., metadata fields)
+    if (normalized.metadata && typeof normalized.metadata === 'object') {
+      normalized.metadata = this.normalizeDatesInObject(normalized.metadata);
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Recursively convert Date objects to ISO strings in an object
+   */
+  private normalizeDatesInObject(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+
+    if (obj instanceof Date) {
+      return obj.toISOString();
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.normalizeDatesInObject(item));
+    }
+
+    if (typeof obj === 'object') {
+      const normalized: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        normalized[key] = this.normalizeDatesInObject(value);
+      }
+      return normalized;
+    }
+
+    return obj;
   }
 }

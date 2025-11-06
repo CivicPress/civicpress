@@ -92,11 +92,13 @@ interface FrontmatterData {
     path: string;
     original_name: string;
     description?: string;
-    category?: string | {
-      label: string;
-      value: string;
-      description: string;
-    };
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
   }>;
 
   // Metadata (catch-all for other fields)
@@ -115,10 +117,7 @@ export class RecordParser {
    * @returns Parsed RecordData object
    * @throws Error if required fields are missing
    */
-  static parseFromMarkdown(
-    content: string,
-    filePath?: string
-  ): RecordData {
+  static parseFromMarkdown(content: string, filePath?: string): RecordData {
     try {
       const { data: frontmatter, content: markdownContent } = matter(content);
 
@@ -172,6 +171,10 @@ export class RecordParser {
         // Source & Origin
         source: normalized.source,
 
+        // Commit Linkage (populated during export/archive, not normal operations)
+        commit_ref: normalized.commit_ref,
+        commit_signature: normalized.commit_signature,
+
         // Geography
         geography: normalized.geography_data
           ? { ...normalized.geography_data }
@@ -182,12 +185,10 @@ export class RecordParser {
 
         // Linked Geography Files - normalize field name
         linkedGeographyFiles:
-          normalized.linked_geography_files ||
-          normalized.linkedGeographyFiles,
+          normalized.linked_geography_files || normalized.linkedGeographyFiles,
 
         // Attached Files - normalize field name
-        attachedFiles:
-          normalized.attached_files || normalized.attachedFiles,
+        attachedFiles: normalized.attached_files || normalized.attachedFiles,
 
         // Metadata - store optional fields
         metadata: {
@@ -198,7 +199,9 @@ export class RecordParser {
           ...(normalized.priority && { priority: normalized.priority }),
           ...(normalized.department && { department: normalized.department }),
           ...(normalized.category && { category: normalized.category }),
-          ...(normalized.session_type && { session_type: normalized.session_type }),
+          ...(normalized.session_type && {
+            session_type: normalized.session_type,
+          }),
           ...(normalized.date && { date: normalized.date }),
           ...(normalized.duration && { duration: normalized.duration }),
           ...(normalized.location && { location: normalized.location }),
@@ -219,6 +222,8 @@ export class RecordParser {
                   'created',
                   'updated',
                   'source',
+                  'commit_ref',
+                  'commit_signature',
                   'geography_data',
                   'linked_records',
                   'linkedRecords',
@@ -249,9 +254,7 @@ export class RecordParser {
       return record;
     } catch (error) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Unknown error parsing record';
+        error instanceof Error ? error.message : 'Unknown error parsing record';
       logger.error(
         `Failed to parse record${filePath ? ` from ${filePath}` : ''}: ${errorMessage}`
       );
@@ -291,6 +294,14 @@ export class RecordParser {
     // Source & Origin
     if (record.source) {
       frontmatter.source = record.source;
+    }
+
+    // Commit Linkage (populated during export/archive, not normal operations)
+    if (record.commit_ref) {
+      frontmatter.commit_ref = record.commit_ref;
+    }
+    if (record.commit_signature) {
+      frontmatter.commit_signature = record.commit_signature;
     }
 
     // Classification (from metadata)
@@ -353,10 +364,7 @@ export class RecordParser {
     }
 
     // Linked Geography Files
-    if (
-      record.linkedGeographyFiles &&
-      record.linkedGeographyFiles.length > 0
-    ) {
+    if (record.linkedGeographyFiles && record.linkedGeographyFiles.length > 0) {
       frontmatter.linked_geography_files = record.linkedGeographyFiles;
     }
 
@@ -368,9 +376,10 @@ export class RecordParser {
     // Generate YAML with section comments and proper formatting
     const yamlContent = this.generateYamlWithComments(frontmatter);
 
-    // Return formatted markdown
+    // Return formatted markdown (ensure newline before closing ---)
     return `---
-${yamlContent}---
+${yamlContent}
+---
 
 ${record.content || ''}`;
   }
@@ -395,7 +404,9 @@ ${record.content || ''}`;
         } else if (firstAuthor?.username) {
           normalized.author = firstAuthor.username;
         } else if (firstAuthor?.name) {
-          normalized.author = firstAuthor.name.toLowerCase().replace(/\s+/g, '.');
+          normalized.author = firstAuthor.name
+            .toLowerCase()
+            .replace(/\s+/g, '.');
         }
       }
       // Fallback to 'unknown' if nothing found
@@ -410,6 +421,14 @@ ${record.content || ''}`;
     }
     if (!normalized.updated && normalized.updated_at) {
       normalized.updated = normalized.updated_at;
+    }
+
+    // Convert Date objects to ISO strings (gray-matter parses ISO dates as Date objects)
+    if (normalized.created instanceof Date) {
+      normalized.created = normalized.created.toISOString();
+    }
+    if (normalized.updated instanceof Date) {
+      normalized.updated = normalized.updated.toISOString();
     }
 
     // Normalize field names (old format uses camelCase, new uses snake_case for some)
@@ -442,7 +461,15 @@ ${record.content || ''}`;
     frontmatter: any,
     filePath?: string
   ): void {
-    const required = ['id', 'title', 'type', 'status', 'author', 'created', 'updated'];
+    const required = [
+      'id',
+      'title',
+      'type',
+      'status',
+      'author',
+      'created',
+      'updated',
+    ];
     const missing: string[] = [];
 
     for (const field of required) {
@@ -464,7 +491,9 @@ ${record.content || ''}`;
    * @param frontmatter - Frontmatter data to serialize
    * @returns Formatted YAML string with section comments
    */
-  private static generateYamlWithComments(frontmatter: FrontmatterData): string {
+  private static generateYamlWithComments(
+    frontmatter: FrontmatterData
+  ): string {
     // Define field order with section headers
     const sections: Array<{ header: string; fields: string[] }> = [
       {
@@ -481,18 +510,15 @@ ${record.content || ''}`;
       },
       {
         header: 'CLASSIFICATION (Optional but recommended)',
-        fields: [
-          'tags',
-          'module',
-          'slug',
-          'version',
-          'priority',
-          'department',
-        ],
+        fields: ['tags', 'module', 'slug', 'version', 'priority', 'department'],
       },
       {
         header: 'SOURCE & ORIGIN (Optional - for imported/legacy documents)',
         fields: ['source'],
+      },
+      {
+        header: 'COMMIT LINKAGE (Optional - populated during export/archive)',
+        fields: ['commit_ref', 'commit_signature'],
       },
       {
         header: 'TYPE-SPECIFIC FIELDS (Optional)',
@@ -565,12 +591,13 @@ ${record.content || ''}`;
       }
     }
 
-    // Remove trailing empty line
-    if (lines[lines.length - 1] === '') {
+    // Remove trailing empty lines, but ensure we end with a newline
+    while (lines.length > 0 && lines[lines.length - 1] === '') {
       lines.pop();
     }
 
-    return lines.join('\n');
+    // Join lines and ensure trailing newline for proper YAML frontmatter closing
+    return lines.join('\n') + '\n';
   }
 
   /**
@@ -584,14 +611,19 @@ ${record.content || ''}`;
     // Use YAML library to properly format the value
     // This handles arrays, objects, strings, numbers, booleans correctly
     try {
-      const yamlDoc = stringify({ [key]: value }, {
-        indent: 2,
-        lineWidth: 0,
-      });
+      const yamlDoc = stringify(
+        { [key]: value },
+        {
+          indent: 2,
+          lineWidth: 0,
+        }
+      );
 
       // Extract just the key-value line(s) from the YAML output
-      const lines = yamlDoc.split('\n').filter((line: string) => line.trim() !== '');
-      
+      const lines = yamlDoc
+        .split('\n')
+        .filter((line: string) => line.trim() !== '');
+
       if (lines.length === 0) {
         // Fallback for empty values
         return `${key}: null`;
@@ -626,9 +658,10 @@ ${record.content || ''}`;
       }
     } catch (error) {
       // Fallback to simple string representation if YAML formatting fails
-      logger.warn(`Failed to format YAML field ${key}, using fallback: ${error}`);
+      logger.warn(
+        `Failed to format YAML field ${key}, using fallback: ${error}`
+      );
       return `${key}: ${JSON.stringify(value)}`;
     }
   }
 }
-

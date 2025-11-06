@@ -55,6 +55,17 @@ describe('Authorization System', () => {
           '# Test Policy\n\nThis is a test policy for authorization testing.',
       });
 
+    // Debug: Log response if creation failed
+    if (!createResponse.body.data) {
+      console.error('Record creation failed:', {
+        status: createResponse.status,
+        body: createResponse.body,
+      });
+      throw new Error(
+        `Record creation failed: ${JSON.stringify(createResponse.body)}`
+      );
+    }
+
     recordId = createResponse.body.data.id;
   });
 

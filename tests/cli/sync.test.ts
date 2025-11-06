@@ -45,7 +45,7 @@ describe('CLI Sync Commands', () => {
 id: "record-1718208000000"
 title: 'Noise Restrictions'
 type: bylaw
-status: published
+status: approved
 
 # ============================================
 # AUTHORSHIP & ATTRIBUTION (Required)
@@ -197,7 +197,7 @@ This resolution approves the 2025 budget.`,
 
     it('should generate index with filters', () => {
       const result = execSync(
-        `node ${resolve(originalCwd, 'cli/dist/index.js')} index --type bylaw --status adopted`,
+        `node ${resolve(originalCwd, 'cli/dist/index.js')} index --type bylaw --status approved`,
         { cwd: testDir, encoding: 'utf8' }
       );
 
@@ -213,7 +213,7 @@ This resolution approves the 2025 budget.`,
       ) as any;
       expect(indexContent.entries).toHaveLength(1);
       expect(indexContent.entries[0].type).toBe('bylaw');
-      expect(indexContent.entries[0].status).toBe('adopted');
+      expect(indexContent.entries[0].status).toBe('approved');
     });
 
     it('should support --json output', () => {

@@ -209,7 +209,9 @@ Get a specific record by ID (public endpoint).
       "path": "records/bylaw/noise-restrictions.md",
       "author": "admin",
       "created_at": "2025-07-18 20:50:14",
-      "updated_at": "2025-07-23 21:15:08"
+      "updated_at": "2025-07-23 21:15:08",
+      "commit_ref": null,
+      "commit_signature": null
     }
   }
 }
@@ -253,7 +255,9 @@ Create a new record (requires authentication).
       "path": "records/policy/new-policy-document.md",
       "author": "admin",
       "created_at": "2025-07-30 21:33:40",
-      "updated_at": "2025-07-30 21:33:40"
+      "updated_at": "2025-07-30 21:33:40",
+      "commit_ref": null,
+      "commit_signature": null
     },
     "message": "Record created successfully"
   }
@@ -297,7 +301,9 @@ Update an existing record (requires authentication).
       "path": "records/bylaw/noise-restrictions.md",
       "author": "admin",
       "created_at": "2025-07-18 20:50:14",
-      "updated_at": "2025-07-30 21:35:20"
+      "updated_at": "2025-07-30 21:35:20",
+      "commit_ref": null,
+      "commit_signature": null
     },
     "message": "Record updated successfully"
   }
@@ -324,7 +330,8 @@ Delete a record (requires authentication).
 
 ### Validation
 
-CivicPress provides comprehensive validation endpoints for records using JSON Schema validation. All validation endpoints require authentication.
+CivicPress provides comprehensive validation endpoints for records using JSON
+Schema validation. All validation endpoints require authentication.
 
 #### POST /api/v1/validation/record
 
@@ -512,8 +519,10 @@ Get validation status across all records.
 
 **Validation Features:**
 
-- **Schema Validation**: Validates frontmatter against JSON Schema (base + type + module + plugin schemas)
-- **Business Rule Validation**: Validates relationships, compliance fields, and business logic
+- **Schema Validation**: Validates frontmatter against JSON Schema (base +
+  type + module + plugin schemas)
+- **Business Rule Validation**: Validates relationships, compliance fields, and
+  business logic
 - **Clear Error Messages**: Field-level errors with suggestions for fixing
 - **Metadata Extraction**: Returns parsed record metadata if validation succeeds
 - **Bulk Operations**: Validate multiple records efficiently
