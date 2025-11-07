@@ -416,6 +416,29 @@ Field "status": Field "status" must be one of: draft, pending_review, approved, 
 3. Clear cache if config changes: `RecordSchemaBuilder.clearCache()`
 4. Consider disabling type/module extensions if not needed
 
+### CLI Serialization Bug _(tracked)_
+
+**Problem**: Running `civic validate <record>` against a record outside the
+`data/records/` directory reports schema errors such as “Field `date` must be of
+type string, got object,” even though the frontmatter already contains ISO 8601
+strings.
+
+**Root Cause**: `RecordParser.parseFromMarkdown()` returns the correct strings,
+but the CLI’s `validateRecord()` helper re-serializes the `RecordData` back to
+markdown before calling `RecordSchemaValidator.validate()`. During that round
+trip, `gray-matter` converts ISO timestamps into `Date` objects, so Ajv sees an
+object instead of the original string.
+
+**Workaround**:
+
+1. Copy the file into `data/records/` before validation so the CLI reads it
+   directly without the extra serialization step; **or**
+2. Use `RecordSchemaValidator.validate(matter(content).data, type)` directly in
+   scripts and tests until the CLI bug is fixed.
+
+**Next Step**: Patch `cli/src/commands/validate.ts` so it validates the original
+frontmatter object rather than re-serializing the parsed record.
+
 ---
 
 ## 📚 Related Documentation

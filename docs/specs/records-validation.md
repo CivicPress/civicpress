@@ -238,6 +238,18 @@ Errors are shown with file, line, and reason:
 
 ---
 
+## 🐞 Known Issues
+
+- **CLI re-serialization bug**: `civic validate <record>` currently rebuilds the
+  markdown via `RecordParser.serializeToMarkdown()` before running schema
+  checks. When validating files outside `data/records/`, this conversion turns
+  ISO 8601 strings into `Date` objects, so Ajv reports type errors for `date`,
+  `created`, `updated`, and `source.imported_at`. Copy the file into
+  `data/records/` or call `RecordSchemaValidator.validate()` directly until the
+  CLI helper is patched.
+
+---
+
 ## 🛠️ Future Enhancements
 
 - Support `.civic/validation.yml` to customize required fields
