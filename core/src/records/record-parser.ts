@@ -373,8 +373,8 @@ export class RecordParser {
       frontmatter.attached_files = record.attachedFiles;
     }
 
-    // Generate YAML with section comments and proper formatting
-    const yamlContent = this.generateYamlWithComments(frontmatter);
+    // Generate YAML with ordered sections (no comment dividers)
+    const yamlContent = this.generateOrderedYaml(frontmatter);
 
     // Return formatted markdown (ensure newline before closing ---)
     return `---
@@ -486,14 +486,12 @@ ${record.content || ''}`;
   }
 
   /**
-   * Generate YAML content with section comments for readability
+   * Generate YAML content with ordered sections (without comment dividers)
    *
    * @param frontmatter - Frontmatter data to serialize
-   * @returns Formatted YAML string with section comments
+   * @returns Formatted YAML string grouped by logical sections
    */
-  private static generateYamlWithComments(
-    frontmatter: FrontmatterData
-  ): string {
+  private static generateOrderedYaml(frontmatter: FrontmatterData): string {
     // Define field order with section headers
     const sections: Array<{ header: string; fields: string[] }> = [
       {
@@ -548,6 +546,7 @@ ${record.content || ''}`;
     const processedFields = new Set<string>();
 
     // Process each section
+    let isFirstSection = true;
     for (const section of sections) {
       // Check if section has any fields to output
       const hasFields = section.fields.some(
@@ -556,21 +555,27 @@ ${record.content || ''}`;
       );
 
       if (hasFields) {
-        // Add section header comment
-        lines.push(`# ============================================`);
-        lines.push(`# ${section.header}`);
-        lines.push(`# ============================================`);
-
-        // Output fields in order
+        const sectionLines: string[] = [];
         for (const field of section.fields) {
           if (frontmatter[field] !== undefined && frontmatter[field] !== null) {
             processedFields.add(field);
             const value = frontmatter[field];
-            lines.push(this.formatYamlField(field, value));
+            sectionLines.push(this.formatYamlField(field, value));
           }
         }
 
-        lines.push(''); // Empty line between sections
+        if (sectionLines.length > 0) {
+          if (
+            !isFirstSection &&
+            lines.length > 0 &&
+            lines[lines.length - 1] !== ''
+          ) {
+            lines.push('');
+          }
+          lines.push(...sectionLines);
+          lines.push('');
+          isFirstSection = false;
+        }
       }
     }
 
@@ -580,10 +585,13 @@ ${record.content || ''}`;
     );
 
     if (remainingFields.length > 0) {
-      // Add metadata section for unknown fields
-      lines.push(`# ============================================`);
-      lines.push(`# ADDITIONAL METADATA (Optional)`);
-      lines.push(`# ============================================`);
+      if (
+        !isFirstSection &&
+        lines.length > 0 &&
+        lines[lines.length - 1] !== ''
+      ) {
+        lines.push('');
+      }
 
       for (const field of remainingFields) {
         const value = frontmatter[field];

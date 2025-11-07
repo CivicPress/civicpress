@@ -9,11 +9,12 @@ import {
   vi,
 } from 'vitest';
 import { execSync } from 'child_process';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { existsSync, rmSync, mkdirSync, writeFileSync, writeFile } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import yaml from 'js-yaml';
+import { RecordParser, RecordData } from '@civicpress/core';
 
 // Test configuration
 export interface TestConfig {
@@ -78,6 +79,22 @@ export function getRandomPort(): number {
 
 export function releasePort(port: number): void {
   usedPorts.delete(port);
+}
+
+let cliBuilt = false;
+
+export function ensureCliBuilt(): void {
+  if (!cliBuilt) {
+    const cliDir = join(dirname(TEST_CONFIG.CLI_PATH), '..');
+    const distIndex = join(cliDir, 'dist', 'index.js');
+    if (!existsSync(distIndex)) {
+      execSync('pnpm run build', {
+        cwd: cliDir,
+        stdio: 'pipe',
+      });
+    }
+    cliBuilt = true;
+  }
 }
 
 // Mock setup for @civicpress/core - COMMENTED OUT FOR INTEGRATION TESTS
@@ -1132,40 +1149,36 @@ export function createSampleRecords(config: TestConfig) {
     const dir = join(filePath, '..');
     mkdirSync(dir, { recursive: true });
 
-    // Create proper frontmatter format with new standardized structure
-    const frontmatter = `---
-# ============================================
-# CORE IDENTIFICATION (Required)
-# ============================================
-id: "${record.id}"
-title: "${record.title}"
-type: ${record.type}
-status: ${record.status}
+    const metadata: Record<string, any> = {};
+    if (record.metadata.tags) {
+      metadata.tags = record.metadata.tags;
+    }
+    if (record.metadata.attachments) {
+      metadata.attachments = record.metadata.attachments;
+    }
 
-# ============================================
-# AUTHORSHIP & ATTRIBUTION (Required)
-# ============================================
-author: "${record.metadata.author}"
-authors:
-  - name: "${record.metadata.authorName}"
-    username: "${record.metadata.author}"
-    role: "clerk"
+    const recordData: RecordData = {
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      author: record.metadata.author,
+      authors: [
+        {
+          name: record.metadata.authorName,
+          username: record.metadata.author,
+          role: 'clerk',
+        },
+      ],
+      created_at: record.metadata.created,
+      updated_at: record.metadata.updated,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    };
 
-# ============================================
-# TIMESTAMPS (Required)
-# ============================================
-created: "${record.metadata.created}"
-updated: "${record.metadata.updated}"
+    const markdown = RecordParser.serializeToMarkdown(recordData);
 
-# ============================================
-# CLASSIFICATION (Optional but recommended)
-# ============================================
-${record.metadata.tags ? `tags: [${record.metadata.tags.map((tag) => `"${tag}"`).join(', ')}]` : ''}
----
-
-${record.content}`;
-
-    writeFileSync(filePath, frontmatter);
+    writeFileSync(filePath, markdown);
   });
 
   return sampleRecords;
@@ -1265,6 +1278,9 @@ export async function createCLITestContext(): Promise<CLITestContext> {
   createRolesConfig(config);
   createSampleRecords(config);
 
+  // Ensure CLI is built before executing commands
+  ensureCliBuilt();
+
   // Initialize Git repository for the test directory
   const { simpleGit } = await import('simple-git');
   const git = simpleGit(config.testDir);
@@ -1360,68 +1376,49 @@ export async function createAPITestContext(): Promise<APITestContext> {
 
   // Add the test record (using new standardized format)
   const sampleRecordPath = join(bylawDir, 'test-record.md');
-  const sampleRecordContent = `---
-# ============================================
-# CORE IDENTIFICATION (Required)
-# ============================================
-id: "test-record"
-title: Test Record
-type: bylaw
-status: archived
-
-# ============================================
-# AUTHORSHIP & ATTRIBUTION (Required)
-# ============================================
-author: "test"
-authors:
-  - name: 'Test User'
-    username: 'test'
-    role: 'clerk'
-
-# ============================================
-# TIMESTAMPS (Required)
-# ============================================
-created: "2025-01-01T10:00:00Z"
-updated: "2025-01-01T10:00:00Z"
----
-
-# Test Record
-
-This is a test record for API testing.`;
+  const sampleRecord: RecordData = {
+    id: 'test-record',
+    title: 'Test Record',
+    type: 'bylaw',
+    status: 'archived',
+    content: '# Test Record\n\nThis is a test record for API testing.',
+    author: 'test',
+    authors: [
+      {
+        name: 'Test User',
+        username: 'test',
+        role: 'clerk',
+      },
+    ],
+    created_at: '2025-01-01T10:00:00Z',
+    updated_at: '2025-01-01T10:00:00Z',
+  };
+  const sampleRecordContent = RecordParser.serializeToMarkdown(sampleRecord);
   await (
     await import('fs/promises')
   ).writeFile(sampleRecordPath, sampleRecordContent);
 
   // Add an archived record for indexing tests (using new standardized format)
   const archivedRecordPath = join(bylawDir, 'old-regulation.md');
-  const archivedRecordContent = `---
-# ============================================
-# CORE IDENTIFICATION (Required)
-# ============================================
-id: "old-regulation"
-title: Old Regulation
-type: bylaw
-status: archived
-
-# ============================================
-# AUTHORSHIP & ATTRIBUTION (Required)
-# ============================================
-author: "historical"
-authors:
-  - name: 'Historical Department'
-    username: 'historical'
-    role: 'clerk'
-
-# ============================================
-# TIMESTAMPS (Required)
-# ============================================
-created: "2024-01-01T10:00:00Z"
-updated: "2024-01-01T10:00:00Z"
----
-
-# Old Regulation
-
-This regulation has been archived.`;
+  const archivedRecord: RecordData = {
+    id: 'old-regulation',
+    title: 'Old Regulation',
+    type: 'bylaw',
+    status: 'archived',
+    content: '# Old Regulation\n\nThis regulation has been archived.',
+    author: 'historical',
+    authors: [
+      {
+        name: 'Historical Department',
+        username: 'historical',
+        role: 'clerk',
+      },
+    ],
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z',
+  };
+  const archivedRecordContent =
+    RecordParser.serializeToMarkdown(archivedRecord);
   await (
     await import('fs/promises')
   ).writeFile(archivedRecordPath, archivedRecordContent);

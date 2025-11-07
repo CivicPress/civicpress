@@ -163,9 +163,30 @@
     },
     "attendees": {
       "type": "array",
-      "description": "Array of attendee objects (for session type)",
+      "description": "Array of persons invited to or expected at the session, with attendance status.",
       "items": {
-        "type": "object"
+        "type": "object",
+        "description": "Attendance record for one participant.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Full name of the participant (e.g., councillor, mayor, clerk)."
+          },
+          "role": {
+            "type": "string",
+            "description": "Role or title (e.g., Mayor, Councillor, Clerk, Legal Counsel)."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["present", "absent", "excused", "remote"],
+            "description": "Attendance status for this meeting."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional note (e.g., reason for absence, joined late, left early)."
+          }
+        },
+        "additionalProperties": true
       }
     },
     "topics": {

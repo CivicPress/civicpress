@@ -238,6 +238,11 @@ metadata:
 The markdown content of the record goes here...
 ```
 
+> **Note**: The section divider comments shown in this example remain in
+> templates and documentation for clarity. When CivicPress serializes records in
+> code, it omits those comment lines while keeping the same field order and
+> structure.
+
 ## 📊 Field Definitions
 
 ### Core Identification (Required)
