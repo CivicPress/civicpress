@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import { BackupService, type BackupCreateResult } from '@civicpress/core';
 
 async function pathExists(targetPath: string): Promise<boolean> {
@@ -25,7 +26,7 @@ describe('BackupService', () => {
   });
 
   it('creates a backup with data and local storage assets', async () => {
-    const { dataDir, systemDataDir, storageFilePath, outputDir } =
+    const { dataDir, systemDataDir, storageFilePaths, outputDir, recordPath } =
       await createFixtureLayout(tempRoot);
 
     const result = await BackupService.createBackup({
@@ -37,11 +38,11 @@ describe('BackupService', () => {
       version: 'test-version',
     });
 
-    await assertBackup(result, storageFilePath);
+    await assertBackup(result, storageFilePaths, recordPath);
   });
 
   it('restores a previously created backup', async () => {
-    const { dataDir, systemDataDir, storageFilePath, outputDir } =
+    const { dataDir, systemDataDir, storageFilePaths, outputDir, recordPath } =
       await createFixtureLayout(tempRoot);
 
     const createResult = await BackupService.createBackup({
@@ -74,6 +75,18 @@ describe('BackupService', () => {
     );
     expect(await pathExists(restoredStorageFile)).toBe(true);
 
+    const restoredImageFile = path.join(
+      restoreSystem,
+      'storage',
+      'public',
+      'diagram.png'
+    );
+    expect(await pathExists(restoredImageFile)).toBe(true);
+
+    const restoredContent = await fs.readFile(restoredFile, 'utf8');
+    expect(restoredContent).toContain('![City Map]');
+    expect(restoredContent).toContain('diagram.png');
+
     expect(restoreResult.metadata?.data.relativePath).toBe('data');
   });
 });
@@ -82,10 +95,18 @@ async function createFixtureLayout(tempRoot: string) {
   const dataDir = path.join(tempRoot, 'data-src');
   const recordsDir = path.join(dataDir, 'records');
   await fs.mkdir(recordsDir, { recursive: true });
-  await fs.writeFile(
-    path.join(recordsDir, 'sample.md'),
-    '---\ntitle: Test\n---\nContent'
-  );
+  const recordContent = `---
+title: Test
+---
+
+Meeting minutes with supporting image.
+
+![City Map](../../system-data/storage/public/diagram.png)
+
+Internal attachment reference.
+`;
+  const recordPath = path.join(recordsDir, 'sample.md');
+  await fs.writeFile(recordPath, recordContent);
 
   // Simulate nested git repository by creating .git directory
   await fs.mkdir(path.join(dataDir, '.git'), { recursive: true });
@@ -95,6 +116,9 @@ async function createFixtureLayout(tempRoot: string) {
   await fs.mkdir(path.join(storageDir, 'public'), { recursive: true });
   const storageFilePath = path.join(storageDir, 'public', 'hello.txt');
   await fs.writeFile(storageFilePath, 'hello');
+
+  const imageFilePath = path.join(storageDir, 'public', 'diagram.png');
+  await fs.writeFile(imageFilePath, 'fake-image-bytes');
 
   const storageConfig = `
 providers:
@@ -116,12 +140,19 @@ folders:
 
   const outputDir = path.join(tempRoot, 'exports', 'backups');
 
-  return { dataDir, systemDataDir, storageFilePath, outputDir };
+  return {
+    dataDir,
+    systemDataDir,
+    storageFilePaths: [storageFilePath, imageFilePath],
+    outputDir,
+    recordPath,
+  };
 }
 
 async function assertBackup(
   result: BackupCreateResult,
-  storageSourceFile: string
+  storageSourceFiles: string[],
+  recordSourcePath: string
 ) {
   const metadataPath = path.join(result.backupDir, 'metadata.json');
   expect(await pathExists(metadataPath)).toBe(true);
@@ -141,16 +172,30 @@ async function assertBackup(
   );
   expect(await pathExists(backedUpDataFile)).toBe(true);
 
-  const backedUpStorageFile = path.join(
-    result.backupDir,
-    'storage',
-    'public',
-    'hello.txt'
-  );
+  const backedUpMarkdown = await fs.readFile(backedUpDataFile, 'utf8');
+  expect(backedUpMarkdown).toContain('diagram.png');
 
-  expect(await pathExists(backedUpStorageFile)).toBe(true);
+  for (const sourceFile of storageSourceFiles) {
+    const filename = path.basename(sourceFile);
+    const backedUpStorageFile = path.join(
+      result.backupDir,
+      'storage',
+      'public',
+      filename
+    );
 
-  const originalContent = await fs.readFile(storageSourceFile, 'utf8');
-  const backupContent = await fs.readFile(backedUpStorageFile, 'utf8');
-  expect(originalContent).toBe(backupContent);
+    expect(await pathExists(backedUpStorageFile)).toBe(true);
+
+    const originalHash = await hashFile(sourceFile);
+    const backupHash = await hashFile(backedUpStorageFile);
+    expect(originalHash).toBe(backupHash);
+  }
+
+  const originalMarkdown = await fs.readFile(recordSourcePath, 'utf8');
+  expect(backedUpMarkdown).toBe(originalMarkdown);
+}
+
+async function hashFile(filePath: string): Promise<string> {
+  const data = await fs.readFile(filePath);
+  return crypto.createHash('sha256').update(data).digest('hex');
 }
