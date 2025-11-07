@@ -57,12 +57,13 @@ curated civic collections.
 
 ## 🔗 Inputs & Outputs
 
-| Input               | Output                                  |
-| ------------------- | --------------------------------------- |
-| `civic backup`      | Creates compressed snapshot/archive     |
-| `.civic/backup.yml` | Stores config (frequency, paths, scope) |
-| `civic schedule`    | Can trigger automated backups           |
-| Demo bundle repos   | Provide curated snapshot inputs         |
+| Input                  | Output                                  |
+| ---------------------- | --------------------------------------- |
+| `civic backup create`  | Creates timestamped backup directory    |
+| `civic backup restore` | Restores backup into working instance   |
+| `.civic/backup.yml`    | Stores config (frequency, paths, scope) |
+| `civic schedule`       | Can trigger automated backups           |
+| Demo bundle repos      | Provide curated snapshot inputs         |
 
 ---
 

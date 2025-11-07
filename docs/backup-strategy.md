@@ -121,14 +121,14 @@ civic start
 ### **Backup Commands**
 
 ```bash
-# Public data backup
-civic backup --public-only --commit --push
+# Create full backup (data + local storage)
+civic backup create --output exports/backups
 
-# Private data backup
-civic backup --system-data --encrypt --local
+# Create backup without storage assets
+civic backup create --skip-storage
 
-# Full system backup (both)
-civic backup --full --encrypt --local
+# Restore from backup directory or archive
+civic backup restore exports/backups/2025-11-07T15-01-30Z --overwrite
 ```
 
 ### **Restore Commands**

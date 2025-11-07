@@ -32,6 +32,7 @@ build/
 # CivicPress Public Data (separate Git repository)
 # data/ folder has its own Git repository and should not be tracked here
 data/
+exports/backups/
 
 # pnpm
 # Note: pnpm-lock.yaml should be committed for reproducible builds

@@ -101,6 +101,14 @@ export { TemplateEngine } from './utils/template-engine.js';
 export { AuditLogger } from './audit/audit-logger.js';
 export { DocumentNumberGenerator } from './utils/document-number-generator.js';
 export { ComplianceFieldHelpers } from './utils/compliance-helpers.js';
+export {
+  BackupService,
+  type BackupCreateOptions,
+  type BackupCreateResult,
+  type BackupRestoreOptions,
+  type BackupRestoreResult,
+  type BackupMetadata,
+} from './backup/backup-service.js';
 
 // Export utility functions for CLI use
 export async function loadConfig() {
