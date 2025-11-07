@@ -7,6 +7,9 @@ transparency:
 
 - **Public Data**: `data/` folder → Git repository (public access)
 - **Private Data**: `.system-data/` folder → IT-managed backups (private)
+- **Storage Assets**: Managed via storage providers. Local assets are exported
+  with backups; remote cloud objects (S3/Azure) stay in place and rely on cloud
+  durability/backups.
 
 ## 📁 Directory Structure
 
@@ -29,7 +32,7 @@ civicpress/
 
 ## 🔄 Backup Workflows
 
-### **Public Data Backup (Git Repository)**
+### **Public Data Backup (Git Repository + Local Storage Assets)**
 
 ```bash
 # Backup public data to Git
@@ -39,6 +42,7 @@ civic backup --public-only --commit --push
 # ✅ data/records/ (all civic records)
 # ✅ data/.civic/ (public configuration)
 # ✅ data/templates/ (public templates)
+# ✅ storage/ manifests + exported local assets (optional flag)
 # ❌ .system-data/ (never included)
 ```
 
@@ -77,6 +81,17 @@ civic start
 # ✅ Fresh local database for operations
 # ✅ No sensitive data exposure
 ```
+
+### **Demo & Template Bundles**
+
+- Create rich demo datasets (e.g. Richmond) by standing up a clean instance,
+  loading records/files like an editor, then running `civic backup create` to
+  export `data/` **with git history** plus storage assets and metadata.
+- Host bundles in a dedicated repo so teams can clone the full history or
+  download a tagged archive.
+- `civic init` reuses the restore workflow to apply any bundle the operator
+  selects. If offline, CivicPress ships a **minimal built-in sample set** so the
+  experience still works without a network connection.
 
 ### **Template City Benefits**
 
@@ -169,7 +184,8 @@ civic validate --full
 
 - **Git Backup**: Public data in version control
 - **Encrypted Backup**: Private data securely backed up
-- **Easy Restore**: Simple recovery procedures
+- **Easy Restore**: Simple recovery procedures (both operational restores and
+  demo bundle installs use the same tooling)
 - **Integrity Checks**: Validation of restored data
 
 ## 🔗 Related Documentation
