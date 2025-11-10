@@ -12,6 +12,12 @@ import { RecordParser } from './record-parser.js';
 import { RecordSchemaValidator } from './record-schema-validator.js';
 import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
 import matter from 'gray-matter';
+import {
+  buildArchiveRelativePath,
+  buildRecordRelativePath,
+  ensureDirectoryForRecordPath,
+  parseRecordRelativePath,
+} from '../utils/record-paths.js';
 
 const logger = new Logger();
 
@@ -115,8 +121,13 @@ export class RecordManager {
     user: AuthUser
   ): Promise<RecordData> {
     const recordId = `record-${Date.now()}`;
-    const recordPath = `records/${request.type}/${recordId}.md`;
-
+    const now = new Date();
+    const createdAt = now.toISOString();
+    const recordPath = buildRecordRelativePath(
+      request.type,
+      recordId,
+      createdAt
+    );
     // Remove any author property from request.metadata to avoid overwriting
     const safeMetadata = { ...(request.metadata || {}) };
     delete safeMetadata.author;
@@ -131,7 +142,7 @@ export class RecordManager {
     ];
     let documentNumber = safeMetadata.document_number;
     if (!documentNumber && legalTypes.includes(request.type)) {
-      const year = new Date().getFullYear();
+      const year = now.getFullYear();
       const sequence = await DocumentNumberGenerator.getNextSequence(
         request.type,
         year
@@ -170,8 +181,8 @@ export class RecordManager {
         },
       ],
       source: request.source,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: createdAt,
+      updated_at: createdAt,
     };
 
     // Save to database
@@ -227,7 +238,13 @@ export class RecordManager {
     request: CreateRecordRequest,
     user: AuthUser
   ): Promise<RecordData> {
-    const recordPath = `records/${request.type}/${recordId}.md`;
+    const now = new Date();
+    const createdAt = now.toISOString();
+    const recordPath = buildRecordRelativePath(
+      request.type,
+      recordId,
+      createdAt
+    );
 
     // Remove any author property from request.metadata to avoid overwriting
     const safeMetadata2 = { ...(request.metadata || {}) };
@@ -250,12 +267,12 @@ export class RecordManager {
         authorId: user.id,
         authorName: user.name || user.username,
         authorEmail: user.email,
-        created: new Date().toISOString(),
+        created: createdAt,
       },
       path: recordPath,
       author: user.username, // Always set as string
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: createdAt,
+      updated_at: createdAt,
     };
 
     // Save to database
@@ -765,9 +782,8 @@ export class RecordManager {
     }
 
     // Ensure directory exists
+    ensureDirectoryForRecordPath(this.dataDir, filePath);
     const fullPath = path.join(this.dataDir, filePath);
-    const dir = path.dirname(fullPath);
-    await fs.mkdir(dir, { recursive: true });
 
     // Write file
     await fs.writeFile(fullPath, content, 'utf8');
@@ -824,6 +840,7 @@ export class RecordManager {
     }
 
     // Write file
+    ensureDirectoryForRecordPath(this.dataDir, filePath);
     const fullPath = path.join(this.dataDir, filePath);
     await fs.writeFile(fullPath, content, 'utf8');
 
@@ -838,14 +855,19 @@ export class RecordManager {
     const filePath = record.path;
     if (!filePath) return;
 
-    // Move file to archive
-    const archivePath = `archive/${record.type}/${record.id}.md`;
+    // Determine archive path (preserve original year if present)
+    const parsedPath = parseRecordRelativePath(filePath);
+    const archivePath =
+      parsedPath.year && parsedPath.type === record.type
+        ? path
+            .join('archive', record.type, parsedPath.year, `${record.id}.md`)
+            .replace(/\\/g, '/')
+        : buildArchiveRelativePath(record.type, record.id, record.created_at);
     const sourcePath = path.join(this.dataDir, filePath);
     const targetPath = path.join(this.dataDir, archivePath);
 
     // Ensure archive directory exists
-    const archiveDir = path.dirname(targetPath);
-    await fs.mkdir(archiveDir, { recursive: true });
+    ensureDirectoryForRecordPath(this.dataDir, archivePath);
 
     // Move file
     await fs.rename(sourcePath, targetPath);

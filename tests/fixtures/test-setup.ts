@@ -1144,8 +1144,26 @@ export function createSampleRecords(config: TestConfig) {
   ];
 
   sampleRecords.forEach((record) => {
-    // record.path already includes 'records/', so join with dataDir, not recordsDir
-    const filePath = join(config.dataDir, record.path);
+    const createdTimestamp =
+      record.metadata.created ||
+      record.metadata.updated ||
+      new Date().toISOString();
+    const createdDate = new Date(createdTimestamp);
+    const year = Number.isNaN(createdDate.getTime())
+      ? new Date().getUTCFullYear().toString()
+      : createdDate.getUTCFullYear().toString();
+    const relativePath = join(
+      'records',
+      record.type,
+      year,
+      `${record.id}.md`
+    ).replace(/\\/g, '/');
+    record.path = relativePath;
+
+    const filePath = join(
+      config.dataDir,
+      relativePath.replace(/^records\//, '')
+    );
     const dir = join(filePath, '..');
     mkdirSync(dir, { recursive: true });
 
@@ -1238,7 +1256,11 @@ export function createExtendedSampleRecords(config: TestConfig) {
         tags: ['parks', 'community', 'recreation'],
         budget: 50000,
       },
-      path: 'records/proposal-new-park.md',
+      metadata: {
+        author: 'Jane Smith',
+        authorName: 'Jane Smith',
+        created: '2025-08-01T00:00:00Z',
+      },
     },
     {
       id: 'report-quarterly-2025',
@@ -1249,20 +1271,59 @@ export function createExtendedSampleRecords(config: TestConfig) {
         '# Q1 2025 Quarterly Report\n\nFinancial and operational summary.',
       metadata: {
         author: 'Finance Department',
-        created: '2025-04-15',
+        authorName: 'Finance Department',
+        created: '2025-04-15T00:00:00Z',
         tags: ['finance', 'quarterly', '2025'],
         attachments: ['budget.pdf', 'metrics.xlsx'],
       },
-      path: 'records/report-quarterly-2025.md',
     },
   ];
 
   // Write the new records
   extendedRecords.forEach((record) => {
-    const filePath = join(config.recordsDir, record.path);
-    const dir = join(filePath, '..');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(filePath, record.content);
+    const createdTimestamp =
+      record.metadata?.created ||
+      record.metadata?.updated ||
+      new Date().toISOString();
+    const createdDate = new Date(createdTimestamp);
+    const year = Number.isNaN(createdDate.getTime())
+      ? new Date().getUTCFullYear().toString()
+      : createdDate.getUTCFullYear().toString();
+    const relativePath = join(
+      'records',
+      record.type,
+      year,
+      `${record.id}.md`
+    ).replace(/\\/g, '/');
+    record.path = relativePath;
+
+    const filePath = join(
+      config.dataDir,
+      relativePath.replace(/^records\//, '')
+    );
+    mkdirSync(join(filePath, '..'), { recursive: true });
+
+    const recordData: RecordData = {
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      author: record.metadata?.author || 'system',
+      authors: [
+        {
+          name: record.metadata?.authorName || 'System',
+          username: record.metadata?.author || 'system',
+          role: 'clerk',
+        },
+      ],
+      created_at: record.metadata?.created || new Date().toISOString(),
+      updated_at: record.metadata?.created || new Date().toISOString(),
+      metadata: record.metadata,
+    };
+
+    const markdown = RecordParser.serializeToMarkdown(recordData);
+    writeFileSync(filePath, markdown);
   });
 
   return extendedRecords;

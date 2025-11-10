@@ -30,8 +30,8 @@
     transitions
   - ✅ **Hook Config**: `data/.civic/hooks.yml` with event-driven workflows
   - ✅ **Template System**: Complete template system for all record types
-  - ✅ **Records Data**: `data/records/` with organized structure (bylaw,
-    policy, resolution, ordinance, proclamation)
+  - ✅ **Records Data**: `data/records/<type>/<year>/` structure to avoid large
+    folders over time
 
 - ✅ **Complete Developer Experience**: Comprehensive tooling and testing
   - ✅ **AI Memory**: Complete agent memory and context system

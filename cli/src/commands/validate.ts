@@ -16,8 +16,13 @@ import {
   RecordValidator,
   RecordParser,
   RecordSchemaValidator,
+  parseRecordRelativePath,
 } from '@civicpress/core';
 import matter from 'gray-matter';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 interface ValidationResult {
   record: string;
@@ -155,10 +160,48 @@ async function validateSingleRecord(
   shouldOutputJson?: boolean
 ) {
   const logger = new Logger();
-  const fullPath = recordPath.endsWith('.md') ? recordPath : `${recordPath}.md`;
+  const resolvedRecord = resolveRecordReference(dataDir, recordPath);
+
+  if (!resolvedRecord) {
+    const availableRecords = getAvailableRecords(dataDir);
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: `Record "${recordPath}" not found`,
+            availableRecords,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error(`❌ Record "${recordPath}" not found.`);
+      logger.info('Available records:');
+      for (const [type, files] of Object.entries(availableRecords)) {
+        if (files.length > 0) {
+          logger.info(`  ${type}:`);
+          for (const file of files) {
+            logger.debug(`    ${file}`);
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  const displayPath = resolvedRecord.relativePath.replace(/\\/g, '/');
+  const normalizedPath = displayPath.replace(/^records\//, '');
+  const fullPath = join(dataDir, ...displayPath.split('/').filter(Boolean));
 
   try {
-    const result = await validateRecord(dataDir, fullPath, options);
+    const result = await validateRecord(
+      dataDir,
+      normalizedPath,
+      options,
+      fullPath
+    );
     displayValidationResults([result], options, shouldOutputJson);
   } catch (error) {
     logger.error(`❌ Error validating ${recordPath}:`, error);
@@ -168,14 +211,20 @@ async function validateSingleRecord(
 async function validateRecord(
   dataDir: string,
   recordPath: string,
-  options: any
+  options: any,
+  absoluteOverride?: string
 ): Promise<ValidationResult> {
   const logger = new Logger();
-  const fullPath = join(dataDir, 'records', recordPath);
+  const normalizedPathRaw = recordPath.startsWith('records/')
+    ? recordPath.replace(/^records\//, '')
+    : recordPath;
+  const normalizedPath = normalizedPathRaw.replace(/\\/g, '/');
+  const displayPath = ['records', normalizedPath].join('/');
+  const fullPath = absoluteOverride ?? join(dataDir, 'records', normalizedPath);
 
   if (!fs.existsSync(fullPath)) {
     return {
-      record: recordPath,
+      record: displayPath,
       isValid: false,
       errors: [
         {
@@ -197,10 +246,11 @@ async function validateRecord(
   // Use RecordParser for consistent parsing
   let record;
   try {
-    record = RecordParser.parseFromMarkdown(content, fullPath);
+    const parserPath = ['records', normalizedPath].join('/');
+    record = RecordParser.parseFromMarkdown(content, parserPath);
   } catch (error) {
     return {
-      record: recordPath,
+      record: displayPath,
       isValid: false,
       errors: [
         {
@@ -214,7 +264,10 @@ async function validateRecord(
     };
   }
 
-  const recordType = record.type || recordPath.split('/')[0];
+  const parsedPathInfo = parseRecordRelativePath(
+    ['records', normalizedPath].join('/')
+  );
+  const recordType = record.type || parsedPathInfo.type;
 
   // Try to load the template using the template engine
   let template: any | null = null;
@@ -348,7 +401,7 @@ async function validateRecord(
   }
 
   return {
-    record: recordPath,
+    record: displayPath,
     isValid,
     errors,
     warnings: options.strict ? [] : warnings,

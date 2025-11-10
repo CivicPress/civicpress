@@ -5,6 +5,7 @@ import {
   RecordParser,
   RecordData,
   RecordSchemaValidator,
+  getRecordYear,
 } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -185,8 +186,11 @@ export const createCommand = (cli: CAC) => {
           .replace(/-+/g, '-')
           .trim();
 
+        const createdAt = new Date().toISOString();
+        const recordYear = getRecordYear(createdAt);
+
         // Create directory structure
-        const recordsDir = path.join(dataDir, 'records', type);
+        const recordsDir = path.join(dataDir, 'records', type, recordYear);
         if (!fs.existsSync(recordsDir)) {
           fs.mkdirSync(recordsDir, { recursive: true });
         }
@@ -201,8 +205,8 @@ export const createCommand = (cli: CAC) => {
           status: 'draft',
           author: 'system', // TODO: Get from user context
           version: '1.0.0',
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
+          created: createdAt,
+          updated: createdAt,
         };
 
         // Process template with context
@@ -213,7 +217,6 @@ export const createCommand = (cli: CAC) => {
 
         // Generate record ID
         const recordId = `record-${Date.now()}`;
-        const now = new Date().toISOString();
 
         // Create RecordData object following standard format
         const recordData: RecordData = {
@@ -231,8 +234,8 @@ export const createCommand = (cli: CAC) => {
               email: user.email,
             },
           ],
-          created_at: now,
-          updated_at: now,
+          created_at: createdAt,
+          updated_at: createdAt,
           metadata: {
             version: '1.0.0',
           },
@@ -257,7 +260,7 @@ export const createCommand = (cli: CAC) => {
           const errorMessages = schemaValidation.errors
             .map((err) => `${err.field}: ${err.message}`)
             .join('; ');
-          
+
           if (shouldOutputJson) {
             console.log(
               JSON.stringify(

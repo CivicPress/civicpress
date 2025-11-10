@@ -132,7 +132,7 @@ platform.
 
 ### Data Management (100% Complete)
 
-- **Record Structure**: Proper organization in `data/records/` by type ✅
+- **Record Structure**: Proper organization in `data/records/<type>/<year>/` ✅
 - **Git Integration**: Complete Git integration with role-aware commits ✅
 - **Search System**: Advanced full-text search with filtering and ranking ✅
 - **Indexing**: Complete indexing system with auto-update workflows ✅

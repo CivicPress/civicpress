@@ -199,6 +199,32 @@ civic commit [record] [options]
 - `--dry-run` - Preview commit
 - `--json` - Output as JSON
 
+#### `records migrate-folders`
+
+Organize existing markdown files into year-based subdirectories to prevent
+overgrown type folders.
+
+```bash
+civic records migrate-folders [options]
+```
+
+**Options:**
+
+- `--dry-run` - Preview moves without touching files or the database
+- `--include-archive` - Also reorganize files under `data/archive/`
+- `--data-dir <path>` - Override the data directory (defaults to config)
+- `--json` / `--silent` - Standard output controls
+
+**Examples:**
+
+```bash
+# Preview how many files would move
+civic records migrate-folders --dry-run
+
+# Migrate records and archive content
+civic records migrate-folders --include-archive
+```
+
 **Examples:**
 
 ```bash

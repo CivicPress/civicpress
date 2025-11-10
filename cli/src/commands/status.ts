@@ -1,7 +1,6 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
-import { WorkflowConfigManager } from '@civicpress/core';
+import { CivicPress, WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter = require('gray-matter');
@@ -9,6 +8,10 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 export function statusCommand(cli: CAC) {
   cli
@@ -130,35 +133,11 @@ export function statusCommand(cli: CAC) {
           process.exit(1);
         }
 
-        // Find the record file
-        let recordPath: string | null = null;
-        let recordType: string | null = null;
+        const resolvedRecord = resolveRecordReference(dataDir, recordName);
 
-        // Search through all record types
-        const recordTypes = fs
-          .readdirSync(recordsDir, { withFileTypes: true })
-          .filter((dirent) => dirent.isDirectory())
-          .map((dirent) => dirent.name);
+        if (!resolvedRecord) {
+          const availableRecords = getAvailableRecords(dataDir);
 
-        for (const type of recordTypes) {
-          const typeDir = path.join(recordsDir, type);
-          const files = fs
-            .readdirSync(typeDir)
-            .filter((file) => file.endsWith('.md'))
-            .map((file) => path.join(typeDir, file));
-
-          for (const filePath of files) {
-            const filename = path.basename(filePath, '.md');
-            if (filename === recordName || filePath.includes(recordName)) {
-              recordPath = filePath;
-              recordType = type;
-              break;
-            }
-          }
-          if (recordPath) break;
-        }
-
-        if (!recordPath) {
           if (shouldOutputJson) {
             console.log(
               JSON.stringify(
@@ -166,20 +145,7 @@ export function statusCommand(cli: CAC) {
                   success: false,
                   error: 'Record not found',
                   details: `Record "${recordName}" not found`,
-                  availableRecords: recordTypes.reduce(
-                    (acc, type) => {
-                      const typeDir = path.join(recordsDir, type);
-                      const files = fs
-                        .readdirSync(typeDir)
-                        .filter((file) => file.endsWith('.md'))
-                        .map((file) => path.basename(file, '.md'));
-                      if (files.length > 0) {
-                        acc[type] = files;
-                      }
-                      return acc;
-                    },
-                    {} as Record<string, string[]>
-                  ),
+                  availableRecords,
                 },
                 null,
                 2
@@ -189,14 +155,7 @@ export function statusCommand(cli: CAC) {
             logger.error(`❌ Record "${recordName}" not found.`);
             logger.info('Available records:');
 
-            // List available records
-            for (const type of recordTypes) {
-              const typeDir = path.join(recordsDir, type);
-              const files = fs
-                .readdirSync(typeDir)
-                .filter((file) => file.endsWith('.md'))
-                .map((file) => path.basename(file, '.md'));
-
+            for (const [type, files] of Object.entries(availableRecords)) {
               if (files.length > 0) {
                 logger.info(`  ${type}:`);
                 for (const file of files) {
@@ -207,6 +166,9 @@ export function statusCommand(cli: CAC) {
           }
           process.exit(1);
         }
+
+        const recordPath = resolvedRecord.absolutePath;
+        const recordType = resolvedRecord.parsed.type;
 
         // Read current record
         const content = fs.readFileSync(recordPath, 'utf8');

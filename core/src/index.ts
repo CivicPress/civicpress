@@ -8,6 +8,15 @@ export { RecordParser } from './records/record-parser.js';
 export { RecordValidator } from './records/record-validator.js';
 export { RecordSchemaBuilder } from './records/record-schema-builder.js';
 export { RecordSchemaValidator } from './records/record-schema-validator.js';
+export {
+  buildRecordRelativePath,
+  buildArchiveRelativePath,
+  ensureDirectoryForRecordPath,
+  findRecordFileSync,
+  getRecordYear,
+  listRecordFilesSync,
+  parseRecordRelativePath,
+} from './utils/record-paths.js';
 export type {
   ValidationError,
   ValidationResult,

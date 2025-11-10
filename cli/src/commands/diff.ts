@@ -1,6 +1,6 @@
 import { CAC } from 'cac';
 import { simpleGit, SimpleGit } from 'simple-git';
-import { loadConfig } from '@civicpress/core';
+import { loadConfig, parseRecordRelativePath } from '@civicpress/core';
 import chalk from 'chalk';
 import * as diff from 'diff';
 import * as readline from 'readline';
@@ -8,6 +8,10 @@ import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 interface DiffOptions {
   record?: string;
@@ -42,6 +46,23 @@ interface CommitInfo {
   author: string;
   message: string;
   changes: string[];
+}
+
+function resolveRecordPath(
+  dataDir: string,
+  recordRef: string
+): { relativePath: string; displayPath: string } | null {
+  const resolved = resolveRecordReference(dataDir, recordRef);
+  if (!resolved) {
+    return null;
+  }
+
+  const relativePath = resolved.relativePath.replace(/\\/g, '/');
+  const displayPath = relativePath.replace(/^records\//, '');
+  return {
+    relativePath,
+    displayPath,
+  };
 }
 
 export function registerDiffCommand(cli: CAC) {
@@ -132,9 +153,25 @@ export function registerDiffCommand(cli: CAC) {
 async function handleInteractiveDiff(dataDir: string, options: DiffOptions) {
   const logger = initializeLogger();
   const git = simpleGit(dataDir);
-  const recordPath = options.record!.endsWith('.md')
-    ? options.record!
-    : `${options.record!}.md`;
+  const resolved = resolveRecordPath(dataDir, options.record!);
+
+  if (!resolved) {
+    logger.error(`❌ Record "${options.record}" not found.`);
+    const availableRecords = getAvailableRecords(dataDir);
+    const entries = Object.entries(availableRecords);
+    if (entries.length > 0) {
+      logger.info('Available records:');
+      for (const [type, files] of entries) {
+        if (files.length === 0) continue;
+        for (const file of files) {
+          logger.debug(`  ${type}/${file}`);
+        }
+      }
+    }
+    return;
+  }
+
+  const recordPath = resolved.relativePath;
 
   try {
     // Get commit history for this file
@@ -303,12 +340,13 @@ async function compareRecords(
 
     // If specific record is provided, compare that record
     if (options.record) {
-      const recordPath = options.record.endsWith('.md')
-        ? options.record
-        : `${options.record}.md`;
+      const resolved = resolveRecordPath(dataDir, options.record);
+      if (!resolved) {
+        return [];
+      }
       const result = await compareSingleRecord(
         git,
-        recordPath,
+        resolved.relativePath,
         commit1,
         commit2,
         options
@@ -359,7 +397,8 @@ async function compareSingleRecord(
       return null; // File doesn't exist in either commit
     }
 
-    const type = recordPath.split('/')[0];
+    const parsedPath = parseRecordRelativePath(recordPath);
+    const type = parsedPath.type || 'unknown';
     const changes: DiffResult['changes'] = [];
 
     // Parse metadata from both versions

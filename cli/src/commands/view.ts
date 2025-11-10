@@ -9,6 +9,10 @@ import {
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 export const viewCommand = (cli: CAC) => {
   cli
@@ -77,54 +81,17 @@ export const viewCommand = (cli: CAC) => {
           }
         }
 
-        // Find the record file
-        let recordPath: string | null = null;
-        let recordType: string | null = null;
+        const resolvedRecord = resolveRecordReference(dataDir, recordName);
 
-        // Search through all record types
-        const recordTypes = fs
-          .readdirSync(recordsDir, { withFileTypes: true })
-          .filter((dirent) => dirent.isDirectory())
-          .map((dirent) => dirent.name);
+        if (!resolvedRecord) {
+          const availableRecords = getAvailableRecords(dataDir);
 
-        for (const type of recordTypes) {
-          const typeDir = path.join(recordsDir, type);
-          const files = fs
-            .readdirSync(typeDir)
-            .filter((file) => file.endsWith('.md'))
-            .map((file) => path.join(typeDir, file));
-
-          for (const filePath of files) {
-            const filename = path.basename(filePath, '.md');
-            if (filename === recordName || filePath.includes(recordName)) {
-              recordPath = filePath;
-              recordType = type;
-              break;
-            }
-          }
-          if (recordPath) break;
-        }
-
-        if (!recordPath) {
           if (shouldOutputJson) {
             console.log(
               JSON.stringify(
                 {
                   error: `Record "${recordName}" not found`,
-                  availableRecords: recordTypes.reduce(
-                    (acc, type) => {
-                      const typeDir = path.join(recordsDir, type);
-                      const files = fs
-                        .readdirSync(typeDir)
-                        .filter((file) => file.endsWith('.md'))
-                        .map((file) => path.basename(file, '.md'));
-                      if (files.length > 0) {
-                        acc[type] = files;
-                      }
-                      return acc;
-                    },
-                    {} as Record<string, string[]>
-                  ),
+                  availableRecords,
                 },
                 null,
                 2
@@ -136,13 +103,7 @@ export const viewCommand = (cli: CAC) => {
             logger.info('Available records:');
 
             // List available records
-            for (const type of recordTypes) {
-              const typeDir = path.join(recordsDir, type);
-              const files = fs
-                .readdirSync(typeDir)
-                .filter((file) => file.endsWith('.md'))
-                .map((file) => path.basename(file, '.md'));
-
+            for (const [type, files] of Object.entries(availableRecords)) {
               if (files.length > 0) {
                 logger.info(`  ${type}:`);
                 for (const file of files) {
@@ -154,22 +115,30 @@ export const viewCommand = (cli: CAC) => {
           }
         }
 
+        const recordPath = resolvedRecord.absolutePath;
+        const parsedRecord = resolvedRecord.parsed;
+        const recordType = parsedRecord.type;
+
         // Read and parse the record
         const content = fs.readFileSync(recordPath, 'utf8');
         const { data: frontmatter, content: markdownContent } = matter(content);
 
         // Create record object for JSON output
+        const pathFromDataRoot = path
+          .relative(dataDir, recordPath)
+          .replace(/\\/g, '/');
+        const pathFromRecordsDir = path
+          .relative(path.join(dataDir, 'records'), recordPath)
+          .replace(/\\/g, '/');
+
         const record = {
           title: frontmatter.title || path.basename(recordPath, '.md'),
           type: recordType,
           status: frontmatter.status || 'draft',
           author: frontmatter.author || 'unknown',
           version: frontmatter.version || '1.0.0',
-          path: path.relative(dataDir, recordPath),
-          relativePath: path.relative(
-            path.join(dataDir, 'records'),
-            recordPath
-          ),
+          path: pathFromDataRoot,
+          relativePath: pathFromRecordsDir,
           createdAt: frontmatter.created
             ? new Date(frontmatter.created).toISOString()
             : null,

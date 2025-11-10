@@ -1,7 +1,14 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
-import { Logger, RecordValidator, RecordSchemaValidator } from '@civicpress/core';
+import {
+  Logger,
+  RecordValidator,
+  RecordSchemaValidator,
+  findRecordFileSync,
+  parseRecordRelativePath,
+  listRecordFilesSync,
+} from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -294,43 +301,62 @@ async function validateSingleRecord(
   recordId: string,
   type?: string
 ): Promise<any> {
-  const recordsDir = path.join(dataDir, 'records');
   const issues: any[] = [];
-  let recordPath: string | null = null;
   let recordContent: string | null = null;
 
-  // Find the record file
-  if (type) {
-    const typeDir = path.join(recordsDir, type);
-    if (fs.existsSync(typeDir)) {
-      const filePath = path.join(typeDir, `${recordId}.md`);
-      if (fs.existsSync(filePath)) {
-        recordPath = filePath;
-      }
-    }
-  } else {
-    // Search all record types
-    const recordTypes = fs
-      .readdirSync(recordsDir, { withFileTypes: true })
-      .filter((dirent) => dirent.isDirectory())
-      .map((dirent) => dirent.name);
+  const normalizedInput = recordId.replace(/\.md$/, '');
+  let recordRelativePath: string | null = null;
 
-    for (const recordType of recordTypes) {
-      const typeDir = path.join(recordsDir, recordType);
-      const filePath = path.join(typeDir, `${recordId}.md`);
-      if (fs.existsSync(filePath)) {
-        recordPath = filePath;
-        break;
-      }
+  if (recordId.includes('/')) {
+    const candidate = recordId.endsWith('.md') ? recordId : `${recordId}.md`;
+    const relativeCandidate = candidate.startsWith('records/')
+      ? candidate
+      : `records/${candidate}`.replace(/\\/g, '/');
+    const fullCandidateSegments = relativeCandidate
+      .replace(/^records\//, '')
+      .split('/');
+    const fullCandidate = path.join(
+      dataDir,
+      'records',
+      ...fullCandidateSegments
+    );
+    if (fs.existsSync(fullCandidate)) {
+      recordRelativePath = relativeCandidate;
     }
   }
 
-  if (!recordPath) {
+  if (!recordRelativePath) {
+    const id = normalizedInput.split('/').pop() ?? normalizedInput;
+    recordRelativePath = findRecordFileSync(dataDir, id, {
+      type,
+    });
+  }
+
+  if (!recordRelativePath) {
+    const availableRecords = listRecordFilesSync(dataDir).reduce(
+      (acc, relPath) => {
+        const parsed = parseRecordRelativePath(relPath);
+        if (!parsed.type) {
+          return acc;
+        }
+        if (!acc[parsed.type]) {
+          acc[parsed.type] = [];
+        }
+        const name = parsed.year ? `${parsed.year}/${parsed.id}` : parsed.id;
+        acc[parsed.type].push(name);
+        return acc;
+      },
+      {} as Record<string, string[]>
+    );
+
     issues.push({
       severity: 'error' as Severity,
       code: 'RECORD_NOT_FOUND',
       message: `Record '${recordId}' not found`,
       field: 'recordId',
+      metadata: {
+        availableRecords,
+      },
     });
     return {
       recordId,
@@ -340,8 +366,27 @@ async function validateSingleRecord(
     };
   }
 
+  const normalizedPath = recordRelativePath.replace(/^records\//, '');
+  const fullPathSegments = normalizedPath.split('/');
+  const fullPath = path.join(dataDir, 'records', ...fullPathSegments);
+
   try {
-    recordContent = fs.readFileSync(recordPath, 'utf-8');
+    if (!fs.existsSync(fullPath)) {
+      issues.push({
+        severity: 'error' as Severity,
+        code: 'RECORD_NOT_FOUND',
+        message: `Record '${recordId}' not found`,
+        field: 'recordId',
+      });
+      return {
+        recordId,
+        isValid: false,
+        issues,
+        content: null,
+      };
+    }
+
+    recordContent = fs.readFileSync(fullPath, 'utf-8');
   } catch (error) {
     issues.push({
       severity: 'error' as Severity,
@@ -358,7 +403,10 @@ async function validateSingleRecord(
   }
 
   // Validate record structure
-  const validationResult = await validateRecordContent(recordContent, recordId);
+  const validationResult = await validateRecordContent(
+    recordContent,
+    normalizedPath
+  );
   issues.push(...validationResult.issues);
 
   return {
@@ -393,11 +441,15 @@ async function validateRecordContent(
     );
 
     // STEP 2: Use RecordValidator for comprehensive validation (includes schema + business rules)
-    const validationResult = RecordValidator.validateMarkdown(content, recordId, {
-      strict: false,
-      checkFormat: true,
-      checkContent: true,
-    });
+    const validationResult = RecordValidator.validateMarkdown(
+      content,
+      recordId,
+      {
+        strict: false,
+        checkFormat: true,
+        checkContent: true,
+      }
+    );
 
     // Combine schema and business rule validation results
     // Schema errors are already included in RecordValidator results, but we track them separately for clarity

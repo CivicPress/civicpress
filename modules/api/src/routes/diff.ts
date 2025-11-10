@@ -8,6 +8,13 @@ import {
 } from '../utils/api-logger';
 import { requirePermission } from '../middleware/auth';
 import { AuthenticatedRequest } from '../middleware/auth';
+import {
+  findRecordFileSync,
+  listRecordFilesSync,
+  parseRecordRelativePath,
+} from '@civicpress/core';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface DiffOptions {
   commit1?: string;
@@ -55,6 +62,76 @@ interface ContentDiff {
     wordsRemoved: number;
     filesChanged: number;
   };
+}
+
+function resolveRecordPath(
+  dataDir: string,
+  recordRef: string,
+  type?: string
+): string | null {
+  const normalizedInput = recordRef.replace(/\.md$/, '');
+  let recordRelativePath: string | null = null;
+
+  if (recordRef.includes('/')) {
+    const candidate = recordRef.endsWith('.md') ? recordRef : `${recordRef}.md`;
+    const relativeCandidate = candidate.startsWith('records/')
+      ? candidate
+      : `records/${candidate}`.replace(/\\/g, '/');
+    const candidateSegments = relativeCandidate
+      .replace(/^records\//, '')
+      .split('/');
+    const fullCandidate = path.join(dataDir, 'records', ...candidateSegments);
+    if (fs.existsSync(fullCandidate)) {
+      recordRelativePath = relativeCandidate;
+    }
+  }
+
+  if (!recordRelativePath) {
+    const id = normalizedInput.split('/').pop() ?? normalizedInput;
+    recordRelativePath = findRecordFileSync(dataDir, id, {
+      type,
+    });
+  }
+
+  return recordRelativePath;
+}
+
+function getAvailableRecords(dataDir: string): Record<string, string[]> {
+  return listRecordFilesSync(dataDir).reduce(
+    (acc, relPath) => {
+      const parsed = parseRecordRelativePath(relPath);
+      if (!parsed.type) {
+        return acc;
+      }
+      if (!acc[parsed.type]) {
+        acc[parsed.type] = [];
+      }
+      const displayName = parsed.year
+        ? `${parsed.year}/${parsed.id}`
+        : parsed.id;
+      acc[parsed.type].push(displayName);
+      return acc;
+    },
+    {} as Record<string, string[]>
+  );
+}
+
+function requireRecordPath(
+  dataDir: string,
+  recordRef: string,
+  type?: string
+): string {
+  const resolved = resolveRecordPath(dataDir, recordRef, type);
+  if (resolved) {
+    return resolved;
+  }
+
+  const availableRecords = getAvailableRecords(dataDir);
+  const err = new Error(`Record not found: ${recordRef}`);
+  (err as any).statusCode = 404;
+  (err as any).code = 'RECORD_NOT_FOUND';
+  (err as any).details = { availableRecords };
+  throw err;
 }
 
 interface DiffLine {
@@ -169,9 +246,7 @@ export function createDiffRouter() {
         }
 
         const dataDir = civicPress.getDataDir();
-        const recordPath = recordId.endsWith('.md')
-          ? recordId
-          : `${recordId}.md`;
+        const recordPath = requireRecordPath(dataDir, recordId);
 
         const git = simpleGit(dataDir);
 
@@ -246,9 +321,7 @@ export function createDiffRouter() {
         }
 
         const dataDir = civicPress.getDataDir();
-        const recordPath = recordId.endsWith('.md')
-          ? recordId
-          : `${recordId}.md`;
+        const recordPath = requireRecordPath(dataDir, recordId);
 
         const git = simpleGit(dataDir);
 
@@ -303,9 +376,7 @@ export function createDiffRouter() {
         }
 
         const dataDir = civicPress.getDataDir();
-        const recordPath = recordId.endsWith('.md')
-          ? recordId
-          : `${recordId}.md`;
+        const recordPath = requireRecordPath(dataDir, recordId);
 
         const git = simpleGit(dataDir);
 
@@ -371,9 +442,7 @@ export function createDiffRouter() {
         }
 
         const dataDir = civicPress.getDataDir();
-        const recordPath = recordId.endsWith('.md')
-          ? recordId
-          : `${recordId}.md`;
+        const recordPath = requireRecordPath(dataDir, recordId);
 
         const git = simpleGit(dataDir);
 
@@ -478,9 +547,11 @@ async function compareRecordVersions(
       content: contentDiff,
     });
 
+    const parsedPath = parseRecordRelativePath(recordPath);
+
     return {
-      recordId: recordPath.replace('.md', ''),
-      type: 'record',
+      recordId: parsedPath.id || recordPath.replace('.md', ''),
+      type: parsedPath.type || 'record',
       commit1,
       commit2,
       changes: {

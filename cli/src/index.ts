@@ -31,6 +31,7 @@ import { CentralConfigManager } from '@civicpress/core';
 import { infoCommand } from './commands/info.js';
 import notifyCommand from './commands/notify.js';
 import { registerBackupCommand } from './commands/backup.js';
+import { registerRecordsCommand } from './commands/records.js';
 
 // Set logger options immediately to prevent warnings during config loading
 CentralConfigManager.setLoggerOptions({
@@ -74,6 +75,7 @@ autoIndexCommand(cli);
 cleanupCommand(cli);
 registerConfigCommands(cli);
 registerBackupCommand(cli);
+registerRecordsCommand(cli);
 
 infoCommand(cli);
 

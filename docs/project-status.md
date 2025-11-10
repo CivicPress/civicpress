@@ -26,6 +26,8 @@ ready for development and testing.
 #### **Record Management (100% Functional)**
 
 - **Record CRUD**: Create, read, update, delete operations
+- **Directory Layout**: Records stored under `data/records/<type>/<year>/...` to
+  avoid oversized folders over time
 - **Standardized Format**: Unified markdown format with section comments and ISO
   8601 timestamps
 - **Lifecycle Management**: Draft → Pending Review → Under Review → Approved →

@@ -1,12 +1,14 @@
 import { CAC } from 'cac';
 import { AuthUtils } from '../utils/auth-utils.js';
-import * as fs from 'fs';
-import * as path from 'path';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 import { userCan } from '@civicpress/core';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 export const commitCommand = (cli: CAC) => {
   cli
@@ -103,34 +105,11 @@ export const commitCommand = (cli: CAC) => {
             ...status.renamed,
           ];
         } else if (recordName) {
-          // Find specific record file
-          const recordsDir = path.join(dataDir, 'records');
-          let recordPath: string | null = null;
+          const resolved = resolveRecordReference(dataDir, recordName);
 
-          // Search through all record types
-          const recordTypes = fs
-            .readdirSync(recordsDir, { withFileTypes: true })
-            .filter((dirent) => dirent.isDirectory())
-            .map((dirent) => dirent.name);
+          if (!resolved) {
+            const availableRecords = getAvailableRecords(dataDir);
 
-          for (const type of recordTypes) {
-            const typeDir = path.join(recordsDir, type);
-            const files = fs
-              .readdirSync(typeDir)
-              .filter((file) => file.endsWith('.md'))
-              .map((file) => path.join(typeDir, file));
-
-            for (const filePath of files) {
-              const filename = path.basename(filePath, '.md');
-              if (filename === recordName || filePath.includes(recordName)) {
-                recordPath = filePath;
-                break;
-              }
-            }
-            if (recordPath) break;
-          }
-
-          if (!recordPath) {
             if (shouldOutputJson) {
               console.log(
                 JSON.stringify(
@@ -138,20 +117,7 @@ export const commitCommand = (cli: CAC) => {
                     success: false,
                     error: 'Record not found',
                     details: `Record "${recordName}" not found`,
-                    availableRecords: recordTypes.reduce(
-                      (acc, type) => {
-                        const typeDir = path.join(recordsDir, type);
-                        const files = fs
-                          .readdirSync(typeDir)
-                          .filter((file) => file.endsWith('.md'))
-                          .map((file) => path.basename(file, '.md'));
-                        if (files.length > 0) {
-                          acc[type] = files;
-                        }
-                        return acc;
-                      },
-                      {} as Record<string, string[]>
-                    ),
+                    availableRecords,
                   },
                   null,
                   2
@@ -161,14 +127,7 @@ export const commitCommand = (cli: CAC) => {
               logger.error(`❌ Record "${recordName}" not found.`);
               logger.info('Available records:');
 
-              // List available records
-              for (const type of recordTypes) {
-                const typeDir = path.join(recordsDir, type);
-                const files = fs
-                  .readdirSync(typeDir)
-                  .filter((file) => file.endsWith('.md'))
-                  .map((file) => path.basename(file, '.md'));
-
+              for (const [type, files] of Object.entries(availableRecords)) {
                 if (files.length > 0) {
                   logger.info(`  ${type}:`);
                   for (const file of files) {
@@ -189,7 +148,7 @@ export const commitCommand = (cli: CAC) => {
             ...status.renamed,
           ];
 
-          const relativeRecordPath = path.relative(dataDir, recordPath);
+          const relativeRecordPath = resolved.relativePath.replace(/\\/g, '/');
           if (allChangedFiles.includes(relativeRecordPath)) {
             filesToCommit = [relativeRecordPath];
           } else {
