@@ -21,7 +21,7 @@ export const useSearchSuggestions = () => {
     error.value = null;
 
     try {
-      const response = (await $civicApi('/api/search/suggestions', {
+      const response = (await $civicApi('/api/v1/search/suggestions', {
         method: 'GET',
         params: {
           q: query.trim(),
