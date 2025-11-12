@@ -136,12 +136,41 @@ describe('UUID Storage API', () => {
       expect(response.headers['content-disposition']).toBeDefined();
     });
 
-    it('should fail download without authentication', async () => {
+    it('should allow public download without authentication', async () => {
       const response = await request(context.api.getApp()).get(
         `/api/v1/storage/files/${uploadedFileId}`
       );
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBeDefined();
+    });
+
+    it('should require authentication for private folder downloads', async () => {
+      const privateFilePath = path.join(context.testDir, 'private-file.pdf');
+      await fs.writeFile(
+        privateFilePath,
+        'Test file content for private folder download'
+      );
+
+      const privateUploadResponse = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', privateFilePath)
+        .field('folder', 'private')
+        .field('description', 'Private file for download test');
+
+      expect(privateUploadResponse.status).toBe(200);
+      const privateFileId = privateUploadResponse.body.data.id;
+
+      const unauthenticatedResponse = await request(context.api.getApp()).get(
+        `/api/v1/storage/files/${privateFileId}`
+      );
+      expect(unauthenticatedResponse.status).toBe(401);
+
+      const authenticatedResponse = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${privateFileId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(authenticatedResponse.status).toBe(200);
     });
 
     it('should return 404 for non-existent file', async () => {

@@ -5,7 +5,7 @@ import {
   CloudUuidStorageService,
   StorageConfigManager,
 } from '@civicpress/storage';
-import { DatabaseService } from '@civicpress/core';
+import { DatabaseService, userCan } from '@civicpress/core';
 import { requireStoragePermission } from '../middleware/auth.js';
 import {
   handleStorageSuccess,
@@ -256,7 +256,6 @@ router.post(
 // GET /api/v1/storage/files/:id - Download file by UUID
 router.get(
   '/files/:id',
-  requireStoragePermission('download'),
   param('id').isUUID(),
   async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, {
@@ -289,6 +288,46 @@ router.get(
         );
       }
 
+      const config = await configManager.loadConfig();
+      const folderConfig = config.folders?.[fileInfo.folder];
+      const folderAccess = folderConfig?.access ?? 'private';
+      const isPublicFolder = folderAccess === 'public';
+
+      if (!req.user) {
+        if (!isPublicFolder) {
+          res.status(401).json({
+            success: false,
+            error: {
+              message: 'Authentication required',
+              code: 'UNAUTHENTICATED',
+            },
+          });
+          return;
+        }
+      } else if (!isPublicFolder) {
+        const hasPermission = await userCan(req.user, 'storage:download', {
+          action: 'download',
+          folder: fileInfo.folder,
+        } as any);
+
+        if (!hasPermission) {
+          res.status(403).json({
+            success: false,
+            error: {
+              message: 'Permission denied: Cannot download storage resources',
+              code: 'INSUFFICIENT_PERMISSIONS',
+              required: 'storage:download',
+              user: {
+                id: req.user.id,
+                username: req.user.username,
+                role: req.user.role,
+              },
+            },
+          });
+          return;
+        }
+      }
+
       const fileContent = await storageService.getFileContent(fileId);
       if (!fileContent) {
         return handleStorageError(
@@ -319,7 +358,6 @@ router.get(
 // GET /api/v1/storage/files/:id/info - Get file information by UUID
 router.get(
   '/files/:id/info',
-  requireStoragePermission('download'),
   param('id').isUUID(),
   async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, {
@@ -350,6 +388,46 @@ router.get(
           res,
           404
         );
+      }
+
+      const config = await configManager.loadConfig();
+      const folderConfig = config.folders?.[fileInfo.folder];
+      const folderAccess = folderConfig?.access ?? 'private';
+      const isPublicFolder = folderAccess === 'public';
+
+      if (!req.user) {
+        if (!isPublicFolder) {
+          res.status(401).json({
+            success: false,
+            error: {
+              message: 'Authentication required',
+              code: 'UNAUTHENTICATED',
+            },
+          });
+          return;
+        }
+      } else if (!isPublicFolder) {
+        const hasPermission = await userCan(req.user, 'storage:download', {
+          action: 'download',
+          folder: fileInfo.folder,
+        } as any);
+
+        if (!hasPermission) {
+          res.status(403).json({
+            success: false,
+            error: {
+              message: 'Permission denied: Cannot download storage resources',
+              code: 'INSUFFICIENT_PERMISSIONS',
+              required: 'storage:download',
+              user: {
+                id: req.user.id,
+                username: req.user.username,
+                role: req.user.role,
+              },
+            },
+          });
+          return;
+        }
       }
 
       return handleStorageSuccess(

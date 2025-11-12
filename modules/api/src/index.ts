@@ -55,7 +55,7 @@ import {
   requestContextMiddleware,
   createDatabaseContextMiddleware,
 } from './middleware/logging.js';
-import { authMiddleware } from './middleware/auth.js';
+import { authMiddleware, optionalAuth } from './middleware/auth.js';
 import { delayMiddleware } from './middleware/delay.js';
 
 export class CivicPressAPI {
@@ -326,7 +326,7 @@ export class CivicPressAPI {
     // UUID-based storage API (for file attachments)
     this.app.use(
       '/api/v1/storage',
-      authMiddleware(this.civicPress),
+      optionalAuth(this.civicPress),
       createDatabaseContextMiddleware(this.civicPress),
       uuidStorageRouter
     );
