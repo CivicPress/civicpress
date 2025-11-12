@@ -262,6 +262,15 @@ export class CivicPressAPI {
       },
       searchRouter
     );
+    this.app.use(
+      '/api/search',
+      optionalAuth(this.civicPress),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      searchRouter
+    );
     this.app.use('/api/v1/status', createStatusRouter());
     this.app.use('/api/v1/validation', createValidationRouter());
     this.app.use(
