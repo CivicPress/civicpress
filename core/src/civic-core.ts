@@ -55,6 +55,11 @@ export interface CreateRecordRequest {
   type: string;
   content?: string;
   metadata?: Record<string, any>;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  relativePath?: string;
+  skipFileGeneration?: boolean;
   geography?: Geography;
   attachedFiles?: Array<{
     id: string;
@@ -72,7 +77,7 @@ export interface CreateRecordRequest {
   linkedRecords?: LinkedRecord[];
   linkedGeographyFiles?: LinkedGeographyFile[];
   role?: string;
-  
+
   // Authorship - support both formats
   authors?: Array<{
     name: string;
@@ -80,7 +85,7 @@ export interface CreateRecordRequest {
     role?: string;
     email?: string;
   }>;
-  
+
   // Source & Origin - for imported/legacy documents
   source?: {
     reference: string;
@@ -97,6 +102,7 @@ export interface UpdateRecordRequest {
   title?: string;
   content?: string;
   status?: string;
+  relativePath?: string;
   metadata?: Record<string, any>;
   geography?: Geography;
   attachedFiles?: Array<{
@@ -114,7 +120,7 @@ export interface UpdateRecordRequest {
   }>;
   linkedRecords?: LinkedRecord[];
   linkedGeographyFiles?: LinkedGeographyFile[];
-  
+
   // Authorship - support both formats
   authors?: Array<{
     name: string;
@@ -122,7 +128,7 @@ export interface UpdateRecordRequest {
     role?: string;
     email?: string;
   }>;
-  
+
   // Source & Origin - for imported/legacy documents
   source?: {
     reference: string;

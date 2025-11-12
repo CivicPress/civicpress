@@ -121,16 +121,23 @@ export class RecordManager {
     user: AuthUser
   ): Promise<RecordData> {
     const recordId = `record-${Date.now()}`;
-    const now = new Date();
-    const createdAt = now.toISOString();
-    const recordPath = buildRecordRelativePath(
-      request.type,
-      recordId,
-      createdAt
-    );
-    // Remove any author property from request.metadata to avoid overwriting
+    const creationDate = request.createdAt
+      ? new Date(request.createdAt)
+      : new Date();
+    const createdAt =
+      !request.createdAt || Number.isNaN(creationDate.getTime())
+        ? new Date().toISOString()
+        : creationDate.toISOString();
+    const updatedAt =
+      request.updatedAt && !Number.isNaN(new Date(request.updatedAt).getTime())
+        ? new Date(request.updatedAt).toISOString()
+        : createdAt;
+    const status = request.status || 'draft';
+    const recordPath = request.relativePath
+      ? request.relativePath.replace(/\\/g, '/')
+      : buildRecordRelativePath(request.type, recordId, createdAt);
+    // Remove any author property from request.metadata to avoid overwriting existing values unintentionally
     const safeMetadata = { ...(request.metadata || {}) };
-    delete safeMetadata.author;
 
     // Auto-generate document number for legal record types if not provided
     const legalTypes = [
@@ -142,7 +149,12 @@ export class RecordManager {
     ];
     let documentNumber = safeMetadata.document_number;
     if (!documentNumber && legalTypes.includes(request.type)) {
-      const year = now.getFullYear();
+      const documentDate = request.createdAt
+        ? new Date(request.createdAt)
+        : creationDate;
+      const year = Number.isNaN(documentDate.getTime())
+        ? new Date().getFullYear()
+        : documentDate.getFullYear();
       const sequence = await DocumentNumberGenerator.getNextSequence(
         request.type,
         year
@@ -154,12 +166,32 @@ export class RecordManager {
       );
     }
 
+    // Ensure metadata defaults
+    if (user?.username && safeMetadata.author === undefined) {
+      safeMetadata.author = user.username;
+    }
+    if (user?.id && safeMetadata.authorId === undefined) {
+      safeMetadata.authorId = user.id;
+    }
+    if (user?.name && safeMetadata.authorName === undefined) {
+      safeMetadata.authorName = user.name;
+    }
+    if (user?.email && safeMetadata.authorEmail === undefined) {
+      safeMetadata.authorEmail = user.email;
+    }
+    if (safeMetadata.created === undefined) {
+      safeMetadata.created = createdAt;
+    }
+    if (safeMetadata.updated === undefined) {
+      safeMetadata.updated = updatedAt;
+    }
+
     // Create the record object
     const record: RecordData = {
       id: recordId,
       title: request.title,
       type: request.type,
-      status: 'draft',
+      status,
       content: request.content,
       geography: request.geography,
       attachedFiles: request.attachedFiles,
@@ -182,7 +214,7 @@ export class RecordManager {
       ],
       source: request.source,
       created_at: createdAt,
-      updated_at: createdAt,
+      updated_at: updatedAt,
     };
 
     // Save to database
@@ -209,8 +241,10 @@ export class RecordManager {
       author: record.author,
     });
 
-    // Create file in git repository
-    await this.createRecordFile(record);
+    // Create file in git repository (unless explicitly skipped)
+    if (!request.skipFileGeneration) {
+      await this.createRecordFile(record);
+    }
 
     // Log audit event
     await this.db.logAuditEvent({
@@ -238,24 +272,50 @@ export class RecordManager {
     request: CreateRecordRequest,
     user: AuthUser
   ): Promise<RecordData> {
-    const now = new Date();
-    const createdAt = now.toISOString();
-    const recordPath = buildRecordRelativePath(
-      request.type,
-      recordId,
-      createdAt
-    );
+    const creationDate = request.createdAt
+      ? new Date(request.createdAt)
+      : new Date();
+    const createdAt =
+      request.createdAt && !Number.isNaN(creationDate.getTime())
+        ? creationDate.toISOString()
+        : new Date().toISOString();
+    const updatedAt =
+      request.updatedAt && !Number.isNaN(new Date(request.updatedAt).getTime())
+        ? new Date(request.updatedAt).toISOString()
+        : createdAt;
+    const status = request.status || 'draft';
+    const recordPath = request.relativePath
+      ? request.relativePath.replace(/\\/g, '/')
+      : buildRecordRelativePath(request.type, recordId, createdAt);
 
-    // Remove any author property from request.metadata to avoid overwriting
+    // Remove any author property from request.metadata to avoid overwriting existing values unintentionally
     const safeMetadata2 = { ...(request.metadata || {}) };
-    delete safeMetadata2.author;
+
+    if (user?.username && safeMetadata2.author === undefined) {
+      safeMetadata2.author = user.username;
+    }
+    if (user?.id && safeMetadata2.authorId === undefined) {
+      safeMetadata2.authorId = user.id;
+    }
+    if (user?.name && safeMetadata2.authorName === undefined) {
+      safeMetadata2.authorName = user.name;
+    }
+    if (user?.email && safeMetadata2.authorEmail === undefined) {
+      safeMetadata2.authorEmail = user.email;
+    }
+    if (safeMetadata2.created === undefined) {
+      safeMetadata2.created = createdAt;
+    }
+    if (safeMetadata2.updated === undefined) {
+      safeMetadata2.updated = updatedAt;
+    }
 
     // Create the record object
     const record: RecordData = {
       id: recordId,
       title: request.title,
       type: request.type,
-      status: 'draft',
+      status,
       content: request.content,
       geography: request.geography,
       attachedFiles: request.attachedFiles,
@@ -263,16 +323,20 @@ export class RecordManager {
       linkedGeographyFiles: request.linkedGeographyFiles,
       metadata: {
         ...safeMetadata2,
-        author: user.username, // Always set as string
-        authorId: user.id,
-        authorName: user.name || user.username,
-        authorEmail: user.email,
-        created: createdAt,
       },
       path: recordPath,
       author: user.username, // Always set as string
+      authors: request.authors || [
+        {
+          name: user.name || user.username,
+          username: user.username,
+          role: user.role,
+          email: user.email,
+        },
+      ],
+      source: request.source,
       created_at: createdAt,
-      updated_at: createdAt,
+      updated_at: updatedAt,
     };
 
     // Save to database
@@ -299,8 +363,10 @@ export class RecordManager {
       author: record.author,
     });
 
-    // Create file in git repository
-    await this.createRecordFile(record);
+    // Create file in git repository unless explicitly skipped
+    if (!request.skipFileGeneration) {
+      await this.createRecordFile(record);
+    }
 
     // Log audit event
     await this.db.logAuditEvent({
@@ -498,6 +564,10 @@ export class RecordManager {
       updatedRecord.linkedRecords = request.linkedRecords;
     if (request.linkedGeographyFiles !== undefined)
       updatedRecord.linkedGeographyFiles = request.linkedGeographyFiles;
+    if (request.relativePath !== undefined) {
+      const sanitizedPath = request.relativePath.replace(/\\/g, '/');
+      updatedRecord.path = sanitizedPath;
+    }
 
     // Update authors if provided
     if (request.authors !== undefined) {
@@ -544,6 +614,9 @@ export class RecordManager {
       dbUpdates.linked_geography_files = JSON.stringify(
         request.linkedGeographyFiles
       );
+    if (request.relativePath !== undefined) {
+      dbUpdates.path = updatedRecord.path;
+    }
 
     // Include authors and source in metadata JSON for database storage
     dbUpdates.metadata = JSON.stringify({
@@ -897,6 +970,9 @@ export class RecordManager {
     }
     if (normalized.updated instanceof Date) {
       normalized.updated = normalized.updated.toISOString();
+    }
+    if (normalized.date instanceof Date) {
+      normalized.date = normalized.date.toISOString();
     }
 
     // Normalize source: if it's a string (old format), convert to object

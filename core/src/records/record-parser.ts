@@ -271,6 +271,25 @@ export class RecordParser {
    * @returns Formatted markdown string with YAML frontmatter
    */
   static serializeToMarkdown(record: RecordData): string {
+    const frontmatter = this.buildFrontmatter(record);
+    // Generate YAML with ordered sections (no comment dividers)
+    const yamlContent = this.generateOrderedYaml(frontmatter);
+
+    // Return formatted markdown (ensure newline before closing ---)
+    return `---
+${yamlContent}
+---
+
+${record.content || ''}`;
+  }
+
+  /**
+   * Build a frontmatter-compatible object from RecordData without serializing
+   *
+   * @param record - RecordData to convert
+   * @returns Frontmatter data object ready for schema validation or serialization
+   */
+  static buildFrontmatter(record: RecordData): FrontmatterData {
     const frontmatter: any = {
       // Core Identification (Required)
       id: record.id,
@@ -287,13 +306,25 @@ export class RecordParser {
       frontmatter.authors = record.authors;
     }
 
-    // Timestamps - convert internal format to frontmatter format
-    frontmatter.created = record.created_at || new Date().toISOString();
-    frontmatter.updated = record.updated_at || new Date().toISOString();
+    // Timestamps - ensure strings (schema expects string values)
+    const created = record.created_at || new Date().toISOString();
+    const updated = record.updated_at || new Date().toISOString();
+    frontmatter.created =
+      typeof created === 'string' ? created : new Date(created).toISOString();
+    frontmatter.updated =
+      typeof updated === 'string' ? updated : new Date(updated).toISOString();
 
     // Source & Origin
     if (record.source) {
-      frontmatter.source = record.source;
+      const source = { ...record.source };
+      if (source.imported_at !== undefined && source.imported_at !== null) {
+        const importedAt = source.imported_at;
+        source.imported_at =
+          typeof importedAt === 'string'
+            ? importedAt
+            : new Date(importedAt as any).toISOString();
+      }
+      frontmatter.source = source;
     }
 
     // Commit Linkage (populated during export/archive, not normal operations)
@@ -334,7 +365,10 @@ export class RecordParser {
         frontmatter.session_type = record.metadata.session_type;
       }
       if (record.metadata.date) {
-        frontmatter.date = record.metadata.date;
+        frontmatter.date =
+          typeof record.metadata.date === 'string'
+            ? record.metadata.date
+            : new Date(record.metadata.date as any).toISOString();
       }
       if (record.metadata.duration) {
         frontmatter.duration = record.metadata.duration;
@@ -373,15 +407,35 @@ export class RecordParser {
       frontmatter.attached_files = record.attachedFiles;
     }
 
-    // Generate YAML with ordered sections (no comment dividers)
-    const yamlContent = this.generateOrderedYaml(frontmatter);
+    // Carry over any additional metadata passthrough fields
+    if (record.metadata) {
+      const {
+        tags,
+        module,
+        slug,
+        version,
+        priority,
+        department,
+        category,
+        session_type,
+        date,
+        duration,
+        location,
+        attendees,
+        topics,
+        media,
+        ...rest
+      } = record.metadata;
 
-    // Return formatted markdown (ensure newline before closing ---)
-    return `---
-${yamlContent}
----
+      if (Object.keys(rest).length > 0) {
+        frontmatter.metadata = {
+          ...(frontmatter.metadata || {}),
+          ...rest,
+        };
+      }
+    }
 
-${record.content || ''}`;
+    return frontmatter;
   }
 
   /**
@@ -447,7 +501,31 @@ ${record.content || ''}`;
       normalized.geography_data = normalized.geography;
     }
 
-    return normalized;
+    return this.normalizeDateValues(normalized);
+  }
+
+  private static normalizeDateValues(value: any): any {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.normalizeDateValues(item));
+    }
+
+    if (typeof value === 'object') {
+      const result: Record<string, any> = {};
+      for (const [key, nestedValue] of Object.entries(value)) {
+        result[key] = this.normalizeDateValues(nestedValue);
+      }
+      return result;
+    }
+
+    return value;
   }
 
   /**

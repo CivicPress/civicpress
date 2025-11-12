@@ -18,7 +18,6 @@ import { CentralConfigManager } from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
 import { RecordSchemaValidator } from './record-schema-validator.js';
 import { ComplianceFieldHelpers } from '../utils/compliance-helpers.js';
-import matter from 'gray-matter';
 
 const logger = new Logger();
 
@@ -45,7 +44,7 @@ export interface ValidationResult {
 
 /**
  * RecordValidator - Validate records against the standard format
- * 
+ *
  * Validation rules are loaded dynamically from configuration files,
  * allowing new record types and statuses to be added without code changes.
  */
@@ -58,9 +57,20 @@ export class RecordValidator {
       const recordTypes = CentralConfigManager.getRecordTypesConfig();
       return Object.keys(recordTypes);
     } catch (error) {
-      logger.warn('Failed to load record types from config, using fallback', error);
+      logger.warn(
+        'Failed to load record types from config, using fallback',
+        error
+      );
       // Fallback to core types if config not available
-      return ['bylaw', 'ordinance', 'policy', 'proclamation', 'resolution', 'geography', 'session'];
+      return [
+        'bylaw',
+        'ordinance',
+        'policy',
+        'proclamation',
+        'resolution',
+        'geography',
+        'session',
+      ];
     }
   }
 
@@ -72,7 +82,10 @@ export class RecordValidator {
       const recordStatuses = CentralConfigManager.getRecordStatusesConfig();
       return Object.keys(recordStatuses);
     } catch (error) {
-      logger.warn('Failed to load record statuses from config, using fallback', error);
+      logger.warn(
+        'Failed to load record statuses from config, using fallback',
+        error
+      );
       // Fallback to core statuses if config not available
       return [
         'draft',
@@ -107,10 +120,9 @@ export class RecordValidator {
     const info: ValidationError[] = [];
 
     // STEP 1: Schema validation first (fail fast on schema errors)
-    // Convert RecordData to frontmatter format for schema validation
-    const markdownContent = RecordParser.serializeToMarkdown(record);
-    const { data: frontmatter } = matter(markdownContent);
-    
+    // Build frontmatter from RecordData without re-parsing via markdown to avoid type coercion
+    const frontmatter = RecordParser.buildFrontmatter(record);
+
     const schemaValidation = RecordSchemaValidator.validate(
       frontmatter,
       record.type,
@@ -154,7 +166,8 @@ export class RecordValidator {
 
     // STEP 3: Compliance field validation
     if (record.metadata) {
-      const complianceErrors = ComplianceFieldHelpers.validateComplianceMetadata(record.metadata);
+      const complianceErrors =
+        ComplianceFieldHelpers.validateComplianceMetadata(record.metadata);
       for (const complianceError of complianceErrors) {
         errors.push({
           severity: 'error',
@@ -167,7 +180,8 @@ export class RecordValidator {
 
     // Categorize issues by severity
     const result: ValidationResult = {
-      isValid: errors.length === 0 && (!options.strict || warnings.length === 0),
+      isValid:
+        errors.length === 0 && (!options.strict || warnings.length === 0),
       errors,
       warnings,
       info,
@@ -318,7 +332,8 @@ export class RecordValidator {
       errors.push({
         severity: 'error',
         code: 'INVALID_ID_FORMAT',
-        message: 'Field `id` must contain only alphanumeric characters, hyphens, and underscores',
+        message:
+          'Field `id` must contain only alphanumeric characters, hyphens, and underscores',
         field: 'id',
         suggestion: 'Use format like: record-1234567890 or geo-001',
       });
@@ -329,7 +344,8 @@ export class RecordValidator {
       errors.push({
         severity: 'error',
         code: 'INVALID_CREATED_FORMAT',
-        message: 'Field `created_at` must be in ISO 8601 format (e.g., 2025-01-15T10:30:00Z)',
+        message:
+          'Field `created_at` must be in ISO 8601 format (e.g., 2025-01-15T10:30:00Z)',
         field: 'created_at',
         suggestion: 'Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ',
       });
@@ -339,7 +355,8 @@ export class RecordValidator {
       errors.push({
         severity: 'error',
         code: 'INVALID_UPDATED_FORMAT',
-        message: 'Field `updated_at` must be in ISO 8601 format (e.g., 2025-01-15T10:30:00Z)',
+        message:
+          'Field `updated_at` must be in ISO 8601 format (e.g., 2025-01-15T10:30:00Z)',
         field: 'updated_at',
         suggestion: 'Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ',
       });
@@ -403,7 +420,8 @@ export class RecordValidator {
         warnings.push({
           severity: 'warning',
           code: 'MISSING_GEOGRAPHY_DATA',
-          message: 'Geography records should have `geography_data` or `category` field',
+          message:
+            'Geography records should have `geography_data` or `category` field',
           field: 'geography',
         });
       }
@@ -502,7 +520,10 @@ export class RecordValidator {
       }
     }
 
-    if (record.source.imported_at && !this.isValidISO8601(record.source.imported_at)) {
+    if (
+      record.source.imported_at &&
+      !this.isValidISO8601(record.source.imported_at)
+    ) {
       warnings.push({
         severity: 'warning',
         code: 'INVALID_SOURCE_IMPORTED_AT',
@@ -599,7 +620,10 @@ export class RecordValidator {
     record: RecordData,
     warnings: ValidationError[]
   ): void {
-    if (!record.linkedGeographyFiles || record.linkedGeographyFiles.length === 0)
+    if (
+      !record.linkedGeographyFiles ||
+      record.linkedGeographyFiles.length === 0
+    )
       return;
 
     record.linkedGeographyFiles.forEach((geoFile, index) => {
@@ -650,7 +674,7 @@ export class RecordValidator {
   private static getFieldSuggestion(field: string): string {
     const validTypes = this.getValidTypes();
     const validStatuses = this.getValidStatuses();
-    
+
     const suggestions: Record<string, string> = {
       id: 'Generate a unique ID like: record-1234567890',
       title: 'Provide a descriptive title for the record',
@@ -664,4 +688,3 @@ export class RecordValidator {
     return suggestions[field] || `Provide a value for ${field}`;
   }
 }
-

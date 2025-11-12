@@ -1,6 +1,6 @@
 import { CAC } from 'cac';
 import { readFile, readdir } from 'fs/promises';
-import { join, extname } from 'path';
+import { join, extname, dirname, resolve } from 'path';
 import { loadConfig } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
@@ -381,12 +381,15 @@ async function validateRecord(
 
   // Check for common content issues
   validateCommonIssues(
+    record.title || '',
     record.metadata || {},
     record.content || '',
     errors,
     warnings,
     suggestions
   );
+
+  validateMarkdownLinks(fullPath, dataDir, record.content || '', warnings);
 
   const isValid = errors.filter((e) => e.severity === 'error').length === 0;
   if (options.strict) {
@@ -620,18 +623,23 @@ function validateBasicMetadata(
 }
 
 function validateCommonIssues(
+  title: string,
   metadata: Record<string, any>,
   content: string,
   errors: ValidationError[],
   warnings: ValidationWarning[],
   suggestions: string[]
 ) {
-  // Check for placeholder content
-  const placeholders = content.match(/\[.*?\]/g);
-  if (placeholders && placeholders.length > 0) {
+  // Check for placeholder content (exclude markdown links)
+  const linkRegex = /\[[^\]]+\]\([^)]+\)/g;
+  const contentWithoutLinks = content.replace(linkRegex, '');
+  const placeholderRegex = /\[[^\]]+\]/g;
+  const placeholderMatches = contentWithoutLinks.match(placeholderRegex);
+
+  if (placeholderMatches && placeholderMatches.length > 0) {
     warnings.push({
       field: 'content',
-      message: `Found ${placeholders.length} placeholder(s) in content`,
+      message: `Found ${placeholderMatches.length} placeholder(s) in content`,
       suggestion: 'Replace placeholders with actual content',
     });
   }
@@ -645,12 +653,89 @@ function validateCommonIssues(
     });
   }
 
-  // Check for missing title in content
-  if (!content.includes(`# ${metadata.title}`)) {
+  const normalizedTitle = title.trim();
+  if (normalizedTitle.length > 0) {
+    const firstHeadingLine = content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('#'));
+
+    if (!firstHeadingLine) {
+      warnings.push({
+        field: 'content',
+        message: 'Content does not include a top-level heading',
+        suggestion: `Add "# ${normalizedTitle}" near the top of the document`,
+      });
+    } else {
+      const headingText = firstHeadingLine.replace(/^#+\s*/, '').trim();
+      if (
+        headingText.localeCompare(normalizedTitle, undefined, {
+          sensitivity: 'base',
+          usage: 'search',
+        }) !== 0
+      ) {
+        warnings.push({
+          field: 'content',
+          message: 'Content does not start with the record title',
+          suggestion: `Start content with "# ${normalizedTitle}"`,
+        });
+      }
+    }
+  } else if (!content.includes('# ')) {
     warnings.push({
       field: 'content',
-      message: 'Content does not start with the record title',
-      suggestion: `Start content with "# ${metadata.title}"`,
+      message: 'Content does not include a top-level heading',
+      suggestion: 'Add a "# Title" heading near the top of the document',
+    });
+  }
+}
+
+function validateMarkdownLinks(
+  fullPath: string,
+  dataDir: string,
+  content: string,
+  warnings: ValidationWarning[]
+) {
+  if (!content) return;
+
+  const linkPattern = /\[[^\]]+\]\(([^)]+)\)/g;
+  const recordDir = dirname(fullPath);
+  const missingTargets = new Set<string>();
+  let match: RegExpExecArray | null;
+
+  while ((match = linkPattern.exec(content)) !== null) {
+    const rawTarget = match[1]?.trim();
+    if (!rawTarget) continue;
+    if (rawTarget.startsWith('#')) continue;
+    if (
+      /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(rawTarget) &&
+      !rawTarget.startsWith('file:')
+    ) {
+      // Skip absolute URLs (http, https, mailto, etc.)
+      continue;
+    }
+
+    const cleanedTarget = rawTarget.split('#')[0]?.split('?')[0]?.trim();
+    if (!cleanedTarget) continue;
+
+    if (extname(cleanedTarget).toLowerCase() !== '.md') {
+      continue;
+    }
+
+    const resolvedPath = cleanedTarget.startsWith('/')
+      ? join(dataDir, cleanedTarget.replace(/^\/+/, ''))
+      : resolve(recordDir, cleanedTarget);
+
+    if (!fs.existsSync(resolvedPath)) {
+      missingTargets.add(cleanedTarget);
+    }
+  }
+
+  for (const target of missingTargets) {
+    warnings.push({
+      field: 'content',
+      message: `Linked record not found: ${target}`,
+      suggestion: 'Ensure the linked record exists and the path is correct.',
     });
   }
 }

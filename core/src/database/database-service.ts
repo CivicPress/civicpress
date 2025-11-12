@@ -459,6 +459,7 @@ export class DatabaseService {
       attached_files?: string;
       linked_records?: string;
       linked_geography_files?: string;
+      path?: string;
     }
   ): Promise<void> {
     const fields = [];
@@ -479,6 +480,10 @@ export class DatabaseService {
     if (updates.metadata !== undefined) {
       fields.push('metadata = ?');
       values.push(updates.metadata);
+    }
+    if (updates.path !== undefined) {
+      fields.push('path = ?');
+      values.push(updates.path);
     }
     if (updates.geography !== undefined) {
       fields.push('geography = ?');

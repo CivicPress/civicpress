@@ -459,6 +459,11 @@ export class IndexingService {
         attachedFiles: record.attachedFiles,
         linkedRecords: record.linkedRecords,
         linkedGeographyFiles: record.linkedGeographyFiles,
+        status: record.status,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at,
+        relativePath: ['records', entry.file].join('/'),
+        skipFileGeneration: true,
       },
       {
         id: 'admin',
@@ -503,6 +508,7 @@ export class IndexingService {
         attachedFiles: record.attachedFiles,
         linkedRecords: record.linkedRecords,
         linkedGeographyFiles: record.linkedGeographyFiles,
+        relativePath: ['records', entry.file].join('/'),
       },
       {
         id: 'admin',
