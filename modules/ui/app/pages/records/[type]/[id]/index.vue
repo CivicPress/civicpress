@@ -9,9 +9,6 @@ const router = useRouter();
 const type = route.params.type as string;
 const id = route.params.id as string;
 
-// Store
-const recordsStore = useRecordsStore();
-
 // Reactive state
 const record = ref<CivicRecord | null>(null);
 const loading = ref(false);
@@ -20,6 +17,180 @@ const error = ref('');
 // Composables
 const { $api } = useNuxtApp();
 const { renderMarkdown } = useMarkdown();
+
+const markdownContainer = ref<HTMLElement | null>(null);
+
+const rewriteLinks = (
+  root: Document | DocumentFragment | Element,
+  currentRecordPath: string
+) => {
+  const anchors = root.querySelectorAll('a[href]');
+  anchors.forEach((anchor) => {
+    const href = anchor.getAttribute('href') || '';
+
+    if (isExternalLink(href)) {
+      return;
+    }
+
+    const resolved = resolveRecordLink(href, currentRecordPath);
+    if (!resolved) {
+      return;
+    }
+
+    anchor.setAttribute('href', resolved);
+    anchor.setAttribute('data-record-link', 'true');
+  });
+};
+
+const isExternalLink = (href: string) => {
+  return /^(https?:|mailto:|tel:)/i.test(href);
+};
+
+const resolveRecordLink = (
+  href: string,
+  currentRecordPath: string
+): string | null => {
+  if (!href.endsWith('.md')) {
+    return null;
+  }
+
+  let normalizedCurrent = currentRecordPath.replace(/\\/g, '/');
+  if (!normalizedCurrent.startsWith('records/')) {
+    normalizedCurrent = `records/${normalizedCurrent.replace(/^\/+/, '')}`;
+  }
+  const currentDir = normalizedCurrent.includes('/')
+    ? normalizedCurrent.substring(0, normalizedCurrent.lastIndexOf('/'))
+    : normalizedCurrent;
+
+  let combinedPath: string;
+  if (href.startsWith('.')) {
+    combinedPath = normalizeRelativePath(`${currentDir}/${href}`);
+  } else if (href.includes('/')) {
+    combinedPath = normalizeRelativePath(
+      href.startsWith('records/') ? href : `${currentDir}/${href}`
+    );
+  } else {
+    combinedPath = normalizeRelativePath(`${currentDir}/${href}`);
+  }
+
+  if (!combinedPath.startsWith('records/')) {
+    return null;
+  }
+
+  const pathParts = combinedPath.split('/');
+  if (pathParts.length < 3) {
+    return null;
+  }
+
+  const type = pathParts[1];
+  const filename = pathParts[pathParts.length - 1];
+  if (!filename) {
+    return null;
+  }
+  const recordId = filename.replace(/\.md$/i, '');
+
+  if (!type || !recordId) {
+    return null;
+  }
+
+  return `/records/${type}/${recordId}`;
+};
+
+const normalizeRelativePath = (path: string): string => {
+  const segments = path.split('/');
+  const stack: string[] = [];
+
+  segments.forEach((segment) => {
+    if (segment === '..') {
+      stack.pop();
+    } else if (segment !== '.' && segment !== '') {
+      stack.push(segment);
+    }
+  });
+
+  return stack.join('/');
+};
+
+const applyLinkTransformations = () => {
+  if (!process.client) {
+    return;
+  }
+
+  if (!record.value?.path) {
+    return;
+  }
+
+  const container = markdownContainer.value;
+  if (!container) {
+    return;
+  }
+
+  rewriteLinks(container, record.value.path);
+};
+
+const renderedContent = computed(() => {
+  if (!record.value?.content) {
+    return '';
+  }
+
+  return renderMarkdown(record.value.content, {
+    preserveLineBreaks: true,
+  });
+});
+
+watch(
+  () => renderedContent.value,
+  () => {
+    if (!process.client) {
+      return;
+    }
+    nextTick(() => applyLinkTransformations());
+  }
+);
+
+watch(
+  () => record.value?.path,
+  () => {
+    if (!process.client) {
+      return;
+    }
+    nextTick(() => applyLinkTransformations());
+  }
+);
+
+onMounted(() => {
+  if (!process.client) {
+    return;
+  }
+  nextTick(() => applyLinkTransformations());
+});
+
+const handleContentClick = (event: MouseEvent) => {
+  if (!process.client) {
+    return;
+  }
+
+  const target = event.target as Element | null;
+  if (!target) {
+    return;
+  }
+
+  const link = target.closest(
+    'a[data-record-link="true"]'
+  ) as HTMLAnchorElement | null;
+
+  if (!link) {
+    return;
+  }
+
+  const href = link.getAttribute('href');
+  if (!href) {
+    return;
+  }
+
+  event.preventDefault();
+  router.push(href);
+};
 const { formatDate, getStatusColor, getTypeIcon, getTypeLabel } =
   useRecordUtils();
 
@@ -125,7 +296,7 @@ const breadcrumbItems = computed(() => [
 // Handle status changed
 const handleStatusChanged = (payload: { newStatus: string; record?: any }) => {
   if (record.value) {
-    record.value.status = payload.newStatus;
+    record.value.status = payload.newStatus as CivicRecord['status'];
   }
   useToast().add({
     title: 'Status Updated',
@@ -133,6 +304,47 @@ const handleStatusChanged = (payload: { newStatus: string; record?: any }) => {
     color: 'primary',
   });
 };
+
+const detailAccordionItems = computed(() => {
+  const currentRecord = record.value;
+
+  return [
+    {
+      label: 'Linked Records',
+      value: 'linked-records',
+      iconName: 'i-lucide-link-2',
+      description: currentRecord?.linkedRecords?.length
+        ? `${currentRecord.linkedRecords.length} linked`
+        : 'No linked records',
+    },
+    {
+      label: 'File Attachments',
+      value: 'attachments',
+      iconName: 'i-lucide-paperclip',
+      description: currentRecord?.attachedFiles?.length
+        ? `${currentRecord.attachedFiles.length} files`
+        : 'No attachments',
+    },
+    {
+      label: 'Linked Geography',
+      value: 'linked-geography',
+      iconName: 'i-lucide-map-pin',
+      description: currentRecord?.linkedGeographyFiles?.length
+        ? `${currentRecord.linkedGeographyFiles.length} items`
+        : 'No linked geography',
+    },
+    {
+      label: 'Additional Information',
+      value: 'additional-info',
+      iconName: 'i-lucide-info',
+      description:
+        currentRecord?.metadata &&
+        Object.keys(currentRecord.metadata).length > 0
+          ? `${Object.keys(currentRecord.metadata).length} fields`
+          : 'No additional metadata',
+    },
+  ];
+});
 
 // Handle file download
 const downloadFile = async (fileId: string, fileName: string) => {
@@ -173,7 +385,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
     useToast().add({
       title: 'Download Failed',
       description: 'Failed to download the file. Please try again.',
-      color: 'red',
+      color: 'error',
     });
   }
 };
@@ -345,11 +557,16 @@ const downloadFile = async (fileId: string, fileName: string) => {
             <h2 class="text-lg font-semibold">Content</h2>
           </div>
           <div class="p-6">
-            <div v-if="record.content" class="markdown-content">
+            <div
+              v-if="record.content"
+              class="markdown-content"
+              @click="handleContentClick"
+            >
               <!-- Render markdown content -->
               <div
+                ref="markdownContainer"
                 class="prose prose-sm max-w-none prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
-                v-html="renderMarkdown(record.content)"
+                v-html="renderedContent"
               />
             </div>
             <div v-else class="text-gray-500 dark:text-gray-400 italic">
@@ -358,141 +575,183 @@ const downloadFile = async (fileId: string, fileName: string) => {
           </div>
         </div>
 
-        <!-- Geography Files -->
-        <GeographyLinkDisplay
-          :linked-geography-files="record.linkedGeographyFiles || []"
-        />
+        <UAccordion
+          :items="detailAccordionItems"
+          class="rounded-lg border"
+          :ui="{
+            item: 'border-b last:border-b-0',
+            trigger: 'px-6 py-4 flex items-center gap-3 text-sm font-medium',
+            content: 'px-6 pb-6 pt-0',
+          }"
+        >
+          <template #default="{ item }">
+            <div class="flex items-center gap-3">
+              <UIcon :name="item.iconName" class="text-gray-500" />
+              <div class="flex flex-col text-left">
+                <span>{{ item.label }}</span>
+                <span class="text-xs text-gray-500">
+                  {{ item.description }}
+                </span>
+              </div>
+            </div>
+          </template>
 
-        <!-- File Attachments -->
-        <div class="rounded-lg border">
-          <div class="border-b px-6 py-4">
-            <h2 class="text-lg font-semibold">File Attachments</h2>
-          </div>
-          <div class="p-6">
-            <div
-              v-if="record.attachedFiles && record.attachedFiles.length > 0"
-              class="space-y-4"
-            >
+          <template #content="{ item }">
+            <div v-if="item.value === 'linked-records'">
+              <LinkedRecordList
+                v-if="record.linkedRecords && record.linkedRecords.length > 0"
+                :model-value="record.linkedRecords"
+                :editable="false"
+              />
+              <div v-else class="text-gray-500 dark:text-gray-400 italic">
+                No records linked to this record.
+              </div>
+            </div>
+
+            <div v-else-if="item.value === 'attachments'" class="space-y-4">
               <div
-                v-for="(file, index) in record.attachedFiles"
-                :key="file.id"
-                class="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+                v-if="record.attachedFiles && record.attachedFiles.length > 0"
+                class="space-y-4"
               >
-                <div class="flex items-start justify-between">
-                  <div class="flex-1 min-w-0">
-                    <!-- File Name and Category -->
-                    <div class="flex items-center gap-3 mb-2">
-                      <h3
-                        class="text-sm font-medium text-gray-900 dark:text-white"
-                      >
-                        {{ file.original_name }}
-                      </h3>
-                      <span
-                        v-if="file.category"
-                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      >
-                        {{
-                          typeof file.category === 'object'
-                            ? file.category.label
-                            : file.category
-                        }}
-                      </span>
-                    </div>
-
-                    <!-- File Details -->
-                    <div
-                      class="space-y-1 text-sm text-gray-600 dark:text-gray-400"
-                    >
-                      <div class="flex items-center gap-2">
-                        <UIcon name="i-lucide-link" class="w-4 h-4" />
-                        <span class="font-mono text-xs">{{ file.id }}</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <UIcon name="i-lucide-folder" class="w-4 h-4" />
-                        <span>{{ file.path }}</span>
+                <div
+                  v-for="file in record.attachedFiles"
+                  :key="file.id"
+                  class="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-3 mb-2">
+                        <h3
+                          class="text-sm font-medium text-gray-900 dark:text-white"
+                        >
+                          {{ file.original_name }}
+                        </h3>
+                        <span
+                          v-if="file.category"
+                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        >
+                          {{
+                            typeof file.category === 'object'
+                              ? file.category.label
+                              : file.category
+                          }}
+                        </span>
                       </div>
                       <div
-                        v-if="file.description"
-                        class="flex items-center gap-2"
+                        class="space-y-1 text-sm text-gray-600 dark:text-gray-400"
                       >
-                        <UIcon name="i-lucide-file-text" class="w-4 h-4" />
-                        <span>{{ file.description }}</span>
+                        <div class="flex items-center gap-2">
+                          <UIcon name="i-lucide-link" class="w-4 h-4" />
+                          <span class="font-mono text-xs">{{ file.id }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <UIcon name="i-lucide-folder" class="w-4 h-4" />
+                          <span>{{ file.path }}</span>
+                        </div>
+                        <div
+                          v-if="file.description"
+                          class="flex items-center gap-2"
+                        >
+                          <UIcon name="i-lucide-file-text" class="w-4 h-4" />
+                          <span>{{ file.description }}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  <!-- Download Button -->
-                  <div class="ml-4">
-                    <UButton
-                      icon="i-lucide-download"
-                      color="blue"
-                      variant="outline"
-                      size="sm"
-                      @click="downloadFile(file.id, file.original_name)"
-                      title="Download file"
-                    >
-                      Download
-                    </UButton>
+                    <div class="ml-4">
+                      <UButton
+                        icon="i-lucide-download"
+                        color="primary"
+                        variant="outline"
+                        size="sm"
+                        @click="downloadFile(file.id, file.original_name)"
+                        title="Download file"
+                      >
+                        Download
+                      </UButton>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div v-else class="text-gray-500 dark:text-gray-400 italic">
-              No files attached to this record.
-            </div>
-          </div>
-        </div>
-
-        <!-- Linked Records -->
-        <div class="rounded-lg border">
-          <div class="border-b px-6 py-4">
-            <h2 class="text-lg font-semibold">Linked Records</h2>
-          </div>
-          <div class="p-6">
-            <LinkedRecordList
-              v-if="record.linkedRecords && record.linkedRecords.length > 0"
-              :model-value="record.linkedRecords"
-              :editable="false"
-            />
-            <div v-else class="text-gray-500 dark:text-gray-400 italic">
-              No records linked to this record.
-            </div>
-          </div>
-        </div>
-
-        <!-- Additional Metadata -->
-        <div
-          v-if="record.metadata && Object.keys(record.metadata).length > 0"
-          class="rounded-lg border"
-        >
-          <div class="border-b px-6 py-4">
-            <h2 class="text-lg font-semibold">Additional Information</h2>
-          </div>
-          <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div
-                v-for="(value, key) in record.metadata"
-                :key="key"
-                class="space-y-1"
-              >
-                <dt
-                  class="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize"
-                >
-                  {{ key }}
-                </dt>
-                <dd class="text-sm">
-                  <span v-if="typeof value === 'string'">{{ value }}</span>
-                  <span
-                    v-else
-                    class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
-                  >
-                    {{ JSON.stringify(value) }}
-                  </span>
-                </dd>
+              <div v-else class="text-gray-500 dark:text-gray-400 italic">
+                No files attached to this record.
               </div>
             </div>
-          </div>
-        </div>
+
+            <div v-else-if="item.value === 'linked-geography'">
+              <GeographyLinkDisplay
+                :linked-geography-files="record.linkedGeographyFiles || []"
+              />
+            </div>
+
+            <div v-else-if="item.value === 'additional-info'">
+              <div
+                v-if="
+                  record.metadata && Object.keys(record.metadata).length > 0
+                "
+                class="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
+                <div
+                  v-for="(value, key) in record.metadata"
+                  :key="key"
+                  class="space-y-1"
+                >
+                  <dt
+                    class="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize"
+                  >
+                    {{ key }}
+                  </dt>
+                  <dd class="text-sm">
+                    <template
+                      v-if="
+                        key === 'attendees' &&
+                        Array.isArray(value) &&
+                        value.length
+                      "
+                    >
+                      <ul class="space-y-2">
+                        <li
+                          v-for="(attendee, attendeeIndex) in value"
+                          :key="attendeeIndex"
+                          class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+                        >
+                          <span class="font-medium">
+                            {{ attendee.name || 'Unknown Attendee' }}
+                          </span>
+                          <span
+                            v-if="attendee.role"
+                            class="text-gray-500 dark:text-gray-400"
+                          >
+                            {{ attendee.role }}
+                          </span>
+                          <UBadge
+                            v-if="attendee.status"
+                            color="neutral"
+                            variant="soft"
+                            size="xs"
+                          >
+                            {{ attendee.status }}
+                          </UBadge>
+                        </li>
+                      </ul>
+                    </template>
+                    <span v-else-if="typeof value === 'string'">{{
+                      value
+                    }}</span>
+                    <span
+                      v-else
+                      class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
+                    >
+                      {{ JSON.stringify(value) }}
+                    </span>
+                  </dd>
+                </div>
+              </div>
+              <div class="text-gray-500 dark:text-gray-400 italic" v-else>
+                No additional metadata available for this record.
+              </div>
+            </div>
+          </template>
+        </UAccordion>
 
         <!-- Status Transitions -->
         <StatusTransitionControls
@@ -523,3 +782,17 @@ const downloadFile = async (fileId: string, fileName: string) => {
     </template>
   </UDashboardPanel>
 </template>
+
+<style scoped>
+:deep(.markdown-empty-line) {
+  display: block;
+  height: 0.75rem;
+  margin: 0;
+  content: '';
+}
+
+:deep(.markdown-content p) {
+  margin: 0;
+  line-height: 1.4rem;
+}
+</style>
