@@ -253,7 +253,15 @@ export class CivicPressAPI {
     // Public routes that should be accessible to guests
     this.app.use('/api/v1/records', createRecordsRouter(recordsService));
     this.app.use('/api/v1/geography', createGeographyRouter(geographyManager));
-    this.app.use('/api/v1/search', searchRouter);
+    this.app.use(
+      '/api/v1/search',
+      optionalAuth(this.civicPress),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      searchRouter
+    );
     this.app.use('/api/v1/status', createStatusRouter());
     this.app.use('/api/v1/validation', createValidationRouter());
     this.app.use(
