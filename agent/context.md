@@ -53,7 +53,8 @@ platform.
   - ✅ **Authentication Flow**: Complete login/logout with JWT token management
   - ✅ **Records Interface**: Complete with search, filtering, pagination, and
     URL state management
-  - ✅ **Record Detail**: Complete with Markdown rendering and metadata display
+  - ✅ **Record Detail**: Complete with Markdown rendering, preserved line
+    breaks, internal link rewriting, and metadata display
   - ✅ **API Integration**: Complete integration with backend REST API
   - ✅ **Composables**: Complete reusable composables for DRY principle
   - ❌ **Account Management**: Registration and password reset not implemented

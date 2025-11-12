@@ -35,6 +35,8 @@ ready for development and testing.
 - **Search System**: Full-text search with filtering and ranking
 - **Record Summary API**: `/api/v1/records/summary` exposes aggregate counts for
   type and status filters
+- **Record Presentation**: UI preserves markdown line breaks and rewrites
+  internal `.md` links to in-app routes for seamless navigation
 - **Validation**: Config-driven validation with dynamic type/status checking
 - **RecordParser**: Central parsing/serialization ensuring format consistency
 - **Templates**: Template system for record creation with confirmation modal
