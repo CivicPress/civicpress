@@ -19,6 +19,43 @@ export class RecordsService {
   private workflowManager: WorkflowConfigManager;
   private dataDir: string | null = null;
 
+  private buildFilterClause(filters: { type?: string; status?: string } = {}) {
+    const clauses: string[] = [];
+    const params: any[] = [];
+
+    if (filters.type) {
+      const types = filters.type
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (types.length === 1) {
+        clauses.push('type = ?');
+        params.push(types[0]);
+      } else if (types.length > 1) {
+        clauses.push(`type IN (${types.map(() => '?').join(',')})`);
+        params.push(...types);
+      }
+    }
+
+    if (filters.status) {
+      const statuses = filters.status
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (statuses.length === 1) {
+        clauses.push('status = ?');
+        params.push(statuses[0]);
+      } else if (statuses.length > 1) {
+        clauses.push(`status IN (${statuses.map(() => '?').join(',')})`);
+        params.push(...statuses);
+      }
+    }
+
+    const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    return { whereClause, params };
+  }
+
   constructor(
     civicPress: CivicPress,
     recordManager?: RecordManager,
@@ -621,6 +658,51 @@ export class RecordsService {
       records: transformedRecords,
       nextCursor,
       hasMore,
+    };
+  }
+
+  /**
+   * Get aggregate record summary
+   */
+  async getRecordSummary(filters: { type?: string; status?: string }): Promise<{
+    total: number;
+    types: Record<string, number>;
+    statuses: Record<string, number>;
+  }> {
+    const db = this.civicPress.getDatabaseService();
+    const { whereClause, params } = this.buildFilterClause(filters || {});
+
+    const typeRows = await db.query(
+      `SELECT type, COUNT(*) as count FROM records ${whereClause} GROUP BY type`,
+      [...params]
+    );
+    const statusRows = await db.query(
+      `SELECT status, COUNT(*) as count FROM records ${whereClause} GROUP BY status`,
+      [...params]
+    );
+    const totalRows = await db.query(
+      `SELECT COUNT(*) as count FROM records ${whereClause}`,
+      [...params]
+    );
+
+    const types: Record<string, number> = {};
+    typeRows.forEach((row: any) => {
+      if (row.type) {
+        types[row.type] = Number(row.count) || 0;
+      }
+    });
+
+    const statuses: Record<string, number> = {};
+    statusRows.forEach((row: any) => {
+      if (row.status) {
+        statuses[row.status] = Number(row.count) || 0;
+      }
+    });
+
+    return {
+      total: totalRows?.[0]?.count ? Number(totalRows[0].count) : 0,
+      types,
+      statuses,
     };
   }
 }

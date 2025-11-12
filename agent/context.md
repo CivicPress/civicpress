@@ -141,6 +141,8 @@ platform.
 ### API System (100% Complete)
 
 - **20+ Endpoints**: Comprehensive REST API covering all functionality ✅
+- **Summary Endpoint**: `/api/v1/records/summary` delivers aggregate counts for
+  filters ✅
 - **Authentication**: Complete OAuth-based authentication with role mapping ✅
 - **Authorization**: Granular permission system with middleware ✅
 - **Error Handling**: Secure error responses with proper logging ✅

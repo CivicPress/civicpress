@@ -33,6 +33,8 @@ ready for development and testing.
 - **Lifecycle Management**: Draft → Pending Review → Under Review → Approved →
   Published → Archived flow
 - **Search System**: Full-text search with filtering and ranking
+- **Record Summary API**: `/api/v1/records/summary` exposes aggregate counts for
+  type and status filters
 - **Validation**: Config-driven validation with dynamic type/status checking
 - **RecordParser**: Central parsing/serialization ensuring format consistency
 - **Templates**: Template system for record creation with confirmation modal

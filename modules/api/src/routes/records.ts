@@ -95,6 +95,47 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   });
 
+  // GET /api/records/summary - Aggregate counts
+  router.get('/summary', async (req: any, res: Response) => {
+    const isAuthenticated = (req as any).user !== undefined;
+    const operation = isAuthenticated
+      ? 'records_summary_authenticated'
+      : 'records_summary_public';
+
+    logApiRequest(req, { operation });
+
+    try {
+      const { type, status } = req.query;
+
+      logger.info(
+        `Fetching record summary (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          type,
+          status,
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
+      );
+
+      const summary = await recordsService.getRecordSummary({
+        type: type as string,
+        status: status as string,
+      });
+
+      sendSuccess(summary, req, res, { operation });
+    } catch (error) {
+      handleApiError(
+        operation,
+        error,
+        req,
+        res,
+        'Failed to get record summary'
+      );
+    }
+  });
+
   // GET /api/records/:id - Get a specific record (handles both public and authenticated access)
   router.get(
     '/:id',

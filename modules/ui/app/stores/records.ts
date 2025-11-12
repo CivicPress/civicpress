@@ -4,9 +4,24 @@ import { validateApiResponse } from '~/utils/api-response';
 export interface CivicRecord {
   id: string;
   title: string;
-  type: 'bylaw' | 'ordinance' | 'policy' | 'proclamation' | 'resolution' | 'geography' | 'session';
+  type:
+    | 'bylaw'
+    | 'ordinance'
+    | 'policy'
+    | 'proclamation'
+    | 'resolution'
+    | 'geography'
+    | 'session';
   content: string;
-  status: 'draft' | 'pending_review' | 'under_review' | 'approved' | 'published' | 'rejected' | 'archived' | 'expired';
+  status:
+    | 'draft'
+    | 'pending_review'
+    | 'under_review'
+    | 'approved'
+    | 'published'
+    | 'rejected'
+    | 'archived'
+    | 'expired';
   path: string;
   author: string; // Required: primary author username
   authors?: Array<{
@@ -88,7 +103,36 @@ export interface RecordsState {
   hasMore: boolean;
   // Configurable page size
   pageSize: number;
+  summaryCounts: RecordSummaryCounts | null;
 }
+
+interface RecordSummaryCounts {
+  total: number;
+  types: Record<string, number>;
+  statuses: Record<string, number>;
+}
+
+const calculateCountsFromRecords = (
+  records: CivicRecord[]
+): RecordSummaryCounts => {
+  const summary: RecordSummaryCounts = {
+    total: records.length,
+    types: {},
+    statuses: {},
+  };
+
+  for (const record of records) {
+    if (record.type) {
+      summary.types[record.type] = (summary.types[record.type] || 0) + 1;
+    }
+    if (record.status) {
+      summary.statuses[record.status] =
+        (summary.statuses[record.status] || 0) + 1;
+    }
+  }
+
+  return summary;
+};
 
 export const useRecordsStore = defineStore('records', {
   state: (): RecordsState => ({
@@ -99,7 +143,8 @@ export const useRecordsStore = defineStore('records', {
     filters: {},
     nextCursor: null,
     hasMore: true,
-    pageSize: 300, // Default page size - large for better UX
+    pageSize: 1000, // Large enough to load full datasets like bylaws
+    summaryCounts: null,
   }),
 
   getters: {
@@ -107,25 +152,23 @@ export const useRecordsStore = defineStore('records', {
      * Facet counts computed from the currently loaded records
      */
     facetCounts: (state) => {
-      const counts = {
-        types: {} as Record<string, number>,
-        statuses: {} as Record<string, number>,
-        tags: {} as Record<string, number>,
-      };
+      const summary =
+        state.summaryCounts ?? calculateCountsFromRecords(state.records);
 
+      const tags: Record<string, number> = {};
       for (const record of state.records) {
-        counts.types[record.type] = (counts.types[record.type] || 0) + 1;
-        counts.statuses[record.status] =
-          (counts.statuses[record.status] || 0) + 1;
-
         if (Array.isArray(record.metadata?.tags)) {
           for (const tag of record.metadata.tags) {
-            counts.tags[tag] = (counts.tags[tag] || 0) + 1;
+            tags[tag] = (tags[tag] || 0) + 1;
           }
         }
       }
 
-      return counts;
+      return {
+        types: summary.types,
+        statuses: summary.statuses,
+        tags,
+      };
     },
     /**
      * Get filtered records (client-side filtering)
@@ -234,6 +277,31 @@ export const useRecordsStore = defineStore('records', {
     },
 
     /**
+     * Fetch aggregated record counts from API (fallback to local counts on error)
+     */
+    async fetchSummaryCounts(params?: { type?: string; status?: string }) {
+      try {
+        const queryParams = new URLSearchParams();
+        if (params?.type) queryParams.append('type', params.type);
+        if (params?.status) queryParams.append('status', params.status);
+        const queryString = queryParams.toString();
+        const url = `/api/v1/records/summary${
+          queryString ? `?${queryString}` : ''
+        }`;
+        const response = await useNuxtApp().$civicApi(url);
+        const data = validateApiResponse(response);
+        this.summaryCounts = {
+          total: data.total || 0,
+          types: data.types || {},
+          statuses: data.statuses || {},
+        };
+      } catch (error) {
+        // Fallback to counts derived from currently loaded records
+        this.summaryCounts = calculateCountsFromRecords(this.records);
+      }
+    },
+
+    /**
      * Load initial records (first batch)
      */
     async loadInitialRecords(params?: { type?: string; status?: string }) {
@@ -268,6 +336,16 @@ export const useRecordsStore = defineStore('records', {
           // Update cursor and hasMore
           this.nextCursor = data.nextCursor || null;
           this.hasMore = data.hasMore || false;
+
+          this.filters = {
+            type: params?.type,
+            status: params?.status,
+          };
+
+          await this.fetchSummaryCounts({
+            type: params?.type,
+            status: params?.status,
+          });
         }
       } catch (error: any) {
         const { handleError } = useErrorHandler();
@@ -375,6 +453,8 @@ export const useRecordsStore = defineStore('records', {
           status: params?.status,
           search: query,
         };
+
+        this.summaryCounts = calculateCountsFromRecords(apiResults);
       } catch (error: any) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
