@@ -17,6 +17,7 @@ const filters = ref({
   types: [type], // Pre-select the record type
   statuses: [] as string[],
 });
+const filtersResetKey = ref(0);
 
 // URL state management functions
 const updateURL = () => {
@@ -103,6 +104,20 @@ const handleFilterChange = async (newFilters: {
   }
 };
 
+const resetFilters = async () => {
+  searchQuery.value = '';
+  filters.value = {
+    search: '',
+    types: [type],
+    statuses: [],
+  };
+  filtersResetKey.value += 1;
+  updateURL();
+  await recordsStore.loadInitialRecords({
+    type,
+  });
+  await ensureBylawHierarchyLoaded();
+};
 // Get record type display name
 const { getRecordTypeLabel } = useRecordTypes();
 const recordTypeLabel = computed(() => getRecordTypeLabel(type));
@@ -165,9 +180,7 @@ const breadcrumbItems = computed(() => [
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">
-            {{ recordTypeLabel }}
-          </h1>
+          <h1 class="text-2xl font-semibold">{{ recordTypeLabel }} Records</h1>
         </template>
         <template #description>
           Browse and search through {{ recordTypeLabel.toLowerCase() }} records
@@ -193,6 +206,7 @@ const breadcrumbItems = computed(() => [
 
         <!-- Search and Filters Component -->
         <RecordSearch
+          :key="filtersResetKey"
           :initial-filters="filters"
           :record-type="type"
           :disable-type-filter="true"
@@ -205,6 +219,7 @@ const breadcrumbItems = computed(() => [
           :record-type="type"
           :filters="filters"
           :search-query="searchQuery"
+          @resetFilters="resetFilters"
         />
       </div>
     </template>

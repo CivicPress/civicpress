@@ -49,7 +49,7 @@ body {
 }
 
 .markdown-content .prose h2 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   line-height: 2rem;
   margin-top: 1.25rem;
   margin-bottom: 0.75rem;
@@ -67,6 +67,11 @@ body {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
   padding-left: 1.5rem;
+  list-style: decimal;
+}
+
+.markdown-content .prose ol {
+  list-style: decimal;
 }
 
 .markdown-content .prose li {
@@ -80,4 +85,33 @@ body {
   margin: 1rem 0;
   font-style: italic;
   color: #6b7280;
+} 
+
+@layer components {
+  .markdown-content ol {
+    list-style: decimal;
+    margin: 0 0 1rem;
+    padding-left: 1.75rem;
+  }
+
+  .markdown-content ol ol {
+    list-style: decimal;
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .markdown-content ol li {
+    margin: 0.3rem 0;
+  }
+
+  .markdown-content h2 {
+    font-size: 1.75rem;
+    line-height: 2rem;
+    margin-top: 1.25rem;
+  }
+
+  .markdown-content hr {
+    border-color: theme('colors.gray.200');
+    border-top-width: 1px;
+  }
 } 

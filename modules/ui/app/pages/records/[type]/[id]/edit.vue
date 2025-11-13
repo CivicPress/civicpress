@@ -185,7 +185,7 @@ const breadcrumbItems = computed(() => [
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">
+          <h1 class="text-2xl font-semibold">
             Edit {{ record?.title || 'Record' }}
           </h1>
         </template>

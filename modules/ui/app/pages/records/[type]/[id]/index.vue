@@ -111,6 +111,67 @@ const normalizeRelativePath = (path: string): string => {
   return stack.join('/');
 };
 
+const normalizeOrderedLists = (root: HTMLElement) => {
+  const olElements = root.querySelectorAll('ol');
+  olElements.forEach((ol) => {
+    const items = Array.from(ol.children).filter(
+      (child) => child.tagName === 'LI'
+    );
+    items.forEach((item) => {
+      const li = item as HTMLElement;
+      const rawSegments = li.innerHTML
+        .split(/<br\s*\/?>/i)
+        .map((segment) => segment.trim())
+        .filter((segment): segment is string => segment.length > 0);
+
+      if (rawSegments.length <= 1) {
+        return;
+      }
+
+      li.innerHTML = rawSegments[0] ?? '';
+
+      const parentStack: HTMLElement[] = [li];
+
+      rawSegments.slice(1).forEach((segment) => {
+        const match = segment.match(/^(\d+(?:\.\d+)*)(?:\.)?\s*(.*)$/);
+        if (!match) {
+          const wrapper = document.createElement('span');
+          wrapper.innerHTML = segment;
+          li.appendChild(document.createElement('br'));
+          li.appendChild(wrapper);
+          return;
+        }
+
+        const matchedNumber = match[1] ?? '';
+        const matchedText = match[2] ?? '';
+        const depth = matchedNumber.split('.').length;
+        const contentText = matchedText.trim() || matchedNumber.trim();
+
+        if (!contentText) {
+          return;
+        }
+
+        while (parentStack.length >= depth) {
+          parentStack.pop();
+        }
+
+        const currentParent = parentStack[parentStack.length - 1] ?? li;
+
+        let nestedOl = currentParent.querySelector(':scope > ol');
+        if (!nestedOl) {
+          nestedOl = document.createElement('ol');
+          currentParent.appendChild(nestedOl);
+        }
+
+        const newLi = document.createElement('li');
+        newLi.innerHTML = contentText;
+        nestedOl.appendChild(newLi);
+        parentStack.push(newLi);
+      });
+    });
+  });
+};
+
 const applyLinkTransformations = () => {
   if (!process.client) {
     return;
@@ -191,8 +252,44 @@ const handleContentClick = (event: MouseEvent) => {
   event.preventDefault();
   router.push(href);
 };
-const { formatDate, getStatusColor, getTypeIcon, getTypeLabel } =
-  useRecordUtils();
+const {
+  formatDate,
+  getStatusColor,
+  getTypeIcon,
+  getTypeLabel,
+  getStatusLabel,
+  getStatusIcon,
+} = useRecordUtils();
+
+const statusDisplay = computed(() =>
+  record.value ? getStatusLabel(record.value.status) : ''
+);
+
+const statusHistory = computed(() => {
+  const source =
+    record.value?.metadata?.status_history ||
+    record.value?.metadata?.statusHistory ||
+    [];
+
+  if (!Array.isArray(source)) {
+    return [] as Array<{ status: string; user?: string; date?: string }>;
+  }
+
+  return source
+    .map((entry: any) => ({
+      status: entry?.status || entry?.value || entry?.name,
+      user: entry?.user || entry?.by || entry?.actor || entry?.updated_by,
+      date:
+        entry?.date ||
+        entry?.at ||
+        entry?.timestamp ||
+        entry?.updated_at ||
+        entry?.created_at,
+    }))
+    .filter(
+      (entry) => typeof entry.status === 'string' && entry.status.length > 0
+    );
+});
 
 // Fetch record data
 const fetchRecord = async () => {
@@ -289,7 +386,7 @@ const breadcrumbItems = computed(() => [
     to: `/records/${type}`,
   },
   {
-    label: record.value?.title || 'Record',
+    label: record.value?.id || 'Record',
   },
 ]);
 
@@ -326,6 +423,12 @@ const detailAccordionItems = computed(() => {
         : 'No attachments',
     },
     {
+      label: 'Status Transitions',
+      value: 'status-transitions',
+      iconName: getStatusIcon(record.value?.status || ''),
+      description: getStatusLabel(record.value?.status || ''),
+    },
+    {
       label: 'Linked Geography',
       value: 'linked-geography',
       iconName: 'i-lucide-map-pin',
@@ -344,6 +447,16 @@ const detailAccordionItems = computed(() => {
           : 'No additional metadata',
     },
   ];
+});
+
+const additionalMetadata = computed(() => {
+  const meta = record.value?.metadata;
+  if (!meta) return [] as Array<{ key: string; value: unknown }>;
+
+  const hiddenKeys = new Set(['metadata', 'file_path', 'extensions']);
+  return Object.entries(meta)
+    .filter(([key]) => !hiddenKeys.has(key))
+    .map(([key, value]) => ({ key, value }));
 });
 
 // Handle file download
@@ -396,8 +509,8 @@ const downloadFile = async (fileId: string, fileName: string) => {
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">
-            {{ record?.title || 'Record' }}
+          <h1 class="text-2xl font-semibold">
+            {{ record?.id || 'Record' }}
           </h1>
         </template>
         <template #description>
@@ -460,83 +573,47 @@ const downloadFile = async (fileId: string, fileName: string) => {
       <!-- Record Content -->
       <div v-else-if="record" class="space-y-6">
         <!-- Record Header -->
-        <div class="rounded-lg border p-6">
-          <div class="flex items-start justify-between mb-4">
-            <div class="flex-1">
-              <div class="flex items-center gap-3 mb-2">
-                <UIcon
-                  :name="getTypeIcon(record.type)"
-                  class="text-gray-500 text-xl"
-                />
-                <UBadge
-                  :color="getStatusColor(record.status) as any"
-                  variant="soft"
-                >
-                  {{ record.status }}
-                </UBadge>
-                <UBadge color="neutral" variant="soft">
-                  {{ record.type }}
-                </UBadge>
-              </div>
-              <h1 class="text-2xl font-bold mb-2">
-                {{ record.title }}
-              </h1>
-              <p class="text-gray-600 dark:text-gray-400">
-                Record ID:
-                <code
-                  class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm"
-                  >{{ record.id }}</code
-                >
-              </p>
-            </div>
+        <div
+          class="rounded-lg border border-gray-200 dark:border-gray-800 p-6 space-y-4"
+        >
+          <div
+            class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-600 dark:text-gray-400"
+          >
+            <span class="font-medium text-gray-800 dark:text-gray-100">
+              Record ID:
+              <code
+                class="ml-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs tracking-tight"
+                >{{ record.id }}</code
+              >
+            </span>
+            <span class="inline-flex items-center gap-2">
+              <UIcon
+                :name="getTypeIcon(record.type)"
+                class="w-4 h-4 text-gray-500"
+              />
+              <span class="uppercase tracking-wide">{{ record.type }}</span>
+            </span>
+            <span class="inline-flex items-center gap-2">
+              <UIcon name="i-lucide-calendar" class="w-4 h-4 text-gray-500" />
+              {{ formatDate(record.created_at) }}
+            </span>
+            <span v-if="record.author" class="inline-flex items-center gap-2">
+              <UIcon name="i-lucide-user" class="w-4 h-4 text-gray-500" />
+              {{ record.author }}
+            </span>
+            <span
+              class="inline-flex items-center gap-2 rounded-full px-2 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-200 dark:text-green-200 dark:ring-green-800"
+            >
+              <UIcon name="i-lucide-badge-check" class="w-4 h-4" />
+              {{ statusDisplay }}
+            </span>
           </div>
 
-          <!-- Metadata -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-            <div class="space-y-2">
-              <div
-                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
-              >
-                <UIcon name="i-lucide-calendar" class="w-4 h-4" />
-                <span>Created: {{ formatDate(record.created_at) }}</span>
-              </div>
-              <div
-                v-if="record.author"
-                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
-              >
-                <UIcon name="i-lucide-user" class="w-4 h-4" />
-                <span>Author: {{ record.author }}</span>
-              </div>
-            </div>
-            <div class="space-y-2">
-              <div
-                v-if="record.metadata?.updated"
-                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
-              >
-                <UIcon name="i-lucide-edit" class="w-4 h-4" />
-                <span>Updated: {{ formatDate(record.metadata.updated) }}</span>
-              </div>
-              <div
-                v-if="record.metadata?.updated"
-                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
-              >
-                <UIcon name="i-lucide-edit" class="w-4 h-4" />
-                <span>Updated: {{ formatDate(record.metadata.updated) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tags -->
           <div
             v-if="record.metadata?.tags && record.metadata.tags.length > 0"
-            class="pt-4 border-t mt-4"
+            class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
           >
-            <div
-              class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2"
-            >
-              <UIcon name="i-lucide-tags" class="w-4 h-4" />
-              <span>Tags:</span>
-            </div>
+            <span class="font-medium">Tags:</span>
             <div class="flex flex-wrap gap-2">
               <UBadge
                 v-for="tag in record.metadata.tags"
@@ -552,11 +629,8 @@ const downloadFile = async (fileId: string, fileName: string) => {
         </div>
 
         <!-- Record Content -->
-        <div class="rounded-lg border">
-          <div class="border-b px-6 py-4">
-            <h2 class="text-lg font-semibold">Content</h2>
-          </div>
-          <div class="p-6">
+        <div class="rounded-lg border border-gray-200 dark:border-gray-800">
+          <div class="p-6 leading-relaxed">
             <div
               v-if="record.content"
               class="markdown-content"
@@ -577,7 +651,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
 
         <UAccordion
           :items="detailAccordionItems"
-          class="rounded-lg border"
+          class="rounded-lg border border-gray-200 dark:border-gray-800"
           :ui="{
             item: 'border-b last:border-b-0',
             trigger: 'px-6 py-4 flex items-center gap-3 text-sm font-medium',
@@ -677,6 +751,19 @@ const downloadFile = async (fileId: string, fileName: string) => {
               </div>
             </div>
 
+            <div v-else-if="item.value === 'status-transitions'">
+              <StatusTransitionControls
+                v-if="record"
+                :record-id="record.id"
+                :current-status="record.status"
+                :user-can-change-status="
+                  authStore.hasPermission('records:status')
+                "
+                :status-history="statusHistory"
+                @changed="handleStatusChanged"
+              />
+            </div>
+
             <div v-else-if="item.value === 'linked-geography'">
               <GeographyLinkDisplay
                 :linked-geography-files="record.linkedGeographyFiles || []"
@@ -685,32 +772,30 @@ const downloadFile = async (fileId: string, fileName: string) => {
 
             <div v-else-if="item.value === 'additional-info'">
               <div
-                v-if="
-                  record.metadata && Object.keys(record.metadata).length > 0
-                "
+                v-if="additionalMetadata.length > 0"
                 class="grid grid-cols-1 md:grid-cols-2 gap-4"
               >
                 <div
-                  v-for="(value, key) in record.metadata"
-                  :key="key"
+                  v-for="entry in additionalMetadata"
+                  :key="entry.key"
                   class="space-y-1"
                 >
                   <dt
                     class="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize"
                   >
-                    {{ key }}
+                    {{ entry.key }}
                   </dt>
                   <dd class="text-sm">
                     <template
                       v-if="
-                        key === 'attendees' &&
-                        Array.isArray(value) &&
-                        value.length
+                        entry.key === 'attendees' &&
+                        Array.isArray(entry.value) &&
+                        entry.value.length
                       "
                     >
                       <ul class="space-y-2">
                         <li
-                          v-for="(attendee, attendeeIndex) in value"
+                          v-for="(attendee, attendeeIndex) in entry.value"
                           :key="attendeeIndex"
                           class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
                         >
@@ -734,14 +819,14 @@ const downloadFile = async (fileId: string, fileName: string) => {
                         </li>
                       </ul>
                     </template>
-                    <span v-else-if="typeof value === 'string'">{{
-                      value
+                    <span v-else-if="typeof entry.value === 'string'">{{
+                      entry.value
                     }}</span>
                     <span
                       v-else
                       class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
                     >
-                      {{ JSON.stringify(value) }}
+                      {{ JSON.stringify(entry.value) }}
                     </span>
                   </dd>
                 </div>
@@ -753,14 +838,20 @@ const downloadFile = async (fileId: string, fileName: string) => {
           </template>
         </UAccordion>
 
-        <!-- Status Transitions -->
-        <StatusTransitionControls
-          v-if="record"
-          :record-id="record.id"
-          :current-status="record.status"
-          :user-can-change-status="authStore.hasPermission('records:status')"
-          @changed="handleStatusChanged"
-        />
+        <div
+          class="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4 text-center"
+        >
+          <span>Stored as Markdown/YAML</span>
+          <span>·</span>
+          <span>Git-backed</span>
+          <span>·</span>
+          <span>
+            Last sync
+            <time :datetime="record?.updated_at">
+              {{ formatDate(record?.updated_at || record?.created_at || '') }}
+            </time>
+          </span>
+        </div>
       </div>
 
       <!-- No Record Found -->
@@ -794,5 +885,10 @@ const downloadFile = async (fileId: string, fileName: string) => {
 :deep(.markdown-content p) {
   margin: 0;
   line-height: 1.4rem;
+}
+
+:deep(.markdown-content h2:first-of-type) {
+  margin-top: 0;
+  padding-top: 0;
 }
 </style>

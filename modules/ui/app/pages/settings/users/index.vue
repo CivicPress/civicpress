@@ -77,7 +77,7 @@ onMounted(() => {
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">Users</h1>
+          <h1 class="text-2xl font-semibold">Users</h1>
         </template>
         <template #description> Manage system users and their roles </template>
         <template #right>

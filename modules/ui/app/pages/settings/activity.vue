@@ -3,7 +3,7 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">Activity</h1>
+          <h1 class="text-2xl font-semibold">Activity</h1>
         </template>
         <template #description> Recent system activity (admin only) </template>
       </UDashboardNavbar>

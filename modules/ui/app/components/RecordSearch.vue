@@ -210,108 +210,123 @@ onUnmounted(() => {
 <template>
   <div class="space-y-4">
     <!-- Search and Filters -->
-    <div class="flex flex-col sm:flex-row gap-4">
-      <!-- Search Input with Suggestions -->
-      <div class="flex-1 relative search-suggestions-container">
-        <UInput
-          v-model="searchQuery"
-          @blur="handleInputBlur"
-          placeholder="Search records..."
-          icon="i-lucide-search"
-          class="w-full"
-          :ui="{ trailing: 'pe-1' }"
-        >
-          <template v-if="searchQuery?.length" #trailing>
-            <UButton
-              color="neutral"
-              variant="link"
-              size="sm"
-              icon="i-lucide-circle-x"
-              aria-label="Clear search"
-              @click="searchQuery = ''"
-            />
-          </template>
-        </UInput>
-
-        <!-- Suggestions Dropdown -->
-        <div
-          v-if="suggestions.length > 0"
-          class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
-        >
-          <div class="p-2">
-            <div class="text-xs text-gray-500 mb-2 px-2">
-              <UIcon name="i-lucide-lightbulb" class="w-3 h-3 inline mr-1" />
-              Suggestions
-            </div>
-            <div
-              v-for="suggestion in suggestions"
-              :key="suggestion"
-              class="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer text-sm"
-              @click="handleSuggestionClick(suggestion)"
-            >
-              <UIcon
-                name="i-lucide-search"
-                class="w-3 h-3 inline mr-2 text-gray-400"
-              />
-              {{ suggestion }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Loading indicator for suggestions -->
-        <div
-          v-if="
-            suggestionsLoading && searchQuery && searchQuery.trim().length >= 2
-          "
-          class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3"
-        >
-          <div class="flex items-center justify-center text-sm text-gray-500">
-            <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin mr-2" />
-            Loading suggestions...
-          </div>
-        </div>
+    <div
+      class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40 space-y-3"
+    >
+      <div class="sm:hidden">
+        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">
+          Filters
+        </span>
       </div>
 
-      <USelectMenu
-        v-if="!disableTypeFilter"
-        v-model="selectedRecordTypes"
-        :items="typeFacetItems"
-        multiple
-        :loading="recordTypesLoading"
-        placeholder="Select Record Types"
-        class="w-full sm:w-48"
-      >
-        <template #trailing>
-          <UButton
-            v-if="selectedRecordTypes.length > 0"
-            icon="i-lucide-x"
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            @click="selectedRecordTypes = []"
-          />
-        </template>
-      </USelectMenu>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <!-- Search Input with Suggestions -->
+        <div class="flex-1 relative search-suggestions-container">
+          <UInput
+            v-model="searchQuery"
+            @blur="handleInputBlur"
+            placeholder="Search records..."
+            icon="i-lucide-search"
+            class="w-full"
+            :ui="{ trailing: 'pe-1' }"
+          >
+            <template v-if="searchQuery?.length" #trailing>
+              <UButton
+                color="neutral"
+                variant="link"
+                size="sm"
+                icon="i-lucide-circle-x"
+                aria-label="Clear search"
+                @click="searchQuery = ''"
+              />
+            </template>
+          </UInput>
 
-      <USelectMenu
-        v-model="selectedRecordStatuses"
-        :items="statusFacetItems"
-        multiple
-        :loading="recordStatusesLoading"
-        placeholder="Select Record Statuses"
-        class="w-full sm:w-48"
-      >
-        <template #trailing>
-          <UButton
-            v-if="selectedRecordStatuses.length > 0"
-            icon="i-lucide-x"
-            color="neutral"
-            variant="ghost"
-            size="xs"
-            @click="selectedRecordStatuses = []"
-          />
-        </template>
-      </USelectMenu>
+          <!-- Suggestions Dropdown -->
+          <div
+            v-if="suggestions.length > 0"
+            class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
+          >
+            <div class="p-2">
+              <div class="text-xs text-gray-500 mb-2 px-2">
+                <UIcon name="i-lucide-lightbulb" class="w-3 h-3 inline mr-1" />
+                Suggestions
+              </div>
+              <div
+                v-for="suggestion in suggestions"
+                :key="suggestion"
+                class="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer text-sm"
+                @click="handleSuggestionClick(suggestion)"
+              >
+                <UIcon
+                  name="i-lucide-search"
+                  class="w-3 h-3 inline mr-2 text-gray-400"
+                />
+                {{ suggestion }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading indicator for suggestions -->
+          <div
+            v-if="
+              suggestionsLoading &&
+              searchQuery &&
+              searchQuery.trim().length >= 2
+            "
+            class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3"
+          >
+            <div class="flex items-center justify-center text-sm text-gray-500">
+              <UIcon
+                name="i-lucide-loader-2"
+                class="w-4 h-4 animate-spin mr-2"
+              />
+              Loading suggestions...
+            </div>
+          </div>
+        </div>
+
+        <USelectMenu
+          v-if="!disableTypeFilter"
+          v-model="selectedRecordTypes"
+          :items="typeFacetItems"
+          multiple
+          :loading="recordTypesLoading"
+          placeholder="Filter by type..."
+          class="w-full sm:w-48"
+        >
+          <template #trailing>
+            <UButton
+              v-if="selectedRecordTypes.length > 0"
+              icon="i-lucide-x"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="selectedRecordTypes = []"
+            />
+          </template>
+        </USelectMenu>
+
+        <USelectMenu
+          v-model="selectedRecordStatuses"
+          :items="statusFacetItems"
+          multiple
+          :loading="recordStatusesLoading"
+          placeholder="Status..."
+          class="w-full sm:w-48"
+        >
+          <template #trailing>
+            <UButton
+              v-if="selectedRecordStatuses.length > 0"
+              icon="i-lucide-x"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="selectedRecordStatuses = []"
+            />
+          </template>
+        </USelectMenu>
+      </div>
     </div>
 
     <!-- Records Summary -->

@@ -3,7 +3,7 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">
+          <h1 class="text-2xl font-semibold">
             {{ geographyFile?.name || 'Geography File' }}
           </h1>
         </template>

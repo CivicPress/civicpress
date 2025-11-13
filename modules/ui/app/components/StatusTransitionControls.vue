@@ -1,8 +1,17 @@
 <script setup lang="ts">
+import { useMediaQuery } from '@vueuse/core';
+
+interface StatusHistoryEntry {
+  status: string;
+  user?: string;
+  date?: string;
+}
+
 interface Props {
   recordId: string;
   currentStatus: string;
   userCanChangeStatus?: boolean;
+  statusHistory?: StatusHistoryEntry[];
 }
 
 const props = defineProps<Props>();
@@ -10,7 +19,13 @@ const emit = defineEmits<{
   changed: [{ newStatus: string; record?: any }];
 }>();
 
-const { getStatusColor, getStatusLabel, getStatusIcon } = useRecordUtils();
+const { getStatusColor, getStatusLabel, getStatusIcon, formatDate } =
+  useRecordUtils();
+const isDesktop = useMediaQuery('(min-width: 1024px)');
+
+const timelineOrientation = computed(() =>
+  isDesktop.value ? 'horizontal' : 'vertical'
+);
 const {
   recordStatusOptions,
   fetchRecordStatuses,
@@ -23,15 +38,68 @@ const showConfirm = ref(false);
 const saving = ref(false);
 const inlineError = ref<string | null>(null);
 
+const timelineEntries = computed<any[]>(() => {
+  const historyEntries = Array.isArray(props.statusHistory)
+    ? props.statusHistory
+    : [];
+  const historyMap = new Map<string, StatusHistoryEntry>();
+  historyEntries.forEach((entry) => {
+    if (entry?.status) {
+      historyMap.set(entry.status, entry);
+    }
+  });
+
+  const options = recordStatusOptions();
+  const availableSet = new Set(
+    availableTargets.value.map((opt: any) => opt.value as string)
+  );
+
+  const items = options.map((opt: any) => {
+    const history = historyMap.get(opt.value);
+    const formattedDate = history?.date ? formatDate(history.date) : undefined;
+    const details = [formattedDate, history?.user].filter(Boolean).join(' · ');
+    const isCurrent = opt.value === props.currentStatus;
+
+    return {
+      value: opt.value as string,
+      title: getStatusLabel(opt.value),
+      icon: getStatusIcon(opt.value),
+      description: details || undefined,
+      status: opt.value as string,
+      isCurrent,
+      isTransition: availableSet.has(opt.value),
+      color: isCurrent ? 'primary' : 'neutral',
+    };
+  });
+
+  const seen = new Set(items.map((item) => item.status));
+  historyEntries.forEach((entry) => {
+    if (entry?.status && !seen.has(entry.status)) {
+      const formattedDate = entry.date ? formatDate(entry.date) : undefined;
+      const details = [formattedDate, entry.user].filter(Boolean).join(' · ');
+      items.push({
+        value: entry.status,
+        title: getStatusLabel(entry.status),
+        icon: getStatusIcon(entry.status),
+        description: details || undefined,
+        status: entry.status,
+        isCurrent: entry.status === props.currentStatus,
+        isTransition: availableSet.has(entry.status),
+        color: entry.status === props.currentStatus ? 'primary' : 'neutral',
+      });
+    }
+  });
+
+  return items;
+});
+
 onMounted(async () => {
-  // Only proceed if user has permission to change status
   if (!props.userCanChangeStatus) {
     return;
   }
 
   try {
     await fetchRecordStatuses();
-    // Fetch allowed transitions for current user/record
     try {
       const { $civicApi } = useNuxtApp();
       const res = (await $civicApi(
@@ -61,9 +129,7 @@ const availableTargets = computed(() => {
 });
 
 // Only show component if user has permission to change status
-const shouldShowComponent = computed(() => {
-  return props.userCanChangeStatus === true;
-});
+const shouldShowComponent = computed(() => true);
 
 // Show different content based on permission
 const showStatusTransitions = computed(() => {
@@ -97,7 +163,6 @@ const confirmChange = async () => {
         newStatus: pendingStatus.value,
         record: response.data?.record,
       });
-      // Close modal and reset state
       showConfirm.value = false;
       pendingStatus.value = null;
     } else {
@@ -115,61 +180,92 @@ const confirmChange = async () => {
 </script>
 
 <template>
-  <div v-if="shouldShowComponent" class="rounded-lg border">
-    <div class="border-b px-6 py-4 flex items-center justify-between">
-      <h2 class="text-lg font-semibold">Status Transitions</h2>
-      <UBadge :color="getStatusColor(currentStatus) as any" variant="soft">
-        Current: {{ getStatusLabel(currentStatus) }}
-      </UBadge>
+  <div v-if="shouldShowComponent" class="space-y-4">
+    <UTimeline
+      v-if="timelineEntries.length > 0"
+      :orientation="timelineOrientation"
+      color="neutral"
+      size="sm"
+      :items="timelineEntries"
+      :default-value="currentStatus"
+      class="mt-2"
+    >
+      <template #default="{ item }">
+        <div class="flex flex-col gap-1 w-full max-w-xs lg:max-w-sm">
+          <div class="flex items-center justify-between">
+            <span
+              :class="[
+                'text-sm font-medium',
+                item.isCurrent
+                  ? 'text-primary-600'
+                  : 'text-gray-800 dark:text-gray-100',
+              ]"
+            >
+              {{ item.title }}
+            </span>
+            <UBadge
+              v-if="item.isCurrent"
+              color="primary"
+              variant="soft"
+              size="xs"
+            >
+              Current
+            </UBadge>
+          </div>
+          <div
+            v-if="item.description"
+            class="text-xs text-gray-500 dark:text-gray-400"
+          >
+            {{ item.description }}
+          </div>
+          <div v-else class="text-xs text-gray-400">—</div>
+          <div
+            v-if="item.isTransition"
+            class="mt-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-2"
+          >
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              Transition to {{ getStatusLabel(item.status) }}
+              <span v-if="!showStatusTransitions">(permission required)</span>
+            </p>
+            <UButton
+              size="xs"
+              :color="getStatusColor(item.status) as any"
+              :icon="getStatusIcon(item.status)"
+              variant="outline"
+              :disabled="!showStatusTransitions"
+              @click="openConfirm(item.status)"
+            >
+              Change status
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UTimeline>
+
+    <UAlert
+      v-if="statusesError"
+      color="error"
+      variant="soft"
+      :title="statusesError"
+      icon="i-lucide-alert-circle"
+    />
+    <UAlert
+      v-if="inlineError"
+      color="error"
+      variant="soft"
+      :title="inlineError"
+      icon="i-lucide-alert-triangle"
+    />
+
+    <div
+      v-if="statusesLoading"
+      class="text-sm text-gray-500 flex items-center gap-2"
+    >
+      <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" /> Loading
+      statuses...
     </div>
-
-    <div class="p-6 space-y-4">
-      <UAlert
-        v-if="statusesError"
-        color="error"
-        variant="soft"
-        :title="statusesError"
-        icon="i-lucide-alert-circle"
-      />
-      <UAlert
-        v-if="inlineError"
-        color="error"
-        variant="soft"
-        :title="inlineError"
-        icon="i-lucide-alert-triangle"
-      />
-
-      <div
-        v-if="showStatusTransitions && !statusesLoading"
-        class="flex flex-wrap gap-2"
-      >
-        <UButton
-          v-for="opt in availableTargets"
-          :key="opt.value"
-          :icon="getStatusIcon(opt.value)"
-          :color="getStatusColor(opt.value) as any"
-          variant="outline"
-          size="sm"
-          @click="openConfirm(opt.value)"
-        >
-          {{ getStatusLabel(opt.value) }}
-        </UButton>
-        <span v-if="availableTargets.length === 0" class="text-sm text-gray-500"
-          >No available transitions</span
-        >
-      </div>
-
-      <div v-else-if="!statusesLoading" class="text-sm text-gray-500">
-        <p>You don't have permission to change record status.</p>
-      </div>
-
-      <div
-        v-else-if="statusesLoading"
-        class="text-sm text-gray-500 flex items-center gap-2"
-      >
-        <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" /> Loading
-        statuses...
-      </div>
+    <div v-else-if="!showStatusTransitions" class="text-sm text-gray-500">
+      You don't have permission to change record status.
     </div>
 
     <UModal

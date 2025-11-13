@@ -117,7 +117,7 @@ onMounted(() => {
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">Settings</h1>
+          <h1 class="text-2xl font-semibold">Settings</h1>
         </template>
       </UDashboardNavbar>
     </template>

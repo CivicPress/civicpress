@@ -3,7 +3,7 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">Setup Wizard</h1>
+          <h1 class="text-2xl font-semibold">Setup Wizard</h1>
         </template>
         <template #description>
           Create missing configuration files from defaults and validate

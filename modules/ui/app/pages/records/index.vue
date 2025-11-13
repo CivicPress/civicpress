@@ -21,6 +21,7 @@ const sort = ref<
   'relevance' | 'updated_desc' | 'created_desc' | 'title_asc' | 'title_desc'
 >('relevance');
 const page = ref(1);
+const filtersResetKey = ref(0);
 
 // URL state management functions
 const updateURL = () => {
@@ -107,6 +108,20 @@ const handleFilterChange = (newFilters: {
   }
 };
 
+const resetAllFilters = async () => {
+  searchQuery.value = '';
+  filters.value = {
+    search: '',
+    types: [],
+    statuses: [],
+  };
+  page.value = 1;
+  sort.value = 'relevance';
+  filtersResetKey.value += 1;
+  updateURL();
+  await recordsStore.loadInitialRecords({});
+};
+
 // Sort handling
 const sortOptions = [
   { label: 'Relevance', value: 'relevance' },
@@ -178,10 +193,10 @@ const breadcrumbsRef = ref<HTMLElement>();
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">Browse Records</h1>
+          <h1 class="text-2xl font-semibold">All Records</h1>
         </template>
         <template #description>
-          Browse and search through all records
+          Browse and search through the complete records catalog
         </template>
         <template #right>
           <div class="flex items-center gap-2">
@@ -213,6 +228,7 @@ const breadcrumbsRef = ref<HTMLElement>();
 
         <!-- Search and Filters Component -->
         <RecordSearch
+          :key="filtersResetKey"
           :initial-filters="filters"
           @search="handleSearch"
           @filter-change="handleFilterChange"
@@ -224,6 +240,7 @@ const breadcrumbsRef = ref<HTMLElement>();
           :search-query="searchQuery"
           :breadcrumbs-ref="breadcrumbsRef"
           :sort="sort"
+          @resetFilters="resetAllFilters"
         />
       </div>
     </template>

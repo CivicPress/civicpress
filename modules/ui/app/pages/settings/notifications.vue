@@ -3,7 +3,7 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">Notifications</h1>
+          <h1 class="text-2xl font-semibold">Notifications</h1>
         </template>
         <template #description>
           Send a test email to verify configuration
