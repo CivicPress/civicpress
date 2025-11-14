@@ -295,6 +295,10 @@ const configDescription = computed(
 // Breadcrumb navigation
 const breadcrumbItems = computed(() => [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Settings',
     to: '/settings',
   },

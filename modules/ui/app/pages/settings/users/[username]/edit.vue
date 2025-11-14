@@ -31,6 +31,7 @@ const pageTitle = computed(() => {
 });
 
 const breadcrumbItems = computed(() => [
+  { label: 'Home', to: '/' },
   { label: 'Settings', to: '/settings' },
   { label: 'Users', to: '/settings/users' },
   { label: user.value?.name || user.value?.username || 'User' },

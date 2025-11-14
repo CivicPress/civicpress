@@ -3,7 +3,7 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">Storage</h1>
+          <h1 class="text-lg font-semibold">File Storage</h1>
         </template>
       </UDashboardNavbar>
     </template>
@@ -14,121 +14,90 @@
 
         <!-- Page Header -->
         <div class="page-header">
-          <h2 class="text-2xl font-semibold text-gray-900 mb-2">
-            File Storage
-          </h2>
           <p class="text-gray-600">
             Manage and organize your files across different storage folders
           </p>
         </div>
 
-        <!-- Storage Overview -->
-        <div class="storage-overview mb-8">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div
-              v-for="folder in storageFolders"
-              :key="folder.name"
-              class="storage-folder-card"
-              :class="{ 'cursor-pointer': folder.enabled }"
-              @click="folder.enabled ? selectFolder(folder.name) : null"
-            >
-              <div class="folder-icon mb-3">
-                <UIcon
-                  :name="getFolderIcon(folder.name)"
-                  class="w-12 h-12"
-                  :class="getFolderIconColor(folder.name)"
-                />
-              </div>
-
-              <h3 class="text-lg font-semibold text-gray-900 mb-1">
-                {{ folder.label }}
-              </h3>
-
-              <p class="text-sm text-gray-600 mb-3">
-                {{ folder.description }}
-              </p>
-
-              <div class="folder-stats text-xs text-gray-500">
-                <div class="flex justify-between">
-                  <span>Files:</span>
-                  <span>{{ folder.fileCount || 0 }}</span>
+        <!-- Storage Overview + Stats (top band) -->
+        <div v-if="!selectedFolder" class="mb-8 grid gap-6 lg:grid-cols-5">
+          <!-- Folder cards -->
+          <div class="lg:col-span-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+              <UCard v-for="folder in storageFolders" :key="folder.name" :class="{ 'cursor-pointer': folder.enabled }"
+                class="text-center" @click="folder.enabled ? selectFolder(folder.name) : null">
+                <div class="mb-3 flex justify-center">
+                  <UIcon :name="getFolderIcon(folder.name)" class="w-10 h-10"
+                    :class="getFolderIconColor(folder.name)" />
                 </div>
-                <div class="flex justify-between">
-                  <span>Size:</span>
-                  <span>{{ folder.totalSize || '0 B' }}</span>
+
+                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                  {{ folder.label }}
+                </h3>
+
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  {{ folder.description }}
+                </p>
+
+                <div class="text-xs text-gray-500 dark:text-gray-500 space-y-1 mb-3">
+                  <div class="flex justify-between">
+                    <span>Files</span>
+                    <span>{{ folder.fileCount || 0 }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span>Size</span>
+                    <span>{{ folder.totalSize || '0 B' }}</span>
+                  </div>
                 </div>
-              </div>
 
-              <UButton
-                v-if="folder.enabled"
-                size="sm"
-                variant="outline"
-                class="mt-3 w-full"
-              >
-                Browse Files
-              </UButton>
-
-              <UButton
-                v-else
-                size="sm"
-                variant="ghost"
-                disabled
-                class="mt-3 w-full"
-              >
-                Coming Soon
-              </UButton>
-            </div>
-          </div>
-        </div>
-
-        <!-- Selected Folder Browser -->
-        <div v-if="selectedFolder" class="folder-browser">
-          <div class="flex items-center justify-between mb-6">
-            <div>
-              <h2 class="text-2xl font-semibold text-gray-900">
-                {{ getFolderLabel(selectedFolder) }}
-              </h2>
-              <p class="text-gray-600">
-                {{ getFolderDescription(selectedFolder) }}
-              </p>
-            </div>
-
-            <div class="flex items-center space-x-3">
-              <UButton variant="ghost" @click="selectedFolder = null">
-                <UIcon name="i-lucide-arrow-left" class="w-4 h-4 mr-2" />
-                Back to Overview
-              </UButton>
-
-              <UButton
-                @click="refreshFolderFiles"
-                :loading="refreshing"
-                variant="outline"
-                size="sm"
-                class="hover:bg-gray-50"
-              >
-                <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
-                Refresh
-              </UButton>
-
-              <UButton
-                v-if="canUpload"
-                @click="showUploadModal = true"
-                color="primary"
-                size="sm"
-                class="hover:shadow-md transition-shadow"
-              >
-                <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
-                Upload Files
-              </UButton>
+                <UButton v-if="folder.enabled" size="sm" variant="outline" class="w-full">
+                  Browse files
+                </UButton>
+                <UButton v-else size="sm" variant="ghost" disabled class="w-full">
+                  Coming soon
+                </UButton>
+              </UCard>
             </div>
           </div>
 
-          <FileBrowser
-            ref="fileBrowserRef"
-            :folder="selectedFolder"
-            :allowed-types="getFolderAllowedTypes(selectedFolder)"
-            :max-size="getFolderMaxSize(selectedFolder)"
-          />
+          <!-- Storage overview card -->
+          <UCard class="lg:col-span-1 h-full">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Storage overview
+            </h3>
+
+            <div class="space-y-4 text-sm">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-lucide-hard-drive" class="w-4 h-4 text-blue-500" />
+                  <span>Total files</span>
+                </div>
+                <span class="font-medium text-gray-900 dark:text-gray-100">
+                  {{ totalFiles }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-lucide-database" class="w-4 h-4 text-blue-500" />
+                  <span>Total size</span>
+                </div>
+                <span class="font-medium text-gray-900 dark:text-gray-100">
+                  {{ totalSize }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-lucide-folder" class="w-4 h-4 text-blue-500" />
+                  <span>Active folders</span>
+                </div>
+                <span class="font-medium text-gray-900 dark:text-gray-100">
+                  {{ activeFolders }}
+                </span>
+              </div>
+            </div>
+          </UCard>
         </div>
 
         <!-- Quick Upload Section -->
@@ -144,9 +113,7 @@
                 <p class="text-sm text-gray-600 mb-3">
                   Upload files that will be accessible to everyone
                 </p>
-                <FileUpload
-                  folder="public"
-                  :allowed-types="[
+                <FileUpload folder="public" :allowed-types="[
                     'jpg',
                     'jpeg',
                     'png',
@@ -162,11 +129,7 @@
                     'xlsx',
                     'ppt',
                     'pptx',
-                  ]"
-                  max-size="10MB"
-                  @upload-complete="handleUploadComplete"
-                  @upload-error="handleUploadError"
-                />
+                  ]" max-size="10MB" @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
               </div>
 
               <div>
@@ -176,91 +139,73 @@
                 <p class="text-sm text-gray-600 mb-3">
                   Upload meeting recordings and session documents
                 </p>
-                <FileUpload
-                  folder="sessions"
-                  :allowed-types="['mp4', 'webm', 'mp3', 'wav', 'pdf', 'md']"
-                  max-size="100MB"
-                  @upload-complete="handleUploadComplete"
-                  @upload-error="handleUploadError"
-                />
+                <FileUpload folder="sessions" :allowed-types="['mp4', 'webm', 'mp3', 'wav', 'pdf', 'md']"
+                  max-size="100MB" @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Storage Statistics -->
-        <div v-if="!selectedFolder" class="storage-stats mt-8">
-          <div class="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-              Storage Overview
-            </h3>
+        <!-- Selected Folder Browser -->
+        <div v-if="selectedFolder" class="mt-8">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                {{ getFolderLabel(selectedFolder) }}
+              </h2>
+              <p class="text-gray-600 dark:text-gray-400">
+                {{ getFolderDescription(selectedFolder) }}
+              </p>
+            </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div class="stat-card">
-                <div class="stat-icon mb-2">
-                  <UIcon
-                    name="i-lucide-hard-drive"
-                    class="w-8 h-8 text-blue-500"
-                  />
-                </div>
-                <div class="stat-value text-2xl font-bold text-gray-900">
-                  {{ totalFiles }}
-                </div>
-                <div class="stat-label text-sm text-gray-600">Total Files</div>
-              </div>
+            <div class="flex items-center space-x-3">
+              <UButton variant="ghost" @click="selectedFolder = null">
+                <UIcon name="i-lucide-arrow-left" class="w-4 h-4 mr-2" />
+                Back to Overview
+              </UButton>
 
-              <div class="stat-card">
-                <div class="stat-icon mb-2">
-                  <UIcon
-                    name="i-lucide-database"
-                    class="w-8 h-8 text-green-500"
-                  />
-                </div>
-                <div class="stat-value text-2xl font-bold text-gray-900">
-                  {{ totalSize }}
-                </div>
-                <div class="stat-label text-sm text-gray-600">Total Size</div>
-              </div>
+              <UButton
+                @click="refreshFolderFiles"
+                :loading="refreshing"
+                variant="outline"
+                size="sm"
+              >
+                <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
+                Refresh
+              </UButton>
 
-              <div class="stat-card">
-                <div class="stat-icon mb-2">
-                  <UIcon
-                    name="i-lucide-folder"
-                    class="w-8 h-8 text-purple-500"
-                  />
-                </div>
-                <div class="stat-value text-2xl font-bold text-gray-900">
-                  {{ activeFolders }}
-                </div>
-                <div class="stat-label text-sm text-gray-600">
-                  Active Folders
-                </div>
-              </div>
+              <UButton
+                v-if="canUpload"
+                @click="showUploadModal = true"
+                color="primary"
+                size="sm"
+              >
+                <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
+                Upload Files
+              </UButton>
             </div>
           </div>
+
+          <FileBrowser
+            ref="fileBrowserRef"
+            :folder="selectedFolder"
+            :allowed-types="getFolderAllowedTypes(selectedFolder)"
+            :max-size="getFolderMaxSize(selectedFolder)"
+          />
         </div>
+
       </div>
 
       <!-- Upload Modal -->
-      <UModal
-        v-model:open="showUploadModal"
-        title="Upload Files"
-        description="Upload files to this storage folder"
-      >
+      <UModal v-model:open="showUploadModal" title="Upload Files" description="Upload files to this storage folder">
         <template #body>
-          <FileUpload
-            :folder="selectedFolder || 'public'"
-            :allowed-types="
+          <FileUpload :folder="selectedFolder || 'public'" :allowed-types="
               selectedFolder
                 ? getFolderAllowedTypes(selectedFolder)
                 : ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'txt', 'md']
-            "
-            :max-size="
+            " :max-size="
               selectedFolder ? getFolderMaxSize(selectedFolder) : '10MB'
-            "
-            @upload-complete="handleUploadComplete"
-            @upload-error="handleUploadError"
-          />
+            " @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
         </template>
       </UModal>
     </template>
@@ -335,8 +280,9 @@ const activeFolders = computed(
 );
 
 const breadcrumbItems = [
+  { label: 'Home', to: '/' },
   { label: 'Settings', to: '/settings' },
-  { label: 'Storage', to: '/settings/storage' },
+  { label: 'File Storage', to: '/settings/storage' },
 ];
 
 // Methods
@@ -408,13 +354,7 @@ const getFolderIcon = (folderName: string): string => {
 };
 
 const getFolderIconColor = (folderName: string): string => {
-  const colorMap: Record<string, string> = {
-    public: 'text-blue-500',
-    sessions: 'text-purple-500',
-    permits: 'text-green-500',
-    private: 'text-red-500',
-  };
-  return colorMap[folderName] || 'text-gray-500';
+  return 'text-blue-500';
 };
 
 const canUpload = computed(() => {
@@ -550,66 +490,5 @@ onMounted(() => {
   /* @apply text-center; */
 }
 
-.storage-overview {
-  /* @apply w-full; */
-}
 
-.storage-folder-card {
-  /* @apply bg-white border border-gray-200 rounded-lg p-6 text-center hover:border-gray-300 hover:shadow-sm transition-all duration-200; */
-}
-
-.storage-folder-card:hover {
-  /* @apply transform scale-105; */
-}
-
-.folder-icon {
-  /* @apply flex justify-center; */
-}
-
-.folder-stats {
-  /* @apply space-y-1; */
-}
-
-.folder-browser {
-  /* @apply w-full; */
-}
-
-.quick-upload {
-  /* @apply w-full; */
-}
-
-.storage-stats {
-  /* @apply w-full; */
-}
-
-.stat-card {
-  /* @apply text-center; */
-}
-
-.stat-icon {
-  /* @apply flex justify-center; */
-}
-
-.stat-value {
-  /* @apply text-gray-900; */
-}
-
-.stat-label {
-  /* @apply text-gray-600; */
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .storage-overview .grid {
-    /* @apply grid-cols-1; */
-  }
-
-  .quick-upload .grid {
-    /* @apply grid-cols-1; */
-  }
-
-  .storage-stats .grid {
-    /* @apply grid-cols-1; */
-  }
-}
 </style>

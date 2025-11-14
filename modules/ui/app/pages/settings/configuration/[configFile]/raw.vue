@@ -85,6 +85,7 @@ const route = useRoute();
 const configFile = computed(() => route.params.configFile as string);
 
 const breadcrumbItems = [
+  { label: 'Home', to: '/' },
   { label: 'Settings', to: '/settings' },
   { label: 'Configuration', to: '/settings/configuration' },
   { label: 'Raw' },

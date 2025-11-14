@@ -65,6 +65,25 @@ const searchQuery = ref(props.initialFilters.search || '');
 const selectedRecordTypes = ref<any[]>([]);
 const selectedRecordStatuses = ref<any[]>([]);
 
+// Track if we're syncing from props to prevent emitting during initial sync
+const isSyncingFromProps = ref(false);
+
+// Watch for changes to initialFilters.search prop (e.g., from URL restoration)
+watch(
+  () => props.initialFilters.search,
+  (newSearch) => {
+    if (newSearch !== undefined && newSearch !== searchQuery.value) {
+      isSyncingFromProps.value = true;
+      searchQuery.value = newSearch || '';
+      // Reset flag after next tick to allow the searchQuery watch to skip emitting
+      nextTick(() => {
+        isSyncingFromProps.value = false;
+      });
+    }
+  },
+  { immediate: true }
+);
+
 // Initialize filters based on props
 onMounted(async () => {
   await Promise.all([fetchRecordTypes(), fetchRecordStatuses()]);
@@ -137,8 +156,11 @@ const recordStatusOptionsComputed = computed(() => {
   });
 });
 
-// Watch for changes and emit events
+// Watch for changes and emit events (but skip if syncing from props)
 watch(searchQuery, (newQuery) => {
+  // Don't emit if we're syncing from props (prevents duplicate API calls on mount)
+  if (isSyncingFromProps.value) return;
+
   emit('search', newQuery);
   emitFilterChange();
 });

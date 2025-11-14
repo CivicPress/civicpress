@@ -70,6 +70,10 @@ const canCreateRecords = computed(() => {
 
 const breadcrumbItems = computed(() => [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Records',
     to: '/records',
   },

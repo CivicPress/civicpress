@@ -7,21 +7,10 @@
         </template>
         <template #description> Update existing geographic data </template>
         <template #right>
-          <div class="flex items-center gap-2">
-            <UButton color="neutral" variant="ghost" @click="router.back()">
-              <UIcon name="i-lucide-arrow-left" class="w-4 h-4" />
-              Back
-            </UButton>
-            <UButton
-              v-if="canDeleteGeography"
-              color="error"
-              variant="outline"
-              @click="showDeleteModal = true"
-            >
-              <UIcon name="i-lucide-trash-2" class="w-4 h-4" />
-              Delete
-            </UButton>
-          </div>
+          <UButton color="neutral" variant="ghost" @click="router.back()">
+            <UIcon name="i-lucide-arrow-left" class="w-4 h-4" />
+            Back
+          </UButton>
         </template>
       </UDashboardNavbar>
     </template>
@@ -51,11 +40,54 @@
         <!-- Edit Form -->
         <GeographyForm
           v-else
+          ref="geographyFormRef"
           mode="edit"
           :geography-id="route.params.id as string"
           @success="handleSuccess"
           @cancel="handleCancel"
         />
+
+        <!-- Form Actions -->
+        <div
+          v-if="!loading && !error"
+          class="flex items-center justify-between gap-4 pt-6 border-t border-gray-200 dark:border-gray-800"
+        >
+          <!-- Delete Button (left side) -->
+          <UButton
+            v-if="canDeleteGeography"
+            color="error"
+            variant="outline"
+            :disabled="geographyFormRef?.saving"
+            @click="showDeleteModal = true"
+          >
+            <UIcon name="i-lucide-trash-2" class="w-4 h-4" />
+            Delete
+          </UButton>
+          <div v-else></div>
+
+          <!-- Save/Cancel Buttons (right side) -->
+          <div class="flex items-center gap-4">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="handleCancel"
+              :disabled="geographyFormRef?.saving"
+            >
+              Cancel
+            </UButton>
+            <UButton
+              color="primary"
+              :loading="geographyFormRef?.saving"
+              :disabled="!geographyFormRef?.isFormValid"
+              @click="geographyFormRef?.handleSubmit"
+            >
+              Update Geography File
+            </UButton>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <SystemFooter v-if="!loading && !error" />
       </div>
     </template>
   </UDashboardPanel>
@@ -93,6 +125,8 @@
 import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import type { GeographyFile } from '@civicpress/core';
+import GeographyForm from '~/components/GeographyForm.vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
 const router = useRouter();
@@ -103,9 +137,11 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const showDeleteModal = ref(false);
 const deleting = ref(false);
+const geographyFormRef = ref<InstanceType<typeof GeographyForm> | null>(null);
 
 // Breadcrumbs
 const breadcrumbItems = computed(() => [
+  { label: 'Home', to: '/' },
   { label: 'Geography', to: '/geography' },
   { label: 'Edit Geography File' },
 ]);

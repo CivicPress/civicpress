@@ -311,7 +311,9 @@ export const useRecordsStore = defineStore('records', {
 
       try {
         const queryParams = new URLSearchParams();
-        queryParams.append('limit', this.pageSize.toString());
+        // API max limit is 300, cap at that
+        const apiLimit = Math.min(this.pageSize, 300);
+        queryParams.append('limit', apiLimit.toString());
 
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
@@ -376,7 +378,9 @@ export const useRecordsStore = defineStore('records', {
       try {
         const queryParams = new URLSearchParams();
         queryParams.append('cursor', this.nextCursor);
-        queryParams.append('limit', this.pageSize.toString());
+        // API max limit is 300, cap at that
+        const apiLimit = Math.min(this.pageSize, 300);
+        queryParams.append('limit', apiLimit.toString());
 
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
@@ -429,7 +433,9 @@ export const useRecordsStore = defineStore('records', {
       try {
         const queryParams = new URLSearchParams();
         queryParams.append('q', query);
-        queryParams.append('limit', this.pageSize.toString());
+        // API max limit is 300, cap at that
+        const apiLimit = Math.min(this.pageSize, 300);
+        queryParams.append('limit', apiLimit.toString());
 
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
@@ -455,6 +461,9 @@ export const useRecordsStore = defineStore('records', {
         };
 
         this.summaryCounts = calculateCountsFromRecords(apiResults);
+
+        // Clear any previous errors on successful search
+        this.error = null;
       } catch (error: any) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {

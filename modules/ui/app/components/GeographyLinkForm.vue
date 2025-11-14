@@ -1,35 +1,33 @@
 <template>
   <div class="space-y-4">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Geography Files
-        </h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          Link existing geography files to this record
-        </p>
-      </div>
-      <UPopover>
-        <UButton color="primary" variant="outline" icon="i-lucide-plus">
-          Add Geography Files
-        </UButton>
-
-        <template #content>
-          <GeographySelector
-            :selected-ids="selectedIds"
-            :multiple="true"
-            @update:selected-ids="handleSelectionChange"
-            @selection-change="handleSelectionConfirm"
-            @preview="handlePreview"
-            @create-new="handleCreateNew"
-          />
-        </template>
-      </UPopover>
-    </div>
-
     <!-- Current Links -->
     <div v-if="linkedFiles.length > 0" class="space-y-3">
+      <div class="flex items-center justify-end mb-4">
+        <UPopover
+          :popper="{ placement: 'bottom-end' }"
+          :close-on-click-outside="true"
+        >
+          <UButton color="primary" variant="outline" icon="i-lucide-plus">
+            Add Geography Files
+          </UButton>
+
+          <template #content>
+            <GeographySelector
+              :selected-ids="selectedIds"
+              :multiple="true"
+              @update:selected-ids="
+                (ids) => {
+                  selectedIds = ids;
+                  console.log('Manual update:', ids);
+                }
+              "
+              @selection-change="handleSelectionConfirm"
+              @preview="handlePreview"
+              @create-new="handleCreateNew"
+            />
+          </template>
+        </UPopover>
+      </div>
       <div
         v-for="(link, index) in linkedFiles"
         :key="link.id"
@@ -109,25 +107,9 @@
       <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
         No geography files linked
       </h4>
-      <p class="text-gray-600 dark:text-gray-400 mb-4">
+      <p class="text-gray-600 dark:text-gray-400">
         Link geography files to provide spatial context for this record.
       </p>
-      <UPopover>
-        <UButton color="primary" variant="outline" icon="i-lucide-plus">
-          Add Geography Files
-        </UButton>
-
-        <template #content>
-          <GeographySelector
-            :selected-ids="selectedIds"
-            :multiple="true"
-            @update:selected-ids="handleSelectionChange"
-            @selection-change="handleSelectionConfirm"
-            @preview="handlePreview"
-            @create-new="handleCreateNew"
-          />
-        </template>
-      </UPopover>
     </div>
 
     <!-- Preview Modal -->
@@ -227,6 +209,15 @@ const showPreview = ref(false);
 const previewFile = ref<GeographyFile | null>(null);
 const selectedIds = ref<string[]>([]);
 
+// Debug: watch selectedIds changes
+watch(
+  selectedIds,
+  (newIds) => {
+    console.log('GeographyLinkForm: selectedIds changed to:', newIds);
+  },
+  { deep: true }
+);
+
 // Computed
 const linkedFiles = computed(() => props.modelValue);
 
@@ -258,9 +249,8 @@ const removeLink = (index: number) => {
   emit('update:modelValue', updatedLinks);
 };
 
-const handleSelectionChange = (ids: string[]) => {
-  selectedIds.value = ids;
-};
+// Note: v-model:selected-ids automatically handles the binding
+// We don't need a separate handler for update:selected-ids
 
 const handleSelectionConfirm = (files: GeographyFile[]) => {
   // Add selected files that aren't already linked
@@ -281,7 +271,7 @@ const handleSelectionConfirm = (files: GeographyFile[]) => {
     emit('update:modelValue', updatedLinks);
   }
 
-  // Clear selection
+  // Clear selection after adding
   selectedIds.value = [];
 };
 

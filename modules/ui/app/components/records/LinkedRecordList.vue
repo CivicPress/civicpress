@@ -14,85 +14,96 @@
       <div
         v-for="(linkedRecord, index) in linkedRecords"
         :key="`${linkedRecord.id}-${index}`"
-        class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3"
+        class="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-white dark:bg-gray-700"
       >
-        <!-- Record Info -->
-        <div class="flex items-center space-x-3">
-          <!-- Record Icon -->
-          <div class="flex-shrink-0">
-            <UIcon name="i-lucide-file-text" class="w-8 h-8 text-gray-400" />
-          </div>
-
-          <!-- Record Details -->
+        <div class="flex items-start justify-between">
           <div class="flex-1 min-w-0">
-            <p
-              class="text-sm font-medium text-gray-900 dark:text-white truncate"
-            >
-              {{ linkedRecord.id }}
-            </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
-              Type: {{ linkedRecord.type }}
-            </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
-              Path: {{ linkedRecord.path }}
-            </p>
+            <!-- Record Name and Type -->
+            <div class="flex items-center gap-2 mb-2">
+              <p
+                class="text-sm font-medium text-gray-900 dark:text-white truncate"
+              >
+                {{ linkedRecord.id }}
+              </p>
+              <span
+                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+              >
+                {{ linkedRecord.type }}
+              </span>
+            </div>
+
+            <!-- Record Details -->
+            <div class="space-y-1">
+              <p class="text-xs text-gray-500 font-mono">
+                ID: {{ linkedRecord.id }}
+              </p>
+              <p v-if="linkedRecord.path" class="text-xs text-gray-500">
+                Path: {{ linkedRecord.path }}
+              </p>
+            </div>
+
+            <!-- Category and Description -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <UFormField v-if="editable" label="Category">
+                <USelectMenu
+                  :model-value="linkedRecord.category"
+                  :items="getLinkCategoryOptions()"
+                  placeholder="Select category"
+                  @update:model-value="
+                    (value) => updateLinkCategory(index, value)
+                  "
+                  class="w-full"
+                />
+              </UFormField>
+              <div v-else-if="linkedRecord.category" class="text-xs">
+                <span class="font-medium text-gray-700 dark:text-gray-300"
+                  >Category:</span
+                >
+                <span class="ml-1 text-gray-600 dark:text-gray-400">{{
+                  linkedRecord.category
+                }}</span>
+              </div>
+
+              <UFormField v-if="editable" label="Description">
+                <UInput
+                  :model-value="linkedRecord.description || ''"
+                  placeholder="Optional description"
+                  @update:model-value="
+                    (value) => updateLinkDescription(index, value)
+                  "
+                  class="w-full"
+                />
+              </UFormField>
+              <div v-else-if="linkedRecord.description" class="text-xs">
+                <span class="font-medium text-gray-700 dark:text-gray-300"
+                  >Description:</span
+                >
+                <span class="ml-1 text-gray-600 dark:text-gray-400">{{
+                  linkedRecord.description
+                }}</span>
+              </div>
+            </div>
           </div>
 
-          <!-- Open in new tab link -->
-          <div class="flex-shrink-0">
+          <!-- Actions -->
+          <div class="flex items-center gap-1 ml-4">
             <UButton
+              icon="i-lucide-external-link"
               color="primary"
               variant="ghost"
               size="xs"
               @click="openInNewTab(linkedRecord)"
-            >
-              <UIcon name="i-lucide-external-link" class="w-3 h-3" />
-            </UButton>
-          </div>
-
-          <!-- Remove Link -->
-          <div v-if="editable" class="flex-shrink-0">
+              title="Open in new tab"
+            />
             <UButton
+              v-if="editable"
+              icon="i-lucide-x"
               color="error"
               variant="ghost"
               size="xs"
               @click="removeLink(index)"
-            >
-              <UIcon name="i-lucide-trash-2" class="w-3 h-3" />
-            </UButton>
-          </div>
-        </div>
-
-        <!-- Structured Form Fields -->
-        <div v-if="editable" class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-          <UFormField label="Category">
-            <USelectMenu
-              :model-value="linkedRecord.category"
-              :items="getLinkCategoryOptions()"
-              placeholder="Select category"
-              @update:model-value="(value) => updateLinkCategory(index, value)"
-              class="w-full"
+              title="Remove link"
             />
-          </UFormField>
-
-          <UFormField label="Description">
-            <UInput
-              :model-value="linkedRecord.description || ''"
-              placeholder="Optional description"
-              @update:model-value="
-                (value) => updateLinkDescription(index, value)
-              "
-              class="w-full"
-            />
-          </UFormField>
-        </div>
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-          <div v-if="linkedRecord.category" class="text-xs">
-            <span class="font-medium">Category:</span>
-          </div>
-          <div v-if="linkedRecord.description" class="text-xs">
-            <span class="font-medium">Description:</span>
-            {{ linkedRecord.description }}
           </div>
         </div>
       </div>

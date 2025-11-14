@@ -1,5 +1,5 @@
 {
-  "editor.formatOnSave": true,
+  "editor.formatOnSave": false,
   "editor.formatOnPaste": true,
   "editor.formatOnType": true,
   "[markdown]": {
@@ -8,5 +8,6 @@
   },
   "files.associations": {
     "*.md": "markdown"
-  }
+  },
+  "files.trimTrailingWhitespaceInRegexAndStrings": false
 }

@@ -11,6 +11,7 @@ definePageMeta({
 
 // Breadcrumbs
 const breadcrumbItems = [
+  { label: 'Home', to: '/' },
   { label: 'Settings', to: '/settings' },
   { label: 'Users', to: '/settings/users' },
   { label: 'Create User' },

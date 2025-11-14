@@ -30,11 +30,13 @@ interface Props {
   };
   height?: string;
   interactive?: boolean;
+  scrollWheelZoom?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   height: '400px',
   interactive: true,
+  scrollWheelZoom: undefined, // undefined means use interactive value
 });
 
 const mapContainer = ref<HTMLElement>();
@@ -45,12 +47,17 @@ const initializeMap = async () => {
   if (!mapContainer.value) return;
 
   // Create map
+  const scrollWheelZoomEnabled =
+    props.scrollWheelZoom !== undefined
+      ? props.scrollWheelZoom
+      : props.interactive;
+
   map = L.map(mapContainer.value, {
     zoomControl: props.interactive,
     dragging: props.interactive,
     touchZoom: props.interactive,
     doubleClickZoom: props.interactive,
-    scrollWheelZoom: props.interactive,
+    scrollWheelZoom: scrollWheelZoomEnabled,
     boxZoom: props.interactive,
     keyboard: props.interactive,
   });

@@ -86,7 +86,15 @@ export function useRecordTypes() {
 
   const getRecordTypeLabel = (key: string): string => {
     const recordType = getRecordTypeByKey(key);
-    return recordType?.label || key;
+    if (recordType?.label) {
+      // Ensure label is Title Case
+      return (
+        recordType.label.charAt(0).toUpperCase() +
+        recordType.label.slice(1).toLowerCase()
+      );
+    }
+    // Fallback: capitalize the key
+    return key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
   };
 
   const getRecordTypeDescription = (key: string): string => {

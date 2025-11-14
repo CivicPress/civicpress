@@ -36,83 +36,25 @@ const generateAvatar = () => {
 const items = computed<DropdownMenuItem[][]>(() => {
   const menuItems: DropdownMenuItem[][] = [];
 
-  // User info section (only if logged in)
   if (authStore.isLoggedIn && authStore.currentUser) {
+    // User label
+
+    // Direct profile + (optional) settings link
     menuItems.push([
       {
-        type: 'label',
-        label: authStore.currentUser.name,
-        avatar: generateAvatar(),
+        label: 'Profile',
+        icon: 'i-lucide-user',
+        onClick: () => navigateTo('/settings/profile'),
       },
-    ]);
-
-    // Settings section (only if logged in)
-    menuItems.push([
       {
         label: 'Settings',
         icon: 'i-lucide-settings',
-        children: [
-          {
-            label: 'Overview',
-            icon: 'i-lucide-home',
-            onClick: () => navigateTo('/settings'),
-          },
-          {
-            label: 'Profile',
-            icon: 'i-lucide-user',
-            onClick: () => navigateTo('/settings/profile'),
-          },
-          // Show Users when user has users:manage permission
-          ...(authStore.hasPermission('users:manage')
-            ? [
-                {
-                  label: 'Users',
-                  icon: 'i-lucide-users',
-                  onClick: () => navigateTo('/settings/users'),
-                },
-              ]
-            : []),
-          // Show Configuration when user has config:manage permission
-          ...(authStore.hasPermission('config:manage')
-            ? [
-                {
-                  label: 'Configurations',
-                  icon: 'i-lucide-sliders-vertical',
-                  onClick: () => navigateTo('/settings/configuration'),
-                },
-              ]
-            : []),
-          // Show Storage when user has storage:manage permission
-          ...(authStore.hasPermission('storage:manage')
-            ? [
-                {
-                  label: 'Storage',
-                  icon: 'i-lucide-folder',
-                  onClick: () => navigateTo('/settings/storage'),
-                },
-              ]
-            : []),
-          // Show Activity when user has system:admin permission
-          ...(authStore.hasPermission('system:admin')
-            ? [
-                {
-                  label: 'Activity Log',
-                  icon: 'i-lucide-activity',
-                  onClick: () => navigateTo('/settings/activity'),
-                },
-                {
-                  label: 'Notifications',
-                  icon: 'i-lucide-mail',
-                  onClick: () => navigateTo('/settings/notifications'),
-                },
-              ]
-            : []),
-        ],
+        onClick: () => navigateTo('/settings'),
       },
     ]);
   }
 
-  // Appearance section (always available)
+  // Appearance (light/dark) – always available
   menuItems.push([
     {
       label: 'Appearance',
@@ -133,20 +75,17 @@ const items = computed<DropdownMenuItem[][]>(() => {
           icon: 'i-lucide-moon',
           type: 'checkbox',
           checked: colorMode.value === 'dark',
-          onUpdateChecked(checked: boolean) {
-            if (checked) {
-              colorMode.preference = 'dark';
-            }
-          },
           onSelect(e: Event) {
             e.preventDefault();
+            colorMode.preference = 'dark';
+            // or use onUpdateChecked if you prefer
           },
         },
       ],
     },
   ]);
 
-  // Login/Logout options based on auth state
+  // Auth actions
   if (authStore.isLoggedIn) {
     menuItems.push([
       {
@@ -160,9 +99,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
       {
         label: 'Log in',
         icon: 'i-lucide-log-in',
-        onClick: () => {
-          navigateTo('/auth/login');
-        },
+        onClick: () => navigateTo('/auth/login'),
       },
     ]);
   }

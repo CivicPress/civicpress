@@ -188,6 +188,10 @@ onMounted(async () => {
 
 const breadcrumbItems = [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Settings',
     to: '/settings',
   },
@@ -206,6 +210,35 @@ const breadcrumbItems = [
         </template>
         <template #description>
           Manage your account settings and view your information
+        </template>
+        <template #right>
+          <div class="flex gap-2">
+            <UButton
+              v-if="
+                authStore.currentUser?.username === userInfo?.username ||
+                authStore.hasPermission('users:manage')
+              "
+              color="primary"
+              variant="outline"
+              @click="navigateTo(`/settings/users/${userInfo?.username}/edit`)"
+            >
+              <template #leading>
+                <UIcon name="i-lucide-edit" class="w-4 h-4" />
+              </template>
+              Edit Profile
+            </UButton>
+
+            <UButton
+              :color="'red' as any"
+              variant="outline"
+              @click="navigateTo('/auth/logout')"
+            >
+              <template #leading>
+                <UIcon name="i-lucide-log-out" class="w-4 h-4" />
+              </template>
+              Logout
+            </UButton>
+          </div>
         </template>
       </UDashboardNavbar>
     </template>
@@ -241,9 +274,9 @@ const breadcrumbItems = [
       </UAlert>
 
       <!-- Profile Content -->
-      <div v-else-if="userInfo" class="space-y-6">
+      <div v-else-if="userInfo" class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- User Information -->
-        <div class="rounded-lg border p-6">
+        <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-6">
           <h2 class="text-lg font-semibold mb-4">User Information</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="space-y-4">
@@ -283,10 +316,7 @@ const breadcrumbItems = [
                   >Role</label
                 >
                 <div class="mt-1">
-                  <UBadge
-                    :color="getRoleColor(userInfo.role) as any"
-                    variant="soft"
-                  >
+                  <UBadge :color="getRoleColor(userInfo.role) as any">
                     {{ getRoleDisplayName(userInfo.role) }}
                   </UBadge>
                 </div>
@@ -318,11 +348,13 @@ const breadcrumbItems = [
         </div>
 
         <!-- Authentication Token -->
-        <div class="rounded-lg border p-6">
-          <h2 class="text-lg font-semibold mb-4">Authentication Token</h2>
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Use this token for API testing in Postman or other tools. Keep it
-            secure and don't share it publicly.
+        <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+          <h2 class="text-lg font-semibold mb-4">API Access Token</h2>
+          <p class="text-xs text-gray-600 dark:text-gray-400 mb-4">
+            Use this token for API testing in Postman or other tools.
+            <span class="text-amber-600 dark:text-amber-500">
+              Never share this token. It grants full access to your account.
+            </span>
           </p>
 
           <div class="space-y-4">
@@ -408,8 +440,28 @@ const breadcrumbItems = [
           </div>
         </div>
 
+        <!-- Permissions -->
+        <div
+          v-if="userInfo.permissions && userInfo.permissions.length > 0"
+          class="rounded-lg border border-gray-200 dark:border-gray-800 p-6"
+        >
+          <h2 class="text-lg font-semibold mb-4">Your Permissions</h2>
+          <div class="flex flex-wrap gap-1.5">
+            <UBadge
+              v-for="permission in userInfo.permissions"
+              :key="permission"
+              :color="'blue' as any"
+              variant="subtle"
+              size="sm"
+              class="border border-gray-200 dark:border-gray-800"
+            >
+              {{ permission }}
+            </UBadge>
+          </div>
+        </div>
+
         <!-- Session Information -->
-        <div class="rounded-lg border p-6">
+        <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-6">
           <h2 class="text-lg font-semibold mb-4">Session Information</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -439,59 +491,8 @@ const breadcrumbItems = [
           </div>
         </div>
 
-        <!-- Permissions -->
-        <div
-          v-if="userInfo.permissions && userInfo.permissions.length > 0"
-          class="rounded-lg border p-6"
-        >
-          <h2 class="text-lg font-semibold mb-4">Permissions</h2>
-          <div class="flex flex-wrap gap-2">
-            <UBadge
-              v-for="permission in userInfo.permissions"
-              :key="permission"
-              :color="'blue' as any"
-              variant="soft"
-              size="sm"
-            >
-              {{ permission }}
-            </UBadge>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="rounded-lg border p-6">
-          <h2 class="text-lg font-semibold mb-4">Account Actions</h2>
-          <div class="flex flex-wrap gap-4">
-            <UButton
-              v-if="
-                authStore.currentUser?.username === userInfo?.username ||
-                authStore.hasPermission('users:manage')
-              "
-              color="primary"
-              variant="soft"
-              @click="navigateTo(`/settings/users/${userInfo?.username}/edit`)"
-            >
-              <template #leading>
-                <UIcon name="i-lucide-edit" class="w-4 h-4" />
-              </template>
-              Edit Profile
-            </UButton>
-
-            <UButton
-              :color="'red' as any"
-              variant="soft"
-              @click="navigateTo('/auth/logout')"
-            >
-              <template #leading>
-                <UIcon name="i-lucide-log-out" class="w-4 h-4" />
-              </template>
-              Logout
-            </UButton>
-          </div>
-        </div>
-
         <!-- Security Settings -->
-        <div class="mt-8">
+        <div class="md:col-span-2">
           <SecuritySettings
             :user-id="userInfo.id"
             :user-data="{
@@ -500,6 +501,18 @@ const breadcrumbItems = [
             }"
           />
         </div>
+      </div>
+
+      <!-- Footer -->
+      <div
+        v-if="userInfo"
+        class="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4 text-center mt-8"
+      >
+        <span>Stored as Markdown/YAML</span>
+        <span>·</span>
+        <span>Git-backed</span>
+        <span>·</span>
+        <span>Last sync …</span>
       </div>
 
       <!-- No User Info -->

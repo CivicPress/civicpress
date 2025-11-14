@@ -84,24 +84,9 @@
         <!-- Main Content -->
         <div v-else-if="geographyFile" class="space-y-6">
           <!-- File Information and Map -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
             <!-- File Information Card -->
             <UCard>
-              <template #header>
-                <div class="flex items-center space-x-3">
-                  <UIcon
-                    name="i-lucide-file-text"
-                    class="w-6 h-6 text-primary-600"
-                  />
-                  <div>
-                    <h2 class="text-xl font-semibold">File Information</h2>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">
-                      Geography file details and metadata
-                    </p>
-                  </div>
-                </div>
-              </template>
-
               <div class="space-y-4">
                 <!-- Basic Info -->
                 <div class="grid grid-cols-2 gap-4">
@@ -231,24 +216,13 @@
 
             <!-- Map Visualization -->
             <UCard>
-              <template #header>
-                <div class="flex items-center space-x-3">
-                  <UIcon name="i-lucide-map" class="w-6 h-6 text-primary-600" />
-                  <div>
-                    <h2 class="text-xl font-semibold">Map Visualization</h2>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">
-                      Interactive map view
-                    </p>
-                  </div>
-                </div>
-              </template>
-
-              <div class="h-64 rounded-lg overflow-hidden">
+              <div class="rounded-lg overflow-hidden" style="height: 450px">
                 <GeographyMap
                   :geography-data="parsedGeoJsonData"
                   :bounds="geographyFile?.bounds"
                   :interactive="true"
-                  height="256px"
+                  :scroll-wheel-zoom="false"
+                  height="450px"
                 />
               </div>
             </UCard>
@@ -258,27 +232,6 @@
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Data Preview -->
             <UCard>
-              <template #header>
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center space-x-3">
-                    <UIcon
-                      name="i-lucide-code"
-                      class="w-6 h-6 text-primary-600"
-                    />
-                    <div>
-                      <h2 class="text-xl font-semibold">Data Preview</h2>
-                      <p class="text-sm text-gray-600 dark:text-gray-400">
-                        Raw file content
-                      </p>
-                    </div>
-                  </div>
-                  <UButton size="sm" variant="outline" @click="copyToClipboard">
-                    <UIcon name="i-lucide-copy" class="w-4 h-4" />
-                    Copy
-                  </UButton>
-                </div>
-              </template>
-
               <div class="space-y-4">
                 <div
                   class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 max-h-64 overflow-auto"
@@ -288,26 +241,17 @@
                     >{{ rawContent }}</pre
                   >
                 </div>
+                <div class="flex items-center justify-end">
+                  <UButton size="sm" variant="outline" @click="copyToClipboard">
+                    <UIcon name="i-lucide-copy" class="w-4 h-4" />
+                    Copy
+                  </UButton>
+                </div>
               </div>
             </UCard>
 
             <!-- Statistics -->
             <UCard>
-              <template #header>
-                <div class="flex items-center space-x-3">
-                  <UIcon
-                    name="i-lucide-bar-chart-3"
-                    class="w-6 h-6 text-primary-600"
-                  />
-                  <div>
-                    <h2 class="text-xl font-semibold">Statistics</h2>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">
-                      File and data metrics
-                    </p>
-                  </div>
-                </div>
-              </template>
-
               <div class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                   <div
@@ -370,6 +314,9 @@
           v-if="geographyFile"
           :geography-id="geographyFile.id"
         />
+
+        <!-- Footer -->
+        <SystemFooter v-if="geographyFile" />
       </div>
     </template>
   </UDashboardPanel>
@@ -401,6 +348,7 @@ interface GeographyFile {
 }
 import GeographyMap from '~/components/GeographyMap.vue';
 import GeographyLinkedRecords from '~/components/GeographyLinkedRecords.vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route and router
 const route = useRoute();
@@ -416,6 +364,7 @@ const parsedData = ref<any>(null);
 
 // Computed properties
 const breadcrumbItems = computed(() => [
+  { label: 'Home', to: '/' },
   { label: 'Geography', to: '/geography' },
   { label: geographyFile.value?.name || 'Geography File' },
 ]);

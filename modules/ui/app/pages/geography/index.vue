@@ -49,76 +49,95 @@
         </UAlert>
 
         <!-- Empty State -->
-        <UCard v-else-if="geographyFiles.length === 0">
-          <div class="text-center py-12">
+        <div v-else-if="!loading && filteredFiles.length === 0" class="py-16">
+          <div
+            class="mx-auto flex max-w-xl flex-col items-center rounded-xl border border-dashed border-gray-200 bg-white px-8 py-12 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900/40"
+          >
             <UIcon
-              name="i-lucide-map"
-              class="w-16 h-16 text-gray-400 mx-auto mb-4"
+              name="i-lucide-file-search"
+              class="mb-6 h-16 w-16 text-gray-300 dark:text-gray-600"
             />
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No geography files found
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              No geography files match your filters
             </h3>
-            <p class="text-gray-600 dark:text-gray-400 mb-6">
-              Create your first geography file to get started with spatial data
-              management.
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Try adjusting or clearing your filters to see all available
+              geography files.
             </p>
-            <UButton color="primary" @click="navigateToCreate">
-              <UIcon name="i-lucide-plus" class="w-4 h-4" />
-              Create Geography File
-            </UButton>
+            <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row">
+              <UButton
+                variant="link"
+                color="primary"
+                class="text-sm"
+                @click="resetFilters"
+              >
+                Clear all filters
+              </UButton>
+              <UButton
+                v-if="canCreateGeography"
+                variant="link"
+                color="primary"
+                class="text-sm"
+                @click="navigateToCreate"
+              >
+                Create new geography file
+              </UButton>
+            </div>
           </div>
-        </UCard>
+        </div>
 
         <!-- Geography Files Grid -->
-        <UCard v-else>
-          <template #header>
-            <div class="flex items-center space-x-3">
-              <UIcon name="i-lucide-map-pin" class="w-6 h-6 text-primary-600" />
-              <div>
-                <h2 class="text-xl font-semibold">Geography Files</h2>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ geographyFiles.length }} file{{
-                    geographyFiles.length === 1 ? '' : 's'
-                  }}
-                  found
-                </p>
-              </div>
+        <div v-else class="space-y-6">
+          <!-- Search and Filters -->
+          <div
+            class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40 space-y-3"
+          >
+            <div class="sm:hidden">
+              <span
+                class="text-sm font-semibold text-gray-700 dark:text-gray-200"
+              >
+                Filters
+              </span>
             </div>
-          </template>
 
-          <div class="space-y-6">
-            <!-- Search and Filters -->
-            <div class="flex flex-col sm:flex-row gap-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div class="flex-1">
                 <UInput
                   v-model="searchQuery"
                   placeholder="Search geography files..."
                   icon="i-lucide-search"
                   @input="debouncedSearch"
+                  class="w-full"
                 />
               </div>
-              <div class="flex gap-2">
-                <USelect
-                  v-model="selectedCategory"
-                  :options="categoryOptions"
-                  placeholder="All Categories"
-                  @change="applyFilters"
-                />
-                <USelect
-                  v-model="selectedType"
-                  :options="typeOptions"
-                  placeholder="All Types"
-                  @change="applyFilters"
-                />
-              </div>
+              <USelectMenu
+                v-model="selectedCategory"
+                :items="categoryOptions"
+                placeholder="Filter by category..."
+                value-key="value"
+                option-attribute="label"
+                class="w-full sm:w-48"
+                @change="applyFilters"
+              />
+              <USelectMenu
+                v-model="selectedType"
+                :items="typeOptions"
+                placeholder="Filter by type..."
+                value-key="value"
+                option-attribute="label"
+                class="w-full sm:w-48"
+                @change="applyFilters"
+              />
             </div>
+          </div>
 
+          <div class="space-y-6">
             <!-- Geography Files Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div
                 v-for="file in filteredFiles"
                 :key="file.id"
-                class="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                class="border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                 @click="navigateToFile(file.id)"
               >
                 <!-- File Header -->
@@ -136,14 +155,6 @@
                       {{ file.category }}
                     </UBadge>
                   </div>
-                  <UDropdownMenu :items="getFileMenuItems(file)">
-                    <UButton
-                      icon="i-lucide-more-vertical"
-                      color="gray"
-                      variant="ghost"
-                      size="sm"
-                    />
-                  </UDropdownMenu>
                 </div>
 
                 <!-- File Info -->
@@ -183,7 +194,10 @@
               />
             </div>
           </div>
-        </UCard>
+
+          <!-- Footer -->
+          <SystemFooter />
+        </div>
       </div>
     </template>
   </UDashboardPanel>
@@ -200,6 +214,7 @@ import type {
   GeographyCategory,
   GeographyFileType,
 } from '@civicpress/core';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
 const router = useRouter();
@@ -207,7 +222,7 @@ const authStore = useAuthStore();
 const toast = useToast();
 
 // Breadcrumbs
-const breadcrumbItems = [{ label: 'Geography' }];
+const breadcrumbItems = [{ label: 'Home', to: '/' }, { label: 'Geography' }];
 
 // Reactive data
 const geographyFiles = ref<GeographyFile[]>([]);
@@ -321,6 +336,14 @@ const debouncedSearch = useDebounceFn(() => {
 }, 300);
 
 const applyFilters = () => {
+  currentPage.value = 1;
+  loadGeographyFiles();
+};
+
+const resetFilters = () => {
+  searchQuery.value = '';
+  selectedCategory.value = '';
+  selectedType.value = '';
   currentPage.value = 1;
   loadGeographyFiles();
 };

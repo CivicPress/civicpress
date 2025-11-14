@@ -16,6 +16,7 @@ const record = ref<CivicRecord | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
+const recordFormRef = ref<InstanceType<typeof RecordForm> | null>(null);
 
 // Toast notifications
 const toast = useToast();
@@ -23,6 +24,10 @@ const toast = useToast();
 // Get record type display name
 const { getRecordTypeLabel } = useRecordTypes();
 const recordTypeLabel = computed(() => getRecordTypeLabel(type));
+
+// Get type label helper
+const { getTypeLabel, getStatusLabel, getTypeIcon, getStatusIcon } =
+  useRecordUtils();
 
 // Fetch record data
 const fetchRecord = async () => {
@@ -163,15 +168,19 @@ onMounted(() => {
 
 const breadcrumbItems = computed(() => [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Records',
     to: '/records',
   },
   {
-    label: recordTypeLabel.value,
+    label: getTypeLabel(type),
     to: `/records/${type}`,
   },
   {
-    label: record.value?.title || 'Record',
+    label: record.value?.id || id || 'Record',
     to: `/records/${type}/${id}`,
   },
   {
@@ -186,7 +195,7 @@ const breadcrumbItems = computed(() => [
       <UDashboardNavbar>
         <template #title>
           <h1 class="text-2xl font-semibold">
-            Edit {{ record?.title || 'Record' }}
+            Edit {{ record?.id || id || 'Record' }}
           </h1>
         </template>
         <template #description>
@@ -215,13 +224,136 @@ const breadcrumbItems = computed(() => [
         />
 
         <!-- Record Form -->
-        <div v-else-if="record">
+        <div v-else-if="record" class="space-y-6">
+          <!-- Record Information Card -->
+          <UCard v-if="recordFormRef">
+            <div class="space-y-4">
+              <!-- Title -->
+              <UFormField
+                label="Title"
+                required
+                :error="
+                  recordFormRef.hasSubmitted && recordFormRef.formErrors.title
+                    ? recordFormRef.formErrors.title
+                    : undefined
+                "
+              >
+                <UInput
+                  v-model="recordFormRef.form.title"
+                  placeholder="Enter record title"
+                  :disabled="saving"
+                  class="w-full"
+                />
+              </UFormField>
+
+              <!-- Type and Status -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <UFormField
+                  label="Type"
+                  required
+                  :error="
+                    recordFormRef.hasSubmitted && recordFormRef.formErrors.type
+                      ? recordFormRef.formErrors.type
+                      : undefined
+                  "
+                >
+                  <USelectMenu
+                    v-model="recordFormRef.selectedRecordType"
+                    :items="recordFormRef.recordTypeOptionsComputed"
+                    placeholder="Select record type"
+                    :disabled="saving"
+                    class="w-full"
+                  />
+                </UFormField>
+
+                <UFormField
+                  label="Status"
+                  required
+                  :error="
+                    recordFormRef.hasSubmitted &&
+                    recordFormRef.formErrors.status
+                      ? recordFormRef.formErrors.status
+                      : undefined
+                  "
+                >
+                  <USelectMenu
+                    v-model="recordFormRef.selectedRecordStatus"
+                    :items="recordFormRef.recordStatusOptionsComputed"
+                    placeholder="Select status"
+                    :disabled="saving"
+                    class="w-full"
+                  />
+                </UFormField>
+              </div>
+
+              <!-- Description -->
+              <UFormField
+                label="Description"
+                :error="
+                  recordFormRef.hasSubmitted &&
+                  recordFormRef.formErrors.description
+                    ? recordFormRef.formErrors.description
+                    : undefined
+                "
+              >
+                <UTextarea
+                  v-model="recordFormRef.form.description"
+                  placeholder="Enter record description (optional)"
+                  :disabled="saving"
+                  :rows="3"
+                  class="w-full"
+                />
+              </UFormField>
+
+              <!-- Tags -->
+              <UFormField
+                label="Tags"
+                :error="
+                  recordFormRef.hasSubmitted && recordFormRef.formErrors.tags
+                    ? recordFormRef.formErrors.tags
+                    : undefined
+                "
+              >
+                <UInput
+                  v-model="recordFormRef.newTag"
+                  placeholder="Add a tag and press Enter"
+                  :disabled="saving"
+                  @keyup.enter="recordFormRef.handleTagEnter"
+                  class="w-full"
+                />
+                <div
+                  v-if="recordFormRef.form.tags.length > 0"
+                  class="flex flex-wrap gap-2 mt-2"
+                >
+                  <UBadge
+                    v-for="tag in recordFormRef.form.tags"
+                    :key="tag"
+                    color="primary"
+                    variant="soft"
+                    size="sm"
+                  >
+                    {{ tag }}
+                    <UButton
+                      icon="i-lucide-x"
+                      color="neutral"
+                      variant="ghost"
+                      size="xs"
+                      @click="recordFormRef.removeTag(tag)"
+                    />
+                  </UBadge>
+                </div>
+              </UFormField>
+            </div>
+          </UCard>
+
           <RecordForm
+            ref="recordFormRef"
             :record="record"
             :is-editing="true"
             :saving="saving"
             :error="error"
             :can-delete="canDeleteRecords"
+            :hide-basic-fields="true"
             @submit="handleSubmit"
             @delete="handleDelete"
           />

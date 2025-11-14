@@ -4,6 +4,7 @@ import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
 import RecordPreview from '~/components/RecordPreview.vue';
 import LinkedRecordList from '~/components/records/LinkedRecordList.vue';
 import GeographyLinkForm from '~/components/GeographyLinkForm.vue';
+import GeographySelector from '~/components/GeographySelector.vue';
 
 // Types
 interface RecordFormData {
@@ -56,6 +57,7 @@ interface Props {
   saving?: boolean;
   canDelete?: boolean;
   recordType?: string | null; // Pre-select type for type-specific creation
+  hideBasicFields?: boolean; // Hide Title, Type, Status, Description, Tags fields
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -65,6 +67,7 @@ const props = withDefaults(defineProps<Props>(), {
   saving: false,
   canDelete: false,
   recordType: null,
+  hideBasicFields: false,
 });
 
 // Emits
@@ -186,6 +189,50 @@ const recordStatusOptionsComputed = computed(() => {
 const templateOptionsComputed = computed(() => {
   if (!form.type) return [];
   return getTemplateOptions(form.type);
+});
+
+// Tabs for content editor and preview
+const contentTabs = computed(() => [
+  {
+    label: 'Content',
+    icon: 'i-lucide-file-text',
+    slot: 'content',
+  },
+  {
+    label: 'Preview',
+    icon: 'i-lucide-eye',
+    slot: 'preview',
+  },
+]);
+
+// Accordion items for related content
+const relatedItemsAccordion = computed(() => {
+  return [
+    {
+      label: 'Linked Geography',
+      value: 'linked-geography',
+      iconName: 'i-lucide-map-pin',
+      description: form.linkedGeographyFiles?.length
+        ? `${form.linkedGeographyFiles.length} items`
+        : 'No linked geography',
+    },
+    {
+      label: 'File Attachments',
+      value: 'attachments',
+      iconName: 'i-lucide-paperclip',
+      description: form.attachedFiles?.length
+        ? `${form.attachedFiles.length} files`
+        : 'No attachments',
+    },
+    {
+      label: 'Linked Records',
+      value: 'linked-records',
+      iconName: 'i-lucide-link',
+      description: form.linkedRecords?.length
+        ? `${form.linkedRecords.length} records`
+        : 'No linked records',
+    },
+  ];
 });
 
 // Watch for selected options changes
@@ -470,6 +517,49 @@ const updateFileDescription = (index: number, description: string) => {
   }
 };
 
+// Expose form state and methods for parent components
+defineExpose({
+  form,
+  formErrors,
+  selectedRecordType,
+  selectedRecordStatus,
+  recordTypeOptionsComputed,
+  recordStatusOptionsComputed,
+  handleTagEnter,
+  removeTag,
+  hasSubmitted,
+  newTag,
+});
+
+// Get file URL
+const getFileUrl = (fileId: string): string => {
+  if (!process.client) return '';
+  const config = useRuntimeConfig();
+  return `${config.public.civicApiUrl}/api/v1/storage/files/${fileId}`;
+};
+
+// Handle geography selection
+const handleGeographySelection = (files: any[]) => {
+  // Add selected files that aren't already linked
+  const newLinks = files
+    .filter(
+      (file) => !form.linkedGeographyFiles.some((link) => link.id === file.id)
+    )
+    .map((file) => ({
+      id: file.id,
+      name: file.name,
+      description: file.description || '',
+      type: file.type,
+      category: file.category,
+      created_at: file.created_at,
+      stats: file.stats,
+    }));
+
+  if (newLinks.length > 0) {
+    form.linkedGeographyFiles = [...form.linkedGeographyFiles, ...newLinks];
+  }
+};
+
 // Handle file download
 const downloadFile = async (fileId: string, fileName: string) => {
   if (!process.client) return;
@@ -522,6 +612,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
       <div class="grid grid-cols-1 gap-6">
         <!-- Title -->
         <UFormField
+          v-if="!props.hideBasicFields"
           label="Title"
           required
           :error="
@@ -538,6 +629,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
 
         <!-- Record Type -->
         <UFormField
+          v-if="!props.hideBasicFields"
           label="Record Type"
           required
           :error="hasSubmitted && formErrors.type ? formErrors.type : undefined"
@@ -553,6 +645,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
 
         <!-- Status -->
         <UFormField
+          v-if="!props.hideBasicFields"
           label="Status"
           required
           :error="
@@ -570,6 +663,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
 
         <!-- Description -->
         <UFormField
+          v-if="!props.hideBasicFields"
           label="Description"
           :error="
             hasSubmitted && formErrors.description
@@ -588,6 +682,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
 
         <!-- Tags -->
         <UFormField
+          v-if="!props.hideBasicFields"
           label="Tags"
           :error="hasSubmitted && formErrors.tags ? formErrors.tags : undefined"
         >
@@ -618,231 +713,265 @@ const downloadFile = async (fileId: string, fileName: string) => {
           </div>
         </UFormField>
 
-        <!-- Geography Files Section -->
-        <div class="space-y-4">
-          <GeographyLinkForm
-            v-model="form.linkedGeographyFiles"
-            :disabled="saving"
-          />
-        </div>
-
-        <!-- File Attachments Section -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-              File Attachments
-            </h3>
-
-            <UPopover>
-              <UButton
-                color="primary"
-                variant="outline"
-                size="sm"
-                :disabled="saving"
-                icon="i-lucide-link"
-              >
-                Link Files
-              </UButton>
-
-              <template #content>
-                <FileBrowserPopover
-                  @files-selected="handleFilesSelected"
-                  @cancel="showFileBrowser = false"
-                />
-              </template>
-            </UPopover>
-          </div>
-
-          <!-- Attached Files List -->
-          <div v-if="form.attachedFiles.length > 0" class="space-y-3">
-            <div
-              v-for="(file, index) in form.attachedFiles"
-              :key="file.id"
-              class="border rounded-lg p-4 bg-white dark:bg-gray-700"
-            >
-              <div class="flex items-start justify-between">
-                <div class="flex-1 min-w-0">
-                  <!-- File Name and Path -->
-                  <div class="flex items-center gap-2 mb-2">
-                    <p
-                      class="text-sm font-medium text-gray-900 dark:text-white truncate"
-                    >
-                      {{ file.original_name }}
-                    </p>
-                    <span
-                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                    >
-                      UUID
-                    </span>
-                  </div>
-
-                  <!-- File Details -->
-                  <div class="space-y-1">
-                    <p class="text-xs text-gray-500 font-mono">
-                      ID: {{ file.id }}
-                    </p>
-                    <p class="text-xs text-gray-500">Path: {{ file.path }}</p>
-                  </div>
-
-                  <!-- Category and Description -->
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                    <UFormField label="Category">
-                      <USelectMenu
-                        :model-value="getAttachmentTypeByValue(file.category)"
-                        :items="getAttachmentTypeOptions()"
-                        placeholder="Select category"
-                        @update:model-value="
-                          (value) => updateFileCategory(index, value)
-                        "
-                        :disabled="saving"
-                        class="w-full"
-                      />
-                    </UFormField>
-
-                    <UFormField label="Description">
-                      <UInput
-                        :model-value="file.description || ''"
-                        placeholder="Optional description"
-                        @update:model-value="
-                          (value) => updateFileDescription(index, value)
-                        "
-                        :disabled="saving"
-                        class="w-full"
-                      />
-                    </UFormField>
-                  </div>
-                </div>
-
-                <!-- Actions -->
-                <div class="flex items-center gap-1 ml-4">
-                  <UButton
-                    icon="i-lucide-external-link"
-                    color="primary"
-                    variant="ghost"
-                    size="xs"
-                    @click="downloadFile(file.id, file.original_name)"
-                    :disabled="saving"
-                    title="Download file"
-                  />
-                  <UButton
-                    icon="i-lucide-x"
-                    color="error"
-                    variant="ghost"
-                    size="xs"
-                    @click="removeAttachedFile(index)"
-                    :disabled="saving"
-                    title="Remove attachment"
-                  />
-                </div>
+        <!-- Related Items Accordion -->
+        <UAccordion
+          :items="relatedItemsAccordion"
+          type="multiple"
+          class="rounded-lg border border-gray-200 dark:border-gray-800"
+          :ui="{
+            item: 'border-b last:border-b-0',
+            trigger: 'px-6 py-4 flex items-center gap-3 text-sm font-medium',
+            content: 'px-6 pb-6 pt-0',
+          }"
+        >
+          <template #default="{ item }">
+            <div class="flex items-center gap-3">
+              <UIcon :name="item.iconName" class="text-gray-500" />
+              <div class="flex flex-col text-left">
+                <span>{{ item.label }}</span>
+                <span class="text-xs text-gray-500">
+                  {{ item.description }}
+                </span>
               </div>
             </div>
-          </div>
+          </template>
 
-          <!-- Empty State -->
-          <div
-            v-else
-            class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center"
-          >
-            <UIcon
-              name="i-lucide-paperclip"
-              class="w-8 h-8 text-gray-400 mx-auto mb-2"
-            />
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              No files attached to this record
-            </p>
-            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Click "Link Files" above to attach existing files from storage
-            </p>
-          </div>
-        </div>
+          <template #content="{ item }">
+            <!-- Linked Geography -->
+            <div v-if="item.value === 'linked-geography'" class="space-y-4">
+              <div class="flex items-center justify-end mb-4">
+                <UPopover>
+                  <UButton
+                    color="primary"
+                    variant="outline"
+                    size="sm"
+                    :disabled="saving"
+                    :icon="item.iconName"
+                  >
+                    Link Geography Files
+                  </UButton>
 
-        <!-- Linked Records Section -->
-        <div
-          class="space-y-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-4"
-        >
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-              Linked Records
-            </h3>
+                  <template #content>
+                    <GeographySelector
+                      :selected-ids="
+                        form.linkedGeographyFiles?.map((f: any) => f.id) || []
+                      "
+                      :multiple="true"
+                      @update:selected-ids="() => {}"
+                      @selection-change="handleGeographySelection"
+                      @preview="() => {}"
+                      @create-new="() => {}"
+                    />
+                  </template>
+                </UPopover>
+              </div>
 
-            <UPopover>
-              <UButton
-                color="primary"
-                variant="outline"
-                size="sm"
+              <GeographyLinkForm
+                v-model="form.linkedGeographyFiles"
                 :disabled="saving"
-              >
-                Link Records
-              </UButton>
-
-              <template #content>
-                <recordsRecordLinkSelector
-                  v-model="form.linkedRecords"
-                  :exclude-ids="props.record?.id ? [props.record.id] : []"
-                  @close="() => {}"
-                />
-              </template>
-            </UPopover>
-          </div>
-
-          <LinkedRecordList
-            v-model="form.linkedRecords"
-            :editable="true"
-            :exclude-ids="props.record?.id ? [props.record.id] : []"
-          />
-        </div>
-
-        <!-- Template Loading -->
-        <div class="my-4">
-          <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-            Templates
-          </h3>
-          <div v-if="form.type" class="space-y-2">
-            <label
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Available Templates
-            </label>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="primary"
-                variant="outline"
-                size="sm"
-                @click="openTemplateModal"
-                :disabled="
-                  saving || !selectedTemplate || !templateOptionsComputed.length
-                "
-              >
-                Load Template
-              </UButton>
-              <USelectMenu
-                v-model="selectedTemplate"
-                :items="templateOptionsComputed"
-                placeholder="Select a template"
-                :disabled="saving"
-                class="flex-1"
               />
             </div>
-            <p class="text-sm text-gray-600">
-              Choose a template and click "Load Template" to populate the
-              content field.
-            </p>
-          </div>
-          <div v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
-            Select a record type above to see available templates.
-          </div>
-        </div>
-      </div>
-      <div class="my-4 grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-        <!-- Content -->
-        <div class="space-y-2">
-          <UCard class="h-full flex flex-col">
-            <template #header>
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium">Content</span>
+
+            <!-- File Attachments -->
+            <div v-else-if="item.value === 'attachments'" class="space-y-4">
+              <div class="flex items-center justify-end mb-4">
+                <UPopover>
+                  <UButton
+                    color="primary"
+                    variant="outline"
+                    size="sm"
+                    :disabled="saving"
+                    :icon="item.iconName"
+                  >
+                    Link Files
+                  </UButton>
+
+                  <template #content>
+                    <FileBrowserPopover
+                      @files-selected="handleFilesSelected"
+                      @cancel="showFileBrowser = false"
+                    />
+                  </template>
+                </UPopover>
               </div>
-            </template>
-            <div class="-m-6">
+
+              <!-- Attached Files List -->
+              <div v-if="form.attachedFiles.length > 0" class="space-y-3">
+                <div
+                  v-for="(file, index) in form.attachedFiles"
+                  :key="file.id"
+                  class="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-white dark:bg-gray-700"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                      <!-- File Name and Path -->
+                      <div class="flex items-center gap-2 mb-2">
+                        <p
+                          class="text-sm font-medium text-gray-900 dark:text-white truncate"
+                        >
+                          {{ file.original_name }}
+                        </p>
+                        <span
+                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        >
+                          UUID
+                        </span>
+                      </div>
+
+                      <!-- File Details -->
+                      <div class="space-y-1">
+                        <p class="text-xs text-gray-500 font-mono">
+                          ID: {{ file.id }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                          Path: {{ file.path }}
+                        </p>
+                        <p class="text-xs text-gray-500 font-mono break-all">
+                          URL: {{ getFileUrl(file.id) }}
+                        </p>
+                      </div>
+
+                      <!-- Category and Description -->
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                        <UFormField label="Category">
+                          <USelectMenu
+                            :model-value="
+                              getAttachmentTypeByValue(file.category)
+                            "
+                            :items="getAttachmentTypeOptions()"
+                            placeholder="Select category"
+                            @update:model-value="
+                              (value) => updateFileCategory(index, value)
+                            "
+                            :disabled="saving"
+                            class="w-full"
+                          />
+                        </UFormField>
+
+                        <UFormField label="Description">
+                          <UInput
+                            :model-value="file.description || ''"
+                            placeholder="Optional description"
+                            @update:model-value="
+                              (value) => updateFileDescription(index, value)
+                            "
+                            :disabled="saving"
+                            class="w-full"
+                          />
+                        </UFormField>
+                      </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-1 ml-4">
+                      <UButton
+                        icon="i-lucide-external-link"
+                        color="primary"
+                        variant="ghost"
+                        size="xs"
+                        @click="downloadFile(file.id, file.original_name)"
+                        :disabled="saving"
+                        title="Download file"
+                      />
+                      <UButton
+                        icon="i-lucide-x"
+                        color="error"
+                        variant="ghost"
+                        size="xs"
+                        @click="removeAttachedFile(index)"
+                        :disabled="saving"
+                        title="Remove attachment"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <div
+                v-else
+                class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
+              >
+                <UIcon
+                  name="i-lucide-paperclip"
+                  class="w-12 h-12 text-gray-400 mx-auto mb-4"
+                />
+                <h4
+                  class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2"
+                >
+                  No files attached
+                </h4>
+                <p class="text-gray-600 dark:text-gray-400">
+                  Link files to provide supporting documents for this record.
+                </p>
+              </div>
+            </div>
+
+            <!-- Linked Records -->
+            <div v-else-if="item.value === 'linked-records'" class="space-y-4">
+              <div class="flex items-center justify-end mb-4">
+                <UPopover>
+                  <UButton
+                    color="primary"
+                    variant="outline"
+                    size="sm"
+                    :disabled="saving"
+                    :icon="item.iconName"
+                  >
+                    Link Records
+                  </UButton>
+
+                  <template #content>
+                    <recordsRecordLinkSelector
+                      v-model="form.linkedRecords"
+                      :exclude-ids="props.record?.id ? [props.record.id] : []"
+                      @close="() => {}"
+                    />
+                  </template>
+                </UPopover>
+              </div>
+
+              <div v-if="form.linkedRecords.length > 0" class="space-y-3">
+                <LinkedRecordList
+                  v-model="form.linkedRecords"
+                  :editable="true"
+                  :exclude-ids="props.record?.id ? [props.record.id] : []"
+                />
+              </div>
+
+              <!-- Empty State -->
+              <div
+                v-else
+                class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
+              >
+                <UIcon
+                  name="i-lucide-link"
+                  class="w-12 h-12 text-gray-400 mx-auto mb-4"
+                />
+                <h4
+                  class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2"
+                >
+                  No records linked
+                </h4>
+                <p class="text-gray-600 dark:text-gray-400">
+                  Link related records to create connections between documents.
+                </p>
+              </div>
+            </div>
+          </template>
+        </UAccordion>
+      </div>
+
+      <div class="my-6 p-0">
+        <UCard :ui="{ body: 'p-0', root: 'p-0' }">
+          <UTabs
+            :items="contentTabs"
+            variant="link"
+            color="neutral"
+            :ui="{ content: 'p-0' }"
+          >
+            <!-- WRITE TAB -->
+            <template #content>
               <UFormField
                 required
                 :error="
@@ -850,33 +979,29 @@ const downloadFile = async (fileId: string, fileName: string) => {
                     ? formErrors.content
                     : undefined
                 "
-                class="extended-textarea"
               >
                 <UTextarea
                   v-model="form.content"
                   placeholder="Enter the record content"
                   :disabled="saving"
-                  class="font-mono w-full border-none h-full"
                   variant="none"
+                  :rows="30"
+                  :ui="{
+                    base: 'font-mono w-full border-none min-h-[70vh] max-h-[70vh] overflow-y-auto resize-none',
+                  }"
+                  class="w-full"
                 />
               </UFormField>
-            </div>
-          </UCard>
-        </div>
+            </template>
 
-        <!-- Preview Pane (right column on lg+) -->
-        <div class="">
-          <UCard>
-            <template #header>
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium">Preview</span>
+            <!-- PREVIEW TAB -->
+            <template #preview>
+              <div class="p-4 min-h-[70vh] max-h-[70vh] overflow-y-auto">
+                <RecordPreview :content="form.content" :wrap="true" />
               </div>
             </template>
-            <div class="p-2">
-              <RecordPreview :content="form.content" :wrap="true" />
-            </div>
-          </UCard>
-        </div>
+          </UTabs>
+        </UCard>
       </div>
     </div>
 
@@ -1033,12 +1158,18 @@ const downloadFile = async (fileId: string, fileName: string) => {
   </div>
 </template>
 
-<style>
-.extended-textarea > div:nth-child(2) {
-  min-height: 100vh;
+<style scoped>
+/* Make the editor area tall and let both panes share the same height */
+
+.editor-pane {
+  min-height: 75vh;
+  max-height: 75vh;
+  overflow-y: auto;
 }
 
-.extended-textarea > div:nth-child(2) textarea {
-  min-height: 100vh;
+.preview-pane {
+  min-height: 75vh;
+  max-height: 75vh;
+  overflow-y: auto;
 }
 </style>

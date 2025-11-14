@@ -53,6 +53,10 @@ const navigateToUser = (user: User) => {
 
 const breadcrumbItems = [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Settings',
     to: '/settings',
   },

@@ -14,9 +14,11 @@
     </p>
   </div>
 
-  <div v-else class="space-y-8">
+  <div v-else class="space-y-6">
     <!-- Security Overview -->
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+    <div
+      class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-800"
+    >
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-gray-900 dark:text-white">
           Security Overview
@@ -97,9 +99,7 @@
               Your account is managed by
               {{ getAuthProviderDisplayName(securityInfo?.authProvider) }}.
               Password changes must be done through your
-              {{
-                getAuthProviderDisplayName(securityInfo?.authProvider)
-              }}
+              {{ getAuthProviderDisplayName(securityInfo?.authProvider) }}
               account.
             </p>
           </div>
@@ -107,228 +107,244 @@
       </div>
     </div>
 
-    <!-- Password Management -->
-    <div
-      v-if="securityInfo?.canSetPassword"
-      class="bg-white dark:bg-gray-800 shadow rounded-lg p-6"
-    >
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-          Password Management
-        </h3>
-      </div>
+    <!-- Password and Email Management -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Password Management -->
+      <div
+        v-if="securityInfo?.canSetPassword"
+        class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-800"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            Password Management
+          </h3>
+        </div>
 
-      <form @submit.prevent="handlePasswordChange" class="space-y-4">
-        <!-- Current Password -->
-        <UFormField
-          label="Current Password"
-          description="Enter your current password to confirm your identity"
-          :error="passwordErrors.currentPassword"
-        >
-          <UInput
-            v-model="passwordForm.currentPassword"
-            type="password"
-            placeholder="Enter current password"
-            :disabled="passwordLoading"
-            required
-          />
-        </UFormField>
-
-        <!-- New Password -->
-        <UFormField
-          label="New Password"
-          description="Choose a strong password with at least 8 characters"
-          :error="passwordErrors.newPassword"
-        >
-          <div class="flex space-x-2">
+        <form @submit.prevent="handlePasswordChange" class="space-y-4">
+          <!-- Current Password -->
+          <UFormField
+            label="Current Password"
+            description="Enter your current password to confirm your identity"
+            :error="passwordErrors.currentPassword"
+          >
             <UInput
-              v-model="passwordForm.newPassword"
-              :type="showNewPassword ? 'text' : 'password'"
-              placeholder="Enter new password"
+              v-model="passwordForm.currentPassword"
+              type="password"
+              placeholder="Enter current password"
               :disabled="passwordLoading"
-              class="flex-1"
+              class="w-full"
               required
             />
+          </UFormField>
+
+          <!-- New Password -->
+          <UFormField
+            label="New Password"
+            description="Choose a strong password with at least 8 characters"
+            :error="passwordErrors.newPassword"
+          >
+            <div class="flex space-x-2 w-full">
+              <UInput
+                v-model="passwordForm.newPassword"
+                :type="showNewPassword ? 'text' : 'password'"
+                placeholder="Enter new password"
+                :disabled="passwordLoading"
+                class="flex-1 w-full"
+                required
+              />
+              <UButton
+                type="button"
+                :icon="showNewPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                @click="showNewPassword = !showNewPassword"
+                :title="showNewPassword ? 'Hide password' : 'Show password'"
+              />
+            </div>
+          </UFormField>
+
+          <!-- Confirm New Password -->
+          <UFormField
+            label="Confirm New Password"
+            description="Re-enter your new password to confirm"
+            :error="passwordErrors.confirmPassword"
+          >
+            <UInput
+              v-model="passwordForm.confirmPassword"
+              :type="showNewPassword ? 'text' : 'password'"
+              placeholder="Confirm new password"
+              :disabled="passwordLoading"
+              class="w-full"
+              required
+            />
+          </UFormField>
+
+          <!-- Actions -->
+          <div class="flex justify-end space-x-3">
             <UButton
               type="button"
-              :icon="showNewPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
               color="neutral"
               variant="outline"
-              size="sm"
-              @click="showNewPassword = !showNewPassword"
-              :title="showNewPassword ? 'Hide password' : 'Show password'"
+              @click="resetPasswordForm"
+              :disabled="passwordLoading"
+            >
+              Cancel
+            </UButton>
+            <UButton
+              type="submit"
+              :loading="passwordLoading"
+              :disabled="!isPasswordFormValid"
+            >
+              Change Password
+            </UButton>
+          </div>
+        </form>
+      </div>
+
+      <!-- Email Management -->
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-800"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            Email Management
+          </h3>
+        </div>
+
+        <!-- Current Email -->
+        <div class="mb-4">
+          <label
+            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >
+            Current Email
+          </label>
+          <div class="flex items-center space-x-2 w-full">
+            <UInput
+              :model-value="securityInfo?.email"
+              disabled
+              class="flex-1 w-full"
             />
+            <UBadge
+              :color="securityInfo?.emailVerified ? 'green' : 'yellow'"
+              variant="subtle"
+            >
+              {{ securityInfo?.emailVerified ? 'Verified' : 'Unverified' }}
+            </UBadge>
           </div>
-        </UFormField>
-
-        <!-- Confirm New Password -->
-        <UFormField
-          label="Confirm New Password"
-          description="Re-enter your new password to confirm"
-          :error="passwordErrors.confirmPassword"
-        >
-          <UInput
-            v-model="passwordForm.confirmPassword"
-            :type="showNewPassword ? 'text' : 'password'"
-            placeholder="Confirm new password"
-            :disabled="passwordLoading"
-            required
-          />
-        </UFormField>
-
-        <!-- Actions -->
-        <div class="flex justify-end space-x-3">
-          <UButton
-            type="button"
-            color="neutral"
-            variant="outline"
-            @click="resetPasswordForm"
-            :disabled="passwordLoading"
-          >
-            Cancel
-          </UButton>
-          <UButton
-            type="submit"
-            :loading="passwordLoading"
-            :disabled="!isPasswordFormValid"
-          >
-            Change Password
-          </UButton>
         </div>
-      </form>
-    </div>
 
-    <!-- Email Management -->
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-          Email Management
-        </h3>
-      </div>
-
-      <!-- Current Email -->
-      <div class="mb-4">
-        <label
-          class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        <!-- Email Verification -->
+        <div
+          v-if="!securityInfo?.emailVerified && securityInfo?.email"
+          class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md"
         >
-          Current Email
-        </label>
-        <div class="flex items-center space-x-2">
-          <UInput :model-value="securityInfo?.email" disabled class="flex-1" />
-          <UBadge
-            :color="securityInfo?.emailVerified ? 'green' : 'yellow'"
-            variant="subtle"
-          >
-            {{ securityInfo?.emailVerified ? 'Verified' : 'Unverified' }}
-          </UBadge>
-        </div>
-      </div>
-
-      <!-- Email Verification -->
-      <div
-        v-if="!securityInfo?.emailVerified && securityInfo?.email"
-        class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md"
-      >
-        <div class="flex items-start">
-          <UIcon
-            name="i-lucide-mail-warning"
-            class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5"
-          />
-          <div class="ml-3 flex-1">
-            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-              Email verification required
-            </p>
-            <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-              Please verify your email address to secure your account and
-              receive important notifications.
-            </p>
-            <div class="mt-3">
-              <UButton
-                size="sm"
-                color="yellow"
-                @click="handleSendEmailVerification"
-                :loading="emailVerificationLoading"
+          <div class="flex items-start">
+            <UIcon
+              name="i-lucide-mail-warning"
+              class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5"
+            />
+            <div class="ml-3 flex-1">
+              <p
+                class="text-sm font-medium text-yellow-800 dark:text-yellow-200"
               >
-                <UIcon name="i-lucide-mail" class="w-4 h-4 mr-2" />
-                Send Verification Email
-              </UButton>
+                Email verification required
+              </p>
+              <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                Please verify your email address to secure your account and
+                receive important notifications.
+              </p>
+              <div class="mt-3">
+                <UButton
+                  size="sm"
+                  color="yellow"
+                  @click="handleSendEmailVerification"
+                  :loading="emailVerificationLoading"
+                >
+                  <UIcon name="i-lucide-mail" class="w-4 h-4 mr-2" />
+                  Send Verification Email
+                </UButton>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Pending Email Change -->
-      <div
-        v-if="hasPendingEmailChange(securityInfo)"
-        class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md"
-      >
-        <div class="flex items-start">
-          <UIcon
-            name="i-lucide-clock"
-            class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5"
-          />
-          <div class="ml-3 flex-1">
-            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-              Email change pending
-            </p>
-            <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-              Verification email sent to:
-              {{ securityInfo?.pendingEmailChange?.email }}
-            </p>
-            <div class="mt-2 flex space-x-2">
-              <UButton
-                size="xs"
-                color="yellow"
-                variant="outline"
-                @click="cancelEmailChange"
-                :loading="emailLoading"
+        <!-- Pending Email Change -->
+        <div
+          v-if="hasPendingEmailChange(securityInfo)"
+          class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md"
+        >
+          <div class="flex items-start">
+            <UIcon
+              name="i-lucide-clock"
+              class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5"
+            />
+            <div class="ml-3 flex-1">
+              <p
+                class="text-sm font-medium text-yellow-800 dark:text-yellow-200"
               >
-                Cancel Change
-              </UButton>
+                Email change pending
+              </p>
+              <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                Verification email sent to:
+                {{ securityInfo?.pendingEmailChange?.email }}
+              </p>
+              <div class="mt-2 flex space-x-2">
+                <UButton
+                  size="xs"
+                  color="yellow"
+                  variant="outline"
+                  @click="cancelEmailChange"
+                  :loading="emailLoading"
+                >
+                  Cancel Change
+                </UButton>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Change Email Form -->
-      <form
-        v-if="!hasPendingEmailChange(securityInfo)"
-        @submit.prevent="handleEmailChange"
-        class="space-y-4"
-      >
-        <UFormField
-          label="New Email Address"
-          description="Enter a new email address to change your current email"
-          :error="emailErrors.newEmail"
+        <!-- Change Email Form -->
+        <form
+          v-if="!hasPendingEmailChange(securityInfo)"
+          @submit.prevent="handleEmailChange"
+          class="space-y-4"
         >
-          <UInput
-            v-model="emailForm.newEmail"
-            type="email"
-            placeholder="Enter new email address"
-            :disabled="emailLoading"
-            required
-          />
-        </UFormField>
+          <UFormField
+            label="New Email Address"
+            description="Enter a new email address to change your current email"
+            :error="emailErrors.newEmail"
+          >
+            <UInput
+              v-model="emailForm.newEmail"
+              type="email"
+              placeholder="Enter new email address"
+              :disabled="emailLoading"
+              class="w-full"
+              required
+            />
+          </UFormField>
 
-        <div class="flex justify-end space-x-3">
-          <UButton
-            type="button"
-            color="neutral"
-            variant="outline"
-            @click="resetEmailForm"
-            :disabled="emailLoading"
-          >
-            Cancel
-          </UButton>
-          <UButton
-            type="submit"
-            :loading="emailLoading"
-            :disabled="!isEmailFormValid"
-          >
-            Request Email Change
-          </UButton>
-        </div>
-      </form>
+          <div class="flex justify-end space-x-3">
+            <UButton
+              type="button"
+              color="neutral"
+              variant="outline"
+              @click="resetEmailForm"
+              :disabled="emailLoading"
+            >
+              Cancel
+            </UButton>
+            <UButton
+              type="submit"
+              :loading="emailLoading"
+              :disabled="!isEmailFormValid"
+            >
+              Request Email Change
+            </UButton>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>

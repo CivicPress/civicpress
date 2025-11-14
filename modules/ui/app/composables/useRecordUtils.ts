@@ -156,13 +156,21 @@ export const useRecordUtils = () => {
   };
 
   /**
+   * Capitalize a string to Title Case (first letter uppercase, rest lowercase)
+   */
+  const toTitleCase = (str: string): string => {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  };
+
+  /**
    * Get type label with validation and fallback
    */
   const getTypeLabel = (type: string): string => {
     if (!type) return '';
 
     const normalizedType = type.toLowerCase();
-    return TYPE_LABELS[normalizedType] || type;
+    return TYPE_LABELS[normalizedType] || toTitleCase(type);
   };
 
   /**
@@ -245,6 +253,7 @@ export const useRecordUtils = () => {
     getStatusConfig,
     isValidRecordStatus,
     getAvailableRecordStatuses,
+    toTitleCase,
 
     // Constants for direct access
     STATUS_COLORS,

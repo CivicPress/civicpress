@@ -378,6 +378,10 @@ onMounted(() => {
 
 const breadcrumbItems = computed(() => [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Records',
     to: '/records',
   },

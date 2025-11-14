@@ -1,101 +1,87 @@
 <template>
-  <UCard>
-    <template #header>
-      <div class="flex items-center space-x-3">
-        <UIcon name="i-lucide-map-pin" class="w-6 h-6 text-primary-600" />
-        <div>
-          <h2 class="text-xl font-semibold">
-            {{
-              mode === 'create'
-                ? 'Create Geography File'
-                : 'Edit Geography File'
-            }}
-          </h2>
-          <p class="text-sm text-gray-600 dark:text-gray-400">
-            {{ descriptionText }}
-          </p>
-        </div>
-      </div>
-    </template>
-
-    <UForm :state="form" @submit="handleSubmit" class="space-y-6">
-      <!-- Basic Information -->
+  <UForm :state="form" @submit="handleSubmit" class="space-y-6">
+    <!-- Basic Information Card -->
+    <UCard>
       <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-          Basic Information
-        </h3>
-
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <UFormField
-            label="Name"
-            name="name"
-            :error="formErrors.name"
-            required
-          >
-            <UInput
-              v-model="form.name"
-              placeholder="Enter geography file name"
-              :disabled="saving"
-            />
-          </UFormField>
+          <!-- Left Column -->
+          <div class="space-y-4">
+            <UFormField
+              label="Name"
+              name="name"
+              :error="formErrors.name"
+              required
+            >
+              <UInput
+                v-model="form.name"
+                placeholder="Enter geography file name"
+                :disabled="saving"
+                class="w-full"
+              />
+            </UFormField>
 
-          <UFormField
-            label="Category"
-            name="category"
-            :error="formErrors.category"
-            required
-          >
-            <USelectMenu
-              v-model="form.category"
-              :items="categoryOptions"
-              placeholder="Select category"
-              :disabled="saving"
-              value-key="value"
-            />
-          </UFormField>
+            <UFormField
+              label="Description"
+              name="description"
+              :error="formErrors.description"
+              required
+            >
+              <UTextarea
+                v-model="form.description"
+                placeholder="Describe this geography data..."
+                :disabled="saving"
+                :rows="3"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+
+          <!-- Right Column -->
+          <div class="space-y-4">
+            <UFormField
+              label="Category"
+              name="category"
+              :error="formErrors.category"
+              required
+            >
+              <USelectMenu
+                v-model="form.category"
+                :items="categoryOptions"
+                placeholder="Select category"
+                :disabled="saving"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UFormField
+              label="Spatial Reference System ID (SRID)"
+              name="srid"
+              :error="formErrors.srid"
+            >
+              <UInput
+                v-model.number="form.srid"
+                type="number"
+                placeholder="4326"
+                :disabled="saving"
+                class="w-full"
+              />
+              <template #help>
+                <p class="text-sm text-gray-600">
+                  Default: 4326 (WGS84). Leave empty to use default.
+                </p>
+              </template>
+            </UFormField>
+          </div>
         </div>
-
-        <UFormField
-          label="Description"
-          name="description"
-          :error="formErrors.description"
-          required
-        >
-          <UTextarea
-            v-model="form.description"
-            placeholder="Describe this geography data..."
-            :disabled="saving"
-            :rows="3"
-          />
-        </UFormField>
-
-        <UFormField
-          label="Spatial Reference System ID (SRID)"
-          name="srid"
-          :error="formErrors.srid"
-        >
-          <UInput
-            v-model.number="form.srid"
-            type="number"
-            placeholder="4326"
-            :disabled="saving"
-          />
-          <template #help>
-            <p class="text-sm text-gray-600">
-              Default: 4326 (WGS84). Leave empty to use default.
-            </p>
-          </template>
-        </UFormField>
       </div>
+    </UCard>
 
-      <!-- Geography Content -->
+    <!-- Geography Data Card -->
+    <UCard>
       <div class="space-y-4">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-          Geography Data
-        </h3>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Text Input Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <!-- Text Input Area (Left) -->
           <div class="space-y-4">
             <UFormField
               label="File Type"
@@ -110,6 +96,7 @@
                 :disabled="saving"
                 value-key="value"
                 @change="onTypeChange"
+                class="w-full"
               />
             </UFormField>
 
@@ -124,7 +111,7 @@
                 placeholder="Paste your GeoJSON or KML content here..."
                 :disabled="saving"
                 :rows="12"
-                class="font-mono text-sm"
+                class="font-mono text-sm w-full"
                 @input="onContentChange"
               />
               <template #help>
@@ -167,14 +154,16 @@
             </div>
           </div>
 
-          <!-- Live Preview -->
-          <div class="space-y-4">
+          <!-- Live Preview (Right) -->
+          <div class="flex flex-col space-y-4">
             <h4 class="text-md font-medium text-gray-900 dark:text-white">
               Live Preview
             </h4>
 
             <!-- Map Preview -->
-            <div class="border rounded-lg h-64 bg-gray-50 dark:bg-gray-800">
+            <div
+              class="border rounded-lg flex-1 bg-gray-50 dark:bg-gray-800 min-h-[400px]"
+            >
               <div
                 v-if="preview.isLoading"
                 class="flex items-center justify-center h-full"
@@ -294,32 +283,8 @@
           </div>
         </div>
       </div>
-
-      <!-- Submit Button -->
-      <div class="flex justify-end gap-4 pt-6 border-t">
-        <UButton
-          color="neutral"
-          variant="ghost"
-          @click="handleCancel"
-          :disabled="saving"
-        >
-          Cancel
-        </UButton>
-        <UButton
-          type="submit"
-          color="primary"
-          :loading="saving"
-          :disabled="!isFormValid"
-        >
-          {{
-            mode === 'create'
-              ? 'Create Geography File'
-              : 'Update Geography File'
-          }}
-        </UButton>
-      </div>
-    </UForm>
-  </UCard>
+    </UCard>
+  </UForm>
 </template>
 
 <script setup lang="ts">
@@ -625,6 +590,15 @@ const handleCancel = () => {
 const formatBounds = (bounds: any): string => {
   return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} to ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
 };
+
+// Expose methods and state for parent component
+defineExpose({
+  handleSubmit,
+  handleCancel,
+  isFormValid,
+  saving,
+  form,
+});
 
 // Lifecycle
 onMounted(() => {

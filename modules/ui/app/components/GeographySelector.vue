@@ -1,6 +1,7 @@
 <template>
   <div
     class="geography-selector-popover w-96 max-h-96 overflow-hidden flex flex-col"
+    @click.stop
   >
     <!-- Header -->
     <div class="border-b p-4 flex-shrink-0">
@@ -57,7 +58,7 @@
           :key="file.id"
           class="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer flex items-center space-x-3"
           :class="{ 'bg-blue-50 dark:bg-blue-900/20': isSelected(file.id) }"
-          @click="toggleSelection(file)"
+          @click.stop="toggleSelection(file)"
         >
           <!-- File Icon -->
           <div class="flex-shrink-0">
@@ -140,7 +141,7 @@
           <UButton
             color="primary"
             size="sm"
-            @click="confirmSelection"
+            @click.stop="confirmSelection"
             :disabled="selectedFiles.length === 0"
           >
             Add Selected Files
@@ -157,6 +158,8 @@ import { useDebounceFn } from '@vueuse/core';
 import type { GeographyFile } from '@civicpress/core';
 
 // Props
+// Note: For v-model:selected-ids, Vue converts kebab-case to camelCase
+// So the prop is 'selectedIds' but the event is 'update:selected-ids'
 interface Props {
   selectedIds?: string[];
   multiple?: boolean;
@@ -164,14 +167,14 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  selectedIds: () => [],
+  selectedIds: () => [] as string[],
   multiple: true,
   showPreview: true,
 });
 
 // Emits
 const emit = defineEmits<{
-  'update:selectedIds': [ids: string[]];
+  'update:selected-ids': [ids: string[]];
   'selection-change': [files: GeographyFile[]];
   preview: [file: GeographyFile];
   'create-new': [];
@@ -228,25 +231,36 @@ const selectedFiles = computed(() => {
 
 // Methods
 const isSelected = (fileId: string) => {
-  return props.selectedIds.includes(fileId);
+  const ids = props.selectedIds || [];
+  const result = ids.includes(fileId);
+  console.log('isSelected check:', fileId, 'in', ids, '=', result);
+  return result;
 };
 
 const toggleSelection = (file: GeographyFile) => {
+  console.log(
+    'toggleSelection called for file:',
+    file.id,
+    'isSelected:',
+    isSelected(file.id)
+  );
   if (props.multiple) {
+    const currentIds = props.selectedIds || [];
     const newIds = isSelected(file.id)
-      ? props.selectedIds.filter((id) => id !== file.id)
-      : [...props.selectedIds, file.id];
+      ? currentIds.filter((id) => id !== file.id)
+      : [...currentIds, file.id];
 
-    emit('update:selectedIds', newIds);
+    console.log('Emitting update:selected-ids with:', newIds);
+    emit('update:selected-ids', newIds);
   } else {
     const newIds = isSelected(file.id) ? [] : [file.id];
-    emit('update:selectedIds', newIds);
+    emit('update:selected-ids', newIds);
   }
 };
 
 const removeSelection = (fileId: string) => {
   const newIds = props.selectedIds.filter((id) => id !== fileId);
-  emit('update:selectedIds', newIds);
+  emit('update:selected-ids', newIds);
 };
 
 const previewFile = (file: GeographyFile) => {
@@ -258,7 +272,7 @@ const confirmSelection = () => {
 };
 
 const clearSelection = () => {
-  emit('update:selectedIds', []);
+  emit('update:selected-ids', []);
 };
 
 const getCategoryColor = (category: string) => {
@@ -297,6 +311,15 @@ const loadGeographyFiles = async () => {
     loading.value = false;
   }
 };
+
+// Watch for changes in selectedIds prop
+watch(
+  () => props.selectedIds,
+  (newIds) => {
+    console.log('selectedIds prop changed to:', newIds);
+  },
+  { deep: true, immediate: true }
+);
 
 // Load data on mount
 onMounted(() => {

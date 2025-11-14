@@ -108,6 +108,15 @@ description:
   description: 'Brief description of your organization'
   required: false
 
+about_intro:
+  value:
+    'This is an example CivicPress deployment. It includes sample bylaws,
+    meeting minutes, and geography layers to demonstrate how documents,
+    sessions, and zones appear in an open, transparent civic registry.'
+  type: 'string:textarea'
+  description: 'Homepage introduction copy for the public demo'
+  required: false
+
 tagline:
   value: null
   type: 'string'
@@ -160,3 +169,10 @@ custom:
     type: 'string'
     description: 'Preferred font family'
     required: false
+
+# Public Demo Metadata
+version:
+  value: '0.1.1'
+  type: 'string'
+  description: 'Public-facing release version label for this deployment'
+  required: false

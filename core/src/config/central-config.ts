@@ -40,6 +40,9 @@ export interface OrgConfig {
   tagline?: string | null;
   mission?: string | null;
 
+  // Demo Information
+  about_intro?: string | null;
+
   // Social Media
   social?: {
     twitter?: string | null;

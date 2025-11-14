@@ -81,6 +81,10 @@ const isActive = (to: any) => route.path === toPath(to);
 
 const breadcrumbItems = [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Settings',
     to: '/settings',
   },
@@ -159,7 +163,7 @@ onMounted(() => {
               <div class="flex-shrink-0">
                 <UIcon
                   :name="item.icon || 'i-lucide-circle'"
-                  class="w-8 h-8 text-primary-600 dark:text-primary-400"
+                  class="w-8 h-8 text-blue-600 dark:text-blue-400"
                 />
               </div>
               <div class="flex-1">

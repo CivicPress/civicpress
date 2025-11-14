@@ -11,7 +11,11 @@
 
     <template #body>
       <UBreadcrumb
-        :items="[{ label: 'Settings', to: '/settings' }, { label: 'Activity' }]"
+        :items="[
+          { label: 'Home', to: '/' },
+          { label: 'Settings', to: '/settings' },
+          { label: 'Activity' },
+        ]"
       />
 
       <UCard class="mt-6">

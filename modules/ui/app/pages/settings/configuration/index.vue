@@ -187,6 +187,10 @@ const canManageConfiguration = computed(() =>
 // Breadcrumb navigation
 const breadcrumbItems = [
   {
+    label: 'Home',
+    to: '/',
+  },
+  {
     label: 'Settings',
     to: '/settings',
   },

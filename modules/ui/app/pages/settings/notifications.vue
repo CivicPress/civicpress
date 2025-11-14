@@ -14,6 +14,7 @@
     <template #body>
       <UBreadcrumb
         :items="[
+          { label: 'Home', to: '/' },
           { label: 'Settings', to: '/settings' },
           { label: 'Notifications' },
         ]"

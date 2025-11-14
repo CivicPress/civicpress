@@ -160,25 +160,69 @@ watch(sort, () => {
   }
 });
 
+// Function to load records based on current state
+const loadRecordsFromState = async () => {
+  const typeFilter =
+    filters.value.types.length > 0 ? filters.value.types.join(',') : undefined;
+  const statusFilter =
+    filters.value.statuses.length > 0
+      ? filters.value.statuses.join(',')
+      : undefined;
+
+  // Ensure we have a valid, non-empty search query before calling searchRecords
+  const trimmedQuery = searchQuery.value?.trim();
+  if (trimmedQuery && trimmedQuery.length > 0) {
+    // URL has a search query, trigger search
+    await recordsStore.searchRecords(trimmedQuery, {
+      type: typeFilter,
+      status: statusFilter,
+    });
+  } else {
+    // No search query, load initial records
+    await recordsStore.loadInitialRecords({
+      type: typeFilter,
+      status: statusFilter,
+    });
+  }
+};
+
+// Track initial query to detect actual changes
+const initialQuery = ref<string>(JSON.stringify(route.query));
+
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
   // Restore state from URL first
   restoreFromURL();
-
-  // Start fetching records immediately
-  await recordsStore.loadInitialRecords({
-    type:
-      filters.value.types.length > 0
-        ? filters.value.types.join(',')
-        : undefined,
-    status:
-      filters.value.statuses.length > 0
-        ? filters.value.statuses.join(',')
-        : undefined,
-  });
+  // Load records based on restored state
+  await loadRecordsFromState();
+  // Store initial query state after first load
+  initialQuery.value = JSON.stringify(route.query);
 });
 
+// Watch for route query changes (e.g., browser back/forward)
+watch(
+  () => route.query,
+  async (newQuery) => {
+    const newQueryString = JSON.stringify(newQuery);
+    // Only run if query actually changed (skip initial mount)
+    if (newQueryString === initialQuery.value) return;
+
+    // Update initial query reference
+    initialQuery.value = newQueryString;
+
+    // Restore state from URL when route changes
+    restoreFromURL();
+    // Reload records based on new state
+    await loadRecordsFromState();
+  },
+  { deep: true }
+);
+
 const breadcrumbItems = [
+  {
+    label: 'Home',
+    to: '/',
+  },
   {
     label: 'Records',
   },
