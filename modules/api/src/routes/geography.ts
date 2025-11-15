@@ -236,17 +236,16 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
       try {
         const { id } = req.params;
 
-        // Import the records service to query linked records
+        // Get CivicPress instance from request (injected by middleware)
+        const civicPress = (req as any).civicPress;
+        if (!civicPress) {
+          throw new Error('CivicPress instance not available');
+        }
+
+        // Import and create RecordsService using the existing CivicPress instance
         const { RecordsService } = await import(
           '../services/records-service.js'
         );
-        const { CivicPress } = await import('@civicpress/core');
-
-        // Initialize CivicPress and RecordsService
-        const civicPress = new CivicPress({
-          dataDir: './data',
-          logger: { verbose: false },
-        });
         const recordsService = new RecordsService(civicPress);
 
         // Get all records and filter those that link to this geography file

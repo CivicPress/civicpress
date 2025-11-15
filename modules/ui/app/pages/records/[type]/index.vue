@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 const recordsStore = useRecordsStore();
 
@@ -225,6 +226,9 @@ const breadcrumbItems = computed(() => [
           :search-query="searchQuery"
           @resetFilters="resetFilters"
         />
+
+        <!-- Footer -->
+        <SystemFooter />
       </div>
     </template>
   </UDashboardPanel>

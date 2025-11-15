@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
 const { $civicApi } = useNuxtApp();
@@ -196,6 +197,9 @@ onMounted(() => {
           Add First User
         </UButton>
       </div>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route parameters
 const route = useRoute();
@@ -283,7 +284,9 @@ const breadcrumbItems = computed(() => [
           <div
             class="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden"
           >
-            <div class="border-b px-6 py-4">
+            <div
+              class="border-b border-gray-200 dark:border-gray-800 px-6 py-4"
+            >
               <h2 class="text-lg font-semibold">Raw Markdown Content</h2>
               <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 This is the complete markdown file including frontmatter and
@@ -341,20 +344,7 @@ const breadcrumbItems = computed(() => [
             </div>
           </div>
 
-          <div
-            class="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4 text-center"
-          >
-            <span>Stored as Markdown/YAML</span>
-            <span>·</span>
-            <span>Git-backed</span>
-            <span>·</span>
-            <span>
-              Last sync
-              <time :datetime="record.updated_at || record.created_at">
-                {{ formatDate(record.updated_at || record.created_at || '') }}
-              </time>
-            </span>
-          </div>
+          <SystemFooter v-if="record" />
         </div>
       </div>
     </template>

@@ -127,11 +127,15 @@
           </div>
         </div>
       </UCard>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>
 
 <script setup lang="ts">
+import SystemFooter from '~/components/SystemFooter.vue';
 definePageMeta({
   requiresAuth: true,
   layout: 'default',

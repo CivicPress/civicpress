@@ -55,12 +55,16 @@
           </div>
         </div>
       </UCard>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 import { useAuthStore } from '~/stores/auth';
 import { useNuxtApp } from '#app';
 

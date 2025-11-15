@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/stores/auth';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Store
 const authStore = useAuthStore();
@@ -504,16 +505,7 @@ const breadcrumbItems = [
       </div>
 
       <!-- Footer -->
-      <div
-        v-if="userInfo"
-        class="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4 text-center mt-8"
-      >
-        <span>Stored as Markdown/YAML</span>
-        <span>·</span>
-        <span>Git-backed</span>
-        <span>·</span>
-        <span>Last sync …</span>
-      </div>
+      <SystemFooter v-if="userInfo" />
 
       <!-- No User Info -->
       <div v-else class="flex justify-center items-center h-64">

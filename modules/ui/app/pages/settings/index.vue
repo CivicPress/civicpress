@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui';
 import { ref, onMounted, computed } from 'vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -181,6 +182,9 @@ onMounted(() => {
             </div>
           </UCard>
         </div>
+
+        <!-- Footer -->
+        <SystemFooter />
       </div>
     </template>
   </UDashboardPanel>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
 import RecordForm from '~/components/RecordForm.vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Store
 const recordsStore = useRecordsStore();
@@ -236,6 +237,9 @@ const breadcrumbItems = [
             @delete="handleDelete"
           />
         </div>
+
+        <!-- Footer -->
+        <SystemFooter />
       </div>
     </template>
   </UDashboardPanel>

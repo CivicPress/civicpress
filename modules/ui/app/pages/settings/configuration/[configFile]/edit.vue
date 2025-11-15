@@ -247,11 +247,15 @@
           </template>
         </UDashboardPanel>
       </div>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>
 
 <script setup lang="ts">
+import SystemFooter from '~/components/SystemFooter.vue';
 import {
   getFieldValue as normalizeValue,
   isMetadataField,

@@ -2,6 +2,7 @@
 import type { CivicRecord } from '~/stores/records';
 import LinkedRecordList from '~/components/records/LinkedRecordList.vue';
 import GeographyLinkDisplay from '~/components/GeographyLinkDisplay.vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route parameters
 const route = useRoute();
@@ -842,20 +843,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
           </template>
         </UAccordion>
 
-        <div
-          class="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4 text-center"
-        >
-          <span>Stored as Markdown/YAML</span>
-          <span>·</span>
-          <span>Git-backed</span>
-          <span>·</span>
-          <span>
-            Last sync
-            <time :datetime="record?.updated_at">
-              {{ formatDate(record?.updated_at || record?.created_at || '') }}
-            </time>
-          </span>
-        </div>
+        <SystemFooter v-if="record" />
       </div>
 
       <!-- No Record Found -->

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 const recordsStore = useRecordsStore();
 const { buildQueryFromState, parseQueryToState } = await import(
@@ -286,6 +287,9 @@ const breadcrumbsRef = ref<HTMLElement>();
           :sort="sort"
           @resetFilters="resetAllFilters"
         />
+
+        <!-- Footer -->
+        <SystemFooter />
       </div>
     </template>
   </UDashboardPanel>

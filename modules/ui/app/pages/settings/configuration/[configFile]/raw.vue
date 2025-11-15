@@ -68,11 +68,15 @@
           </div>
         </UCard>
       </div>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>
 
 <script setup lang="ts">
+import SystemFooter from '~/components/SystemFooter.vue';
 import { CentralConfigManager } from '@civicpress/core';
 
 definePageMeta({

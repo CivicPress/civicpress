@@ -99,12 +99,16 @@
           </div>
         </div>
       </UCard>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 definePageMeta({
   layout: 'default',

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
 import RecordForm from '~/components/RecordForm.vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 import FormSkeleton from '~/components/FormSkeleton.vue';
 
 // Route parameters
@@ -379,6 +380,9 @@ const breadcrumbItems = computed(() => [
             icon="i-lucide-alert-circle"
           />
         </div>
+
+        <!-- Footer -->
+        <SystemFooter v-if="record || error" />
       </div>
     </template>
   </UDashboardPanel>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Page metadata
 definePageMeta({
@@ -223,6 +224,9 @@ onMounted(() => {
           />
         </UCard>
       </div>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>

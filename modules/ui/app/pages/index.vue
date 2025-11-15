@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
 import { getFieldValue as normalizeValue } from '~/utils/config';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Stores
 const authStore = useAuthStore();
@@ -426,16 +427,8 @@ watch(isAuthenticated, (newValue) => {
           </UCard>
         </div>
 
-        <!-- Footer mini-meta -->
-        <div
-          class="flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-800 pt-4 text-center"
-        >
-          <span>Stored as Markdown/YAML</span>
-          <span>·</span>
-          <span>Git-backed</span>
-          <span>·</span>
-          <span>Version {{ orgVersionLabel }}</span>
-        </div>
+        <!-- Footer -->
+        <SystemFooter />
       </div>
     </template>
   </UDashboardPanel>

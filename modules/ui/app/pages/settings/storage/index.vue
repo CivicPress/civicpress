@@ -208,12 +208,16 @@
             " @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
         </template>
       </UModal>
+
+      <!-- Footer -->
+      <SystemFooter />
     </template>
   </UDashboardPanel>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 import { useAuthStore } from '@/stores/auth';
 import FileBrowser from '~/components/storage/FileBrowser.vue';
 import FileUpload from '~/components/storage/FileUpload.vue';

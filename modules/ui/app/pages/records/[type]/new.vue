@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route parameters
 const route = useRoute();
@@ -126,6 +127,9 @@ const breadcrumbItems = computed(() => [
             @delete="handleDelete"
           />
         </div>
+
+        <!-- Footer -->
+        <SystemFooter />
       </div>
     </template>
   </UDashboardPanel>
