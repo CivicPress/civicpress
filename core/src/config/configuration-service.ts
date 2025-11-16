@@ -234,6 +234,7 @@ export class ConfigurationService {
       'notifications',
       'attachment-types',
       'link-categories',
+      'analytics',
     ];
 
     const configs = [];

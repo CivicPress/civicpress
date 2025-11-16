@@ -1,0 +1,51 @@
+# Analytics & Custom Content Injection
+# This file allows you to inject custom HTML, scripts, or CSS into your site
+# without modifying the codebase. Perfect for analytics trackers, custom CSS, or any other HTML content.
+
+_metadata:
+  name: 'Analytics & Custom Content'
+  description: 'Inject custom HTML, scripts, or CSS into the site'
+  version: '1.0.0'
+  editable: true
+
+# Global toggle - set to false to disable all injections
+enabled:
+  value: false
+  type: 'boolean'
+  description: 'Enable or disable all custom content injections'
+  required: true
+
+# Inject content into <head> section
+# Use for: meta tags, early-loading scripts, CSS, Google Analytics initialization
+# Example: Google Analytics, meta tags, Open Graph tags, etc.
+inject_head:
+  value: ''
+  type: 'textarea'
+  description: |
+    HTML content to inject into the <head> section.
+    Use for meta tags, early-loading scripts, or CSS.
+    Most modern analytics trackers (GA4, Plausible) handle SPA navigation automatically.
+  required: false
+
+# Inject content at the start of <body> (immediately after <body> tag)
+# Use for: tracking pixels, early initialization scripts, Facebook Pixel
+# Example: Facebook Pixel, early tracking scripts that need to run before page content
+inject_body_start:
+  value: ''
+  type: 'textarea'
+  description: |
+    HTML content to inject at the start of the <body> tag.
+    Use for tracking pixels or scripts that need to initialize early.
+  required: false
+
+# Inject content at the end of <body> (just before </body> tag)
+# Use for: analytics scripts, custom CSS, deferred scripts
+# Example: Plausible Analytics, custom styles, deferred tracking scripts
+inject_body_end:
+  value: ''
+  type: 'textarea'
+  description: |
+    HTML content to inject at the end of the <body> tag, just before closing.
+    Use for analytics scripts, custom CSS, or any deferred content.
+    This is the most common location for analytics trackers.
+  required: false

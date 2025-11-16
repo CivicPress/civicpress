@@ -18,6 +18,9 @@ router.get('/', async (req, res) => {
     // Get organization config
     const orgConfig = CentralConfigManager.getOrgConfig();
 
+    // Get analytics config (public, no auth needed)
+    const analyticsConfig = CentralConfigManager.getAnalyticsConfig();
+
     // Validate token if provided
     if (token) {
       try {
@@ -58,6 +61,13 @@ router.get('/', async (req, res) => {
     const response: any = {
       success: true,
       organization: orgConfig,
+      analytics: analyticsConfig.enabled
+        ? {
+            inject_head: analyticsConfig.inject_head || '',
+            inject_body_start: analyticsConfig.inject_body_start || '',
+            inject_body_end: analyticsConfig.inject_body_end || '',
+          }
+        : null,
     };
 
     if (isAdmin) {

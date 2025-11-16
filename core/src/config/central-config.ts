@@ -16,6 +16,13 @@ import {
   getRecordStatusesWithMetadata,
 } from './record-statuses.js';
 
+export interface AnalyticsConfig {
+  enabled?: boolean;
+  inject_head?: string;
+  inject_body_start?: string;
+  inject_body_end?: string;
+}
+
 export interface OrgConfig {
   // Basic Organization Information
   name?: string;
@@ -307,6 +314,45 @@ export class CentralConfigManager {
       `Please create it (e.g., copy core/src/defaults/org-config.yml to data/.civic/org-config.yml).`;
     this.logger.warn(msg);
     throw new Error(msg);
+  }
+
+  /**
+   * Get analytics configuration
+   * Returns config from analytics.yml, or defaults if not found
+   */
+  static getAnalyticsConfig(): AnalyticsConfig {
+    const dataDir = this.getDataDir();
+    const analyticsConfigPath = path.join(dataDir, '.civic', 'analytics.yml');
+
+    const userConfig = this.loadYamlIfExists(analyticsConfigPath);
+
+    if (userConfig) {
+      // Extract values from metadata format if present
+      const enabled = userConfig.enabled?.value ?? userConfig.enabled ?? false;
+      const inject_head =
+        userConfig.inject_head?.value ?? userConfig.inject_head ?? '';
+      const inject_body_start =
+        userConfig.inject_body_start?.value ??
+        userConfig.inject_body_start ??
+        '';
+      const inject_body_end =
+        userConfig.inject_body_end?.value ?? userConfig.inject_body_end ?? '';
+
+      return {
+        enabled: enabled === true || enabled === 'true',
+        inject_head: inject_head || '',
+        inject_body_start: inject_body_start || '',
+        inject_body_end: inject_body_end || '',
+      };
+    }
+
+    // Return defaults if config doesn't exist
+    return {
+      enabled: false,
+      inject_head: '',
+      inject_body_start: '',
+      inject_body_end: '',
+    };
   }
 
   /**

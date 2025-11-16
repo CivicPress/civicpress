@@ -404,6 +404,16 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
+        // Copy analytics.yml
+        const analyticsSrc = path.join(defaultsDir, 'analytics.yml');
+        const analyticsDest = path.join(civicDir, 'analytics.yml');
+        if (!fs.existsSync(analyticsDest) && fs.existsSync(analyticsSrc)) {
+          fs.copyFileSync(analyticsSrc, analyticsDest);
+          if (!shouldOutputJson) {
+            logger.success('📊 Default analytics.yml created');
+          }
+        }
+
         // Copy default templates
         const templatesSrc = path.join(defaultsDir, 'templates');
         const templatesDest = path.join(civicDir, 'templates');
