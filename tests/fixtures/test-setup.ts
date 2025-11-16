@@ -97,74 +97,11 @@ export function ensureCliBuilt(): void {
   }
 }
 
-// Mock setup for @civicpress/core - COMMENTED OUT FOR INTEGRATION TESTS
+// Mock setup for @civicpress/core - Removed for integration tests
+// Integration tests now use the real CivicPress instance instead of mocks
 export function setupCoreMocks() {
-  // Core mocks disabled for integration testing
-  // vi.mock('@civicpress/core', () => ({
-  //   CivicPress: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     shutdown: vi.fn().mockResolvedValue(undefined),
-  //     getRecordManager: vi.fn(() => createMockRecordManager()),
-  //     getTemplateManager: vi.fn(() => createMockTemplateManager()),
-  //     getHookSystem: vi.fn(() => createMockHookSystem()),
-  //     getWorkflowEngine: vi.fn(() => createMockWorkflowEngine()),
-  //     getImportExportManager: vi.fn(() => createMockImportExportManager()),
-  //     getSearchManager: vi.fn(() => createMockSearchManager()),
-  //     getAuthService: vi.fn(() => createMockAuthService()),
-  //     getIndexingService: vi.fn(() => createMockIndexingService()),
-  //     getGitEngine: vi.fn(() => createMockGitEngine()),
-  //   })),
-  //   WorkflowConfigManager: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     loadWorkflows: vi.fn().mockResolvedValue([]),
-  //     getWorkflow: vi.fn().mockReturnValue(null),
-  //     listWorkflows: vi.fn().mockReturnValue([]),
-  //     validateAction: vi.fn().mockResolvedValue({ valid: true }),
-  //   })),
-  //   AuthConfigManager: {
-  //     getInstance: vi.fn().mockReturnValue({
-  //       loadConfig: vi.fn().mockResolvedValue(undefined),
-  //     }),
-  //   },
-  //   Logger: vi.fn().mockImplementation(() => ({
-  //     info: vi.fn(),
-  //     warn: vi.fn(),
-  //     error: vi.fn(),
-  //     debug: vi.fn(),
-  //   })),
-  //   CentralConfigManager: {
-  //     getDatabaseConfig: vi.fn().mockReturnValue({
-  //     type: 'sqlite',
-  //     database: ':memory:',
-  //   }),
-  // },
-  // userCan: vi
-  //   .fn()
-  //   .mockImplementation(async (user: any, permission: string) => {
-  //   const role = user?.role || 'public';
-  //   if (role === 'admin') return true;
-  //   if (role === 'clerk') {
-  //     if (
-  //       permission.includes('delete') ||
-  //       permission.includes('import') ||
-  //       permission.includes('export') ||
-  //       permission.includes('templates:manage') ||
-  //       permission.includes('hooks:manage') ||
-  //       permission.includes('workflows:manage')
-  //     ) {
-  //       return false;
-  //     }
-  //     return true;
-  //   }
-  //   if (role === 'public') {
-  //     if (permission.includes('view') || permission.includes('search')) {
-  //       return true;
-  //     }
-  //     return false;
-  //   }
-  //   return false;
-  // }),
-  // }));
+  // This function is kept for API compatibility but does nothing
+  // Integration tests use real CivicPress instances
 }
 
 // Mock implementations
@@ -1696,8 +1633,8 @@ export async function setupGlobalTestEnvironment() {
   const logger = new loggerModule.Logger({ level: 4 }); // DEBUG level
   loggerModule.setLogger(logger);
 
-  // Setup core mocks - COMMENTED OUT FOR INTEGRATION TESTS
-  // setupCoreMocks();
+  // Integration tests use real CivicPress instances, not mocks
+  // setupCoreMocks(); // No longer needed
 
   // Global cleanup
   afterAll(() => {
@@ -1705,75 +1642,11 @@ export async function setupGlobalTestEnvironment() {
   });
 }
 
-// Example: How to update the main mock setup when new services are added - COMMENTED OUT FOR INTEGRATION TESTS
+// Extended mock setup - Removed for integration tests
+// Integration tests now use the real CivicPress instance instead of mocks
 export function setupExtendedCoreMocks() {
-  // vi.mock('@civicpress/core', () => ({
-  //   CivicPress: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     shutdown: vi.fn().mockResolvedValue(undefined),
-  //     getRecordManager: vi.fn(() => createMockRecordManager()),
-  //     getTemplateManager: vi.fn(() => createMockTemplateManager()),
-  //     getHookSystem: vi.fn(() => createMockHookSystem()),
-  //     getWorkflowEngine: vi.fn(() => createMockWorkflowEngine()),
-  //     getImportExportManager: vi.fn(() => createMockImportExportManager()),
-  //     getSearchManager: vi.fn(() => createMockSearchManager()),
-  //     getAuthService: vi.fn(() => createMockAuthService()),
-  //     getIndexingService: vi.fn(() => createMockIndexingService()),
-  //     // New services can be added here
-  //     getNotificationService: vi.fn(() => createMockNotificationService()),
-  //     getAuditService: vi.fn(() => createMockAuditService()),
-  //   })),
-  //   WorkflowConfigManager: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     loadWorkflows: vi.fn().mockResolvedValue([]),
-  //     getWorkflow: vi.fn().mockReturnValue(null),
-  //     listWorkflows: vi.fn().mockReturnValue([]),
-  //     validateAction: vi.fn().mockResolvedValue({ valid: true }),
-  //   })),
-  //   AuthConfigManager: {
-  //     getInstance: vi.fn().mockReturnValue({
-  //       loadConfig: vi.fn().mockResolvedValue(undefined),
-  //     }),
-  //   },
-  //   Logger: vi.fn().mockImplementation(() => ({
-  //     info: vi.fn(),
-  //     warn: vi.fn(),
-  //     error: vi.fn(),
-  //     debug: vi.fn(),
-  //   })),
-  //   CentralConfigManager: {
-  //     getDatabaseConfig: vi.fn().mockReturnValue({
-  //       type: 'sqlite',
-  //       database: ':memory:',
-  //     }),
-  //   },
-  //   userCan: vi
-  //     .fn()
-  //     .mockImplementation(async (user: any, permission: string) => {
-  //       const role = user?.role || 'public';
-  //       if (role === 'admin') return true;
-  //       if (role === 'clerk') {
-  //         if (
-  //           permission.includes('delete') ||
-  //           permission.includes('import') ||
-  //           permission.includes('export') ||
-  //           permission.includes('templates:manage') ||
-  //           permission.includes('hooks:manage') ||
-  //           permission.includes('workflows:manage')
-  //         ) {
-  //           return false;
-  //         }
-  //         return true;
-  //       }
-  //       if (role === 'public') {
-  //         if (permission.includes('view') || permission.includes('search')) {
-  //           return true;
-  //         }
-  //         return false;
-  //       }
-  //       return false;
-  //     }),
-  // }));
+  // This function is kept for API compatibility but does nothing
+  // Integration tests use real CivicPress instances
 }
 
 // Export test utilities for use in individual test files

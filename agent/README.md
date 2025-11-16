@@ -27,7 +27,7 @@ agent/
 ├── context/                  # Contextual information
 │   ├── goals.md             # Current development goals
 │   ├── priorities.md        # Development priorities
-│   └── blockers.md          # Current blockers and issues
+│   # Note: blockers.md was removed (all blockers resolved)
 ├── knowledge/               # Domain knowledge base
 │   ├── patterns.md          # Development patterns and conventions
 │   ├── references.md        # External references and resources

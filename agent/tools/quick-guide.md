@@ -26,8 +26,8 @@ cat agent/sessions/current-session.md
 # Update current session
 echo "## $(date): [What you're working on]" >> agent/sessions/current-session.md
 
-# Check for blockers
-cat agent/context/blockers.md
+# Check project status for current issues
+cat agent/memory/project-state.md
 ```
 
 ### **End Your Session**
@@ -60,13 +60,14 @@ echo "- **What Was Learned**: [The insight]" >> agent/memory/lessons.md
 echo "- **Application**: [How to use this lesson]" >> agent/memory/lessons.md
 ```
 
-### **Add a Blocker**
+### **Add a Blocker or Issue**
 
 ```bash
-echo "## $(date): [Blocker Title]" >> agent/context/blockers.md
-echo "- **Issue**: [What's blocking you]" >> agent/context/blockers.md
-echo "- **Impact**: [What this affects]" >> agent/context/blockers.md
-echo "- **Status**: [Active/Resolved]" >> agent/context/blockers.md
+# Add to project state instead
+echo "## $(date): [Issue Title]" >> agent/memory/project-state.md
+echo "- **Issue**: [What's blocking you]" >> agent/memory/project-state.md
+echo "- **Impact**: [What this affects]" >> agent/memory/project-state.md
+echo "- **Status**: [Active/Resolved]" >> agent/memory/project-state.md
 ```
 
 ### **Update Priorities**

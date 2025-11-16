@@ -30,6 +30,12 @@ the project root (the CivicPress repository) with Node.
   Basic lint for spec files—checks that each markdown document has a top-level
   heading and a `Status:` field.
 
+- `migrate-geography-to-markdown.mjs`  
+  **One-time migration script** - Converts existing geography files (.geojson,
+  .kml, .gpx) to the new markdown format with YAML frontmatter. This script was
+  used during the geography system migration and is kept for reference. Run with
+  `--dry-run` to preview changes.
+
 ## Usage
 
 ```bash

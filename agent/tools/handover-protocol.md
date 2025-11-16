@@ -58,7 +58,7 @@ fill in:
 2. **Read current session**: `agent/sessions/current-session.md`
 3. **Check project state**: `agent/memory/project-state.md`
 4. **Review recent decisions**: `agent/memory/decisions.md`
-5. **Check for blockers**: `agent/context/blockers.md`
+5. **Check project status**: `agent/memory/project-state.md` for current issues
 
 ### **Acknowledge Handover**
 
