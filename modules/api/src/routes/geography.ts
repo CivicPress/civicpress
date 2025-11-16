@@ -162,6 +162,44 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
     }
   );
 
+  // GET /api/v1/geography/:id/raw - Get raw GeoJSON/KML content (for external tools)
+  router.get(
+    '/:id/raw',
+    param('id').isString().notEmpty().withMessage('Invalid geography ID'),
+    async (req: Request, res: Response) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleValidationError('get_geography_raw', errors.array(), res);
+      }
+
+      try {
+        const { id } = req.params;
+        const rawContent = await geographyManager.getRawContent(id);
+
+        if (!rawContent) {
+          return handleError(
+            'get_geography_raw',
+            new Error('Geography file not found'),
+            res,
+            404
+          );
+        }
+
+        // Determine content type based on file type
+        const geographyFile = await geographyManager.getGeographyFile(id);
+        const contentType =
+          geographyFile?.type === 'kml' || geographyFile?.type === 'gpx'
+            ? 'application/xml'
+            : 'application/json';
+
+        res.setHeader('Content-Type', contentType);
+        res.send(rawContent);
+      } catch (error) {
+        handleError('get_geography_raw', error, res);
+      }
+    }
+  );
+
   // PUT /api/v1/geography/:id - Update geography file
   router.put(
     '/:id',

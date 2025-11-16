@@ -117,6 +117,9 @@ export class CivicPressAPI {
     try {
       logger.info('Initializing CivicPress API...');
 
+      // Store dataDir for use in routes
+      this.dataDir = dataDir;
+
       // Change to project root directory to ensure database paths are resolved correctly
       const projectRoot = this.findProjectRoot();
       if (projectRoot && process.cwd() !== projectRoot) {

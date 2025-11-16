@@ -57,21 +57,36 @@ citizens, with interactive mapping capabilities and public transparency.
 ```
 data/
 ├── geography/                 # Geography files (git versioned)
-│   ├── geojson/              # GeoJSON files (.geojson)
+│   ├── geojson/              # GeoJSON files (.md with embedded GeoJSON)
 │   │   ├── zones/            # Zoning data
 │   │   ├── boundaries/       # Municipal boundaries
 │   │   ├── districts/        # Administrative districts
 │   │   └── facilities/       # Public facilities
-│   ├── kml/                  # KML files (.kml)
+│   ├── kml/                  # KML files (.md with embedded KML)
 │   │   ├── municipal-boundaries/
 │   │   └── service-areas/
-│   ├── gpx/                  # GPX files (.gpx)
+│   ├── gpx/                  # GPX files (.md with embedded GPX)
 │   │   └── routes/
 │   └── shp/                  # Shapefile data (.shp, .dbf, .shx)
 │       └── cadastral/
 ├── records/                  # Existing civic records
 └── .civic/                   # Platform configuration
 ```
+
+**File Format**: Geography files are stored in a hybrid markdown format (`.md`)
+with:
+
+- **YAML Frontmatter**: Contains metadata (id, name, type, category,
+  description, SRID, bounds, timestamps)
+- **Code Block**: Contains the raw GeoJSON/KML/GPX content in a fenced code
+  block
+
+This format ensures:
+
+- All metadata is versioned alongside the geographic data
+- Files are human-readable and editable
+- Consistent with CivicPress record format
+- Full Git history and audit trail
 
 ### API Endpoints
 
@@ -85,6 +100,9 @@ DELETE /api/v1/geography/:id          // Delete geography file
 
 // Geography validation
 POST   /api/v1/geography/validate     // Validate geography content
+
+// Geography raw content
+GET    /api/v1/geography/:id/raw      // Get raw GeoJSON/KML content (for external tools)
 
 // Geography search
 GET    /api/v1/geography/search       // Search geography files
@@ -347,6 +365,43 @@ pnpm run test:run -- tests/ui/geography.test.ts
 # Run all tests
 pnpm run test:run
 ```
+
+## Migration to Markdown Format
+
+Geography files are now stored in a hybrid markdown format (`.md`) instead of
+raw GeoJSON/KML files. This ensures all metadata (name, description, category,
+bounds, etc.) is versioned alongside the geographic data.
+
+### Migration Script
+
+A migration script is available to convert existing raw geography files to the
+new markdown format:
+
+```bash
+# Dry run to see what would be migrated
+node scripts/migrate-geography-to-markdown.mjs --dry-run
+
+# Run the migration
+node scripts/migrate-geography-to-markdown.mjs
+
+# Use custom data directory
+node scripts/migrate-geography-to-markdown.mjs --data-dir /path/to/data
+```
+
+**What the migration does:**
+
+- Converts `.geojson`, `.kml`, and `.gpx` files to `.md` format
+- Extracts metadata from filenames and directory paths
+- Preserves all geographic content in code blocks
+- Calculates bounds from GeoJSON data
+- Generates proper YAML frontmatter with all required fields
+
+**After migration:**
+
+- Old raw files are deleted (backup recommended)
+- New `.md` files are created with complete metadata
+- Files are ready for Git versioning
+- API and UI continue to work seamlessly
 
 ## Migration from Legacy System
 

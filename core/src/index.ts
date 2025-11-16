@@ -40,6 +40,7 @@ export type {
 
 // Export new geography data system
 export { GeographyManager } from './geography/geography-manager.js';
+export { GeographyParser } from './geography/geography-parser.js';
 export type {
   GeographyFile,
   GeographyFileType,

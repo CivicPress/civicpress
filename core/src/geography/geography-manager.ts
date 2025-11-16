@@ -23,6 +23,7 @@ import {
   GeographyNotFoundError,
   SRID,
 } from '../types/geography.js';
+import { GeographyParser } from './geography-parser.js';
 
 export class GeographyManager {
   private dataDir: string;
@@ -61,7 +62,7 @@ export class GeographyManager {
 
       // Generate unique ID and filename
       const id = uuidv4();
-      const filename = this.generateFilename(request.name, request.type);
+      const filename = this.generateFilename(request.name, id, request.type);
       const categoryDir = path.join(
         this.geographyDir,
         request.type,
@@ -71,9 +72,6 @@ export class GeographyManager {
 
       // Ensure directory exists
       await fs.mkdir(categoryDir, { recursive: true });
-
-      // Save the file
-      await fs.writeFile(filePath, request.content, 'utf8');
 
       // Create metadata
       const metadata: GeographyMetadata = {
@@ -98,7 +96,13 @@ export class GeographyManager {
         file_path: path.relative(this.dataDir, filePath),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        content: request.content, // Store raw content for serialization
       };
+
+      // Serialize to markdown and save
+      const markdownContent =
+        GeographyParser.serializeToMarkdown(geographyFile);
+      await fs.writeFile(filePath, markdownContent, 'utf8');
 
       // TODO: Save to database
       // await this.saveToDatabase(geographyFile);
@@ -148,51 +152,32 @@ export class GeographyManager {
               const fileNames = await fs.readdir(categoryDir);
 
               for (const fileName of fileNames) {
-                const fileId = path.basename(fileName, path.extname(fileName));
+                // Only process .md files
+                if (!fileName.endsWith('.md')) {
+                  continue;
+                }
 
-                if (fileId === id) {
-                  // Found the file, read and parse it
-                  const filePath = path.join(categoryDir, fileName);
-                  const stats = await fs.stat(filePath);
+                const filePath = path.join(categoryDir, fileName);
+                const stats = await fs.stat(filePath);
 
-                  if (stats.isFile()) {
-                    const content = await fs.readFile(filePath, 'utf8');
+                if (stats.isFile()) {
+                  try {
+                    const markdownContent = await fs.readFile(filePath, 'utf8');
+                    const geographyFile = GeographyParser.parseFromMarkdown(
+                      markdownContent,
+                      path.relative(this.dataDir, filePath)
+                    );
 
-                    try {
-                      const parsed = await this.parseGeographyContent(
-                        content,
-                        fileType as GeographyFileType
-                      );
-
-                      const geographyFile: GeographyFile = {
-                        id: fileId,
-                        name: this.extractNameFromFilename(fileName),
-                        type: fileType as GeographyFileType,
-                        category: category as GeographyCategory,
-                        description: `Geography file: ${fileName}`,
-                        srid: 4326,
-                        bounds: parsed.bounds,
-                        metadata: {
-                          source: 'CivicPress Geography System',
-                          created: stats.birthtime.toISOString(),
-                          updated: stats.mtime.toISOString(),
-                          version: '1.0.0',
-                          accuracy: 'Standard',
-                        },
-                        file_path: path.relative(this.dataDir, filePath),
-                        created_at: stats.birthtime.toISOString(),
-                        updated_at: stats.mtime.toISOString(),
-                        content: content, // Include raw content for the view page
-                      };
-
+                    // Check if this is the file we're looking for
+                    if (geographyFile.id === id) {
                       return geographyFile;
-                    } catch (parseError) {
-                      console.warn(
-                        `Failed to parse file: ${fileName}`,
-                        parseError
-                      );
-                      continue;
                     }
+                  } catch (parseError) {
+                    console.warn(
+                      `Failed to parse geography file: ${fileName}`,
+                      parseError
+                    );
+                    continue;
                   }
                 }
               }
@@ -249,18 +234,13 @@ export class GeographyManager {
         }
       }
 
-      // Update the file if content changed
-      if (request.content) {
-        const filePath = path.join(this.dataDir, existingFile.file_path);
-        await fs.writeFile(filePath, request.content, 'utf8');
-      }
-
-      // Update metadata
+      // Update metadata and content
       const updatedFile: GeographyFile = {
         ...existingFile,
         name: request.name || existingFile.name,
         category: request.category || existingFile.category,
         description: request.description || existingFile.description,
+        content: request.content || existingFile.content,
         metadata: {
           ...existingFile.metadata,
           ...request.metadata,
@@ -268,6 +248,20 @@ export class GeographyManager {
         },
         updated_at: new Date().toISOString(),
       };
+
+      // If content changed, re-parse to update bounds
+      if (request.content) {
+        const parsed = await this.parseGeographyContent(
+          request.content,
+          updatedFile.type
+        );
+        updatedFile.bounds = parsed.bounds;
+      }
+
+      // Serialize to markdown and save
+      const markdownContent = GeographyParser.serializeToMarkdown(updatedFile);
+      const filePath = path.join(this.dataDir, existingFile.file_path);
+      await fs.writeFile(filePath, markdownContent, 'utf8');
 
       // TODO: Update in database
       // await this.updateInDatabase(updatedFile);
@@ -281,6 +275,37 @@ export class GeographyManager {
         `Failed to update geography file: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'UPDATE_ERROR',
         { id, request, error }
+      );
+    }
+  }
+
+  /**
+   * Get raw GeoJSON/KML content for a geography file (for external tools)
+   *
+   * @param id - Geography file ID
+   * @returns Raw content string or null if not found
+   */
+  async getRawContent(id: string): Promise<string | null> {
+    try {
+      const geographyFile = await this.getGeographyFile(id);
+      if (!geographyFile) {
+        return null;
+      }
+
+      // Return raw content if available
+      if (geographyFile.content) {
+        return geographyFile.content;
+      }
+
+      // Fallback: read file and extract content
+      const filePath = path.join(this.dataDir, geographyFile.file_path);
+      const markdownContent = await fs.readFile(filePath, 'utf8');
+      return GeographyParser.extractRawContent(markdownContent);
+    } catch (error) {
+      throw new GeographyError(
+        `Failed to get raw content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'GET_RAW_ERROR',
+        { id, error }
       );
     }
   }
@@ -357,47 +382,35 @@ export class GeographyManager {
               const fileNames = await fs.readdir(categoryDir);
 
               for (const fileName of fileNames) {
+                // Only process .md files
+                if (!fileName.endsWith('.md')) {
+                  continue;
+                }
+
                 const filePath = path.join(categoryDir, fileName);
-                const stats = await fs.stat(filePath);
 
-                if (stats.isFile()) {
-                  // Read file content to extract metadata
-                  const content = await fs.readFile(filePath, 'utf8');
+                try {
+                  const markdownContent = await fs.readFile(filePath, 'utf8');
+                  const geographyFile = GeographyParser.parseFromMarkdown(
+                    markdownContent,
+                    path.relative(this.dataDir, filePath)
+                  );
 
-                  try {
-                    const parsed = await this.parseGeographyContent(
-                      content,
-                      fileType as GeographyFileType
-                    );
-
-                    const geographyFile: GeographyFile = {
-                      id: path.basename(fileName, path.extname(fileName)),
-                      name: this.extractNameFromFilename(fileName),
-                      type: fileType as GeographyFileType,
-                      category: cat as GeographyCategory,
-                      description: `Geography file: ${fileName}`,
-                      srid: 4326,
-                      bounds: parsed.bounds,
-                      metadata: {
-                        source: 'CivicPress Geography System',
-                        created: stats.birthtime.toISOString(),
-                        updated: stats.mtime.toISOString(),
-                        version: '1.0.0',
-                        accuracy: 'Standard',
-                      },
-                      file_path: path.relative(this.dataDir, filePath),
-                      created_at: stats.birthtime.toISOString(),
-                      updated_at: stats.mtime.toISOString(),
-                    };
-
-                    files.push(geographyFile);
-                  } catch (parseError) {
-                    // Skip files that can't be parsed
-                    console.warn(
-                      `Skipping unparseable file: ${fileName}`,
-                      parseError
-                    );
+                  // Apply filters
+                  if (category && geographyFile.category !== category) {
+                    continue;
                   }
+                  if (type && geographyFile.type !== type) {
+                    continue;
+                  }
+
+                  files.push(geographyFile);
+                } catch (parseError) {
+                  // Skip files that can't be parsed
+                  console.warn(
+                    `Skipping unparseable geography file: ${fileName}`,
+                    parseError
+                  );
                 }
               }
             } catch (error) {
@@ -618,7 +631,11 @@ export class GeographyManager {
   /**
    * Generate filename from name and type
    */
-  private generateFilename(name: string, type: GeographyFileType): string {
+  private generateFilename(
+    name: string,
+    id: string,
+    type: GeographyFileType
+  ): string {
     const sanitizedName = name
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
@@ -626,8 +643,8 @@ export class GeographyManager {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    const timestamp = Date.now();
-    return `${sanitizedName}-${timestamp}.${type}`;
+    // Use ID instead of timestamp for consistent naming
+    return `${sanitizedName}-${id}.md`;
   }
 
   /**

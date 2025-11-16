@@ -10,6 +10,15 @@ and this project adheres to
 
 ### Added
 
+- **Geography Markdown Format**: Geography files now stored in hybrid markdown
+  format (`.md`) with YAML frontmatter and embedded GeoJSON/KML content
+  - All metadata (name, description, category, bounds, timestamps) versioned
+    alongside geographic data
+  - Consistent with CivicPress record format for unified Git versioning
+  - Human-readable and editable format
+  - Migration script (`scripts/migrate-geography-to-markdown.mjs`) to convert
+    existing raw files
+  - New API endpoint `/api/v1/geography/:id/raw` for raw content access
 - **Geography Data Management System**: Complete centralized geography file
   management
   - Text box input system for pasting GeoJSON/KML content with API validation
@@ -32,6 +41,8 @@ and this project adheres to
 
 ### Changed
 
+- **Geography File Format**: Migrated from raw GeoJSON/KML files to hybrid
+  markdown format for better metadata management and Git versioning
 - Enhanced geography data system from simple coordinate storage to full spatial
   document management
 - Updated record forms to support both legacy geography fields and new geography
