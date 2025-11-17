@@ -10,6 +10,7 @@ const authStore = useAuthStore();
 const { $civicApi } = useNuxtApp();
 const { formatDate } = useRecordUtils();
 const runtimeConfig = useRuntimeConfig();
+const { t } = useI18n();
 
 // Reactive state
 const organizationInfo = ref<any>(null);
@@ -105,7 +106,7 @@ const loadDashboardData = async () => {
     await fetchOrganizationInfo();
     await fetchRecentRecords();
   } catch (err: any) {
-    error.value = err.message || 'Failed to load dashboard data';
+    error.value = err.message || t('home.failedToLoad');
     console.error('Error loading dashboard data:', err);
   } finally {
     loading.value = false;
@@ -162,7 +163,7 @@ watch(isAuthenticated, (newValue) => {
             name="i-lucide-loader-2"
             class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4"
           />
-          <p class="text-gray-600">Loading dashboard...</p>
+          <p class="text-gray-600">{{ t('home.loadingDashboard') }}</p>
         </div>
       </div>
 
@@ -177,7 +178,7 @@ watch(isAuthenticated, (newValue) => {
       >
         <template #footer>
           <UButton color="error" variant="soft" @click="loadDashboardData">
-            Try Again
+            {{ t('common.tryAgain') }}
           </UButton>
         </template>
       </UAlert>
@@ -186,11 +187,11 @@ watch(isAuthenticated, (newValue) => {
       <div v-else class="space-y-8">
         <!-- Welcome Section -->
         <div class="text-center py-12 space-y-6">
-          <h2 class="text-4xl font-bold">CivicPress</h2>
+          <h2 class="text-4xl font-bold">{{ t('home.title') }}</h2>
           <p
             class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-lg mb-10"
           >
-            Open infrastructure for accountable local government.
+            {{ t('home.tagline') }}
           </p>
 
           <!-- Hero search -->
@@ -200,7 +201,7 @@ watch(isAuthenticated, (newValue) => {
           >
             <UInput
               v-model="homeSearchQuery"
-              placeholder="Search records, bylaws, and minutes…"
+              :placeholder="t('home.searchPlaceholder')"
               size="lg"
               icon="i-lucide-search"
               class="w-full"
@@ -217,7 +218,7 @@ watch(isAuthenticated, (newValue) => {
               class="text-gray-700 dark:text-gray-300"
               @click="navigateToRecords"
             >
-              Browse records
+              {{ t('home.browseRecords') }}
             </UButton>
 
             <span class="text-gray-300 dark:text-gray-600">·</span>
@@ -227,7 +228,7 @@ watch(isAuthenticated, (newValue) => {
               class="text-gray-700 dark:text-gray-300"
               @click="navigateToLogin"
             >
-              Sign in
+              {{ t('common.signIn') }}
             </UButton>
 
             <span class="text-gray-300 dark:text-gray-600">·</span>
@@ -237,7 +238,7 @@ watch(isAuthenticated, (newValue) => {
               class="text-gray-700 dark:text-gray-300"
               @click="scrollToAboutSection"
             >
-              About this demo
+              {{ t('home.aboutDemo') }}
             </UButton>
           </div>
         </div>
@@ -256,7 +257,7 @@ watch(isAuthenticated, (newValue) => {
                   name="i-lucide-folder-open"
                   class="w-5 h-5 text-blue-600"
                 />
-                <span>Browse Records</span>
+                <span>{{ t('home.browseRecordsButton') }}</span>
               </button>
 
               <!-- Create Record -->
@@ -269,7 +270,7 @@ watch(isAuthenticated, (newValue) => {
                   name="i-lucide-plus-circle"
                   class="w-5 h-5 text-blue-600"
                 />
-                <span>Create Record</span>
+                <span>{{ t('home.createRecord') }}</span>
               </button>
 
               <!-- Geography -->
@@ -279,7 +280,7 @@ watch(isAuthenticated, (newValue) => {
                 @click="navigateTo('/geography')"
               >
                 <UIcon name="i-lucide-map" class="w-5 h-5 text-blue-600" />
-                <span>Geography</span>
+                <span>{{ t('home.geography') }}</span>
               </button>
 
               <!-- Profile -->
@@ -289,7 +290,7 @@ watch(isAuthenticated, (newValue) => {
                 @click="navigateToProfile"
               >
                 <UIcon name="i-lucide-user" class="w-5 h-5 text-blue-600" />
-                <span>Profile</span>
+                <span>{{ t('common.profile') }}</span>
               </button>
             </div>
           </UCard>
@@ -301,7 +302,7 @@ watch(isAuthenticated, (newValue) => {
           class="space-y-4 border-t border-gray-200 dark:border-gray-800 mt-12 pt-8"
         >
           <h3 class="text-xl font-semibold text-center">
-            Latest Public Records
+            {{ t('home.latestPublicRecords') }}
           </h3>
           <div class="grid gap-4">
             <UCard
@@ -334,7 +335,7 @@ watch(isAuthenticated, (newValue) => {
           class="space-y-4 border-t border-gray-200 dark:border-gray-800 mt-12 pt-8"
         >
           <h3 class="text-xl font-semibold text-center">
-            About This Environment
+            {{ t('home.aboutEnvironment') }}
           </h3>
           <UCard class="border-gray-200 dark:border-gray-800">
             <div class="space-y-4">
@@ -381,7 +382,7 @@ watch(isAuthenticated, (newValue) => {
                     class="w-4 h-4 text-gray-500"
                   />
                   <span class="text-gray-700 dark:text-gray-300">
-                    Version {{ orgVersionLabel }}
+                    {{ t('home.versionLabel', { version: orgVersionLabel }) }}
                   </span>
                 </div>
               </div>
@@ -395,7 +396,7 @@ watch(isAuthenticated, (newValue) => {
           class="space-y-4 border-t border-gray-200 dark:border-gray-800 pt-8"
         >
           <h3 class="text-xl font-semibold text-center">
-            Workspace Information
+            {{ t('home.workspaceInformation') }}
           </h3>
 
           <UCard class="border-gray-200 dark:border-gray-800">
@@ -403,7 +404,7 @@ watch(isAuthenticated, (newValue) => {
               <div class="flex items-center gap-2">
                 <UIcon name="i-lucide-server" class="w-4 h-4 text-gray-500" />
                 <span
-                  >Environment:
+                  >{{ t('home.environment') }}:
                   {{ runtimeConfig.public.environment || 'Demo' }}</span
                 >
               </div>
@@ -413,7 +414,9 @@ watch(isAuthenticated, (newValue) => {
                   name="i-lucide-user-check"
                   class="w-4 h-4 text-gray-500"
                 />
-                <span>Role: {{ authStore.currentUser?.role }}</span>
+                <span
+                  >{{ t('home.role') }}: {{ authStore.currentUser?.role }}</span
+                >
               </div>
 
               <div class="flex items-center gap-2">
@@ -421,7 +424,10 @@ watch(isAuthenticated, (newValue) => {
                   name="i-lucide-git-branch"
                   class="w-4 h-4 text-gray-500"
                 />
-                <span>CivicPress Version {{ orgVersionLabel }}</span>
+                <span
+                  >{{ t('home.title') }} {{ t('home.version') }}
+                  {{ orgVersionLabel }}</span
+                >
               </div>
             </div>
           </UCard>

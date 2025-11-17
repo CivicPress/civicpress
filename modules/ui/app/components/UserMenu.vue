@@ -11,6 +11,24 @@ const props = withDefaults(defineProps<Props>(), {
 
 const authStore = useAuthStore();
 const colorMode = useColorMode();
+const { locale, locales, setLocale, t } = useI18n();
+
+// Load saved locale from localStorage on mount
+onMounted(async () => {
+  if (process.client) {
+    const savedLocale = localStorage.getItem('i18n_locale');
+    if (savedLocale && (savedLocale === 'en' || savedLocale === 'fr')) {
+      await setLocale(savedLocale);
+    }
+  }
+});
+
+// Watch for locale changes and persist to localStorage
+watch(locale, (newLocale) => {
+  if (process.client) {
+    localStorage.setItem('i18n_locale', newLocale);
+  }
+});
 
 const generateAvatar = () => {
   if (authStore.currentUser?.avatar_url) {
@@ -42,12 +60,12 @@ const items = computed<DropdownMenuItem[][]>(() => {
     // Direct profile + (optional) settings link
     menuItems.push([
       {
-        label: 'Profile',
+        label: t('common.profile'),
         icon: 'i-lucide-user',
         onClick: () => navigateTo('/settings/profile'),
       },
       {
-        label: 'Settings',
+        label: t('common.settings'),
         icon: 'i-lucide-settings',
         onClick: () => navigateTo('/settings'),
       },
@@ -57,11 +75,11 @@ const items = computed<DropdownMenuItem[][]>(() => {
   // Appearance (light/dark) – always available
   menuItems.push([
     {
-      label: 'Appearance',
+      label: t('common.appearance'),
       icon: 'i-lucide-sun-moon',
       children: [
         {
-          label: 'Light',
+          label: t('common.light'),
           icon: 'i-lucide-sun',
           type: 'checkbox',
           checked: colorMode.value === 'light',
@@ -71,7 +89,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
           },
         },
         {
-          label: 'Dark',
+          label: t('common.dark'),
           icon: 'i-lucide-moon',
           type: 'checkbox',
           checked: colorMode.value === 'dark',
@@ -83,13 +101,27 @@ const items = computed<DropdownMenuItem[][]>(() => {
         },
       ],
     },
+    {
+      label: t('common.language'),
+      icon: 'i-lucide-languages',
+      children: (locales.value as any[]).map((loc: any) => ({
+        label: loc.name,
+        icon: loc.code === 'en' ? 'i-lucide-languages' : 'i-lucide-languages',
+        type: 'checkbox',
+        checked: locale.value === loc.code,
+        async onSelect(e: Event) {
+          e.preventDefault();
+          await setLocale(loc.code);
+        },
+      })),
+    },
   ]);
 
   // Auth actions
   if (authStore.isLoggedIn) {
     menuItems.push([
       {
-        label: 'Log out',
+        label: t('common.logOut'),
         icon: 'i-lucide-log-out',
         onClick: () => navigateTo('/auth/logout'),
       },
@@ -97,7 +129,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
   } else {
     menuItems.push([
       {
-        label: 'Log in',
+        label: t('common.logIn'),
         icon: 'i-lucide-log-in',
         onClick: () => navigateTo('/auth/login'),
       },

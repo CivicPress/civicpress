@@ -8,6 +8,27 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- **Internationalization (i18n)**: Added full i18n support to Nuxt UI module
+  - Installed and configured `@nuxtjs/i18n` v10.2.1
+  - Added English (en) and French (fr) language support
+  - Created translation files in `i18n/locales/` with organized namespaces
+    (common, home)
+  - Implemented language switcher in UserMenu component (next to Appearance
+    menu)
+  - Auto-detects browser language on first visit
+  - Persists language preference to localStorage
+  - Translated home page (`index.vue`) with all user-facing strings
+  - Uses `no_prefix` strategy (no URL prefix for now, can be extended later)
+  - All translations working correctly for both languages
+- **Geography Markdown Format**: Geography files now stored in hybrid markdown
+  format (`.md`) with YAML frontmatter and embedded GeoJSON/KML content
+  - All metadata (name, description, category, bounds, timestamps) versioned
+    alongside geographic data
+  - Consistent with CivicPress record format for unified Git versioning
+  - Human-readable and editable format
+
 ### Changed
 
 - **Nuxt 4 Upgrade**: Successfully upgraded UI module from Nuxt 3 to Nuxt 4.2.1
@@ -56,17 +77,10 @@ and this project adheres to
     cache issues
   - All storage tests now pass reliably without affecting working directory
 
-### Added
-
-- **Geography Markdown Format**: Geography files now stored in hybrid markdown
-  format (`.md`) with YAML frontmatter and embedded GeoJSON/KML content
-  - All metadata (name, description, category, bounds, timestamps) versioned
-    alongside geographic data
-  - Consistent with CivicPress record format for unified Git versioning
-  - Human-readable and editable format
   - Migration script (`scripts/migrate-geography-to-markdown.mjs`) to convert
     existing raw files
   - New API endpoint `/api/v1/geography/:id/raw` for raw content access
+
 - **Geography Data Management System**: Complete centralized geography file
   management
   - Text box input system for pasting GeoJSON/KML content with API validation

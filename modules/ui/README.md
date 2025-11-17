@@ -48,6 +48,7 @@ interacting with the CivicPress API.
 - Admin panel with user management
 - Record listing and search functionality
 - Status transition controls
+- Internationalization (i18n) with English and French support
 - File attachment system
 - Geography file management
 - Configuration management UI
