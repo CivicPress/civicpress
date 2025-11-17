@@ -48,6 +48,13 @@ export class StorageConfigManager {
           max_size: '25MB',
           description: 'Private documents for authorized users only',
         },
+        icons: {
+          path: 'icons',
+          access: 'authenticated',
+          allowed_types: ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp', 'ico'],
+          max_size: '2MB',
+          description: 'Icons and map-related images for geography records',
+        },
       },
       metadata: {
         auto_generate_thumbnails: true,

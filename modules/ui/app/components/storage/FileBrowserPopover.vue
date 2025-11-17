@@ -1,7 +1,7 @@
 <template>
   <div class="file-browser-popover w-96 max-h-96 overflow-hidden flex flex-col">
     <!-- Header with Folder Selection -->
-    <div class="border-b p-4 flex-shrink-0">
+    <div class="border-b border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
       <div class="space-y-3">
         <h3 class="font-medium text-gray-900 dark:text-white">Select Files</h3>
 
@@ -88,7 +88,7 @@
     </div>
 
     <!-- Footer with Actions -->
-    <div class="border-t p-4 flex-shrink-0">
+    <div class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
       <div class="flex items-center justify-between">
         <p class="text-sm text-gray-500">
           {{ selectedFiles.length }} file{{

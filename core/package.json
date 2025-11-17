@@ -5,6 +5,13 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc && npm run build:copy-schemas",
     "build:copy-schemas": "mkdir -p dist/schemas/record-type-schemas && cp -r src/schemas/*.json dist/schemas/ 2>/dev/null || true && cp -r src/schemas/record-type-schemas/*.json dist/schemas/record-type-schemas/ 2>/dev/null || true",

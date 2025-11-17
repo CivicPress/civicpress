@@ -1,0 +1,84 @@
+# Geography Styling Presets
+# This file contains reusable color and icon mapping configurations
+# that can be applied to geography files for consistent styling
+
+_metadata:
+  name: 'Geography Styling Presets'
+  description:
+    'Reusable color and icon mapping configurations for geography files'
+  version: '1.0.0'
+  editable: true
+
+# Preset definitions
+presets:
+  # Land use zones (Grandes Affectations) - based on LETTRE property
+  land_use_zones:
+    name: 'Land Use Zones'
+    description:
+      'Color scheme for land use zones (Grandes Affectations) using LETTRE codes'
+    type: 'color'
+    color_mapping:
+      property: 'LETTRE'
+      type: 'property'
+      colors:
+        IND: '#64748b' # slate-500 (Industrial - neutral gray)
+        A: '#10b981' # green-500 (Agricultural - green)
+        RF: '#059669' # emerald-600 (Recreational-Forestry - forest green)
+        PU: '#f59e0b' # amber-500 (Urbanization Perimeter - amber/orange)
+        AFD: '#84cc16' # lime-500 (Dynamic Agro-Forestry - light green)
+        AF: '#22c55e' # emerald-500 (Agro-Forestry - medium green)
+      default_color: '#6b7280' # gray-500
+
+  # Zone colors by name (NOM property)
+  zone_by_name:
+    name: 'Zones by Name'
+    description: 'Color scheme for zones using the NOM property'
+    type: 'color'
+    color_mapping:
+      property: 'NOM'
+      type: 'property'
+      colors:
+        'Industrielle': '#64748b' # slate-500
+        'Agricole': '#10b981' # green-500
+        'Récréo-forestière': '#059669' # emerald-600
+        "Périmètre d'urbanisation": '#f59e0b' # amber-500
+        'Agro-forestière dynamique': '#84cc16' # lime-500
+        'Agro-forestière': '#22c55e' # emerald-500
+      default_color: '#6b7280' # gray-500
+
+  # Municipal facilities preset
+  municipal_facilities:
+    name: 'Municipal Facilities'
+    description: 'Styling for municipal buildings and facilities'
+    type: 'combined'
+    color_mapping:
+      property: 'TYPE'
+      type: 'property'
+      colors:
+        'Bureau': '#3b82f6' # blue
+        'Bibliothèque': '#10b981' # green
+        'Centre communautaire': '#f59e0b' # amber
+        'Hôtel de ville': '#ef4444' # red
+      default_color: '#6b7280'
+    icon_mapping:
+      property: 'TYPE'
+      type: 'property'
+      icons:
+        'Bureau':
+          url: '' # Will be set via icon library
+          size: [32, 32]
+          anchor: [16, 32]
+        'Bibliothèque':
+          url: '' # Will be set via icon library
+          size: [32, 32]
+          anchor: [16, 32]
+        'Centre communautaire':
+          url: '' # Will be set via icon library
+          size: [32, 32]
+          anchor: [16, 32]
+        'Hôtel de ville':
+          url: '' # Will be set via icon library
+          size: [32, 32]
+          anchor: [16, 32]
+      default_icon: 'circle'
+      apply_to: ['Point']

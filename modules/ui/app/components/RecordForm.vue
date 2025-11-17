@@ -1006,7 +1006,9 @@ const downloadFile = async (fileId: string, fileName: string) => {
     </div>
 
     <!-- Form Actions -->
-    <div class="flex items-center justify-between pt-6 border-t">
+    <div
+      class="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-800"
+    >
       <!-- Delete Button (only for editing) -->
       <UModal
         v-if="isEditing && canDelete"

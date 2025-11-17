@@ -826,7 +826,11 @@ export class CloudUuidStorageService {
   private getLocalStoragePath(): string {
     const localProvider = this.config.providers?.local;
     if (localProvider) {
-      return path.resolve(this.basePath, localProvider.path || 'storage');
+      const storagePath = localProvider.path || 'storage';
+      // If path is absolute, use it directly; otherwise resolve relative to basePath
+      return path.isAbsolute(storagePath)
+        ? storagePath
+        : path.resolve(this.basePath, storagePath);
     }
     return path.resolve(this.basePath, 'storage');
   }

@@ -8,6 +8,18 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- **Test Storage Isolation**: Fixed storage operations in tests to use isolated
+  directories
+  - Storage paths in tests now use absolute paths within test directories
+    (`{testDir}/storage`)
+  - Prevents test interference and ensures complete isolation between test runs
+  - Storage service updated to handle absolute paths correctly
+  - Request context enhanced to pass `dataDir` to avoid `CentralConfigManager`
+    cache issues
+  - All storage tests now pass reliably without affecting working directory
+
 ### Added
 
 - **Geography Markdown Format**: Geography files now stored in hybrid markdown
@@ -38,6 +50,30 @@ and this project adheres to
   - Data summary panels with feature counts, bounds, and SRID information
   - Debounced parsing with real-time validation and error feedback
   - File generation with standardized naming and metadata extraction
+- **Geography Styling Presets**: Pre-configured color and icon mapping presets
+  for common geography use cases
+  - Three default presets: land use zones, zones by name, and municipal
+    facilities
+  - Preset management API endpoints (`/api/v1/geography/presets`)
+  - Apply presets to existing geography files with one-click styling
+  - Configurable presets stored in `core/src/defaults/geography-presets.yml`
+- **Storage Icons Folder**: New dedicated storage folder for map icons and
+  geography-related images
+  - Authenticated access with image type restrictions
+  - 2MB max file size limit
+  - Integrated with geography icon mapping system
+  - UUID-based file references for map markers
+- **Geography API Tests**: Comprehensive test coverage for geography endpoints
+  - CRUD operations testing
+  - Color and icon mapping validation
+  - Preset management and application
+  - Raw content retrieval
+  - Error handling and edge cases
+- **Storage Icons Tests**: Test coverage for icons folder functionality
+  - Upload, list, and download operations
+  - Access control validation
+  - File type and size restrictions
+  - Storage configuration API integration
 
 ### Changed
 
@@ -64,12 +100,15 @@ and this project adheres to
 - **Validation Engine**: Real-time content validation with detailed error
   reporting
 - **Map Integration**: Leaflet-based interactive maps with feature highlighting
+  and UUID-based icon support
 - **Search System**: Public search by location, category, metadata, and date
 - **Access Control**: Granular permissions for different user roles
+- **Testing**: Comprehensive API test suite for geography and storage systems
+  using Vitest and Supertest
 
 ## [1.0.0] - 2025-07-02
 
-### Fixed
+### Initial Release
 
 - Initial CivicPress platform foundation
 - Monorepo structure with pnpm workspaces

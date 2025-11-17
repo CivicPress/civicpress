@@ -236,7 +236,7 @@
     <!-- File Preview Modal -->
     <UModal
       v-model:open="showPreviewModal"
-      :ui="{ content: 'w-full lg:max-w-screen-xl' }"
+      :ui="{ content: 'w-full lg:max-w-[1330px]' }"
       :title="previewFile?.name || 'File Preview'"
       :description="`Previewing ${previewFile?.mime_type || 'file'}`"
     >
@@ -265,6 +265,22 @@
                 <p class="text-gray-600">
                   {{ formatDate(previewFile.modified) }}
                 </p>
+              </div>
+            </div>
+            <div v-if="previewFile.id" class="mt-4 pt-4 border-t border-gray-200">
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-gray-700">UUID:</span>
+                <code class="text-xs text-gray-600 bg-white px-2 py-1 rounded border border-gray-300 font-mono break-all">
+                  {{ previewFile.id }}
+                </code>
+                <UButton
+                  size="xs"
+                  variant="ghost"
+                  @click="copyToClipboard(previewFile.id)"
+                  class="ml-auto"
+                >
+                  <UIcon name="i-lucide-copy" class="w-3 h-3" />
+                </UButton>
               </div>
             </div>
           </div>
@@ -868,6 +884,23 @@ const formatFileSize = (bytes: number): string => {
 
 const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString();
+};
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.add({
+      title: 'Copied',
+      description: 'UUID copied to clipboard',
+      color: 'primary',
+    });
+  } catch (error) {
+    toast.add({
+      title: 'Copy Failed',
+      description: 'Failed to copy UUID to clipboard',
+      color: 'error',
+    });
+  }
 };
 
 const getAuthToken = (): string => {

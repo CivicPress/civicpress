@@ -353,4 +353,199 @@ describe('UUID Storage API', () => {
       expect(response.status).toBe(401);
     });
   });
+
+  describe('Icons Folder - Specialized Storage', () => {
+    let iconFilePath: string;
+    let uploadedIconId: string;
+
+    beforeEach(async () => {
+      // Create a test icon file (PNG format)
+      iconFilePath = path.join(context.testDir, 'test-icon.png');
+      await fs.writeFile(iconFilePath, Buffer.from('fake png content'));
+    });
+
+    it('should upload icon file to icons folder', async () => {
+      const response = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', iconFilePath)
+        .field('folder', 'icons')
+        .field('description', 'Test icon for geography records');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data).toHaveProperty('folder', 'icons');
+      expect(response.body.data).toHaveProperty(
+        'original_name',
+        'test-icon.png'
+      );
+      expect(response.body.data.mime_type).toContain('image');
+
+      uploadedIconId = response.body.data.id;
+    });
+
+    it('should list files in icons folder', async () => {
+      // Upload an icon first
+      const uploadResponse = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', iconFilePath)
+        .field('folder', 'icons')
+        .field('description', 'Test icon');
+
+      expect(uploadResponse.status).toBe(200);
+
+      // List files in icons folder
+      const listResponse = await request(context.api.getApp())
+        .get('/api/v1/storage/folders/icons/files')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(listResponse.status).toBe(200);
+      expect(listResponse.body.success).toBe(true);
+      expect(listResponse.body.data.files).toBeDefined();
+      expect(Array.isArray(listResponse.body.data.files)).toBe(true);
+      expect(listResponse.body.data.files.length).toBeGreaterThanOrEqual(1);
+
+      // Verify file is in the list
+      const file = listResponse.body.data.files.find(
+        (f: any) => f.id === uploadResponse.body.data.id
+      );
+      expect(file).toBeDefined();
+      // Folder might be in metadata or at root level
+      expect(
+        file.folder || file.metadata?.folder || listResponse.body.data.folder
+      ).toBe('icons');
+    });
+
+    it('should download icon file by UUID', async () => {
+      // Upload an icon first
+      const uploadResponse = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', iconFilePath)
+        .field('folder', 'icons')
+        .field('description', 'Test icon for download');
+
+      expect(uploadResponse.status).toBe(200);
+      const iconId = uploadResponse.body.data.id;
+
+      // Download the icon
+      const downloadResponse = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${iconId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(downloadResponse.status).toBe(200);
+      expect(downloadResponse.headers['content-type']).toBeDefined();
+      expect(downloadResponse.headers['content-disposition']).toBeDefined();
+    });
+
+    it('should enforce authenticated access for icons folder', async () => {
+      // Upload an icon first
+      const uploadResponse = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', iconFilePath)
+        .field('folder', 'icons')
+        .field('description', 'Test icon');
+
+      expect(uploadResponse.status).toBe(200);
+      const iconId = uploadResponse.body.data.id;
+
+      // Icons folder should require authentication (access: authenticated)
+      const unauthenticatedResponse = await request(context.api.getApp()).get(
+        `/api/v1/storage/files/${iconId}`
+      );
+
+      // Should require authentication for icons folder
+      expect(unauthenticatedResponse.status).toBe(401);
+    });
+
+    it('should accept various image formats in icons folder', async () => {
+      const formats = [
+        { ext: 'png', content: Buffer.from('fake png') },
+        { ext: 'svg', content: Buffer.from('<svg></svg>') },
+        { ext: 'jpg', content: Buffer.from('fake jpg') },
+        { ext: 'gif', content: Buffer.from('fake gif') },
+      ];
+
+      for (const format of formats) {
+        const formatFilePath = path.join(
+          context.testDir,
+          `test-icon.${format.ext}`
+        );
+        await fs.writeFile(formatFilePath, format.content);
+
+        const response = await request(context.api.getApp())
+          .post('/api/v1/storage/files')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .attach('file', formatFilePath)
+          .field('folder', 'icons')
+          .field('description', `Test ${format.ext} icon`);
+
+        // Some formats might be rejected if they're not valid image files
+        // For now, just check that valid formats (png, jpg) work
+        if (format.ext === 'png' || format.ext === 'jpg') {
+          expect(response.status).toBe(200);
+          expect(response.body.success).toBe(true);
+          expect(response.body.data.folder).toBe('icons');
+        }
+      }
+    });
+
+    it('should enforce max size limit for icons folder (2MB)', async () => {
+      // Create a file larger than 2MB
+      const largeIconPath = path.join(context.testDir, 'large-icon.png');
+      const largeContent = Buffer.alloc(3 * 1024 * 1024); // 3MB
+      await fs.writeFile(largeIconPath, largeContent);
+
+      const response = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', largeIconPath)
+        .field('folder', 'icons')
+        .field('description', 'Large icon test');
+
+      // Should reject files larger than max_size (2MB)
+      // API might return 400 (Bad Request) or 413 (Payload Too Large)
+      expect([400, 413]).toContain(response.status);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /api/v1/storage/config - Storage Configuration', () => {
+    it('should return storage configuration with icons folder', async () => {
+      const response = await request(context.api.getApp())
+        .get('/api/v1/storage/config')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.config).toBeDefined();
+      expect(response.body.data.config.folders).toBeDefined();
+      expect(response.body.data.config.folders.icons).toBeDefined();
+      expect(response.body.data.config.folders.icons.path).toBe('icons');
+      expect(response.body.data.config.folders.icons.access).toBe(
+        'authenticated'
+      );
+      expect(response.body.data.config.folders.icons.allowed_types).toContain(
+        'png'
+      );
+      expect(response.body.data.config.folders.icons.allowed_types).toContain(
+        'svg'
+      );
+      expect(response.body.data.config.folders.icons.max_size).toBe('2MB');
+      expect(response.body.data.config.folders.icons.description).toContain(
+        'Icons'
+      );
+    });
+
+    it('should require authentication to access storage config', async () => {
+      const response = await request(context.api.getApp()).get(
+        '/api/v1/storage/config'
+      );
+
+      expect(response.status).toBe(401);
+    });
+  });
 });

@@ -121,8 +121,18 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
       throw new Error('CivicPress instance not available');
     }
 
-    // Storage configuration is in project root, not data directory
-    const systemDataDir = path.join(process.cwd(), '.system-data');
+    // Get dataDir from request context (avoids CentralConfigManager cache issues in tests)
+    // Storage configuration is in dataDir/.system-data, not project root
+    const dataDir = (req as any).context?.dataDir;
+    let systemDataDir: string;
+    if (!dataDir) {
+      // Fallback to CentralConfigManager if not in context (production)
+      const { CentralConfigManager } = await import('@civicpress/core');
+      const fallbackDataDir = CentralConfigManager.getDataDir();
+      systemDataDir = path.join(fallbackDataDir, '.system-data');
+    } else {
+      systemDataDir = path.join(dataDir, '.system-data');
+    }
 
     configManager = new StorageConfigManager(systemDataDir);
 

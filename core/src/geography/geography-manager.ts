@@ -24,6 +24,9 @@ import {
   SRID,
 } from '../types/geography.js';
 import { GeographyParser } from './geography-parser.js';
+import { Logger } from '../utils/logger.js';
+
+const logger = new Logger();
 
 export class GeographyManager {
   private dataDir: string;
@@ -73,7 +76,7 @@ export class GeographyManager {
       // Ensure directory exists
       await fs.mkdir(categoryDir, { recursive: true });
 
-      // Create metadata
+      // Create metadata with color/icon mappings
       const metadata: GeographyMetadata = {
         source: 'CivicPress Geography System',
         created: new Date().toISOString(),
@@ -81,6 +84,8 @@ export class GeographyManager {
         version: '1.0.0',
         accuracy: 'Standard',
         ...request.metadata,
+        ...(request.color_mapping && { color_mapping: request.color_mapping }),
+        ...(request.icon_mapping && { icon_mapping: request.icon_mapping }),
       };
 
       // Create geography file record
@@ -173,9 +178,13 @@ export class GeographyManager {
                       return geographyFile;
                     }
                   } catch (parseError) {
-                    console.warn(
+                    // Log parsing errors but continue searching other files
+                    // This prevents one corrupted file from breaking the entire search
+                    logger.warn(
                       `Failed to parse geography file: ${fileName}`,
-                      parseError
+                      parseError instanceof Error
+                        ? parseError.message
+                        : String(parseError)
                     );
                     continue;
                   }
@@ -234,18 +243,28 @@ export class GeographyManager {
         }
       }
 
-      // Update metadata and content
+      // Update metadata and content, including color/icon mappings
+      const updatedMetadata: GeographyMetadata = {
+        ...existingFile.metadata,
+        ...request.metadata,
+        updated: new Date().toISOString(),
+        // Update color_mapping if provided (can be set to undefined to remove)
+        ...(request.color_mapping !== undefined && {
+          color_mapping: request.color_mapping,
+        }),
+        // Update icon_mapping if provided (can be set to undefined to remove)
+        ...(request.icon_mapping !== undefined && {
+          icon_mapping: request.icon_mapping,
+        }),
+      };
+
       const updatedFile: GeographyFile = {
         ...existingFile,
         name: request.name || existingFile.name,
         category: request.category || existingFile.category,
         description: request.description || existingFile.description,
         content: request.content || existingFile.content,
-        metadata: {
-          ...existingFile.metadata,
-          ...request.metadata,
-          updated: new Date().toISOString(),
-        },
+        metadata: updatedMetadata,
         updated_at: new Date().toISOString(),
       };
 

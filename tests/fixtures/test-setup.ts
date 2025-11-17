@@ -10,7 +10,14 @@ import {
 } from 'vitest';
 import { execSync } from 'child_process';
 import { join, dirname } from 'path';
-import { existsSync, rmSync, mkdirSync, writeFileSync, writeFile } from 'fs';
+import {
+  existsSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  writeFile,
+  readFileSync,
+} from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import yaml from 'js-yaml';
@@ -698,15 +705,17 @@ export function createCivicConfig(config: TestConfig, overrides: any = {}) {
 }
 
 export function createStorageConfig(config: TestConfig) {
+  // Use absolute path within test directory to ensure complete isolation
+  const storagePath = join(config.testDir, 'storage');
   const storageConfig = {
     backend: {
       type: 'local',
-      path: 'storage',
+      path: storagePath, // Use absolute path for test isolation
     },
     providers: {
       local: {
         type: 'local',
-        path: 'storage',
+        path: storagePath, // Use absolute path for test isolation
         enabled: true,
       },
     },
@@ -745,6 +754,13 @@ export function createStorageConfig(config: TestConfig) {
         max_size: '100MB',
         description: 'Session files for testing',
       },
+      icons: {
+        path: 'icons',
+        access: 'authenticated',
+        allowed_types: ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp', 'ico'],
+        max_size: '2MB',
+        description: 'Icons and map-related images for geography records',
+      },
     },
     metadata: {
       auto_generate_thumbnails: false,
@@ -757,6 +773,14 @@ export function createStorageConfig(config: TestConfig) {
   const systemDataDir = join(config.dataDir, '.system-data');
   ensureDirSync(systemDataDir);
   const storageConfigPath = join(systemDataDir, 'storage.yml');
+
+  // Ensure storage directory exists
+  ensureDirSync(storagePath);
+  // Create folder subdirectories
+  for (const folder of Object.keys(storageConfig.folders)) {
+    const folderPath = join(storagePath, storageConfig.folders[folder].path);
+    ensureDirSync(folderPath);
+  }
 
   writeFileSync(storageConfigPath, yaml.dump(storageConfig));
 }
@@ -1012,6 +1036,75 @@ export function createRolesConfig(config: TestConfig) {
   };
 
   writeFileSync(join(config.civicDir, 'roles.yml'), yaml.dump(rolesConfig));
+
+  // Copy geography presets file - ensure it's always created for tests
+  const presetsSourcePath = join(
+    process.cwd(),
+    'core',
+    'src',
+    'defaults',
+    'geography-presets.yml'
+  );
+  const presetsDestPath = join(config.civicDir, 'geography-presets.yml');
+
+  // Always create presets file - either from source or minimal version
+  if (existsSync(presetsSourcePath)) {
+    const presetsContent = readFileSync(presetsSourcePath, 'utf8');
+    writeFileSync(presetsDestPath, presetsContent);
+  } else {
+    // If source doesn't exist, create a minimal presets file for tests
+    const minimalPresets = {
+      _metadata: {
+        name: 'Geography Styling Presets',
+        description: 'Reusable color and icon mapping configurations',
+        version: '1.0.0',
+        editable: true,
+      },
+      presets: {
+        land_use_zones: {
+          name: 'Land Use Zones',
+          description: 'Color scheme for land use zones using LETTRE codes',
+          type: 'color',
+          color_mapping: {
+            property: 'LETTRE',
+            type: 'property',
+            colors: {
+              IND: '#64748b',
+              A: '#10b981',
+              RF: '#059669',
+              PU: '#f59e0b',
+              AFD: '#84cc16',
+              AF: '#22c55e',
+            },
+            default_color: '#6b7280',
+          },
+        },
+        zone_by_name: {
+          name: 'Zones by Name',
+          description: 'Color scheme for zones using the NOM property',
+          type: 'color',
+          color_mapping: {
+            property: 'NOM',
+            type: 'property',
+            colors: {
+              Industrielle: '#64748b',
+              Agricole: '#10b981',
+              'Récréo-forestière': '#059669',
+            },
+            default_color: '#6b7280',
+          },
+        },
+      },
+    };
+    writeFileSync(presetsDestPath, yaml.dump(minimalPresets));
+  }
+
+  // Ensure the file was created
+  if (!existsSync(presetsDestPath)) {
+    console.warn(
+      `Warning: Failed to create presets file at ${presetsDestPath}`
+    );
+  }
 }
 
 // Sample data generation

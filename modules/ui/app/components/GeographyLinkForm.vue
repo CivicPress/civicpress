@@ -150,7 +150,9 @@
             />
           </div>
 
-          <div class="flex justify-end gap-3 pt-4 border-t">
+          <div
+            class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800"
+          >
             <UButton
               color="neutral"
               variant="ghost"

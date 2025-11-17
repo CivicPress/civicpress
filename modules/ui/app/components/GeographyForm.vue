@@ -194,6 +194,8 @@
                   :bounds="preview.parsed.bounds"
                   :interactive="true"
                   height="100%"
+                  :color-mapping="form.color_mapping"
+                  :icon-mapping="form.icon_mapping"
                 />
               </div>
 
@@ -284,6 +286,214 @@
         </div>
       </div>
     </UCard>
+
+    <!-- Color & Icon Configuration Card -->
+    <UCard v-if="preview.parsed && preview.parsed.content">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold">Color & Icon Configuration</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Customize how features appear on the map
+            </p>
+          </div>
+        </div>
+      </template>
+      <div class="space-y-6">
+        <!-- Preset Selection -->
+        <div
+          class="space-y-3 border-b border-gray-200 dark:border-gray-800 pb-4"
+        >
+          <h4 class="text-md font-medium">Apply Preset</h4>
+          <div class="flex items-center gap-3">
+            <USelectMenu
+              v-model="selectedPreset"
+              :items="presetOptions"
+              placeholder="Select a preset..."
+              value-key="key"
+              class="flex-1"
+              @change="onPresetSelected"
+            >
+              <template #option="{ option }">
+                <div class="flex flex-col">
+                  <span class="font-medium">{{ option.name }}</span>
+                  <span class="text-xs text-gray-500">{{
+                    option.description
+                  }}</span>
+                </div>
+              </template>
+            </USelectMenu>
+            <UButton
+              v-if="selectedPreset"
+              size="sm"
+              color="primary"
+              variant="outline"
+              @click="applyPreset"
+            >
+              Apply
+            </UButton>
+          </div>
+        </div>
+        <!-- Color Mapping Section -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-md font-medium">Color Mapping</h4>
+            <UButton
+              v-if="form.color_mapping"
+              size="xs"
+              color="red"
+              variant="ghost"
+              @click="form.color_mapping = undefined"
+            >
+              Clear
+            </UButton>
+          </div>
+
+          <div v-if="!form.color_mapping" class="space-y-3">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Assign colors to features based on property values
+            </p>
+            <UButton
+              size="sm"
+              color="primary"
+              variant="outline"
+              @click="initializeColorMapping"
+            >
+              <UIcon name="i-lucide-palette" class="w-4 h-4" />
+              Configure Colors
+            </UButton>
+          </div>
+
+          <div v-else class="space-y-4">
+            <UFormField label="Property Name" name="color_property">
+              <UInput
+                v-model="form.color_mapping.property"
+                placeholder="e.g., NOM, LETTRE, type"
+                @input="updateColorMapping"
+              />
+              <template #help>
+                <p class="text-sm text-gray-600">
+                  Property name from GeoJSON features to use for color mapping
+                </p>
+              </template>
+            </UFormField>
+
+            <div v-if="colorPropertyValues.length > 0" class="space-y-2">
+              <label class="text-sm font-medium">Color Assignments</label>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div
+                  v-for="value in colorPropertyValues"
+                  :key="value"
+                  class="flex items-center gap-2"
+                >
+                  <span
+                    class="text-sm text-gray-700 dark:text-gray-300 flex-1"
+                    >{{ value }}</span
+                  >
+                  <input
+                    v-model="form.color_mapping.colors[value]"
+                    type="color"
+                    class="w-12 h-8 rounded border border-gray-300 cursor-pointer"
+                    @change="updateColorMapping"
+                  />
+                  <UInput
+                    v-model="form.color_mapping.colors[value]"
+                    type="text"
+                    placeholder="#3b82f6"
+                    class="w-24 text-xs"
+                    @input="updateColorMapping"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Icon Mapping Section (Phase 1 - Basic) -->
+        <div
+          class="space-y-4 border-t border-gray-200 dark:border-gray-800 pt-4"
+        >
+          <div class="flex items-center justify-between">
+            <h4 class="text-md font-medium">Icon Mapping</h4>
+            <UButton
+              v-if="form.icon_mapping"
+              size="xs"
+              color="red"
+              variant="ghost"
+              @click="form.icon_mapping = undefined"
+            >
+              Clear
+            </UButton>
+          </div>
+
+          <div v-if="!form.icon_mapping" class="space-y-3">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Assign custom icons to point features (Phase 1 - URL-based)
+            </p>
+            <UButton
+              size="sm"
+              color="primary"
+              variant="outline"
+              @click="initializeIconMapping"
+            >
+              <UIcon name="i-lucide-image" class="w-4 h-4" />
+              Configure Icons
+            </UButton>
+          </div>
+
+          <div v-else class="space-y-4">
+            <UFormField label="Property Name" name="icon_property">
+              <UInput
+                v-model="form.icon_mapping.property"
+                placeholder="e.g., NOM, LETTRE, type"
+                @input="updateIconMapping"
+              />
+              <template #help>
+                <p class="text-sm text-gray-600">
+                  Property name from GeoJSON features to use for icon mapping
+                </p>
+              </template>
+            </UFormField>
+
+            <UFormField label="Apply To Geometry Types">
+              <USelectMenu
+                v-model="form.icon_mapping.apply_to"
+                :items="geometryTypeOptions"
+                multiple
+                placeholder="Select geometry types"
+              />
+              <template #help>
+                <p class="text-sm text-gray-600">
+                  Which geometry types should use icons (default: Point only)
+                </p>
+              </template>
+            </UFormField>
+
+            <div v-if="iconPropertyValues.length > 0" class="space-y-2">
+              <label class="text-sm font-medium">Icon Assignments</label>
+              <div class="space-y-3">
+                <div
+                  v-for="value in iconPropertyValues"
+                  :key="value"
+                  class="flex items-center gap-2"
+                >
+                  <span class="text-sm text-gray-700 dark:text-gray-300 w-32">{{
+                    value
+                  }}</span>
+                  <UInput
+                    v-model="form.icon_mapping.icons[value].url"
+                    type="text"
+                    placeholder="https://example.com/icon.png or UUID"
+                    class="flex-1 text-xs"
+                    @input="updateIconMapping"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </UCard>
   </UForm>
 </template>
 
@@ -293,6 +503,11 @@ import { useRouter } from 'vue-router';
 import { useToast } from '#imports';
 import { useDebounceFn } from '@vueuse/core';
 import GeographyMap from '~/components/GeographyMap.vue';
+import {
+  suggestPropertyName,
+  extractPropertyValues,
+  assignDefaultColors,
+} from '~/utils/geography-colors';
 import type {
   GeographyFormData,
   GeographyFormErrors,
@@ -328,11 +543,28 @@ const form = ref<GeographyFormData>({
   description: '',
   content: '',
   srid: 4326,
+  color_mapping: undefined,
+  icon_mapping: undefined,
 });
 
 const formErrors = ref<GeographyFormErrors>({});
 const saving = ref(false);
 const loading = ref(false);
+
+// Presets
+const presets = ref<
+  Array<{ key: string; name: string; description: string; type: string }>
+>([]);
+const selectedPreset = ref<string | null>(null);
+const presetOptions = computed(() => [
+  { key: null, label: 'None', name: 'None', description: 'No preset' },
+  ...presets.value.map((p) => ({
+    key: p.key,
+    label: p.name,
+    name: p.name,
+    description: p.description,
+  })),
+]);
 
 // Preview data
 const preview = ref<GeographyPreviewData>({
@@ -355,6 +587,15 @@ const typeOptions = [
   { label: 'KML', value: 'kml' },
   { label: 'GPX', value: 'gpx' },
   { label: 'Shapefile', value: 'shapefile' },
+];
+
+const geometryTypeOptions = [
+  { label: 'Point', value: 'Point' },
+  { label: 'LineString', value: 'LineString' },
+  { label: 'Polygon', value: 'Polygon' },
+  { label: 'MultiPoint', value: 'MultiPoint' },
+  { label: 'MultiLineString', value: 'MultiLineString' },
+  { label: 'MultiPolygon', value: 'MultiPolygon' },
 ];
 
 // Computed properties
@@ -395,6 +636,8 @@ const loadGeographyFile = async () => {
         description: geographyFile.description,
         content: geographyFile.content || '',
         srid: geographyFile.srid,
+        color_mapping: geographyFile.metadata?.color_mapping,
+        icon_mapping: geographyFile.metadata?.icon_mapping,
       };
 
       // Trigger preview update
@@ -546,6 +789,8 @@ const handleSubmit = async () => {
         category: form.value.category,
         description: form.value.description,
         content: form.value.content,
+        color_mapping: form.value.color_mapping,
+        icon_mapping: form.value.icon_mapping,
         srid: form.value.srid,
       },
     });
@@ -601,7 +846,206 @@ defineExpose({
 });
 
 // Lifecycle
-onMounted(() => {
+// Color/Icon mapping helpers
+const colorPropertyValues = computed(() => {
+  if (!form.value.color_mapping?.property || !preview.value.parsed?.content) {
+    return [];
+  }
+  const geoJson = preview.value.parsed.content;
+  if (!geoJson.features || !Array.isArray(geoJson.features)) {
+    return [];
+  }
+  const values = new Set<string>();
+  geoJson.features.forEach((feature: any) => {
+    if (
+      feature.properties &&
+      feature.properties[form.value.color_mapping!.property!]
+    ) {
+      values.add(
+        String(feature.properties[form.value.color_mapping!.property!])
+      );
+    }
+  });
+  return Array.from(values).sort();
+});
+
+const iconPropertyValues = computed(() => {
+  if (!form.value.icon_mapping?.property || !preview.value.parsed?.content) {
+    return [];
+  }
+  const geoJson = preview.value.parsed.content;
+  if (!geoJson.features || !Array.isArray(geoJson.features)) {
+    return [];
+  }
+  const values = new Set<string>();
+  geoJson.features.forEach((feature: any) => {
+    if (
+      feature.properties &&
+      feature.properties[form.value.icon_mapping!.property!]
+    ) {
+      values.add(
+        String(feature.properties[form.value.icon_mapping!.property!])
+      );
+    }
+  });
+  return Array.from(values).sort();
+});
+
+const initializeColorMapping = () => {
+  if (!preview.value.parsed?.content) return;
+
+  const geoJson = preview.value.parsed.content;
+  if (!geoJson.features || !Array.isArray(geoJson.features)) return;
+
+  // Suggest property name
+  const suggestedProperty = suggestPropertyName(geoJson);
+  if (!suggestedProperty) {
+    toast.add({
+      title: 'No Properties Found',
+      description: 'No properties found in GeoJSON features',
+      color: 'warning',
+    });
+    return;
+  }
+
+  // Extract unique values
+  const values = extractPropertyValues(geoJson, suggestedProperty);
+  if (values.length === 0) {
+    toast.add({
+      title: 'No Values Found',
+      description: `No values found for property "${suggestedProperty}"`,
+      color: 'warning',
+    });
+    return;
+  }
+
+  // Assign default colors
+  const colors = assignDefaultColors(values);
+
+  form.value.color_mapping = {
+    property: suggestedProperty,
+    type: 'property',
+    colors,
+    default_color: '#6b7280',
+  };
+};
+
+const initializeIconMapping = () => {
+  if (!preview.value.parsed?.content) return;
+
+  const geoJson = preview.value.parsed.content;
+  if (!geoJson.features || !Array.isArray(geoJson.features)) return;
+
+  // Suggest property name
+  const suggestedProperty = suggestPropertyName(geoJson);
+  if (!suggestedProperty) {
+    toast.add({
+      title: 'No Properties Found',
+      description: 'No properties found in GeoJSON features',
+      color: 'warning',
+    });
+    return;
+  }
+
+  // Extract unique values
+  const values = extractPropertyValues(geoJson, suggestedProperty);
+  if (values.length === 0) {
+    toast.add({
+      title: 'No Values Found',
+      description: `No values found for property "${suggestedProperty}"`,
+      color: 'warning',
+    });
+    return;
+  }
+
+  // Initialize icons with empty URLs
+  const icons: Record<string, any> = {};
+  values.forEach((value) => {
+    icons[value] = {
+      url: '',
+      size: [32, 32],
+      anchor: [16, 32],
+    };
+  });
+
+  form.value.icon_mapping = {
+    property: suggestedProperty,
+    type: 'property',
+    icons,
+    default_icon: 'circle',
+    apply_to: ['Point'],
+  };
+};
+
+const updateColorMapping = () => {
+  // Trigger reactivity update
+  if (form.value.color_mapping) {
+    form.value.color_mapping = { ...form.value.color_mapping };
+  }
+};
+
+const updateIconMapping = () => {
+  // Trigger reactivity update
+  if (form.value.icon_mapping) {
+    form.value.icon_mapping = { ...form.value.icon_mapping };
+  }
+};
+
+// Preset management
+const loadPresets = async () => {
+  try {
+    const response = await useNuxtApp().$civicApi('/api/v1/geography/presets');
+    if (response.success) {
+      presets.value = response.data || [];
+    }
+  } catch (error) {
+    console.error('Failed to load presets:', error);
+  }
+};
+
+const onPresetSelected = () => {
+  // Preset selection changed, but not applied yet
+};
+
+const applyPreset = async () => {
+  if (!selectedPreset.value) return;
+
+  try {
+    const response = await useNuxtApp().$civicApi(
+      `/api/v1/geography/presets/${selectedPreset.value}/apply`,
+      {
+        method: 'POST',
+        body: {
+          color_mapping: form.value.color_mapping,
+          icon_mapping: form.value.icon_mapping,
+        },
+      }
+    );
+
+    if (response.success) {
+      if (response.data.color_mapping) {
+        form.value.color_mapping = response.data.color_mapping;
+      }
+      if (response.data.icon_mapping) {
+        form.value.icon_mapping = response.data.icon_mapping;
+      }
+      toast.add({
+        title: 'Preset Applied',
+        description: 'Preset has been applied to your configuration',
+        color: 'primary',
+      });
+    }
+  } catch (error) {
+    toast.add({
+      title: 'Failed to Apply Preset',
+      description: error instanceof Error ? error.message : 'Unknown error',
+      color: 'error',
+    });
+  }
+};
+
+onMounted(async () => {
+  await loadPresets();
   if (props.mode === 'edit') {
     loadGeographyFile();
   }

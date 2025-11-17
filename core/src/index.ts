@@ -41,6 +41,22 @@ export type {
 // Export new geography data system
 export { GeographyManager } from './geography/geography-manager.js';
 export { GeographyParser } from './geography/geography-parser.js';
+export {
+  validateColor,
+  colorToHex,
+  DEFAULT_COLOR_PALETTE,
+  getDefaultColor,
+} from './geography/geography-colors.js';
+export {
+  getGeographyPresets,
+  getGeographyPreset,
+  listGeographyPresets,
+  applyGeographyPreset,
+} from './geography/geography-presets.js';
+export type {
+  GeographyPreset,
+  GeographyPresetsConfig,
+} from './geography/geography-presets.js';
 export type {
   GeographyFile,
   GeographyFileType,
@@ -63,6 +79,9 @@ export type {
   GeographyError,
   GeographyValidationError,
   GeographyNotFoundError,
+  ColorMapping,
+  IconMapping,
+  IconConfig,
 } from './types/geography.js';
 
 // Export database services

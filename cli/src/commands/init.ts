@@ -414,6 +414,25 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
+        // Copy geography-presets.yml
+        const geographyPresetsSrc = path.join(
+          defaultsDir,
+          'geography-presets.yml'
+        );
+        const geographyPresetsDest = path.join(
+          civicDir,
+          'geography-presets.yml'
+        );
+        if (
+          !fs.existsSync(geographyPresetsDest) &&
+          fs.existsSync(geographyPresetsSrc)
+        ) {
+          fs.copyFileSync(geographyPresetsSrc, geographyPresetsDest);
+          if (!shouldOutputJson) {
+            logger.success('🗺️  Default geography-presets.yml created');
+          }
+        }
+
         // Copy default templates
         const templatesSrc = path.join(defaultsDir, 'templates');
         const templatesDest = path.join(civicDir, 'templates');
@@ -1616,7 +1635,7 @@ async function setupStorage(
       }
 
       // Create default storage folders
-      const folders = ['public', 'sessions', 'permits', 'private'];
+      const folders = ['public', 'sessions', 'permits', 'private', 'icons'];
       for (const folder of folders) {
         const folderPath = path.join(storageDir, folder);
         if (!fs.existsSync(folderPath)) {
@@ -1669,6 +1688,13 @@ async function setupStorage(
             max_size: '10MB',
             description: 'Public files for testing',
           },
+          icons: {
+            path: 'icons',
+            access: 'authenticated',
+            allowed_types: ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp', 'ico'],
+            max_size: '2MB',
+            description: 'Icons and map-related images for geography records',
+          },
         },
         metadata: {
           auto_generate_thumbnails: true,
@@ -1694,7 +1720,7 @@ async function setupStorage(
       }
 
       // Create default storage folders
-      const folders = ['public', 'sessions', 'permits', 'private'];
+      const folders = ['public', 'sessions', 'permits', 'private', 'icons'];
       for (const folder of folders) {
         const folderPath = path.join(storageDir, folder);
         if (!fs.existsSync(folderPath)) {

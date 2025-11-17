@@ -223,6 +223,8 @@
                   :interactive="true"
                   :scroll-wheel-zoom="false"
                   height="450px"
+                  :color-mapping="geographyFile?.metadata?.color_mapping"
+                  :icon-mapping="geographyFile?.metadata?.icon_mapping"
                 />
               </div>
             </UCard>

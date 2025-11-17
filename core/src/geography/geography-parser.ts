@@ -19,6 +19,8 @@ import {
   GeographyFileType,
   GeographyMetadata,
   BoundingBox,
+  ColorMapping,
+  IconMapping,
 } from '../types/geography.js';
 import { Logger } from '../utils/logger.js';
 
@@ -68,6 +70,27 @@ export class GeographyParser {
         throw new Error('No geography content found in markdown body');
       }
 
+      // Build metadata object with color/icon mappings
+      const baseMetadata = frontmatter.metadata || {
+        source: 'CivicPress Geography System',
+        created: frontmatter.created_at || new Date().toISOString(),
+        updated: frontmatter.updated_at || new Date().toISOString(),
+        version: '1.0.0',
+        accuracy: 'Standard',
+      };
+
+      // Include color_mapping and icon_mapping if present in frontmatter (can be at top level or in metadata)
+      const colorMapping =
+        frontmatter.color_mapping || frontmatter.metadata?.color_mapping;
+      const iconMapping =
+        frontmatter.icon_mapping || frontmatter.metadata?.icon_mapping;
+
+      const metadata: GeographyMetadata = {
+        ...baseMetadata,
+        ...(colorMapping && { color_mapping: colorMapping }),
+        ...(iconMapping && { icon_mapping: iconMapping }),
+      };
+
       // Build GeographyFile object
       const geographyFile: GeographyFile = {
         id: frontmatter.id,
@@ -77,13 +100,7 @@ export class GeographyParser {
         description: frontmatter.description,
         srid: frontmatter.srid || 4326,
         bounds: frontmatter.bounds || this.parseBoundsFromContent(rawContent),
-        metadata: frontmatter.metadata || {
-          source: 'CivicPress Geography System',
-          created: frontmatter.created_at || new Date().toISOString(),
-          updated: frontmatter.updated_at || new Date().toISOString(),
-          version: '1.0.0',
-          accuracy: 'Standard',
-        },
+        metadata,
         file_path: filePath || '',
         created_at: frontmatter.created_at || new Date().toISOString(),
         updated_at: frontmatter.updated_at || new Date().toISOString(),
@@ -125,6 +142,14 @@ export class GeographyParser {
       created_at: geographyFile.created_at,
       updated_at: geographyFile.updated_at,
     };
+
+    // Extract color_mapping and icon_mapping from metadata to top-level for cleaner YAML
+    if (geographyFile.metadata?.color_mapping) {
+      frontmatter.color_mapping = geographyFile.metadata.color_mapping;
+    }
+    if (geographyFile.metadata?.icon_mapping) {
+      frontmatter.icon_mapping = geographyFile.metadata.icon_mapping;
+    }
 
     // Generate YAML frontmatter
     const yamlContent = stringify(frontmatter, {

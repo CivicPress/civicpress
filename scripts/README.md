@@ -36,6 +36,11 @@ the project root (the CivicPress repository) with Node.
   used during the geography system migration and is kept for reference. Run with
   `--dry-run` to preview changes.
 
+- `update-geography-colors.mjs`  
+  Utility script to add color mapping configuration to geography files. Extracts
+  unique property values from GeoJSON features and assigns default colors.
+  Usage: `node scripts/update-geography-colors.mjs <path-to-geography-file.md>`
+
 ## Usage
 
 ```bash

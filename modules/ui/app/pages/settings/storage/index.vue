@@ -20,48 +20,50 @@
         </div>
 
         <!-- Storage Overview + Stats (top band) -->
-        <div v-if="!selectedFolder" class="mb-8 grid gap-6 lg:grid-cols-5">
+        <div v-if="!selectedFolder" class="mb-8">
           <!-- Folder cards -->
-          <div class="lg:col-span-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-              <UCard v-for="folder in storageFolders" :key="folder.name" :class="{ 'cursor-pointer': folder.enabled }"
-                class="text-center" @click="folder.enabled ? selectFolder(folder.name) : null">
-                <div class="mb-3 flex justify-center">
-                  <UIcon :name="getFolderIcon(folder.name)" class="w-10 h-10"
-                    :class="getFolderIconColor(folder.name)" />
-                </div>
-
-                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                  {{ folder.label }}
-                </h3>
-
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  {{ folder.description }}
-                </p>
-
-                <div class="text-xs text-gray-500 dark:text-gray-500 space-y-1 mb-3">
-                  <div class="flex justify-between">
-                    <span>Files</span>
-                    <span>{{ folder.fileCount || 0 }}</span>
+          <div class="mb-6">
+            <div class="storage-grid">
+              <div v-for="folder in storageFolders" :key="folder.name" :class="{ 'cursor-pointer': folder.enabled }"
+                class="flex" @click="folder.enabled ? selectFolder(folder.name) : null">
+                <UCard class="flex-1 flex flex-col">
+                  <div class="mb-3 flex justify-center">
+                    <UIcon :name="getFolderIcon(folder.name)" class="w-10 h-10"
+                      :class="getFolderIconColor(folder.name)" />
                   </div>
-                  <div class="flex justify-between">
-                    <span>Size</span>
-                    <span>{{ folder.totalSize || '0 B' }}</span>
-                  </div>
-                </div>
 
-                <UButton v-if="folder.enabled" size="sm" variant="outline" class="w-full">
-                  Browse files
-                </UButton>
-                <UButton v-else size="sm" variant="ghost" disabled class="w-full">
-                  Coming soon
-                </UButton>
-              </UCard>
+                  <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                    {{ folder.label }}
+                  </h3>
+
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    {{ folder.description }}
+                  </p>
+
+                  <div class="text-xs text-gray-500 dark:text-gray-500 space-y-1 mb-3">
+                    <div class="flex justify-between">
+                      <span>Files</span>
+                      <span>{{ folder.fileCount || 0 }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span>Size</span>
+                      <span>{{ folder.totalSize || '0 B' }}</span>
+                    </div>
+                  </div>
+
+                  <UButton v-if="folder.enabled" size="sm" variant="outline" class="w-full">
+                    Browse files
+                  </UButton>
+                  <UButton v-else size="sm" variant="ghost" disabled class="w-full">
+                    Coming soon
+                  </UButton>
+                </UCard>
+              </div>
             </div>
           </div>
 
           <!-- Storage overview card -->
-          <UCard class="lg:col-span-1 h-full">
+          <UCard class="mt-6">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
               Storage overview
             </h3>
@@ -101,46 +103,20 @@
         </div>
 
         <!-- Quick Upload Section -->
-        <div v-if="!selectedFolder" class="quick-upload mt-8">
+        <div v-if="!selectedFolder && storageFolders.length > 0" class="quick-upload mt-8">
           <div class="bg-white border border-gray-200 rounded-lg p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">
               Quick Upload
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 class="font-medium text-gray-700 mb-2">Public Files</h4>
+              <div v-for="folder in storageFolders.slice(0, 2)" :key="folder.name">
+                <h4 class="font-medium text-gray-700 mb-2">{{ folder.label }}</h4>
                 <p class="text-sm text-gray-600 mb-3">
-                  Upload files that will be accessible to everyone
+                  {{ folder.description }}
                 </p>
-                <FileUpload folder="public" :allowed-types="[
-                    'jpg',
-                    'jpeg',
-                    'png',
-                    'gif',
-                    'pdf',
-                    'txt',
-                    'md',
-                    'doc',
-                    'docx',
-                    'rtf',
-                    'epub',
-                    'xls',
-                    'xlsx',
-                    'ppt',
-                    'pptx',
-                  ]" max-size="10MB" @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
-              </div>
-
-              <div>
-                <h4 class="font-medium text-gray-700 mb-2">
-                  Session Materials
-                </h4>
-                <p class="text-sm text-gray-600 mb-3">
-                  Upload meeting recordings and session documents
-                </p>
-                <FileUpload folder="sessions" :allowed-types="['mp4', 'webm', 'mp3', 'wav', 'pdf', 'md']"
-                  max-size="100MB" @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
+                <FileUpload :folder="folder.name" :allowed-types="folder.allowedTypes" :max-size="folder.maxSize"
+                  @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
               </div>
             </div>
           </div>
@@ -164,34 +140,20 @@
                 Back to Overview
               </UButton>
 
-              <UButton
-                @click="refreshFolderFiles"
-                :loading="refreshing"
-                variant="outline"
-                size="sm"
-              >
+              <UButton @click="refreshFolderFiles" :loading="refreshing" variant="outline" size="sm">
                 <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
                 Refresh
               </UButton>
 
-              <UButton
-                v-if="canUpload"
-                @click="showUploadModal = true"
-                color="primary"
-                size="sm"
-              >
+              <UButton v-if="canUpload" @click="showUploadModal = true" color="primary" size="sm">
                 <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
                 Upload Files
               </UButton>
             </div>
           </div>
 
-          <FileBrowser
-            ref="fileBrowserRef"
-            :folder="selectedFolder"
-            :allowed-types="getFolderAllowedTypes(selectedFolder)"
-            :max-size="getFolderMaxSize(selectedFolder)"
-          />
+          <FileBrowser ref="fileBrowserRef" :folder="selectedFolder"
+            :allowed-types="getFolderAllowedTypes(selectedFolder)" :max-size="getFolderMaxSize(selectedFolder)" />
         </div>
 
       </div>
@@ -199,13 +161,10 @@
       <!-- Upload Modal -->
       <UModal v-model:open="showUploadModal" title="Upload Files" description="Upload files to this storage folder">
         <template #body>
-          <FileUpload :folder="selectedFolder || 'public'" :allowed-types="
-              selectedFolder
-                ? getFolderAllowedTypes(selectedFolder)
-                : ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'txt', 'md']
-            " :max-size="
-              selectedFolder ? getFolderMaxSize(selectedFolder) : '10MB'
-            " @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
+          <FileUpload :folder="selectedFolder || 'public'"
+            :allowed-types="selectedFolder ? getFolderAllowedTypes(selectedFolder) : (storageFolders.find(f => f.name === 'public')?.allowedTypes || [])"
+            :max-size="selectedFolder ? getFolderMaxSize(selectedFolder) : (storageFolders.find(f => f.name === 'public')?.maxSize || '10MB')"
+            @upload-complete="handleUploadComplete" @upload-error="handleUploadError" />
         </template>
       </UModal>
 
@@ -236,46 +195,35 @@ const storageStats = ref({
 });
 const refreshing = ref(false);
 const showUploadModal = ref(false);
+const folderConfigs = ref<Record<string, any>>({});
+const loadingFolders = ref(false);
 
 // Computed
-const storageFolders = computed(() => [
-  {
-    name: 'public',
-    label: 'Public Files',
-    description: 'Files accessible to everyone',
-    icon: 'i-lucide-globe',
-    enabled: true,
-    fileCount: storageStats.value.folderStats.public?.fileCount || 0,
-    totalSize: storageStats.value.folderStats.public?.totalSize || '0 B',
-  },
-  {
-    name: 'sessions',
-    label: 'Session Materials',
-    description: 'Meeting recordings and documents',
-    icon: 'i-lucide-video',
-    enabled: true,
-    fileCount: storageStats.value.folderStats.sessions?.fileCount || 0,
-    totalSize: storageStats.value.folderStats.sessions?.totalSize || '0 B',
-  },
-  {
-    name: 'permits',
-    label: 'Permit Documents',
-    description: 'Application materials and permits',
-    icon: 'i-lucide-file-text',
-    enabled: true,
-    fileCount: storageStats.value.folderStats.permits?.fileCount || 0,
-    totalSize: storageStats.value.folderStats.permits?.totalSize || '0 B',
-  },
-  {
-    name: 'private',
-    label: 'Private Files',
-    description: 'Restricted access documents',
-    icon: 'i-lucide-lock',
-    enabled: authStore.hasPermission('storage:admin'),
-    fileCount: storageStats.value.folderStats.private?.fileCount || 0,
-    totalSize: storageStats.value.folderStats.private?.totalSize || '0 B',
-  },
-]);
+const storageFolders = computed(() => {
+  return Object.entries(folderConfigs.value).map(([name, config]) => {
+    // Determine if folder is enabled based on access level and permissions
+    let enabled = true;
+    if (config.access === 'private') {
+      enabled = authStore.hasPermission('storage:admin');
+    } else if (config.access === 'authenticated') {
+      enabled = !!authStore.user; // Any authenticated user
+    } else {
+      enabled = true; // public
+    }
+
+    return {
+      name,
+      label: getFolderLabelFromName(name),
+      description: config.description || '',
+      icon: getFolderIcon(name),
+      enabled,
+      fileCount: storageStats.value.folderStats[name]?.fileCount || 0,
+      totalSize: storageStats.value.folderStats[name]?.totalSize || '0 B',
+      allowedTypes: config.allowed_types || [],
+      maxSize: config.max_size || '10MB',
+    };
+  });
+});
 
 const totalFiles = computed(() => storageStats.value.totalFiles);
 const totalSize = computed(() => storageStats.value.totalSize);
@@ -305,46 +253,13 @@ const getFolderDescription = (folderName: string): string => {
 };
 
 const getFolderAllowedTypes = (folderName: string): string[] => {
-  const typeMap: Record<string, string[]> = {
-    public: [
-      'jpg',
-      'jpeg',
-      'png',
-      'gif',
-      'pdf',
-      'txt',
-      'md',
-      'doc',
-      'docx',
-      'rtf',
-      'epub',
-    ],
-    sessions: [
-      'mp4',
-      'webm',
-      'mp3',
-      'wav',
-      'pdf',
-      'md',
-      'doc',
-      'docx',
-      'ppt',
-      'pptx',
-    ],
-    permits: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'],
-    private: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md'],
-  };
-  return typeMap[folderName] || [];
+  const folder = storageFolders.value.find((f) => f.name === folderName);
+  return folder?.allowedTypes || [];
 };
 
 const getFolderMaxSize = (folderName: string): string => {
-  const sizeMap: Record<string, string> = {
-    public: '10MB',
-    sessions: '100MB',
-    permits: '5MB',
-    private: '25MB',
-  };
-  return sizeMap[folderName] || '10MB';
+  const folder = storageFolders.value.find((f) => f.name === folderName);
+  return folder?.maxSize || '10MB';
 };
 
 const getFolderIcon = (folderName: string): string => {
@@ -353,8 +268,20 @@ const getFolderIcon = (folderName: string): string => {
     sessions: 'i-lucide-video',
     permits: 'i-lucide-file-text',
     private: 'i-lucide-lock',
+    icons: 'i-lucide-image',
   };
   return iconMap[folderName] || 'i-lucide-folder';
+};
+
+const getFolderLabelFromName = (name: string): string => {
+  const labelMap: Record<string, string> = {
+    public: 'Public Files',
+    sessions: 'Session Materials',
+    permits: 'Permit Documents',
+    private: 'Private Files',
+    icons: 'Icons & Map Images',
+  };
+  return labelMap[name] || name.charAt(0).toUpperCase() + name.slice(1);
 };
 
 const getFolderIconColor = (folderName: string): string => {
@@ -414,6 +341,29 @@ const handleUploadError = (error: string) => {
     description: error,
     color: 'error',
   });
+};
+
+const loadStorageConfig = async () => {
+  try {
+    loadingFolders.value = true;
+    const response = (await useNuxtApp().$civicApi(
+      '/api/v1/storage/config'
+    )) as any;
+
+    if (response.success && response.data?.config?.folders) {
+      folderConfigs.value = response.data.config.folders;
+    } else {
+      console.error('Failed to load storage config:', response);
+      // Fallback to empty config
+      folderConfigs.value = {};
+    }
+  } catch (error) {
+    console.error('Failed to load storage config:', error);
+    // Fallback to empty config
+    folderConfigs.value = {};
+  } finally {
+    loadingFolders.value = false;
+  }
 };
 
 const loadStorageStats = async () => {
@@ -484,8 +434,10 @@ const parseFileSize = (sizeStr: string): number => {
 };
 
 // Lifecycle
-onMounted(() => {
-  loadStorageStats();
+onMounted(async () => {
+  // Load folder config first, then stats
+  await loadStorageConfig();
+  await loadStorageStats();
 });
 </script>
 
@@ -494,5 +446,27 @@ onMounted(() => {
   /* @apply text-center; */
 }
 
+/* Storage folder grid: 1 / 3 / 6 columns */
+.storage-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1.5rem;
+  /* 24px ~ Tailwind gap-6 */
+}
 
+@media (min-width: 768px) {
+
+  /* md */
+  .storage-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+
+  /* lg */
+  .storage-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
 </style>

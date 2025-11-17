@@ -316,12 +316,43 @@ export interface CenterCoordinates {
   lat: number;
 }
 
+export interface ColorMapping {
+  property?: string; // Property name to match (e.g., "NOM", "LETTRE", "FID")
+  type?: 'property' | 'feature_id'; // Mapping strategy
+  colors: Record<string, string>; // Key-value pairs: property_value -> color
+  feature_overrides?: Record<string, string>; // Optional: feature_id -> color
+  default_color?: string; // Fallback color
+}
+
+export interface IconConfig {
+  url: string; // UUID-based URL or external URL
+  library_id?: string; // Reference to library icon (alternative to url)
+  size?: [number, number]; // [width, height] - optional, auto-detect if not provided
+  anchor?: [number, number]; // [x, y] - optional, defaults to center-bottom for markers
+  popupAnchor?: [number, number]; // Optional: where popup appears relative to icon
+  shadowUrl?: string; // Optional: shadow image URL
+  shadowSize?: [number, number]; // Optional: shadow dimensions
+  shadowAnchor?: [number, number]; // Optional: shadow anchor point
+  colorize?: string; // Optional: apply color filter to monochrome icon
+}
+
+export interface IconMapping {
+  property?: string; // Property to match (e.g., "NOM", "LETTRE")
+  type?: 'property' | 'feature_id'; // Mapping strategy
+  icons: Record<string, IconConfig>; // property_value -> icon config
+  feature_overrides?: Record<string, IconConfig>; // feature_id -> icon config
+  default_icon?: 'circle' | 'marker' | 'none' | string; // Fallback icon type or URL
+  apply_to?: ('Point' | 'LineString' | 'Polygon')[]; // Which geometry types get icons
+}
+
 export interface GeographyMetadata {
   source: string;
   created: string;
   updated: string;
   version: string;
   accuracy: string;
+  color_mapping?: ColorMapping;
+  icon_mapping?: IconMapping;
 }
 
 export interface GeographyFile {
@@ -372,6 +403,8 @@ export interface CreateGeographyRequest {
   content: string;
   srid?: SRID;
   metadata?: Partial<GeographyMetadata>;
+  color_mapping?: ColorMapping;
+  icon_mapping?: IconMapping;
 }
 
 export interface UpdateGeographyRequest {
@@ -380,6 +413,8 @@ export interface UpdateGeographyRequest {
   description?: string;
   content?: string;
   metadata?: Partial<GeographyMetadata>;
+  color_mapping?: ColorMapping;
+  icon_mapping?: IconMapping;
 }
 
 export interface GeographyValidationResult {
@@ -410,6 +445,8 @@ export interface GeographyFormData {
   description: string;
   content: string;
   srid: SRID;
+  color_mapping?: ColorMapping;
+  icon_mapping?: IconMapping;
 }
 
 export interface GeographyFormErrors {

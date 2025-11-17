@@ -239,7 +239,7 @@ export class CivicPressAPI {
     // Public user registration endpoint (no auth required) - must come before general API middleware
     this.app.use(
       '/api/v1/users/register',
-      createDatabaseContextMiddleware(this.civicPress),
+      createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       registrationRouter
     );
 
@@ -257,6 +257,7 @@ export class CivicPressAPI {
     this.app.use('/api/v1/records', createRecordsRouter(recordsService));
     this.app.use(
       '/api/v1/geography',
+      optionalAuth(this.civicPress),
       (req, _res, next) => {
         (req as any).civicPress = this.civicPress;
         next();
@@ -345,17 +346,17 @@ export class CivicPressAPI {
     this.app.use(
       '/api/v1/storage',
       optionalAuth(this.civicPress),
-      createDatabaseContextMiddleware(this.civicPress),
+      createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       uuidStorageRouter
     );
     this.app.use(
       '/api/v1/users/verify-email-change',
-      createDatabaseContextMiddleware(this.civicPress),
+      createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       publicRouter
     ); // Public endpoints (no auth required)
     this.app.use(
       '/api/v1/users/verify-current-email',
-      createDatabaseContextMiddleware(this.civicPress),
+      createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       emailVerificationRouter
     ); // Public endpoints (no auth required)
     this.app.use('/api/v1/users', authMiddleware(this.civicPress), usersRouter);

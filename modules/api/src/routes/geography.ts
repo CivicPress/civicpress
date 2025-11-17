@@ -7,15 +7,25 @@
 
 import { Router, Request, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
-import { GeographyManager } from '@civicpress/core';
+import {
+  GeographyManager,
+  listGeographyPresets,
+  getGeographyPreset,
+  applyGeographyPreset,
+} from '@civicpress/core';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 
 export function createGeographyRouter(geographyManager: GeographyManager) {
   const router = Router();
 
   // Helper function to handle API responses
-  const handleSuccess = (operation: string, data: any, res: Response) => {
-    res.json({
+  const handleSuccess = (
+    operation: string,
+    data: any,
+    res: Response,
+    statusCode: number = 200
+  ) => {
+    res.status(statusCode).json({
       success: true,
       data,
       message: `${operation} completed successfully`,
@@ -99,6 +109,16 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
     body('srid').optional().isInt({ min: 1 }),
     body('metadata').optional().isObject(),
     async (req: AuthenticatedRequest, res: Response) => {
+      // Check authentication
+      if (!req.user) {
+        return handleError(
+          'create_geography',
+          new Error('Authentication required'),
+          res,
+          401
+        );
+      }
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return handleValidationError('create_geography', errors.array(), res);
@@ -119,15 +139,115 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
             content,
             srid,
             metadata,
+            color_mapping: req.body.color_mapping,
+            icon_mapping: req.body.icon_mapping,
           },
           req.user
         );
 
         console.log('API: Geography file created:', geographyFile.id);
 
-        handleSuccess('create_geography', geographyFile, res);
+        handleSuccess('create_geography', geographyFile, res, 201);
       } catch (error) {
         handleError('create_geography', error, res);
+      }
+    }
+  );
+
+  // POST /api/v1/geography/validate - Validate geography content
+  // Must be before /:id route to avoid matching "validate" as an ID
+  router.post(
+    '/validate',
+    body('content').isString().notEmpty().withMessage('Content is required'),
+    body('type')
+      .isIn(['geojson', 'kml', 'gpx', 'shapefile'])
+      .withMessage('Invalid type'),
+    async (req: Request, res: Response) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleValidationError('validate_geography', errors.array(), res);
+      }
+
+      try {
+        const { content, type } = req.body;
+        const validation = await geographyManager.validateGeographyContent(
+          content,
+          type
+        );
+
+        handleSuccess('validate_geography', validation, res);
+      } catch (error) {
+        handleError('validate_geography', error, res);
+      }
+    }
+  );
+
+  // GET /api/v1/geography/presets - List all available presets
+  // Must be before /:id route to avoid matching "presets" as an ID
+  router.get('/presets', async (req: Request, res: Response) => {
+    try {
+      const presets = listGeographyPresets();
+      handleSuccess('list_presets', presets, res);
+    } catch (error) {
+      handleError('list_presets', error, res);
+    }
+  });
+
+  // GET /api/v1/geography/presets/:key - Get a specific preset
+  router.get(
+    '/presets/:key',
+    param('key').isString().notEmpty().withMessage('Invalid preset key'),
+    async (req: Request, res: Response) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleValidationError('get_preset', errors.array(), res);
+      }
+
+      try {
+        const { key } = req.params;
+        const preset = getGeographyPreset(key);
+
+        if (!preset) {
+          return handleError(
+            'get_preset',
+            new Error('Preset not found'),
+            res,
+            404
+          );
+        }
+
+        handleSuccess('get_preset', preset, res);
+      } catch (error) {
+        handleError('get_preset', error, res);
+      }
+    }
+  );
+
+  // POST /api/v1/geography/presets/:key/apply - Apply a preset
+  router.post(
+    '/presets/:key/apply',
+    param('key').isString().notEmpty().withMessage('Invalid preset key'),
+    body('existing_color_mapping').optional().isObject(),
+    body('existing_icon_mapping').optional().isObject(),
+    async (req: Request, res: Response) => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleValidationError('apply_preset', errors.array(), res);
+      }
+
+      try {
+        const { key } = req.params;
+        const { existing_color_mapping, existing_icon_mapping } = req.body;
+
+        const result = applyGeographyPreset(
+          key,
+          existing_color_mapping,
+          existing_icon_mapping
+        );
+
+        handleSuccess('apply_preset', result, res);
+      } catch (error) {
+        handleError('apply_preset', error, res);
       }
     }
   );
@@ -144,12 +264,19 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
       try {
         const { id } = req.params;
+
+        // Log the ID being searched for debugging
+        console.log(
+          `[Geography API] Searching for geography file with ID: ${id}`
+        );
+
         const geographyFile = await geographyManager.getGeographyFile(id);
 
         if (!geographyFile) {
+          console.log(`[Geography API] Geography file not found for ID: ${id}`);
           return handleError(
             'get_geography',
-            new Error('Geography file not found'),
+            new Error(`Geography file not found: ${id}`),
             res,
             404
           );
@@ -157,6 +284,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         handleSuccess('get_geography', geographyFile, res);
       } catch (error) {
+        console.error(`[Geography API] Error getting geography file:`, error);
         handleError('get_geography', error, res);
       }
     }
@@ -212,6 +340,16 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
     body('content').optional().isString().notEmpty(),
     body('metadata').optional().isObject(),
     async (req: AuthenticatedRequest, res: Response) => {
+      // Check authentication
+      if (!req.user) {
+        return handleError(
+          'update_geography',
+          new Error('Authentication required'),
+          res,
+          401
+        );
+      }
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return handleValidationError('update_geography', errors.array(), res);
@@ -229,6 +367,8 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
             description,
             content,
             metadata,
+            color_mapping: req.body.color_mapping,
+            icon_mapping: req.body.icon_mapping,
           },
           req.user
         );
@@ -245,6 +385,16 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
     '/:id',
     param('id').isString().notEmpty().withMessage('Invalid geography ID'),
     async (req: AuthenticatedRequest, res: Response) => {
+      // Check authentication
+      if (!req.user) {
+        return handleError(
+          'delete_geography',
+          new Error('Authentication required'),
+          res,
+          401
+        );
+      }
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return handleValidationError('delete_geography', errors.array(), res);
@@ -255,7 +405,14 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         await geographyManager.deleteGeographyFile(id, req.user);
 
         handleSuccess('delete_geography', { id }, res);
-      } catch (error) {
+      } catch (error: any) {
+        // Check if it's a GeographyNotFoundError
+        if (
+          error?.code === 'NOT_FOUND' ||
+          error?.name === 'GeographyNotFoundError'
+        ) {
+          return handleError('delete_geography', error, res, 404);
+        }
         handleError('delete_geography', error, res);
       }
     }
@@ -295,33 +452,6 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         handleSuccess('get_linked_records', linkedRecords, res);
       } catch (error) {
         handleError('get_linked_records', error, res);
-      }
-    }
-  );
-
-  // POST /api/v1/geography/validate - Validate geography content
-  router.post(
-    '/validate',
-    body('content').isString().notEmpty().withMessage('Content is required'),
-    body('type')
-      .isIn(['geojson', 'kml', 'gpx', 'shapefile'])
-      .withMessage('Invalid type'),
-    async (req: Request, res: Response) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return handleValidationError('validate_geography', errors.array(), res);
-      }
-
-      try {
-        const { content, type } = req.body;
-        const validation = await geographyManager.validateGeographyContent(
-          content,
-          type
-        );
-
-        handleSuccess('validate_geography', validation, res);
-      } catch (error) {
-        handleError('validate_geography', error, res);
       }
     }
   );
