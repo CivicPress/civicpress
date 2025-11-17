@@ -76,13 +76,13 @@ public transparency.
 
 ## 🔗 Inputs & Outputs
 
-| Input                    | Description                      | Output                   | Description                                             |
-| ------------------------ | -------------------------------- | ------------------------ | ------------------------------------------------------- |
-| GeoJSON content          | Pasted GeoJSON data in text box  | Validated geography file | Saved to `data/geography/{category}/{filename}.geojson` |
-| KML content              | Pasted KML data in text box      | Converted GeoJSON file   | Converted and saved with metadata                       |
-| Geography metadata       | Name, category, description      | Database record          | Metadata stored with file reference                     |
-| Manual coordinates       | SRID, zone_ref, bbox, center     | Record geography data    | Linked to geography files                               |
-| Geography file selection | Browse and select existing files | Linked geography         | Added to record geography section                       |
+| Input                    | Description                      | Output                   | Description                                                                                 |
+| ------------------------ | -------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------- |
+| GeoJSON content          | Pasted GeoJSON data in text box  | Validated geography file | Saved to `data/geography/{category}/{name}-{id}.md` (markdown format with YAML frontmatter) |
+| KML content              | Pasted KML data in text box      | Converted markdown file  | Converted and saved with metadata in markdown format                                        |
+| Geography metadata       | Name, category, description      | Markdown file            | Metadata stored in YAML frontmatter within .md file                                         |
+| Manual coordinates       | SRID, zone_ref, bbox, center     | Record geography data    | Linked to geography files                                                                   |
+| Geography file selection | Browse and select existing files | Linked geography         | Added to record geography section                                                           |
 
 ---
 
@@ -90,19 +90,12 @@ public transparency.
 
 ```
 data/
-├── geography/                 # Geography files (git versioned)
-│   ├── geojson/              # GeoJSON files (.geojson)
-│   │   ├── zones/            # Zoning data
-│   │   ├── boundaries/       # Municipal boundaries
-│   │   ├── districts/        # Administrative districts
-│   │   └── facilities/       # Public facilities
-│   ├── kml/                  # KML files (.kml)
-│   │   ├── municipal-boundaries/
-│   │   └── service-areas/
-│   ├── gpx/                  # GPX files (.gpx)
-│   │   └── routes/
-│   └── shp/                  # Shapefile data (.shp, .dbf, .shx)
-│       └── cadastral/
+├── geography/                 # Geography files (git versioned, markdown format)
+│   ├── zones/                 # Zoning data (.md files)
+│   ├── boundaries/            # Municipal boundaries (.md files)
+│   ├── districts/             # Administrative districts (.md files)
+│   ├── facilities/            # Public facilities (.md files)
+│   └── routes/                # Route data (.md files)
 ├── records/                  # Existing civic records
 └── .civic/                   # Platform configuration
 

@@ -58,13 +58,13 @@ dataDir: data
 database:
   type: sqlite
   sqlite:
-    file: .civic/civic.db
+    file: .system-data/civic.db
 ```
 
 - `dataDir`: Path to your civic data directory (relative to project root)
 - `database.type`: Set to `sqlite` for local development
-- `database.sqlite.file`: Path to the SQLite database file (recommended: inside
-  `.civic/`)
+- `database.sqlite.file`: Path to the SQLite database file (default:
+  `.system-data/civic.db` for private system data)
 
 ### Example: .civicrc for PostgreSQL (future)
 
@@ -582,7 +582,7 @@ node cli/dist/index.js validate --help
 node cli/dist/index.js template --help
 ```
 
-## 🎉 Congratulations!
+## 🎉 Congratulations
 
 You've successfully set up and used CivicPress! You now have:
 

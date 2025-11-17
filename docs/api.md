@@ -21,22 +21,22 @@ standard HTTP status codes.
 These endpoints are accessible without authentication and are used by the UI for
 initial configuration:
 
-- `GET /api/config/roles` - Get available user roles
-- `GET /api/config/record-types` - Get available record types
-- `GET /api/config/record-statuses` - Get available record statuses
-- `GET /api/status` - Get system status
-- `GET /api/status/git` - Get Git repository status
-- `GET /api/status/records` - Get records statistics
-- `GET /api/records` - List records (read-only)
-- `GET /api/records/:id` - Get specific record (read-only)
-- `GET /api/search` - Search records (read-only)
+- `GET /api/v1/config/roles` - Get available user roles
+- `GET /api/v1/system/record-types` - Get available record types
+- `GET /api/v1/system/record-statuses` - Get available record statuses
+- `GET /api/v1/status` - Get system status
+- `GET /api/v1/status/git` - Get Git repository status
+- `GET /api/v1/status/records` - Get records statistics
+- `GET /api/v1/records` - List records (read-only)
+- `GET /api/v1/records/:id` - Get specific record (read-only)
+- `GET /api/v1/search` - Search records (read-only)
 
 #### **Protected Endpoints** (Authentication Required)
 
 These endpoints require valid authentication and appropriate permissions:
 
-- **User Management**: All `/api/users/*` endpoints (admin only)
-- **Record Management**: POST, PUT, DELETE on `/api/records/*`
+- **User Management**: All `/api/v1/users/*` endpoints (admin only)
+- **Record Management**: POST, PUT, DELETE on `/api/v1/records/*`
   (permission-based)
 - **Authentication**: `/auth/*` endpoints for login/logout
 - **System Operations**: Export, import, hooks, etc. (role-based)
@@ -141,7 +141,7 @@ Logout and invalidate current session.
 
 ### Records
 
-#### GET /api/records
+#### GET /api/v1/records
 
 List all records (public endpoint).
 
@@ -184,7 +184,7 @@ List all records (public endpoint).
 }
 ```
 
-#### GET /api/records/:id
+#### GET /api/v1/records/:id
 
 Get a specific record by ID (public endpoint).
 
@@ -217,7 +217,7 @@ Get a specific record by ID (public endpoint).
 }
 ```
 
-#### POST /api/records
+#### POST /api/v1/records
 
 Create a new record (requires authentication).
 
@@ -264,7 +264,7 @@ Create a new record (requires authentication).
 }
 ```
 
-#### PUT /api/records/:id
+#### PUT /api/v1/records/:id
 
 Update an existing record (requires authentication).
 
@@ -310,7 +310,7 @@ Update an existing record (requires authentication).
 }
 ```
 
-#### DELETE /api/records/:id
+#### DELETE /api/v1/records/:id
 
 Delete a record (requires authentication).
 
@@ -529,7 +529,7 @@ Get validation status across all records.
 
 ### Search
 
-#### GET /api/search
+#### GET /api/v1/search
 
 Search records with full-text search capabilities.
 
@@ -570,7 +570,7 @@ Search records with full-text search capabilities.
 
 ### User Management
 
-#### GET /api/users
+#### GET /api/v1/users
 
 List all users (admin only).
 
@@ -606,7 +606,7 @@ List all users (admin only).
 }
 ```
 
-#### GET /api/users/:id
+#### GET /api/v1/users/:id
 
 Get a specific user by ID (admin only).
 
@@ -632,7 +632,7 @@ Get a specific user by ID (admin only).
 }
 ```
 
-#### POST /api/users
+#### POST /api/v1/users
 
 Create a new user (admin only).
 
@@ -671,7 +671,7 @@ Create a new user (admin only).
 }
 ```
 
-#### PUT /api/users/:id
+#### PUT /api/v1/users/:id
 
 Update an existing user (admin only).
 
@@ -710,7 +710,7 @@ Update an existing user (admin only).
 }
 ```
 
-#### DELETE /api/users/:id
+#### DELETE /api/v1/users/:id
 
 Delete a user (admin only).
 
@@ -910,7 +910,7 @@ Get user security information (self-service or admin).
 
 ### Configuration
 
-#### GET /api/config/roles
+#### GET /api/v1/config/roles
 
 Get available user roles (public endpoint).
 
@@ -958,7 +958,7 @@ Get available user roles (public endpoint).
 }
 ```
 
-#### GET /api/config/record-types
+#### GET /api/v1/system/record-types
 
 Get available record types (public endpoint).
 
@@ -995,7 +995,7 @@ Get available record types (public endpoint).
 }
 ```
 
-#### GET /api/config/record-statuses
+#### GET /api/v1/system/record-statuses
 
 Get available record statuses (public endpoint).
 
@@ -1041,7 +1041,7 @@ Get available record statuses (public endpoint).
 
 ### Status
 
-#### GET /api/status
+#### GET /api/v1/status
 
 Get system status (public endpoint).
 
@@ -1064,7 +1064,7 @@ Get system status (public endpoint).
 }
 ```
 
-#### GET /api/status/git
+#### GET /api/v1/status/git
 
 Get Git repository status (public endpoint).
 
@@ -1088,7 +1088,7 @@ Get Git repository status (public endpoint).
 }
 ```
 
-#### GET /api/status/records
+#### GET /api/v1/status/records
 
 Get records statistics (public endpoint).
 
@@ -1218,7 +1218,7 @@ List all geography files (public endpoint).
           "version": "1.0",
           "accuracy": "high"
         },
-        "file_path": "data/geography/geojson/zones/residential-zones.geojson",
+        "file_path": "data/geography/zones/residential-zones-1763155301879.md",
         "created_at": "2025-01-27T10:00:00.000Z",
         "updated_at": "2025-01-27T10:00:00.000Z"
       }
@@ -1277,7 +1277,7 @@ Create a new geography file (admin only).
         "version": "1.0",
         "accuracy": "high"
       },
-      "file_path": "data/geography/geojson/zones/commercial-zones.geojson",
+      "file_path": "data/geography/zones/commercial-zones-1763155301880.md",
       "created_at": "2025-01-27T11:00:00.000Z",
       "updated_at": "2025-01-27T11:00:00.000Z"
     }
@@ -1439,7 +1439,7 @@ Search geography files (public endpoint).
           "version": "1.0",
           "accuracy": "high"
         },
-        "file_path": "data/geography/geojson/zones/residential-zones.geojson",
+        "file_path": "data/geography/zones/residential-zones-1763155301879.md",
         "created_at": "2025-01-27T10:00:00.000Z",
         "updated_at": "2025-01-27T10:00:00.000Z"
       }

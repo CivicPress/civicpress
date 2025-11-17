@@ -274,7 +274,8 @@ CivicPress
 - **Backend**: Node.js, TypeScript, Express, SQLite
 - **Authentication**: JWT, OAuth, Role-based access control
 - **Version Control**: Git integration with full audit trails
-- **Testing**: Vitest with comprehensive test coverage (391 tests)
+- **Testing**: Vitest with comprehensive test coverage (599 tests passing, 22
+  skipped)
 - **Build System**: pnpm workspaces
 - **Security**: Cryptographic verification, audit logs, compliance
 
