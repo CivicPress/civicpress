@@ -66,7 +66,7 @@
               v-if="verificationResult.message?.includes('expired')"
               @click="requestNewToken"
               :loading="requestingNewToken"
-              color="yellow"
+              color="primary"
               variant="outline"
               size="sm"
               class="w-full"
@@ -169,7 +169,7 @@ const verifyEmail = async () => {
       toast.add({
         title: 'Email Verified',
         description: verificationResult.value.message,
-        color: 'green',
+        color: 'primary',
       });
     }
   } catch (error: any) {
@@ -193,7 +193,7 @@ const requestNewToken = async () => {
       title: 'Feature Coming Soon',
       description:
         'Please log in and request a new email change from your profile.',
-      color: 'yellow',
+      color: 'primary',
     });
 
     // Redirect to login or profile
@@ -203,7 +203,7 @@ const requestNewToken = async () => {
     toast.add({
       title: 'Request Failed',
       description: 'Failed to request new verification email',
-      color: 'red',
+      color: 'error',
     });
   } finally {
     requestingNewToken.value = false;

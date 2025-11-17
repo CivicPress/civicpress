@@ -258,7 +258,7 @@ onMounted(async () => {
                       >
                         <UBadge
                           size="xs"
-                          color="gray"
+                          color="neutral"
                           variant="soft"
                           class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-300"
                         >
@@ -378,7 +378,7 @@ onMounted(async () => {
                     >
                       <UBadge
                         size="xs"
-                        color="gray"
+                        color="neutral"
                         variant="soft"
                         class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-300"
                       >

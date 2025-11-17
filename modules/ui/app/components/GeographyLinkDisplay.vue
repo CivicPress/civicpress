@@ -28,7 +28,7 @@
         <h4 class="text-md font-medium text-gray-900 dark:text-gray-100">
           Combined Map View
         </h4>
-        <UBadge color="blue" variant="soft">
+        <UBadge color="primary" variant="soft">
           {{ linkedFiles.length }} files
         </UBadge>
       </div>
@@ -37,7 +37,7 @@
       >
         <GeographyMap
           :geography-data="allGeographyData"
-          :bounds="combinedBounds"
+          :bounds="combinedBounds as any"
           :interactive="true"
           height="100%"
         />
@@ -57,7 +57,10 @@
               <h4 class="font-medium text-gray-900 dark:text-gray-100">
                 {{ link.name }}
               </h4>
-              <UBadge :color="getCategoryColor(link.category)" variant="soft">
+              <UBadge
+                :color="getCategoryColor(link.category || '') as any"
+                variant="soft"
+              >
                 {{ link.category }}
               </UBadge>
             </div>
@@ -89,15 +92,15 @@
             >
               <span class="flex items-center gap-1">
                 <UIcon name="i-lucide-file" class="w-3 h-3" />
-                {{ link.type.toUpperCase() }}
+                {{ (link.type || 'UNKNOWN').toUpperCase() }}
               </span>
               <span class="flex items-center gap-1">
                 <UIcon name="i-lucide-calendar" class="w-3 h-3" />
-                {{ formatDate(link.created_at) }}
+                {{ link.created_at ? formatDate(link.created_at) : 'Unknown' }}
               </span>
-              <span v-if="link.stats" class="flex items-center gap-1">
+              <span v-if="(link as any).stats" class="flex items-center gap-1">
                 <UIcon name="i-lucide-map-pin" class="w-3 h-3" />
-                {{ link.stats.featureCount }} features
+                {{ (link as any).stats.featureCount }} features
               </span>
             </div>
           </div>
@@ -106,9 +109,9 @@
             <!-- View Full Map Button -->
             <UButton
               size="sm"
-              color="blue"
+              color="primary"
               variant="outline"
-              @click="viewFullMap(link)"
+              @click="viewFullMap(link as any)"
             >
               <UIcon name="i-lucide-map" class="w-4 h-4" />
               Full Map
@@ -187,14 +190,17 @@ const linkedFiles = computed(() => {
 
 // Combined map data for multiple files
 const allGeographyData = computed(() => {
-  const filesWithData = linkedFiles.value.filter((file) => file.geographyData);
+  const filesWithData = linkedFiles.value.filter(
+    (file) => (file as any).geographyData
+  );
   if (filesWithData.length === 0) return null;
 
   // Combine all GeoJSON features into a single FeatureCollection
   const allFeatures: any[] = [];
   filesWithData.forEach((file) => {
-    if (file.geographyData && file.geographyData.features) {
-      allFeatures.push(...file.geographyData.features);
+    const geoData = (file as any).geographyData;
+    if (geoData && geoData.features) {
+      allFeatures.push(...geoData.features);
     }
   });
 
@@ -215,11 +221,17 @@ const combinedBounds = computed(() => {
     maxLat = -Infinity;
 
   filesWithBounds.forEach((file) => {
-    if (file.bounds) {
-      minLon = Math.min(minLon, file.bounds[0]);
-      minLat = Math.min(minLat, file.bounds[1]);
-      maxLon = Math.max(maxLon, file.bounds[2]);
-      maxLat = Math.max(maxLat, file.bounds[3]);
+    const bounds = file.bounds;
+    if (bounds && Array.isArray(bounds) && bounds.length >= 4) {
+      minLon = Math.min(minLon, bounds[0]);
+      minLat = Math.min(minLat, bounds[1]);
+      maxLon = Math.max(maxLon, bounds[2]);
+      maxLat = Math.max(maxLat, bounds[3]);
+    } else if (bounds && typeof bounds === 'object' && 'minLon' in bounds) {
+      minLon = Math.min(minLon, (bounds as any).minLon);
+      minLat = Math.min(minLat, (bounds as any).minLat);
+      maxLon = Math.max(maxLon, (bounds as any).maxLon);
+      maxLat = Math.max(maxLat, (bounds as any).maxLat);
     }
   });
 
@@ -227,16 +239,16 @@ const combinedBounds = computed(() => {
 });
 
 // Methods
-const getCategoryColor = (category: string) => {
-  const colors = {
-    Reference: 'blue',
-    Financial: 'green',
-    Legal: 'purple',
-    Planning: 'orange',
-    Environmental: 'emerald',
-    Infrastructure: 'gray',
+const getCategoryColor = (category: string): string => {
+  const colors: Record<string, string> = {
+    Reference: 'primary',
+    Financial: 'primary',
+    Legal: 'primary',
+    Planning: 'primary',
+    Environmental: 'primary',
+    Infrastructure: 'neutral',
   };
-  return colors[category as keyof typeof colors] || 'neutral';
+  return colors[category] || 'neutral';
 };
 
 const formatDate = (dateString: string) => {

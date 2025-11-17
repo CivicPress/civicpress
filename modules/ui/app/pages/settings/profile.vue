@@ -134,12 +134,13 @@ const handleEmailVerification = async () => {
         body: { token },
       });
 
-      if (response.success) {
+      if ((response as any).success) {
         useToast().add({
           title: 'Email Verified Successfully',
           description:
-            response.data?.message || 'Your email address has been verified.',
-          color: 'green',
+            (response as any).data?.message ||
+            'Your email address has been verified.',
+          color: 'primary',
         });
 
         // Clear the URL parameters
@@ -152,14 +153,16 @@ const handleEmailVerification = async () => {
         await fetchUserInfo();
       } else {
         throw new Error(
-          response.error?.message || response.message || 'Verification failed'
+          (response as any).error?.message ||
+            (response as any).message ||
+            'Verification failed'
         );
       }
     } catch (err: any) {
       useToast().add({
         title: 'Email Verification Failed',
         description: err.message || 'Failed to verify email address',
-        color: 'red',
+        color: 'error',
       });
 
       // Clear the URL parameters even on error
@@ -331,14 +334,14 @@ const breadcrumbItems = [
                 <p class="mt-1 text-sm font-mono">{{ userInfo.id }}</p>
               </div>
 
-              <div v-if="userInfo.avatar">
+              <div v-if="userInfo.avatar_url">
                 <label
                   class="block text-sm font-medium text-gray-500 dark:text-gray-400"
                   >Avatar</label
                 >
                 <div class="mt-1">
                   <img
-                    :src="userInfo.avatar"
+                    :src="userInfo.avatar_url"
                     alt="User avatar"
                     class="w-8 h-8 rounded-full"
                   />
@@ -498,7 +501,7 @@ const breadcrumbItems = [
             :user-id="userInfo.id"
             :user-data="{
               email: userInfo.email,
-              email_verified: userInfo.email_verified,
+              email_verified: (userInfo as any).emailVerified || false,
             }"
           />
         </div>

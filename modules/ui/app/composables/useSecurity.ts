@@ -36,7 +36,9 @@ export const useSecurity = () => {
    * Get security information for a user
    */
   const getSecurityInfo = async (userId: number): Promise<SecurityInfo> => {
-    const response = await $civicApi(`/api/v1/users/${userId}/security-info`);
+    const response = (await $civicApi(
+      `/api/v1/users/${userId}/security-info`
+    )) as any;
     return response.data.securityInfo;
   };
 
@@ -47,13 +49,13 @@ export const useSecurity = () => {
     userId: number,
     passwordData: ChangePasswordRequest
   ): Promise<SecurityResponse> => {
-    const response = await $civicApi(
+    const response = (await $civicApi(
       `/api/v1/users/${userId}/change-password`,
       {
         method: 'POST',
         body: passwordData,
       }
-    );
+    )) as any;
     return response.data;
   };
 
@@ -64,10 +66,10 @@ export const useSecurity = () => {
     userId: number,
     newPassword: string
   ): Promise<SecurityResponse> => {
-    const response = await $civicApi(`/api/v1/users/${userId}/set-password`, {
+    const response = (await $civicApi(`/api/v1/users/${userId}/set-password`, {
       method: 'POST',
       body: { newPassword },
-    });
+    })) as any;
     return response.data;
   };
 
@@ -78,13 +80,13 @@ export const useSecurity = () => {
     userId: number,
     emailData: RequestEmailChangeRequest
   ): Promise<SecurityResponse> => {
-    const response = await $civicApi(
+    const response = (await $civicApi(
       `/api/v1/users/${userId}/request-email-change`,
       {
         method: 'POST',
         body: emailData,
       }
-    );
+    )) as any;
     return response.data;
   };
 
@@ -94,10 +96,10 @@ export const useSecurity = () => {
   const verifyEmailChange = async (
     token: string
   ): Promise<SecurityResponse> => {
-    const response = await $civicApi('/api/v1/users/verify-email-change', {
+    const response = (await $civicApi('/api/v1/users/verify-email-change', {
       method: 'POST',
       body: { token },
-    });
+    })) as any;
     return response.data;
   };
 
@@ -107,12 +109,12 @@ export const useSecurity = () => {
   const cancelEmailChange = async (
     userId: number
   ): Promise<SecurityResponse> => {
-    const response = await $civicApi(
+    const response = (await $civicApi(
       `/api/v1/users/${userId}/cancel-email-change`,
       {
         method: 'POST',
       }
-    );
+    )) as any;
     return response.data;
   };
 
@@ -171,12 +173,12 @@ export const useSecurity = () => {
   const sendEmailVerification = async (
     userId: number
   ): Promise<SecurityResponse> => {
-    const response = await $civicApi(
+    const response = (await $civicApi(
       `/api/v1/users/${userId}/send-email-verification`,
       {
         method: 'POST',
       }
-    );
+    )) as any;
     return response.data;
   };
 
@@ -186,10 +188,10 @@ export const useSecurity = () => {
   const verifyCurrentEmail = async (
     token: string
   ): Promise<SecurityResponse> => {
-    const response = await $civicApi('/api/v1/users/verify-current-email', {
+    const response = (await $civicApi('/api/v1/users/verify-current-email', {
       method: 'POST',
       body: { token },
-    });
+    })) as any;
     return response.data;
   };
 

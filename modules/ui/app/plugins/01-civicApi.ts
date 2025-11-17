@@ -23,7 +23,9 @@ export default defineNuxtPlugin((nuxtApp) => {
           } else if (headers instanceof Headers) {
             headers.set('Authorization', `Bearer ${authStore.token}`);
           } else {
-            if (!headers) options.headers = {};
+            if (!headers) {
+              options.headers = {} as any;
+            }
             (options.headers as any)['Authorization'] =
               `Bearer ${authStore.token}`;
           }

@@ -148,7 +148,7 @@
                       class="w-5 h-5 text-blue-500"
                     />
                     <UBadge
-                      :color="getCategoryColor(file.category)"
+                      :color="getCategoryColor(file.category) as any"
                       variant="soft"
                       size="sm"
                     >
@@ -312,9 +312,9 @@ const loadGeographyFiles = async () => {
       params.append('type', selectedType.value);
     }
 
-    const response = await useNuxtApp().$civicApi(
+    const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography?${params}`
-    );
+    )) as any;
 
     if (response.success) {
       geographyFiles.value = response.data.files;

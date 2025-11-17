@@ -58,6 +58,8 @@ export const useUserRoles = () => {
               description,
               permissions,
               status_transitions: statusTransitions,
+              color: 'primary',
+              icon: 'i-lucide-user',
             } as Role);
           }
           roles.value = result;
@@ -143,7 +145,7 @@ export const useUserRoles = () => {
   // Get available status transitions for a role
   const getStatusTransitions = (roleKey: string): string[] => {
     const role = getRoleByKey(roleKey);
-    return role?.status_transitions || [];
+    return (role as any)?.status_transitions || [];
   };
 
   return {

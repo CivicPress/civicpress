@@ -171,7 +171,7 @@ const loadFiles = async () => {
   try {
     const response = await useNuxtApp().$civicApi(
       `/api/v1/storage/folders/${selectedFolder.value.value}/files`
-    );
+    ) as any;
 
     if (response.success) {
       files.value = response.data.files || [];

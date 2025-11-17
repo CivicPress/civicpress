@@ -387,7 +387,7 @@ const getNestedValue = (
   sectionKey: string,
   nestedKey: string,
   subKey: string
-) => {
+): any => {
   const cfg = config.value?.[sectionKey]?.[nestedKey]?.[subKey];
   if (cfg !== undefined) return normalizeValue(cfg);
   const metaField = configMetadata.value?.[sectionKey]?.[nestedKey]?.[subKey];
@@ -433,6 +433,7 @@ const updateSecondLevelFieldValue = (fullKey: string, value: any) => {
   const parts = fullKey.split('.');
   if (parts.length !== 2) return;
   const [sectionKey, nestedKey] = parts;
+  if (!sectionKey || !nestedKey) return;
   if (!config.value[sectionKey]) config.value[sectionKey] = {};
   config.value[sectionKey][nestedKey] = value;
   hasChanges.value = true;

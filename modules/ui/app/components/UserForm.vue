@@ -475,8 +475,8 @@ const userCanSetPassword = computed(() => {
 });
 
 const userAuthProviderDisplay = computed(() => {
-  if (!props.user?.authProvider) return null;
-  return getAuthProviderDisplayName(props.user.authProvider);
+  if (!(props.user as any)?.authProvider) return null;
+  return getAuthProviderDisplayName((props.user as any).authProvider);
 });
 
 // Form validation

@@ -5,9 +5,9 @@ export const useLinkCategories = () => {
 
   const fetchLinkCategories = async () => {
     try {
-      const response = await useNuxtApp().$civicApi(
+      const response = (await useNuxtApp().$civicApi(
         '/api/v1/config/link-categories'
-      );
+      )) as any;
       if (response.success && response.data.categories) {
         linkCategories.value = Object.entries(response.data.categories).map(
           ([key, category]: [string, any]) => ({

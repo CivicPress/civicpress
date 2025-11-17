@@ -109,7 +109,13 @@ const hasChanges = computed(() => yaml.value !== original.value);
 const statusLabel = computed(() =>
   hasChanges.value ? 'Unsaved changes' : 'Saved'
 );
-const statusColor = computed(() => (hasChanges.value ? 'warning' : 'primary'));
+const statusColor = computed(
+  () =>
+    (hasChanges.value ? 'primary' : 'primary') as
+      | 'primary'
+      | 'error'
+      | 'neutral'
+);
 
 const filePath = computed(() => {
   // Approximate path display only
@@ -214,7 +220,7 @@ const validate = async () => {
     error.value = e.message || 'Failed to validate configuration';
     useToast().add({
       title: 'Validation failed',
-      description: error.value,
+      description: error.value || 'Unknown error',
       color: 'error',
     });
   } finally {

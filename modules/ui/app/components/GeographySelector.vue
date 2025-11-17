@@ -76,7 +76,7 @@
                 {{ file.name }}
               </p>
               <UBadge
-                :color="getCategoryColor(file.category)"
+                :color="getCategoryColor(file.category) as any"
                 variant="soft"
                 size="xs"
               >

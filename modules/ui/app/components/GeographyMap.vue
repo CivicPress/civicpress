@@ -134,7 +134,8 @@ const getFeatureColor = (feature: any): string => {
 
   // 1. Check feature-specific override first (highest priority)
   if (feature.id && mapping.feature_overrides?.[feature.id]) {
-    return mapping.feature_overrides[feature.id];
+    const color = mapping.feature_overrides[feature.id];
+    return typeof color === 'string' ? color : color || '';
   }
 
   // 2. Check property-based mapping
@@ -185,9 +186,9 @@ const preResolveIcons = async (data: any) => {
       // Check feature override
       if (feature.id && mapping.feature_overrides?.[feature.id]) {
         const iconConfig = mapping.feature_overrides[feature.id];
-        if (isValidIconConfig(iconConfig)) {
+        if (iconConfig && isValidIconConfig(iconConfig)) {
           const url =
-            typeof iconConfig === 'string' ? iconConfig : iconConfig.url;
+            typeof iconConfig === 'string' ? iconConfig : iconConfig?.url || '';
           if (
             url &&
             !url.startsWith('http://') &&
@@ -269,7 +270,7 @@ const getFeatureIcon = (feature: any): L.Icon | null => {
   // 2. Check feature-specific override first (highest priority)
   if (feature.id && mapping.feature_overrides?.[feature.id]) {
     const iconConfig = mapping.feature_overrides[feature.id];
-    if (isValidIconConfig(iconConfig)) {
+    if (iconConfig && isValidIconConfig(iconConfig)) {
       const url = typeof iconConfig === 'string' ? iconConfig : iconConfig.url;
       const resolvedUrl = resolvedIconCache.get(url) || url;
       try {
@@ -450,10 +451,10 @@ const addGeographyData = async (data: any) => {
 
     // Parse and add GeoJSON data
     geoJsonLayer = L.geoJSON(data, {
-      style: (feature) => {
+      style: (feature: any) => {
         // Get color from mapping or use default
         const featureColor = getFeatureColor(feature);
-        const geometryType = feature.geometry.type;
+        const geometryType = feature?.geometry?.type;
 
         // For Point features, styling is handled by pointToLayer
         if (geometryType === 'Point') {

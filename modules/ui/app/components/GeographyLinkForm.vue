@@ -79,7 +79,7 @@
               size="sm"
               color="neutral"
               variant="ghost"
-              @click="previewFile(link)"
+              @click="() => handlePreview(link as any)"
             >
               <UIcon name="i-lucide-eye" class="w-4 h-4" />
             </UButton>
@@ -121,7 +121,7 @@
         <div v-if="previewFile" class="space-y-4">
           <div class="flex items-center gap-2">
             <UBadge
-              :color="getCategoryColor(previewFile.category)"
+              :color="getCategoryColor(previewFile.category || '') as any"
               variant="soft"
             >
               {{ previewFile.category }}
@@ -139,11 +139,11 @@
           </p>
 
           <div
-            v-if="previewFile.geographyData"
+            v-if="(previewFile as any).geographyData"
             class="h-96 rounded-lg overflow-hidden border"
           >
             <GeographyMap
-              :geography-data="previewFile.geographyData"
+              :geography-data="(previewFile as any).geographyData"
               :bounds="previewFile.bounds"
               :interactive="true"
               height="100%"
@@ -224,16 +224,16 @@ watch(
 const linkedFiles = computed(() => props.modelValue);
 
 // Methods
-const getCategoryColor = (category: string) => {
-  const colors = {
-    Reference: 'blue',
-    Financial: 'green',
-    Legal: 'purple',
-    Planning: 'orange',
-    Environmental: 'emerald',
-    Infrastructure: 'gray',
+const getCategoryColor = (category: string): string => {
+  const colors: Record<string, string> = {
+    Reference: 'primary',
+    Financial: 'primary',
+    Legal: 'primary',
+    Planning: 'primary',
+    Environmental: 'primary',
+    Infrastructure: 'neutral',
   };
-  return colors[category as keyof typeof colors] || 'neutral';
+  return colors[category] || 'neutral';
 };
 
 const formatDate = (dateString: string) => {
@@ -265,7 +265,7 @@ const handleSelectionConfirm = (files: GeographyFile[]) => {
       type: file.type,
       category: file.category,
       created_at: file.created_at,
-      stats: file.stats,
+      stats: (file as any).stats,
     }));
 
   if (newLinks.length > 0) {

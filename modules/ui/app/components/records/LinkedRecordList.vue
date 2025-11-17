@@ -46,7 +46,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
               <UFormField v-if="editable" label="Category">
                 <USelectMenu
-                  :model-value="linkedRecord.category"
+                  :model-value="linkedRecord.category as any"
                   :items="getLinkCategoryOptions()"
                   placeholder="Select category"
                   @update:model-value="

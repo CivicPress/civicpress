@@ -27,16 +27,16 @@ const handleSubmit = async (recordData: any) => {
 
   try {
     // Create record via API
-    const response = await useNuxtApp().$civicApi('/api/v1/records', {
+    const response = (await useNuxtApp().$civicApi('/api/v1/records', {
       method: 'POST',
       body: recordData,
-    });
+    })) as any;
 
     if (response && response.success) {
       toast.add({
         title: 'Record Created',
         description: `Successfully created "${recordData.title}"`,
-        color: 'green',
+        color: 'primary',
       });
 
       // Navigate to the new record
@@ -50,7 +50,7 @@ const handleSubmit = async (recordData: any) => {
     toast.add({
       title: 'Error',
       description: errorMessage,
-      color: 'red',
+      color: 'error',
     });
   } finally {
     saving.value = false;

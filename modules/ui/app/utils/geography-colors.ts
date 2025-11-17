@@ -28,7 +28,13 @@ export const DEFAULT_COLOR_PALETTE = [
  * Get a color from the default palette by index (with wrapping)
  */
 export function getDefaultColor(index: number): string {
-  return DEFAULT_COLOR_PALETTE[index % DEFAULT_COLOR_PALETTE.length];
+  const idx = Math.abs(index) % DEFAULT_COLOR_PALETTE.length;
+  const color = DEFAULT_COLOR_PALETTE[idx];
+  if (typeof color !== 'string' || !color) {
+    const fallback = DEFAULT_COLOR_PALETTE[0];
+    return typeof fallback === 'string' && fallback ? fallback : '#3b82f6';
+  }
+  return color;
 }
 
 /**

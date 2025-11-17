@@ -5,9 +5,9 @@ export const useAttachmentTypes = () => {
 
   const fetchAttachmentTypes = async () => {
     try {
-      const response = await useNuxtApp().$civicApi(
+      const response = (await useNuxtApp().$civicApi(
         '/api/v1/config/attachment-types'
-      );
+      )) as any;
       if (response.success && response.data.types) {
         attachmentTypes.value = Object.entries(response.data.types).map(
           ([key, type]: [string, any]) => ({

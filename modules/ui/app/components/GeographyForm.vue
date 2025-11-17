@@ -120,7 +120,7 @@
                   {{
                     (typeof form.type === 'string'
                       ? form.type
-                      : form.type?.value || 'geojson'
+                      : (form.type as any)?.value || 'geojson'
                     ).toUpperCase()
                   }}
                   content in the text area above. The preview will update
@@ -311,18 +311,11 @@
               :items="presetOptions"
               placeholder="Select a preset..."
               value-key="key"
+              option-label="name"
+              option-description="description"
               class="flex-1"
               @change="onPresetSelected"
-            >
-              <template #option="{ option }">
-                <div class="flex flex-col">
-                  <span class="font-medium">{{ option.name }}</span>
-                  <span class="text-xs text-gray-500">{{
-                    option.description
-                  }}</span>
-                </div>
-              </template>
-            </USelectMenu>
+            />
             <UButton
               v-if="selectedPreset"
               size="sm"
@@ -341,7 +334,7 @@
             <UButton
               v-if="form.color_mapping"
               size="xs"
-              color="red"
+              color="error"
               variant="ghost"
               @click="form.color_mapping = undefined"
             >
@@ -418,7 +411,7 @@
             <UButton
               v-if="form.icon_mapping"
               size="xs"
-              color="red"
+              color="error"
               variant="ghost"
               @click="form.icon_mapping = undefined"
             >
@@ -458,7 +451,7 @@
             <UFormField label="Apply To Geometry Types">
               <USelectMenu
                 v-model="form.icon_mapping.apply_to"
-                :items="geometryTypeOptions"
+                :items="geometryTypeOptions as any"
                 multiple
                 placeholder="Select geometry types"
               />
@@ -481,7 +474,7 @@
                     value
                   }}</span>
                   <UInput
-                    v-model="form.icon_mapping.icons[value].url"
+                    v-model="form.icon_mapping.icons[value]?.url"
                     type="text"
                     placeholder="https://example.com/icon.png or UUID"
                     class="flex-1 text-xs"
@@ -681,7 +674,7 @@ const onContentChange = useDebounceFn(async () => {
     preview.value.error = undefined;
 
     // Validate content
-    const response = await useNuxtApp().$civicApi(
+    const response = (await useNuxtApp().$civicApi(
       '/api/v1/geography/validate',
       {
         method: 'POST',
@@ -690,7 +683,7 @@ const onContentChange = useDebounceFn(async () => {
           type: form.value.type,
         },
       }
-    );
+    )) as any;
 
     if (response.success) {
       preview.value.validation = response.data;
@@ -775,25 +768,26 @@ const handleSubmit = async () => {
       return;
     }
 
-    const url =
+    const endpoint =
       props.mode === 'create'
         ? '/api/v1/geography'
         : `/api/v1/geography/${props.geographyId}`;
-    const method = props.mode === 'create' ? 'POST' : 'PUT';
 
-    const response = await useNuxtApp().$civicApi(url, {
-      method,
+    const response = (await useNuxtApp().$civicApi(endpoint, {
+      method: props.mode === 'create' ? 'POST' : 'PUT',
       body: {
         name: form.value.name,
-        type: form.value.type,
-        category: form.value.category,
         description: form.value.description,
+        category: form.value.category,
+        srid: form.value.srid || undefined,
         content: form.value.content,
-        color_mapping: form.value.color_mapping,
-        icon_mapping: form.value.icon_mapping,
-        srid: form.value.srid,
+        type: form.value.type,
+        metadata: {
+          color_mapping: form.value.color_mapping,
+          icon_mapping: form.value.icon_mapping,
+        },
       },
-    });
+    })) as any;
 
     if (response.success) {
       const action = props.mode === 'create' ? 'created' : 'updated';
@@ -903,7 +897,7 @@ const initializeColorMapping = () => {
     toast.add({
       title: 'No Properties Found',
       description: 'No properties found in GeoJSON features',
-      color: 'warning',
+      color: 'primary',
     });
     return;
   }
@@ -914,7 +908,7 @@ const initializeColorMapping = () => {
     toast.add({
       title: 'No Values Found',
       description: `No values found for property "${suggestedProperty}"`,
-      color: 'warning',
+      color: 'primary',
     });
     return;
   }
@@ -942,7 +936,7 @@ const initializeIconMapping = () => {
     toast.add({
       title: 'No Properties Found',
       description: 'No properties found in GeoJSON features',
-      color: 'warning',
+      color: 'primary',
     });
     return;
   }
@@ -953,7 +947,7 @@ const initializeIconMapping = () => {
     toast.add({
       title: 'No Values Found',
       description: `No values found for property "${suggestedProperty}"`,
-      color: 'warning',
+      color: 'primary',
     });
     return;
   }
@@ -994,7 +988,9 @@ const updateIconMapping = () => {
 // Preset management
 const loadPresets = async () => {
   try {
-    const response = await useNuxtApp().$civicApi('/api/v1/geography/presets');
+    const response = (await useNuxtApp().$civicApi(
+      '/api/v1/geography/presets'
+    )) as any;
     if (response.success) {
       presets.value = response.data || [];
     }
@@ -1011,7 +1007,7 @@ const applyPreset = async () => {
   if (!selectedPreset.value) return;
 
   try {
-    const response = await useNuxtApp().$civicApi(
+    const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography/presets/${selectedPreset.value}/apply`,
       {
         method: 'POST',
@@ -1020,7 +1016,7 @@ const applyPreset = async () => {
           icon_mapping: form.value.icon_mapping,
         },
       }
-    );
+    )) as any;
 
     if (response.success) {
       if (response.data.color_mapping) {

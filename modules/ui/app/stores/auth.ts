@@ -339,12 +339,12 @@ export const useAuthStore = defineStore('auth', {
       }
 
       try {
-        const response = await useNuxtApp().$civicApi('/auth/me', {
+        const response = (await useNuxtApp().$civicApi('/auth/me', {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${this.token}`,
           },
-        });
+        })) as any;
 
         if (response.success) {
           // Update user data from server

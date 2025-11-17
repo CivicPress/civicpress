@@ -358,7 +358,7 @@ const parseSizeString = (sizeStr: string): number => {
   };
 
   const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([A-Z]+)$/i);
-  if (!match) return 0;
+  if (!match || !match[1] || !match[2]) return 0;
 
   const value = parseFloat(match[1]);
   const unit = match[2].toUpperCase();
@@ -380,15 +380,15 @@ const uploadFiles = async () => {
     id: generateId(),
     file,
     progress: 0,
-    status: 'pending' as const,
-    message: undefined,
+    status: 'pending' as 'pending' | 'uploading' | 'completed' | 'error',
+    message: undefined as string | undefined,
   }));
 
   uploads.value.push(...newUploads);
 
   for (const item of newUploads) {
     try {
-      item.status = 'uploading' as const;
+      item.status = 'uploading' as 'pending' | 'uploading' | 'completed' | 'error';
       item.progress = 0;
 
       // Simulate progress (in real implementation, use XMLHttpRequest or fetch with progress)
@@ -401,9 +401,9 @@ const uploadFiles = async () => {
       // Upload file
       const formData = new FormData();
       formData.append('file', item.file);
-      formData.append('folder', props.folder);
-      if (item.description) {
-        formData.append('description', item.description);
+      formData.append('folder', props.folder || '');
+      if ((item as any).description) {
+        formData.append('description', (item as any).description);
       }
 
       const response = (await useNuxtApp().$civicApi(`/api/v1/storage/files`, {
@@ -414,9 +414,9 @@ const uploadFiles = async () => {
       clearInterval(progressInterval);
 
       if (response.success) {
-        item.status = 'completed' as const;
+        item.status = 'completed' as 'pending' | 'uploading' | 'completed' | 'error';
         item.progress = 100;
-        item.message = 'Upload successful';
+        item.message = 'Upload successful' as string | undefined;
 
         // Emit success
         emit('upload-complete', [
@@ -436,11 +436,11 @@ const uploadFiles = async () => {
         throw new Error(response.error?.message || 'Upload failed');
       }
     } catch (error) {
-      item.status = 'error' as const;
+      item.status = 'error' as 'pending' | 'uploading' | 'completed' | 'error';
       item.progress = 0;
-      item.message = error instanceof Error ? error.message : 'Upload failed';
+      item.message = (error instanceof Error ? error.message : 'Upload failed') as string | undefined;
 
-      emit('upload-error', item.message);
+      emit('upload-error', item.message || 'Upload failed');
     }
   }
 

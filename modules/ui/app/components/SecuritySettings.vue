@@ -24,7 +24,7 @@
           Security Overview
         </h3>
         <UBadge
-          :color="securityInfo?.emailVerified ? 'green' : 'yellow'"
+          :color="securityInfo?.emailVerified ? 'primary' : 'primary'"
           variant="subtle"
         >
           {{
@@ -226,7 +226,7 @@
               class="flex-1 w-full"
             />
             <UBadge
-              :color="securityInfo?.emailVerified ? 'green' : 'yellow'"
+              :color="securityInfo?.emailVerified ? 'primary' : 'primary'"
               variant="subtle"
             >
               {{ securityInfo?.emailVerified ? 'Verified' : 'Unverified' }}
@@ -257,7 +257,7 @@
               <div class="mt-3">
                 <UButton
                   size="sm"
-                  color="yellow"
+                  color="primary"
                   @click="handleSendEmailVerification"
                   :loading="emailVerificationLoading"
                 >
@@ -292,7 +292,7 @@
               <div class="mt-2 flex space-x-2">
                 <UButton
                   size="xs"
-                  color="yellow"
+                  color="primary"
                   variant="outline"
                   @click="cancelEmailChange"
                   :loading="emailLoading"
@@ -450,7 +450,7 @@ const fetchSecurityInfo = async () => {
     toast.add({
       title: 'Error',
       description: 'Failed to load security information',
-      color: 'red',
+      color: 'error',
     });
   } finally {
     loading.value = false;
@@ -481,7 +481,7 @@ const handlePasswordChange = async () => {
       toast.add({
         title: 'Success',
         description: result.message,
-        color: 'green',
+        color: 'primary',
       });
       resetPasswordForm();
     }
@@ -495,13 +495,13 @@ const handlePasswordChange = async () => {
       toast.add({
         title: 'Cannot Change Password',
         description: error.message,
-        color: 'yellow',
+        color: 'primary',
       });
     } else {
       toast.add({
         title: 'Password Change Failed',
         description: error.message || 'Failed to change password',
-        color: 'red',
+        color: 'error',
       });
     }
   } finally {
@@ -522,7 +522,7 @@ const handleEmailChange = async () => {
       toast.add({
         title: 'Email Change Requested',
         description: result.message,
-        color: 'green',
+        color: 'primary',
       });
       resetEmailForm();
       await fetchSecurityInfo(); // Refresh to show pending change
@@ -536,7 +536,7 @@ const handleEmailChange = async () => {
       toast.add({
         title: 'Email Change Failed',
         description: error.message || 'Failed to request email change',
-        color: 'red',
+        color: 'error',
       });
     }
   } finally {
@@ -553,7 +553,7 @@ const cancelEmailChange = async () => {
       toast.add({
         title: 'Email Change Cancelled',
         description: result.message,
-        color: 'green',
+        color: 'primary',
       });
       await fetchSecurityInfo(); // Refresh to hide pending change
     }
@@ -562,7 +562,7 @@ const cancelEmailChange = async () => {
     toast.add({
       title: 'Cancel Failed',
       description: error.message || 'Failed to cancel email change',
-      color: 'red',
+      color: 'error',
     });
   } finally {
     emailLoading.value = false;
@@ -578,7 +578,7 @@ const handleSendEmailVerification = async () => {
       toast.add({
         title: 'Verification Email Sent',
         description: result.message,
-        color: 'green',
+        color: 'primary',
       });
     }
   } catch (error: any) {
@@ -586,7 +586,7 @@ const handleSendEmailVerification = async () => {
     toast.add({
       title: 'Failed to Send Verification Email',
       description: error.message || 'Failed to send verification email',
-      color: 'red',
+      color: 'error',
     });
   } finally {
     emailVerificationLoading.value = false;

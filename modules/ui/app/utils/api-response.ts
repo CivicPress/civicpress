@@ -42,7 +42,7 @@ export function validateApiResponse<T = any>(
     // Validate required fields if specified
     if (requiredFields && Array.isArray(requiredFields)) {
       for (const field of requiredFields) {
-        if (!(field in data)) {
+        if (!(field in (data as object))) {
           throw new Error(`Missing required field: ${field}`);
         }
       }

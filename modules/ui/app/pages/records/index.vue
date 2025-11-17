@@ -230,7 +230,7 @@ const breadcrumbItems = [
 ];
 
 // Breadcrumbs ref for scroll-to-top functionality
-const breadcrumbsRef = ref<HTMLElement>();
+const breadcrumbsRef = ref<HTMLElement | undefined>();
 </script>
 
 <template>
@@ -283,7 +283,7 @@ const breadcrumbsRef = ref<HTMLElement>();
         <RecordList
           :filters="filters"
           :search-query="searchQuery"
-          :breadcrumbs-ref="breadcrumbsRef"
+          :breadcrumbs-ref="breadcrumbsRef as any"
           :sort="sort"
           @resetFilters="resetAllFilters"
         />

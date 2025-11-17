@@ -15,7 +15,8 @@ export interface ErrorOptions {
 }
 
 export function useErrorHandler() {
-  const { $toast } = useNuxtApp();
+  const nuxtApp = useNuxtApp();
+  const $toast = (nuxtApp as any).$toast;
 
   /**
    * Handle API errors with consistent formatting and user feedback
@@ -37,11 +38,11 @@ export function useErrorHandler() {
     }
 
     // Show toast notification if enabled
-    if (showToast && $toast) {
+    if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
         description: errorMessage,
-        color: 'red',
+        color: 'error',
         icon: 'i-lucide-alert-circle',
         timeout: 5000,
       });
@@ -73,11 +74,11 @@ export function useErrorHandler() {
       console.error(`[${title}]`, message, error);
     }
 
-    if (showToast && $toast) {
+    if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
         description: message,
-        color: 'red',
+        color: 'error',
         icon: 'i-lucide-wifi-off',
         timeout: 8000,
       });
@@ -116,11 +117,11 @@ export function useErrorHandler() {
       console.warn(`[${title}]`, message, error);
     }
 
-    if (showToast && $toast) {
+    if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
         description: message,
-        color: 'orange',
+        color: 'primary',
         icon: 'i-lucide-alert-triangle',
         timeout: 6000,
       });
@@ -145,11 +146,11 @@ export function useErrorHandler() {
       console.error(`[${title}]`, message, error);
     }
 
-    if (showToast && $toast) {
+    if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
         description: message,
-        color: 'red',
+        color: 'error',
         icon: 'i-lucide-shield-alert',
         timeout: 5000,
       });
