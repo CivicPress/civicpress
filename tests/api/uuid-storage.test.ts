@@ -445,7 +445,7 @@ describe('UUID Storage API', () => {
       expect(downloadResponse.headers['content-disposition']).toBeDefined();
     });
 
-    it('should enforce authenticated access for icons folder', async () => {
+    it('should allow public access for icons folder', async () => {
       // Upload an icon first
       const uploadResponse = await request(context.api.getApp())
         .post('/api/v1/storage/files')
@@ -457,13 +457,13 @@ describe('UUID Storage API', () => {
       expect(uploadResponse.status).toBe(200);
       const iconId = uploadResponse.body.data.id;
 
-      // Icons folder should require authentication (access: authenticated)
+      // Icons folder should allow public access (access: public)
       const unauthenticatedResponse = await request(context.api.getApp()).get(
         `/api/v1/storage/files/${iconId}`
       );
 
-      // Should require authentication for icons folder
-      expect(unauthenticatedResponse.status).toBe(401);
+      // Should allow public access for icons folder
+      expect(unauthenticatedResponse.status).toBe(200);
     });
 
     it('should accept various image formats in icons folder', async () => {
@@ -530,9 +530,7 @@ describe('UUID Storage API', () => {
       expect(response.body.data.config.folders).toBeDefined();
       expect(response.body.data.config.folders.icons).toBeDefined();
       expect(response.body.data.config.folders.icons.path).toBe('icons');
-      expect(response.body.data.config.folders.icons.access).toBe(
-        'authenticated'
-      );
+      expect(response.body.data.config.folders.icons.access).toBe('public');
       expect(response.body.data.config.folders.icons.allowed_types).toContain(
         'png'
       );

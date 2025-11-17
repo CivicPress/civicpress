@@ -29,22 +29,22 @@
         </template>
 
         <div class="grid gap-4 max-w-xl">
-          <UFormGroup label="Recipient" :error="errors.to">
+          <UFormField label="Recipient" name="to" :error="errors.to">
             <UInput v-model="form.to" placeholder="you@example.com" />
-          </UFormGroup>
-          <UFormGroup label="Subject">
+          </UFormField>
+          <UFormField label="Subject" name="subject">
             <UInput
               v-model="form.subject"
               placeholder="Test email from CivicPress"
             />
-          </UFormGroup>
-          <UFormGroup label="Message">
+          </UFormField>
+          <UFormField label="Message" name="message">
             <UTextarea
               v-model="form.message"
               :rows="5"
               placeholder="Hello from CivicPress!"
             />
-          </UFormGroup>
+          </UFormField>
           <div class="flex items-center gap-2">
             <USelect
               v-model="form.provider"
@@ -66,7 +66,7 @@
 import { ref } from 'vue';
 import SystemFooter from '~/components/SystemFooter.vue';
 import { useAuthStore } from '~/stores/auth';
-import { useNuxtApp } from '#app';
+import { useNuxtApp } from '#imports';
 
 definePageMeta({
   layout: 'default',

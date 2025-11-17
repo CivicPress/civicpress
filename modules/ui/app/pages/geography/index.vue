@@ -213,7 +213,7 @@ import type {
   GeographyFile,
   GeographyCategory,
   GeographyFileType,
-} from '@civicpress/core';
+} from '~/types/geography';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
@@ -274,7 +274,7 @@ const filteredFiles = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
-      (file) =>
+      (file: GeographyFile) =>
         file.name.toLowerCase().includes(query) ||
         file.description.toLowerCase().includes(query)
     );
@@ -282,12 +282,14 @@ const filteredFiles = computed(() => {
 
   if (selectedCategory.value) {
     filtered = filtered.filter(
-      (file) => file.category === selectedCategory.value
+      (file: GeographyFile) => file.category === selectedCategory.value
     );
   }
 
   if (selectedType.value) {
-    filtered = filtered.filter((file) => file.type === selectedType.value);
+    filtered = filtered.filter(
+      (file: GeographyFile) => file.type === selectedType.value
+    );
   }
 
   return filtered;
@@ -361,7 +363,7 @@ const navigateToEdit = (id: string) => {
 };
 
 const getFileTypeIcon = (type: GeographyFileType): string => {
-  const icons = {
+  const icons: Record<GeographyFileType, string> = {
     geojson: 'i-lucide-map',
     kml: 'i-lucide-map-pin',
     gpx: 'i-lucide-route',
@@ -371,7 +373,7 @@ const getFileTypeIcon = (type: GeographyFileType): string => {
 };
 
 const getCategoryColor = (category: GeographyCategory): string => {
-  const colors = {
+  const colors: Record<GeographyCategory, string> = {
     zone: 'blue',
     boundary: 'green',
     district: 'purple',

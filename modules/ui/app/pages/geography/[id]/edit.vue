@@ -124,7 +124,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import type { GeographyFile } from '@civicpress/core';
+import type { GeographyFile } from '~/types/geography';
 import GeographyForm from '~/components/GeographyForm.vue';
 import SystemFooter from '~/components/SystemFooter.vue';
 

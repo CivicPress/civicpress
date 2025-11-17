@@ -172,7 +172,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { GeographyFile } from '@civicpress/core';
+import type { GeographyFile } from '~/types/geography';
 import GeographySelector from './GeographySelector.vue';
 import GeographyMap from './GeographyMap.vue';
 

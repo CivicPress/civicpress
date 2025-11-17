@@ -1,10 +1,6 @@
-import type { UseFetchOptions } from 'nuxt/app';
-
 export function useCivicApi<T>(
   url: string | (() => string),
-  options?: Omit<UseFetchOptions<T>, 'default'> & {
-    default: () => T | Ref<T>;
-  }
+  options?: Parameters<typeof useFetch<T>>[1]
 ) {
   return useFetch(url, {
     ...options,

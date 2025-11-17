@@ -240,7 +240,7 @@ The CivicPress UI is divided into **two layers**:
 
 ## 🧱 Frameworks
 
-- **Nuxt 3** (recommended): handles SSR, SSG, file-based routing
+- **Nuxt 4** (recommended): handles SSR, SSG, file-based routing
 - **Tailwind CSS**: styling baseline
 - **Headless UI (Vue)**: component logic (dialogs, tabs, etc.)
 - Optional: TinaCMS or Decap for file-based visual editing

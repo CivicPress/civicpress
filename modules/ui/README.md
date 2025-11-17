@@ -252,9 +252,11 @@ When contributing to the UI module:
 
 ### Core
 
-- `nuxt`: ^4.0.0
-- `@nuxt/ui-pro`: Latest version
-- `vue`: ^3.5.0
+- `nuxt`: ^4.2.1 (Nuxt 4 - latest stable)
+- `@nuxt/ui-pro`: ^3.3.7 (Nuxt UI Pro 3 - Nuxt 4 compatible)
+- `vue`: ^3.5.18
+- `@pinia/nuxt`: ^0.11.3
+- `pinia`: ^3.0.4
 
 ### Development Tools
 

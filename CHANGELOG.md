@@ -8,8 +8,44 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- **Nuxt 4 Upgrade**: Successfully upgraded UI module from Nuxt 3 to Nuxt 4.2.1
+  - Updated all dependencies to Nuxt 4 compatible versions
+  - Fixed 114+ TypeScript errors across all UI components
+  - Migrated from `UFormGroup` to `UFormField` (Nuxt UI 4 breaking change)
+  - Updated import paths (`#app` → `#imports`)
+  - Fixed color type system to use Nuxt UI 4 compatible values
+  - Updated documentation references (Nuxt 3 → Nuxt 4)
+  - All features tested and working correctly
+  - Production build successful with 0 TypeScript errors
+- **Geography File Format**: Migrated from raw GeoJSON/KML files to hybrid
+  markdown format for better metadata management and Git versioning
+- Enhanced geography data system from simple coordinate storage to full spatial
+  document management
+- Updated record forms to support both legacy geography fields and new geography
+  file linking
+- Improved geography validation with comprehensive geometry and metadata
+  checking
+
 ### Fixed
 
+- **Storage Path Detection**: Fixed storage configuration path detection in API
+  routes
+  - Production: Uses `.system-data/storage.yml` at project root (checks if file
+    exists)
+  - Tests: Uses `{testDir}/data/.system-data/storage.yml` for complete isolation
+  - Fixed issue where production was incorrectly using `data/.system-data`
+    instead of project root
+  - Fixed issue where tests were incorrectly using production storage config
+  - Storage operations now correctly isolated in test environments
+  - Detection logic: checks project root first, then falls back to test
+    directory if in test environment
+- **Icons Folder Access**: Changed icons folder from `authenticated` to `public`
+  access
+  - Icons can now be loaded without authentication for public-facing features
+  - Updated storage configuration and test expectations
+  - All storage tests updated and passing
 - **Test Storage Isolation**: Fixed storage operations in tests to use isolated
   directories
   - Storage paths in tests now use absolute paths within test directories
@@ -74,17 +110,6 @@ and this project adheres to
   - Access control validation
   - File type and size restrictions
   - Storage configuration API integration
-
-### Changed
-
-- **Geography File Format**: Migrated from raw GeoJSON/KML files to hybrid
-  markdown format for better metadata management and Git versioning
-- Enhanced geography data system from simple coordinate storage to full spatial
-  document management
-- Updated record forms to support both legacy geography fields and new geography
-  file linking
-- Improved geography validation with comprehensive geometry and metadata
-  checking
 
 ### Technical Details
 

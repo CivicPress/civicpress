@@ -474,11 +474,22 @@
                     value
                   }}</span>
                   <UInput
-                    v-model="form.icon_mapping.icons[value]?.url"
+                    :model-value="form.icon_mapping?.icons?.[value]?.url || ''"
+                    @update:model-value="
+                      (val) => {
+                        if (!form.icon_mapping) {
+                          form.icon_mapping = { icons: {}, type: 'property' };
+                        }
+                        if (!form.icon_mapping.icons[value]) {
+                          form.icon_mapping.icons[value] = { url: '' };
+                        }
+                        form.icon_mapping.icons[value].url = val;
+                        updateIconMapping();
+                      }
+                    "
                     type="text"
                     placeholder="https://example.com/icon.png or UUID"
                     class="flex-1 text-xs"
-                    @input="updateIconMapping"
                   />
                 </div>
               </div>
@@ -508,7 +519,7 @@ import type {
   ParsedGeographyData,
   GeographyValidationResult,
   GeographyFile,
-} from '@civicpress/core';
+} from '~/types/geography';
 
 // Props
 interface Props {

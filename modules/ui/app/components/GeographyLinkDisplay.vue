@@ -145,7 +145,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import type { GeographyFile } from '@civicpress/core';
+import type { GeographyFile } from '~/types/geography';
 import GeographyMap from './GeographyMap.vue';
 
 // Props

@@ -756,7 +756,7 @@ export function createStorageConfig(config: TestConfig) {
       },
       icons: {
         path: 'icons',
-        access: 'authenticated',
+        access: 'public',
         allowed_types: ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp', 'ico'],
         max_size: '2MB',
         description: 'Icons and map-related images for geography records',
@@ -1391,35 +1391,49 @@ export async function createCLITestContext(): Promise<CLITestContext> {
       { encoding: 'utf8' }
     );
 
-    // Extract JSON from the output - look for the last JSON object
-    const lines = authResult.split('\n');
+    // Extract JSON from the output - the CLI might output warnings before JSON
+    // Look for JSON object in the output (might be on single line or multiple lines)
+    const fullOutput = authResult.trim();
 
-    // Find the last line that starts with '{' (the JSON response)
-    let jsonStart = -1;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      if (lines[i].trim().startsWith('{')) {
-        jsonStart = i;
-        break;
+    // Try to find JSON object by looking for '{' and matching '}'
+    const firstBrace = fullOutput.indexOf('{');
+    if (firstBrace === -1) {
+      throw new Error('No JSON output found in simulated authentication');
+    }
+
+    // Find the matching closing brace
+    let braceDepth = 0;
+    let jsonEnd = -1;
+
+    for (let i = firstBrace; i < fullOutput.length; i++) {
+      if (fullOutput[i] === '{') braceDepth++;
+      if (fullOutput[i] === '}') {
+        braceDepth--;
+        if (braceDepth === 0) {
+          jsonEnd = i + 1;
+          break;
+        }
       }
     }
 
-    if (jsonStart !== -1) {
-      // Parse from the start of JSON to the end
-      const jsonText = lines.slice(jsonStart).join('\n');
-      try {
-        const authJson = JSON.parse(jsonText);
-        if (authJson.success && authJson.session && authJson.session.token) {
-          adminToken = authJson.session.token;
-        } else {
-          throw new Error('Invalid JSON structure from auth:simulated');
-        }
-      } catch (parseError) {
-        throw new Error(
-          `Failed to parse JSON from auth:simulated: ${parseError}`
-        );
+    if (jsonEnd === -1) {
+      throw new Error(
+        'Incomplete JSON object in simulated authentication output'
+      );
+    }
+
+    const jsonText = fullOutput.substring(firstBrace, jsonEnd);
+    try {
+      const authJson = JSON.parse(jsonText);
+      if (authJson.success && authJson.session && authJson.session.token) {
+        adminToken = authJson.session.token;
+      } else {
+        throw new Error('Invalid JSON structure from auth:simulated');
       }
-    } else {
-      throw new Error('No JSON output found in simulated authentication');
+    } catch (parseError: any) {
+      throw new Error(
+        `Failed to parse JSON from auth:simulated: ${parseError.message}`
+      );
     }
   } catch (error) {
     // If admin user creation failed, we'll continue without admin token

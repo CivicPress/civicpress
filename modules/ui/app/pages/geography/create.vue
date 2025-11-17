@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import type { GeographyFile } from '@civicpress/core';
+import type { GeographyFile } from '~/types/geography';
 import GeographyForm from '~/components/GeographyForm.vue';
 import SystemFooter from '~/components/SystemFooter.vue';
 

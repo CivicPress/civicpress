@@ -22,7 +22,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-import type { ColorMapping, IconMapping, IconConfig } from '@civicpress/core';
+import type { ColorMapping, IconMapping, IconConfig } from '~/types/geography';
 
 interface Props {
   geographyData?: any;
@@ -70,7 +70,7 @@ const isUUID = (str: string): boolean => {
 /**
  * Convert UUID to blob URL by fetching from API
  */
-const uuidToBlobUrl = async (uuid: string): Promise<string> => {
+const uuidToBlobUrl = async (uuid: string): Promise<string | null> => {
   // Check cache first
   if (blobUrlCache.has(uuid)) {
     return blobUrlCache.get(uuid)!;
@@ -86,9 +86,11 @@ const uuidToBlobUrl = async (uuid: string): Promise<string> => {
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch file: ${response.status} ${response.statusText}`
+      // Log error but don't throw - return null to indicate failure
+      console.warn(
+        `Failed to fetch file ${uuid}: ${response.status} ${response.statusText}`
       );
+      return null;
     }
 
     const blob = await response.blob();
@@ -99,15 +101,16 @@ const uuidToBlobUrl = async (uuid: string): Promise<string> => {
 
     return blobUrl;
   } catch (error) {
-    console.error('Failed to load icon from UUID:', uuid, error);
-    throw error;
+    // Log error but don't throw - return null to indicate failure
+    console.warn('Failed to load icon from UUID:', uuid, error);
+    return null;
   }
 };
 
 /**
  * Resolve icon URL - convert UUID to blob URL if needed
  */
-const resolveIconUrl = async (url: string): Promise<string> => {
+const resolveIconUrl = async (url: string): Promise<string | null> => {
   // If it's already a full URL (http/https), use it directly
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
@@ -243,9 +246,17 @@ const preResolveIcons = async (data: any) => {
       if (!resolvedIconCache.has(url)) {
         try {
           const resolved = await resolveIconUrl(url);
-          resolvedIconCache.set(url, resolved);
+          if (resolved) {
+            resolvedIconCache.set(url, resolved);
+          } else {
+            // Cache empty string to avoid retrying failed URLs
+            resolvedIconCache.set(url, '');
+            console.warn('Failed to resolve icon URL:', url);
+          }
         } catch (error) {
-          console.error('Failed to resolve icon URL:', url, error);
+          // Cache empty string to avoid retrying failed URLs
+          resolvedIconCache.set(url, '');
+          console.warn('Failed to resolve icon URL:', url, error);
         }
       }
     })
@@ -273,13 +284,17 @@ const getFeatureIcon = (feature: any): L.Icon | null => {
     if (iconConfig && isValidIconConfig(iconConfig)) {
       const url = typeof iconConfig === 'string' ? iconConfig : iconConfig.url;
       const resolvedUrl = resolvedIconCache.get(url) || url;
+      // Skip if URL resolution failed (empty string in cache)
+      if (!resolvedUrl || resolvedUrl === '') {
+        return null;
+      }
       try {
         return createLeafletIconSync({
           ...(typeof iconConfig === 'object' ? iconConfig : {}),
           url: resolvedUrl,
         });
       } catch (error) {
-        console.error('Failed to create icon:', error);
+        console.warn('Failed to create icon:', error);
         return null;
       }
     }
@@ -295,6 +310,10 @@ const getFeatureIcon = (feature: any): L.Icon | null => {
         const url =
           typeof iconConfig === 'string' ? iconConfig : iconConfig.url;
         const resolvedUrl = resolvedIconCache.get(url) || url;
+        // Skip if URL resolution failed (empty string in cache)
+        if (!resolvedUrl || resolvedUrl === '') {
+          return null;
+        }
         try {
           return createLeafletIconSync({
             ...(typeof iconConfig === 'object' ? iconConfig : {}),

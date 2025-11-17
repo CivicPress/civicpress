@@ -121,17 +121,39 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
       throw new Error('CivicPress instance not available');
     }
 
-    // Get dataDir from request context (avoids CentralConfigManager cache issues in tests)
-    // Storage configuration is in dataDir/.system-data, not project root
-    const dataDir = (req as any).context?.dataDir;
+    // Get system data directory
+    // In production: .system-data is at project root
+    // In tests: .system-data is at {dataDir}/.system-data
+    // Check project root first, then fall back to contextDataDir for tests
+    const contextDataDir = (req as any).context?.dataDir;
     let systemDataDir: string;
-    if (!dataDir) {
-      // Fallback to CentralConfigManager if not in context (production)
-      const { CentralConfigManager } = await import('@civicpress/core');
-      const fallbackDataDir = CentralConfigManager.getDataDir();
-      systemDataDir = path.join(fallbackDataDir, '.system-data');
-    } else {
-      systemDataDir = path.join(dataDir, '.system-data');
+
+    // Default to project root .system-data (production)
+    const projectRootSystemData = path.join(process.cwd(), '.system-data');
+
+    // Check if we're in a test environment by checking if contextDataDir is in a temp directory
+    // or if .system-data doesn't exist at project root
+    const fs = await import('fs/promises');
+    const isTestEnvironment =
+      contextDataDir &&
+      (contextDataDir.includes('/tmp/') ||
+        contextDataDir.includes('test') ||
+        process.env.NODE_ENV === 'test');
+
+    try {
+      await fs.access(projectRootSystemData);
+      // .system-data exists at project root, use it (production)
+      systemDataDir = projectRootSystemData;
+    } catch {
+      // .system-data doesn't exist at project root
+      if (isTestEnvironment && contextDataDir) {
+        // Test environment: use contextDataDir/.system-data
+        systemDataDir = path.join(contextDataDir, '.system-data');
+      } else {
+        // Production but .system-data missing at root - use project root anyway
+        // (will fail with clear error if missing)
+        systemDataDir = projectRootSystemData;
+      }
     }
 
     configManager = new StorageConfigManager(systemDataDir);
@@ -149,13 +171,24 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
       storageService.setDatabaseService(databaseService);
       await storageService.initialize();
     } catch (error: any) {
+      // Log the actual error for debugging
+      console.error('Storage initialization error:', {
+        message: error.message,
+        stack: error.stack,
+        systemDataDir,
+        configPath: configManager
+          ? (configManager as any).configPath
+          : 'unknown',
+      });
+
       // If storage config doesn't exist, return a helpful error
       if (error.message.includes('Storage configuration not found')) {
         throw new Error(
           'Storage configuration not initialized. Please run "civic init" to set up storage.'
         );
       }
-      throw error;
+      // Re-throw with more context
+      throw new Error(`Failed to load storage configuration: ${error.message}`);
     }
   }
 };
@@ -250,11 +283,31 @@ router.post(
           res
         );
       } else {
+        // Determine status code based on error message
+        const errorMessage = result.error || 'Upload failed';
+        let statusCode: number | undefined;
+
+        // Check if error is about file size
+        if (
+          errorMessage.toLowerCase().includes('size') ||
+          errorMessage.toLowerCase().includes('limit') ||
+          errorMessage.toLowerCase().includes('exceeds')
+        ) {
+          statusCode = 413; // Payload Too Large
+        } else if (
+          errorMessage.toLowerCase().includes('type') ||
+          errorMessage.toLowerCase().includes('format') ||
+          errorMessage.toLowerCase().includes('invalid')
+        ) {
+          statusCode = 400; // Bad Request
+        }
+
         return handleStorageError(
           'upload_file',
-          new Error(result.error || 'Upload failed'),
+          new Error(errorMessage),
           req,
-          res
+          res,
+          statusCode
         );
       }
     } catch (error: any) {

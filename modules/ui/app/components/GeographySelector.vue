@@ -159,7 +159,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useDebounceFn } from '@vueuse/core';
-import type { GeographyFile } from '@civicpress/core';
+import type { GeographyFile, GeographyCategory } from '~/types/geography';
 
 // Props
 // Note: For v-model:selected-ids, Vue converts kebab-case to camelCase
@@ -193,10 +193,12 @@ const selectedCategory = ref<string | null>(null);
 
 // Computed
 const categoryOptions = computed(() => {
-  const categories = new Set(geographyFiles.value.map((file) => file.category));
+  const categories = new Set(
+    geographyFiles.value.map((file: GeographyFile) => file.category)
+  );
   return [
     { label: 'All Categories', value: null },
-    ...Array.from(categories).map((category) => ({
+    ...Array.from(categories).map((category: GeographyCategory) => ({
       label: category,
       value: category,
     })),
@@ -210,7 +212,7 @@ const filteredFiles = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(
-      (file) =>
+      (file: GeographyFile) =>
         file.name.toLowerCase().includes(query) ||
         file.description?.toLowerCase().includes(query) ||
         file.category.toLowerCase().includes(query)
@@ -220,7 +222,7 @@ const filteredFiles = computed(() => {
   // Filter by category
   if (selectedCategory.value) {
     filtered = filtered.filter(
-      (file) => file.category === selectedCategory.value
+      (file: GeographyFile) => file.category === selectedCategory.value
     );
   }
 
@@ -228,7 +230,7 @@ const filteredFiles = computed(() => {
 });
 
 const selectedFiles = computed(() => {
-  return geographyFiles.value.filter((file) =>
+  return geographyFiles.value.filter((file: GeographyFile) =>
     props.selectedIds.includes(file.id)
   );
 });
