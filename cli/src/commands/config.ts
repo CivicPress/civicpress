@@ -603,8 +603,33 @@ export function registerConfigCommands(cli: CAC) {
       const logger = initializeLogger();
       const { json } = getGlobalOptionsFromArgs();
       try {
-        const service = createConfigService();
-        const status = await service.getConfigurationStatus();
+        let service;
+        try {
+          service = createConfigService();
+        } catch (serviceError: any) {
+          const serviceErrMsg =
+            serviceError?.message ||
+            serviceError?.toString() ||
+            String(serviceError) ||
+            'Unknown error';
+          throw new Error(
+            `Failed to create configuration service: ${serviceErrMsg}`
+          );
+        }
+
+        let status;
+        try {
+          status = await service.getConfigurationStatus();
+        } catch (statusError: any) {
+          const statusErrMsg =
+            statusError?.message ||
+            statusError?.toString() ||
+            String(statusError) ||
+            'Unknown error';
+          throw new Error(
+            `Failed to get configuration status: ${statusErrMsg}`
+          );
+        }
 
         const initOne = async (t: string) => {
           const state = (status as any)[t];
@@ -630,7 +655,20 @@ export function registerConfigCommands(cli: CAC) {
         }
 
         const results: Array<{ type: string; created: boolean }> = [];
-        for (const t of types) results.push(await initOne(t));
+        for (const t of types) {
+          try {
+            results.push(await initOne(t));
+          } catch (initError: any) {
+            const initErrMsg =
+              initError?.message ||
+              initError?.toString() ||
+              String(initError) ||
+              'Unknown error';
+            throw new Error(
+              `Failed to initialize configuration ${t}: ${initErrMsg}`
+            );
+          }
+        }
 
         if (json) {
           console.log(
@@ -644,13 +682,48 @@ export function registerConfigCommands(cli: CAC) {
           }
         }
       } catch (err: any) {
-        const errorMessage = err?.message || err?.toString() || 'Unknown error';
+        // Extract error message from various error formats
+        let errorMessage = 'Unknown error';
+        if (err?.message && err.message.trim()) {
+          errorMessage = err.message;
+        } else if (typeof err === 'string' && err.trim()) {
+          errorMessage = err;
+        } else if (
+          err?.toString &&
+          err.toString() !== '[object Object]' &&
+          err.toString().trim()
+        ) {
+          errorMessage = err.toString();
+        } else if (err?.stack) {
+          errorMessage = err.stack.split('\n')[0];
+        }
+
+        // If still empty, try to get more context
+        if (errorMessage === 'Unknown error' || !errorMessage.trim()) {
+          // Try to extract from stack trace
+          if (err?.stack) {
+            const stackLines = err.stack.split('\n');
+            if (stackLines.length > 1) {
+              errorMessage =
+                stackLines[1].trim() ||
+                `Error occurred during initialization${err?.code ? ` (code: ${err.code})` : ''}`;
+            } else {
+              errorMessage = `Error occurred during initialization${err?.code ? ` (code: ${err.code})` : ''}`;
+            }
+          } else {
+            errorMessage = `Error occurred during initialization${err?.code ? ` (code: ${err.code})` : ''}`;
+          }
+        }
+
         if (json) {
           console.log(
             JSON.stringify({ success: false, error: errorMessage }, null, 2)
           );
         } else {
           logger.error('❌ Initialization failed:', errorMessage);
+          if (err?.stack && !json) {
+            logger.debug('Stack trace:', err.stack);
+          }
         }
         process.exit(1);
       }

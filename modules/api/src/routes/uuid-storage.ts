@@ -140,16 +140,17 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
         contextDataDir.includes('test') ||
         process.env.NODE_ENV === 'test');
 
-    try {
-      await fs.access(projectRootSystemData);
-      // .system-data exists at project root, use it (production)
-      systemDataDir = projectRootSystemData;
-    } catch {
-      // .system-data doesn't exist at project root
-      if (isTestEnvironment && contextDataDir) {
-        // Test environment: use contextDataDir/.system-data
-        systemDataDir = path.join(contextDataDir, '.system-data');
-      } else {
+    // In test environments, always use test directory to ensure isolation
+    if (isTestEnvironment && contextDataDir) {
+      // Test environment: use contextDataDir/.system-data (isolated per test)
+      systemDataDir = path.join(contextDataDir, '.system-data');
+    } else {
+      // Production: check if .system-data exists at project root
+      try {
+        await fs.access(projectRootSystemData);
+        // .system-data exists at project root, use it (production)
+        systemDataDir = projectRootSystemData;
+      } catch {
         // Production but .system-data missing at root - use project root anyway
         // (will fail with clear error if missing)
         systemDataDir = projectRootSystemData;

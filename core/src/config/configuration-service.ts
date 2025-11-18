@@ -186,8 +186,12 @@ export class ConfigurationService {
         await mkdir(dirname(userPath), { recursive: true });
       }
       await this.saveConfiguration(configType, defaultConfig);
-    } catch (error) {
-      throw new Error(`Failed to reset configuration ${configType}: ${error}`);
+    } catch (error: any) {
+      const errorMsg =
+        error?.message || error?.toString() || String(error) || 'Unknown error';
+      throw new Error(
+        `Failed to reset configuration ${configType}: ${errorMsg}`
+      );
     }
   }
 

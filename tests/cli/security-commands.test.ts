@@ -34,6 +34,27 @@ describe('CLI Security Commands', () => {
       // Create test users
       const authService = civic.getAuthService();
 
+      // Check if users already exist and delete them first to avoid UNIQUE constraint errors
+      try {
+        const existingPasswordUser =
+          await authService.getUserByUsername('clipassworduser');
+        if (existingPasswordUser) {
+          await authService.deleteUser(existingPasswordUser.id);
+        }
+      } catch {
+        // User doesn't exist, continue
+      }
+
+      try {
+        const existingGithubUser =
+          await authService.getUserByUsername('cligithubuser');
+        if (existingGithubUser) {
+          await authService.deleteUser(existingGithubUser.id);
+        }
+      } catch {
+        // User doesn't exist, continue
+      }
+
       // Create password-authenticated user
       const passwordUser = await authService.createUserWithPassword({
         username: 'clipassworduser',
