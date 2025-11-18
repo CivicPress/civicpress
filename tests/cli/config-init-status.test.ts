@@ -27,6 +27,7 @@ describe('CLI Config - status and init', () => {
     const out = execSync(`node ${context.cliPath} config:init --all`, {
       cwd: context.testDir,
     }).toString();
-    expect(out).toMatch(/Initialized|'Skipped/);
+    // Match either "Initialized" or "Skipped" (with or without emoji)
+    expect(out).toMatch(/Initialized|Skipped/);
   });
 });

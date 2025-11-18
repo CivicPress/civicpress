@@ -99,19 +99,23 @@ export class CloudUuidStorageService {
    * Initialize local storage
    */
   private async initializeLocalStorage(provider: any): Promise<void> {
-    const storagePath = path.resolve(this.basePath, provider.path || 'storage');
-    await fs.ensureDir(storagePath);
+    // Use the same path resolution logic as getLocalStoragePath()
+    const storagePath = provider.path || 'storage';
+    const resolvedPath = path.isAbsolute(storagePath)
+      ? storagePath
+      : path.resolve(this.basePath, storagePath);
+    await fs.ensureDir(resolvedPath);
 
-    // Create configured folders
-    for (const [folderName, folderConfig] of Object.entries(
-      this.config.folders
-    )) {
-      const folderPath = path.join(storagePath, folderConfig.path);
-      await fs.ensureDir(folderPath);
-      this.logger.info(
-        `Initialized local folder: ${folderName} -> ${folderPath}`
-      );
-    }
+        // Create configured folders
+        for (const [folderName, folderConfig] of Object.entries(
+          this.config.folders
+        )) {
+          const folderPath = path.join(resolvedPath, folderConfig.path);
+          await fs.ensureDir(folderPath);
+          this.logger.info(
+            `Initialized local folder: ${folderName} -> ${folderPath}`
+          );
+        }
   }
 
   /**

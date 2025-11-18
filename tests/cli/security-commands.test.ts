@@ -19,8 +19,20 @@ describe('CLI Security Commands', () => {
     if (context.adminToken) {
       adminToken = context.adminToken;
 
+      // Create CivicPress instance for test user creation
+      const { CivicPress } = await import('@civicpress/core');
+      const { CentralConfigManager } = await import('@civicpress/core');
+      const dataDir = CentralConfigManager.getDataDir();
+      const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+      const civic = new CivicPress({
+        dataDir,
+        database: dbConfig,
+      });
+      await civic.initialize();
+
       // Create test users
-      const authService = context.civic.getAuthService();
+      const authService = civic.getAuthService();
 
       // Create password-authenticated user
       const passwordUser = await authService.createUserWithPassword({

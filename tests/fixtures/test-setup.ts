@@ -88,6 +88,55 @@ export function releasePort(port: number): void {
   usedPorts.delete(port);
 }
 
+/**
+ * Extract JSON from CLI output that may contain mixed text and JSON.
+ * Looks for the last JSON object in the output.
+ */
+export function extractJSONFromOutput(output: string): any {
+  const fullOutput = output.trim();
+
+  // Find the last '{' in the output (most likely the JSON response)
+  let lastBrace = -1;
+  for (let i = fullOutput.length - 1; i >= 0; i--) {
+    if (fullOutput[i] === '{') {
+      lastBrace = i;
+      break;
+    }
+  }
+
+  if (lastBrace === -1) {
+    throw new Error('No JSON output found in CLI output');
+  }
+
+  // Find the matching closing brace
+  let braceDepth = 0;
+  let jsonEnd = -1;
+
+  for (let i = lastBrace; i < fullOutput.length; i++) {
+    if (fullOutput[i] === '{') braceDepth++;
+    if (fullOutput[i] === '}') {
+      braceDepth--;
+      if (braceDepth === 0) {
+        jsonEnd = i + 1;
+        break;
+      }
+    }
+  }
+
+  if (jsonEnd === -1) {
+    throw new Error('Incomplete JSON object in CLI output');
+  }
+
+  const jsonText = fullOutput.substring(lastBrace, jsonEnd);
+  try {
+    return JSON.parse(jsonText);
+  } catch (parseError: any) {
+    throw new Error(
+      `Failed to parse JSON from CLI output: ${parseError.message}`
+    );
+  }
+}
+
 let cliBuilt = false;
 
 export function ensureCliBuilt(): void {
@@ -1367,6 +1416,7 @@ export async function createCLITestContext(): Promise<CLITestContext> {
   createCivicConfig(config);
   createWorkflowConfig(config);
   createRolesConfig(config);
+  createStorageConfig(config);
   createSampleRecords(config);
 
   // Ensure CLI is built before executing commands

@@ -24,6 +24,7 @@
   "license": "MIT",
   "dependencies": {
     "@civicpress/core": "workspace:*",
+    "@civicpress/storage": "workspace:*",
     "@types/diff": "8.0.0",
     "cac": "^6.7.14",
     "chalk": "^5.0.0",

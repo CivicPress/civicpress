@@ -2,7 +2,62 @@ import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
 import fs from 'fs-extra';
-import fetch from 'node-fetch';
+import path from 'path';
+import {
+  CloudUuidStorageService,
+  StorageConfigManager,
+  StorageFile,
+  MulterFile,
+} from '@civicpress/storage';
+
+// Helper function to initialize storage services
+async function initializeStorageServices(
+  civic: CivicPress,
+  dataDir: string
+): Promise<{
+  storageService: CloudUuidStorageService;
+  configManager: StorageConfigManager;
+}> {
+  // Determine system data directory (same logic as API routes)
+  const projectRootSystemData = path.join(process.cwd(), '.system-data');
+  const isTestEnvironment =
+    dataDir.includes('/tmp/') ||
+    dataDir.includes('test') ||
+    process.env.NODE_ENV === 'test';
+
+  let systemDataDir: string;
+
+  // In test environments, always use test directory to ensure isolation
+  if (isTestEnvironment) {
+    // Test environment: use dataDir/.system-data (isolated per test)
+    systemDataDir = path.join(dataDir, '.system-data');
+  } else {
+    // Production: check if .system-data exists at project root
+    try {
+      await fs.access(projectRootSystemData);
+      // .system-data exists at project root, use it (production)
+      systemDataDir = projectRootSystemData;
+    } catch {
+      // Production but .system-data missing at root - use project root anyway
+      systemDataDir = projectRootSystemData;
+    }
+  }
+
+  const configManager = new StorageConfigManager(systemDataDir);
+  const config = await configManager.loadConfig();
+  const storageService = new CloudUuidStorageService(config, systemDataDir);
+
+  // Get database service from CivicPress instance
+  const databaseService = (civic as any).getDatabaseService();
+  if (!databaseService) {
+    throw new Error('Database service not available');
+  }
+
+  storageService.setDatabaseService(databaseService);
+  await storageService.initialize();
+
+  return { storageService, configManager };
+}
 
 export default function setupStorageCommand(cli: CAC) {
   cli
@@ -38,9 +93,14 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
+        // Initialize storage services
+        const { storageService, configManager } =
+          await initializeStorageServices(civic, dataDir);
+
         if (options.update) {
           // Update configuration
-          const updateData: any = {};
+          const currentConfig = await configManager.loadConfig();
+          const updateData: any = { ...currentConfig };
 
           if (options.backend) {
             try {
@@ -75,62 +135,47 @@ export default function setupStorageCommand(cli: CAC) {
             }
           }
 
-          // Make API call to update storage config
-          const response = await fetch(
-            `http://localhost:3000/api/v1/storage/config`,
-            {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${options.token}`,
-              },
-              body: JSON.stringify(updateData),
-            }
-          );
+          // Save updated configuration
+          await configManager.saveConfig(updateData);
 
-          if (response.ok) {
-            const result = await response.json();
-            if (options.json) {
-              console.log(JSON.stringify(result, null, 2));
-            } else {
-              console.log('✅ Storage configuration updated successfully');
-            }
+          if (options.json) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: true,
+                  data: { config: updateData },
+                },
+                null,
+                2
+              )
+            );
           } else {
-            if (!options.json) {
-              console.error('❌ Failed to update storage configuration');
-            }
-            process.exit(1);
+            console.log('✅ Storage configuration updated successfully');
           }
         } else {
           // Get configuration
-          const response = await fetch(
-            `http://localhost:3000/api/v1/storage/config`,
-            {
-              headers: {
-                Authorization: `Bearer ${options.token}`,
-              },
-            }
-          );
+          const config = await configManager.loadConfig();
 
-          if (response.ok) {
-            const result = (await response.json()) as any;
-            if (options.json) {
-              console.log(JSON.stringify(result, null, 2));
-            } else {
-              console.log('📁 Storage Configuration:');
-              console.log(`Backend: ${result.data.config.backend.type}`);
-              console.log(
-                `Folders: ${Object.keys(result.data.config.folders).length} configured`
-              );
-              console.log(
-                `Metadata: ${Object.keys(result.data.config.metadata).length} settings`
-              );
-            }
+          if (options.json) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: true,
+                  data: { config },
+                },
+                null,
+                2
+              )
+            );
           } else {
-            if (!options.json) {
-              console.error('❌ Failed to get storage configuration');
-            }
-            process.exit(1);
+            console.log('📁 Storage Configuration:');
+            console.log(`Backend: ${config.backend.type}`);
+            console.log(
+              `Folders: ${Object.keys(config.folders).length} configured`
+            );
+            console.log(
+              `Metadata: ${Object.keys(config.metadata).length} settings`
+            );
           }
         }
       } catch (error: any) {
@@ -187,37 +232,68 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Create form data for file upload
-        const { default: FormData } = await import('form-data');
-        const form = new FormData();
-        form.append('file', fs.createReadStream(options.file));
-
-        // Make API call to upload file
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/upload/${options.folder}`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${options.token}`,
-              ...form.getHeaders(),
-            },
-            body: form,
-          }
+        // Initialize storage services
+        const { storageService } = await initializeStorageServices(
+          civic,
+          dataDir
         );
 
-        if (response.ok) {
-          const result = (await response.json()) as any;
+        // Read file and create MulterFile-like object
+        const fileBuffer = await fs.readFile(options.file);
+        const fileName = path.basename(options.file);
+        const mimeType =
+          (await import('mime-types')).lookup(options.file) ||
+          'application/octet-stream';
+
+        const multerFile: MulterFile = {
+          fieldname: 'file',
+          originalname: fileName,
+          encoding: '7bit',
+          mimetype: mimeType,
+          buffer: fileBuffer,
+          size: fileBuffer.length,
+          destination: '',
+          filename: fileName,
+          path: options.file,
+        };
+
+        // Upload file
+        const result = await storageService.uploadFile({
+          folder: options.folder,
+          file: multerFile,
+          uploaded_by: user.username,
+        });
+
+        if (result.success && result.file) {
           if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
+            console.log(
+              JSON.stringify(
+                {
+                  success: true,
+                  data: {
+                    file: {
+                      name: result.file.original_name,
+                      size: result.file.size,
+                      id: result.file.id,
+                    },
+                    path: result.file.relative_path,
+                  },
+                },
+                null,
+                2
+              )
+            );
           } else {
             console.log('✅ File uploaded successfully');
-            console.log(`File: ${result.data.file.name}`);
-            console.log(`Size: ${result.data.file.size} bytes`);
-            console.log(`Path: ${result.data.path}`);
+            console.log(`File: ${result.file.original_name}`);
+            console.log(`Size: ${result.file.size} bytes`);
+            console.log(`Path: ${result.file.relative_path}`);
           }
         } else {
           if (!options.json) {
-            console.error('❌ Failed to upload file');
+            console.error(
+              `❌ Failed to upload file: ${result.error || 'Unknown error'}`
+            );
           }
           process.exit(1);
         }
@@ -270,56 +346,82 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Build query parameters
-        const params = new URLSearchParams({
-          page: options.page,
-          limit: options.limit,
-        });
-
-        if (options.search) {
-          params.append('search', options.search);
-        }
-
-        if (options.type) {
-          params.append('type', options.type);
-        }
-
-        // Make API call to list files
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/files/${options.folder}?${params}`,
-          {
-            headers: {
-              Authorization: `Bearer ${options.token}`,
-            },
-          }
+        // Initialize storage services
+        const { storageService } = await initializeStorageServices(
+          civic,
+          dataDir
         );
 
-        if (response.ok) {
-          const result = (await response.json()) as any;
-          if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-          } else {
-            console.log(`📁 Files in ${options.folder}:`);
-            console.log(`Total: ${result.data.pagination.total} files`);
-            console.log(
-              `Page: ${result.data.pagination.page} of ${result.data.pagination.pages}`
-            );
+        // List files
+        const files = await storageService.listFiles(options.folder);
 
-            if (result.data.files.length === 0) {
-              console.log('No files found');
-            } else {
-              result.data.files.forEach((file: any) => {
-                console.log(
-                  `  ${file.name} (${file.size} bytes, ${file.mime_type})`
-                );
-              });
-            }
-          }
+        // Apply filters
+        let filteredFiles: StorageFile[] = files;
+        if (options.search) {
+          filteredFiles = filteredFiles.filter((file: StorageFile) =>
+            file.original_name
+              .toLowerCase()
+              .includes(options.search.toLowerCase())
+          );
+        }
+        if (options.type) {
+          const ext = options.type.startsWith('.')
+            ? options.type.slice(1)
+            : options.type;
+          filteredFiles = filteredFiles.filter((file: StorageFile) =>
+            file.original_name.toLowerCase().endsWith(`.${ext.toLowerCase()}`)
+          );
+        }
+
+        // Apply pagination
+        const page = parseInt(options.page) || 1;
+        const limit = parseInt(options.limit) || 50;
+        const start = (page - 1) * limit;
+        const end = start + limit;
+        const paginatedFiles = filteredFiles.slice(start, end);
+        const total = filteredFiles.length;
+        const pages = Math.ceil(total / limit);
+
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                data: {
+                  files: paginatedFiles.map((file) => ({
+                    id: file.id,
+                    name: file.original_name,
+                    size: file.size,
+                    mime_type: file.mime_type,
+                    created_at: file.created_at,
+                    updated_at: file.updated_at,
+                  })),
+                  pagination: {
+                    page,
+                    limit,
+                    total,
+                    pages,
+                  },
+                },
+              },
+              null,
+              2
+            )
+          );
         } else {
-          if (!options.json) {
-            console.error('❌ Failed to list files');
+          console.log(`📁 Files in ${options.folder}:`);
+          console.log(`Total: ${total} files`);
+          console.log(`Page: ${page} of ${pages}`);
+
+          if (paginatedFiles.length === 0) {
+            console.log('No files found');
+          } else {
+            paginatedFiles.forEach((file: StorageFile) => {
+              console.log(
+                `  ${file.original_name} (${file.size} bytes, ${file.mime_type})`
+              );
+            });
           }
-          process.exit(1);
         }
       } catch (error: any) {
         if (!options.json) {
@@ -368,46 +470,59 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Make API call to download file
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/download/${options.folder}/${options.file}`,
-          {
-            headers: {
-              Authorization: `Bearer ${options.token}`,
-            },
-          }
+        // Initialize storage services
+        const { storageService } = await initializeStorageServices(
+          civic,
+          dataDir
         );
 
-        if (response.ok) {
-          const buffer = await response.arrayBuffer();
-          const outputPath = options.output || options.file;
+        // Find file by name in folder
+        const files = await storageService.listFiles(options.folder);
+        const file = files.find(
+          (f: StorageFile) =>
+            f.original_name === options.file ||
+            f.stored_filename === options.file
+        );
 
-          await fs.writeFile(outputPath, Buffer.from(buffer));
-
-          if (options.json) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: true,
-                  file: options.file,
-                  output: outputPath,
-                  size: buffer.byteLength,
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            console.log('✅ File downloaded successfully');
-            console.log(`File: ${options.file}`);
-            console.log(`Output: ${outputPath}`);
-            console.log(`Size: ${buffer.byteLength} bytes`);
-          }
-        } else {
+        if (!file) {
           if (!options.json) {
-            console.error('❌ Failed to download file');
+            console.error(
+              `❌ File not found: ${options.file} in folder ${options.folder}`
+            );
           }
           process.exit(1);
+        }
+
+        // Download file content
+        const content = await storageService.getFileContent(file.id);
+        if (!content) {
+          if (!options.json) {
+            console.error('❌ Failed to read file content');
+          }
+          process.exit(1);
+        }
+
+        const outputPath = options.output || options.file;
+        await fs.writeFile(outputPath, content);
+
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                file: options.file,
+                output: outputPath,
+                size: content.length,
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          console.log('✅ File downloaded successfully');
+          console.log(`File: ${options.file}`);
+          console.log(`Output: ${outputPath}`);
+          console.log(`Size: ${content.length} bytes`);
         }
       } catch (error: any) {
         if (!options.json) {
@@ -455,21 +570,44 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Make API call to delete file
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/files/${options.folder}/${options.file}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${options.token}`,
-            },
-          }
+        // Initialize storage services
+        const { storageService } = await initializeStorageServices(
+          civic,
+          dataDir
         );
 
-        if (response.ok) {
-          const result = await response.json();
+        // Find file by name in folder
+        const files = await storageService.listFiles(options.folder);
+        const file = files.find(
+          (f: StorageFile) =>
+            f.original_name === options.file ||
+            f.stored_filename === options.file
+        );
+
+        if (!file) {
+          if (!options.json) {
+            console.error(
+              `❌ File not found: ${options.file} in folder ${options.folder}`
+            );
+          }
+          process.exit(1);
+        }
+
+        // Delete file
+        const success = await storageService.deleteFile(file.id, user.username);
+
+        if (success) {
           if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
+            console.log(
+              JSON.stringify(
+                {
+                  success: true,
+                  message: 'File deleted successfully',
+                },
+                null,
+                2
+              )
+            );
           } else {
             console.log('✅ File deleted successfully');
             console.log(`File: ${options.file}`);
@@ -534,8 +672,25 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Prepare folder configuration
-        const folderConfig = {
+        // Initialize storage services
+        const { configManager } = await initializeStorageServices(
+          civic,
+          dataDir
+        );
+
+        // Load current config
+        const config = await configManager.loadConfig();
+
+        // Check if folder already exists
+        if (config.folders[options.name]) {
+          if (!options.json) {
+            console.error(`❌ Folder '${options.name}' already exists`);
+          }
+          process.exit(1);
+        }
+
+        // Add folder configuration
+        config.folders[options.name] = {
           path: options.path,
           access: options.access,
           allowed_types: options.types
@@ -545,37 +700,28 @@ export default function setupStorageCommand(cli: CAC) {
           description: options.description || `Storage folder: ${options.name}`,
         };
 
-        // Make API call to add folder
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/folders`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${options.token}`,
-            },
-            body: JSON.stringify({
-              name: options.name,
-              config: folderConfig,
-            }),
-          }
-        );
+        // Save updated configuration
+        await configManager.saveConfig(config);
 
-        if (response.ok) {
-          const result = await response.json();
-          if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-          } else {
-            console.log('✅ Storage folder added successfully');
-            console.log(`Name: ${options.name}`);
-            console.log(`Path: ${options.path}`);
-            console.log(`Access: ${options.access}`);
-          }
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                data: {
+                  name: options.name,
+                  config: config.folders[options.name],
+                },
+              },
+              null,
+              2
+            )
+          );
         } else {
-          if (!options.json) {
-            console.error('❌ Failed to add storage folder');
-          }
-          process.exit(1);
+          console.log('✅ Storage folder added successfully');
+          console.log(`Name: ${options.name}`);
+          console.log(`Path: ${options.path}`);
+          console.log(`Access: ${options.access}`);
         }
       } catch (error: any) {
         if (!options.json) {
@@ -629,53 +775,58 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Prepare update configuration
-        const updateConfig: any = {};
-
-        if (options.access) {
-          updateConfig.access = options.access;
-        }
-
-        if (options.types) {
-          updateConfig.allowed_types = options.types.split(',');
-        }
-
-        if (options.maxSize) {
-          updateConfig.max_size = options.maxSize;
-        }
-
-        if (options.description) {
-          updateConfig.description = options.description;
-        }
-
-        // Make API call to update folder
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/folders/${options.name}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${options.token}`,
-            },
-            body: JSON.stringify({
-              config: updateConfig,
-            }),
-          }
+        // Initialize storage services
+        const { configManager } = await initializeStorageServices(
+          civic,
+          dataDir
         );
 
-        if (response.ok) {
-          const result = await response.json();
-          if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-          } else {
-            console.log('✅ Storage folder updated successfully');
-            console.log(`Name: ${options.name}`);
-          }
-        } else {
+        // Load current config
+        const config = await configManager.loadConfig();
+
+        // Check if folder exists
+        if (!config.folders[options.name]) {
           if (!options.json) {
-            console.error('❌ Failed to update storage folder');
+            console.error(`❌ Folder '${options.name}' not found`);
           }
           process.exit(1);
+        }
+
+        // Update folder configuration
+        const folderConfig = config.folders[options.name];
+        if (options.access) {
+          folderConfig.access = options.access;
+        }
+        if (options.types) {
+          folderConfig.allowed_types = options.types.split(',');
+        }
+        if (options.maxSize) {
+          folderConfig.max_size = options.maxSize;
+        }
+        if (options.description) {
+          folderConfig.description = options.description;
+        }
+
+        // Save updated configuration
+        await configManager.saveConfig(config);
+
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                data: {
+                  name: options.name,
+                  config: folderConfig,
+                },
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          console.log('✅ Storage folder updated successfully');
+          console.log(`Name: ${options.name}`);
         }
       } catch (error: any) {
         if (!options.json) {
@@ -722,30 +873,43 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Make API call to remove folder
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/folders/${options.name}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${options.token}`,
-            },
-          }
+        // Initialize storage services
+        const { configManager } = await initializeStorageServices(
+          civic,
+          dataDir
         );
 
-        if (response.ok) {
-          const result = await response.json();
-          if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-          } else {
-            console.log('✅ Storage folder removed successfully');
-            console.log(`Name: ${options.name}`);
-          }
-        } else {
+        // Load current config
+        const config = await configManager.loadConfig();
+
+        // Check if folder exists
+        if (!config.folders[options.name]) {
           if (!options.json) {
-            console.error('❌ Failed to remove storage folder');
+            console.error(`❌ Folder '${options.name}' not found`);
           }
           process.exit(1);
+        }
+
+        // Remove folder from configuration
+        delete config.folders[options.name];
+
+        // Save updated configuration
+        await configManager.saveConfig(config);
+
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                message: 'Storage folder removed successfully',
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          console.log('✅ Storage folder removed successfully');
+          console.log(`Name: ${options.name}`);
         }
       } catch (error: any) {
         if (!options.json) {
@@ -793,33 +957,58 @@ export default function setupStorageCommand(cli: CAC) {
           options.json
         );
 
-        // Make API call to get file info
-        const response = await fetch(
-          `http://localhost:3000/api/v1/storage/files/${options.folder}/${options.file}/info`,
-          {
-            headers: {
-              Authorization: `Bearer ${options.token}`,
-            },
-          }
+        // Initialize storage services
+        const { storageService } = await initializeStorageServices(
+          civic,
+          dataDir
         );
 
-        if (response.ok) {
-          const result = (await response.json()) as any;
-          if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-          } else {
-            console.log('📄 File Information:');
-            console.log(`Name: ${result.data.file.name}`);
-            console.log(`Size: ${result.data.file.size} bytes`);
-            console.log(`Type: ${result.data.file.mime_type}`);
-            console.log(`Created: ${result.data.file.created_at}`);
-            console.log(`Modified: ${result.data.file.updated_at}`);
-          }
-        } else {
+        // Find file by name in folder
+        const files = await storageService.listFiles(options.folder);
+        const file = files.find(
+          (f: StorageFile) =>
+            f.original_name === options.file ||
+            f.stored_filename === options.file
+        );
+
+        if (!file) {
           if (!options.json) {
-            console.error('❌ Failed to get file information');
+            console.error(
+              `❌ File not found: ${options.file} in folder ${options.folder}`
+            );
           }
           process.exit(1);
+        }
+
+        if (options.json) {
+          console.log(
+            JSON.stringify(
+              {
+                success: true,
+                data: {
+                  file: {
+                    id: file.id,
+                    name: file.original_name,
+                    size: file.size,
+                    mime_type: file.mime_type,
+                    created_at: file.created_at,
+                    updated_at: file.updated_at,
+                    folder: file.folder,
+                    relative_path: file.relative_path,
+                  },
+                },
+              },
+              null,
+              2
+            )
+          );
+        } else {
+          console.log('📄 File Information:');
+          console.log(`Name: ${file.original_name}`);
+          console.log(`Size: ${file.size} bytes`);
+          console.log(`Type: ${file.mime_type}`);
+          console.log(`Created: ${file.created_at}`);
+          console.log(`Modified: ${file.updated_at}`);
         }
       } catch (error: any) {
         if (!options.json) {

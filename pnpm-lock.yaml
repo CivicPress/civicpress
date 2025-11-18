@@ -63,6 +63,9 @@ importers:
       '@civicpress/core':
         specifier: workspace:*
         version: link:../core
+      '@civicpress/storage':
+        specifier: workspace:*
+        version: link:../modules/storage
       '@types/diff':
         specifier: 8.0.0
         version: 8.0.0

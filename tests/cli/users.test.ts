@@ -4,6 +4,7 @@ import {
   createCLITestContext,
   cleanupCLITestContext,
   setupGlobalTestEnvironment,
+  extractJSONFromOutput,
 } from '../fixtures/test-setup';
 
 // Setup global test environment
@@ -139,7 +140,7 @@ describe('CLI User Management', () => {
         { encoding: 'utf8' }
       );
 
-      const jsonResult = JSON.parse(result);
+      const jsonResult = extractJSONFromOutput(result);
       expect(jsonResult.success).toBe(true);
       expect(jsonResult.user.username).toBe('testuser4');
     });
@@ -213,7 +214,7 @@ describe('CLI User Management', () => {
         { encoding: 'utf8' }
       );
 
-      const jsonResult = JSON.parse(result);
+      const jsonResult = extractJSONFromOutput(result);
       expect(jsonResult.success).toBe(true);
       expect(jsonResult.session.token).toBeDefined();
       expect(jsonResult.session.user.role).toBe('public');
@@ -268,7 +269,7 @@ describe('CLI User Management', () => {
         `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password regularpass123 --json`,
         { encoding: 'utf8' }
       );
-      const regularJsonResult = JSON.parse(regularResult);
+      const regularJsonResult = extractJSONFromOutput(regularResult);
       regularUserToken = regularJsonResult.session.token;
     });
 
@@ -324,7 +325,7 @@ describe('CLI User Management', () => {
         { encoding: 'utf8' }
       );
 
-      const jsonResult = JSON.parse(result);
+      const jsonResult = extractJSONFromOutput(result);
       expect(jsonResult.success).toBe(true);
       expect(Array.isArray(jsonResult.users)).toBe(true);
       expect(jsonResult.users.length).toBeGreaterThan(0);
@@ -349,7 +350,7 @@ describe('CLI User Management', () => {
         `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password regularpass123 --json`,
         { encoding: 'utf8' }
       );
-      const regularJsonResult = JSON.parse(regularResult);
+      const regularJsonResult = extractJSONFromOutput(regularResult);
       regularUserToken = regularJsonResult.session.token;
     });
 
@@ -394,7 +395,7 @@ describe('CLI User Management', () => {
         { encoding: 'utf8' }
       );
 
-      const jsonResult = JSON.parse(result);
+      const jsonResult = extractJSONFromOutput(result);
       expect(jsonResult.success).toBe(true);
       expect(jsonResult.user.username).toBe('testregular');
       expect(jsonResult.user.role).toBe('clerk');
@@ -423,7 +424,7 @@ describe('CLI User Management', () => {
         `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password regularpass123 --json`,
         { encoding: 'utf8' }
       );
-      const regularJsonResult = JSON.parse(regularResult);
+      const regularJsonResult = extractJSONFromOutput(regularResult);
       regularUserToken = regularJsonResult.session.token;
     });
 
@@ -467,7 +468,7 @@ describe('CLI User Management', () => {
         { encoding: 'utf8' }
       );
 
-      const jsonResult = JSON.parse(result);
+      const jsonResult = extractJSONFromOutput(result);
       expect(jsonResult.success).toBe(true);
       expect(jsonResult.message).toContain('deleted successfully');
     });

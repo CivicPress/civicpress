@@ -644,16 +644,13 @@ export function registerConfigCommands(cli: CAC) {
           }
         }
       } catch (err: any) {
+        const errorMessage = err?.message || err?.toString() || 'Unknown error';
         if (json) {
           console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
+            JSON.stringify({ success: false, error: errorMessage }, null, 2)
           );
         } else {
-          logger.error('❌ Initialization failed:', err);
+          logger.error('❌ Initialization failed:', errorMessage);
         }
         process.exit(1);
       }

@@ -99,7 +99,7 @@ describe('CLI Storage Management', () => {
       }
 
       const result = execSync(
-        `cd ${context.cliPath} && node ${context.cliPath} storage:config --token ${adminToken} --json`,
+        `cd ${context.testDir} && node ${context.cliPath} storage:config --token ${adminToken} --json`,
         { encoding: 'utf8' }
       );
 
