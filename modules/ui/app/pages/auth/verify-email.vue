@@ -6,10 +6,10 @@
       <div class="text-center">
         <UIcon name="i-lucide-mail" class="mx-auto h-12 w-12 text-blue-600" />
         <h2 class="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
-          Email Verification
+          {{ t('auth.verifyEmail') }}
         </h2>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Verify your email address to complete the process
+          {{ t('auth.verifyEmailDesc') }}
         </p>
       </div>
 
@@ -21,7 +21,7 @@
             class="w-8 h-8 animate-spin mx-auto text-blue-600"
           />
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Verifying your email...
+            {{ t('auth.verifyingEmail') }}
           </p>
         </div>
 
@@ -32,14 +32,14 @@
             class="w-12 h-12 mx-auto text-green-600"
           />
           <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-            Email Verified Successfully!
+            {{ t('auth.emailVerifiedSuccessfully') }}
           </h3>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
             {{ verificationResult.message }}
           </p>
           <div class="mt-6">
             <UButton to="/settings/profile" size="lg" class="w-full">
-              Go to Profile
+              {{ t('auth.goToProfile') }}
             </UButton>
           </div>
         </div>
@@ -54,7 +54,7 @@
             class="w-12 h-12 mx-auto text-red-600"
           />
           <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-            Verification Failed
+            {{ t('auth.verificationFailed') }}
           </h3>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
             {{ verificationResult.message }}
@@ -71,7 +71,7 @@
               size="sm"
               class="w-full"
             >
-              Request New Verification Email
+              {{ t('auth.requestNewVerification') }}
             </UButton>
 
             <UButton
@@ -81,7 +81,7 @@
               size="sm"
               class="w-full"
             >
-              Back to Profile
+              {{ t('auth.backToProfile') }}
             </UButton>
           </div>
         </div>
@@ -93,11 +93,10 @@
             class="w-12 h-12 mx-auto text-yellow-600"
           />
           <h3 class="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-            Invalid Verification Link
+            {{ t('auth.invalidVerificationLink') }}
           </h3>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            This verification link is invalid or incomplete. Please check your
-            email for the correct link.
+            {{ t('auth.invalidVerificationLinkDesc') }}
           </p>
           <div class="mt-6">
             <UButton
@@ -107,7 +106,7 @@
               size="sm"
               class="w-full"
             >
-              Back to Profile
+              {{ t('auth.backToProfile') }}
             </UButton>
           </div>
         </div>
@@ -137,6 +136,7 @@ const route = useRoute();
 const toast = useToast();
 const { verifyEmailChange } = useSecurity();
 const { refreshUser } = useAuth();
+const { t } = useI18n();
 
 // Reactive state
 const loading = ref(false);
@@ -167,7 +167,7 @@ const verifyEmail = async () => {
 
       // Show success toast
       toast.add({
-        title: 'Email Verified',
+        title: t('auth.emailVerified'),
         description: verificationResult.value.message,
         color: 'primary',
       });
@@ -176,7 +176,7 @@ const verifyEmail = async () => {
     console.error('Email verification failed:', error);
     verificationResult.value = {
       success: false,
-      message: error.message || 'Email verification failed. Please try again.',
+      message: error.message || t('auth.emailVerificationFailed'),
     };
   } finally {
     loading.value = false;
@@ -190,9 +190,8 @@ const requestNewToken = async () => {
     // This would typically require the user to be logged in
     // and we'd call the request email change API again
     toast.add({
-      title: 'Feature Coming Soon',
-      description:
-        'Please log in and request a new email change from your profile.',
+      title: t('auth.featureComingSoon'),
+      description: t('auth.requestNewEmailFromProfile'),
       color: 'primary',
     });
 

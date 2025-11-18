@@ -24,6 +24,9 @@ export function useRecordTypes() {
   // Get icons from central registry
   const { getIcon } = useIcons();
 
+  // Get translation functions at top level
+  const { translateRecordType } = useConfigTranslations();
+
   const fetchRecordTypes = async () => {
     // Skip if already fetched globally
     if (globalFetched && globalRecordTypes.length > 0) {
@@ -86,15 +89,15 @@ export function useRecordTypes() {
 
   const getRecordTypeLabel = (key: string): string => {
     const recordType = getRecordTypeByKey(key);
-    if (recordType?.label) {
-      // Ensure label is Title Case
-      return (
-        recordType.label.charAt(0).toUpperCase() +
+
+    // Get fallback label from API/config
+    const fallback = recordType?.label
+      ? recordType.label.charAt(0).toUpperCase() +
         recordType.label.slice(1).toLowerCase()
-      );
-    }
-    // Fallback: capitalize the key
-    return key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+      : key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+
+    // Use translation with fallback
+    return translateRecordType(key, fallback);
   };
 
   const getRecordTypeDescription = (key: string): string => {
@@ -136,13 +139,19 @@ export function useRecordTypes() {
   };
 
   const getRecordTypeOptions = () => {
-    return recordTypes.value.map((type: RecordTypeMetadata) => ({
-      value: type.key,
-      label: type.label,
-      description: type.description,
-      icon: getRecordTypeIcon(type.key),
-      color: getRecordTypeColor(type.key),
-    }));
+    return recordTypes.value.map((type: RecordTypeMetadata) => {
+      // Ensure we have a fallback label
+      const fallbackLabel =
+        type.label ||
+        type.key.charAt(0).toUpperCase() + type.key.slice(1).toLowerCase();
+      return {
+        value: type.key,
+        label: translateRecordType(type.key, fallbackLabel),
+        description: type.description,
+        icon: getRecordTypeIcon(type.key),
+        color: getRecordTypeColor(type.key),
+      };
+    });
   };
 
   const isValidRecordType = (type: string): boolean => {

@@ -166,7 +166,6 @@ export const useAuthStore = defineStore('auth', {
           body: { username, password },
         });
 
-        console.log('response', response);
         return await this.handleLoginResponse(response, 'Login failed');
       } catch (error: any) {
         const { handleError } = useErrorHandler();
@@ -190,7 +189,6 @@ export const useAuthStore = defineStore('auth', {
           body: { token, provider: 'github' },
         });
 
-        console.log('response', response);
         return await this.handleLoginResponse(response, 'Token login failed');
       } catch (error: any) {
         const { handleError } = useErrorHandler();

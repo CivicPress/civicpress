@@ -86,7 +86,7 @@ ready for development and testing.
 - ✅ Config-driven validation (RecordValidator loads from config.yml)
 - ✅ System routes load types/statuses dynamically from config
 
-#### **UI Development (80% Complete)**
+#### **UI Development (90% Complete)**
 
 - ✅ Nuxt 4 setup with Nuxt UI Pro
 - ✅ Basic page structure
@@ -99,10 +99,48 @@ ready for development and testing.
 - ✅ Loading states and error handling
 - ✅ Record creation/editing with geography fields and template loading
 - ✅ Geography data display in record views
+- ✅ **Complete Internationalization (i18n)**: Full English/French translation
+  support across all UI components
 - 🔄 Authentication UI
 - 🔄 Admin dashboard
 
 ### ✅ Recently Completed Features
+
+#### **Internationalization (i18n) System (December 2025)**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Complete UI Translation**: All UI components, pages, and messages translated
+  to English and French
+- **Translation Coverage**:
+  - All pages: Records, Geography, Settings (Profile, Users, Configuration,
+    Notifications, Storage, Activity)
+  - All components: Forms, Selectors, Browsers, Modals, Alerts, Toasts
+  - All navigation: Sidebar, breadcrumbs, buttons, labels
+  - All error messages and validation feedback
+- **Implementation Details**:
+  - Using `@nuxtjs/i18n` with `vue-i18n` for Vue 3
+  - JSON-based translation files (`en.json`, `fr.json`)
+  - ICU MessageFormat for pluralization support
+  - Dynamic content translation via `useConfigTranslations` composable
+  - Proper fallback mechanisms for missing translations
+- **Key Features**:
+  - Language toggle support (ready for implementation)
+  - Pluralization for file counts, record counts, etc.
+  - Context-aware translations (e.g., "Records" vs "Registres" in French)
+  - Consistent translation patterns across all components
+  - Translation keys organized by feature area (auth, records, geography,
+    settings, etc.)
+- **Translation Files**:
+  - `modules/ui/i18n/locales/en.json` - English translations
+  - `modules/ui/i18n/locales/fr.json` - French translations
+- **Components Translated**:
+  - All page components (records, geography, settings, auth)
+  - All form components (RecordForm, UserForm, GeographyForm)
+  - All selector components (FileBrowser, GeographySelector, RecordLinkSelector)
+  - All display components (RecordList, GeographyLinkDisplay, etc.)
+  - System components (SystemFooter, SecuritySettings, etc.)
+- **Documentation**: Translation keys follow consistent naming patterns and are
+  fully documented
 
 #### **Record Format Standardization (November 2025)**
 
@@ -427,7 +465,8 @@ pnpm run type-check
 
 ### 🔄 In Progress Documentation
 
-- **UI Documentation**: Frontend development guide
+- **UI Documentation**: Frontend development guide (internationalization section
+  added)
 - **Plugin Development**: Plugin system documentation
 - **Deployment Guide**: Production deployment instructions
 

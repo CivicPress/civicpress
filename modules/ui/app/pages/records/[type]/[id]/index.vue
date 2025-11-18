@@ -18,6 +18,7 @@ const error = ref('');
 // Composables
 const { $api } = useNuxtApp();
 const { renderMarkdown } = useMarkdown();
+const { t } = useI18n();
 
 const markdownContainer = ref<HTMLElement | null>(null);
 
@@ -298,13 +299,9 @@ const fetchRecord = async () => {
   error.value = '';
 
   try {
-    console.log('Fetching record:', id);
-
     // Direct API call for now to test
     const { $civicApi } = useNuxtApp();
     const response = (await $civicApi(`/api/v1/records/${id}`)) as any;
-
-    console.log('API response:', response);
 
     if (response && response.success && response.data) {
       const apiRecord = response.data;
@@ -340,13 +337,11 @@ const fetchRecord = async () => {
         attachedFiles: apiRecord.attachedFiles || [],
         linkedRecords: apiRecord.linkedRecords || [],
       };
-
-      console.log('Record loaded:', record.value);
     } else {
-      throw new Error('Failed to fetch record');
+      throw new Error(t('records.failedToLoadRecord'));
     }
   } catch (err: any) {
-    error.value = err.message || 'Failed to load record';
+    error.value = err.message || t('records.failedToLoadRecord');
     console.error('Error fetching record:', err);
   } finally {
     loading.value = false;
@@ -379,11 +374,11 @@ onMounted(() => {
 
 const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Records',
+    label: t('records.allRecords'),
     to: '/records',
   },
   {
@@ -391,7 +386,7 @@ const breadcrumbItems = computed(() => [
     to: `/records/${type}`,
   },
   {
-    label: record.value?.id || 'Record',
+    label: record.value?.id || t('records.record'),
   },
 ]);
 
@@ -401,8 +396,8 @@ const handleStatusChanged = (payload: { newStatus: string; record?: any }) => {
     record.value.status = payload.newStatus as CivicRecord['status'];
   }
   useToast().add({
-    title: 'Status Updated',
-    description: `Record status changed to ${payload.newStatus}`,
+    title: t('records.statusUpdated'),
+    description: t('records.statusChangedTo', { status: payload.newStatus }),
     color: 'primary',
   });
 };
@@ -412,44 +407,46 @@ const detailAccordionItems = computed(() => {
 
   return [
     {
-      label: 'Linked Records',
+      label: t('records.linkedRecords.title'),
       value: 'linked-records',
       iconName: 'i-lucide-link-2',
       description: currentRecord?.linkedRecords?.length
-        ? `${currentRecord.linkedRecords.length} linked`
-        : 'No linked records',
+        ? currentRecord.linkedRecords.length === 1
+          ? `1 ${t('records.record').toLowerCase()}`
+          : `${currentRecord.linkedRecords.length} ${t('records.records')}`
+        : t('records.linkedRecords.noLinks'),
     },
     {
-      label: 'File Attachments',
+      label: t('records.fileAttachments'),
       value: 'attachments',
       iconName: 'i-lucide-paperclip',
       description: currentRecord?.attachedFiles?.length
-        ? `${currentRecord.attachedFiles.length} files`
-        : 'No attachments',
+        ? `${currentRecord.attachedFiles.length} ${t('records.files')}`
+        : t('records.attachments.noAttachments'),
     },
     {
-      label: 'Status Transitions',
+      label: t('records.statusTransitions'),
       value: 'status-transitions',
       iconName: getStatusIcon(record.value?.status || ''),
       description: getStatusLabel(record.value?.status || ''),
     },
     {
-      label: 'Linked Geography',
+      label: t('records.linkedGeography'),
       value: 'linked-geography',
       iconName: 'i-lucide-map-pin',
       description: currentRecord?.linkedGeographyFiles?.length
-        ? `${currentRecord.linkedGeographyFiles.length} items`
-        : 'No linked geography',
+        ? `${currentRecord.linkedGeographyFiles.length} ${t('records.items')}`
+        : t('records.geography.noGeography'),
     },
     {
-      label: 'Additional Information',
+      label: t('records.additionalInformation'),
       value: 'additional-info',
       iconName: 'i-lucide-info',
       description:
         currentRecord?.metadata &&
         Object.keys(currentRecord.metadata).length > 0
-          ? `${Object.keys(currentRecord.metadata).length} fields`
-          : 'No additional metadata',
+          ? `${Object.keys(currentRecord.metadata).length} ${t('records.fields')}`
+          : t('records.noAdditionalMetadata'),
     },
   ];
 });
@@ -463,6 +460,18 @@ const additionalMetadata = computed(() => {
     .filter(([key]) => !hiddenKeys.has(key))
     .map(([key, value]) => ({ key, value }));
 });
+
+// Translate metadata field labels
+const getMetadataFieldLabel = (key: string): string => {
+  const translationKey = `records.metadataFields.${key}`;
+  const translated = t(translationKey);
+  // If translation exists and is different from the key, use it
+  if (translated && translated !== translationKey) {
+    return translated;
+  }
+  // Otherwise, capitalize the key as fallback
+  return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+};
 
 // Handle file download
 const downloadFile = async (fileId: string, fileName: string) => {
@@ -501,8 +510,8 @@ const downloadFile = async (fileId: string, fileName: string) => {
   } catch (error) {
     console.error('Download failed:', error);
     useToast().add({
-      title: 'Download Failed',
-      description: 'Failed to download the file. Please try again.',
+      title: t('records.downloadFailed'),
+      description: t('records.failedToDownloadFile'),
       color: 'error',
     });
   }
@@ -515,24 +524,28 @@ const downloadFile = async (fileId: string, fileName: string) => {
       <UDashboardNavbar>
         <template #title>
           <h1 class="text-2xl font-semibold">
-            {{ record?.id || 'Record' }}
+            {{ record?.id || t('records.record') }}
           </h1>
         </template>
         <template #description>
-          View the details of {{ record?.title || 'this record' }}
+          {{
+            record?.title
+              ? t('records.viewRecordDetails', { title: record.title })
+              : t('records.viewRecordDetailsDefault')
+          }}
         </template>
         <template #right>
           <HeaderActions
             :actions="[
               {
-                label: 'View Raw',
+                label: t('records.viewRaw'),
                 icon: 'i-lucide-code',
                 to: `/records/${type}/${id}/raw`,
                 color: 'neutral',
                 disabled: loading || !record,
               },
               {
-                label: 'Edit Record',
+                label: t('records.editRecord'),
                 icon: 'i-lucide-edit',
                 to: `/records/${type}/${id}/edit`,
                 color: 'primary',
@@ -649,7 +662,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
               />
             </div>
             <div v-else class="text-gray-500 dark:text-gray-400 italic">
-              No content available for this record.
+              {{ t('records.noContentAvailable') }}
             </div>
           </div>
         </div>
@@ -682,8 +695,19 @@ const downloadFile = async (fileId: string, fileName: string) => {
                 :model-value="record.linkedRecords"
                 :editable="false"
               />
-              <div v-else class="text-gray-500 dark:text-gray-400 italic">
-                No records linked to this record.
+              <div v-else class="text-center py-8">
+                <UIcon
+                  name="i-lucide-link"
+                  class="w-12 h-12 text-gray-400 mx-auto mb-4"
+                />
+                <h4
+                  class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2"
+                >
+                  {{ t('records.linkedRecords.noRecordsLinkedTitle') }}
+                </h4>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                  {{ t('records.linkedRecords.noRecordsLinkedDesc') }}
+                </p>
               </div>
             </div>
 
@@ -743,16 +767,27 @@ const downloadFile = async (fileId: string, fileName: string) => {
                         variant="outline"
                         size="sm"
                         @click="downloadFile(file.id, file.original_name)"
-                        title="Download file"
+                        :title="t('records.downloadFile')"
                       >
-                        Download
+                        {{ t('records.download') }}
                       </UButton>
                     </div>
                   </div>
                 </div>
               </div>
-              <div v-else class="text-gray-500 dark:text-gray-400 italic">
-                No files attached to this record.
+              <div v-else class="text-center py-8">
+                <UIcon
+                  name="i-lucide-paperclip"
+                  class="w-12 h-12 text-gray-400 mx-auto mb-4"
+                />
+                <h4
+                  class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2"
+                >
+                  {{ t('records.attachments.noFilesAttachedTitle') }}
+                </h4>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                  {{ t('records.attachments.noFilesAttachedDesc') }}
+                </p>
               </div>
             </div>
 
@@ -788,7 +823,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                   <dt
                     class="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize"
                   >
-                    {{ entry.key }}
+                    {{ getMetadataFieldLabel(entry.key) }}
                   </dt>
                   <dd class="text-sm">
                     <template
@@ -805,7 +840,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                           class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
                         >
                           <span class="font-medium">
-                            {{ attendee.name || 'Unknown Attendee' }}
+                            {{ attendee.name || t('records.unknownAttendee') }}
                           </span>
                           <span
                             v-if="attendee.role"
@@ -837,7 +872,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                 </div>
               </div>
               <div class="text-gray-500 dark:text-gray-400 italic" v-else>
-                No additional metadata available for this record.
+                {{ t('records.noAdditionalMetadataAvailable') }}
               </div>
             </div>
           </template>

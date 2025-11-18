@@ -2,6 +2,7 @@
 import type { User } from '~/types/user';
 import SystemFooter from '~/components/SystemFooter.vue';
 
+const { t } = useI18n();
 // Page metadata
 definePageMeta({
   title: 'Create New User',
@@ -11,12 +12,12 @@ definePageMeta({
 });
 
 // Breadcrumbs
-const breadcrumbItems = [
-  { label: 'Home', to: '/' },
-  { label: 'Settings', to: '/settings' },
-  { label: 'Users', to: '/settings/users' },
-  { label: 'Create User' },
-];
+const breadcrumbItems = computed(() => [
+  { label: t('common.home'), to: '/' },
+  { label: t('common.settings'), to: '/settings' },
+  { label: t('settings.users.title'), to: '/settings/users' },
+  { label: t('settings.users.createUser') },
+]);
 
 // Reactive state
 const error = ref<string | null>(null);
@@ -36,19 +37,19 @@ const handleSubmit = async (userData: any) => {
     if (response.success) {
       // Show success message
       useToast().add({
-        title: 'Success',
-        description: 'User created successfully',
+        title: t('common.success'),
+        description: t('settings.users.userCreatedSuccessfully'),
         color: 'primary',
       });
 
       // Navigate back to users list
       await navigateTo('/settings/users');
     } else {
-      error.value = response.message || 'Failed to create user';
+      error.value = response.message || t('settings.users.failedToCreateUser');
     }
   } catch (err: any) {
     console.error('Error creating user:', err);
-    error.value = err.message || 'Failed to create user';
+    error.value = err.message || t('settings.users.failedToCreateUser');
   } finally {
     saving.value = false;
   }
@@ -58,7 +59,7 @@ const handleSubmit = async (userData: any) => {
 <template>
   <UDashboardPanel>
     <template #header>
-      <UDashboardNavbar title="Create New User">
+      <UDashboardNavbar :title="t('settings.users.createUser')">
         <template #right>
           <UButton
             to="/settings/users"
@@ -66,7 +67,7 @@ const handleSubmit = async (userData: any) => {
             variant="outline"
             icon="i-lucide-arrow-left"
           >
-            Back to Users
+            {{ t('settings.users.backToUsers') }}
           </UButton>
         </template>
       </UDashboardNavbar>
@@ -84,9 +85,11 @@ const handleSubmit = async (userData: any) => {
                 class="w-6 h-6 text-primary-600"
               />
               <div>
-                <h2 class="text-xl font-semibold">Create New User</h2>
+                <h2 class="text-xl font-semibold">
+                  {{ t('settings.users.createUser') }}
+                </h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                  Add a new user to the system
+                  {{ t('settings.users.addNewUserToSystem') }}
                 </p>
               </div>
             </div>

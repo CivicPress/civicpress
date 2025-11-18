@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const state = reactive({
   username: '',
@@ -33,11 +34,35 @@ const passwordStrength = computed(() => {
   score += checks.numbers ? 1 : 0;
   score += checks.special ? 1 : 0;
 
-  if (score <= 1) return { score, label: 'Very Weak', color: 'error' as const };
-  if (score <= 2) return { score, label: 'Weak', color: 'primary' as const };
-  if (score <= 3) return { score, label: 'Fair', color: 'primary' as const };
-  if (score <= 4) return { score, label: 'Good', color: 'primary' as const };
-  return { score, label: 'Strong', color: 'primary' as const };
+  if (score <= 1)
+    return {
+      score,
+      label: t('auth.passwordStrength.veryWeak'),
+      color: 'error' as const,
+    };
+  if (score <= 2)
+    return {
+      score,
+      label: t('auth.passwordStrength.weak'),
+      color: 'primary' as const,
+    };
+  if (score <= 3)
+    return {
+      score,
+      label: t('auth.passwordStrength.fair'),
+      color: 'primary' as const,
+    };
+  if (score <= 4)
+    return {
+      score,
+      label: t('auth.passwordStrength.good'),
+      color: 'primary' as const,
+    };
+  return {
+    score,
+    label: t('auth.passwordStrength.strong'),
+    color: 'primary' as const,
+  };
 });
 
 // Computed properties for form validation
@@ -84,8 +109,7 @@ const handleRegister = async () => {
     );
 
     if ((response as any).success) {
-      success.value =
-        'Registration successful! You can now sign in with your credentials.';
+      success.value = t('auth.registrationSuccessful');
       // Clear form
       state.username = '';
       state.password = '';
@@ -100,7 +124,7 @@ const handleRegister = async () => {
     }
   } catch (err: any) {
     error.value =
-      err.data?.error?.message || err.message || 'Registration failed';
+      err.data?.error?.message || err.message || t('auth.registrationFailed');
   } finally {
     loading.value = false;
   }
@@ -120,7 +144,7 @@ watch(
 <template>
   <UDashboardPanel>
     <template #header>
-      <UDashboardNavbar title="Register" />
+      <UDashboardNavbar :title="t('auth.register')" />
     </template>
 
     <template #body>
@@ -129,9 +153,11 @@ watch(
           <template #default>
             <div class="space-y-6">
               <div class="text-center">
-                <h2 class="text-2xl font-bold">Create Account</h2>
+                <h2 class="text-2xl font-bold">
+                  {{ t('auth.createAccount') }}
+                </h2>
                 <p class="text-muted mt-2">
-                  Join CivicPress to manage your records and workflows.
+                  {{ t('auth.createAccountDesc') }}
                 </p>
               </div>
 
@@ -140,21 +166,25 @@ watch(
                 class="flex flex-col gap-4"
                 @submit="handleRegister"
               >
-                <UFormField label="Username" name="username" required>
+                <UFormField
+                  :label="t('auth.username')"
+                  name="username"
+                  required
+                >
                   <UInput
                     v-model="state.username"
-                    placeholder="Enter your username"
+                    :placeholder="t('auth.usernamePlaceholder')"
                     :disabled="loading"
                     autocomplete="username"
                     class="w-full"
                   />
                 </UFormField>
 
-                <UFormField label="Email" name="email" required>
+                <UFormField :label="t('auth.email')" name="email" required>
                   <UInput
                     v-model="state.email"
                     type="email"
-                    placeholder="Enter your email"
+                    :placeholder="t('auth.emailPlaceholder')"
                     :disabled="loading"
                     autocomplete="email"
                     class="w-full"
@@ -165,26 +195,30 @@ watch(
                       v-if="state.email && !isEmailValid"
                       class="text-red-500 text-sm"
                     >
-                      Please enter a valid email address
+                      {{ t('auth.invalidEmail') }}
                     </span>
                   </template>
                 </UFormField>
 
-                <UFormField label="Full Name" name="name">
+                <UFormField :label="t('auth.fullName')" name="name">
                   <UInput
                     v-model="state.name"
-                    placeholder="Enter your full name (optional)"
+                    :placeholder="t('auth.namePlaceholder')"
                     :disabled="loading"
                     autocomplete="name"
                     class="w-full"
                   />
                 </UFormField>
 
-                <UFormField label="Password" name="password" required>
+                <UFormField
+                  :label="t('auth.password')"
+                  name="password"
+                  required
+                >
                   <UInput
                     v-model="state.password"
                     type="password"
-                    placeholder="Enter your password"
+                    :placeholder="t('auth.passwordPlaceholder')"
                     :disabled="loading"
                     autocomplete="new-password"
                     class="w-full"
@@ -235,22 +269,21 @@ watch(
                         </span>
                       </div>
                       <div class="text-xs text-gray-500">
-                        Password must be at least 8 characters with uppercase,
-                        lowercase, numbers, and special characters
+                        {{ t('auth.passwordRequirements') }}
                       </div>
                     </div>
                   </template>
                 </UFormField>
 
                 <UFormField
-                  label="Confirm Password"
+                  :label="t('auth.confirmPassword')"
                   name="confirmPassword"
                   required
                 >
                   <UInput
                     v-model="state.confirmPassword"
                     type="password"
-                    placeholder="Confirm your password"
+                    :placeholder="t('auth.confirmPasswordPlaceholder')"
                     :disabled="loading"
                     autocomplete="new-password"
                     class="w-full"
@@ -264,13 +297,13 @@ watch(
                       v-if="state.confirmPassword && !doPasswordsMatch"
                       class="text-red-500 text-sm"
                     >
-                      Passwords do not match
+                      {{ t('auth.passwordsDoNotMatch') }}
                     </span>
                   </template>
                 </UFormField>
 
                 <UButton
-                  label="Create Account"
+                  :label="t('auth.createAccount')"
                   type="submit"
                   :loading="loading"
                   :disabled="!isFormValid"
@@ -300,9 +333,9 @@ watch(
           <template #footer>
             <div class="text-center space-y-2">
               <p class="text-sm text-gray-600">
-                Already have an account?
+                {{ t('auth.alreadyHaveAccount') }}
                 <NuxtLink to="/auth/login" class="text-primary hover:underline">
-                  Sign in
+                  {{ t('auth.signIn') }}
                 </NuxtLink>
               </p>
             </div>

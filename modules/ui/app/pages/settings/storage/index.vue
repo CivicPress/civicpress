@@ -3,7 +3,7 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-lg font-semibold">File Storage</h1>
+          <h1 class="text-lg font-semibold">{{ t('settings.storage.title') }}</h1>
         </template>
       </UDashboardNavbar>
     </template>
@@ -15,7 +15,7 @@
         <!-- Page Header -->
         <div class="page-header">
           <p class="text-gray-600">
-            Manage and organize your files across different storage folders
+            {{ t('settings.storage.description') }}
           </p>
         </div>
 
@@ -42,20 +42,20 @@
 
                   <div class="text-xs text-gray-500 dark:text-gray-500 space-y-1 mb-3">
                     <div class="flex justify-between">
-                      <span>Files</span>
+                      <span>{{ t('settings.storage.files') }}</span>
                       <span>{{ folder.fileCount || 0 }}</span>
                     </div>
                     <div class="flex justify-between">
-                      <span>Size</span>
+                      <span>{{ t('settings.storage.size') }}</span>
                       <span>{{ folder.totalSize || '0 B' }}</span>
                     </div>
                   </div>
 
                   <UButton v-if="folder.enabled" size="sm" variant="outline" class="w-full">
-                    Browse files
+                    {{ t('settings.storage.browseFiles') }}
                   </UButton>
                   <UButton v-else size="sm" variant="ghost" disabled class="w-full">
-                    Coming soon
+                    {{ t('settings.storage.comingSoon') }}
                   </UButton>
                 </UCard>
               </div>
@@ -65,14 +65,14 @@
           <!-- Storage overview card -->
           <UCard class="mt-6">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              Storage overview
+              {{ t('settings.storage.storageOverview') }}
             </h3>
 
             <div class="space-y-4 text-sm">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <UIcon name="i-lucide-hard-drive" class="w-4 h-4 text-blue-500" />
-                  <span>Total files</span>
+                  <span>{{ t('settings.storage.totalFiles') }}</span>
                 </div>
                 <span class="font-medium text-gray-900 dark:text-gray-100">
                   {{ totalFiles }}
@@ -82,7 +82,7 @@
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <UIcon name="i-lucide-database" class="w-4 h-4 text-blue-500" />
-                  <span>Total size</span>
+                  <span>{{ t('settings.storage.totalSize') }}</span>
                 </div>
                 <span class="font-medium text-gray-900 dark:text-gray-100">
                   {{ totalSize }}
@@ -92,7 +92,7 @@
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <UIcon name="i-lucide-folder" class="w-4 h-4 text-blue-500" />
-                  <span>Active folders</span>
+                  <span>{{ t('settings.storage.activeFolders') }}</span>
                 </div>
                 <span class="font-medium text-gray-900 dark:text-gray-100">
                   {{ activeFolders }}
@@ -106,7 +106,7 @@
         <div v-if="!selectedFolder && storageFolders.length > 0" class="quick-upload mt-8">
           <div class="bg-white border border-gray-200 rounded-lg p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">
-              Quick Upload
+              {{ t('settings.storage.quickUpload') }}
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -137,17 +137,17 @@
             <div class="flex items-center space-x-3">
               <UButton variant="ghost" @click="selectedFolder = null">
                 <UIcon name="i-lucide-arrow-left" class="w-4 h-4 mr-2" />
-                Back to Overview
+                {{ t('settings.storage.backToOverview') }}
               </UButton>
 
               <UButton @click="refreshFolderFiles" :loading="refreshing" variant="outline" size="sm">
                 <UIcon name="i-lucide-refresh-cw" class="w-4 h-4 mr-2" />
-                Refresh
+                {{ t('common.refresh') }}
               </UButton>
 
               <UButton v-if="canUpload" @click="showUploadModal = true" color="primary" size="sm">
                 <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
-                Upload Files
+                {{ t('settings.storage.uploadFiles') }}
               </UButton>
             </div>
           </div>
@@ -159,7 +159,7 @@
       </div>
 
       <!-- Upload Modal -->
-      <UModal v-model:open="showUploadModal" title="Upload Files" description="Upload files to this storage folder">
+      <UModal v-model:open="showUploadModal" :title="t('settings.storage.uploadFiles')" :description="t('settings.storage.uploadFilesDescription')">
         <template #body>
           <FileUpload :folder="selectedFolder || 'public'"
             :allowed-types="selectedFolder ? getFolderAllowedTypes(selectedFolder) : (storageFolders.find(f => f.name === 'public')?.allowedTypes || [])"
@@ -184,6 +184,7 @@ import FileUpload from '~/components/storage/FileUpload.vue';
 // Composables
 const toast = useToast();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 // State
 const selectedFolder = ref<string | null>(null);
@@ -231,11 +232,11 @@ const activeFolders = computed(
   () => storageFolders.value.filter((f) => f.enabled).length
 );
 
-const breadcrumbItems = [
-  { label: 'Home', to: '/' },
-  { label: 'Settings', to: '/settings' },
-  { label: 'File Storage', to: '/settings/storage' },
-];
+const breadcrumbItems = computed(() => [
+  { label: t('common.home'), to: '/' },
+  { label: t('settings.title'), to: '/settings' },
+  { label: t('settings.storage.title'), to: '/settings/storage' },
+]);
 
 // Methods
 const selectFolder = (folderName: string) => {
@@ -275,11 +276,11 @@ const getFolderIcon = (folderName: string): string => {
 
 const getFolderLabelFromName = (name: string): string => {
   const labelMap: Record<string, string> = {
-    public: 'Public Files',
-    sessions: 'Session Materials',
-    permits: 'Permit Documents',
-    private: 'Private Files',
-    icons: 'Icons & Map Images',
+    public: t('settings.storage.folders.public'),
+    sessions: t('settings.storage.folders.sessions'),
+    permits: t('settings.storage.folders.permits'),
+    private: t('settings.storage.folders.private'),
+    icons: t('settings.storage.folders.icons'),
   };
   return labelMap[name] || name.charAt(0).toUpperCase() + name.slice(1);
 };
@@ -309,14 +310,14 @@ const refreshFolderFiles = async () => {
     await loadStorageStats();
 
     toast.add({
-      title: 'Success',
-      description: 'Storage information refreshed',
+      title: t('common.success'),
+      description: t('settings.storage.storageInformationRefreshed'),
       color: 'primary',
     });
   } catch (error) {
     toast.add({
-      title: 'Error',
-      description: 'Failed to refresh storage information',
+      title: t('common.error'),
+      description: t('settings.storage.failedToRefresh'),
       color: 'error',
     });
   } finally {
@@ -326,8 +327,8 @@ const refreshFolderFiles = async () => {
 
 const handleUploadComplete = (uploadedFiles: any[]) => {
   toast.add({
-    title: 'Upload Complete',
-    description: `${uploadedFiles.length} files uploaded successfully`,
+    title: t('settings.storage.uploadComplete'),
+    description: t('settings.storage.filesUploadedSuccessfully', { count: uploadedFiles.length }),
     color: 'primary',
   });
   showUploadModal.value = false;
@@ -337,7 +338,7 @@ const handleUploadComplete = (uploadedFiles: any[]) => {
 
 const handleUploadError = (error: string) => {
   toast.add({
-    title: 'Upload Failed',
+    title: t('settings.storage.uploadFailed'),
     description: error,
     color: 'error',
   });

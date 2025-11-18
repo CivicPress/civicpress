@@ -2,6 +2,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import SystemFooter from '~/components/SystemFooter.vue';
 
+const { t } = useI18n();
 const recordsStore = useRecordsStore();
 const { buildQueryFromState, parseQueryToState } = await import(
   '~/composables/useRecordQueryState'
@@ -124,13 +125,13 @@ const resetAllFilters = async () => {
 };
 
 // Sort handling
-const sortOptions = [
-  { label: 'Relevance', value: 'relevance' },
-  { label: 'Last Updated', value: 'updated_desc' },
-  { label: 'Recently Created', value: 'created_desc' },
-  { label: 'Title A→Z', value: 'title_asc' },
-  { label: 'Title Z→A', value: 'title_desc' },
-];
+const sortOptions = computed(() => [
+  { label: t('records.sortBy.relevance'), value: 'relevance' },
+  { label: t('records.sortBy.lastUpdated'), value: 'updated_desc' },
+  { label: t('records.sortBy.recentlyCreated'), value: 'created_desc' },
+  { label: t('records.sortBy.titleAsc'), value: 'title_asc' },
+  { label: t('records.sortBy.titleDesc'), value: 'title_desc' },
+]);
 
 watch(sort, () => {
   page.value = 1;
@@ -219,15 +220,15 @@ watch(
   { deep: true }
 );
 
-const breadcrumbItems = [
+const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Records',
+    label: t('records.allRecords'),
   },
-];
+]);
 
 // Breadcrumbs ref for scroll-to-top functionality
 const breadcrumbsRef = ref<HTMLElement | undefined>();
@@ -238,10 +239,10 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">All Records</h1>
+          <h1 class="text-2xl font-semibold">{{ t('records.allRecords') }}</h1>
         </template>
         <template #description>
-          Browse and search through the complete records catalog
+          {{ t('records.browseCatalog') }}
         </template>
         <template #right>
           <div class="flex items-center gap-2">
@@ -255,7 +256,7 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
             <HeaderActions
               :actions="[
                 {
-                  label: 'Create Record',
+                  label: t('records.createRecord'),
                   icon: 'i-lucide-plus',
                   to: '/records/new',
                   color: 'primary',

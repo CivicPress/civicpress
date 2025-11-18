@@ -6,23 +6,24 @@ const route = useRoute();
 const toast = useToast();
 const appStore = useAppStore();
 const authStore = useAuthStore(); // ⬅️ add this
+const { t } = useI18n();
 
 const collapsed = ref(true);
 
 const links = computed<NavigationMenuItem[][]>(() => {
   const primary: NavigationMenuItem[] = [
     {
-      label: 'Home',
+      label: t('common.home'),
       icon: 'i-lucide-house',
       to: '/',
     },
     {
-      label: 'Records',
+      label: t('common.records'),
       to: '/records',
       icon: 'i-lucide-scale',
     },
     {
-      label: 'Geography',
+      label: t('geography.title'),
       to: '/geography',
       icon: 'i-lucide-map',
     },
@@ -32,7 +33,7 @@ const links = computed<NavigationMenuItem[][]>(() => {
 
   if (authStore.isLoggedIn) {
     secondary.push({
-      label: 'Settings',
+      label: t('common.settings'),
       to: '/settings',
       icon: 'i-lucide-settings',
     });

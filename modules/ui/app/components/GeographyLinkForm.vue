@@ -8,7 +8,7 @@
           :close-on-click-outside="true"
         >
           <UButton color="primary" variant="outline" icon="i-lucide-plus">
-            Add Geography Files
+            {{ t('records.geography.addGeographyFiles') }}
           </UButton>
 
           <template #content>
@@ -18,7 +18,6 @@
               @update:selected-ids="
                 (ids) => {
                   selectedIds = ids;
-                  console.log('Manual update:', ids);
                 }
               "
               @selection-change="handleSelectionConfirm"
@@ -47,7 +46,7 @@
             <!-- Description Input -->
             <UInput
               v-model="link.description"
-              placeholder="Add a description for this geography file..."
+              :placeholder="t('records.geography.addDescriptionPlaceholder')"
               class="mb-2"
               @input="updateLink(index, link)"
             />
@@ -63,12 +62,15 @@
               <span class="flex items-center gap-1">
                 <UIcon name="i-lucide-calendar" class="w-3 h-3" />
                 {{
-                  link.created_at ? formatDate(link.created_at) : 'Unknown date'
+                  link.created_at
+                    ? formatDate(link.created_at)
+                    : t('records.geography.unknownDate')
                 }}
               </span>
               <span v-if="link.stats" class="flex items-center gap-1">
                 <UIcon name="i-lucide-map-pin" class="w-3 h-3" />
-                {{ link.stats.featureCount }} features
+                {{ link.stats.featureCount }}
+                {{ t('records.geography.features') }}
               </span>
             </div>
           </div>
@@ -105,17 +107,17 @@
     >
       <UIcon name="i-lucide-map" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
       <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-        No geography files linked
+        {{ t('records.geography.noGeographyFilesLinked') }}
       </h4>
       <p class="text-gray-600 dark:text-gray-400">
-        Link geography files to provide spatial context for this record.
+        {{ t('records.geography.linkGeographyFilesDesc') }}
       </p>
     </div>
 
     <!-- Preview Modal -->
     <UModal
       v-model:open="showPreview"
-      :title="previewFile?.name || 'Geography File Preview'"
+      :title="previewFile?.name || t('records.geography.filePreview')"
     >
       <template #body>
         <div v-if="previewFile" class="space-y-4">
@@ -158,10 +160,10 @@
               variant="ghost"
               @click="showPreview = false"
             >
-              Close
+              {{ t('common.close') }}
             </UButton>
             <UButton color="primary" @click="selectPreviewFile">
-              Select This File
+              {{ t('records.geography.selectThisFile') }}
             </UButton>
           </div>
         </div>
@@ -175,6 +177,9 @@ import { ref, computed, watch } from 'vue';
 import type { GeographyFile } from '~/types/geography';
 import GeographySelector from './GeographySelector.vue';
 import GeographyMap from './GeographyMap.vue';
+
+// Composables
+const { t } = useI18n();
 
 // Props
 interface Props {
@@ -215,7 +220,7 @@ const selectedIds = ref<string[]>([]);
 watch(
   selectedIds,
   (newIds) => {
-    console.log('GeographyLinkForm: selectedIds changed to:', newIds);
+    // Watch for selectedIds changes
   },
   { deep: true }
 );

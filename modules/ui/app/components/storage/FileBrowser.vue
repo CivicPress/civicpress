@@ -5,7 +5,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <UInput
           v-model="searchQuery"
-          placeholder="Search files..."
+          :placeholder="t('settings.storage.searchFiles')"
           icon="i-lucide-search"
           @input="debouncedSearch"
           clearable
@@ -15,14 +15,14 @@
           v-model="selectedType"
           :items="fileTypeOptions"
           multiple
-          placeholder="All types"
+          :placeholder="t('settings.storage.allTypes')"
           icon="i-lucide-filter"
         />
 
         <USelectMenu
           v-model="sortBy"
           :items="sortOptions"
-          placeholder="Sort by"
+          :placeholder="t('settings.storage.sortBy')"
           icon="i-lucide-sort-asc"
         />
       </div>
@@ -41,9 +41,9 @@
               class="w-8 h-8 text-blue-600 animate-spin"
             />
           </div>
-          <span class="text-gray-600 font-medium">Loading files...</span>
+          <span class="text-gray-600 font-medium">{{ t('settings.storage.loadingFiles') }}</span>
           <span class="text-gray-400 text-sm mt-1"
-            >Please wait while we fetch your storage contents</span
+            >{{ t('settings.storage.loadingFilesDescription') }}</span
           >
         </div>
       </div>
@@ -60,13 +60,13 @@
             />
           </div>
           <h3 class="text-xl font-semibold text-gray-900 mb-3">
-            {{ searchQuery ? 'No files found' : 'No files in this folder' }}
+            {{ searchQuery ? t('settings.storage.noFilesFound') : t('settings.storage.noFilesInFolder') }}
           </h3>
           <p class="text-gray-500 mb-6 max-w-md mx-auto">
             {{
               searchQuery
-                ? 'Try adjusting your search terms or check your spelling'
-                : 'This folder is empty. Upload some files to get started with your storage.'
+                ? t('settings.storage.tryAdjustingSearch')
+                : t('settings.storage.folderEmpty')
             }}
           </p>
           <UButton
@@ -77,7 +77,7 @@
             class="hover:shadow-lg transition-shadow"
           >
             <UIcon name="i-lucide-upload" class="w-5 h-5 mr-2" />
-            Upload Files
+            {{ t('settings.storage.uploadFiles') }}
           </UButton>
         </div>
       </div>
@@ -162,10 +162,7 @@
                 class="w-5 h-5 text-blue-600"
               />
               <span class="text-sm font-medium text-blue-700">
-                {{ selectedFiles.length }} file{{
-                  selectedFiles.length > 1 ? 's' : ''
-                }}
-                selected
+                {{ (t as any)('settings.storage.filesSelected', selectedFiles.length, { count: selectedFiles.length }) }}
               </span>
             </div>
 
@@ -177,7 +174,7 @@
                 class="hover:bg-blue-100"
               >
                 <UIcon name="i-lucide-download" class="w-4 h-4 mr-2" />
-                Download Selected
+                {{ t('settings.storage.downloadSelected') }}
               </UButton>
 
               <UButton
@@ -189,7 +186,7 @@
                 class="hover:bg-red-100"
               >
                 <UIcon name="i-lucide-trash-2" class="w-4 h-4 mr-2" />
-                Delete Selected
+                {{ t('settings.storage.deleteSelected') }}
               </UButton>
 
               <UButton
@@ -198,7 +195,7 @@
                 @click="clearSelection"
                 class="hover:bg-gray-100"
               >
-                Clear Selection
+                {{ t('settings.storage.clearSelection') }}
               </UButton>
             </div>
           </div>
@@ -219,8 +216,8 @@
     <!-- Upload Modal -->
     <UModal
       v-model:open="showUploadModal"
-      title="Upload Files"
-      description="Upload files to this storage folder"
+      :title="t('settings.storage.uploadFiles')"
+      :description="t('settings.storage.uploadFilesDescription')"
     >
       <template #body>
         <FileUpload
@@ -237,31 +234,31 @@
     <UModal
       v-model:open="showPreviewModal"
       :ui="{ content: 'w-full lg:max-w-[1330px]' }"
-      :title="previewFile?.name || 'File Preview'"
-      :description="`Previewing ${previewFile?.mime_type || 'file'}`"
+      :title="previewFile?.name || t('settings.storage.filePreview')"
+      :description="t('settings.storage.previewingFile', { type: previewFile?.mime_type || t('settings.storage.file') })"
     >
       <template #body>
         <div v-if="previewFile" class="file-preview p-6">
           <div class="bg-gray-50 rounded-lg p-4 mb-4">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <span class="font-medium text-gray-700">Size:</span>
+                <span class="font-medium text-gray-700">{{ t('settings.storage.size') }}:</span>
                 <p class="text-gray-600">
                   {{ formatFileSize(previewFile.size) }}
                 </p>
               </div>
               <div>
-                <span class="font-medium text-gray-700">Type:</span>
+                <span class="font-medium text-gray-700">{{ t('common.type') }}:</span>
                 <p class="text-gray-700">{{ previewFile.mime_type }}</p>
               </div>
               <div>
-                <span class="font-medium text-gray-700">Created:</span>
+                <span class="font-medium text-gray-700">{{ t('settings.storage.created') }}:</span>
                 <p class="text-gray-600">
                   {{ formatDate(previewFile.created) }}
                 </p>
               </div>
               <div>
-                <span class="font-medium text-gray-700">Modified:</span>
+                <span class="font-medium text-gray-700">{{ t('settings.storage.modified') }}:</span>
                 <p class="text-gray-600">
                   {{ formatDate(previewFile.modified) }}
                 </p>
@@ -297,9 +294,9 @@
             :disabled="!previewFile"
           >
             <UIcon name="i-lucide-download" class="w-4 h-4 mr-2" />
-            Download
+            {{ t('common.download') }}
           </UButton>
-          <UButton @click="close"> Close </UButton>
+          <UButton @click="close">{{ t('common.close') }}</UButton>
         </div>
       </template>
     </UModal>
@@ -307,15 +304,13 @@
     <!-- Single File Delete Confirmation Modal -->
     <UModal
       v-model:open="showDeleteModal"
-      title="Delete File"
-      description="Are you sure you want to delete this file? This action cannot be undone."
+      :title="t('settings.storage.deleteFile')"
+      :description="t('settings.storage.deleteFileDescription')"
     >
       <template #body>
         <div class="space-y-4">
           <p class="text-gray-700 dark:text-gray-300">
-            Are you sure you want to delete
-            <strong>{{ fileToDelete?.name }}</strong
-            >? This will permanently remove this file and all associated data.
+            {{ t('settings.storage.deleteFileConfirm', { name: fileToDelete?.name }) }}
           </p>
 
           <div
@@ -327,11 +322,11 @@
                 class="w-5 h-5 text-red-600 mt-0.5"
               />
               <div class="text-sm text-red-700 dark:text-red-300">
-                <p class="font-medium">Warning:</p>
+                <p class="font-medium">{{ t('settings.storage.warning') }}:</p>
                 <ul class="mt-1 space-y-1">
-                  <li>• File will be permanently deleted</li>
-                  <li>• All associated data will be lost</li>
-                  <li>• This action cannot be reversed</li>
+                  <li>• {{ t('settings.storage.filePermanentlyDeleted') }}</li>
+                  <li>• {{ t('settings.storage.allAssociatedDataLost') }}</li>
+                  <li>• {{ t('settings.storage.actionCannotBeReversed') }}</li>
                 </ul>
               </div>
             </div>
@@ -342,10 +337,10 @@
       <template #footer="{ close }">
         <div class="flex justify-end space-x-3">
           <UButton color="neutral" variant="outline" @click="close">
-            Cancel
+            {{ t('common.cancel') }}
           </UButton>
           <UButton color="error" :loading="deleting" @click="confirmDeleteFile">
-            Delete File
+            {{ t('settings.storage.deleteFile') }}
           </UButton>
         </div>
       </template>
@@ -354,15 +349,13 @@
     <!-- Bulk Delete Confirmation Modal -->
     <UModal
       v-model:open="showBulkDeleteModal"
-      title="Delete Multiple Files"
-      description="Are you sure you want to delete these files? This action cannot be undone."
+      :title="t('settings.storage.deleteMultipleFiles')"
+      :description="t('settings.storage.deleteMultipleFilesDescription')"
     >
       <template #body>
         <div class="space-y-4">
           <p class="text-gray-700 dark:text-gray-300">
-            Are you sure you want to delete
-            <strong>{{ selectedFiles.length }} files</strong>? This will
-            permanently remove these files and all associated data.
+            {{ t('settings.storage.deleteMultipleFilesConfirm', { count: selectedFiles.length }) }}
           </p>
 
           <div
@@ -374,11 +367,11 @@
                 class="w-5 h-5 text-red-600 mt-0.5"
               />
               <div class="text-sm text-red-700 dark:text-red-300">
-                <p class="font-medium">Warning:</p>
+                <p class="font-medium">{{ t('settings.storage.warning') }}:</p>
                 <ul class="mt-1 space-y-1">
-                  <li>• All selected files will be permanently deleted</li>
-                  <li>• All associated data will be lost</li>
-                  <li>• This action cannot be reversed</li>
+                  <li>• {{ t('settings.storage.allSelectedFilesDeleted') }}</li>
+                  <li>• {{ t('settings.storage.allAssociatedDataLost') }}</li>
+                  <li>• {{ t('settings.storage.actionCannotBeReversed') }}</li>
                 </ul>
               </div>
             </div>
@@ -389,10 +382,10 @@
       <template #footer="{ close }">
         <div class="flex justify-end space-x-3">
           <UButton color="neutral" variant="outline" @click="close">
-            Cancel
+            {{ t('common.cancel') }}
           </UButton>
           <UButton color="error" :loading="deleting" @click="confirmBulkDelete">
-            Delete {{ selectedFiles.length }} Files
+            {{ t('settings.storage.deleteFiles', { count: selectedFiles.length }) }}
           </UButton>
         </div>
       </template>
@@ -437,6 +430,7 @@ const props = withDefaults(defineProps<Props>(), {
 const toast = useToast();
 const authStore = useAuthStore();
 const config = useRuntimeConfig();
+const { t } = useI18n();
 
 // State
 const loading = ref(false);
@@ -459,20 +453,20 @@ const fileToDelete = ref<FileInfo | null>(null);
 const folderName = computed(() => props.folder);
 
 const fileTypeOptions = computed(() => [
-  { label: 'Images', id: 'image' },
-  { label: 'Documents', id: 'document' },
-  { label: 'Videos', id: 'video' },
-  { label: 'Audio', id: 'audio' },
-  { label: 'Other', id: 'other' },
+  { label: t('settings.storage.fileTypes.images'), id: 'image' },
+  { label: t('settings.storage.fileTypes.documents'), id: 'document' },
+  { label: t('settings.storage.fileTypes.videos'), id: 'video' },
+  { label: t('settings.storage.fileTypes.audio'), id: 'audio' },
+  { label: t('settings.storage.fileTypes.other'), id: 'other' },
 ]);
 
 const sortOptions = computed(() => [
-  { label: 'Name A-Z', id: 'name' },
-  { label: 'Name Z-A', id: 'name-desc' },
-  { label: 'Date (newest)', id: 'date-desc' },
-  { label: 'Date (oldest)', id: 'date-asc' },
-  { label: 'Size (largest)', id: 'size-desc' },
-  { label: 'Size (smallest)', id: 'size-asc' },
+  { label: t('settings.storage.sort.nameAsc'), id: 'name' },
+  { label: t('settings.storage.sort.nameDesc'), id: 'name-desc' },
+  { label: t('settings.storage.sort.dateDesc'), id: 'date-desc' },
+  { label: t('settings.storage.sort.dateAsc'), id: 'date-asc' },
+  { label: t('settings.storage.sort.sizeDesc'), id: 'size-desc' },
+  { label: t('settings.storage.sort.sizeAsc'), id: 'size-asc' },
 ]);
 
 const filteredFiles = computed(() => {
@@ -624,9 +618,9 @@ const loadFiles = async () => {
     }
   } catch (error) {
     toast.add({
-      title: 'Error',
+      title: t('common.error'),
       description:
-        error instanceof Error ? error.message : 'Failed to load files',
+        error instanceof Error ? error.message : t('settings.storage.failedToLoadFiles'),
       color: 'error',
     });
   } finally {
@@ -699,14 +693,14 @@ const downloadFile = async (file: FileInfo) => {
     window.URL.revokeObjectURL(url);
 
     toast.add({
-      title: 'Download Started',
-      description: 'Download started',
+      title: t('settings.storage.downloadStarted'),
+      description: t('settings.storage.downloadStarted'),
       color: 'primary',
     });
   } catch (error) {
     toast.add({
-      title: 'Download Failed',
-      description: error instanceof Error ? error.message : 'Download failed',
+      title: t('settings.storage.downloadFailed'),
+      description: error instanceof Error ? error.message : t('settings.storage.downloadFailed'),
       color: 'error',
     });
   }
@@ -731,20 +725,20 @@ const confirmDeleteFile = async () => {
 
     if (response.success) {
       toast.add({
-        title: 'Success',
-        description: 'File deleted successfully',
+        title: t('common.success'),
+        description: t('settings.storage.fileDeletedSuccessfully'),
         color: 'primary',
       });
       await loadFiles();
       showDeleteModal.value = false;
       fileToDelete.value = null;
     } else {
-      throw new Error(response.error?.message || 'Delete failed');
+      throw new Error(response.error?.message || t('settings.storage.deleteFailed'));
     }
   } catch (error) {
     toast.add({
-      title: 'Delete Failed',
-      description: error instanceof Error ? error.message : 'Delete failed',
+      title: t('settings.storage.deleteFailed'),
+      description: error instanceof Error ? error.message : t('settings.storage.deleteFailed'),
       color: 'error',
     });
   } finally {
@@ -759,8 +753,8 @@ const deleteFile = async (file: FileInfo) => {
 const downloadSelectedFiles = () => {
   // For multiple files, we'd need to implement a zip download or individual downloads
   toast.add({
-    title: 'Downloading',
-    description: 'Downloading selected files...',
+    title: t('settings.storage.downloading'),
+    description: t('settings.storage.downloadingSelectedFiles'),
     color: 'primary',
   });
   selectedFiles.value.forEach((path) => {
@@ -798,8 +792,8 @@ const confirmBulkDelete = async () => {
     }
 
     toast.add({
-      title: 'Success',
-      description: `${deletedCount} files deleted successfully`,
+      title: t('common.success'),
+      description: t('settings.storage.filesDeletedSuccessfully', { count: deletedCount }),
       color: 'primary',
     });
     clearSelection();
@@ -807,8 +801,8 @@ const confirmBulkDelete = async () => {
     await loadFiles();
   } catch (error) {
     toast.add({
-      title: 'Error',
-      description: 'Some files could not be deleted',
+      title: t('common.error'),
+      description: t('settings.storage.someFilesCouldNotBeDeleted'),
       color: 'error',
     });
   } finally {
@@ -822,8 +816,8 @@ const deleteSelectedFiles = async () => {
 
 const handleUploadComplete = (uploadedFiles: any[]) => {
   toast.add({
-    title: 'Upload Complete',
-    description: `${uploadedFiles.length} files uploaded successfully`,
+    title: t('settings.storage.uploadComplete'),
+    description: t('settings.storage.filesUploadedSuccessfully', { count: uploadedFiles.length }),
     color: 'primary',
   });
   showUploadModal.value = false;
@@ -832,7 +826,7 @@ const handleUploadComplete = (uploadedFiles: any[]) => {
 
 const handleUploadError = (error: string) => {
   toast.add({
-    title: 'Upload Error',
+    title: t('settings.storage.uploadError'),
     description: error,
     color: 'error',
   });
@@ -890,14 +884,14 @@ const copyToClipboard = async (text: string) => {
   try {
     await navigator.clipboard.writeText(text);
     toast.add({
-      title: 'Copied',
-      description: 'UUID copied to clipboard',
+      title: t('common.copied'),
+      description: t('settings.storage.uuidCopiedToClipboard'),
       color: 'primary',
     });
   } catch (error) {
     toast.add({
-      title: 'Copy Failed',
-      description: 'Failed to copy UUID to clipboard',
+      title: t('settings.storage.copyFailed'),
+      description: t('settings.storage.failedToCopyUuid'),
       color: 'error',
     });
   }

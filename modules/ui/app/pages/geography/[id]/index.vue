@@ -4,18 +4,18 @@
       <UDashboardNavbar>
         <template #title>
           <h1 class="text-2xl font-semibold">
-            {{ geographyFile?.name || 'Geography File' }}
+            {{ geographyFile?.name || t('geography.viewGeography') }}
           </h1>
         </template>
         <template #description>
           {{ geographyFile?.type?.toUpperCase() }} •
-          {{ geographyFile?.category }}
+          {{ t(`geography.categories.${geographyFile?.category}`) }}
         </template>
         <template #right>
           <div class="flex items-center gap-2">
             <UButton color="neutral" variant="ghost" @click="router.back()">
               <UIcon name="i-lucide-arrow-left" class="w-4 h-4" />
-              Back
+              {{ t('common.back') }}
             </UButton>
             <UButton
               v-if="canEditGeography"
@@ -24,7 +24,7 @@
               @click="editFile"
             >
               <UIcon name="i-lucide-edit" class="w-4 h-4" />
-              Edit
+              {{ t('common.edit') }}
             </UButton>
           </div>
         </template>
@@ -77,7 +77,9 @@
           class="mb-6"
         >
           <template #actions>
-            <UButton @click="loadGeographyFile"> Try Again </UButton>
+            <UButton @click="loadGeographyFile">
+              {{ t('common.tryAgain') }}
+            </UButton>
           </template>
         </UAlert>
 
@@ -94,7 +96,7 @@
                     <label
                       class="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      Name
+                      {{ t('common.name') }}
                     </label>
                     <p class="text-sm text-gray-900 dark:text-white">
                       {{ geographyFile.name }}
@@ -104,7 +106,7 @@
                     <label
                       class="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      Type
+                      {{ t('common.type') }}
                     </label>
                     <p class="text-sm text-gray-900 dark:text-white">
                       {{ geographyFile.type.toUpperCase() }}
@@ -114,17 +116,17 @@
                     <label
                       class="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      Category
+                      {{ t('common.category') }}
                     </label>
                     <p class="text-sm text-gray-900 dark:text-white">
-                      {{ geographyFile.category }}
+                      {{ t(`geography.categories.${geographyFile.category}`) }}
                     </p>
                   </div>
                   <div>
                     <label
                       class="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      SRID
+                      {{ t('geography.srid') }}
                     </label>
                     <p class="text-sm text-gray-900 dark:text-white">
                       {{ geographyFile.srid }}
@@ -137,7 +139,7 @@
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Description
+                    {{ t('common.description') }}
                   </label>
                   <p class="text-sm text-gray-900 dark:text-white mt-1">
                     {{ geographyFile.description }}
@@ -149,16 +151,20 @@
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Bounding Box
+                    {{ t('geography.boundingBox') }}
                   </label>
                   <div class="grid grid-cols-2 gap-2 mt-1 text-xs">
                     <div>
-                      <span class="text-gray-500">Min:</span>
+                      <span class="text-gray-500"
+                        >{{ t('geography.min') }}:</span
+                      >
                       {{ geographyFile.bounds.minLon.toFixed(6) }},
                       {{ geographyFile.bounds.minLat.toFixed(6) }}
                     </div>
                     <div>
-                      <span class="text-gray-500">Max:</span>
+                      <span class="text-gray-500"
+                        >{{ t('geography.max') }}:</span
+                      >
                       {{ geographyFile.bounds.maxLon.toFixed(6) }},
                       {{ geographyFile.bounds.maxLat.toFixed(6) }}
                     </div>
@@ -171,7 +177,7 @@
                     <label
                       class="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      Created
+                      {{ t('geography.created') }}
                     </label>
                     <p class="text-sm text-gray-900 dark:text-white">
                       {{ formatDate(geographyFile.created_at) }}
@@ -181,7 +187,7 @@
                     <label
                       class="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      Updated
+                      {{ t('geography.updated') }}
                     </label>
                     <p class="text-sm text-gray-900 dark:text-white">
                       {{ formatDate(geographyFile.updated_at) }}
@@ -194,19 +200,25 @@
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Metadata
+                    {{ t('geography.metadata') }}
                   </label>
                   <div class="mt-1 space-y-1">
                     <div v-if="geographyFile.metadata.source" class="text-xs">
-                      <span class="text-gray-500">Source:</span>
+                      <span class="text-gray-500"
+                        >{{ t('geography.source') }}:</span
+                      >
                       {{ geographyFile.metadata.source }}
                     </div>
                     <div v-if="geographyFile.metadata.version" class="text-xs">
-                      <span class="text-gray-500">Version:</span>
+                      <span class="text-gray-500"
+                        >{{ t('geography.version') }}:</span
+                      >
                       {{ geographyFile.metadata.version }}
                     </div>
                     <div v-if="geographyFile.metadata.accuracy" class="text-xs">
-                      <span class="text-gray-500">Accuracy:</span>
+                      <span class="text-gray-500"
+                        >{{ t('geography.accuracy') }}:</span
+                      >
                       {{ geographyFile.metadata.accuracy }}
                     </div>
                   </div>
@@ -246,7 +258,7 @@
                 <div class="flex items-center justify-end">
                   <UButton size="sm" variant="outline" @click="copyToClipboard">
                     <UIcon name="i-lucide-copy" class="w-4 h-4" />
-                    Copy
+                    {{ t('common.copy') }}
                   </UButton>
                 </div>
               </div>
@@ -263,7 +275,7 @@
                       {{ parsedData?.featureCount || 0 }}
                     </div>
                     <div class="text-sm text-gray-600 dark:text-gray-400">
-                      Features
+                      {{ t('geography.features') }}
                     </div>
                   </div>
                   <div
@@ -273,7 +285,7 @@
                       {{ parsedData?.geometryTypes?.length || 0 }}
                     </div>
                     <div class="text-sm text-gray-600 dark:text-gray-400">
-                      Geometry Types
+                      {{ t('geography.geometryTypesLabel') }}
                     </div>
                   </div>
                 </div>
@@ -282,7 +294,7 @@
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Geometry Types
+                    {{ t('geography.geometryTypesLabel') }}
                   </label>
                   <div class="flex flex-wrap gap-2">
                     <UBadge
@@ -300,7 +312,7 @@
                   <label
                     class="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    File Size
+                    {{ t('geography.fileSize') }}
                   </label>
                   <p class="text-sm text-gray-900 dark:text-white">
                     {{ formatFileSize(rawContent.length) }}
@@ -356,6 +368,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 // Reactive state
 const loading = ref(true);
@@ -366,9 +379,9 @@ const parsedData = ref<any>(null);
 
 // Computed properties
 const breadcrumbItems = computed(() => [
-  { label: 'Home', to: '/' },
-  { label: 'Geography', to: '/geography' },
-  { label: geographyFile.value?.name || 'Geography File' },
+  { label: t('common.home'), to: '/' },
+  { label: t('geography.title'), to: '/geography' },
+  { label: geographyFile.value?.name || t('geography.viewGeography') },
 ]);
 
 const canEditGeography = computed(() => {
@@ -409,11 +422,11 @@ const loadGeographyFile = async () => {
       // Parse content for statistics
       await parseContent();
     } else {
-      error.value = response.error || 'Failed to load geography file';
+      error.value = response.error || t('geography.failedToLoad');
     }
   } catch (err) {
     console.error('Error loading geography file:', err);
-    error.value = 'Failed to load geography file';
+    error.value = t('geography.failedToLoad');
   } finally {
     loading.value = false;
   }
@@ -433,7 +446,7 @@ const loadRawContent = async () => {
     }
   } catch (err) {
     console.error('Error loading raw content:', err);
-    rawContent.value = 'Content not available';
+    rawContent.value = t('geography.contentNotAvailable');
   }
 };
 
@@ -476,9 +489,14 @@ const formatDate = (dateString: string) => {
 };
 
 const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 Bytes';
+  if (bytes === 0) return `0 ${t('geography.bytes')}`;
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const sizes = [
+    t('geography.bytes'),
+    t('geography.kb'),
+    t('geography.mb'),
+    t('geography.gb'),
+  ];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };

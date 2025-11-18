@@ -3,13 +3,13 @@
     <!-- Header with Folder Selection -->
     <div class="border-b border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
       <div class="space-y-3">
-        <h3 class="font-medium text-gray-900 dark:text-white">Select Files</h3>
+        <h3 class="font-medium text-gray-900 dark:text-white">{{ t('records.attachments.selectFiles') }}</h3>
 
         <!-- Folder Selection -->
         <USelectMenu
           v-model="selectedFolder"
           :items="folderOptions"
-          placeholder="Select folder"
+          :placeholder="t('records.attachments.selectFolder')"
           icon="i-lucide-folder"
           @change="loadFiles"
           class="w-full"
@@ -25,7 +25,7 @@
           name="i-lucide-loader-2"
           class="w-6 h-6 animate-spin mx-auto mb-2"
         />
-        <p class="text-sm text-gray-500">Loading files...</p>
+        <p class="text-sm text-gray-500">{{ t('records.attachments.loadingFiles') }}</p>
       </div>
 
       <!-- Empty State -->
@@ -34,7 +34,7 @@
           name="i-lucide-folder-open"
           class="w-8 h-8 text-gray-400 mx-auto mb-2"
         />
-        <p class="text-sm text-gray-500">No files in this folder</p>
+        <p class="text-sm text-gray-500">{{ t('records.attachments.noFilesInFolder') }}</p>
       </div>
 
       <!-- File List -->
@@ -91,19 +91,16 @@
     <div class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
       <div class="flex items-center justify-between">
         <p class="text-sm text-gray-500">
-          {{ selectedFiles.length }} file{{
-            selectedFiles.length !== 1 ? 's' : ''
-          }}
-          selected
+          {{ (t as any)('common.selected', selectedFiles.length, { count: selectedFiles.length }) }}
         </p>
         <div class="flex space-x-2">
           <UButton
             color="neutral"
-            variant="outline"
+            variant="ghost"
             size="sm"
             @click="$emit('cancel')"
           >
-            Cancel
+            {{ t('common.clear') }}
           </UButton>
           <UButton
             color="primary"
@@ -111,7 +108,7 @@
             :disabled="selectedFiles.length === 0"
             @click="confirmSelection"
           >
-            Add Files
+            {{ t('common.link') }}
           </UButton>
         </div>
       </div>
@@ -148,18 +145,21 @@ const files = ref<FileInfo[]>([]);
 const selectedFiles = ref<string[]>([]);
 const selectedFolder = ref<any>(null);
 
+// Composables
+const { t } = useI18n();
+
 // Folder options
-const folderOptions = [
-  { label: 'Public', value: 'public', icon: 'i-lucide-globe' },
-  { label: 'Sessions', value: 'sessions', icon: 'i-lucide-calendar' },
-  { label: 'Permits', value: 'permits', icon: 'i-lucide-file-text' },
-  { label: 'Private', value: 'private', icon: 'i-lucide-lock' },
-];
+const folderOptions = computed(() => [
+  { label: t('records.attachments.folders.public'), value: 'public', icon: 'i-lucide-globe' },
+  { label: t('records.attachments.folders.sessions'), value: 'sessions', icon: 'i-lucide-calendar' },
+  { label: t('records.attachments.folders.permits'), value: 'permits', icon: 'i-lucide-file-text' },
+  { label: t('records.attachments.folders.private'), value: 'private', icon: 'i-lucide-lock' },
+]);
 
 // Initialize with default folder
 onMounted(() => {
   selectedFolder.value =
-    folderOptions.find((f) => f.value === props.folder) || folderOptions[0];
+    folderOptions.value.find((f) => f.value === props.folder) || folderOptions.value[0];
   loadFiles();
 });
 

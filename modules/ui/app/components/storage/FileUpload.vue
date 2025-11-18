@@ -58,9 +58,7 @@
           :disabled="isUploading"
         >
           <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
-          Upload {{ selectedFiles.length }} File{{
-            selectedFiles.length > 1 ? 's' : ''
-          }}
+          {{ t('settings.storage.uploadFilesCount', { count: selectedFiles.length }) }}
         </UButton>
 
         <UButton
@@ -69,7 +67,7 @@
           @click.stop="clearFiles"
           :disabled="isUploading"
         >
-          Clear
+          {{ t('common.clear') }}
         </UButton>
       </div>
     </div>
@@ -77,7 +75,7 @@
     <!-- Upload Progress -->
     <div v-if="uploads.length > 0" class="upload-progress mt-4">
       <h4 class="text-sm font-medium text-gray-700 mb-3">
-        Upload Progress ({{ completedCount }}/{{ uploads.length }})
+        {{ t('settings.storage.uploadProgress', { completed: completedCount, total: uploads.length }) }}
       </h4>
 
       <div class="space-y-3">
@@ -107,7 +105,7 @@
                 "
               >
                 {{
-                  upload.status === 'error' ? 'Failed' : `${upload.progress}%`
+                  upload.status === 'error' ? t('common.failed') : `${upload.progress}%`
                 }}
               </span>
               <UButton
@@ -117,7 +115,7 @@
                 variant="ghost"
                 @click="retryUpload(upload)"
               >
-                Retry
+                {{ t('common.retry') }}
               </UButton>
             </div>
           </div>
@@ -157,14 +155,14 @@
         <template #title>
           {{
             hasErrors
-              ? 'Upload completed with errors'
-              : 'Upload completed successfully'
+              ? t('settings.storage.uploadCompletedWithErrors')
+              : t('settings.storage.uploadCompletedSuccessfully')
           }}
         </template>
         <template #description>
-          {{ completedCount }} files uploaded
+          {{ t('settings.storage.filesUploaded', { count: completedCount }) }}
           <span v-if="errorCount > 0" class="text-red-600">
-            • {{ errorCount }} failed
+            • {{ t('settings.storage.filesFailed', { count: errorCount }) }}
           </span>
         </template>
       </UAlert>
@@ -213,6 +211,7 @@ const emit = defineEmits<{
 
 // Composables
 const toast = useToast();
+const { t } = useI18n();
 
 // State
 const selectedFiles = ref<File[]>([]);
@@ -227,12 +226,12 @@ const acceptedTypes = computed(() => {
 });
 
 const uploadLabel = computed(() => {
-  if (isUploading.value) return 'Uploading...';
-  return 'Drop files here or click to browse';
+  if (isUploading.value) return t('settings.storage.uploading');
+  return t('settings.storage.dropFilesHere');
 });
 
 const uploadDescription = computed(() => {
-  return `Supports: ${props.allowedTypes.join(', ')} • Max: ${props.maxSize}`;
+  return t('settings.storage.uploadDescription', { types: props.allowedTypes.join(', '), maxSize: props.maxSize });
 });
 
 const completedCount = computed(() => {
@@ -320,8 +319,8 @@ const validateFile = (file: File): boolean => {
   const extension = file.name.split('.').pop()?.toLowerCase();
   if (!extension || !props.allowedTypes.includes(extension)) {
     toast.add({
-      title: 'Invalid File Type',
-      description: `File type '${extension}' not allowed`,
+      title: t('settings.storage.invalidFileType'),
+      description: t('settings.storage.fileTypeNotAllowed', { type: extension }),
       color: 'error',
     });
     return false;
@@ -331,8 +330,8 @@ const validateFile = (file: File): boolean => {
   const maxSizeBytes = parseSizeString(props.maxSize);
   if (file.size > maxSizeBytes) {
     toast.add({
-      title: 'File Too Large',
-      description: `File size exceeds limit of ${props.maxSize}`,
+      title: t('settings.storage.fileTooLarge'),
+      description: t('settings.storage.fileSizeExceedsLimit', { maxSize: props.maxSize }),
       color: 'error',
     });
     return false;
@@ -416,7 +415,7 @@ const uploadFiles = async () => {
       if (response.success) {
         item.status = 'completed' as 'pending' | 'uploading' | 'completed' | 'error';
         item.progress = 100;
-        item.message = 'Upload successful' as string | undefined;
+        item.message = t('settings.storage.uploadSuccessful') as string | undefined;
 
         // Emit success
         emit('upload-complete', [
@@ -433,14 +432,14 @@ const uploadFiles = async () => {
           },
         ]);
       } else {
-        throw new Error(response.error?.message || 'Upload failed');
+        throw new Error(response.error?.message || t('settings.storage.uploadFailed'));
       }
     } catch (error) {
       item.status = 'error' as 'pending' | 'uploading' | 'completed' | 'error';
       item.progress = 0;
-      item.message = (error instanceof Error ? error.message : 'Upload failed') as string | undefined;
+      item.message = (error instanceof Error ? error.message : t('settings.storage.uploadFailed')) as string | undefined;
 
-      emit('upload-error', item.message || 'Upload failed');
+      emit('upload-error', item.message || t('settings.storage.uploadFailed'));
     }
   }
 

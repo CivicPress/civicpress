@@ -77,6 +77,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
+const { t } = useI18n();
 const { getRecordTypeOptions, getRecordTypeLabel, fetchRecordTypes } =
   useRecordTypes();
 const { recordStatusOptions, getRecordStatusLabel, fetchRecordStatuses } =
@@ -137,9 +138,9 @@ const showTemplateModal = ref(false);
 // File browser popover state
 const showFileBrowser = ref(false);
 
-// Watch for changes to showFileBrowser for debugging
+// Watch for changes to showFileBrowser
 watch(showFileBrowser, (newValue) => {
-  console.log('showFileBrowser changed:', newValue);
+  // Handle file browser visibility changes
 });
 
 // Form errors
@@ -194,12 +195,12 @@ const templateOptionsComputed = computed(() => {
 // Tabs for content editor and preview
 const contentTabs = computed(() => [
   {
-    label: 'Content',
+    label: t('common.content'),
     icon: 'i-lucide-file-text',
     slot: 'content',
   },
   {
-    label: 'Preview',
+    label: t('common.preview'),
     icon: 'i-lucide-eye',
     slot: 'preview',
   },
@@ -209,28 +210,28 @@ const contentTabs = computed(() => [
 const relatedItemsAccordion = computed(() => {
   return [
     {
-      label: 'Linked Geography',
+      label: t('records.geography.title'),
       value: 'linked-geography',
       iconName: 'i-lucide-map-pin',
       description: form.linkedGeographyFiles?.length
-        ? `${form.linkedGeographyFiles.length} items`
-        : 'No linked geography',
+        ? `${form.linkedGeographyFiles.length} ${t('records.items')}`
+        : t('records.geography.noGeography'),
     },
     {
-      label: 'File Attachments',
+      label: t('records.attachments.title'),
       value: 'attachments',
       iconName: 'i-lucide-paperclip',
       description: form.attachedFiles?.length
-        ? `${form.attachedFiles.length} files`
-        : 'No attachments',
+        ? `${form.attachedFiles.length} ${t('records.files')}`
+        : t('records.attachments.noAttachments'),
     },
     {
-      label: 'Linked Records',
+      label: t('records.linkedRecords.title'),
       value: 'linked-records',
       iconName: 'i-lucide-link',
       description: form.linkedRecords?.length
-        ? `${form.linkedRecords.length} records`
-        : 'No linked records',
+        ? `${form.linkedRecords.length} ${t('records.record').toLowerCase()}${form.linkedRecords.length !== 1 ? 's' : ''}`
+        : t('records.linkedRecords.noLinks'),
     },
   ];
 });
@@ -400,8 +401,8 @@ const confirmDelete = async () => {
   } catch (error) {
     console.error('Error deleting record:', error);
     toast.add({
-      title: 'Error',
-      description: 'Failed to delete record',
+      title: t('common.error'),
+      description: t('records.failedToDeleteRecord'),
       color: 'error',
     });
   } finally {
@@ -445,8 +446,8 @@ const loadTemplate = () => {
     const template = getTemplateById(selectedTemplate.value.value);
     if (template) {
       const variables = {
-        title: form.title || '[Record Title]',
-        user: 'Current User', // TODO: Get from auth store
+        title: form.title || t('records.recordTitle'),
+        user: t('records.currentUser'), // TODO: Get from auth store
         timestamp: new Date().toISOString(),
       };
 
@@ -458,8 +459,10 @@ const loadTemplate = () => {
 
       // Show success message
       toast.add({
-        title: 'Template Loaded',
-        description: `Template "${template.name}" has been loaded successfully.`,
+        title: t('records.templateLoaded'),
+        description: t('records.templateLoadedSuccessfully', {
+          name: template.name,
+        }),
         color: 'primary',
       });
     }
@@ -487,8 +490,10 @@ const handleFilesSelected = (files: any[]) => {
   showFileBrowser.value = false;
 
   toast.add({
-    title: 'Files Added',
-    description: `${files.length} file${files.length !== 1 ? 's' : ''} attached to record.`,
+    title: t('records.filesAdded'),
+    description: (t as any)('records.filesAttachedToRecord', files.length, {
+      count: files.length,
+    }),
     color: 'primary',
   });
 };
@@ -597,8 +602,8 @@ const downloadFile = async (fileId: string, fileName: string) => {
   } catch (error) {
     console.error('Download failed:', error);
     useToast().add({
-      title: 'Download Failed',
-      description: 'Failed to download the file. Please try again.',
+      title: t('records.downloadFailed'),
+      description: t('records.failedToDownloadFile'),
       color: 'error',
     });
   }
@@ -613,7 +618,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
         <!-- Title -->
         <UFormField
           v-if="!props.hideBasicFields"
-          label="Title"
+          :label="t('common.title')"
           required
           :error="
             hasSubmitted && formErrors.title ? formErrors.title : undefined
@@ -621,7 +626,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
         >
           <UInput
             v-model="form.title"
-            placeholder="Enter record title"
+            :placeholder="t('records.enterTitle')"
             :disabled="saving"
             class="w-full"
           />
@@ -630,14 +635,14 @@ const downloadFile = async (fileId: string, fileName: string) => {
         <!-- Record Type -->
         <UFormField
           v-if="!props.hideBasicFields"
-          label="Record Type"
+          :label="t('records.recordType')"
           required
           :error="hasSubmitted && formErrors.type ? formErrors.type : undefined"
         >
           <USelectMenu
             v-model="selectedRecordType"
             :items="recordTypeOptionsComputed"
-            placeholder="Select record type"
+            :placeholder="t('records.selectType')"
             :disabled="saving || props.recordType !== null"
             class="w-full"
           />
@@ -646,7 +651,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
         <!-- Status -->
         <UFormField
           v-if="!props.hideBasicFields"
-          label="Status"
+          :label="t('common.status')"
           required
           :error="
             hasSubmitted && formErrors.status ? formErrors.status : undefined
@@ -655,7 +660,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
           <USelectMenu
             v-model="selectedRecordStatus"
             :items="recordStatusOptionsComputed"
-            placeholder="Select status"
+            :placeholder="t('records.selectStatus')"
             :disabled="saving"
             class="w-full"
           />
@@ -664,7 +669,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
         <!-- Description -->
         <UFormField
           v-if="!props.hideBasicFields"
-          label="Description"
+          :label="t('common.description')"
           :error="
             hasSubmitted && formErrors.description
               ? formErrors.description
@@ -673,7 +678,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
         >
           <UTextarea
             v-model="form.description"
-            placeholder="Enter record description (optional)"
+            :placeholder="t('records.enterRecordDescription')"
             :disabled="saving"
             :rows="3"
             class="w-full"
@@ -683,12 +688,12 @@ const downloadFile = async (fileId: string, fileName: string) => {
         <!-- Tags -->
         <UFormField
           v-if="!props.hideBasicFields"
-          label="Tags"
+          :label="t('common.tags')"
           :error="hasSubmitted && formErrors.tags ? formErrors.tags : undefined"
         >
           <UInput
             v-model="newTag"
-            placeholder="Add a tag and press Enter"
+            :placeholder="t('records.addTagPlaceholder')"
             :disabled="saving"
             @keyup.enter="handleTagEnter"
             class="w-full"
@@ -748,7 +753,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                     :disabled="saving"
                     :icon="item.iconName"
                   >
-                    Link Geography Files
+                    {{ t('records.geography.linkGeography') }}
                   </UButton>
 
                   <template #content>
@@ -783,7 +788,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                     :disabled="saving"
                     :icon="item.iconName"
                   >
-                    Link Files
+                    {{ t('records.attachments.linkFiles') }}
                   </UButton>
 
                   <template #content>
@@ -833,13 +838,15 @@ const downloadFile = async (fileId: string, fileName: string) => {
 
                       <!-- Category and Description -->
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                        <UFormField label="Category">
+                        <UFormField :label="t('common.category')">
                           <USelectMenu
                             :model-value="
                               getAttachmentTypeByValue(file.category)
                             "
                             :items="getAttachmentTypeOptions()"
-                            placeholder="Select category"
+                            :placeholder="
+                              t('records.attachments.selectCategory')
+                            "
                             @update:model-value="
                               (value) => updateFileCategory(index, value)
                             "
@@ -848,10 +855,12 @@ const downloadFile = async (fileId: string, fileName: string) => {
                           />
                         </UFormField>
 
-                        <UFormField label="Description">
+                        <UFormField :label="t('common.description')">
                           <UInput
                             :model-value="file.description || ''"
-                            placeholder="Optional description"
+                            :placeholder="
+                              t('records.attachments.optionalDescription')
+                            "
                             @update:model-value="
                               (value) => updateFileDescription(index, value)
                             "
@@ -871,7 +880,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                         size="xs"
                         @click="downloadFile(file.id, file.original_name)"
                         :disabled="saving"
-                        title="Download file"
+                        :title="t('records.attachments.downloadFile')"
                       />
                       <UButton
                         icon="i-lucide-x"
@@ -880,7 +889,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                         size="xs"
                         @click="removeAttachedFile(index)"
                         :disabled="saving"
-                        title="Remove attachment"
+                        :title="t('records.attachments.removeAttachment')"
                       />
                     </div>
                   </div>
@@ -899,10 +908,10 @@ const downloadFile = async (fileId: string, fileName: string) => {
                 <h4
                   class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2"
                 >
-                  No files attached
+                  {{ t('records.attachments.noFilesAttached') }}
                 </h4>
                 <p class="text-gray-600 dark:text-gray-400">
-                  Link files to provide supporting documents for this record.
+                  {{ t('records.attachments.linkFilesDescription') }}
                 </p>
               </div>
             </div>
@@ -918,7 +927,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
                     :disabled="saving"
                     :icon="item.iconName"
                   >
-                    Link Records
+                    {{ t('records.linkRecords') }}
                   </UButton>
 
                   <template #content>
@@ -951,10 +960,10 @@ const downloadFile = async (fileId: string, fileName: string) => {
                 <h4
                   class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2"
                 >
-                  No records linked
+                  {{ t('records.linkedRecords.noLinks') }}
                 </h4>
                 <p class="text-gray-600 dark:text-gray-400">
-                  Link related records to create connections between documents.
+                  {{ t('records.linkedRecords.linkRecordsDescription') }}
                 </p>
               </div>
             </div>
@@ -982,7 +991,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
               >
                 <UTextarea
                   v-model="form.content"
-                  placeholder="Enter the record content"
+                  :placeholder="t('records.enterRecordContent')"
                   :disabled="saving"
                   variant="none"
                   :rows="30"
@@ -1012,8 +1021,8 @@ const downloadFile = async (fileId: string, fileName: string) => {
       <!-- Delete Button (only for editing) -->
       <UModal
         v-if="isEditing && canDelete"
-        title="Delete Record"
-        description="Are you sure you want to delete this record? This action cannot be undone."
+        :title="t('records.deleteRecord')"
+        :description="t('records.confirmDeleteRecord')"
       >
         <UButton
           color="error"
@@ -1021,16 +1030,17 @@ const downloadFile = async (fileId: string, fileName: string) => {
           :disabled="saving"
           @click="showDeleteModal = true"
         >
-          Delete Record
+          {{ t('records.deleteRecord') }}
         </UButton>
 
         <template #body>
           <div class="space-y-4">
             <p class="text-gray-700 dark:text-gray-300">
-              Are you sure you want to delete
-              <strong>{{ record?.title }}</strong
-              >? This will permanently remove this record and all associated
-              data.
+              {{
+                t('records.confirmDeleteRecordMessage', {
+                  title: record?.title,
+                })
+              }}
             </p>
 
             <div
@@ -1042,11 +1052,13 @@ const downloadFile = async (fileId: string, fileName: string) => {
                   class="w-5 h-5 text-red-600 mt-0.5"
                 />
                 <div class="text-sm text-red-700 dark:text-red-300">
-                  <p class="font-medium">Warning:</p>
+                  <p class="font-medium">{{ t('common.warning') }}:</p>
                   <ul class="mt-1 space-y-1">
-                    <li>• Record will be permanently deleted</li>
-                    <li>• All associated data will be lost</li>
-                    <li>• This action cannot be reversed</li>
+                    <li>
+                      • {{ t('records.deleteWarning.permanentlyDeleted') }}
+                    </li>
+                    <li>• {{ t('records.deleteWarning.allDataLost') }}</li>
+                    <li>• {{ t('records.deleteWarning.cannotBeReversed') }}</li>
                   </ul>
                 </div>
               </div>
@@ -1057,10 +1069,10 @@ const downloadFile = async (fileId: string, fileName: string) => {
         <template #footer="{ close }">
           <div class="flex justify-end space-x-3">
             <UButton color="neutral" variant="outline" @click="close">
-              Cancel
+              {{ t('common.cancel') }}
             </UButton>
             <UButton color="error" :loading="deleting" @click="confirmDelete">
-              Delete Record
+              {{ t('records.deleteRecord') }}
             </UButton>
           </div>
         </template>
@@ -1069,8 +1081,8 @@ const downloadFile = async (fileId: string, fileName: string) => {
       <!-- Template Confirmation Modal -->
       <UModal
         v-model:open="showTemplateModal"
-        title="Load Template"
-        description="Are you sure you want to load this template? This will replace your current content."
+        :title="t('records.templates.loadTemplate')"
+        :description="t('records.templates.confirmLoadTemplate')"
       >
         <template #body>
           <div class="space-y-4">
@@ -1083,14 +1095,21 @@ const downloadFile = async (fileId: string, fileName: string) => {
                   class="w-5 h-5 text-blue-600 mt-0.5"
                 />
                 <div class="text-sm text-blue-700 dark:text-blue-300">
-                  <p class="font-medium">Template Details:</p>
+                  <p class="font-medium">
+                    {{ t('records.templates.templateDetails') }}
+                  </p>
                   <ul class="mt-1 space-y-1">
                     <li>
-                      • <strong>Name:</strong> {{ selectedTemplate?.label }}
+                      • <strong>{{ t('records.templates.name') }}</strong>
+                      {{ selectedTemplate?.label }}
                     </li>
-                    <li>• <strong>Type:</strong> {{ form.type }}</li>
+                    <li>
+                      • <strong>{{ t('records.templates.type') }}</strong>
+                      {{ form.type }}
+                    </li>
                     <li v-if="selectedTemplate?.description">
-                      • <strong>Description:</strong>
+                      •
+                      <strong>{{ t('records.templates.description') }}</strong>
                       {{ selectedTemplate.description }}
                     </li>
                   </ul>
@@ -1107,13 +1126,13 @@ const downloadFile = async (fileId: string, fileName: string) => {
                   class="w-5 h-5 text-yellow-600 mt-0.5"
                 />
                 <div class="text-sm text-yellow-700 dark:text-yellow-300">
-                  <p class="font-medium">Warning:</p>
+                  <p class="font-medium">
+                    {{ t('records.templates.warning') }}
+                  </p>
                   <ul class="mt-1 space-y-1">
-                    <li>• Current content will be completely replaced</li>
-                    <li>
-                      • Template variables will be filled with current form data
-                    </li>
-                    <li>• This action cannot be undone</li>
+                    <li>• {{ t('records.templates.contentReplaced') }}</li>
+                    <li>• {{ t('records.templates.variablesFilled') }}</li>
+                    <li>• {{ t('records.templates.cannotBeUndone') }}</li>
                   </ul>
                 </div>
               </div>
@@ -1124,10 +1143,10 @@ const downloadFile = async (fileId: string, fileName: string) => {
         <template #footer="{ close }">
           <div class="flex justify-end space-x-3">
             <UButton color="neutral" variant="outline" @click="close">
-              Cancel
+              {{ t('common.cancel') }}
             </UButton>
             <UButton color="primary" :loading="saving" @click="loadTemplate">
-              Load Template
+              {{ t('records.templates.loadTemplate') }}
             </UButton>
           </div>
         </template>
@@ -1141,7 +1160,9 @@ const downloadFile = async (fileId: string, fileName: string) => {
           :disabled="!isFormValid"
           @click="handleSubmit"
         >
-          {{ isEditing ? 'Update Record' : 'Create Record' }}
+          {{
+            isEditing ? t('records.updateRecord') : t('records.createRecord')
+          }}
         </UButton>
 
         <UButton
@@ -1150,7 +1171,7 @@ const downloadFile = async (fileId: string, fileName: string) => {
           :disabled="saving"
           @click="$router.back()"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </UButton>
       </div>
     </div>

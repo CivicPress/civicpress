@@ -7,28 +7,28 @@
           <!-- Left Column -->
           <div class="space-y-4">
             <UFormField
-              label="Name"
+              :label="t('common.name')"
               name="name"
               :error="formErrors.name"
               required
             >
               <UInput
                 v-model="form.name"
-                placeholder="Enter geography file name"
+                :placeholder="t('geography.namePlaceholder')"
                 :disabled="saving"
                 class="w-full"
               />
             </UFormField>
 
             <UFormField
-              label="Description"
+              :label="t('common.description')"
               name="description"
               :error="formErrors.description"
               required
             >
               <UTextarea
                 v-model="form.description"
-                placeholder="Describe this geography data..."
+                :placeholder="t('geography.descriptionPlaceholder')"
                 :disabled="saving"
                 :rows="3"
                 class="w-full"
@@ -39,7 +39,7 @@
           <!-- Right Column -->
           <div class="space-y-4">
             <UFormField
-              label="Category"
+              :label="t('common.category')"
               name="category"
               :error="formErrors.category"
               required
@@ -47,7 +47,7 @@
               <USelectMenu
                 v-model="form.category"
                 :items="categoryOptions"
-                placeholder="Select category"
+                :placeholder="t('geography.selectCategory')"
                 :disabled="saving"
                 value-key="value"
                 class="w-full"
@@ -55,20 +55,20 @@
             </UFormField>
 
             <UFormField
-              label="Spatial Reference System ID (SRID)"
+              :label="t('geography.srid')"
               name="srid"
               :error="formErrors.srid"
             >
               <UInput
                 v-model.number="form.srid"
                 type="number"
-                placeholder="4326"
+                :placeholder="t('geography.sridPlaceholder')"
                 :disabled="saving"
                 class="w-full"
               />
               <template #help>
                 <p class="text-sm text-gray-600">
-                  Default: 4326 (WGS84). Leave empty to use default.
+                  {{ t('geography.sridHelp') }}
                 </p>
               </template>
             </UFormField>
@@ -84,7 +84,7 @@
           <!-- Text Input Area (Left) -->
           <div class="space-y-4">
             <UFormField
-              label="File Type"
+              :label="t('geography.fileType')"
               name="type"
               :error="formErrors.type"
               required
@@ -92,7 +92,7 @@
               <USelectMenu
                 v-model="form.type"
                 :items="typeOptions"
-                placeholder="Select file type"
+                :placeholder="t('geography.selectFileType')"
                 :disabled="saving"
                 value-key="value"
                 @change="onTypeChange"
@@ -101,14 +101,14 @@
             </UFormField>
 
             <UFormField
-              label="Geography Content"
+              :label="t('geography.geographyContent')"
               name="content"
               :error="formErrors.content"
               required
             >
               <UTextarea
                 v-model="form.content"
-                placeholder="Paste your GeoJSON or KML content here..."
+                :placeholder="t('geography.contentPlaceholder')"
                 :disabled="saving"
                 :rows="12"
                 class="font-mono text-sm w-full"
@@ -116,15 +116,14 @@
               />
               <template #help>
                 <p class="text-sm text-gray-600">
-                  Paste your
                   {{
-                    (typeof form.type === 'string'
-                      ? form.type
-                      : (form.type as any)?.value || 'geojson'
-                    ).toUpperCase()
+                    t('geography.contentHelp', {
+                      type: (typeof form.type === 'string'
+                        ? form.type
+                        : (form.type as any)?.value || 'geojson'
+                      ).toUpperCase(),
+                    })
                   }}
-                  content in the text area above. The preview will update
-                  automatically as you type.
                 </p>
               </template>
             </UFormField>
@@ -139,7 +138,7 @@
                 :disabled="saving || !form.content"
               >
                 <UIcon name="i-lucide-trash-2" class="w-4 h-4" />
-                Clear
+                {{ t('geography.clear') }}
               </UButton>
               <UButton
                 type="button"
@@ -149,7 +148,7 @@
                 :disabled="saving || !form.content"
               >
                 <UIcon name="i-lucide-copy" class="w-4 h-4" />
-                Copy
+                {{ t('common.copy') }}
               </UButton>
             </div>
           </div>
@@ -157,7 +156,7 @@
           <!-- Live Preview (Right) -->
           <div class="flex flex-col space-y-4">
             <h4 class="text-md font-medium text-gray-900 dark:text-white">
-              Live Preview
+              {{ t('geography.livePreview') }}
             </h4>
 
             <!-- Map Preview -->
@@ -172,7 +171,9 @@
                   name="i-lucide-loader-2"
                   class="w-6 h-6 animate-spin text-gray-400"
                 />
-                <span class="ml-2 text-gray-600">Parsing content...</span>
+                <span class="ml-2 text-gray-600">{{
+                  t('geography.parsingContent')
+                }}</span>
               </div>
 
               <div
@@ -206,7 +207,7 @@
                     class="w-8 h-8 text-gray-400 mx-auto mb-2"
                   />
                   <p class="text-sm text-gray-500">
-                    Enter content to see preview
+                    {{ t('geography.enterContentForPreview') }}
                   </p>
                 </div>
               </div>
@@ -215,7 +216,7 @@
             <!-- Validation Results -->
             <div v-if="preview.validation.errors.length > 0" class="space-y-2">
               <h5 class="text-sm font-medium text-red-600">
-                Validation Errors:
+                {{ t('geography.validationErrors') }}:
               </h5>
               <ul class="text-sm text-red-600 space-y-1">
                 <li
@@ -236,7 +237,9 @@
               v-if="preview.validation.warnings.length > 0"
               class="space-y-2"
             >
-              <h5 class="text-sm font-medium text-yellow-600">Warnings:</h5>
+              <h5 class="text-sm font-medium text-yellow-600">
+                {{ t('geography.warnings') }}:
+              </h5>
               <ul class="text-sm text-yellow-600 space-y-1">
                 <li
                   v-for="warning in preview.validation.warnings"
@@ -255,27 +258,27 @@
             <!-- Parsed Data Summary -->
             <div v-if="preview.parsed" class="space-y-2">
               <h5 class="text-sm font-medium text-gray-900 dark:text-white">
-                Data Summary:
+                {{ t('geography.dataSummary') }}:
               </h5>
               <div class="text-sm text-gray-600 space-y-1">
                 <div class="flex justify-between">
-                  <span>Features:</span>
+                  <span>{{ t('geography.features') }}:</span>
                   <span class="font-medium">{{
                     preview.parsed.featureCount
                   }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span>Geometry Types:</span>
+                  <span>{{ t('geography.geometryTypesLabel') }}:</span>
                   <span class="font-medium">{{
                     preview.parsed.geometryTypes.join(', ')
                   }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span>SRID:</span>
+                  <span>{{ t('geography.srid') }}:</span>
                   <span class="font-medium">{{ preview.parsed.srid }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span>Bounds:</span>
+                  <span>{{ t('geography.bounds') }}:</span>
                   <span class="font-medium text-xs">{{
                     formatBounds(preview.parsed.bounds)
                   }}</span>
@@ -292,9 +295,11 @@
       <template #header>
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-semibold">Color & Icon Configuration</h3>
+            <h3 class="text-lg font-semibold">
+              {{ t('geography.colorIconConfiguration') }}
+            </h3>
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Customize how features appear on the map
+              {{ t('geography.customizeFeaturesAppearance') }}
             </p>
           </div>
         </div>
@@ -304,12 +309,12 @@
         <div
           class="space-y-3 border-b border-gray-200 dark:border-gray-800 pb-4"
         >
-          <h4 class="text-md font-medium">Apply Preset</h4>
+          <h4 class="text-md font-medium">{{ t('geography.applyPreset') }}</h4>
           <div class="flex items-center gap-3">
             <USelectMenu
               v-model="selectedPreset"
               :items="presetOptions"
-              placeholder="Select a preset..."
+              :placeholder="t('geography.selectPreset')"
               value-key="key"
               option-label="name"
               option-description="description"
@@ -323,14 +328,16 @@
               variant="outline"
               @click="applyPreset"
             >
-              Apply
+              {{ t('geography.apply') }}
             </UButton>
           </div>
         </div>
         <!-- Color Mapping Section -->
         <div class="space-y-4">
           <div class="flex items-center justify-between">
-            <h4 class="text-md font-medium">Color Mapping</h4>
+            <h4 class="text-md font-medium">
+              {{ t('geography.colorMapping') }}
+            </h4>
             <UButton
               v-if="form.color_mapping"
               size="xs"
@@ -338,13 +345,13 @@
               variant="ghost"
               @click="form.color_mapping = undefined"
             >
-              Clear
+              {{ t('geography.clear') }}
             </UButton>
           </div>
 
           <div v-if="!form.color_mapping" class="space-y-3">
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Assign colors to features based on property values
+              {{ t('geography.assignColorsToFeatures') }}
             </p>
             <UButton
               size="sm"
@@ -353,26 +360,31 @@
               @click="initializeColorMapping"
             >
               <UIcon name="i-lucide-palette" class="w-4 h-4" />
-              Configure Colors
+              {{ t('geography.configureColors') }}
             </UButton>
           </div>
 
           <div v-else class="space-y-4">
-            <UFormField label="Property Name" name="color_property">
+            <UFormField
+              :label="t('geography.propertyName')"
+              name="color_property"
+            >
               <UInput
                 v-model="form.color_mapping.property"
-                placeholder="e.g., NOM, LETTRE, type"
+                :placeholder="t('geography.propertyNameExample')"
                 @input="updateColorMapping"
               />
               <template #help>
                 <p class="text-sm text-gray-600">
-                  Property name from GeoJSON features to use for color mapping
+                  {{ t('geography.colorMappingHelp') }}
                 </p>
               </template>
             </UFormField>
 
             <div v-if="colorPropertyValues.length > 0" class="space-y-2">
-              <label class="text-sm font-medium">Color Assignments</label>
+              <label class="text-sm font-medium">{{
+                t('geography.colorAssignments')
+              }}</label>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div
                   v-for="value in colorPropertyValues"
@@ -407,7 +419,9 @@
           class="space-y-4 border-t border-gray-200 dark:border-gray-800 pt-4"
         >
           <div class="flex items-center justify-between">
-            <h4 class="text-md font-medium">Icon Mapping</h4>
+            <h4 class="text-md font-medium">
+              {{ t('geography.iconMapping') }}
+            </h4>
             <UButton
               v-if="form.icon_mapping"
               size="xs"
@@ -415,13 +429,13 @@
               variant="ghost"
               @click="form.icon_mapping = undefined"
             >
-              Clear
+              {{ t('geography.clear') }}
             </UButton>
           </div>
 
           <div v-if="!form.icon_mapping" class="space-y-3">
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Assign custom icons to point features (Phase 1 - URL-based)
+              {{ t('geography.assignIconsToFeatures') }}
             </p>
             <UButton
               size="sm"
@@ -430,40 +444,45 @@
               @click="initializeIconMapping"
             >
               <UIcon name="i-lucide-image" class="w-4 h-4" />
-              Configure Icons
+              {{ t('geography.configureIcons') }}
             </UButton>
           </div>
 
           <div v-else class="space-y-4">
-            <UFormField label="Property Name" name="icon_property">
+            <UFormField
+              :label="t('geography.propertyName')"
+              name="icon_property"
+            >
               <UInput
                 v-model="form.icon_mapping.property"
-                placeholder="e.g., NOM, LETTRE, type"
+                :placeholder="t('geography.propertyNameExample')"
                 @input="updateIconMapping"
               />
               <template #help>
                 <p class="text-sm text-gray-600">
-                  Property name from GeoJSON features to use for icon mapping
+                  {{ t('geography.iconMappingHelp') }}
                 </p>
               </template>
             </UFormField>
 
-            <UFormField label="Apply To Geometry Types">
+            <UFormField :label="t('geography.applyToGeometryTypes')">
               <USelectMenu
                 v-model="form.icon_mapping.apply_to"
                 :items="geometryTypeOptions as any"
                 multiple
-                placeholder="Select geometry types"
+                :placeholder="t('geography.selectGeometryTypes')"
               />
               <template #help>
                 <p class="text-sm text-gray-600">
-                  Which geometry types should use icons (default: Point only)
+                  {{ t('geography.iconGeometryTypesHelp') }}
                 </p>
               </template>
             </UFormField>
 
             <div v-if="iconPropertyValues.length > 0" class="space-y-2">
-              <label class="text-sm font-medium">Icon Assignments</label>
+              <label class="text-sm font-medium">{{
+                t('geography.iconAssignments')
+              }}</label>
               <div class="space-y-3">
                 <div
                   v-for="value in iconPropertyValues"
@@ -488,7 +507,7 @@
                       }
                     "
                     type="text"
-                    placeholder="https://example.com/icon.png or UUID"
+                    :placeholder="t('geography.iconUrlPlaceholder')"
                     class="flex-1 text-xs"
                   />
                 </div>
@@ -538,6 +557,7 @@ const emit = defineEmits<{
 // Composables
 const router = useRouter();
 const toast = useToast();
+const { t } = useI18n();
 
 // Form data
 const form = ref<GeographyFormData>({
@@ -561,7 +581,12 @@ const presets = ref<
 >([]);
 const selectedPreset = ref<string | null>(null);
 const presetOptions = computed(() => [
-  { key: null, label: 'None', name: 'None', description: 'No preset' },
+  {
+    key: null,
+    label: t('geography.presets.none'),
+    name: t('geography.presets.none'),
+    description: t('geography.presets.noPreset'),
+  },
   ...presets.value.map((p) => ({
     key: p.key,
     label: p.name,
@@ -578,29 +603,32 @@ const preview = ref<GeographyPreviewData>({
 });
 
 // Form options
-const categoryOptions = [
-  { label: 'Zone', value: 'zone' },
-  { label: 'Boundary', value: 'boundary' },
-  { label: 'District', value: 'district' },
-  { label: 'Facility', value: 'facility' },
-  { label: 'Route', value: 'route' },
-];
+const categoryOptions = computed(() => [
+  { label: t('geography.categories.zone'), value: 'zone' },
+  { label: t('geography.categories.boundary'), value: 'boundary' },
+  { label: t('geography.categories.district'), value: 'district' },
+  { label: t('geography.categories.facility'), value: 'facility' },
+  { label: t('geography.categories.route'), value: 'route' },
+]);
 
-const typeOptions = [
-  { label: 'GeoJSON', value: 'geojson' },
-  { label: 'KML', value: 'kml' },
-  { label: 'GPX', value: 'gpx' },
-  { label: 'Shapefile', value: 'shapefile' },
-];
+const typeOptions = computed(() => [
+  { label: t('geography.types.geojson'), value: 'geojson' },
+  { label: t('geography.types.kml'), value: 'kml' },
+  { label: t('geography.types.gpx'), value: 'gpx' },
+  { label: t('geography.types.shapefile'), value: 'shapefile' },
+]);
 
-const geometryTypeOptions = [
-  { label: 'Point', value: 'Point' },
-  { label: 'LineString', value: 'LineString' },
-  { label: 'Polygon', value: 'Polygon' },
-  { label: 'MultiPoint', value: 'MultiPoint' },
-  { label: 'MultiLineString', value: 'MultiLineString' },
-  { label: 'MultiPolygon', value: 'MultiPolygon' },
-];
+const geometryTypeOptions = computed(() => [
+  { label: t('geography.geometryTypes.point'), value: 'Point' },
+  { label: t('geography.geometryTypes.linestring'), value: 'LineString' },
+  { label: t('geography.geometryTypes.polygon'), value: 'Polygon' },
+  { label: t('geography.geometryTypes.multipoint'), value: 'MultiPoint' },
+  {
+    label: t('geography.geometryTypes.multilinestring'),
+    value: 'MultiLineString',
+  },
+  { label: t('geography.geometryTypes.multipolygon'), value: 'MultiPolygon' },
+]);
 
 // Computed properties
 const descriptionText = computed(() => {
@@ -755,27 +783,29 @@ const handleSubmit = async () => {
 
     // Manual validation
     if (!form.value.name || form.value.name.trim().length < 1) {
-      formErrors.value.name = 'Name is required';
+      formErrors.value.name = t('geography.validation.nameRequired');
       return;
     }
     if (!form.value.type) {
-      formErrors.value.type = 'File type is required';
+      formErrors.value.type = t('geography.validation.typeRequired');
       return;
     }
     if (!form.value.category) {
-      formErrors.value.category = 'Category is required';
+      formErrors.value.category = t('geography.validation.categoryRequired');
       return;
     }
     if (!form.value.description || form.value.description.trim().length < 1) {
-      formErrors.value.description = 'Description is required';
+      formErrors.value.description = t(
+        'geography.validation.descriptionRequired'
+      );
       return;
     }
     if (!form.value.content || form.value.content.trim().length < 1) {
-      formErrors.value.content = 'Content is required';
+      formErrors.value.content = t('geography.validation.contentRequired');
       return;
     }
     if (!form.value.srid || form.value.srid < 1) {
-      formErrors.value.srid = 'SRID must be a positive integer';
+      formErrors.value.srid = t('geography.validation.sridRequired');
       return;
     }
 
@@ -801,17 +831,26 @@ const handleSubmit = async () => {
     })) as any;
 
     if (response.success) {
-      const action = props.mode === 'create' ? 'created' : 'updated';
+      const actionKey = props.mode === 'create' ? 'created' : 'updated';
       toast.add({
-        title: `Geography File ${action.charAt(0).toUpperCase() + action.slice(1)}`,
-        description: `"${form.value.name}" has been ${action} successfully.`,
+        title:
+          props.mode === 'create'
+            ? t('geography.geographyCreated')
+            : t('geography.geographyUpdated'),
+        description:
+          props.mode === 'create'
+            ? t('geography.successfullyCreated')
+            : t('geography.successfullyUpdated'),
         color: 'primary',
       });
 
       emit('success', response.data);
     } else {
       throw new Error(
-        response.error || `Failed to ${props.mode} geography file`
+        response.error ||
+          (props.mode === 'create'
+            ? t('geography.failedToCreate')
+            : t('geography.failedToUpdate'))
       );
     }
   } catch (error) {
@@ -820,11 +859,16 @@ const handleSubmit = async () => {
       formErrors.value = { content: error.message };
     } else {
       toast.add({
-        title: `${props.mode === 'create' ? 'Creation' : 'Update'} Failed`,
+        title:
+          props.mode === 'create'
+            ? t('geography.creationFailed')
+            : t('geography.updateFailed'),
         description:
           error instanceof Error
             ? error.message
-            : `Failed to ${props.mode} geography file`,
+            : props.mode === 'create'
+              ? t('geography.failedToCreate')
+              : t('geography.failedToUpdate'),
         color: 'error',
       });
     }
@@ -838,7 +882,7 @@ const handleCancel = () => {
 };
 
 const formatBounds = (bounds: any): string => {
-  return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} to ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
+  return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} ${t('geography.boundsTo')} ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
 };
 
 // Expose methods and state for parent component

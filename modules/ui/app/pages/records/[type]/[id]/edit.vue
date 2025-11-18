@@ -4,6 +4,7 @@ import RecordForm from '~/components/RecordForm.vue';
 import SystemFooter from '~/components/SystemFooter.vue';
 import FormSkeleton from '~/components/FormSkeleton.vue';
 
+const { t } = useI18n();
 // Route parameters
 const route = useRoute();
 const type = route.params.type as string;
@@ -60,13 +61,13 @@ const fetchRecord = async () => {
         metadata: apiRecord.metadata || {},
       };
     } else {
-      throw new Error('Failed to fetch record');
+      throw new Error(t('records.failedToLoadRecord'));
     }
   } catch (err: any) {
-    const errorMessage = err.message || 'Failed to load record';
+    const errorMessage = err.message || t('records.failedToLoadRecord');
     error.value = errorMessage;
     toast.add({
-      title: 'Error',
+      title: t('common.error'),
       description: errorMessage,
       color: 'error',
     });
@@ -89,21 +90,23 @@ const handleSubmit = async (recordData: any) => {
 
     if (response && response.success) {
       toast.add({
-        title: 'Record Updated',
-        description: `Successfully updated "${recordData.title}"`,
+        title: t('records.recordUpdated'),
+        description: t('records.successfullyUpdated', {
+          title: recordData.title,
+        }),
         color: 'primary',
       });
 
       // Navigate back to the record
       navigateTo(`/records/${type}/${id}`);
     } else {
-      throw new Error('Failed to update record');
+      throw new Error(t('records.failedToUpdateRecord'));
     }
   } catch (err: any) {
-    const errorMessage = err.message || 'Failed to update record';
+    const errorMessage = err.message || t('records.failedToUpdateRecord');
     error.value = errorMessage;
     toast.add({
-      title: 'Error',
+      title: t('common.error'),
       description: errorMessage,
       color: 'error',
     });
@@ -127,21 +130,21 @@ const handleDelete = async (recordId: string) => {
 
     if (response && response.success) {
       toast.add({
-        title: 'Record Deleted',
-        description: 'Record has been successfully deleted',
+        title: t('records.recordDeleted'),
+        description: t('records.successfullyDeleted'),
         color: 'primary',
       });
 
       // Navigate to records list
       navigateTo(`/records/${type}`);
     } else {
-      throw new Error('Failed to delete record');
+      throw new Error(t('records.failedToDeleteRecord'));
     }
   } catch (err: any) {
-    const errorMessage = err.message || 'Failed to delete record';
+    const errorMessage = err.message || t('records.failedToDeleteRecord');
     error.value = errorMessage;
     toast.add({
-      title: 'Error',
+      title: t('common.error'),
       description: errorMessage,
       color: 'error',
     });
@@ -169,11 +172,11 @@ onMounted(() => {
 
 const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Records',
+    label: t('records.allRecords'),
     to: '/records',
   },
   {
@@ -181,11 +184,11 @@ const breadcrumbItems = computed(() => [
     to: `/records/${type}`,
   },
   {
-    label: record.value?.id || id || 'Record',
+    label: record.value?.id || id || t('records.viewRecord'),
     to: `/records/${type}/${id}`,
   },
   {
-    label: 'Edit',
+    label: t('common.edit'),
   },
 ]);
 </script>
@@ -196,11 +199,15 @@ const breadcrumbItems = computed(() => [
       <UDashboardNavbar>
         <template #title>
           <h1 class="text-2xl font-semibold">
-            Edit {{ record?.id || id || 'Record' }}
+            {{
+              t('records.editRecord', {
+                id: record?.id || id || t('records.viewRecord'),
+              })
+            }}
           </h1>
         </template>
         <template #description>
-          Edit the record information and content
+          {{ t('records.editRecordDesc') }}
         </template>
       </UDashboardNavbar>
     </template>
@@ -219,8 +226,8 @@ const breadcrumbItems = computed(() => [
           v-else-if="!canEditRecords"
           color="error"
           variant="soft"
-          title="Access Denied"
-          description="You don't have permission to edit records."
+          :title="t('records.accessDenied')"
+          :description="t('records.noPermissionToEdit')"
           icon="i-lucide-alert-circle"
         />
 
@@ -231,7 +238,7 @@ const breadcrumbItems = computed(() => [
             <div class="space-y-4">
               <!-- Title -->
               <UFormField
-                label="Title"
+                :label="t('common.title')"
                 required
                 :error="
                   recordFormRef.hasSubmitted && recordFormRef.formErrors.title
@@ -241,7 +248,7 @@ const breadcrumbItems = computed(() => [
               >
                 <UInput
                   v-model="recordFormRef.form.title"
-                  placeholder="Enter record title"
+                  :placeholder="t('records.enterTitle')"
                   :disabled="saving"
                   class="w-full"
                 />
@@ -250,7 +257,7 @@ const breadcrumbItems = computed(() => [
               <!-- Type and Status -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <UFormField
-                  label="Type"
+                  :label="t('common.type')"
                   required
                   :error="
                     recordFormRef.hasSubmitted && recordFormRef.formErrors.type
@@ -261,14 +268,14 @@ const breadcrumbItems = computed(() => [
                   <USelectMenu
                     v-model="recordFormRef.selectedRecordType"
                     :items="recordFormRef.recordTypeOptionsComputed"
-                    placeholder="Select record type"
+                    :placeholder="t('records.selectType')"
                     :disabled="saving"
                     class="w-full"
                   />
                 </UFormField>
 
                 <UFormField
-                  label="Status"
+                  :label="t('common.status')"
                   required
                   :error="
                     recordFormRef.hasSubmitted &&
@@ -280,7 +287,7 @@ const breadcrumbItems = computed(() => [
                   <USelectMenu
                     v-model="recordFormRef.selectedRecordStatus"
                     :items="recordFormRef.recordStatusOptionsComputed"
-                    placeholder="Select status"
+                    :placeholder="t('records.selectStatus')"
                     :disabled="saving"
                     class="w-full"
                   />
@@ -289,7 +296,7 @@ const breadcrumbItems = computed(() => [
 
               <!-- Description -->
               <UFormField
-                label="Description"
+                :label="t('common.description')"
                 :error="
                   recordFormRef.hasSubmitted &&
                   recordFormRef.formErrors.description
@@ -299,7 +306,7 @@ const breadcrumbItems = computed(() => [
               >
                 <UTextarea
                   v-model="recordFormRef.form.description"
-                  placeholder="Enter record description (optional)"
+                  :placeholder="t('records.enterRecordDescription')"
                   :disabled="saving"
                   :rows="3"
                   class="w-full"
@@ -308,7 +315,7 @@ const breadcrumbItems = computed(() => [
 
               <!-- Tags -->
               <UFormField
-                label="Tags"
+                :label="t('common.tags')"
                 :error="
                   recordFormRef.hasSubmitted && recordFormRef.formErrors.tags
                     ? recordFormRef.formErrors.tags
@@ -317,7 +324,7 @@ const breadcrumbItems = computed(() => [
               >
                 <UInput
                   v-model="recordFormRef.newTag"
-                  placeholder="Add a tag and press Enter"
+                  :placeholder="t('records.addTagPlaceholder')"
                   :disabled="saving"
                   @keyup.enter="recordFormRef.handleTagEnter"
                   class="w-full"

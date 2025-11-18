@@ -9,21 +9,21 @@
     >
       <div class="space-y-3">
         <h3 class="font-medium text-gray-900 dark:text-white">
-          Select Geography Files
+          {{ t('records.geography.selectGeographyFiles') }}
         </h3>
 
         <!-- Search and Filter -->
         <div class="space-y-2">
           <UInput
             v-model="searchQuery"
-            placeholder="Search geography files..."
+            :placeholder="t('records.geography.searchPlaceholder')"
             icon="i-lucide-search"
             class="w-full"
           />
           <USelectMenu
             v-model="selectedCategory"
             :options="categoryOptions"
-            placeholder="All Categories"
+            :placeholder="t('records.geography.allCategories')"
             class="w-full"
           />
         </div>
@@ -38,7 +38,9 @@
           name="i-lucide-loader-2"
           class="w-6 h-6 animate-spin mx-auto mb-2"
         />
-        <p class="text-sm text-gray-500">Loading geography files...</p>
+        <p class="text-sm text-gray-500">
+          {{ t('records.geography.loading') }}
+        </p>
       </div>
 
       <!-- Error State -->
@@ -107,8 +109,8 @@
         <p class="text-sm text-gray-500">
           {{
             searchQuery
-              ? 'No geography files found'
-              : 'No geography files available'
+              ? t('records.geography.noFilesFound')
+              : t('records.geography.noFilesAvailable')
           }}
         </p>
         <UButton
@@ -120,7 +122,7 @@
           @click="$emit('create-new')"
         >
           <UIcon name="i-lucide-plus" class="w-4 h-4" />
-          Create Geography File
+          {{ t('records.geography.createGeographyFile') }}
         </UButton>
       </div>
     </div>
@@ -131,7 +133,11 @@
     >
       <div class="flex justify-between items-center">
         <span class="text-sm text-gray-500">
-          {{ selectedFiles.length }} selected
+          {{
+            (t as any)('common.selected', selectedFiles.length, {
+              count: selectedFiles.length,
+            })
+          }}
         </span>
         <div class="flex space-x-2">
           <UButton
@@ -140,7 +146,7 @@
             size="sm"
             @click="clearSelection"
           >
-            Clear
+            {{ t('common.clear') }}
           </UButton>
           <UButton
             color="primary"
@@ -148,7 +154,7 @@
             @click.stop="confirmSelection"
             :disabled="selectedFiles.length === 0"
           >
-            Add Selected Files
+            {{ t('common.link') }}
           </UButton>
         </div>
       </div>
@@ -192,12 +198,14 @@ const searchQuery = ref('');
 const selectedCategory = ref<string | null>(null);
 
 // Computed
+const { t } = useI18n();
+
 const categoryOptions = computed(() => {
   const categories = new Set(
     geographyFiles.value.map((file: GeographyFile) => file.category)
   );
   return [
-    { label: 'All Categories', value: null },
+    { label: t('records.geography.allCategories'), value: null },
     ...Array.from(categories).map((category: GeographyCategory) => ({
       label: category,
       value: category,
@@ -239,24 +247,16 @@ const selectedFiles = computed(() => {
 const isSelected = (fileId: string) => {
   const ids = props.selectedIds || [];
   const result = ids.includes(fileId);
-  console.log('isSelected check:', fileId, 'in', ids, '=', result);
   return result;
 };
 
 const toggleSelection = (file: GeographyFile) => {
-  console.log(
-    'toggleSelection called for file:',
-    file.id,
-    'isSelected:',
-    isSelected(file.id)
-  );
   if (props.multiple) {
     const currentIds = props.selectedIds || [];
     const newIds = isSelected(file.id)
       ? currentIds.filter((id) => id !== file.id)
       : [...currentIds, file.id];
 
-    console.log('Emitting update:selected-ids with:', newIds);
     emit('update:selected-ids', newIds);
   } else {
     const newIds = isSelected(file.id) ? [] : [file.id];
@@ -308,11 +308,11 @@ const loadGeographyFiles = async () => {
     if (response.success && response.data?.files) {
       geographyFiles.value = response.data.files;
     } else {
-      error.value = 'Failed to load geography files';
+      error.value = t('records.geography.failedToLoad');
     }
   } catch (err) {
     console.error('Error loading geography files:', err);
-    error.value = 'Failed to load geography files';
+    error.value = t('records.geography.failedToLoad');
   } finally {
     loading.value = false;
   }
@@ -322,7 +322,7 @@ const loadGeographyFiles = async () => {
 watch(
   () => props.selectedIds,
   (newIds) => {
-    console.log('selectedIds prop changed to:', newIds);
+    // Watch for prop changes
   },
   { deep: true, immediate: true }
 );

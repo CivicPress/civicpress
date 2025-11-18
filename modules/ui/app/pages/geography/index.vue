@@ -3,15 +3,17 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">Geography Files</h1>
+          <h1 class="text-2xl font-semibold">
+            {{ t('geography.filesTitle') }}
+          </h1>
         </template>
         <template #description>
-          Manage geographic data for municipal records
+          {{ t('geography.filesDescription') }}
         </template>
         <template #right>
           <UButton color="primary" @click="navigateToCreate">
             <UIcon name="i-lucide-plus" class="w-4 h-4" />
-            Create Geography File
+            {{ t('geography.createGeography') }}
           </UButton>
         </template>
       </UDashboardNavbar>
@@ -48,46 +50,8 @@
           </template>
         </UAlert>
 
-        <!-- Empty State -->
-        <div v-else-if="!loading && filteredFiles.length === 0" class="py-16">
-          <div
-            class="mx-auto flex max-w-xl flex-col items-center rounded-xl border border-dashed border-gray-200 bg-white px-8 py-12 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900/40"
-          >
-            <UIcon
-              name="i-lucide-file-search"
-              class="mb-6 h-16 w-16 text-gray-300 dark:text-gray-600"
-            />
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              No geography files match your filters
-            </h3>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Try adjusting or clearing your filters to see all available
-              geography files.
-            </p>
-            <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row">
-              <UButton
-                variant="link"
-                color="primary"
-                class="text-sm"
-                @click="resetFilters"
-              >
-                Clear all filters
-              </UButton>
-              <UButton
-                v-if="canCreateGeography"
-                variant="link"
-                color="primary"
-                class="text-sm"
-                @click="navigateToCreate"
-              >
-                Create new geography file
-              </UButton>
-            </div>
-          </div>
-        </div>
-
-        <!-- Geography Files Grid -->
-        <div v-else class="space-y-6">
+        <!-- Content when not loading -->
+        <template v-else>
           <!-- Search and Filters -->
           <div
             class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40 space-y-3"
@@ -104,7 +68,7 @@
               <div class="flex-1">
                 <UInput
                   v-model="searchQuery"
-                  placeholder="Search geography files..."
+                  :placeholder="t('geography.searchPlaceholder')"
                   icon="i-lucide-search"
                   @input="debouncedSearch"
                   class="w-full"
@@ -131,7 +95,48 @@
             </div>
           </div>
 
-          <div class="space-y-6">
+          <!-- Empty State -->
+          <div v-if="filteredFiles.length === 0" class="py-16">
+            <div
+              class="mx-auto flex max-w-xl flex-col items-center rounded-xl border border-dashed border-gray-200 bg-white px-8 py-12 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900/40"
+            >
+              <UIcon
+                name="i-lucide-file-search"
+                class="mb-6 h-16 w-16 text-gray-300 dark:text-gray-600"
+              />
+              <h3
+                class="text-xl font-semibold text-gray-900 dark:text-gray-100"
+              >
+                No geography files match your filters
+              </h3>
+              <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Try adjusting or clearing your filters to see all available
+                geography files.
+              </p>
+              <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row">
+                <UButton
+                  variant="link"
+                  color="primary"
+                  class="text-sm"
+                  @click="resetFilters"
+                >
+                  Clear all filters
+                </UButton>
+                <UButton
+                  v-if="canCreateGeography"
+                  variant="link"
+                  color="primary"
+                  class="text-sm"
+                  @click="navigateToCreate"
+                >
+                  Create new geography file
+                </UButton>
+              </div>
+            </div>
+          </div>
+
+          <!-- Geography Files Grid -->
+          <div v-else class="space-y-6">
             <!-- Geography Files Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div
@@ -152,7 +157,7 @@
                       variant="soft"
                       size="sm"
                     >
-                      {{ file.category }}
+                      {{ t(`geography.categories.${file.category}`) }}
                     </UBadge>
                   </div>
                 </div>
@@ -178,7 +183,7 @@
 
                   <!-- Bounds Info -->
                   <div class="text-xs text-gray-500">
-                    Bounds: {{ formatBounds(file.bounds) }}
+                    {{ t('geography.bounds') }}: {{ formatBounds(file.bounds) }}
                   </div>
                 </div>
               </div>
@@ -193,11 +198,11 @@
                 @update:model-value="loadGeographyFiles"
               />
             </div>
-          </div>
 
-          <!-- Footer -->
-          <SystemFooter />
-        </div>
+            <!-- Footer -->
+            <SystemFooter />
+          </div>
+        </template>
       </div>
     </template>
   </UDashboardPanel>
@@ -220,17 +225,21 @@ import SystemFooter from '~/components/SystemFooter.vue';
 const router = useRouter();
 const authStore = useAuthStore();
 const toast = useToast();
+const { t } = useI18n();
 
 // Breadcrumbs
-const breadcrumbItems = [{ label: 'Home', to: '/' }, { label: 'Geography' }];
+const breadcrumbItems = computed(() => [
+  { label: t('common.home'), to: '/' },
+  { label: t('geography.title') },
+]);
 
 // Reactive data
 const geographyFiles = ref<GeographyFile[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const searchQuery = ref('');
-const selectedCategory = ref<GeographyCategory | ''>('');
-const selectedType = ref<GeographyFileType | ''>('');
+const selectedCategory = ref<GeographyCategory | 'all'>('all');
+const selectedType = ref<GeographyFileType | 'all'>('all');
 const currentPage = ref(1);
 const totalFiles = ref(0);
 const totalPages = ref(1);
@@ -238,12 +247,6 @@ const totalPages = ref(1);
 // Computed properties
 const canCreateGeography = computed(() => {
   const userRole = authStore.user?.role;
-  console.log(
-    'User role:',
-    userRole,
-    'Can create geography:',
-    userRole === 'admin' || userRole === 'clerk'
-  );
   return userRole === 'admin' || userRole === 'clerk';
 });
 
@@ -252,20 +255,20 @@ const canEditGeography = computed(() => {
 });
 
 const categoryOptions = computed(() => [
-  { label: 'All Categories', value: '' },
-  { label: 'Zone', value: 'zone' },
-  { label: 'Boundary', value: 'boundary' },
-  { label: 'District', value: 'district' },
-  { label: 'Facility', value: 'facility' },
-  { label: 'Route', value: 'route' },
+  { label: t('geography.categories.all'), value: 'all' },
+  { label: t('geography.categories.zone'), value: 'zone' },
+  { label: t('geography.categories.boundary'), value: 'boundary' },
+  { label: t('geography.categories.district'), value: 'district' },
+  { label: t('geography.categories.facility'), value: 'facility' },
+  { label: t('geography.categories.route'), value: 'route' },
 ]);
 
 const typeOptions = computed(() => [
-  { label: 'All Types', value: '' },
-  { label: 'GeoJSON', value: 'geojson' },
-  { label: 'KML', value: 'kml' },
-  { label: 'GPX', value: 'gpx' },
-  { label: 'Shapefile', value: 'shapefile' },
+  { label: t('geography.types.all'), value: 'all' },
+  { label: t('geography.types.geojson'), value: 'geojson' },
+  { label: t('geography.types.kml'), value: 'kml' },
+  { label: t('geography.types.gpx'), value: 'gpx' },
+  { label: t('geography.types.shapefile'), value: 'shapefile' },
 ]);
 
 const filteredFiles = computed(() => {
@@ -280,13 +283,13 @@ const filteredFiles = computed(() => {
     );
   }
 
-  if (selectedCategory.value) {
+  if (selectedCategory.value && selectedCategory.value !== 'all') {
     filtered = filtered.filter(
       (file: GeographyFile) => file.category === selectedCategory.value
     );
   }
 
-  if (selectedType.value) {
+  if (selectedType.value && selectedType.value !== 'all') {
     filtered = filtered.filter(
       (file: GeographyFile) => file.type === selectedType.value
     );
@@ -306,11 +309,11 @@ const loadGeographyFiles = async () => {
       limit: '12',
     });
 
-    if (selectedCategory.value) {
+    if (selectedCategory.value && selectedCategory.value !== 'all') {
       params.append('category', selectedCategory.value);
     }
 
-    if (selectedType.value) {
+    if (selectedType.value && selectedType.value !== 'all') {
       params.append('type', selectedType.value);
     }
 
@@ -344,8 +347,8 @@ const applyFilters = () => {
 
 const resetFilters = () => {
   searchQuery.value = '';
-  selectedCategory.value = '';
-  selectedType.value = '';
+  selectedCategory.value = 'all';
+  selectedType.value = 'all';
   currentPage.value = 1;
   loadGeographyFiles();
 };
@@ -388,13 +391,13 @@ const formatDate = (dateString: string): string => {
 };
 
 const formatBounds = (bounds: any): string => {
-  return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} to ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
+  return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} ${t('geography.boundsTo')} ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
 };
 
 const getFileMenuItems = (file: GeographyFile) => {
   const items = [
     {
-      label: 'View',
+      label: t('common.view'),
       icon: 'i-lucide-eye',
       onClick: () => navigateToFile(file.id),
     },
@@ -402,7 +405,7 @@ const getFileMenuItems = (file: GeographyFile) => {
 
   if (canEditGeography.value) {
     items.push({
-      label: 'Edit',
+      label: t('common.edit'),
       icon: 'i-lucide-edit',
       onClick: () => navigateToEdit(file.id),
     });
@@ -413,11 +416,6 @@ const getFileMenuItems = (file: GeographyFile) => {
 
 // Lifecycle
 onMounted(() => {
-  console.log('Geography index mounted, auth state:', {
-    user: authStore.user,
-    isAuthenticated: authStore.isAuthenticated,
-    initialized: authStore.initialized,
-  });
   loadGeographyFiles();
 });
 </script>

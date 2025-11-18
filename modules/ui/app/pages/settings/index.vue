@@ -6,6 +6,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 const route = useRoute();
 const router = useRouter();
 const { $civicApi } = useNuxtApp();
+const { t } = useI18n();
 
 // Auth store for permissions
 const authStore = useAuthStore();
@@ -14,52 +15,52 @@ const authStore = useAuthStore();
 const settingsItems = computed<NavigationMenuItem[]>(() => {
   const items: NavigationMenuItem[] = [
     {
-      label: 'Profile',
+      label: t('settings.profile'),
       icon: 'i-lucide-user',
       to: '/settings/profile',
-      description: 'Manage your account settings',
+      description: t('settings.profileDescription'),
     },
   ];
 
   if (authStore.hasPermission('users:manage')) {
     items.push({
-      label: 'Users',
+      label: t('settings.usersNav'),
       icon: 'i-lucide-users',
       to: '/settings/users',
-      description: 'Manage system users and roles',
+      description: t('settings.usersDescription'),
     });
   }
 
   if (authStore.hasPermission('config:manage')) {
     items.push({
-      label: 'Configurations',
+      label: t('settings.configurations'),
       icon: 'i-lucide-settings',
       to: '/settings/configuration',
-      description: 'Manage system configuration and settings',
+      description: t('settings.configurationsDescription'),
     });
   }
 
   if (authStore.hasPermission('storage:manage')) {
     items.push({
-      label: 'Storage',
+      label: t('settings.storageNav'),
       icon: 'i-lucide-hard-drive',
       to: '/settings/storage',
-      description: 'Manage file storage and media files',
+      description: t('settings.storageDescription'),
     });
   }
 
   if (authStore.hasPermission('system:admin')) {
     items.push({
-      label: 'Activity Log',
+      label: t('settings.activityLog'),
       icon: 'i-lucide-activity',
       to: '/settings/activity',
-      description: 'View system audit trail',
+      description: t('settings.activityLogDescription'),
     });
     items.push({
-      label: 'Notifications',
+      label: t('settings.notificationsNav'),
       icon: 'i-lucide-mail',
       to: '/settings/notifications',
-      description: 'Send test email to verify configuration',
+      description: t('settings.notificationsDescription'),
     });
   }
 
@@ -80,16 +81,21 @@ const toPath = (to: any): string => {
 // Check if current route is active
 const isActive = (to: any) => route.path === toPath(to);
 
-const breadcrumbItems = [
+// Navigation helper
+const navigateTo = (path: string) => {
+  router.push(path);
+};
+
+const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Settings',
+    label: t('settings.title'),
     to: '/settings',
   },
-];
+]);
 
 // Setup banner: show when any config is not a user file (missing or default-only)
 const configStatus = ref<Record<string, 'default' | 'user' | 'missing'> | null>(
@@ -122,7 +128,7 @@ onMounted(() => {
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">Settings</h1>
+          <h1 class="text-2xl font-semibold">{{ t('settings.title') }}</h1>
         </template>
       </UDashboardNavbar>
     </template>
@@ -138,8 +144,8 @@ onMounted(() => {
           color="primary"
           variant="subtle"
           icon="i-lucide-wrench"
-          title="Setup recommended"
-          description="Some configuration files are not initialized. Run the setup to create user copies from defaults and validate."
+          :title="t('settings.setupRecommended')"
+          :description="t('settings.setupRecommendedDescription')"
         >
           <template #actions>
             <UButton
@@ -147,7 +153,7 @@ onMounted(() => {
               variant="outline"
               icon="i-lucide-play-circle"
               @click="navigateTo('/settings/setup')"
-              >Open setup</UButton
+              >{{ t('settings.openSetup') }}</UButton
             >
           </template>
         </UAlert>

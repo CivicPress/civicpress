@@ -3,10 +3,12 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">Notifications</h1>
+          <h1 class="text-2xl font-semibold">
+            {{ t('settings.notifications.title') }}
+          </h1>
         </template>
         <template #description>
-          Send a test email to verify configuration
+          {{ t('settings.notifications.sendTestEmail') }}
         </template>
       </UDashboardNavbar>
     </template>
@@ -14,35 +16,50 @@
     <template #body>
       <UBreadcrumb
         :items="[
-          { label: 'Home', to: '/' },
-          { label: 'Settings', to: '/settings' },
-          { label: 'Notifications' },
+          { label: t('common.home'), to: '/' },
+          { label: t('settings.title'), to: '/settings' },
+          { label: t('settings.notifications.title') },
         ]"
       />
 
       <UCard class="mt-8">
         <template #header>
-          <h3 class="text-base font-medium">Send Test Email</h3>
+          <h3 class="text-base font-medium">
+            {{ t('settings.notifications.sendTestEmail') }}
+          </h3>
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Uses the configured email provider (SendGrid/SMTP)
+            {{ t('settings.notifications.usesConfiguredProvider') }}
           </p>
         </template>
 
         <div class="grid gap-4 max-w-xl">
-          <UFormField label="Recipient" name="to" :error="errors.to">
-            <UInput v-model="form.to" placeholder="you@example.com" />
-          </UFormField>
-          <UFormField label="Subject" name="subject">
+          <UFormField
+            :label="t('settings.notifications.recipient')"
+            name="to"
+            :error="errors.to"
+          >
             <UInput
-              v-model="form.subject"
-              placeholder="Test email from CivicPress"
+              v-model="form.to"
+              :placeholder="`${t('settings.notifications.recipientPlaceholder')}@${t('settings.notifications.recipientPlaceholderDomain')}`"
             />
           </UFormField>
-          <UFormField label="Message" name="message">
+          <UFormField
+            :label="t('settings.notifications.subject')"
+            name="subject"
+          >
+            <UInput
+              v-model="form.subject"
+              :placeholder="t('settings.notifications.subjectPlaceholder')"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('settings.notifications.message')"
+            name="message"
+          >
             <UTextarea
               v-model="form.message"
               :rows="5"
-              placeholder="Hello from CivicPress!"
+              :placeholder="t('settings.notifications.messagePlaceholder')"
             />
           </UFormField>
           <div class="flex items-center gap-2">
@@ -51,7 +68,9 @@
               :items="providerOptions"
               class="w-48"
             />
-            <UButton :loading="loading" @click="sendTest">Send Test</UButton>
+            <UButton :loading="loading" @click="sendTest">{{
+              t('settings.notifications.sendTest')
+            }}</UButton>
           </div>
         </div>
       </UCard>
@@ -75,6 +94,7 @@ definePageMeta({
 
 const { $civicApi } = useNuxtApp();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const form = ref({
   to: '',
@@ -84,16 +104,16 @@ const form = ref({
 });
 const errors = ref<{ to?: string }>({});
 const loading = ref(false);
-const providerOptions = ref([
-  { label: 'Auto (from config)', value: 'auto' },
-  { label: 'SendGrid', value: 'sendgrid' },
-  { label: 'SMTP', value: 'smtp' },
+const providerOptions = computed(() => [
+  { label: t('settings.notifications.auto'), value: 'auto' },
+  { label: t('settings.notifications.sendgrid'), value: 'sendgrid' },
+  { label: t('settings.notifications.smtp'), value: 'smtp' },
 ]);
 
 async function sendTest() {
   errors.value = {};
   if (!form.value.to) {
-    errors.value.to = 'Recipient is required';
+    errors.value.to = t('settings.notifications.recipientRequired');
     return;
   }
   loading.value = true;
@@ -110,16 +130,18 @@ async function sendTest() {
     });
     if (res?.success) {
       useToast().add({
-        title: 'Test email sent',
+        title: t('settings.notifications.testEmailSent'),
         color: 'primary',
-        description: 'Check your inbox for the test email.',
+        description: t('settings.notifications.checkInbox'),
       });
     } else {
-      throw new Error(res?.error || 'Failed to send test email');
+      throw new Error(
+        res?.error || t('settings.notifications.failedToSendTestEmail')
+      );
     }
   } catch (e: any) {
     useToast().add({
-      title: 'Failed to send test email',
+      title: t('settings.notifications.failedToSendTestEmail'),
       description: e?.message || String(e),
       color: 'error',
     });

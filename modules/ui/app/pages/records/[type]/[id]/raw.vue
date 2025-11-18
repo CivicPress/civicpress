@@ -17,6 +17,7 @@ const error = ref('');
 
 // Toast notifications
 const toast = useToast();
+const { t } = useI18n();
 
 // Get record type display name
 const { getRecordTypeLabel } = useRecordTypes();
@@ -29,16 +30,15 @@ const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(record.value.content);
       toast.add({
-        title: 'Copied!',
-        description: 'Raw content copied to clipboard',
+        title: t('records.raw.copied'),
+        description: t('records.raw.copiedToClipboard'),
         color: 'primary',
       });
     } catch (error) {
       console.error('Copy failed:', error);
       toast.add({
-        title: 'Copy Failed',
-        description:
-          'Please select the content and copy manually (Ctrl+C / Cmd+C)',
+        title: t('records.raw.copyFailed'),
+        description: t('records.raw.copyFailedDesc'),
         color: 'error',
       });
     }
@@ -49,7 +49,7 @@ const copyToClipboard = async () => {
 const navigationItems = computed(() => [
   [
     {
-      label: 'Copy',
+      label: t('records.raw.copy'),
       icon: 'i-lucide-copy',
       click: copyToClipboard,
     },
@@ -83,13 +83,13 @@ const fetchRecord = async () => {
         metadata: apiRecord.metadata || {},
       };
     } else {
-      throw new Error('Failed to fetch record');
+      throw new Error(t('records.raw.failedToFetch'));
     }
   } catch (err: any) {
-    const errorMessage = err.message || 'Failed to load record';
+    const errorMessage = err.message || t('records.failedToLoadRecord');
     error.value = errorMessage;
     toast.add({
-      title: 'Error',
+      title: t('common.error'),
       description: errorMessage,
       color: 'error',
     });
@@ -113,11 +113,11 @@ onMounted(() => {
 
 const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Records',
+    label: t('common.records'),
     to: '/records',
   },
   {
@@ -125,11 +125,11 @@ const breadcrumbItems = computed(() => [
     to: `/records/${type}`,
   },
   {
-    label: record.value?.id || 'Record',
+    label: record.value?.id || t('records.record'),
     to: `/records/${type}/${id}`,
   },
   {
-    label: 'Raw Content',
+    label: t('records.raw.title'),
   },
 ]);
 </script>
@@ -140,17 +140,17 @@ const breadcrumbItems = computed(() => [
       <UDashboardNavbar>
         <template #title>
           <h1 class="text-2xl font-semibold">
-            {{ record?.id || 'Record' }}
+            {{ record?.id || t('records.record') }}
           </h1>
         </template>
         <template #description>
-          {{ record?.title || 'View raw markdown and frontmatter' }}
+          {{ record?.title || t('records.raw.description') }}
         </template>
         <template #right>
           <HeaderActions
             :actions="[
               {
-                label: 'Back to Record',
+                label: t('records.raw.backToRecord'),
                 icon: 'i-lucide-arrow-left',
                 to: `/records/${type}/${id}`,
                 color: 'neutral',
@@ -175,7 +175,7 @@ const breadcrumbItems = computed(() => [
                 name="i-lucide-loader-2"
                 class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4"
               />
-              <p class="text-gray-600">Loading record...</p>
+              <p class="text-gray-600">{{ t('records.raw.loading') }}</p>
             </div>
           </div>
         </div>
@@ -185,8 +185,8 @@ const breadcrumbItems = computed(() => [
           v-else-if="!canViewRecords"
           color="error"
           variant="soft"
-          title="Access Denied"
-          description="You don't have permission to view records."
+          :title="t('records.accessDenied')"
+          :description="t('records.noPermissionToView')"
           icon="i-lucide-alert-circle"
         />
 
@@ -205,8 +205,8 @@ const breadcrumbItems = computed(() => [
           <UAlert
             color="neutral"
             variant="soft"
-            title="No Record Found"
-            description="The record could not be loaded."
+            :title="t('records.raw.noRecordFound')"
+            :description="t('records.raw.noRecordFoundDesc')"
             icon="i-lucide-alert-circle"
           />
         </div>
@@ -221,7 +221,7 @@ const breadcrumbItems = computed(() => [
               class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600 dark:text-gray-400"
             >
               <span class="font-medium text-gray-800 dark:text-gray-100">
-                Record ID:
+                {{ t('records.raw.recordId') }}:
                 <code
                   class="ml-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs tracking-tight"
                 >
@@ -244,7 +244,8 @@ const breadcrumbItems = computed(() => [
                 class="inline-flex items-center gap-2"
               >
                 <UIcon name="i-lucide-edit" class="w-4 h-4 text-gray-500" />
-                Updated {{ new Date(record.updated_at).toLocaleString() }}
+                {{ t('records.raw.updated') }}
+                {{ new Date(record.updated_at).toLocaleString() }}
               </span>
               <span v-if="record.author" class="inline-flex items-center gap-2">
                 <UIcon name="i-lucide-user" class="w-4 h-4 text-gray-500" />
@@ -265,7 +266,7 @@ const breadcrumbItems = computed(() => [
               v-if="record.metadata?.tags && record.metadata.tags.length > 0"
               class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
             >
-              <span class="font-medium">Tags:</span>
+              <span class="font-medium">{{ t('records.raw.tags') }}:</span>
               <div class="flex flex-wrap gap-1">
                 <UBadge
                   v-for="tag in record.metadata.tags"
@@ -287,10 +288,11 @@ const breadcrumbItems = computed(() => [
             <div
               class="border-b border-gray-200 dark:border-gray-800 px-6 py-4"
             >
-              <h2 class="text-lg font-semibold">Raw Markdown Content</h2>
+              <h2 class="text-lg font-semibold">
+                {{ t('records.raw.markdownContent') }}
+              </h2>
               <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                This is the complete markdown file including frontmatter and
-                content
+                {{ t('records.raw.markdownContentDesc') }}
               </p>
             </div>
             <div v-if="record.content" class="relative bg-gray-900">
@@ -309,7 +311,7 @@ const breadcrumbItems = computed(() => [
               ><code>{{ record.content }}</code></pre>
             </div>
             <div v-else class="p-6 text-gray-500 dark:text-gray-400 italic">
-              No content available for this record.
+              {{ t('records.noContentAvailable') }}
             </div>
           </div>
 
@@ -318,13 +320,15 @@ const breadcrumbItems = computed(() => [
             <div
               class="border-b border-gray-200 dark:border-gray-800 px-6 py-4"
             >
-              <h2 class="text-lg font-semibold">File Information</h2>
+              <h2 class="text-lg font-semibold">
+                {{ t('records.raw.fileInformation') }}
+              </h2>
             </div>
             <div class="p-6 text-sm text-gray-600 dark:text-gray-400">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <span class="inline-flex items-center gap-2">
                   <UIcon name="i-lucide-file-text" class="w-4 h-4" />
-                  File Path:
+                  {{ t('records.raw.filePath') }}:
                   <code
                     class="ml-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs"
                   >
@@ -333,7 +337,7 @@ const breadcrumbItems = computed(() => [
                 </span>
                 <span class="inline-flex items-center gap-2">
                   <UIcon name="i-lucide-hash" class="w-4 h-4" />
-                  Record ID:
+                  {{ t('records.raw.recordId') }}:
                   <code
                     class="ml-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs"
                   >

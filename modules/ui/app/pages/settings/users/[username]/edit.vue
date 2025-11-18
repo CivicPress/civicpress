@@ -10,6 +10,7 @@ definePageMeta({
   middleware: ['require-users-manage'],
 });
 
+const { t } = useI18n();
 // Route parameters
 const route = useRoute();
 const username = route.params.username as string;
@@ -27,15 +28,19 @@ const authStore = useAuthStore();
 // Computed properties
 const pageTitle = computed(() => {
   return user.value
-    ? `Edit ${user.value.name || user.value.username}`
-    : 'Edit User';
+    ? t('settings.users.editUserTitle', {
+        name: user.value.name || user.value.username,
+      })
+    : t('settings.users.updateUser');
 });
 
 const breadcrumbItems = computed(() => [
-  { label: 'Home', to: '/' },
-  { label: 'Settings', to: '/settings' },
-  { label: 'Users', to: '/settings/users' },
-  { label: user.value?.name || user.value?.username || 'User' },
+  { label: t('common.home'), to: '/' },
+  { label: t('common.settings'), to: '/settings' },
+  { label: t('settings.users.title'), to: '/settings/users' },
+  {
+    label: user.value?.name || user.value?.username || t('settings.users.user'),
+  },
 ]);
 
 // Only show edit page to self or users:manage
@@ -60,11 +65,11 @@ const fetchUser = async () => {
     if (response.success) {
       user.value = response.data.user;
     } else {
-      error.value = response.message || 'Failed to fetch user';
+      error.value = response.message || t('settings.users.failedToFetchUser');
     }
   } catch (err: any) {
     console.error('Error fetching user:', err);
-    error.value = err.message || 'Failed to fetch user';
+    error.value = err.message || t('settings.users.failedToFetchUser');
   } finally {
     loading.value = false;
   }
@@ -90,16 +95,17 @@ const handleSubmit = async (userData: any) => {
 
       // Show success message
       useToast().add({
-        title: 'Success',
-        description: 'User updated successfully',
+        title: t('common.success'),
+        description: t('settings.users.userUpdatedSuccessfully'),
         color: 'primary',
       });
     } else {
-      formError.value = response.message || 'Failed to update user';
+      formError.value =
+        response.message || t('settings.users.failedToUpdateUser');
     }
   } catch (err: any) {
     console.error('Error updating user:', err);
-    formError.value = err.message || 'Failed to update user';
+    formError.value = err.message || t('settings.users.failedToUpdateUser');
   } finally {
     saving.value = false;
   }
@@ -120,19 +126,20 @@ const handleDelete = async () => {
     if (response.success) {
       // Show success message
       useToast().add({
-        title: 'Success',
-        description: 'User deleted successfully',
+        title: t('common.success'),
+        description: t('settings.users.userDeletedSuccessfully'),
         color: 'primary',
       });
 
       // Navigate back to users list
       await navigateTo('/settings/users');
     } else {
-      formError.value = response.message || 'Failed to delete user';
+      formError.value =
+        response.message || t('settings.users.failedToDeleteUser');
     }
   } catch (err: any) {
     console.error('Error deleting user:', err);
-    formError.value = err.message || 'Failed to delete user';
+    formError.value = err.message || t('settings.users.failedToDeleteUser');
   } finally {
     saving.value = false;
   }
@@ -156,7 +163,7 @@ onMounted(() => {
           <HeaderActions
             :actions="[
               {
-                label: 'Back to Users',
+                label: t('settings.users.backToUsers'),
                 icon: 'i-lucide-arrow-left',
                 to: '/settings/users',
                 color: 'neutral',
@@ -181,9 +188,11 @@ onMounted(() => {
                 class="w-6 h-6 animate-spin text-primary-600"
               />
               <div>
-                <h2 class="text-xl font-semibold">Loading User</h2>
+                <h2 class="text-xl font-semibold">
+                  {{ t('settings.users.loadingUser') }}
+                </h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                  Fetching user information...
+                  {{ t('settings.users.fetchingUserInformation') }}
                 </p>
               </div>
             </div>

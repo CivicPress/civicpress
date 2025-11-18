@@ -49,6 +49,9 @@ const {
   getStatusLabel,
 } = useRecordUtils();
 
+// i18n
+const { t } = useI18n();
+
 // Reactive data
 const loading = ref(false);
 
@@ -323,10 +326,15 @@ onMounted(async () => {
               size="sm"
             >
               <UIcon name="i-lucide-chevron-left" class="w-4 h-4 mr-1" />
-              Previous
+              {{ t('common.previous') }}
             </UButton>
             <span class="text-sm text-gray-600 dark:text-gray-400">
-              Page {{ currentPage }} of {{ totalPages }}
+              {{
+                t('records.pagination.pageOf', {
+                  current: currentPage,
+                  total: totalPages,
+                })
+              }}
             </span>
             <UButton
               @click="nextPage"
@@ -334,7 +342,7 @@ onMounted(async () => {
               variant="outline"
               size="sm"
             >
-              Next
+              {{ t('common.next') }}
               <UIcon name="i-lucide-chevron-right" class="w-4 h-4 ml-1" />
             </UButton>
           </div>
@@ -456,10 +464,10 @@ onMounted(async () => {
             class="mb-6 h-16 w-16 text-gray-300 dark:text-gray-600"
           />
           <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            No records match your filters
+            {{ t('records.noRecordsMatchFilters') }}
           </h3>
           <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Try adjusting or clearing your filters to see all available records.
+            {{ t('records.noRecordsMatchFiltersDesc') }}
           </p>
           <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row">
             <UButton
@@ -468,7 +476,7 @@ onMounted(async () => {
               class="text-sm"
               @click="resetFilters"
             >
-              Clear all filters
+              {{ t('records.filters.clearAllFilters') }}
             </UButton>
             <UButton
               v-if="canCreateRecords"
@@ -477,7 +485,7 @@ onMounted(async () => {
               class="text-sm"
               @click.stop="goToCreateRecord"
             >
-              Create new record
+              {{ t('records.createNewRecord') }}
             </UButton>
           </div>
         </div>

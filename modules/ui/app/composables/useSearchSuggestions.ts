@@ -49,7 +49,6 @@ export const useSearchSuggestions = () => {
 
   // Clear suggestions only when query is actually empty
   const clearSuggestions = () => {
-    console.log('🗑️ Clearing suggestions');
     suggestions.value = [];
     error.value = null;
     currentQuery.value = '';

@@ -2,7 +2,9 @@
   <UCard>
     <template #header>
       <div class="flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Linked Records</h3>
+        <h3 class="text-lg font-semibold">
+          {{ t('geography.linkedRecords') }}
+        </h3>
         <UBadge v-if="linkedRecords.length > 0" color="primary" variant="soft">
           {{ linkedRecords.length }}
         </UBadge>
@@ -33,7 +35,7 @@
         class="w-12 h-12 text-gray-400 mx-auto mb-4"
       />
       <p class="text-gray-500 dark:text-gray-400">
-        No records are linked to this geography file.
+        {{ t('geography.noRecordsLinked') }}
       </p>
     </div>
 
@@ -79,7 +81,7 @@
             @click="viewRecord(record)"
           >
             <UIcon name="i-lucide-external-link" class="w-4 h-4" />
-            View
+            {{ t('common.view') }}
           </UButton>
         </div>
       </div>
@@ -102,6 +104,7 @@ const props = defineProps<Props>();
 // Composables
 const router = useRouter();
 const { $civicApi } = useNuxtApp();
+const { t } = useI18n();
 
 // Reactive state
 const linkedRecords = ref<any[]>([]);
@@ -152,11 +155,11 @@ const fetchLinkedRecords = async () => {
     if (response.success) {
       linkedRecords.value = response.data || [];
     } else {
-      error.value = response.error || 'Failed to fetch linked records';
+      error.value = response.error || t('geography.failedToFetchLinkedRecords');
     }
   } catch (err) {
     console.error('Error fetching linked records:', err);
-    error.value = 'Failed to fetch linked records';
+    error.value = t('geography.failedToFetchLinkedRecords');
   } finally {
     loading.value = false;
   }

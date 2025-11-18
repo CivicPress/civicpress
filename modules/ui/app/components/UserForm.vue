@@ -2,22 +2,28 @@
   <form @submit.prevent="handleSubmit" class="space-y-6">
     <!-- Username Field -->
     <UFormField
-      label="Username"
+      :label="t('settings.users.username')"
       :description="
         isEditing
-          ? 'Username cannot be changed after creation'
-          : 'Choose a unique username for this user'
+          ? t('settings.users.usernameDescEdit')
+          : t('settings.users.usernameDesc')
       "
-      :hint="isEditing ? 'Read-only field' : 'Must be unique across the system'"
+      :hint="
+        isEditing
+          ? t('settings.users.readOnlyField')
+          : t('settings.users.usernameHint')
+      "
       :help-text="
         isEditing
-          ? 'Username is permanent and cannot be modified'
-          : 'Use lowercase letters, numbers, and hyphens only'
+          ? t('settings.users.usernameHelpEdit')
+          : t('settings.users.usernameHelp')
       "
     >
       <UInput
         v-model="form.username"
-        :placeholder="isEditing ? user?.username : 'Enter username'"
+        :placeholder="
+          isEditing ? user?.username : t('settings.users.enterUsername')
+        "
         :disabled="isEditing"
         :error="formErrors.username"
         required
@@ -30,15 +36,15 @@
 
     <!-- Email Field -->
     <UFormField
-      label="Email Address"
-      description="Primary contact email for this user"
-      hint="Used for login and notifications"
-      help-text="Must be a valid email address"
+      :label="t('settings.users.emailAddress')"
+      :description="t('settings.users.emailAddressDesc')"
+      :hint="t('settings.users.emailAddressHint')"
+      :help-text="t('settings.users.emailAddressHelp')"
     >
       <UInput
         v-model="form.email"
         type="email"
-        placeholder="Enter email address"
+        :placeholder="t('settings.users.enterEmailAddress')"
         :error="formErrors.email"
         required
       />
@@ -50,29 +56,29 @@
 
     <!-- Full Name Field -->
     <UFormField
-      label="Full Name"
-      description="User's full name (optional)"
-      hint="Will use username if not provided"
-      help-text="Display name shown throughout the system"
+      :label="t('settings.users.fullName')"
+      :description="t('settings.users.fullNameDesc')"
+      :hint="t('settings.users.fullNameHint')"
+      :help-text="t('settings.users.fullNameHelp')"
     >
       <UInput
         v-model="form.name"
-        placeholder="Enter full name (optional)"
+        :placeholder="t('settings.users.enterFullName')"
         :error="formErrors.name"
       />
     </UFormField>
 
     <!-- Role Field -->
     <UFormField
-      label="Role"
-      description="User's role and permissions"
-      hint="Determines access level and capabilities"
-      help-text="Role cannot be changed after creation"
+      :label="t('settings.users.role')"
+      :description="t('settings.users.roleDesc')"
+      :hint="t('settings.users.roleHint')"
+      :help-text="t('settings.users.roleHelp')"
     >
       <USelectMenu
         v-model="roleOptionsSelect"
         :items="roleOptions"
-        placeholder="Select a role"
+        :placeholder="t('settings.users.selectRole')"
         :error="formErrors.role"
         :loading="rolesLoading"
         required
@@ -99,11 +105,14 @@
         />
         <div class="ml-3">
           <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200">
-            External Authentication
+            {{ t('settings.users.externalAuthentication') }}
           </h4>
           <p class="text-sm text-blue-700 dark:text-blue-300 mt-1">
-            This user is authenticated via {{ userAuthProviderDisplay }}.
-            Password management is handled by the external provider.
+            {{
+              t('settings.users.externalAuthDescription', {
+                provider: userAuthProviderDisplay,
+              })
+            }}
           </p>
         </div>
       </div>
@@ -112,20 +121,20 @@
     <!-- Password Fields (only for new users or when changing password, and user can set password) -->
     <template v-if="userCanSetPassword && (!isEditing || showPasswordFields)">
       <UFormField
-        label="Password"
+        :label="t('settings.users.password')"
         :description="
           isEditing
-            ? 'Enter new password to change'
-            : 'Create a secure password'
+            ? t('settings.users.passwordDescEdit')
+            : t('settings.users.passwordDesc')
         "
-        hint="Minimum 8 characters, include numbers and symbols"
-        help-text="Password must be at least 8 characters long"
+        :hint="t('settings.users.passwordHint')"
+        :help-text="t('settings.users.passwordHelp')"
       >
         <div class="flex space-x-2">
           <UInput
             v-model="form.password"
             :type="showPassword ? 'text' : 'password'"
-            placeholder="Enter password"
+            :placeholder="t('settings.users.enterPassword')"
             :error="formErrors.password"
             class="flex-1"
             required
@@ -137,7 +146,7 @@
             variant="outline"
             size="sm"
             @click="generatePassword"
-            title="Generate secure password"
+            :title="t('settings.users.generatePassword')"
           />
           <UButton
             type="button"
@@ -146,7 +155,11 @@
             variant="outline"
             size="sm"
             @click="showPassword = !showPassword"
-            :title="showPassword ? 'Hide password' : 'Show password'"
+            :title="
+              showPassword
+                ? t('settings.users.hidePassword')
+                : t('settings.users.showPassword')
+            "
           />
         </div>
         <!-- Validation error display -->
@@ -196,23 +209,22 @@
               </span>
             </div>
             <div class="text-xs text-gray-500">
-              Password must be at least 8 characters with uppercase, lowercase,
-              numbers, and special characters
+              {{ t('auth.passwordRequirements') }}
             </div>
           </div>
         </template>
       </UFormField>
 
       <UFormField
-        label="Confirm Password"
-        description="Re-enter the password to confirm"
-        hint="Must match the password above"
-        help-text="Passwords must match exactly"
+        :label="t('settings.users.confirmPassword')"
+        :description="t('settings.users.confirmPasswordDesc')"
+        :hint="t('settings.users.confirmPasswordHint')"
+        :help-text="t('settings.users.confirmPasswordHelp')"
       >
         <UInput
           v-model="form.confirmPassword"
           :type="showPassword ? 'text' : 'password'"
-          placeholder="Confirm password"
+          :placeholder="t('settings.users.enterConfirmPassword')"
           :error="formErrors.confirmPassword"
           required
         />
@@ -238,7 +250,7 @@
         icon="i-lucide-key"
         @click="showPasswordFields = true"
       >
-        Change Password
+        {{ t('settings.users.changePassword') }}
       </UButton>
     </div>
 
@@ -247,8 +259,8 @@
       <!-- Delete Button (only for editing) -->
       <div v-if="isEditing && canDelete" class="flex-1">
         <UModal
-          title="Delete User"
-          description="Are you sure you want to delete this user? This action cannot be undone."
+          :title="t('settings.users.deleteUser')"
+          :description="t('settings.users.confirmDeleteUser')"
         >
           <UButton
             type="button"
@@ -258,16 +270,17 @@
             @click="showDeleteModal = true"
             :loading="deleting"
           >
-            Delete User
+            {{ t('settings.users.deleteUser') }}
           </UButton>
 
           <template #body>
             <div class="space-y-4">
               <p class="text-gray-700 dark:text-gray-300">
-                Are you sure you want to delete
-                <strong>{{ user?.name || user?.username }}</strong
-                >? This will permanently remove their account and all associated
-                data.
+                {{
+                  t('settings.users.confirmDeleteUserMessage', {
+                    name: user?.name || user?.username,
+                  })
+                }}
               </p>
 
               <div
@@ -279,11 +292,18 @@
                     class="w-5 h-5 text-red-600 mt-0.5"
                   />
                   <div class="text-sm text-red-700 dark:text-red-300">
-                    <p class="font-medium">Warning:</p>
+                    <p class="font-medium">{{ t('common.warning') }}:</p>
                     <ul class="mt-1 space-y-1">
-                      <li>• User will lose access to the system immediately</li>
-                      <li>• All user data will be permanently deleted</li>
-                      <li>• This action cannot be reversed</li>
+                      <li>
+                        • {{ t('settings.users.deleteWarning.loseAccess') }}
+                      </li>
+                      <li>
+                        • {{ t('settings.users.deleteWarning.allDataDeleted') }}
+                      </li>
+                      <li>
+                        •
+                        {{ t('settings.users.deleteWarning.cannotBeReversed') }}
+                      </li>
                     </ul>
                   </div>
                 </div>
@@ -293,10 +313,10 @@
           <template #footer="{ close }">
             <div class="flex justify-end space-x-3">
               <UButton color="neutral" variant="outline" @click="close">
-                Cancel
+                {{ t('common.cancel') }}
               </UButton>
               <UButton color="error" :loading="deleting" @click="confirmDelete">
-                Delete User
+                {{ t('settings.users.deleteUser') }}
               </UButton>
             </div>
           </template>
@@ -311,7 +331,7 @@
           variant="outline"
           @click="$router.back()"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </UButton>
         <UButton
           type="submit"
@@ -319,7 +339,11 @@
           :loading="saving"
           :disabled="!isFormValid"
         >
-          {{ isEditing ? 'Update User' : 'Create User' }}
+          {{
+            isEditing
+              ? t('settings.users.updateUser')
+              : t('settings.users.createUser')
+          }}
         </UButton>
       </div>
     </div>
@@ -346,7 +370,11 @@
           class="w-8 h-8 animate-spin mx-auto mb-2"
         />
         <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ isEditing ? 'Updating user...' : 'Creating user...' }}
+          {{
+            isEditing
+              ? t('settings.users.updatingUser')
+              : t('settings.users.creatingUser')
+          }}
         </p>
       </div>
     </div>
@@ -355,6 +383,8 @@
 
 <script setup lang="ts">
 import type { User, Role } from '~/types/user';
+
+const { t } = useI18n();
 
 interface Props {
   user?: User;
@@ -461,11 +491,15 @@ const passwordStrength = computed(() => {
   score += checks.numbers ? 1 : 0;
   score += checks.special ? 1 : 0;
 
-  if (score <= 1) return { score, label: 'Very Weak', color: 'red' };
-  if (score <= 2) return { score, label: 'Weak', color: 'orange' };
-  if (score <= 3) return { score, label: 'Fair', color: 'yellow' };
-  if (score <= 4) return { score, label: 'Good', color: 'blue' };
-  return { score, label: 'Strong', color: 'green' };
+  if (score <= 1)
+    return { score, label: t('auth.passwordStrength.veryWeak'), color: 'red' };
+  if (score <= 2)
+    return { score, label: t('auth.passwordStrength.weak'), color: 'orange' };
+  if (score <= 3)
+    return { score, label: t('auth.passwordStrength.fair'), color: 'yellow' };
+  if (score <= 4)
+    return { score, label: t('auth.passwordStrength.good'), color: 'blue' };
+  return { score, label: t('auth.passwordStrength.strong'), color: 'green' };
 });
 
 // External auth detection
@@ -597,7 +631,7 @@ const confirmDelete = async () => {
     console.error('Error deleting user:', error);
     toast.add({
       title: 'Error',
-      description: 'Failed to delete user',
+      description: t('settings.users.failedToDeleteUser'),
       color: 'error',
     });
   } finally {

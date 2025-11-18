@@ -3,15 +3,17 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">Create Geography File</h1>
+          <h1 class="text-2xl font-semibold">
+            {{ t('geography.createGeography') }}
+          </h1>
         </template>
         <template #description>
-          Add new geographic data to the system
+          {{ t('geography.addNewGeographicData') }}
         </template>
         <template #right>
           <UButton color="neutral" variant="ghost" @click="router.back()">
             <UIcon name="i-lucide-arrow-left" class="w-4 h-4" />
-            Back
+            {{ t('geography.back') }}
           </UButton>
         </template>
       </UDashboardNavbar>
@@ -38,7 +40,7 @@
             @click="handleCancel"
             :disabled="geographyFormRef?.saving"
           >
-            Cancel
+            {{ t('common.cancel') }}
           </UButton>
           <UButton
             color="primary"
@@ -46,7 +48,7 @@
             :disabled="!geographyFormRef?.isFormValid"
             @click="geographyFormRef?.handleSubmit"
           >
-            Create Geography File
+            {{ t('geography.createGeographyFile') }}
           </UButton>
         </div>
 
@@ -65,16 +67,17 @@ import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
 const router = useRouter();
+const { t } = useI18n();
 
 // Form reference
 const geographyFormRef = ref<InstanceType<typeof GeographyForm> | null>(null);
 
 // Breadcrumbs
-const breadcrumbItems = [
-  { label: 'Home', to: '/' },
-  { label: 'Geography', to: '/geography' },
-  { label: 'Create Geography File' },
-];
+const breadcrumbItems = computed(() => [
+  { label: t('common.home'), to: '/' },
+  { label: t('geography.title'), to: '/geography' },
+  { label: t('geography.createGeography') },
+]);
 
 // Event handlers
 const handleSuccess = (geographyFile: GeographyFile) => {

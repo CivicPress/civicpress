@@ -6,7 +6,12 @@
         name="i-lucide-link"
         class="w-12 h-12 text-gray-400 mx-auto mb-4"
       />
-      <p class="text-gray-500 dark:text-gray-400">No records linked yet</p>
+      <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+        {{ t('records.linkedRecords.noRecordsLinkedTitle') }}
+      </h4>
+      <p class="text-gray-600 dark:text-gray-400 mb-4">
+        {{ t('records.linkedRecords.noRecordsLinkedDesc') }}
+      </p>
     </div>
 
     <!-- Linked Records List -->
@@ -113,6 +118,9 @@
 
 <script setup lang="ts">
 import RecordLinkSelector from './RecordLinkSelector.vue';
+
+// Composables
+const { t } = useI18n();
 
 interface LinkedRecord {
   id: string;

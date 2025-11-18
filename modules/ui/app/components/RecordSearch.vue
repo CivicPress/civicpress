@@ -60,6 +60,9 @@ const {
 // Record utilities composable
 const { getTypeLabel, getStatusLabel } = useRecordUtils();
 
+// i18n
+const { t } = useI18n();
+
 // Reactive data
 const searchQuery = ref(props.initialFilters.search || '');
 const selectedRecordTypes = ref<any[]>([]);
@@ -247,7 +250,7 @@ onUnmounted(() => {
           <UInput
             v-model="searchQuery"
             @blur="handleInputBlur"
-            placeholder="Search records..."
+            :placeholder="t('records.filters.searchPlaceholder')"
             icon="i-lucide-search"
             class="w-full"
             :ui="{ trailing: 'pe-1' }"
@@ -272,7 +275,7 @@ onUnmounted(() => {
             <div class="p-2">
               <div class="text-xs text-gray-500 mb-2 px-2">
                 <UIcon name="i-lucide-lightbulb" class="w-3 h-3 inline mr-1" />
-                Suggestions
+                {{ t('records.filters.suggestions') }}
               </div>
               <div
                 v-for="suggestion in suggestions"
@@ -303,7 +306,7 @@ onUnmounted(() => {
                 name="i-lucide-loader-2"
                 class="w-4 h-4 animate-spin mr-2"
               />
-              Loading suggestions...
+              {{ t('records.filters.loadingSuggestions') }}
             </div>
           </div>
         </div>
@@ -314,7 +317,7 @@ onUnmounted(() => {
           :items="typeFacetItems"
           multiple
           :loading="recordTypesLoading"
-          placeholder="Filter by type..."
+          :placeholder="t('records.filters.filterByTypePlaceholder')"
           class="w-full sm:w-48"
         >
           <template #trailing>
@@ -334,7 +337,7 @@ onUnmounted(() => {
           :items="statusFacetItems"
           multiple
           :loading="recordStatusesLoading"
-          placeholder="Status..."
+          :placeholder="t('records.filters.statusPlaceholder')"
           class="w-full sm:w-48"
         >
           <template #trailing>
@@ -360,16 +363,20 @@ onUnmounted(() => {
           searchQuery
         "
       >
-        Showing filtered records
+        {{ t('records.filters.showingFilteredRecords') }}
         <span v-if="disableTypeFilter && recordType" class="text-gray-500">
-          ({{ recordType }} only)
+          ({{ getRecordTypeLabel(recordType) }} {{ t('common.only') }})
         </span>
       </span>
       <span v-else>
         <span v-if="disableTypeFilter && recordType">
-          Showing all {{ recordType }} records
+          {{
+            t('records.filters.showingAllTypeRecords', {
+              type: getRecordTypeLabel(recordType),
+            })
+          }}
         </span>
-        <span v-else> Showing all records </span>
+        <span v-else>{{ t('records.filters.showingAllRecords') }}</span>
       </span>
     </div>
 

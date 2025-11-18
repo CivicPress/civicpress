@@ -3,14 +3,14 @@
     <div
       class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"
     ></div>
-    <span class="ml-3 text-gray-600 dark:text-gray-400"
-      >Loading security information...</span
-    >
+    <span class="ml-3 text-gray-600 dark:text-gray-400">{{
+      t('settings.security.loadingSecurityInfo')
+    }}</span>
   </div>
 
   <div v-else-if="!securityInfo" class="text-center p-8">
     <p class="text-gray-500 dark:text-gray-400">
-      Failed to load security information.
+      {{ t('settings.security.failedToLoadSecurity') }}
     </p>
   </div>
 
@@ -21,14 +21,16 @@
     >
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-          Security Overview
+          {{ t('settings.security.title') }}
         </h3>
         <UBadge
           :color="securityInfo?.emailVerified ? 'primary' : 'primary'"
           variant="subtle"
         >
           {{
-            securityInfo?.emailVerified ? 'Email Verified' : 'Email Unverified'
+            securityInfo?.emailVerified
+              ? t('settings.security.emailVerified')
+              : t('settings.security.emailUnverified')
           }}
         </UBadge>
       </div>
@@ -44,7 +46,7 @@
           </div>
           <div>
             <p class="text-sm font-medium text-gray-900 dark:text-white">
-              Authentication Method
+              {{ t('settings.security.authenticationMethod') }}
             </p>
             <p class="text-sm text-gray-500 dark:text-gray-400">
               {{ getAuthProviderDisplayName(securityInfo?.authProvider) }}
@@ -71,13 +73,13 @@
           </div>
           <div>
             <p class="text-sm font-medium text-gray-900 dark:text-white">
-              Email Status
+              {{ t('settings.security.emailStatus') }}
             </p>
             <p class="text-sm text-gray-500 dark:text-gray-400">
               {{
                 securityInfo?.emailVerified
-                  ? 'Verified'
-                  : 'Verification required'
+                  ? t('settings.security.verified')
+                  : t('settings.security.verificationRequired')
               }}
             </p>
           </div>
@@ -96,11 +98,13 @@
           />
           <div class="ml-3">
             <p class="text-sm text-blue-800 dark:text-blue-200">
-              Your account is managed by
-              {{ getAuthProviderDisplayName(securityInfo?.authProvider) }}.
-              Password changes must be done through your
-              {{ getAuthProviderDisplayName(securityInfo?.authProvider) }}
-              account.
+              {{
+                t('settings.security.externalAuthWarning', {
+                  provider: getAuthProviderDisplayName(
+                    securityInfo?.authProvider
+                  ),
+                })
+              }}
             </p>
           </div>
         </div>
@@ -116,21 +120,21 @@
       >
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-            Password Management
+            {{ t('settings.security.passwordManagement') }}
           </h3>
         </div>
 
         <form @submit.prevent="handlePasswordChange" class="space-y-4">
           <!-- Current Password -->
           <UFormField
-            label="Current Password"
-            description="Enter your current password to confirm your identity"
+            :label="t('settings.security.currentPassword')"
+            :description="t('settings.security.currentPasswordDescription')"
             :error="passwordErrors.currentPassword"
           >
             <UInput
               v-model="passwordForm.currentPassword"
               type="password"
-              placeholder="Enter current password"
+              :placeholder="t('settings.security.enterCurrentPassword')"
               :disabled="passwordLoading"
               class="w-full"
               required
@@ -139,15 +143,15 @@
 
           <!-- New Password -->
           <UFormField
-            label="New Password"
-            description="Choose a strong password with at least 8 characters"
+            :label="t('settings.security.newPassword')"
+            :description="t('settings.security.newPasswordDescription')"
             :error="passwordErrors.newPassword"
           >
             <div class="flex space-x-2 w-full">
               <UInput
                 v-model="passwordForm.newPassword"
                 :type="showNewPassword ? 'text' : 'password'"
-                placeholder="Enter new password"
+                :placeholder="t('settings.security.enterNewPassword')"
                 :disabled="passwordLoading"
                 class="flex-1 w-full"
                 required
@@ -159,21 +163,27 @@
                 variant="outline"
                 size="sm"
                 @click="showNewPassword = !showNewPassword"
-                :title="showNewPassword ? 'Hide password' : 'Show password'"
+                :title="
+                  showNewPassword
+                    ? t('settings.security.hidePassword')
+                    : t('settings.security.showPassword')
+                "
               />
             </div>
           </UFormField>
 
           <!-- Confirm New Password -->
           <UFormField
-            label="Confirm New Password"
-            description="Re-enter your new password to confirm"
+            :label="t('settings.security.confirmNewPassword')"
+            :description="t('settings.security.confirmNewPasswordDescription')"
             :error="passwordErrors.confirmPassword"
           >
             <UInput
               v-model="passwordForm.confirmPassword"
               :type="showNewPassword ? 'text' : 'password'"
-              placeholder="Confirm new password"
+              :placeholder="
+                t('settings.security.confirmNewPasswordPlaceholder')
+              "
               :disabled="passwordLoading"
               class="w-full"
               required
@@ -189,14 +199,14 @@
               @click="resetPasswordForm"
               :disabled="passwordLoading"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </UButton>
             <UButton
               type="submit"
               :loading="passwordLoading"
               :disabled="!isPasswordFormValid"
             >
-              Change Password
+              {{ t('settings.security.changePassword') }}
             </UButton>
           </div>
         </form>
@@ -208,7 +218,7 @@
       >
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-            Email Management
+            {{ t('settings.security.emailManagement') }}
           </h3>
         </div>
 
@@ -217,7 +227,7 @@
           <label
             class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
           >
-            Current Email
+            {{ t('settings.security.currentEmail') }}
           </label>
           <div class="flex items-center space-x-2 w-full">
             <UInput
@@ -229,7 +239,11 @@
               :color="securityInfo?.emailVerified ? 'primary' : 'primary'"
               variant="subtle"
             >
-              {{ securityInfo?.emailVerified ? 'Verified' : 'Unverified' }}
+              {{
+                securityInfo?.emailVerified
+                  ? t('settings.security.verified')
+                  : t('settings.security.unverified')
+              }}
             </UBadge>
           </div>
         </div>
@@ -248,11 +262,10 @@
               <p
                 class="text-sm font-medium text-yellow-800 dark:text-yellow-200"
               >
-                Email verification required
+                {{ t('settings.security.emailVerificationRequired') }}
               </p>
               <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                Please verify your email address to secure your account and
-                receive important notifications.
+                {{ t('settings.security.emailVerificationDescription') }}
               </p>
               <div class="mt-3">
                 <UButton
@@ -262,7 +275,7 @@
                   :loading="emailVerificationLoading"
                 >
                   <UIcon name="i-lucide-mail" class="w-4 h-4 mr-2" />
-                  Send Verification Email
+                  {{ t('settings.security.sendVerificationEmail') }}
                 </UButton>
               </div>
             </div>
@@ -283,10 +296,10 @@
               <p
                 class="text-sm font-medium text-yellow-800 dark:text-yellow-200"
               >
-                Email change pending
+                {{ t('settings.security.emailChangePending') }}
               </p>
               <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                Verification email sent to:
+                {{ t('settings.security.verificationEmailSentTo') }}:
                 {{ securityInfo?.pendingEmailChange?.email }}
               </p>
               <div class="mt-2 flex space-x-2">
@@ -297,7 +310,7 @@
                   @click="cancelEmailChange"
                   :loading="emailLoading"
                 >
-                  Cancel Change
+                  {{ t('settings.security.cancelChange') }}
                 </UButton>
               </div>
             </div>
@@ -311,14 +324,14 @@
           class="space-y-4"
         >
           <UFormField
-            label="New Email Address"
-            description="Enter a new email address to change your current email"
+            :label="t('settings.security.newEmail')"
+            :description="t('settings.security.newEmailDescription')"
             :error="emailErrors.newEmail"
           >
             <UInput
               v-model="emailForm.newEmail"
               type="email"
-              placeholder="Enter new email address"
+              :placeholder="t('settings.security.enterNewEmail')"
               :disabled="emailLoading"
               class="w-full"
               required
@@ -333,14 +346,14 @@
               @click="resetEmailForm"
               :disabled="emailLoading"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </UButton>
             <UButton
               type="submit"
               :loading="emailLoading"
               :disabled="!isEmailFormValid"
             >
-              Request Email Change
+              {{ t('settings.security.requestEmailChange') }}
             </UButton>
           </div>
         </form>
@@ -365,6 +378,7 @@ const props = defineProps<Props>();
 // Composables
 const { $civicApi } = useNuxtApp();
 const toast = useToast();
+const { t } = useI18n();
 const {
   getSecurityInfo,
   changePassword,
@@ -448,8 +462,8 @@ const fetchSecurityInfo = async () => {
   } catch (error: any) {
     console.error('Failed to fetch security info:', error);
     toast.add({
-      title: 'Error',
-      description: 'Failed to load security information',
+      title: t('common.error'),
+      description: t('settings.security.failedToLoadSecurity'),
       color: 'error',
     });
   } finally {
@@ -468,7 +482,9 @@ const handlePasswordChange = async () => {
 
     // Validate passwords match
     if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
-      passwordErrors.value.confirmPassword = 'Passwords do not match';
+      passwordErrors.value.confirmPassword = t(
+        'settings.security.passwordsDoNotMatch'
+      );
       return;
     }
 
@@ -479,7 +495,7 @@ const handlePasswordChange = async () => {
 
     if (result.success) {
       toast.add({
-        title: 'Success',
+        title: t('settings.security.passwordChanged'),
         description: result.message,
         color: 'primary',
       });
@@ -490,17 +506,20 @@ const handlePasswordChange = async () => {
 
     // Handle specific error cases
     if (error.message?.includes('current password')) {
-      passwordErrors.value.currentPassword = 'Current password is incorrect';
+      passwordErrors.value.currentPassword = t(
+        'settings.security.currentPasswordIncorrect'
+      );
     } else if (error.message?.includes('external provider')) {
       toast.add({
-        title: 'Cannot Change Password',
+        title: t('settings.security.cannotChangePassword'),
         description: error.message,
         color: 'primary',
       });
     } else {
       toast.add({
-        title: 'Password Change Failed',
-        description: error.message || 'Failed to change password',
+        title: t('settings.security.passwordChangeFailed'),
+        description:
+          error.message || t('settings.security.failedToChangePassword'),
         color: 'error',
       });
     }
@@ -520,7 +539,7 @@ const handleEmailChange = async () => {
 
     if (result.success) {
       toast.add({
-        title: 'Email Change Requested',
+        title: t('settings.security.emailChangeRequested'),
         description: result.message,
         color: 'primary',
       });
@@ -531,11 +550,12 @@ const handleEmailChange = async () => {
     console.error('Email change request failed:', error);
 
     if (error.message?.includes('already in use')) {
-      emailErrors.value.newEmail = 'Email address is already in use';
+      emailErrors.value.newEmail = t('settings.security.emailAlreadyInUse');
     } else {
       toast.add({
-        title: 'Email Change Failed',
-        description: error.message || 'Failed to request email change',
+        title: t('settings.security.emailChangeFailed'),
+        description:
+          error.message || t('settings.security.failedToRequestEmailChange'),
         color: 'error',
       });
     }
@@ -551,7 +571,7 @@ const cancelEmailChange = async () => {
 
     if (result.success) {
       toast.add({
-        title: 'Email Change Cancelled',
+        title: t('settings.security.emailChangeCancelled'),
         description: result.message,
         color: 'primary',
       });
@@ -560,8 +580,9 @@ const cancelEmailChange = async () => {
   } catch (error: any) {
     console.error('Cancel email change failed:', error);
     toast.add({
-      title: 'Cancel Failed',
-      description: error.message || 'Failed to cancel email change',
+      title: t('settings.security.cancelFailed'),
+      description:
+        error.message || t('settings.security.failedToCancelEmailChange'),
       color: 'error',
     });
   } finally {
@@ -576,7 +597,7 @@ const handleSendEmailVerification = async () => {
 
     if (result.success) {
       toast.add({
-        title: 'Verification Email Sent',
+        title: t('settings.security.verificationEmailSent'),
         description: result.message,
         color: 'primary',
       });
@@ -584,8 +605,10 @@ const handleSendEmailVerification = async () => {
   } catch (error: any) {
     console.error('Send email verification failed:', error);
     toast.add({
-      title: 'Failed to Send Verification Email',
-      description: error.message || 'Failed to send verification email',
+      title: t('settings.security.failedToSendVerificationEmail'),
+      description:
+        error.message ||
+        t('settings.security.failedToSendVerificationEmailDesc'),
       color: 'error',
     });
   } finally {

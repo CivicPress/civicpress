@@ -10,6 +10,9 @@ export const useRecordUtils = () => {
   // Get icons from central registry
   const { getIcon } = useIcons();
 
+  // Get translation functions at top level
+  const { translateRecordType, translateStatus } = useConfigTranslations();
+
   // Status color mapping with validation
   const STATUS_COLORS: Record<string, string> = {
     draft: 'neutral',
@@ -170,7 +173,8 @@ export const useRecordUtils = () => {
     if (!type) return '';
 
     const normalizedType = type.toLowerCase();
-    return TYPE_LABELS[normalizedType] || toTitleCase(type);
+    const fallback = TYPE_LABELS[normalizedType] || toTitleCase(type);
+    return translateRecordType(normalizedType, fallback);
   };
 
   /**
@@ -180,7 +184,8 @@ export const useRecordUtils = () => {
     if (!status) return '';
 
     const normalizedStatus = status.toLowerCase().replace(/\s+/g, '_');
-    return STATUS_LABELS[normalizedStatus] || status;
+    const fallback = STATUS_LABELS[normalizedStatus] || status;
+    return translateStatus(normalizedStatus, fallback);
   };
 
   /**

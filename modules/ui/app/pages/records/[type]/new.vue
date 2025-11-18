@@ -2,6 +2,7 @@
 import type { CivicRecord } from '~/stores/records';
 import SystemFooter from '~/components/SystemFooter.vue';
 
+const { t } = useI18n();
 // Route parameters
 const route = useRoute();
 const type = route.params.type as string;
@@ -34,8 +35,10 @@ const handleSubmit = async (recordData: any) => {
 
     if (response && response.success) {
       toast.add({
-        title: 'Record Created',
-        description: `Successfully created "${recordData.title}"`,
+        title: t('records.recordCreated'),
+        description: t('records.successfullyCreated', {
+          title: recordData.title,
+        }),
         color: 'primary',
       });
 
@@ -45,10 +48,10 @@ const handleSubmit = async (recordData: any) => {
       throw new Error('Failed to create record');
     }
   } catch (err: any) {
-    const errorMessage = err.message || 'Failed to create record';
+    const errorMessage = err.message || t('records.failedToCreateRecord');
     error.value = errorMessage;
     toast.add({
-      title: 'Error',
+      title: t('common.error'),
       description: errorMessage,
       color: 'error',
     });
@@ -71,11 +74,11 @@ const canCreateRecords = computed(() => {
 
 const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Records',
+    label: t('records.allRecords'),
     to: '/records',
   },
   {
@@ -83,7 +86,7 @@ const breadcrumbItems = computed(() => [
     to: `/records/${type}`,
   },
   {
-    label: 'New Record',
+    label: t('records.newRecord'),
   },
 ]);
 </script>
@@ -94,11 +97,15 @@ const breadcrumbItems = computed(() => [
       <UDashboardNavbar>
         <template #title>
           <h1 class="text-2xl font-semibold">
-            Create New {{ recordTypeLabel }}
+            {{ t('records.createNewTypeRecord', { type: recordTypeLabel }) }}
           </h1>
         </template>
         <template #description>
-          Create a new {{ recordTypeLabel.toLowerCase() }} record
+          {{
+            t('records.createNewTypeRecordDesc', {
+              type: recordTypeLabel.toLowerCase(),
+            })
+          }}
         </template>
       </UDashboardNavbar>
     </template>
@@ -112,8 +119,8 @@ const breadcrumbItems = computed(() => [
           v-if="!canCreateRecords"
           color="error"
           variant="soft"
-          title="Access Denied"
-          description="You don't have permission to create records."
+          :title="t('records.accessDenied')"
+          :description="t('records.noPermissionToCreate')"
           icon="i-lucide-alert-circle"
         />
 

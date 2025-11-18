@@ -5,12 +5,14 @@
       class="border-b border-gray-200 dark:border-gray-800 p-4 flex-shrink-0"
     >
       <div class="space-y-3">
-        <h3 class="font-medium text-gray-900 dark:text-white">Link Records</h3>
+        <h3 class="font-medium text-gray-900 dark:text-white">
+          {{ t('records.linkedRecords.title') }}
+        </h3>
 
         <!-- Search -->
         <UInput
           v-model="searchQuery"
-          placeholder="Search records..."
+          :placeholder="t('records.filters.searchPlaceholder')"
           icon="i-lucide-search"
           @input="searchRecords"
           class="w-full"
@@ -26,7 +28,9 @@
           name="i-lucide-loader-2"
           class="w-6 h-6 animate-spin mx-auto mb-2"
         />
-        <p class="text-sm text-gray-500">Loading records...</p>
+        <p class="text-sm text-gray-500">
+          {{ t('records.linkedRecords.loading') }}
+        </p>
       </div>
 
       <!-- Empty State -->
@@ -35,7 +39,9 @@
           name="i-lucide-file-text"
           class="w-8 h-8 text-gray-400 mx-auto mb-2"
         />
-        <p class="text-sm text-gray-500">No records found</p>
+        <p class="text-sm text-gray-500">
+          {{ t('records.linkedRecords.noRecordsFound') }}
+        </p>
       </div>
 
       <!-- Record List -->
@@ -80,7 +86,11 @@
     >
       <div class="flex justify-between items-center">
         <span class="text-sm text-gray-500">
-          {{ selectedRecords.length }} selected
+          {{
+            (t as any)('common.selected', selectedRecords.length, {
+              count: selectedRecords.length,
+            })
+          }}
         </span>
         <div class="flex space-x-2">
           <UButton
@@ -89,7 +99,7 @@
             size="sm"
             @click="clearSelection"
           >
-            Clear
+            {{ t('common.clear') }}
           </UButton>
           <UButton
             color="primary"
@@ -97,7 +107,7 @@
             @click="confirmSelection"
             :disabled="selectedRecords.length === 0"
           >
-            Add Links
+            {{ t('common.link') }}
           </UButton>
         </div>
       </div>
@@ -128,6 +138,9 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+// Composables
+const { t } = useI18n();
 
 // Store
 const recordsStore = useRecordsStore();

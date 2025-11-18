@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const authStore = useAuthStore();
+const { t } = useI18n();
 const loading = ref(false);
 const error = ref('');
 
@@ -13,7 +14,7 @@ const handleLogout = async () => {
     // Redirect to login page after successful logout
     await navigateTo('/auth/login');
   } catch (err: any) {
-    error.value = err.message || 'Logout failed';
+    error.value = err.message || t('auth.logoutFailed');
   } finally {
     loading.value = false;
   }
@@ -36,7 +37,7 @@ onMounted(() => {
 <template>
   <UDashboardPanel>
     <template #header>
-      <UDashboardNavbar title="Logout" />
+      <UDashboardNavbar :title="t('auth.logout')" />
     </template>
 
     <template #body>
@@ -44,9 +45,11 @@ onMounted(() => {
         <UCard class="w-full max-w-md">
           <template #header>
             <div class="text-center">
-              <h2 class="text-2xl font-bold text-gray-900">Sign Out</h2>
+              <h2 class="text-2xl font-bold text-gray-900">
+                {{ t('auth.signOut') }}
+              </h2>
               <p class="mt-2 text-sm text-gray-600">
-                Are you sure you want to sign out of your CivicPress account?
+                {{ t('auth.signOutConfirmation') }}
               </p>
             </div>
           </template>
@@ -94,8 +97,8 @@ onMounted(() => {
             <UAlert
               color="primary"
               variant="soft"
-              title="You will be signed out"
-              description="After signing out, you'll need to sign in again to access your account."
+              :title="t('auth.youWillBeSignedOut')"
+              :description="t('auth.afterSigningOut')"
               icon="i-lucide-alert-triangle"
             />
           </div>
@@ -109,7 +112,7 @@ onMounted(() => {
                 :disabled="loading"
                 class="mr-2"
               >
-                Cancel
+                {{ t('common.cancel') }}
               </UButton>
               <UButton
                 color="primary"
@@ -118,7 +121,7 @@ onMounted(() => {
                 :disabled="loading"
                 class=""
               >
-                {{ loading ? 'Signing out...' : 'Sign Out' }}
+                {{ loading ? t('auth.signingOut') : t('auth.signOut') }}
               </UButton>
             </div>
           </template>

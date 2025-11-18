@@ -5,6 +5,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 // Composables
 const { $civicApi } = useNuxtApp();
 const authStore = useAuthStore();
+const { t } = useI18n();
 const ready = computed(() => authStore.isInitialized);
 
 // User roles composable
@@ -26,10 +27,10 @@ const fetchUsers = async () => {
     if (response.success) {
       users.value = response.data.users || [];
     } else {
-      error.value = response.error || 'Failed to fetch users';
+      error.value = response.error || t('settings.users.failedToFetchUsers');
     }
   } catch (err: any) {
-    error.value = err.message || 'Failed to fetch users';
+    error.value = err.message || t('settings.users.failedToFetchUsers');
     console.error('Error fetching users:', err);
   } finally {
     loading.value = false;
@@ -52,19 +53,19 @@ const navigateToUser = (user: User) => {
   navigateTo(`/settings/users/${user.username}`);
 };
 
-const breadcrumbItems = [
+const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Settings',
+    label: t('common.settings'),
     to: '/settings',
   },
   {
-    label: 'Users',
+    label: t('settings.users.title'),
   },
-];
+]);
 
 definePageMeta({
   middleware: ['require-users-manage'],
@@ -82,14 +83,18 @@ onMounted(() => {
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">Users</h1>
+          <h1 class="text-2xl font-semibold">
+            {{ t('settings.users.title') }}
+          </h1>
         </template>
-        <template #description> Manage system users and their roles </template>
+        <template #description>
+          {{ t('settings.users.manageSystemUsers') }}
+        </template>
         <template #right>
           <HeaderActions
             :actions="[
               {
-                label: 'Add User',
+                label: t('settings.users.addUser'),
                 icon: 'i-lucide-plus',
                 to: '/settings/users/new',
                 color: 'primary',
@@ -121,9 +126,9 @@ onMounted(() => {
       <!-- Users list wrapped inside a section card (like configuration page) -->
       <UCard v-else-if="users.length > 0" class="overflow-visible">
         <template #header>
-          <h3 class="text-lg font-semibold">Users</h3>
+          <h3 class="text-lg font-semibold">{{ t('settings.users.title') }}</h3>
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Manage system users and their roles
+            {{ t('settings.users.manageSystemUsers') }}
           </p>
         </template>
         <div class="grid gap-4">
@@ -156,7 +161,8 @@ onMounted(() => {
                         {{ getRoleDisplayName(user.role) }}
                       </UBadge>
                       <span class="text-xs text-gray-500">
-                        Created {{ formatDate(user.created_at || '') }}
+                        {{ t('settings.users.created') }}
+                        {{ formatDate(user.created_at || '') }}
                       </span>
                     </div>
                   </div>
@@ -167,7 +173,7 @@ onMounted(() => {
                     variant="outline"
                     size="sm"
                   >
-                    edit user
+                    {{ t('settings.users.editUser') }}
                   </UButton>
                 </div>
               </div>
@@ -183,10 +189,10 @@ onMounted(() => {
           class="w-16 h-16 text-gray-400 mx-auto mb-4"
         />
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          No users found
+          {{ t('settings.users.noUsersFound') }}
         </h3>
         <p class="text-gray-600 dark:text-gray-400 mb-6">
-          No users have been created yet.
+          {{ t('settings.users.noUsersCreatedYet') }}
         </p>
         <UButton
           v-if="canManageUsers"
@@ -194,7 +200,7 @@ onMounted(() => {
           icon="i-lucide-plus"
           color="primary"
         >
-          Add First User
+          {{ t('settings.users.addFirstUser') }}
         </UButton>
       </div>
 

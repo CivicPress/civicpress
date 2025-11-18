@@ -3,10 +3,11 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-        Linked Geography Files
+        {{ t('records.geography.title') }}
       </h3>
       <UBadge v-if="linkedFiles.length > 0" color="primary" variant="soft">
-        {{ linkedFiles.length }} file{{ linkedFiles.length !== 1 ? 's' : '' }}
+        {{ linkedFiles.length }}
+        {{ linkedFiles.length !== 1 ? t('records.files') : t('records.file') }}
       </UBadge>
     </div>
 
@@ -16,7 +17,9 @@
         name="i-lucide-loader-2"
         class="w-6 h-6 animate-spin text-gray-400"
       />
-      <span class="ml-3 text-gray-600">Loading geography files...</span>
+      <span class="ml-3 text-gray-600">{{
+        t('records.geography.loading')
+      }}</span>
     </div>
 
     <!-- Error State -->
@@ -125,10 +128,10 @@
     <div v-else class="text-center py-8">
       <UIcon name="i-lucide-map" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
       <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-        No geography files linked
+        {{ t('records.geography.noGeographyFilesLinked') }}
       </h4>
       <p class="text-gray-600 dark:text-gray-400 mb-4">
-        This record doesn't have any geography files linked to it yet.
+        {{ t('records.geography.noGeographyFilesLinkedDesc') }}
       </p>
       <UButton
         v-if="canEdit"
@@ -137,7 +140,7 @@
         @click="$emit('edit-links')"
       >
         <UIcon name="i-lucide-link" class="w-4 h-4" />
-        Link Geography Files
+        {{ t('records.geography.linkGeographyFiles') }}
       </UButton>
     </div>
   </div>
@@ -147,6 +150,9 @@
 import { ref, computed, onMounted } from 'vue';
 import type { GeographyFile } from '~/types/geography';
 import GeographyMap from './GeographyMap.vue';
+
+// Composables
+const { t } = useI18n();
 
 // Props
 interface Props {

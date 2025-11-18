@@ -3,6 +3,7 @@ import type { CivicRecord } from '~/stores/records';
 import RecordForm from '~/components/RecordForm.vue';
 import SystemFooter from '~/components/SystemFooter.vue';
 
+const { t } = useI18n();
 // Store
 const recordsStore = useRecordsStore();
 
@@ -28,8 +29,10 @@ const handleSubmit = async (recordData: any) => {
 
     if (response && response.success) {
       toast.add({
-        title: 'Record Created',
-        description: `Successfully created "${recordData.title}"`,
+        title: t('records.recordCreated'),
+        description: t('records.successfullyCreated', {
+          title: recordData.title,
+        }),
         color: 'primary',
       });
 
@@ -39,10 +42,10 @@ const handleSubmit = async (recordData: any) => {
       throw new Error('Failed to create record');
     }
   } catch (err: any) {
-    const errorMessage = err.message || 'Failed to create record';
+    const errorMessage = err.message || t('records.failedToCreateRecord');
     error.value = errorMessage;
     toast.add({
-      title: 'Error',
+      title: t('common.error'),
       description: errorMessage,
       color: 'error',
     });
@@ -63,19 +66,19 @@ const canCreateRecords = computed(() => {
   return userRole === 'admin' || userRole === 'clerk';
 });
 
-const breadcrumbItems = [
+const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Records',
+    label: t('records.allRecords'),
     to: '/records',
   },
   {
-    label: 'New Record',
+    label: t('records.newRecord'),
   },
-];
+]);
 </script>
 
 <template>
@@ -83,10 +86,12 @@ const breadcrumbItems = [
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">Create New Record</h1>
+          <h1 class="text-2xl font-semibold">
+            {{ t('records.createNewRecord') }}
+          </h1>
         </template>
         <template #description>
-          Create a new record with the required information
+          {{ t('records.createNewRecordDesc') }}
         </template>
       </UDashboardNavbar>
     </template>
@@ -100,8 +105,8 @@ const breadcrumbItems = [
           v-if="!canCreateRecords"
           color="error"
           variant="soft"
-          title="Access Denied"
-          description="You don't have permission to create records."
+          :title="t('records.accessDenied')"
+          :description="t('records.noPermissionToCreate')"
           icon="i-lucide-alert-circle"
         />
 
@@ -112,7 +117,7 @@ const breadcrumbItems = [
             <div class="space-y-4">
               <!-- Title -->
               <UFormField
-                label="Title"
+                :label="t('common.title')"
                 required
                 :error="
                   recordFormRef.hasSubmitted && recordFormRef.formErrors.title
@@ -122,7 +127,7 @@ const breadcrumbItems = [
               >
                 <UInput
                   v-model="recordFormRef.form.title"
-                  placeholder="Enter record title"
+                  :placeholder="t('records.enterTitle')"
                   :disabled="saving"
                   class="w-full"
                 />
@@ -131,7 +136,7 @@ const breadcrumbItems = [
               <!-- Type and Status -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <UFormField
-                  label="Type"
+                  :label="t('common.type')"
                   required
                   :error="
                     recordFormRef.hasSubmitted && recordFormRef.formErrors.type
@@ -142,14 +147,14 @@ const breadcrumbItems = [
                   <USelectMenu
                     v-model="recordFormRef.selectedRecordType"
                     :items="recordFormRef.recordTypeOptionsComputed"
-                    placeholder="Select record type"
+                    :placeholder="t('records.selectType')"
                     :disabled="saving"
                     class="w-full"
                   />
                 </UFormField>
 
                 <UFormField
-                  label="Status"
+                  :label="t('common.status')"
                   required
                   :error="
                     recordFormRef.hasSubmitted &&
@@ -161,7 +166,7 @@ const breadcrumbItems = [
                   <USelectMenu
                     v-model="recordFormRef.selectedRecordStatus"
                     :items="recordFormRef.recordStatusOptionsComputed"
-                    placeholder="Select status"
+                    :placeholder="t('records.selectStatus')"
                     :disabled="saving"
                     class="w-full"
                   />
@@ -170,7 +175,7 @@ const breadcrumbItems = [
 
               <!-- Description -->
               <UFormField
-                label="Description"
+                :label="t('common.description')"
                 :error="
                   recordFormRef.hasSubmitted &&
                   recordFormRef.formErrors.description
@@ -180,7 +185,7 @@ const breadcrumbItems = [
               >
                 <UTextarea
                   v-model="recordFormRef.form.description"
-                  placeholder="Enter record description (optional)"
+                  :placeholder="t('records.enterRecordDescription')"
                   :disabled="saving"
                   :rows="3"
                   class="w-full"
@@ -189,7 +194,7 @@ const breadcrumbItems = [
 
               <!-- Tags -->
               <UFormField
-                label="Tags"
+                :label="t('common.tags')"
                 :error="
                   recordFormRef.hasSubmitted && recordFormRef.formErrors.tags
                     ? recordFormRef.formErrors.tags
@@ -198,7 +203,7 @@ const breadcrumbItems = [
               >
                 <UInput
                   v-model="recordFormRef.newTag"
-                  placeholder="Add a tag and press Enter"
+                  :placeholder="t('records.addTagPlaceholder')"
                   :disabled="saving"
                   @keyup.enter="recordFormRef.handleTagEnter"
                   class="w-full"

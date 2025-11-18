@@ -3,18 +3,22 @@
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">Activity</h1>
+          <h1 class="text-2xl font-semibold">
+            {{ t('settings.activity.title') }}
+          </h1>
         </template>
-        <template #description> Recent system activity (admin only) </template>
+        <template #description>{{
+          t('settings.activity.description')
+        }}</template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
       <UBreadcrumb
         :items="[
-          { label: 'Home', to: '/' },
-          { label: 'Settings', to: '/settings' },
-          { label: 'Activity' },
+          { label: t('common.home'), to: '/' },
+          { label: t('settings.title'), to: '/settings' },
+          { label: t('settings.activity.title') },
         ]"
       />
 
@@ -22,9 +26,11 @@
         <template #header>
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="font-medium">Recent Entries</h3>
+              <h3 class="font-medium">
+                {{ t('settings.activity.recentEntries') }}
+              </h3>
               <p class="text-sm text-gray-600 dark:text-gray-400">
-                Latest {{ limit }} events
+                {{ t('settings.activity.latestEvents', { count: limit }) }}
               </p>
             </div>
             <div class="flex items-center gap-2">
@@ -40,12 +46,12 @@
               />
               <UInput
                 v-model="filters.actor"
-                placeholder="actor (username/id)"
+                :placeholder="t('settings.activity.actorPlaceholder')"
                 class="w-40"
               />
               <UInput
                 v-model="filters.action"
-                placeholder="action"
+                :placeholder="t('settings.activity.actionPlaceholder')"
                 class="w-40"
               />
               <UInput
@@ -55,9 +61,9 @@
                 max="500"
                 class="w-24"
               />
-              <UButton @click="load(0)" :loading="loading" variant="outline"
-                >Apply</UButton
-              >
+              <UButton @click="load(0)" :loading="loading" variant="outline">{{
+                t('common.apply')
+              }}</UButton>
             </div>
           </div>
         </template>
@@ -66,7 +72,7 @@
           v-if="loading"
           class="py-8 text-center text-sm text-gray-600 dark:text-gray-400"
         >
-          Loading…
+          {{ t('common.loading') }}
         </div>
         <div
           v-else-if="error"
@@ -78,12 +84,12 @@
           <table class="min-w-full text-sm">
             <thead class="text-left text-gray-600 dark:text-gray-400">
               <tr>
-                <th class="py-2 pr-4">Time</th>
-                <th class="py-2 pr-4">Actor</th>
-                <th class="py-2 pr-4">Action</th>
-                <th class="py-2 pr-4">Target</th>
-                <th class="py-2 pr-4">Outcome</th>
-                <th class="py-2 pr-4">Message</th>
+                <th class="py-2 pr-4">{{ t('settings.activity.time') }}</th>
+                <th class="py-2 pr-4">{{ t('settings.activity.actor') }}</th>
+                <th class="py-2 pr-4">{{ t('settings.activity.action') }}</th>
+                <th class="py-2 pr-4">{{ t('settings.activity.target') }}</th>
+                <th class="py-2 pr-4">{{ t('settings.activity.outcome') }}</th>
+                <th class="py-2 pr-4">{{ t('settings.activity.message') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -112,17 +118,21 @@
             </tbody>
           </table>
           <div class="flex items-center justify-between py-3">
-            <UButton :disabled="page <= 0" @click="prevPage" variant="ghost"
-              >Previous</UButton
-            >
-            <span class="text-xs text-gray-500"
-              >{{ pageStart + 1 }}-{{ pageEnd }} of {{ total }}</span
-            >
+            <UButton :disabled="page <= 0" @click="prevPage" variant="ghost">{{
+              t('common.previous')
+            }}</UButton>
+            <span class="text-xs text-gray-500">{{
+              t('settings.activity.paginationRange', {
+                start: pageStart + 1,
+                end: pageEnd,
+                total,
+              })
+            }}</span>
             <UButton
               :disabled="pageEnd >= total"
               @click="nextPage"
               variant="ghost"
-              >Next</UButton
+              >{{ t('common.next') }}</UButton
             >
           </div>
         </div>
@@ -136,6 +146,8 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+const { t } = useI18n();
+
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
@@ -154,19 +166,19 @@ const filters = reactive<{
   actor: string;
   action: string;
 }>({ source: null, outcome: null, actor: '', action: '' });
-const sourceOptions = ref([
-  { label: 'All sources', value: null },
-  { label: 'API', value: 'api' },
-  { label: 'CLI', value: 'cli' },
-  { label: 'UI', value: 'ui' },
-  { label: 'System', value: 'system' },
-  { label: 'Core', value: 'core' },
+const sourceOptions = computed(() => [
+  { label: t('settings.activity.allSources'), value: null },
+  { label: t('settings.activity.api'), value: 'api' },
+  { label: t('settings.activity.cli'), value: 'cli' },
+  { label: t('settings.activity.ui'), value: 'ui' },
+  { label: t('settings.activity.system'), value: 'system' },
+  { label: t('settings.activity.core'), value: 'core' },
 ]);
-const outcomeOptions = ref([
-  { label: 'All outcomes', value: null },
-  { label: 'Success', value: 'success' },
-  { label: 'Failure', value: 'failure' },
-  { label: 'Warning', value: 'warning' },
+const outcomeOptions = computed(() => [
+  { label: t('settings.activity.allOutcomes'), value: null },
+  { label: t('settings.activity.success'), value: 'success' },
+  { label: t('settings.activity.failure'), value: 'failure' },
+  { label: t('settings.activity.warning'), value: 'warning' },
 ]);
 
 const load = async (goTo?: number) => {
@@ -192,7 +204,7 @@ const load = async (goTo?: number) => {
       throw new Error('Unexpected response');
     }
   } catch (e: any) {
-    error.value = e.message || 'Failed to load activity log';
+    error.value = e.message || t('settings.activity.failedToLoad');
   } finally {
     loading.value = false;
   }
