@@ -207,40 +207,46 @@ watch(isAuthenticated, (newValue) => {
               class="w-full"
             />
           </form>
+        </div>
 
-          <!-- Quick access links -->
-          <div
-            v-if="!isAuthenticated"
-            class="max-w-xl mx-auto mt-6 flex flex-wrap justify-center gap-6 text-base"
-          >
-            <UButton
-              variant="link"
-              class="text-gray-700 dark:text-gray-300"
-              @click="navigateToRecords"
-            >
-              {{ t('home.browseRecords') }}
-            </UButton>
+        <!-- Quick Actions (logged-out) -->
+        <div v-if="!isAuthenticated" class="max-w-4xl mx-auto mt-6 pb-12">
+          <UCard class="" :ui="{ body: 'p-4 sm:p-6' }">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <!-- Browse Records -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateToRecords"
+              >
+                <UIcon
+                  name="i-lucide-folder-open"
+                  class="w-5 h-5 text-blue-600"
+                />
+                <span>{{ t('home.browseRecordsButton') }}</span>
+              </button>
 
-            <span class="text-gray-300 dark:text-gray-600">·</span>
+              <!-- Sign In -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateToLogin"
+              >
+                <UIcon name="i-lucide-log-in" class="w-5 h-5 text-blue-600" />
+                <span>{{ t('common.signIn') }}</span>
+              </button>
 
-            <UButton
-              variant="link"
-              class="text-gray-700 dark:text-gray-300"
-              @click="navigateToLogin"
-            >
-              {{ t('common.signIn') }}
-            </UButton>
-
-            <span class="text-gray-300 dark:text-gray-600">·</span>
-
-            <UButton
-              variant="link"
-              class="text-gray-700 dark:text-gray-300"
-              @click="scrollToAboutSection"
-            >
-              {{ t('home.aboutDemo') }}
-            </UButton>
-          </div>
+              <!-- About Demo -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="scrollToAboutSection"
+              >
+                <UIcon name="i-lucide-info" class="w-5 h-5 text-blue-600" />
+                <span>{{ t('home.aboutDemo') }}</span>
+              </button>
+            </div>
+          </UCard>
         </div>
 
         <!-- Quick Actions (logged-in only) -->
