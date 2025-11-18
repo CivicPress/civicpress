@@ -632,10 +632,22 @@ export function registerConfigCommands(cli: CAC) {
         }
 
         const initOne = async (t: string) => {
-          const state = (status as any)[t];
-          if (state === 'user') return { type: t, created: false };
-          await service.resetToDefaults(t);
-          return { type: t, created: true };
+          try {
+            const state = (status as any)[t];
+            if (state === 'user') return { type: t, created: false };
+            await service.resetToDefaults(t);
+            return { type: t, created: true };
+          } catch (innerError: any) {
+            // Wrap inner error with more context
+            const innerMsg =
+              innerError?.message ||
+              innerError?.toString() ||
+              String(innerError) ||
+              'Unknown inner error';
+            throw new Error(
+              `Failed to reset config ${t} to defaults: ${innerMsg}`
+            );
+          }
         };
 
         const types = options.all ? Object.keys(status) : type ? [type] : [];
@@ -659,11 +671,39 @@ export function registerConfigCommands(cli: CAC) {
           try {
             results.push(await initOne(t));
           } catch (initError: any) {
-            const initErrMsg =
-              initError?.message ||
-              initError?.toString() ||
-              String(initError) ||
-              'Unknown error';
+            // Enhanced error extraction to handle empty messages
+            let initErrMsg = 'Unknown error';
+            if (initError?.message && initError.message.trim()) {
+              initErrMsg = initError.message;
+            } else if (typeof initError === 'string' && initError.trim()) {
+              initErrMsg = initError;
+            } else if (
+              initError?.toString &&
+              initError.toString() !== '[object Object]' &&
+              initError.toString().trim()
+            ) {
+              initErrMsg = initError.toString();
+            } else if (initError?.stack) {
+              initErrMsg = initError.stack.split('\n')[0];
+            } else if (initError?.code) {
+              initErrMsg = `Error code: ${initError.code}`;
+            } else if (initError?.name) {
+              initErrMsg = `Error: ${initError.name}`;
+            } else {
+              // Last resort: try to stringify the entire error object
+              try {
+                const errorStr = JSON.stringify(
+                  initError,
+                  Object.getOwnPropertyNames(initError)
+                );
+                if (errorStr && errorStr !== '{}') {
+                  initErrMsg = `Error details: ${errorStr}`;
+                }
+              } catch {
+                // If stringification fails, use a generic message with the type
+                initErrMsg = `Error of type ${typeof initError} occurred`;
+              }
+            }
             throw new Error(
               `Failed to initialize configuration ${t}: ${initErrMsg}`
             );
@@ -743,7 +783,9 @@ export function registerConfigCommands(cli: CAC) {
           );
         } else {
           // Always output error message, even if logger might suppress it
+          // Use console.error directly to ensure it's always visible
           if (errorMessage && errorMessage.trim()) {
+            console.error('❌ Initialization failed:', errorMessage);
             logger.error('❌ Initialization failed:', errorMessage);
           } else {
             // Fallback: output directly to stderr if message is empty
@@ -759,6 +801,7 @@ export function registerConfigCommands(cli: CAC) {
             }
           }
           if (err?.stack && !json) {
+            console.error('Stack trace:', err.stack);
             logger.debug('Stack trace:', err.stack);
           }
         }
