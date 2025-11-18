@@ -699,19 +699,41 @@ export function registerConfigCommands(cli: CAC) {
         }
 
         // If still empty, try to get more context
-        if (errorMessage === 'Unknown error' || !errorMessage.trim()) {
-          // Try to extract from stack trace
-          if (err?.stack) {
-            const stackLines = err.stack.split('\n');
+        if (
+          errorMessage === 'Unknown error' ||
+          !errorMessage.trim() ||
+          errorMessage === 'Error'
+        ) {
+          // Build a descriptive error message from available properties
+          const parts: string[] = [];
+          if (err?.name) parts.push(`Error type: ${err.name}`);
+          if (err?.code) parts.push(`Code: ${err.code}`);
+          if (err?.path) parts.push(`Path: ${err.path}`);
+          if (err?.syscall) parts.push(`Syscall: ${err.syscall}`);
+          if (err?.errno) parts.push(`Errno: ${err.errno}`);
+
+          if (parts.length > 0) {
+            errorMessage = parts.join(', ');
+          } else if (err?.stack) {
+            // Use first non-empty line from stack
+            const stackLines = err.stack
+              .split('\n')
+              .filter((line: string) => line.trim());
             if (stackLines.length > 1) {
-              errorMessage =
-                stackLines[1].trim() ||
-                `Error occurred during initialization${err?.code ? ` (code: ${err.code})` : ''}`;
-            } else {
-              errorMessage = `Error occurred during initialization${err?.code ? ` (code: ${err.code})` : ''}`;
+              errorMessage = stackLines[1].trim();
+            } else if (stackLines.length > 0) {
+              errorMessage = stackLines[0].trim();
             }
-          } else {
-            errorMessage = `Error occurred during initialization${err?.code ? ` (code: ${err.code})` : ''}`;
+          }
+
+          // Final fallback
+          if (
+            !errorMessage ||
+            errorMessage === 'Unknown error' ||
+            errorMessage === 'Error'
+          ) {
+            errorMessage =
+              'Error occurred during initialization (no error details available)';
           }
         }
 
@@ -720,7 +742,22 @@ export function registerConfigCommands(cli: CAC) {
             JSON.stringify({ success: false, error: errorMessage }, null, 2)
           );
         } else {
-          logger.error('❌ Initialization failed:', errorMessage);
+          // Always output error message, even if logger might suppress it
+          if (errorMessage && errorMessage.trim()) {
+            logger.error('❌ Initialization failed:', errorMessage);
+          } else {
+            // Fallback: output directly to stderr if message is empty
+            console.error(
+              '❌ Initialization failed: Error occurred (no error message available)'
+            );
+            // Also log the raw error object for debugging
+            if (err) {
+              console.error(
+                'Raw error object:',
+                JSON.stringify(err, Object.getOwnPropertyNames(err), 2)
+              );
+            }
+          }
           if (err?.stack && !json) {
             logger.debug('Stack trace:', err.stack);
           }

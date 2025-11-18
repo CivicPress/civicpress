@@ -90,51 +90,62 @@ export function releasePort(port: number): void {
 
 /**
  * Extract JSON from CLI output that may contain mixed text and JSON.
- * Looks for the last JSON object in the output.
+ * Looks for the outermost JSON object that contains 'success' key (API response format).
+ * Falls back to the last JSON object if no 'success' key is found.
  */
 export function extractJSONFromOutput(output: string): any {
   const fullOutput = output.trim();
 
-  // Find the last '{' in the output (most likely the JSON response)
-  let lastBrace = -1;
-  for (let i = fullOutput.length - 1; i >= 0; i--) {
+  // Find all JSON objects in the output
+  const jsonObjects: Array<{
+    start: number;
+    end: number;
+    text: string;
+    parsed: any;
+  }> = [];
+
+  for (let i = 0; i < fullOutput.length; i++) {
     if (fullOutput[i] === '{') {
-      lastBrace = i;
-      break;
-    }
-  }
+      let braceDepth = 0;
+      let jsonEnd = -1;
 
-  if (lastBrace === -1) {
-    throw new Error('No JSON output found in CLI output');
-  }
+      for (let j = i; j < fullOutput.length; j++) {
+        if (fullOutput[j] === '{') braceDepth++;
+        if (fullOutput[j] === '}') {
+          braceDepth--;
+          if (braceDepth === 0) {
+            jsonEnd = j + 1;
+            break;
+          }
+        }
+      }
 
-  // Find the matching closing brace
-  let braceDepth = 0;
-  let jsonEnd = -1;
-
-  for (let i = lastBrace; i < fullOutput.length; i++) {
-    if (fullOutput[i] === '{') braceDepth++;
-    if (fullOutput[i] === '}') {
-      braceDepth--;
-      if (braceDepth === 0) {
-        jsonEnd = i + 1;
-        break;
+      if (jsonEnd > 0) {
+        const jsonText = fullOutput.substring(i, jsonEnd);
+        try {
+          const parsed = JSON.parse(jsonText);
+          jsonObjects.push({ start: i, end: jsonEnd, text: jsonText, parsed });
+        } catch {
+          // Invalid JSON, skip
+        }
       }
     }
   }
 
-  if (jsonEnd === -1) {
-    throw new Error('Incomplete JSON object in CLI output');
+  if (jsonObjects.length === 0) {
+    throw new Error('No JSON output found in CLI output');
   }
 
-  const jsonText = fullOutput.substring(lastBrace, jsonEnd);
-  try {
-    return JSON.parse(jsonText);
-  } catch (parseError: any) {
-    throw new Error(
-      `Failed to parse JSON from CLI output: ${parseError.message}`
-    );
+  // Prefer JSON objects that have a 'success' key (API response format)
+  const responseObject = jsonObjects.find(
+    (obj) => obj.parsed && 'success' in obj.parsed
+  );
+  if (responseObject) {
+    return responseObject.parsed;
   }
+
+  // Fall back to the last (most recent) JSON object
+  return jsonObjects[jsonObjects.length - 1].parsed;
 }
 
 let cliBuilt = false;

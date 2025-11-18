@@ -160,8 +160,12 @@ export class ConfigurationService {
         lineWidth: 0,
       });
       await writeFile(userPath, yamlContent, 'utf-8');
-    } catch (error) {
-      throw new Error(`Failed to save configuration ${configType}: ${error}`);
+    } catch (error: any) {
+      const errorMsg =
+        error?.message || error?.toString() || String(error) || 'Unknown error';
+      throw new Error(
+        `Failed to save configuration ${configType}: ${errorMsg}`
+      );
     }
   }
 
@@ -187,8 +191,25 @@ export class ConfigurationService {
       }
       await this.saveConfiguration(configType, defaultConfig);
     } catch (error: any) {
-      const errorMsg =
-        error?.message || error?.toString() || String(error) || 'Unknown error';
+      // Extract detailed error information
+      let errorMsg = 'Unknown error';
+      if (error?.message && error.message.trim()) {
+        errorMsg = error.message;
+      } else if (typeof error === 'string' && error.trim()) {
+        errorMsg = error;
+      } else if (
+        error?.toString &&
+        error.toString() !== '[object Object]' &&
+        error.toString().trim()
+      ) {
+        errorMsg = error.toString();
+      } else if (error?.stack) {
+        errorMsg = error.stack.split('\n')[0];
+      } else if (error?.code) {
+        errorMsg = `Error code: ${error.code}`;
+      } else if (error?.name) {
+        errorMsg = `Error: ${error.name}`;
+      }
       throw new Error(
         `Failed to reset configuration ${configType}: ${errorMsg}`
       );
