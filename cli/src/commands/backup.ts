@@ -113,6 +113,7 @@ async function handleCreate(
     ? false
     : options.includeGitBundle !== false;
 
+  const dbConfig = CentralConfigManager.getDatabaseConfig();
   const result = await BackupService.createBackup({
     dataDir,
     outputDir,
@@ -120,6 +121,7 @@ async function handleCreate(
     includeStorage,
     includeGitBundle,
     version: civicpressVersion,
+    databaseConfig: dbConfig,
     extraMetadata: {
       createdBy: 'civic-cli',
     },
@@ -151,12 +153,14 @@ async function handleRestore(
       ? false
       : options.includeStorage !== false;
 
+    const dbConfig = CentralConfigManager.getDatabaseConfig();
     const result = await BackupService.restoreBackup({
       backupDir,
       dataDir,
       systemDataDir,
       restoreStorage,
       overwrite: options.overwrite === true,
+      databaseConfig: dbConfig,
     });
 
     outputRestoreResult(result, options.json ?? globalJson, logger);
@@ -214,6 +218,8 @@ function outputCreateResult(
     metadata: result.metadataPath,
     gitBundle: result.gitBundlePath ?? null,
     storageIncluded: result.storageIncluded,
+    storageFilesExported: result.storageFilesExported,
+    storageConfigExported: result.storageConfigExported,
     archive: archivePath ?? null,
     warnings: result.warnings,
   };
@@ -227,6 +233,12 @@ function outputCreateResult(
   logger.info(`📂 Directory: ${result.backupDir}`);
   if (result.gitBundlePath) {
     logger.info(`🔐 Git bundle: ${result.gitBundlePath}`);
+  }
+  if (result.storageFilesExported) {
+    logger.info(`📋 Storage files table exported (storage-files.json)`);
+  }
+  if (result.storageConfigExported) {
+    logger.info(`⚙️  Storage configuration exported (storage-config.json)`);
   }
   if (archivePath) {
     logger.info(`🗜️  Archive: ${archivePath}`);

@@ -658,6 +658,45 @@ export class DatabaseService {
     );
   }
 
+  /**
+   * Upsert (insert or replace) a storage file record.
+   * Used during backup restore to handle existing records gracefully.
+   */
+  async upsertStorageFile(file: {
+    id: string;
+    original_name: string;
+    stored_filename: string;
+    folder: string;
+    relative_path: string;
+    provider_path: string;
+    size: number;
+    mime_type: string;
+    description?: string;
+    uploaded_by?: string;
+    created_at?: string;
+    updated_at?: string;
+  }): Promise<void> {
+    await this.adapter.execute(
+      `INSERT OR REPLACE INTO storage_files 
+       (id, original_name, stored_filename, folder, relative_path, provider_path, 
+        size, mime_type, description, uploaded_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))`,
+      [
+        file.id,
+        file.original_name,
+        file.stored_filename,
+        file.folder,
+        file.relative_path,
+        file.provider_path,
+        file.size,
+        file.mime_type,
+        file.description || null,
+        file.uploaded_by || null,
+        file.created_at || null,
+      ]
+    );
+  }
+
   async getStorageFileById(id: string): Promise<any | null> {
     const results = await this.adapter.query(
       'SELECT * FROM storage_files WHERE id = ?',
@@ -670,6 +709,12 @@ export class DatabaseService {
     return await this.adapter.query(
       'SELECT * FROM storage_files WHERE folder = ? ORDER BY created_at DESC',
       [folder]
+    );
+  }
+
+  async getAllStorageFiles(): Promise<any[]> {
+    return await this.adapter.query(
+      'SELECT * FROM storage_files ORDER BY created_at DESC'
     );
   }
 

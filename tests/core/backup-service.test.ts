@@ -3,7 +3,12 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { BackupService, type BackupCreateResult } from '@civicpress/core';
+import {
+  BackupService,
+  type BackupCreateResult,
+  DatabaseService,
+  DatabaseConfig,
+} from '@civicpress/core';
 
 async function pathExists(targetPath: string): Promise<boolean> {
   try {
@@ -26,8 +31,14 @@ describe('BackupService', () => {
   });
 
   it('creates a backup with data and local storage assets', async () => {
-    const { dataDir, systemDataDir, storageFilePaths, outputDir, recordPath } =
-      await createFixtureLayout(tempRoot);
+    const {
+      dataDir,
+      systemDataDir,
+      storageFilePaths,
+      outputDir,
+      recordPath,
+      dbConfig,
+    } = await createFixtureLayout(tempRoot);
 
     const result = await BackupService.createBackup({
       dataDir,
@@ -36,14 +47,21 @@ describe('BackupService', () => {
       includeStorage: true,
       includeGitBundle: false,
       version: 'test-version',
+      databaseConfig: dbConfig,
     });
 
     await assertBackup(result, storageFilePaths, recordPath);
   });
 
   it('restores a previously created backup', async () => {
-    const { dataDir, systemDataDir, storageFilePaths, outputDir, recordPath } =
-      await createFixtureLayout(tempRoot);
+    const {
+      dataDir,
+      systemDataDir,
+      storageFilePaths,
+      outputDir,
+      recordPath,
+      dbConfig,
+    } = await createFixtureLayout(tempRoot);
 
     const createResult = await BackupService.createBackup({
       dataDir,
@@ -51,10 +69,19 @@ describe('BackupService', () => {
       outputDir,
       includeStorage: true,
       includeGitBundle: false,
+      databaseConfig: dbConfig,
     });
 
     const restoreTarget = path.join(tempRoot, 'restore', 'data');
     const restoreSystem = path.join(tempRoot, 'restore', 'system-data');
+
+    // Create a new database config for restore (simulating different location)
+    const restoreDbConfig: DatabaseConfig = {
+      type: 'sqlite',
+      sqlite: {
+        file: path.join(restoreSystem, 'civic.db'),
+      },
+    };
 
     const restoreResult = await BackupService.restoreBackup({
       backupDir: createResult.backupDir,
@@ -62,6 +89,7 @@ describe('BackupService', () => {
       systemDataDir: restoreSystem,
       restoreStorage: true,
       overwrite: true,
+      databaseConfig: restoreDbConfig,
     });
 
     const restoredFile = path.join(restoreTarget, 'records', 'sample.md');
@@ -88,6 +116,252 @@ describe('BackupService', () => {
     expect(restoredContent).toContain('diagram.png');
 
     expect(restoreResult.metadata?.data.relativePath).toBe('data');
+  });
+
+  it('exports storage-files.json when database config is provided', async () => {
+    const { dataDir, systemDataDir, outputDir, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    // Create some storage file records in the database
+    const dbService = new DatabaseService(dbConfig);
+    await dbService.initialize();
+    await dbService.createStorageFile({
+      id: 'test-uuid-1',
+      original_name: 'test-file.txt',
+      stored_filename: 'test-file.test-uuid-1.txt',
+      folder: 'public',
+      relative_path: 'public/test-file.test-uuid-1.txt',
+      provider_path: path.join(
+        systemDataDir,
+        'storage',
+        'public',
+        'test-file.test-uuid-1.txt'
+      ),
+      size: 1024,
+      mime_type: 'text/plain',
+      description: 'Test file',
+      uploaded_by: 'admin',
+    });
+
+    // Verify the file was created
+    const allFiles = await dbService.getAllStorageFiles();
+    expect(allFiles.length).toBeGreaterThan(0);
+
+    await dbService.close(); // Close connection so backup can access it
+
+    // Verify database file exists
+    const dbPath = (dbConfig.sqlite as any).file;
+    expect(await pathExists(dbPath)).toBe(true);
+
+    const result = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      databaseConfig: dbConfig,
+    });
+
+    // Check warnings for any errors
+    if (result.warnings.length > 0) {
+      console.log('Backup warnings:', result.warnings);
+    }
+
+    expect(result.storageFilesExported).toBe(true);
+    const storageFilesPath = path.join(result.backupDir, 'storage-files.json');
+    expect(await pathExists(storageFilesPath)).toBe(true);
+
+    const storageFilesContent = JSON.parse(
+      await fs.readFile(storageFilesPath, 'utf8')
+    );
+
+    expect(storageFilesContent.schema.table).toBe('storage_files');
+    expect(storageFilesContent.schema.version).toBe('1.0.0');
+    expect(Array.isArray(storageFilesContent.data)).toBe(true);
+    expect(storageFilesContent.data.length).toBeGreaterThan(0);
+
+    const testFile = storageFilesContent.data.find(
+      (f: any) => f.id === 'test-uuid-1'
+    );
+    expect(testFile).toBeDefined();
+    expect(testFile.original_name).toBe('test-file.txt');
+    expect(testFile.folder).toBe('public');
+    expect(result.storageFilesExported).toBe(true);
+  });
+
+  it('exports storage-config.json with minimal configuration', async () => {
+    const { dataDir, systemDataDir, outputDir, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    // Verify storage config file exists before backup
+    const sourceStorageConfigPath = path.join(systemDataDir, 'storage.yml');
+    expect(await pathExists(sourceStorageConfigPath)).toBe(true);
+
+    const result = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      databaseConfig: dbConfig,
+    });
+
+    // Check if storage config was exported
+    expect(result.storageConfigExported).toBe(true);
+
+    const storageConfigPath = path.join(
+      result.backupDir,
+      'storage-config.json'
+    );
+    expect(await pathExists(storageConfigPath)).toBe(true);
+
+    const storageConfigContent = JSON.parse(
+      await fs.readFile(storageConfigPath, 'utf8')
+    );
+
+    expect(storageConfigContent.schema.version).toBe('1.0.0');
+    expect(storageConfigContent.folders).toBeDefined();
+    expect(storageConfigContent.folders.public).toBeDefined();
+    expect(storageConfigContent.folders.public.path).toBe('public');
+    expect(storageConfigContent.folders.public.access).toBeDefined();
+    // Should not contain credentials
+    expect(storageConfigContent.providers).toBeUndefined();
+  });
+
+  it('restores storage files from JSON and updates provider_path', async () => {
+    const { dataDir, systemDataDir, outputDir, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    // Create storage file records
+    const dbService = new DatabaseService(dbConfig);
+    await dbService.initialize();
+    await dbService.createStorageFile({
+      id: 'restore-test-uuid',
+      original_name: 'restore-test.txt',
+      stored_filename: 'restore-test.restore-test-uuid.txt',
+      folder: 'public',
+      relative_path: 'public/restore-test.restore-test-uuid.txt',
+      provider_path: path.join(
+        systemDataDir,
+        'storage',
+        'public',
+        'restore-test.restore-test-uuid.txt'
+      ),
+      size: 2048,
+      mime_type: 'text/plain',
+      description: 'File to restore',
+    });
+    await dbService.close(); // Close connection so backup can access it
+
+    const createResult = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      databaseConfig: dbConfig,
+    });
+
+    const restoreTarget = path.join(tempRoot, 'restore', 'data');
+    const restoreSystem = path.join(tempRoot, 'restore', 'system-data');
+
+    // Create storage config for restore location
+    await fs.mkdir(restoreSystem, { recursive: true });
+    const restoreStorageConfig = `
+providers:
+  local:
+    type: local
+    path: storage
+active_provider: local
+folders:
+  public:
+    path: public
+`;
+    await fs.writeFile(
+      path.join(restoreSystem, 'storage.yml'),
+      restoreStorageConfig.trimStart(),
+      'utf8'
+    );
+
+    const restoreDbConfig: DatabaseConfig = {
+      type: 'sqlite',
+      sqlite: {
+        file: path.join(restoreSystem, 'civic.db'),
+      },
+    };
+
+    const restoreResult = await BackupService.restoreBackup({
+      backupDir: createResult.backupDir,
+      dataDir: restoreTarget,
+      systemDataDir: restoreSystem,
+      restoreStorage: true,
+      overwrite: true,
+      databaseConfig: restoreDbConfig,
+    });
+
+    // Verify storage file was restored to database
+    const restoreDbService = new DatabaseService(restoreDbConfig);
+    await restoreDbService.initialize();
+    const restoredFile =
+      await restoreDbService.getStorageFileById('restore-test-uuid');
+
+    expect(restoredFile).toBeDefined();
+    expect(restoredFile.original_name).toBe('restore-test.txt');
+    expect(restoredFile.folder).toBe('public');
+    // Provider path should be updated to new location
+    expect(restoredFile.provider_path).toContain(restoreSystem);
+    expect(restoredFile.provider_path).toContain('storage/public');
+  });
+
+  it('handles duplicate storage files gracefully during restore', async () => {
+    const { dataDir, systemDataDir, outputDir, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    // Create initial backup
+    const createResult = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      databaseConfig: dbConfig,
+    });
+
+    const restoreSystem = path.join(tempRoot, 'restore', 'system-data');
+    await fs.mkdir(restoreSystem, { recursive: true });
+
+    const restoreDbConfig: DatabaseConfig = {
+      type: 'sqlite',
+      sqlite: {
+        file: path.join(restoreSystem, 'civic.db'),
+      },
+    };
+
+    // Restore once
+    await BackupService.restoreBackup({
+      backupDir: createResult.backupDir,
+      dataDir: path.join(tempRoot, 'restore', 'data'),
+      systemDataDir: restoreSystem,
+      restoreStorage: true,
+      overwrite: true,
+      databaseConfig: restoreDbConfig,
+    });
+
+    // Restore again (should handle duplicates with upsert)
+    const restoreResult2 = await BackupService.restoreBackup({
+      backupDir: createResult.backupDir,
+      dataDir: path.join(tempRoot, 'restore', 'data'),
+      systemDataDir: restoreSystem,
+      restoreStorage: true,
+      overwrite: true,
+      databaseConfig: restoreDbConfig,
+    });
+
+    // Should not have errors about duplicates
+    const duplicateErrors = restoreResult2.warnings.filter((w) =>
+      w.includes('UNIQUE constraint')
+    );
+    expect(duplicateErrors.length).toBe(0);
   });
 });
 
@@ -129,6 +403,9 @@ active_provider: local
 folders:
   public:
     path: public
+    access: public
+    allowed_types: ['txt', 'png']
+    max_size: '10MB'
     backup_included: true
 `;
   await fs.mkdir(systemDataDir, { recursive: true });
@@ -138,6 +415,14 @@ folders:
     'utf8'
   );
 
+  // Create database config for tests
+  const dbConfig: DatabaseConfig = {
+    type: 'sqlite',
+    sqlite: {
+      file: path.join(systemDataDir, 'civic.db'),
+    },
+  };
+
   const outputDir = path.join(tempRoot, 'exports', 'backups');
 
   return {
@@ -146,6 +431,7 @@ folders:
     storageFilePaths: [storageFilePath, imageFilePath],
     outputDir,
     recordPath,
+    dbConfig,
   };
 }
 
@@ -163,6 +449,14 @@ async function assertBackup(
 
   expect(metadata.data.relativePath).toBe('data');
   expect(metadata.storage?.included).toBe(true);
+
+  // Check if storage files and config were exported (if database was available)
+  if (result.storageFilesExported) {
+    expect(metadata.storage?.filesExported).toBe(true);
+  }
+  if (result.storageConfigExported) {
+    expect(metadata.storage?.configExported).toBe(true);
+  }
 
   const backedUpDataFile = path.join(
     result.backupDir,

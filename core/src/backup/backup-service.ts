@@ -4,12 +4,19 @@ import { promisify } from 'util';
 import { execFile } from 'child_process';
 import yaml from 'yaml';
 import { Logger } from '../utils/logger.js';
+import { DatabaseService } from '../database/database-service.js';
+import { DatabaseConfig } from '../database/database-adapter.js';
 
 const execFileAsync = promisify(execFile);
 
 interface StorageFolderConfig {
   path: string;
+  access?: string;
+  allowed_types?: string[];
+  max_size?: string;
+  description?: string;
   backup_included?: boolean;
+  [key: string]: any; // Allow additional properties
 }
 
 interface StorageProviderConfig {
@@ -18,6 +25,10 @@ interface StorageProviderConfig {
 }
 
 interface StorageConfig {
+  backend?: {
+    type: string;
+    path?: string;
+  };
   active_provider?: string;
   providers?: Record<string, StorageProviderConfig>;
   folders?: Record<string, StorageFolderConfig>;
@@ -42,6 +53,8 @@ export interface BackupMetadata {
     provider?: string;
     relativePath?: string;
     source?: string;
+    filesExported?: boolean;
+    configExported?: boolean;
   };
   options?: {
     includeStorage: boolean;
@@ -62,6 +75,7 @@ export interface BackupCreateOptions {
   extraMetadata?: Record<string, unknown>;
   timestamp?: string;
   logger?: Logger;
+  databaseConfig?: DatabaseConfig;
 }
 
 export interface BackupCreateResult {
@@ -70,6 +84,8 @@ export interface BackupCreateResult {
   timestamp: string;
   gitBundlePath?: string;
   storageIncluded: boolean;
+  storageFilesExported: boolean;
+  storageConfigExported: boolean;
   warnings: string[];
 }
 
@@ -80,6 +96,7 @@ export interface BackupRestoreOptions {
   restoreStorage?: boolean;
   overwrite?: boolean;
   logger?: Logger;
+  databaseConfig?: DatabaseConfig;
 }
 
 export interface BackupRestoreResult {
@@ -196,15 +213,28 @@ export class BackupService {
     }
 
     let storageIncluded = false;
-    let storageInfo: BackupMetadata['storage'] | undefined;
+    let storageFilesExported = false;
+    let storageConfigExported = false;
+    let storageInfo: BackupMetadata['storage'] = {
+      included: false,
+    };
 
     if (includeStorage) {
       try {
         const storageConfig = await loadStorageConfig(systemDataDir);
 
         if (storageConfig) {
+          // Handle both legacy (backend) and new (providers) config structures
           const activeProvider = storageConfig.active_provider ?? 'local';
-          const provider = storageConfig.providers?.[activeProvider];
+          let provider = storageConfig.providers?.[activeProvider];
+
+          // Fallback to legacy backend structure if providers not found
+          if (!provider && storageConfig.backend) {
+            provider = {
+              type: storageConfig.backend.type,
+              path: storageConfig.backend.path,
+            };
+          }
 
           if (provider?.type === 'local') {
             const providerPath = path.resolve(
@@ -237,6 +267,57 @@ export class BackupService {
               provider: provider?.type,
             };
           }
+
+          // Export minimal storage configuration (folder structure only, no credentials)
+          try {
+            const minimalConfig = {
+              schema: {
+                version: '1.0.0',
+                exported_at: new Date().toISOString(),
+                description:
+                  'Minimal storage configuration (folder structure only, no credentials)',
+              },
+              folders: storageConfig.folders
+                ? Object.fromEntries(
+                    Object.entries(storageConfig.folders).map(
+                      ([name, folder]) => [
+                        name,
+                        {
+                          path: folder.path,
+                          access: folder.access || undefined,
+                          allowed_types: folder.allowed_types || undefined,
+                          max_size: folder.max_size || undefined,
+                          description: folder.description || undefined,
+                          backup_included: folder.backup_included || undefined,
+                        },
+                      ]
+                    )
+                  )
+                : {},
+              active_provider: activeProvider,
+              provider_type: provider?.type,
+            };
+
+            const storageConfigPath = path.join(
+              backupDir,
+              'storage-config.json'
+            );
+            await fs.writeFile(
+              storageConfigPath,
+              JSON.stringify(minimalConfig, null, 2),
+              'utf8'
+            );
+            storageConfigExported = true;
+            storageInfo = {
+              ...storageInfo,
+              configExported: true,
+            };
+          } catch (error) {
+            const message = `Failed to export storage configuration: ${
+              error instanceof Error ? error.message : String(error)
+            }`;
+            warnings.push(message);
+          }
         }
       } catch (error) {
         const message = `Failed to include storage assets: ${
@@ -246,6 +327,57 @@ export class BackupService {
         storageInfo = {
           included: false,
         };
+      }
+    }
+
+    // Export storage_files table to JSON (if database config is provided)
+    if (options.databaseConfig) {
+      try {
+        const dbService = new DatabaseService(options.databaseConfig, logger);
+        await dbService.initialize();
+        const storageFiles = await dbService.getAllStorageFiles();
+
+        const storageFilesExport = {
+          schema: {
+            version: '1.0.0',
+            table: 'storage_files',
+            exported_at: new Date().toISOString(),
+            civicpress_version: options.version,
+            description:
+              'UUID-based file tracking data for restoring file relationships',
+          },
+          data: storageFiles.map((file) => ({
+            id: file.id,
+            original_name: file.original_name,
+            stored_filename: file.stored_filename,
+            folder: file.folder,
+            relative_path: file.relative_path,
+            provider_path: file.provider_path,
+            size: file.size,
+            mime_type: file.mime_type,
+            description: file.description || null,
+            uploaded_by: file.uploaded_by || null,
+            created_at: file.created_at,
+            updated_at: file.updated_at,
+          })),
+        };
+
+        const storageFilesPath = path.join(backupDir, 'storage-files.json');
+        await fs.writeFile(
+          storageFilesPath,
+          JSON.stringify(storageFilesExport, null, 2),
+          'utf8'
+        );
+        storageFilesExported = true;
+        storageInfo = {
+          ...(storageInfo || { included: false }),
+          filesExported: true,
+        };
+      } catch (error) {
+        const message = `Failed to export storage files table: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        warnings.push(message);
       }
     }
 
@@ -286,6 +418,8 @@ export class BackupService {
       timestamp,
       gitBundlePath,
       storageIncluded,
+      storageFilesExported,
+      storageConfigExported,
       warnings,
     };
   }
@@ -365,6 +499,104 @@ export class BackupService {
           error instanceof Error ? error.message : String(error)
         }`;
         warnings.push(message);
+      }
+    }
+
+    // Restore storage_files table from JSON (if database config is provided)
+    if (options.databaseConfig) {
+      const storageFilesPath = path.join(backupDir, 'storage-files.json');
+      if (await pathExists(storageFilesPath)) {
+        try {
+          const storageFilesContent = await fs.readFile(
+            storageFilesPath,
+            'utf8'
+          );
+          const storageFilesExport = JSON.parse(storageFilesContent) as {
+            schema: { version: string; table: string; exported_at: string };
+            data: Array<{
+              id: string;
+              original_name: string;
+              stored_filename: string;
+              folder: string;
+              relative_path: string;
+              provider_path: string;
+              size: number;
+              mime_type: string;
+              description: string | null;
+              uploaded_by: string | null;
+              created_at: string;
+              updated_at: string;
+            }>;
+          };
+
+          const dbService = new DatabaseService(options.databaseConfig, logger);
+          await dbService.initialize();
+
+          // Load storage config to determine correct provider path
+          const storageConfig = await loadStorageConfig(systemDataDir);
+          const activeProvider = storageConfig?.active_provider ?? 'local';
+          const provider = storageConfig?.providers?.[activeProvider];
+          const isLocalProvider = provider?.type === 'local';
+          const newStorageBasePath = isLocalProvider
+            ? path.resolve(systemDataDir, provider?.path ?? 'storage')
+            : null;
+
+          let restoredCount = 0;
+          let skippedCount = 0;
+
+          // Import each storage file record
+          for (const file of storageFilesExport.data) {
+            try {
+              // Update provider_path if restoring to a different location
+              let providerPath = file.provider_path;
+              if (isLocalProvider && newStorageBasePath) {
+                // Extract the relative path from the old provider_path
+                // The old path might be absolute or relative to old system-data
+                // We'll reconstruct it based on the folder and stored_filename
+                const folderPath = path.join(newStorageBasePath, file.folder);
+                providerPath = path.join(folderPath, file.stored_filename);
+              }
+
+              await dbService.upsertStorageFile({
+                id: file.id,
+                original_name: file.original_name,
+                stored_filename: file.stored_filename,
+                folder: file.folder,
+                relative_path: file.relative_path,
+                provider_path: providerPath,
+                size: file.size,
+                mime_type: file.mime_type,
+                description: file.description || undefined,
+                uploaded_by: file.uploaded_by || undefined,
+                created_at: file.created_at,
+                updated_at: file.updated_at,
+              });
+              restoredCount++;
+            } catch (error) {
+              skippedCount++;
+              warnings.push(
+                `Failed to restore storage file ${file.id}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              );
+            }
+          }
+
+          logger.info(
+            `Restored ${restoredCount} storage file records${
+              skippedCount > 0 ? ` (${skippedCount} skipped)` : ''
+            }`
+          );
+        } catch (error) {
+          const message = `Failed to restore storage files table: ${
+            error instanceof Error ? error.message : String(error)
+          }`;
+          warnings.push(message);
+        }
+      } else {
+        warnings.push(
+          'storage-files.json not found in backup. File UUID relationships may not be restored.'
+        );
       }
     }
 
