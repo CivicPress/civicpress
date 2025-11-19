@@ -153,9 +153,8 @@ export class GeographyParser {
 
     // Generate YAML frontmatter
     const yamlContent = stringify(frontmatter, {
-      lineWidth: 0,
       aliasDuplicateObjects: false,
-      sortKeys: false,
+      lineWidth: 0,
     });
 
     // Determine code block language based on type
