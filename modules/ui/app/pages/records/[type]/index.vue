@@ -2,6 +2,7 @@
 import { useDebounceFn } from '@vueuse/core';
 import SystemFooter from '~/components/SystemFooter.vue';
 
+const { t } = useI18n();
 const recordsStore = useRecordsStore();
 
 // Route and router for URL state management
@@ -167,11 +168,11 @@ onMounted(async () => {
 
 const breadcrumbItems = computed(() => [
   {
-    label: 'Home',
+    label: t('common.home'),
     to: '/',
   },
   {
-    label: 'Records',
+    label: t('records.allRecords'),
     to: '/records',
   },
   {
