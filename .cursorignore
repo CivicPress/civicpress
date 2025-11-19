@@ -1,34 +1,67 @@
-# Ignore nested Git repositories
-data/
-
-# Ignore build artifacts and dependencies
-node_modules/
-.pnpm-store/
+# ─────────────────────────────────────────────
+# Core build artefacts (Nuxt, Vite, Nest, etc.)
+# ─────────────────────────────────────────────
+.nuxt/
+.output/
 dist/
 build/
+.temp/
+.tmp/
 .cache/
+.vite/
 
-# Ignore OS and IDE files
+# ─────────────────────────────────────────────
+# Dependencies (workspace + local)
+# ─────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+**/node_modules/
+**/.pnpm-store/
+
+# ─────────────────────────────────────────────
+# Test artefacts & coverage
+# ─────────────────────────────────────────────
+.nyc_output/
+coverage/
+**/coverage/
+tests/.cache/
+tests/.vitest/
+**/.vitest/
+
+# ─────────────────────────────────────────────
+# Monorepo modules: ignore built files & cache
+# ─────────────────────────────────────────────
+modules/**/dist/
+modules/**/.nuxt/
+modules/**/.output/
+modules/**/.cache/
+modules/**/.vite/
+modules/**/build/
+
+# ─────────────────────────────────────────────
+# Ignore heavy or unneeded AI context
+# (we keep tests readable separately if needed)
+# ─────────────────────────────────────────────
+tests/
+!tests/**/*.ts
+!tests/**/*.js
+!tests/**/*.json
+
+# ─────────────────────────────────────────────
+# Environment, OS, editor files
+# ─────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-
-# Ignore logs and temporary files
 *.log
 *.tmp
 *.bak
+*.lock
 
-# Ignore environment files
-.env
-.env.local
-.env.*.local
-
-# Ignore test coverage
-.nyc_output/
-coverage/
-
-# Ignore CivicPress operational data
+# ─────────────────────────────────────────────
+# CivicPress-specific runtime state (do not index)
+# ─────────────────────────────────────────────
 .civic/state/
 .civic/hooks.log.jsonl
-.civic/backup/ 
+.civic/backup/
