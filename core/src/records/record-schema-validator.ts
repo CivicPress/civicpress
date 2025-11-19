@@ -1,0 +1,351 @@
+/**
+ * Record Schema Validator - JSON Schema Validation for Records
+ *
+ * This module validates record frontmatter against JSON Schema using ajv.
+ * It provides:
+ * - Fast, declarative validation
+ * - Clear error messages with field paths
+ * - Integration with RecordSchemaBuilder for dynamic schemas
+ * - Support for type-specific and module-specific validation
+ *
+ * @module records/record-schema-validator
+ */
+
+import AjvModule from 'ajv';
+import addFormatsModule from 'ajv-formats';
+import { RecordSchemaBuilder } from './record-schema-builder.js';
+import { Logger } from '../utils/logger.js';
+import { ValidationError, ValidationResult } from './record-validator.js';
+
+// Handle default export for ajv
+const Ajv = (AjvModule as any).default || AjvModule;
+const addFormats = (addFormatsModule as any).default || addFormatsModule;
+
+const logger = new Logger();
+
+/**
+ * RecordSchemaValidator - Validates frontmatter against JSON Schema
+ */
+export class RecordSchemaValidator {
+  private static ajvInstance: any = null;
+
+  /**
+   * Get or create the Ajv instance (singleton)
+   * Note: In test environments, we create a new instance to avoid schema ID collisions
+   */
+  private static getAjv(): any {
+    // In test environments, always create a new instance to avoid schema ID collisions
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+      const ajv = new Ajv({
+        allErrors: true,
+        strict: false,
+        validateFormats: true,
+        verbose: true,
+      });
+      addFormats(ajv);
+      return ajv;
+    }
+
+    // In production, use singleton
+    if (!this.ajvInstance) {
+      this.ajvInstance = new Ajv({
+        allErrors: true, // Collect all errors, not just the first
+        strict: false, // Allow additional properties (we validate what we care about)
+        validateFormats: true, // Validate format strings (date-time, email, etc.)
+        verbose: true, // Include schema path in errors
+      });
+
+      // Add format validators (date-time, email, uri, etc.)
+      addFormats(this.ajvInstance);
+    }
+
+    return this.ajvInstance;
+  }
+
+  /**
+   * Validate frontmatter data against JSON Schema
+   *
+   * @param frontmatter - The frontmatter object to validate (parsed YAML)
+   * @param recordType - Optional record type for type-specific validation
+   * @param options - Validation options
+   * @returns ValidationResult with errors, warnings, and info messages
+   */
+  static validate(
+    frontmatter: any,
+    recordType?: string,
+    options: {
+      includeModuleExtensions?: boolean;
+      includeTypeExtensions?: boolean;
+      strict?: boolean;
+    } = {}
+  ): ValidationResult {
+    const result: ValidationResult = {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      info: [],
+    };
+
+    try {
+      // Build the schema for this record type
+      const schema = RecordSchemaBuilder.buildSchema(
+        recordType || frontmatter?.type,
+        {
+          includeModuleExtensions: options.includeModuleExtensions ?? true,
+          includeTypeExtensions: options.includeTypeExtensions ?? true,
+        }
+      );
+
+      // Remove $id to avoid schema collision errors (AJV caches schemas by $id)
+      // We create a deep copy to avoid mutating the cached schema
+      const schemaForValidation = JSON.parse(JSON.stringify(schema));
+      this.removeSchemaIds(schemaForValidation);
+
+      // Get Ajv instance - create new instance in test/CLI environments to avoid schema ID collisions
+      const ajv = this.getAjv();
+
+      // Try to compile schema - if it fails due to ID collision, create a fresh AJV instance
+      let validate;
+      try {
+        validate = ajv.compile(schemaForValidation);
+      } catch (compileError: any) {
+        if (
+          compileError.message?.includes('already exists') ||
+          compileError.message?.includes('key or id')
+        ) {
+          // Schema ID collision - create a fresh AJV instance and try again
+          this.ajvInstance = null;
+          const freshAjv = this.getAjv();
+          validate = freshAjv.compile(schemaForValidation);
+        } else {
+          throw compileError;
+        }
+      }
+
+      // Validate the frontmatter
+      const isValid = validate(frontmatter);
+
+      if (!isValid && validate.errors) {
+        result.isValid = false;
+
+        // Convert Ajv errors to ValidationError format
+        for (const ajvError of validate.errors) {
+          const error: ValidationError = {
+            severity: 'error',
+            code: ajvError.keyword || 'SCHEMA_VALIDATION_ERROR',
+            message: this.formatErrorMessage(ajvError),
+            field: ajvError.instancePath || ajvError.schemaPath || 'unknown',
+            suggestion: this.getSuggestion(ajvError),
+          };
+
+          result.errors.push(error);
+        }
+      } else {
+        result.isValid = true;
+      }
+
+      // Additional business rule validations (if needed)
+      if (result.isValid) {
+        const businessRuleResult = this.validateBusinessRules(
+          frontmatter,
+          recordType
+        );
+        result.errors.push(...businessRuleResult.errors);
+        result.warnings.push(...businessRuleResult.warnings);
+        result.info.push(...businessRuleResult.info);
+        result.isValid = result.errors.length === 0;
+      }
+    } catch (error) {
+      logger.error('Schema validation failed', error);
+      result.isValid = false;
+      result.errors.push({
+        severity: 'error',
+        code: 'SCHEMA_VALIDATION_EXCEPTION',
+        message: `Schema validation exception: ${error instanceof Error ? error.message : String(error)}`,
+        field: 'schema',
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Format Ajv error message for better readability
+   */
+  private static formatErrorMessage(ajvError: any): string {
+    const field = ajvError.instancePath?.replace(/^\//, '') || 'root';
+    const keyword = ajvError.keyword;
+
+    switch (keyword) {
+      case 'required':
+        return `Missing required field: ${ajvError.params.missingProperty}`;
+
+      case 'type':
+        return `Field "${field}" must be of type ${ajvError.params.type}, got ${typeof ajvError.data}`;
+
+      case 'enum':
+        return `Field "${field}" must be one of: ${ajvError.params.allowedValues.join(', ')}`;
+
+      case 'format':
+        return `Field "${field}" must be a valid ${ajvError.params.format}`;
+
+      case 'pattern':
+        return `Field "${field}" does not match required pattern: ${ajvError.params.pattern}`;
+
+      case 'minLength':
+        return `Field "${field}" must be at least ${ajvError.params.limit} characters`;
+
+      case 'maxLength':
+        return `Field "${field}" must be at most ${ajvError.params.limit} characters`;
+
+      case 'minimum':
+        return `Field "${field}" must be at least ${ajvError.params.limit}`;
+
+      case 'maximum':
+        return `Field "${field}" must be at most ${ajvError.params.limit}`;
+
+      default:
+        return ajvError.message || `Validation failed for field "${field}"`;
+    }
+  }
+
+  /**
+   * Get a helpful suggestion based on the error
+   */
+  private static getSuggestion(ajvError: any): string | undefined {
+    const keyword = ajvError.keyword;
+    const field = ajvError.instancePath?.replace(/^\//, '') || '';
+
+    switch (keyword) {
+      case 'required':
+        return `Add the "${ajvError.params.missingProperty}" field to the frontmatter`;
+
+      case 'type':
+        if (ajvError.params.type === 'string') {
+          return `Ensure "${field}" is a string value (use quotes in YAML if needed)`;
+        }
+        return `Ensure "${field}" is of type ${ajvError.params.type}`;
+
+      case 'format':
+        if (ajvError.params.format === 'date-time') {
+          return `Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ (e.g., "2025-01-15T10:30:00Z")`;
+        }
+        if (ajvError.params.format === 'email') {
+          return `Use a valid email format: user@example.com`;
+        }
+        return `Use a valid ${ajvError.params.format} format`;
+
+      case 'enum':
+        return `Choose one of the allowed values: ${ajvError.params.allowedValues.join(', ')}`;
+
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Validate additional business rules that aren't captured in JSON Schema
+   * (e.g., cross-field validation, custom logic)
+   */
+  private static validateBusinessRules(
+    frontmatter: any,
+    recordType?: string
+  ): ValidationResult {
+    const result: ValidationResult = {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      info: [],
+    };
+
+    // Example: Validate that if authors array exists, it should have at least one entry
+    if (frontmatter.authors && Array.isArray(frontmatter.authors)) {
+      if (frontmatter.authors.length === 0) {
+        result.warnings.push({
+          severity: 'warning',
+          code: 'EMPTY_AUTHORS_ARRAY',
+          message:
+            'Authors array is empty. Consider removing it or adding author information.',
+          field: 'authors',
+        });
+      }
+    }
+
+    // Example: Validate that created <= updated
+    if (frontmatter.created && frontmatter.updated) {
+      const created = new Date(frontmatter.created);
+      const updated = new Date(frontmatter.updated);
+
+      if (created > updated) {
+        result.warnings.push({
+          severity: 'warning',
+          code: 'INVALID_TIMESTAMP_ORDER',
+          message:
+            'Created timestamp is after updated timestamp. This may indicate a data entry error.',
+          field: 'created',
+        });
+      }
+    }
+
+    // Add more business rules as needed
+
+    return result;
+  }
+
+  /**
+   * Recursively remove $id from schema and all nested schemas
+   * This prevents schema ID collision errors when the same schema is compiled multiple times
+   */
+  private static removeSchemaIds(schema: any): void {
+    if (!schema || typeof schema !== 'object') {
+      return;
+    }
+
+    // Remove $id from current schema
+    if (schema.$id) {
+      delete schema.$id;
+    }
+
+    // Recursively process nested schemas
+    if (schema.allOf) {
+      schema.allOf.forEach((subSchema: any) => this.removeSchemaIds(subSchema));
+    }
+    if (schema.anyOf) {
+      schema.anyOf.forEach((subSchema: any) => this.removeSchemaIds(subSchema));
+    }
+    if (schema.oneOf) {
+      schema.oneOf.forEach((subSchema: any) => this.removeSchemaIds(subSchema));
+    }
+    if (schema.if) {
+      this.removeSchemaIds(schema.if);
+    }
+    if (schema.then) {
+      this.removeSchemaIds(schema.then);
+    }
+    if (schema.else) {
+      this.removeSchemaIds(schema.else);
+    }
+    if (schema.items) {
+      this.removeSchemaIds(schema.items);
+    }
+    if (schema.properties) {
+      Object.values(schema.properties).forEach((prop: any) =>
+        this.removeSchemaIds(prop)
+      );
+    }
+    if (
+      schema.additionalProperties &&
+      typeof schema.additionalProperties === 'object'
+    ) {
+      this.removeSchemaIds(schema.additionalProperties);
+    }
+  }
+
+  /**
+   * Clear the Ajv instance (useful for testing)
+   */
+  static clearCache(): void {
+    this.ajvInstance = null;
+    RecordSchemaBuilder.clearCache();
+  }
+}

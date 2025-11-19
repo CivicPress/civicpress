@@ -1,54 +1,144 @@
+# User Roles and Permissions Configuration
+# This file defines user roles, their permissions, and status transitions
+
+_metadata:
+  name: 'User Roles & Permissions'
+  description: 'Define user roles, permissions, and status transitions'
+  version: '1.0.0'
+  editable: true
+
+# User Roles Definition
 roles:
   admin:
-    name: 'Administrator'
-    description: 'Full system access'
+    name:
+      value: 'Administrator'
+      type: 'string'
+      description: 'Role display name'
+      required: true
+    description:
+      value: 'Full system access'
+      type: 'string'
+      description: 'Role description'
+      required: true
     permissions:
-      - '*'
-      - 'records:import'
-      - 'records:export'
-      - 'templates:view'
-      - 'templates:manage'
-      - 'hooks:view'
-      - 'hooks:manage'
-      - 'workflows:manage'
+      value:
+        - '*'
+        - 'records:import'
+        - 'records:export'
+        - 'templates:view'
+        - 'templates:manage'
+        - 'hooks:view'
+        - 'hooks:manage'
+        - 'workflows:manage'
+        - 'storage:upload'
+        - 'storage:download'
+        - 'storage:delete'
+        - 'storage:manage'
+        - 'storage:admin'
+      type: 'array'
+      description: 'List of permissions granted to this role'
+      required: true
     status_transitions:
-      - 'draft'
-      - 'review'
-      - 'approved'
-      - 'rejected'
-      - 'archived'
+      value:
+        - 'draft'
+        - 'review'
+        - 'approved'
+        - 'rejected'
+        - 'archived'
+      type: 'array'
+      description: 'Record statuses this role can transition to'
+      required: true
 
   clerk:
-    name: 'Clerk'
-    description: 'Can create and edit records, manage users'
+    name:
+      value: 'Clerk'
+      type: 'string'
+      description: 'Role display name'
+      required: true
+    description:
+      value: 'Can create and edit records, manage users'
+      type: 'string'
+      description: 'Role description'
+      required: true
     permissions:
-      - 'records:create'
-      - 'records:edit'
-      - 'records:view'
-      - 'records:list'
-      - 'users:view'
-      - 'users:edit'
-      - 'users:create'
-      - 'users:delete'
-      - 'templates:view'
+      value:
+        - 'records:create'
+        - 'records:edit'
+        - 'records:view'
+        - 'records:list'
+        - 'users:view'
+        - 'users:edit'
+        - 'users:create'
+        - 'users:delete'
+        - 'templates:view'
+        - 'storage:upload'
+        - 'storage:download'
+      type: 'array'
+      description: 'List of permissions granted to this role'
+      required: true
     status_transitions:
-      - 'draft'
-      - 'review'
+      value:
+        - 'draft'
+        - 'review'
+      type: 'array'
+      description: 'Record statuses this role can transition to'
+      required: true
 
   public:
-    name: 'Public'
-    description: 'Read-only access'
+    name:
+      value: 'Public'
+      type: 'string'
+      description: 'Role display name'
+      required: true
+    description:
+      value: 'Read-only access'
+      type: 'string'
+      description: 'Role description'
+      required: true
     permissions:
-      - 'records:view'
-      - 'records:list'
-    status_transitions: []
+      value:
+        - 'records:view'
+        - 'records:list'
+        - 'storage:download'
+      type: 'array'
+      description: 'List of permissions granted to this role'
+      required: true
+    status_transitions:
+      value: []
+      type: 'array'
+      description: 'Record statuses this role can transition to'
+      required: true
 
+# Role Hierarchy (who can manage whom)
 role_hierarchy:
   admin:
-    - clerk
-    - public
+    value:
+      - 'clerk'
+      - 'public'
+    type: 'array'
+    description: 'Roles that admin can manage'
+    required: true
   clerk:
-    - public
-  public: []
+    value:
+      - 'public'
+    type: 'array'
+    description: 'Roles that clerk can manage'
+    required: true
+  public:
+    value: []
+    type: 'array'
+    description: 'Roles that public users can manage'
+    required: true
 
-default_role: 'public'
+# Default role for new users
+default_role:
+  value: 'public'
+  type: 'array'
+  options:
+    [
+      { value: 'admin', label: 'Administrator' },
+      { value: 'clerk', label: 'Clerk' },
+      { value: 'public', label: 'Public' },
+    ]
+  description: 'Default role assigned to new users'
+  required: true

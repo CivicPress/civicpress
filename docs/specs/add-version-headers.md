@@ -10,7 +10,7 @@ deprecated: false sunset_date: null additions:
 - validation standards compatibility: min_civicpress: 1.0.0 max_civicpress:
   'null' dependencies:
   - 'spec-versioning.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -89,7 +89,7 @@ compatibility:
   dependencies:
   - 'dependency.md: >=1.0.0'
 authors:
-- Sophie Germain <sophie@civic-press.org>
+- Sophie Germain <sophie@civicpress.io>
 reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie

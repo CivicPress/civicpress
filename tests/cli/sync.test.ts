@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 import yaml from 'js-yaml';
+import { RecordParser, RecordData } from '@civicpress/core';
+import { ensureCliBuilt } from '../fixtures/test-setup';
 
 describe('CLI Sync Commands', () => {
   let testDir: string;
@@ -17,11 +19,13 @@ describe('CLI Sync Commands', () => {
     // Store original working directory
     originalCwd = process.cwd();
 
+    // Ensure CLI build is available
+    ensureCliBuilt();
+
     // Change to test directory
     process.chdir(testDir);
 
     // Initialize CivicPress in test directory
-    execSync('cd cli && pnpm run build', { cwd: resolve(originalCwd) });
     execSync(
       `node ${resolve(originalCwd, 'cli/dist/index.js')} init --silent --config ${resolve(originalCwd, 'tests/fixtures/test-init-config.yml')}`,
       {
@@ -35,72 +39,94 @@ describe('CLI Sync Commands', () => {
     const recordsDir = join(testDir, 'data', 'records');
     mkdirSync(recordsDir, { recursive: true });
 
-    const sampleRecords = [
+    const sampleRecords: Array<{ file: string; record: RecordData }> = [
       {
         file: 'bylaw-noise-restrictions.md',
-        content: `---
-title: 'Noise Restrictions'
-type: bylaw
-status: adopted
-module: legal-register
-tags: ['noise', 'nighttime', 'curfew']
-authors:
-  - name: 'Ada Lovelace'
-    role: 'clerk'
-created: '2025-06-12'
-updated: '2025-07-01'
-slug: 'noise-restrictions'
----
-
-# Noise Restrictions
-
-This bylaw establishes noise restrictions.`,
+        record: {
+          id: 'record-1718208000000',
+          title: 'Noise Restrictions',
+          type: 'bylaw',
+          status: 'approved',
+          content:
+            '# Noise Restrictions\n\nThis bylaw establishes noise restrictions.',
+          author: 'alovelace',
+          authors: [
+            {
+              name: 'Ada Lovelace',
+              username: 'alovelace',
+              role: 'clerk',
+            },
+          ],
+          created_at: '2025-06-12T10:00:00Z',
+          updated_at: '2025-07-01T14:30:00Z',
+          metadata: {
+            tags: ['noise', 'nighttime', 'curfew'],
+            module: 'legal-register',
+            slug: 'noise-restrictions',
+            version: '1.0.0',
+          },
+        },
       },
       {
         file: 'policy-data-privacy.md',
-        content: `---
-title: 'Data Privacy Policy'
-type: policy
-status: draft
-module: legal-register
-tags: ['privacy', 'data', 'technology']
-authors:
-  - name: 'Irène Joliot-Curie'
-    role: 'council'
-created: '2025-07-15'
-updated: '2025-07-15'
-slug: 'data-privacy-policy'
----
-
-# Data Privacy Policy
-
-This policy establishes data privacy guidelines.`,
+        record: {
+          id: 'record-1721059200000',
+          title: 'Data Privacy Policy',
+          type: 'policy',
+          status: 'draft',
+          content:
+            '# Data Privacy Policy\n\nThis policy establishes data privacy guidelines.',
+          author: 'ijoliotcurie',
+          authors: [
+            {
+              name: 'Irène Joliot-Curie',
+              username: 'ijoliotcurie',
+              role: 'council',
+            },
+          ],
+          created_at: '2025-07-15T10:00:00Z',
+          updated_at: '2025-07-15T10:00:00Z',
+          metadata: {
+            tags: ['privacy', 'data', 'technology'],
+            module: 'legal-register',
+            slug: 'data-privacy-policy',
+            version: '1.0.0',
+          },
+        },
       },
       {
         file: 'resolution-budget-2025.md',
-        content: `---
-title: 'Budget Resolution 2025'
-type: resolution
-status: proposed
-module: legal-register
-tags: ['budget', 'finance', '2025']
-authors:
-  - name: 'Luc Lapointe'
-    role: 'mayor'
-created: '2025-07-20'
-updated: '2025-07-20'
-slug: 'budget-resolution-2025'
----
-
-# Budget Resolution 2025
-
-This resolution approves the 2025 budget.`,
+        record: {
+          id: 'record-1721491200000',
+          title: 'Budget Resolution 2025',
+          type: 'resolution',
+          status: 'pending_review',
+          content:
+            '# Budget Resolution 2025\n\nThis resolution approves the 2025 budget.',
+          author: 'llapointe',
+          authors: [
+            {
+              name: 'Luc Lapointe',
+              username: 'llapointe',
+              role: 'mayor',
+            },
+          ],
+          created_at: '2025-07-20T10:00:00Z',
+          updated_at: '2025-07-20T10:00:00Z',
+          metadata: {
+            tags: ['budget', 'finance', '2025'],
+            module: 'legal-register',
+            slug: 'budget-resolution-2025',
+            version: '1.0.0',
+          },
+        },
       },
     ];
 
     // Write sample records
-    for (const record of sampleRecords) {
-      writeFileSync(join(recordsDir, record.file), record.content);
+    for (const { file, record } of sampleRecords) {
+      const markdown = RecordParser.serializeToMarkdown(record);
+      writeFileSync(join(recordsDir, file), markdown);
     }
   });
 
@@ -140,7 +166,7 @@ This resolution approves the 2025 budget.`,
 
     it('should generate index with filters', () => {
       const result = execSync(
-        `node ${resolve(originalCwd, 'cli/dist/index.js')} index --type bylaw --status adopted`,
+        `node ${resolve(originalCwd, 'cli/dist/index.js')} index --type bylaw --status approved`,
         { cwd: testDir, encoding: 'utf8' }
       );
 
@@ -156,7 +182,7 @@ This resolution approves the 2025 budget.`,
       ) as any;
       expect(indexContent.entries).toHaveLength(1);
       expect(indexContent.entries[0].type).toBe('bylaw');
-      expect(indexContent.entries[0].status).toBe('adopted');
+      expect(indexContent.entries[0].status).toBe('approved');
     });
 
     it('should support --json output', () => {

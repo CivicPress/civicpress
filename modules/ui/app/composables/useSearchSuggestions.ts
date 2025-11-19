@@ -21,7 +21,7 @@ export const useSearchSuggestions = () => {
     error.value = null;
 
     try {
-      const response = (await $civicApi('/api/search/suggestions', {
+      const response = (await $civicApi('/api/v1/search/suggestions', {
         method: 'GET',
         params: {
           q: query.trim(),
@@ -49,7 +49,6 @@ export const useSearchSuggestions = () => {
 
   // Clear suggestions only when query is actually empty
   const clearSuggestions = () => {
-    console.log('🗑️ Clearing suggestions');
     suggestions.value = [];
     error.value = null;
     currentQuery.value = '';

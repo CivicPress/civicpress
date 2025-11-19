@@ -1,17 +1,37 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1729008000000"
 title: 'Property Tax Increase Ordinance'
 type: ordinance
-status: adopted
-module: legal-register
-tags: ['tax', 'finance', 'property', 'revenue']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "janderson"
 authors:
   - name: 'Mayor James Anderson'
+    username: 'janderson'
     role: 'mayor'
   - name: 'Council Member David Wilson'
+    username: 'dwilson'
     role: 'council'
-created: '2024-10-15'
-updated: '2024-11-20'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-10-15T09:00:00Z"
+updated: "2024-11-20T16:00:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['tax', 'finance', 'property', 'revenue']
+module: legal-register
 slug: 'tax-increase-ordinance'
+version: "1.0.0"
 ---
 
 # Property Tax Increase Ordinance

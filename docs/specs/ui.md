@@ -11,7 +11,7 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
   min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'auth.md: >=1.0.0'
   - 'permissions.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -240,7 +240,7 @@ The CivicPress UI is divided into **two layers**:
 
 ## 🧱 Frameworks
 
-- **Nuxt 3** (recommended): handles SSR, SSG, file-based routing
+- **Nuxt 4** (recommended): handles SSR, SSG, file-based routing
 - **Tailwind CSS**: styling baseline
 - **Headless UI (Vue)**: component logic (dialogs, tabs, etc.)
 - Optional: TinaCMS or Decap for file-based visual editing

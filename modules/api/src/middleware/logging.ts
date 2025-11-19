@@ -129,3 +129,20 @@ export function requestContextMiddleware(
 
   next();
 }
+
+// Database context middleware - to be used with CivicPress instance
+export function createDatabaseContextMiddleware(
+  civicPress: any,
+  dataDir?: string
+) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    // Add database service to request context for storage operations
+    (req as any).context = {
+      databaseService: civicPress?.getDatabaseService?.(),
+      civicPress,
+      dataDir, // Include dataDir in context for storage operations
+    };
+
+    next();
+  };
+}

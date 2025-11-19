@@ -66,14 +66,8 @@ graph TD
 ### API Development
 
 ```bash
-# Start API with file watching (recommended)
-pnpm run dev:api:watch
-
-# Start API without watch
+# Start API (watch mode by default)
 pnpm run dev:api
-
-# Start both API and UI with API watching
-pnpm run dev:all:watch
 ```
 
 ### UI Development
@@ -86,12 +80,15 @@ pnpm run dev:ui
 ### Combined Development
 
 ```bash
-# Start both API and UI (no watch)
-pnpm run dev:all
+# Start both API and UI in watch mode (recommended)
+pnpm run dev
 
-# Start all services in parallel
+# All services in parallel
 pnpm run dev:parallel
 ```
+
+**Note**: Both `pnpm run dev` and `pnpm run dev:api` run in watch mode by
+default, automatically restarting when files change.
 
 ---
 

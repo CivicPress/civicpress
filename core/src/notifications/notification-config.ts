@@ -140,7 +140,7 @@ export class NotificationConfig {
       }
 
       // Save config
-      const configYaml = yaml.dump(this.config);
+      const configYaml = yaml.dump(this.config, { noRefs: true, lineWidth: 0 });
       fs.writeFileSync(this.configPath, configYaml, 'utf8');
     } catch (error) {
       throw new Error(`Failed to save notification config: ${error}`);

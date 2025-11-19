@@ -1,7 +1,14 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
-import { Logger } from '@civicpress/core';
+import {
+  Logger,
+  RecordValidator,
+  RecordSchemaValidator,
+  findRecordFileSync,
+  parseRecordRelativePath,
+  listRecordFilesSync,
+} from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -11,6 +18,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import matter from 'gray-matter';
 
 type Severity = 'error' | 'warning' | 'info';
 function isSeverity(val: any): val is Severity {
@@ -293,43 +301,62 @@ async function validateSingleRecord(
   recordId: string,
   type?: string
 ): Promise<any> {
-  const recordsDir = path.join(dataDir, 'records');
   const issues: any[] = [];
-  let recordPath: string | null = null;
   let recordContent: string | null = null;
 
-  // Find the record file
-  if (type) {
-    const typeDir = path.join(recordsDir, type);
-    if (fs.existsSync(typeDir)) {
-      const filePath = path.join(typeDir, `${recordId}.md`);
-      if (fs.existsSync(filePath)) {
-        recordPath = filePath;
-      }
-    }
-  } else {
-    // Search all record types
-    const recordTypes = fs
-      .readdirSync(recordsDir, { withFileTypes: true })
-      .filter((dirent) => dirent.isDirectory())
-      .map((dirent) => dirent.name);
+  const normalizedInput = recordId.replace(/\.md$/, '');
+  let recordRelativePath: string | null = null;
 
-    for (const recordType of recordTypes) {
-      const typeDir = path.join(recordsDir, recordType);
-      const filePath = path.join(typeDir, `${recordId}.md`);
-      if (fs.existsSync(filePath)) {
-        recordPath = filePath;
-        break;
-      }
+  if (recordId.includes('/')) {
+    const candidate = recordId.endsWith('.md') ? recordId : `${recordId}.md`;
+    const relativeCandidate = candidate.startsWith('records/')
+      ? candidate
+      : `records/${candidate}`.replace(/\\/g, '/');
+    const fullCandidateSegments = relativeCandidate
+      .replace(/^records\//, '')
+      .split('/');
+    const fullCandidate = path.join(
+      dataDir,
+      'records',
+      ...fullCandidateSegments
+    );
+    if (fs.existsSync(fullCandidate)) {
+      recordRelativePath = relativeCandidate;
     }
   }
 
-  if (!recordPath) {
+  if (!recordRelativePath) {
+    const id = normalizedInput.split('/').pop() ?? normalizedInput;
+    recordRelativePath = findRecordFileSync(dataDir, id, {
+      type,
+    });
+  }
+
+  if (!recordRelativePath) {
+    const availableRecords = listRecordFilesSync(dataDir).reduce(
+      (acc, relPath) => {
+        const parsed = parseRecordRelativePath(relPath);
+        if (!parsed.type) {
+          return acc;
+        }
+        if (!acc[parsed.type]) {
+          acc[parsed.type] = [];
+        }
+        const name = parsed.year ? `${parsed.year}/${parsed.id}` : parsed.id;
+        acc[parsed.type].push(name);
+        return acc;
+      },
+      {} as Record<string, string[]>
+    );
+
     issues.push({
       severity: 'error' as Severity,
       code: 'RECORD_NOT_FOUND',
       message: `Record '${recordId}' not found`,
       field: 'recordId',
+      metadata: {
+        availableRecords,
+      },
     });
     return {
       recordId,
@@ -339,8 +366,27 @@ async function validateSingleRecord(
     };
   }
 
+  const normalizedPath = recordRelativePath.replace(/^records\//, '');
+  const fullPathSegments = normalizedPath.split('/');
+  const fullPath = path.join(dataDir, 'records', ...fullPathSegments);
+
   try {
-    recordContent = fs.readFileSync(recordPath, 'utf-8');
+    if (!fs.existsSync(fullPath)) {
+      issues.push({
+        severity: 'error' as Severity,
+        code: 'RECORD_NOT_FOUND',
+        message: `Record '${recordId}' not found`,
+        field: 'recordId',
+      });
+      return {
+        recordId,
+        isValid: false,
+        issues,
+        content: null,
+      };
+    }
+
+    recordContent = fs.readFileSync(fullPath, 'utf-8');
   } catch (error) {
     issues.push({
       severity: 'error' as Severity,
@@ -357,7 +403,10 @@ async function validateSingleRecord(
   }
 
   // Validate record structure
-  const validationResult = await validateRecordContent(recordContent, recordId);
+  const validationResult = await validateRecordContent(
+    recordContent,
+    normalizedPath
+  );
   issues.push(...validationResult.issues);
 
   return {
@@ -370,110 +419,66 @@ async function validateSingleRecord(
 }
 
 // Helper function to validate record content
+// Uses schema validation first, then RecordValidator for comprehensive validation
 async function validateRecordContent(
   content: string,
-  _recordId: string
+  recordId: string
 ): Promise<any> {
-  const issues: any[] = [];
-  const metadata: any = {};
-
   try {
-    // Check for required frontmatter
-    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
-    if (!frontmatterMatch) {
-      issues.push({
-        severity: 'error' as Severity,
-        code: 'MISSING_FRONTMATTER',
-        message: 'Record must have YAML frontmatter',
-        field: 'frontmatter',
-      });
-      return { issues, metadata };
-    }
+    // Extract frontmatter for schema validation
+    const { data: frontmatter } = matter(content);
+    const recordType = frontmatter?.type;
 
-    const frontmatter = frontmatterMatch[1];
+    // STEP 1: Schema validation (fail fast)
+    const schemaValidation = RecordSchemaValidator.validate(
+      frontmatter,
+      recordType,
+      {
+        includeModuleExtensions: true,
+        includeTypeExtensions: true,
+        strict: false,
+      }
+    );
 
+    // STEP 2: Use RecordValidator for comprehensive validation (includes schema + business rules)
+    const validationResult = RecordValidator.validateMarkdown(
+      content,
+      recordId,
+      {
+        strict: false,
+        checkFormat: true,
+        checkContent: true,
+      }
+    );
+
+    // Combine schema and business rule validation results
+    // Schema errors are already included in RecordValidator results, but we track them separately for clarity
+    const issues: any[] = [
+      ...validationResult.errors,
+      ...validationResult.warnings,
+      ...validationResult.info,
+    ];
+
+    // Extract metadata from parsed record (if parsing succeeded)
+    const metadata: any = {
+      schemaValid: schemaValidation.isValid,
+      schemaErrors: schemaValidation.errors.length,
+      schemaWarnings: schemaValidation.warnings.length,
+    };
     try {
-      const parsed = yaml.load(frontmatter) as any;
-
-      // Validate required fields
-      if (!parsed.title) {
-        issues.push({
-          severity: 'error' as Severity,
-          code: 'MISSING_TITLE',
-          message: 'Record must have a title',
-          field: 'title',
-        });
-      }
-
-      if (!parsed.type) {
-        issues.push({
-          severity: 'error' as Severity,
-          code: 'MISSING_TYPE',
-          message: 'Record must have a type',
-          field: 'type',
-        });
-      }
-
-      if (!parsed.status) {
-        issues.push({
-          severity: 'warning' as Severity,
-          code: 'MISSING_STATUS',
-          message: 'Record should have a status',
-          field: 'status',
-        });
-      }
-
-      // Validate status values
-      if (
-        parsed.status &&
-        ![
-          'draft',
-          'proposed',
-          'reviewed',
-          'approved',
-          'active',
-          'archived',
-        ].includes(parsed.status)
-      ) {
-        issues.push({
-          severity: 'warning' as Severity,
-          code: 'INVALID_STATUS',
-          message: `Status '${parsed.status}' is not a standard status`,
-          field: 'status',
-        });
-      }
-
-      // Validate type values
-      if (
-        parsed.type &&
-        !['bylaw', 'policy', 'resolution', 'proposition', 'ordinance'].includes(
-          parsed.type
-        )
-      ) {
-        issues.push({
-          severity: 'warning' as Severity,
-          code: 'INVALID_TYPE',
-          message: `Type '${parsed.type}' is not a standard type`,
-          field: 'type',
-        });
-      }
-
-      metadata.title = parsed.title;
-      metadata.type = parsed.type;
-      metadata.status = parsed.status;
-      metadata.author = parsed.author;
-      metadata.created = parsed.created;
-      metadata.updated = parsed.updated;
-    } catch (yamlError) {
-      issues.push({
-        severity: 'error' as Severity,
-        code: 'INVALID_YAML',
-        message: `Invalid YAML frontmatter: ${(yamlError as Error).message}`,
-        field: 'frontmatter',
-      });
+      const { RecordParser } = await import('@civicpress/core');
+      const record = RecordParser.parseFromMarkdown(content, recordId);
+      metadata.title = record.title;
+      metadata.type = record.type;
+      metadata.status = record.status;
+      metadata.author = record.author;
+      metadata.created = record.created_at;
+      metadata.updated = record.updated_at;
+    } catch {
+      // Metadata extraction failed, will be empty
     }
 
-    // Check content length
+    // Additional content checks (preserve existing behavior)
     const contentWithoutFrontmatter = content.replace(
       /^---\s*\n[\s\S]*?\n---\s*\n/,
       ''
@@ -487,7 +492,6 @@ async function validateRecordContent(
       });
     }
 
-    // Check for common issues
     if (content.includes('TODO') || content.includes('FIXME')) {
       issues.push({
         severity: 'info' as Severity,
@@ -505,16 +509,26 @@ async function validateRecordContent(
         field: 'content',
       });
     }
-  } catch (error) {
-    issues.push({
-      severity: 'error' as Severity,
-      code: 'VALIDATION_ERROR',
-      message: `Validation error: ${(error as Error).message}`,
-      field: 'general',
-    });
-  }
 
-  return { issues, metadata };
+    return {
+      issues,
+      metadata,
+      isValid: validationResult.isValid,
+    };
+  } catch (error) {
+    return {
+      issues: [
+        {
+          severity: 'error' as Severity,
+          code: 'VALIDATION_ERROR',
+          message: `Validation error: ${(error as Error).message}`,
+          field: 'general',
+        },
+      ],
+      metadata: {},
+      isValid: false,
+    };
+  }
 }
 
 // Helper function to validate multiple records

@@ -4,6 +4,9 @@ A comprehensive civic technology platform for managing and publishing civic
 records with Git-based version control, role-based access control, and a modern
 API.
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 🌟 Platform Vision
 
 CivicPress is designed as a **complete civic technology platform** that brings
@@ -37,9 +40,17 @@ provides:
 
 - **Markdown Schema**: YAML+Markdown with validation
 - **Lifecycle Management**: Draft → Proposed → Approved → Archived flow
+- **Status Transition Controls**: Web UI for managing record status changes with
+  workflow validation
 - **Bulk Operations**: Efficient bulk record operations
 - **Search & Discovery**: Advanced indexing and search
 - **Validation System**: Comprehensive record validation and integrity
+- **Geography Data Management**: Complete spatial document management system
+  - Centralized geography file management with public access
+  - Text box input for GeoJSON/KML with live map preview
+  - Interactive maps with Leaflet integration
+  - Geography file linking to civic records
+  - Comprehensive validation and standardized structure
 
 ### 🚀 Advanced Features (Planned)
 
@@ -51,104 +62,124 @@ provides:
 - **Advanced Security**: Cryptographic signatures and verification
 - **Multi-tenant Support**: Support for multiple municipalities
 
+### ✅ Workflow Features (Implemented)
+
+- **Status Transition Controls**: Web UI for managing record status changes
+- **Role-Based Permissions**: Granular control over who can change record status
+- **Workflow Validation**: Automatic enforcement of status transition rules
+- **Smart Error Handling**: Helpful error messages with typo suggestions
+- **Audit Trail**: Complete logging of all status changes with user attribution
+
 ## Quick Start
 
-### Installation
+### Developer Bootstrap
+
+Get up and running quickly with these commands:
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/CivicPress/civicpress.git
 cd civicpress
 
-# Install dependencies
+# 2. Install dependencies
 pnpm install
 
-# Build the project
+# 3. Build the project (required before using CLI)
 pnpm run build
+
+# 4. Make CLI executable (fixes permission issues)
+chmod +x cli/dist/index.js
+
+# 5. Initialize a new CivicPress instance
+./cli/dist/index.js init
+
+# Or initialize with demo data (Richmond or Springfield)
+./cli/dist/index.js init --yes --demo-data richmond-quebec
+# or
+./cli/dist/index.js init --yes --demo-data springfield-usa
+```
+
+**Note**: The `chmod +x` step is required on Unix-like systems (macOS, Linux) to
+make the CLI executable. Without it, you'll get a "permission denied" error.
+
+### Initialize a New CivicPress Instance
+
+```bash
+# Interactive setup (will prompt for configuration)
+./cli/dist/index.js init
+
+# Non-interactive with demo data
+./cli/dist/index.js init --yes --demo-data richmond-quebec
+./cli/dist/index.js init --yes --demo-data springfield-usa
+
+# With configuration file
+./cli/dist/index.js init --config config.yml
 ```
 
 **Note**: Most operations require authentication. CivicPress supports both
 GitHub OAuth and simulated authentication for development. See
 [Authentication Guide](docs/auth-system.md) for setup instructions.
 
-### Initialize a New CivicPress Instance
-
-```bash
-# Initialize with interactive setup
-civic init
-
-# Or initialize with demo data
-civic init --demo-data "Springfield"
-
-# Or initialize with configuration file
-civic init --config config.yml
-```
-
-### Development
+### Development Commands
 
 CivicPress provides multiple development commands for different workflows:
 
 ```bash
-# API development with file watching (recommended)
-pnpm run dev:api:watch
+# Start both API and UI in watch mode (recommended)
+pnpm run dev
+
+# API development (watch mode by default)
+pnpm run dev:api
 
 # UI development
 pnpm run dev:ui
-
-# Combined API + UI development
-pnpm run dev:all:watch
 
 # All services in parallel
 pnpm run dev:parallel
 ```
 
-### Authentication
+**Note**: Both `pnpm run dev` and `pnpm run dev:api` run in watch mode by
+default, automatically restarting when files change.
+
+### CLI Authentication
 
 CivicPress supports multiple authentication methods:
 
 ```bash
 # Simulated authentication (development)
-civic auth:simulated --username admin --role admin
+./cli/dist/index.js auth:simulated --username admin --role admin
 
 # GitHub OAuth (production)
-civic auth:login --token <your_github_token>
+./cli/dist/index.js auth:login --token <your_github_token>
 
 # Username/Password (traditional authentication)
-civic auth:password --username <username> --password <password>
-```
-
-### Authentication
-
-CivicPress supports multiple authentication methods:
-
-```bash
-# GitHub OAuth (recommended for development)
-civic auth:login --token <your_github_token>
-
-# Username/Password (traditional authentication)
-civic auth:password --username <username> --password <password>
-
-# Interactive login (prompts for credentials)
-civic auth:password
+./cli/dist/index.js auth:password --username <username> --password <password>
 ```
 
 ### Basic Usage
 
 ```bash
 # Create a new record
-civic create bylaw "Noise Ordinance"
+./cli/dist/index.js create bylaw "Noise Ordinance"
 
 # List all records
-civic list
+./cli/dist/index.js list
 
 # Search records
-civic search "budget"
+./cli/dist/index.js search "budget"
 
 # View record history
-civic history bylaw/noise-ordinance
+./cli/dist/index.js history bylaw/noise-ordinance
 
 # Change record status
-civic status bylaw/noise-ordinance proposed
+./cli/dist/index.js status bylaw/noise-ordinance proposed
+```
+
+**Tip**: You can create an alias for convenience:
+
+```bash
+alias civic='./cli/dist/index.js'
+# Then use: civic init, civic list, etc.
 ```
 
 ### Running the UI
@@ -207,6 +238,35 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
   "http://localhost:3000/api/search?q=policy"
 ```
 
+### API Testing with Hoppscotch
+
+CivicPress includes a comprehensive Hoppscotch collection for testing the API.
+The collection is located at `docs/hoppscotch/collection.json` and includes
+pre-configured requests for:
+
+- **Authentication** - Login with GitHub token, username/password, and simulated
+  auth
+- **Records** - CRUD operations for civic records
+- **Search** - Full-text search and filtering
+- **Geography** - Geography file management and operations
+- **Storage** - UUID-based file storage operations
+- **Configuration** - System and organization configuration management
+- **Users** - User management and permissions
+
+**To use the collection:**
+
+1. Install [Hoppscotch](https://hoppscotch.io/) (browser extension or desktop
+   app)
+2. Import the collection: `docs/hoppscotch/collection.json`
+3. Set environment variables:
+   - `baseUrl`: `http://localhost:3000` (or your API URL)
+   - `authGitHubToken`: Your GitHub token (if using GitHub auth)
+4. Start making requests!
+
+The collection includes automatic token management - after logging in, the
+`civicToken` environment variable is automatically set and used for
+authenticated requests.
+
 ## Civic Roles & Permissions
 
 CivicPress implements a comprehensive role-based access control system designed
@@ -234,7 +294,7 @@ pnpm run test:run tests/cli/users.test.ts
 pnpm run test:watch
 ```
 
-### Development Commands
+### Build & Development Commands
 
 ```bash
 # Build all packages
@@ -250,8 +310,9 @@ pnpm run lint
 pnpm run type-check
 
 # Start development servers
-pnpm dev:api    # API server on port 3000
-pnpm dev:ui     # UI server on port 3030
+pnpm run dev    # Both API and UI in watch mode (recommended)
+pnpm run dev:api    # API server in watch mode (port 3000)
+pnpm run dev:ui     # UI server (port 3030)
 ```
 
 ## Architecture
@@ -273,7 +334,8 @@ CivicPress
 - **Backend**: Node.js, TypeScript, Express, SQLite
 - **Authentication**: JWT, OAuth, Role-based access control
 - **Version Control**: Git integration with full audit trails
-- **Testing**: Vitest with comprehensive test coverage (391 tests)
+- **Testing**: Vitest with comprehensive test coverage (599 tests passing, 22
+  skipped)
 - **Build System**: pnpm workspaces
 - **Security**: Cryptographic verification, audit logs, compliance
 
@@ -289,6 +351,10 @@ CivicPress
   authorization
 - **[Specifications](docs/specs-index.md)** - Complete platform specifications
   (50+ specs)
+- **[Project Status](docs/project-status.md)** - Current status overview
+- **[Roadmap](docs/roadmap.md)** - Development roadmap
+- **[Milestones](docs/milestones.md)** - Milestone checklist
+- **[Root TODO](docs/todo.md)** - General TODO list
 
 ### 🔧 Development Resources
 
@@ -329,7 +395,11 @@ CivicPress
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development guidelines.
+
+## Code of Conduct
+
+Please read our [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 ## License
 
@@ -337,4 +407,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Built with ❤️ for better governance**
+**🌐 [civicpress.io](https://civicpress.io)** | **📧
+[hello@civicpress.io](mailto:hello@civicpress.io)** | **💬
+[Community Discussions](https://github.com/CivicPress/civicpress/discussions)**
+
+Built with ❤️ for better governance

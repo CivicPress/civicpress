@@ -1,5 +1,8 @@
 # 🧠 CivicPress Development Context
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 📋 Project Overview
 
 CivicPress – a **fully functional civic technology platform** for
@@ -53,7 +56,8 @@ platform.
   - ✅ **Authentication Flow**: Complete login/logout with JWT token management
   - ✅ **Records Interface**: Complete with search, filtering, pagination, and
     URL state management
-  - ✅ **Record Detail**: Complete with Markdown rendering and metadata display
+  - ✅ **Record Detail**: Complete with Markdown rendering, preserved line
+    breaks, internal link rewriting, and metadata display
   - ✅ **API Integration**: Complete integration with backend REST API
   - ✅ **Composables**: Complete reusable composables for DRY principle
   - ❌ **Account Management**: Registration and password reset not implemented
@@ -132,7 +136,7 @@ platform.
 
 ### Data Management (100% Complete)
 
-- **Record Structure**: Proper organization in `data/records/` by type ✅
+- **Record Structure**: Proper organization in `data/records/<type>/<year>/` ✅
 - **Git Integration**: Complete Git integration with role-aware commits ✅
 - **Search System**: Advanced full-text search with filtering and ranking ✅
 - **Indexing**: Complete indexing system with auto-update workflows ✅
@@ -141,6 +145,8 @@ platform.
 ### API System (100% Complete)
 
 - **20+ Endpoints**: Comprehensive REST API covering all functionality ✅
+- **Summary Endpoint**: `/api/v1/records/summary` delivers aggregate counts for
+  filters ✅
 - **Authentication**: Complete OAuth-based authentication with role mapping ✅
 - **Authorization**: Granular permission system with middleware ✅
 - **Error Handling**: Secure error responses with proper logging ✅

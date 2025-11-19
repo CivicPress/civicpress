@@ -20,12 +20,18 @@ import { loginCommand } from './commands/login.js';
 import { indexCommand } from './commands/index.js';
 import { autoIndexCommand } from './commands/auto-index.js';
 import { cleanupCommand } from './commands/cleanup.js';
+import { registerConfigCommands } from './commands/config.js';
 
 import setupAuthCommand from './commands/auth.js';
 import setupUsersCommand from './commands/users.js';
+import setupStorageCommand from './commands/storage.js';
+import { registerGeographyCommand } from './commands/geography.js';
+// import { registerStorageConfigCommand } from './commands/storage-config.js';
 import { CentralConfigManager } from '@civicpress/core';
 import { infoCommand } from './commands/info.js';
 import notifyCommand from './commands/notify.js';
+import { registerBackupCommand } from './commands/backup.js';
+import { registerRecordsCommand } from './commands/records.js';
 
 // Set logger options immediately to prevent warnings during config loading
 CentralConfigManager.setLoggerOptions({
@@ -67,6 +73,9 @@ loginCommand(cli);
 indexCommand(cli);
 autoIndexCommand(cli);
 cleanupCommand(cli);
+registerConfigCommands(cli);
+registerBackupCommand(cli);
+registerRecordsCommand(cli);
 
 infoCommand(cli);
 
@@ -75,6 +84,15 @@ setupAuthCommand(cli);
 
 // Setup users commands
 setupUsersCommand(cli);
+
+// Setup storage commands
+setupStorageCommand(cli);
+
+// Setup geography commands
+registerGeographyCommand(cli);
+
+// Setup storage configuration commands
+// registerStorageConfigCommand(cli); // Temporarily disabled due to import issues
 
 // Setup notification commands
 notifyCommand(cli);

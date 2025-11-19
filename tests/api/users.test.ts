@@ -18,7 +18,7 @@ describe('API User Management', () => {
     }
   });
 
-  describe('POST /api/users/register - User Registration', () => {
+  describe('POST /api/v1/users/register - User Registration', () => {
     it('should register a new user successfully', async () => {
       const userData = {
         username: 'newuser',
@@ -28,7 +28,7 @@ describe('API User Management', () => {
       };
 
       const response = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData);
 
       expect(response.status).toBe(200);
@@ -48,7 +48,7 @@ describe('API User Management', () => {
       };
 
       const response = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData);
 
       expect(response.status).toBe(400);
@@ -64,7 +64,7 @@ describe('API User Management', () => {
       };
 
       const response = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData);
 
       expect(response.status).toBe(400);
@@ -80,7 +80,7 @@ describe('API User Management', () => {
       };
 
       const response = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData);
 
       expect(response.status).toBe(400);
@@ -105,12 +105,12 @@ describe('API User Management', () => {
 
       // First registration should succeed
       await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData1);
 
       // Second registration should fail
       const response = await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData2);
 
       expect(response.status).toBe(409);
@@ -130,7 +130,7 @@ describe('API User Management', () => {
       };
 
       await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData);
 
       // Then authenticate
@@ -160,7 +160,7 @@ describe('API User Management', () => {
       };
 
       await request(context.api.getApp())
-        .post('/api/users/register')
+        .post('/api/v1/users/register')
         .send(userData);
 
       // Then try to authenticate with wrong password

@@ -9,10 +9,19 @@ import {
   vi,
 } from 'vitest';
 import { execSync } from 'child_process';
-import { join } from 'path';
-import { existsSync, rmSync, mkdirSync, writeFileSync, writeFile } from 'fs';
+import { join, dirname } from 'path';
+import {
+  existsSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  writeFile,
+  readFileSync,
+} from 'fs';
+import { ensureDirSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import yaml from 'js-yaml';
+import { RecordParser, RecordData } from '@civicpress/core';
 
 // Test configuration
 export interface TestConfig {
@@ -27,6 +36,7 @@ export interface TestConfig {
 // Test context for API tests
 export interface APITestContext {
   api: any;
+  civic: any;
   testDir: string;
   authToken?: string;
   adminToken?: string;
@@ -78,74 +88,87 @@ export function releasePort(port: number): void {
   usedPorts.delete(port);
 }
 
-// Mock setup for @civicpress/core - COMMENTED OUT FOR INTEGRATION TESTS
+/**
+ * Extract JSON from CLI output that may contain mixed text and JSON.
+ * Looks for the outermost JSON object that contains 'success' key (API response format).
+ * Falls back to the last JSON object if no 'success' key is found.
+ */
+export function extractJSONFromOutput(output: string): any {
+  const fullOutput = output.trim();
+
+  // Find all JSON objects in the output
+  const jsonObjects: Array<{
+    start: number;
+    end: number;
+    text: string;
+    parsed: any;
+  }> = [];
+
+  for (let i = 0; i < fullOutput.length; i++) {
+    if (fullOutput[i] === '{') {
+      let braceDepth = 0;
+      let jsonEnd = -1;
+
+      for (let j = i; j < fullOutput.length; j++) {
+        if (fullOutput[j] === '{') braceDepth++;
+        if (fullOutput[j] === '}') {
+          braceDepth--;
+          if (braceDepth === 0) {
+            jsonEnd = j + 1;
+            break;
+          }
+        }
+      }
+
+      if (jsonEnd > 0) {
+        const jsonText = fullOutput.substring(i, jsonEnd);
+        try {
+          const parsed = JSON.parse(jsonText);
+          jsonObjects.push({ start: i, end: jsonEnd, text: jsonText, parsed });
+        } catch {
+          // Invalid JSON, skip
+        }
+      }
+    }
+  }
+
+  if (jsonObjects.length === 0) {
+    throw new Error('No JSON output found in CLI output');
+  }
+
+  // Prefer JSON objects that have a 'success' key (API response format)
+  const responseObject = jsonObjects.find(
+    (obj) => obj.parsed && 'success' in obj.parsed
+  );
+  if (responseObject) {
+    return responseObject.parsed;
+  }
+
+  // Fall back to the last (most recent) JSON object
+  return jsonObjects[jsonObjects.length - 1].parsed;
+}
+
+let cliBuilt = false;
+
+export function ensureCliBuilt(): void {
+  if (!cliBuilt) {
+    const cliDir = join(dirname(TEST_CONFIG.CLI_PATH), '..');
+    const distIndex = join(cliDir, 'dist', 'index.js');
+    if (!existsSync(distIndex)) {
+      execSync('pnpm run build', {
+        cwd: cliDir,
+        stdio: 'pipe',
+      });
+    }
+    cliBuilt = true;
+  }
+}
+
+// Mock setup for @civicpress/core - Removed for integration tests
+// Integration tests now use the real CivicPress instance instead of mocks
 export function setupCoreMocks() {
-  // Core mocks disabled for integration testing
-  // vi.mock('@civicpress/core', () => ({
-  //   CivicPress: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     shutdown: vi.fn().mockResolvedValue(undefined),
-  //     getRecordManager: vi.fn(() => createMockRecordManager()),
-  //     getTemplateManager: vi.fn(() => createMockTemplateManager()),
-  //     getHookSystem: vi.fn(() => createMockHookSystem()),
-  //     getWorkflowEngine: vi.fn(() => createMockWorkflowEngine()),
-  //     getImportExportManager: vi.fn(() => createMockImportExportManager()),
-  //     getSearchManager: vi.fn(() => createMockSearchManager()),
-  //     getAuthService: vi.fn(() => createMockAuthService()),
-  //     getIndexingService: vi.fn(() => createMockIndexingService()),
-  //     getGitEngine: vi.fn(() => createMockGitEngine()),
-  //   })),
-  //   WorkflowConfigManager: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     loadWorkflows: vi.fn().mockResolvedValue([]),
-  //     getWorkflow: vi.fn().mockReturnValue(null),
-  //     listWorkflows: vi.fn().mockReturnValue([]),
-  //     validateAction: vi.fn().mockResolvedValue({ valid: true }),
-  //   })),
-  //   AuthConfigManager: {
-  //     getInstance: vi.fn().mockReturnValue({
-  //       loadConfig: vi.fn().mockResolvedValue(undefined),
-  //     }),
-  //   },
-  //   Logger: vi.fn().mockImplementation(() => ({
-  //     info: vi.fn(),
-  //     warn: vi.fn(),
-  //     error: vi.fn(),
-  //     debug: vi.fn(),
-  //   })),
-  //   CentralConfigManager: {
-  //     getDatabaseConfig: vi.fn().mockReturnValue({
-  //     type: 'sqlite',
-  //     database: ':memory:',
-  //   }),
-  // },
-  // userCan: vi
-  //   .fn()
-  //   .mockImplementation(async (user: any, permission: string) => {
-  //   const role = user?.role || 'public';
-  //   if (role === 'admin') return true;
-  //   if (role === 'clerk') {
-  //     if (
-  //       permission.includes('delete') ||
-  //       permission.includes('import') ||
-  //       permission.includes('export') ||
-  //       permission.includes('templates:manage') ||
-  //       permission.includes('hooks:manage') ||
-  //       permission.includes('workflows:manage')
-  //     ) {
-  //       return false;
-  //     }
-  //     return true;
-  //   }
-  //   if (role === 'public') {
-  //     if (permission.includes('view') || permission.includes('search')) {
-  //       return true;
-  //     }
-  //     return false;
-  //   }
-  //   return false;
-  // }),
-  // }));
+  // This function is kept for API compatibility but does nothing
+  // Integration tests use real CivicPress instances
 }
 
 // Mock implementations
@@ -356,12 +379,12 @@ function createMockIndexingService() {
           {
             title: 'Noise Restrictions',
             type: 'bylaw',
-            status: 'adopted',
+            status: 'published', // Changed from 'adopted'
             module: 'legal-register',
             tags: ['noise', 'nighttime', 'curfew'],
             authors: [{ name: 'Ada Lovelace', role: 'clerk' }],
-            created: '2025-06-12',
-            updated: '2025-07-01',
+            created: '2025-06-12T10:00:00Z', // ISO 8601 format
+            updated: '2025-07-01T14:30:00Z', // ISO 8601 format
             slug: 'noise-restrictions',
             path: 'records/bylaw-noise-restrictions.md',
           },
@@ -372,8 +395,8 @@ function createMockIndexingService() {
             module: 'legal-register',
             tags: ['archived', 'historical'],
             authors: [{ name: 'Historical Department', role: 'clerk' }],
-            created: '2020-01-01',
-            updated: '2025-01-01',
+            created: '2020-01-01T10:00:00Z', // ISO 8601 format
+            updated: '2025-01-01T10:00:00Z', // ISO 8601 format
             slug: 'old-regulation',
             path: 'records/bylaw-old-regulation.md',
           },
@@ -382,7 +405,7 @@ function createMockIndexingService() {
           totalRecords: 2,
           modules: ['legal-register'],
           types: ['bylaw'],
-          statuses: ['adopted', 'archived'],
+          statuses: ['published', 'archived'], // Changed from 'adopted'
           generatedAt: new Date().toISOString(),
         },
       };
@@ -419,12 +442,12 @@ function createMockIndexingService() {
           {
             title: 'Noise Restrictions',
             type: 'bylaw',
-            status: 'adopted',
+            status: 'published', // Changed from 'adopted'
             module: 'legal-register',
             tags: ['noise', 'nighttime', 'curfew'],
             authors: [{ name: 'Ada Lovelace', role: 'clerk' }],
-            created: '2025-06-12',
-            updated: '2025-07-01',
+            created: '2025-06-12T10:00:00Z', // ISO 8601 format
+            updated: '2025-07-01T14:30:00Z', // ISO 8601 format
             slug: 'noise-restrictions',
             path: 'records/bylaw-noise-restrictions.md',
           },
@@ -433,7 +456,7 @@ function createMockIndexingService() {
           totalRecords: 1,
           modules: ['legal-register'],
           types: ['bylaw'],
-          statuses: ['adopted'],
+          statuses: ['published'], // Changed from 'adopted'
           generatedAt: new Date().toISOString(),
         },
       };
@@ -445,12 +468,12 @@ function createMockIndexingService() {
           {
             title: 'Noise Restrictions',
             type: 'bylaw',
-            status: 'adopted',
+            status: 'published', // Changed from 'adopted'
             module: 'legal-register',
             tags: ['noise', 'nighttime', 'curfew'],
             authors: [{ name: 'Ada Lovelace', role: 'clerk' }],
-            created: '2025-06-12',
-            updated: '2025-07-01',
+            created: '2025-06-12T10:00:00Z', // ISO 8601 format
+            updated: '2025-07-01T14:30:00Z', // ISO 8601 format
             slug: 'noise-restrictions',
             path: 'records/bylaw-noise-restrictions.md',
           },
@@ -629,11 +652,209 @@ export function createCivicConfig(config: TestConfig, overrides: any = {}) {
   };
 
   writeFileSync(join(config.testDir, '.civicrc'), yaml.dump(civicConfig));
+
+  // Also create config.yml in data/.civic/ for CentralConfigManager
+  const configYmlPath = join(config.dataDir, '.civic', 'config.yml');
+  ensureDirSync(join(config.dataDir, '.civic'));
+
+  // Copy default config.yml structure (record types and statuses)
+  const defaultConfig = {
+    modules: ['legal-register'],
+    default_role: 'clerk',
+    hooks: { enabled: true },
+    workflows: { enabled: true },
+    audit: { enabled: true },
+    record_types_config: {
+      bylaw: {
+        label: 'Bylaws',
+        description: 'Municipal bylaws and regulations',
+        source: 'core',
+        priority: 1,
+      },
+      ordinance: {
+        label: 'Ordinances',
+        description: 'Local ordinances and laws',
+        source: 'core',
+        priority: 2,
+      },
+      policy: {
+        label: 'Policies',
+        description: 'Administrative policies',
+        source: 'core',
+        priority: 3,
+      },
+      proclamation: {
+        label: 'Proclamations',
+        description: 'Official proclamations',
+        source: 'core',
+        priority: 4,
+      },
+      resolution: {
+        label: 'Resolutions',
+        description: 'Council resolutions',
+        source: 'core',
+        priority: 5,
+      },
+      geography: {
+        label: 'Geography',
+        description: 'Geographic data files (GeoJSON/KML)',
+        source: 'core',
+        priority: 6,
+      },
+      session: {
+        label: 'Session',
+        description: 'Meeting sessions and minutes',
+        source: 'core',
+        priority: 7,
+      },
+    },
+    record_statuses_config: {
+      draft: {
+        label: 'Draft',
+        description: 'Initial working version, not yet ready for review',
+        source: 'core',
+        priority: 1,
+      },
+      pending_review: {
+        label: 'Pending Review',
+        description: 'Submitted for review and awaiting approval',
+        source: 'core',
+        priority: 2,
+      },
+      under_review: {
+        label: 'Under Review',
+        description: 'Currently under active review by authorized personnel',
+        source: 'core',
+        priority: 3,
+      },
+      approved: {
+        label: 'Approved',
+        description: 'Approved and currently in effect',
+        source: 'core',
+        priority: 4,
+      },
+      published: {
+        label: 'Published',
+        description: 'Publicly available and in effect',
+        source: 'core',
+        priority: 5,
+      },
+      rejected: {
+        label: 'Rejected',
+        description: 'Rejected and not approved',
+        source: 'core',
+        priority: 6,
+      },
+      archived: {
+        label: 'Archived',
+        description: 'No longer active but preserved for reference',
+        source: 'core',
+        priority: 7,
+      },
+      expired: {
+        label: 'Expired',
+        description: 'Past its effective date and no longer in force',
+        source: 'core',
+        priority: 8,
+      },
+    },
+    version: '1.0.0',
+  };
+
+  writeFileSync(configYmlPath, yaml.dump(defaultConfig));
+}
+
+export function createStorageConfig(config: TestConfig) {
+  // Use absolute path within test directory to ensure complete isolation
+  const storagePath = join(config.testDir, 'storage');
+  const storageConfig = {
+    backend: {
+      type: 'local',
+      path: storagePath, // Use absolute path for test isolation
+    },
+    providers: {
+      local: {
+        type: 'local',
+        path: storagePath, // Use absolute path for test isolation
+        enabled: true,
+      },
+    },
+    active_provider: 'local',
+    failover_providers: ['local'],
+    global: {
+      max_file_size: '100MB',
+      health_checks: false,
+      health_check_interval: 30,
+      retry_attempts: 1,
+      cross_provider_backup: false,
+      backup_providers: [],
+    },
+    folders: {
+      public: {
+        path: 'public',
+        access: 'public',
+        allowed_types: [
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'pdf',
+          'txt',
+          'md',
+          'doc',
+          'docx',
+        ],
+        max_size: '10MB',
+        description: 'Public files for testing',
+      },
+      sessions: {
+        path: 'sessions',
+        access: 'public',
+        allowed_types: ['mp4', 'webm', 'mp3', 'wav', 'pdf', 'md'],
+        max_size: '100MB',
+        description: 'Session files for testing',
+      },
+      icons: {
+        path: 'icons',
+        access: 'public',
+        allowed_types: ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp', 'ico'],
+        max_size: '2MB',
+        description: 'Icons and map-related images for geography records',
+      },
+    },
+    metadata: {
+      auto_generate_thumbnails: false,
+      store_exif: false,
+      compress_images: false,
+      backup_included: false,
+    },
+  };
+
+  const systemDataDir = join(config.dataDir, '.system-data');
+  ensureDirSync(systemDataDir);
+  const storageConfigPath = join(systemDataDir, 'storage.yml');
+
+  // Ensure storage directory exists
+  ensureDirSync(storagePath);
+  // Create folder subdirectories
+  for (const folder of Object.keys(storageConfig.folders)) {
+    const folderPath = join(storagePath, storageConfig.folders[folder].path);
+    ensureDirSync(folderPath);
+  }
+
+  writeFileSync(storageConfigPath, yaml.dump(storageConfig));
 }
 
 export function createWorkflowConfig(config: TestConfig) {
   const workflowConfig = {
-    statuses: ['draft', 'proposed', 'reviewed', 'approved', 'archived'],
+    statuses: [
+      'draft',
+      'pending_review',
+      'under_review',
+      'approved',
+      'published',
+      'archived',
+    ],
     transitions: {
       draft: ['proposed'],
       proposed: ['reviewed', 'archived'],
@@ -679,46 +900,136 @@ export function createWorkflowConfig(config: TestConfig) {
 
 export function createRolesConfig(config: TestConfig) {
   const rolesConfig = {
-    default_role: 'public',
+    _metadata: {
+      name: 'Test User Roles & Permissions',
+      description:
+        'Test configuration for user roles, permissions, and status transitions',
+      version: '1.0.0',
+      editable: true,
+    },
+    default_role: {
+      value: 'public',
+      type: 'string',
+      description: 'Default role assigned to new users',
+      required: true,
+    },
     roles: {
       admin: {
-        name: 'Administrator',
-        description: 'Full system access with all permissions',
-        permissions: [
-          'system:admin',
-          'records:create',
-          'records:edit',
-          'records:delete',
-          'records:view',
-          'users:manage',
-          'workflows:manage',
-          'records:import',
-          'records:export',
-          'templates:manage',
-          'hooks:manage',
-        ],
+        name: {
+          value: 'Administrator',
+          type: 'string',
+          description: 'Role display name',
+          required: true,
+        },
+        description: {
+          value: 'Full system access with all permissions',
+          type: 'string',
+          description: 'Role description',
+          required: true,
+        },
+        permissions: {
+          value: [
+            'system:admin',
+            'records:create',
+            'records:edit',
+            'records:delete',
+            'records:view',
+            'users:manage',
+            'workflows:manage',
+            'records:import',
+            'records:export',
+            'templates:manage',
+            'hooks:manage',
+            'config:manage',
+            'storage:admin',
+            'storage:manage',
+            'storage:upload',
+            'storage:download',
+            'storage:delete',
+          ],
+          type: 'array',
+          description: 'List of permissions granted to this role',
+          required: true,
+        },
         status_transitions: {
-          draft: ['proposed'],
-          any: ['archived'],
+          value: {
+            draft: ['proposed'],
+            any: ['archived'],
+          },
+          type: 'object',
+          description: 'Status transitions this role can perform',
+          required: true,
         },
       },
       clerk: {
-        name: 'City Clerk',
-        description: 'Administrative support with document management',
-        permissions: ['records:create', 'records:edit', 'records:view'],
+        name: {
+          value: 'City Clerk',
+          type: 'string',
+          description: 'Role display name',
+          required: true,
+        },
+        description: {
+          value: 'Administrative support with document management',
+          type: 'string',
+          description: 'Role description',
+          required: true,
+        },
+        permissions: {
+          value: [
+            'records:create',
+            'records:edit',
+            'records:view',
+            'storage:upload',
+            'storage:download',
+            'storage:manage',
+          ],
+          type: 'array',
+          description: 'List of permissions granted to this role',
+          required: true,
+        },
         status_transitions: {
-          draft: ['proposed'],
+          value: {
+            draft: ['proposed'],
+          },
+          type: 'object',
+          description: 'Status transitions this role can perform',
+          required: true,
         },
       },
       public: {
-        name: 'Public',
-        description: 'Read-only access to published records',
-        permissions: ['records:view'],
+        name: {
+          value: 'Public',
+          type: 'string',
+          description: 'Role display name',
+          required: true,
+        },
+        description: {
+          value: 'Read-only access to published records',
+          type: 'string',
+          description: 'Role description',
+          required: true,
+        },
+        permissions: {
+          value: ['records:view'],
+          type: 'array',
+          description: 'List of permissions granted to this role',
+          required: true,
+        },
+        status_transitions: {
+          value: {},
+          type: 'object',
+          description: 'Status transitions this role can perform',
+          required: true,
+        },
       },
     },
     permissions: {
       'system:admin': {
         description: 'Full system administration access',
+        level: 'system',
+      },
+      'config:manage': {
+        description: 'Manage configuration files and settings',
         level: 'system',
       },
       'records:create': {
@@ -763,13 +1074,97 @@ export function createRolesConfig(config: TestConfig) {
       },
     },
     role_hierarchy: {
-      admin: ['clerk', 'public'],
-      clerk: ['public'],
-      public: [],
+      admin: {
+        value: ['clerk', 'public'],
+        type: 'array',
+        description: 'Roles that admin can manage',
+        required: true,
+      },
+      clerk: {
+        value: ['public'],
+        type: 'array',
+        description: 'Roles that clerk can manage',
+        required: true,
+      },
+      public: {
+        value: [],
+        type: 'array',
+        description: 'Roles that public users can manage',
+        required: true,
+      },
     },
   };
 
   writeFileSync(join(config.civicDir, 'roles.yml'), yaml.dump(rolesConfig));
+
+  // Copy geography presets file - ensure it's always created for tests
+  const presetsSourcePath = join(
+    process.cwd(),
+    'core',
+    'src',
+    'defaults',
+    'geography-presets.yml'
+  );
+  const presetsDestPath = join(config.civicDir, 'geography-presets.yml');
+
+  // Always create presets file - either from source or minimal version
+  if (existsSync(presetsSourcePath)) {
+    const presetsContent = readFileSync(presetsSourcePath, 'utf8');
+    writeFileSync(presetsDestPath, presetsContent);
+  } else {
+    // If source doesn't exist, create a minimal presets file for tests
+    const minimalPresets = {
+      _metadata: {
+        name: 'Geography Styling Presets',
+        description: 'Reusable color and icon mapping configurations',
+        version: '1.0.0',
+        editable: true,
+      },
+      presets: {
+        land_use_zones: {
+          name: 'Land Use Zones',
+          description: 'Color scheme for land use zones using LETTRE codes',
+          type: 'color',
+          color_mapping: {
+            property: 'LETTRE',
+            type: 'property',
+            colors: {
+              IND: '#64748b',
+              A: '#10b981',
+              RF: '#059669',
+              PU: '#f59e0b',
+              AFD: '#84cc16',
+              AF: '#22c55e',
+            },
+            default_color: '#6b7280',
+          },
+        },
+        zone_by_name: {
+          name: 'Zones by Name',
+          description: 'Color scheme for zones using the NOM property',
+          type: 'color',
+          color_mapping: {
+            property: 'NOM',
+            type: 'property',
+            colors: {
+              Industrielle: '#64748b',
+              Agricole: '#10b981',
+              'Récréo-forestière': '#059669',
+            },
+            default_color: '#6b7280',
+          },
+        },
+      },
+    };
+    writeFileSync(presetsDestPath, yaml.dump(minimalPresets));
+  }
+
+  // Ensure the file was created
+  if (!existsSync(presetsDestPath)) {
+    console.warn(
+      `Warning: Failed to create presets file at ${presetsDestPath}`
+    );
+  }
 }
 
 // Sample data generation
@@ -779,11 +1174,13 @@ export function createSampleRecords(config: TestConfig) {
       id: 'bylaw-noise-restrictions',
       title: 'Noise Restrictions',
       type: 'bylaw',
-      status: 'adopted',
+      status: 'published', // Changed from 'adopted'
       content: '# Noise Restrictions\n\nQuiet hours from 10 PM to 7 AM.',
       metadata: {
-        author: 'Ada Lovelace',
-        created: '2025-06-12',
+        author: 'alovelace',
+        authorName: 'Ada Lovelace',
+        created: '2025-06-12T10:00:00Z', // ISO 8601 format
+        updated: '2025-07-01T14:30:00Z', // Added required updated field
         tags: ['noise', 'nighttime', 'curfew'],
       },
       path: 'records/bylaw-noise-restrictions.md',
@@ -795,8 +1192,10 @@ export function createSampleRecords(config: TestConfig) {
       status: 'draft',
       content: '# Data Privacy Policy\n\nProtecting citizen data.',
       metadata: {
-        author: 'Irène Joliot-Curie',
-        created: '2025-07-15',
+        author: 'ijoliot',
+        authorName: 'Irène Joliot-Curie',
+        created: '2025-07-15T10:00:00Z', // ISO 8601 format
+        updated: '2025-07-15T10:00:00Z', // Added required updated field
         tags: ['privacy', 'data', 'technology'],
       },
       path: 'records/policy-data-privacy.md',
@@ -805,11 +1204,13 @@ export function createSampleRecords(config: TestConfig) {
       id: 'resolution-budget-2025',
       title: 'Budget Resolution 2025',
       type: 'resolution',
-      status: 'proposed',
+      status: 'pending_review', // Changed from 'proposed'
       content: '# Budget Resolution 2025\n\nAnnual budget allocation.',
       metadata: {
-        author: 'Luc Lapointe',
-        created: '2025-07-20',
+        author: 'llapointe',
+        authorName: 'Luc Lapointe',
+        created: '2025-07-20T10:00:00Z', // ISO 8601 format
+        updated: '2025-07-20T10:00:00Z', // Added required updated field
         tags: ['budget', 'finance', '2025'],
         attachments: ['budget.pdf', 'metrics.xlsx'],
       },
@@ -822,8 +1223,10 @@ export function createSampleRecords(config: TestConfig) {
       status: 'archived',
       content: '# Old Regulation\n\nThis regulation has been archived.',
       metadata: {
-        author: 'Historical Department',
-        created: '2020-01-01',
+        author: 'historical',
+        authorName: 'Historical Department',
+        created: '2020-01-01T10:00:00Z', // ISO 8601 format
+        updated: '2025-01-01T10:00:00Z', // Added required updated field
         tags: ['archived', 'historical', 'old'],
       },
       path: 'records/bylaw-old-regulation.md',
@@ -831,25 +1234,59 @@ export function createSampleRecords(config: TestConfig) {
   ];
 
   sampleRecords.forEach((record) => {
-    const filePath = join(config.recordsDir, record.path);
+    const createdTimestamp =
+      record.metadata.created ||
+      record.metadata.updated ||
+      new Date().toISOString();
+    const createdDate = new Date(createdTimestamp);
+    const year = Number.isNaN(createdDate.getTime())
+      ? new Date().getUTCFullYear().toString()
+      : createdDate.getUTCFullYear().toString();
+    const relativePath = join(
+      'records',
+      record.type,
+      year,
+      `${record.id}.md`
+    ).replace(/\\/g, '/');
+    record.path = relativePath;
+
+    const filePath = join(
+      config.dataDir,
+      relativePath.replace(/^records\//, '')
+    );
     const dir = join(filePath, '..');
     mkdirSync(dir, { recursive: true });
 
-    // Create proper frontmatter format
-    const frontmatter = `---
-id: ${record.id}
-title: ${record.title}
-type: ${record.type}
-status: ${record.status}
-author: ${record.metadata.author}
-created: ${record.metadata.created}
-${record.metadata.tags ? `tags: [${record.metadata.tags.map((tag) => `"${tag}"`).join(', ')}]` : ''}
-${record.metadata.attachments ? `attachments: [${record.metadata.attachments.map((att) => `"${att}"`).join(', ')}]` : ''}
----
+    const metadata: Record<string, any> = {};
+    if (record.metadata.tags) {
+      metadata.tags = record.metadata.tags;
+    }
+    if (record.metadata.attachments) {
+      metadata.attachments = record.metadata.attachments;
+    }
 
-${record.content}`;
+    const recordData: RecordData = {
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      author: record.metadata.author,
+      authors: [
+        {
+          name: record.metadata.authorName,
+          username: record.metadata.author,
+          role: 'clerk',
+        },
+      ],
+      created_at: record.metadata.created,
+      updated_at: record.metadata.updated,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    };
 
-    writeFileSync(filePath, frontmatter);
+    const markdown = RecordParser.serializeToMarkdown(recordData);
+
+    writeFileSync(filePath, markdown);
   });
 
   return sampleRecords;
@@ -909,7 +1346,11 @@ export function createExtendedSampleRecords(config: TestConfig) {
         tags: ['parks', 'community', 'recreation'],
         budget: 50000,
       },
-      path: 'records/proposal-new-park.md',
+      metadata: {
+        author: 'Jane Smith',
+        authorName: 'Jane Smith',
+        created: '2025-08-01T00:00:00Z',
+      },
     },
     {
       id: 'report-quarterly-2025',
@@ -920,20 +1361,59 @@ export function createExtendedSampleRecords(config: TestConfig) {
         '# Q1 2025 Quarterly Report\n\nFinancial and operational summary.',
       metadata: {
         author: 'Finance Department',
-        created: '2025-04-15',
+        authorName: 'Finance Department',
+        created: '2025-04-15T00:00:00Z',
         tags: ['finance', 'quarterly', '2025'],
         attachments: ['budget.pdf', 'metrics.xlsx'],
       },
-      path: 'records/report-quarterly-2025.md',
     },
   ];
 
   // Write the new records
   extendedRecords.forEach((record) => {
-    const filePath = join(config.recordsDir, record.path);
-    const dir = join(filePath, '..');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(filePath, record.content);
+    const createdTimestamp =
+      record.metadata?.created ||
+      record.metadata?.updated ||
+      new Date().toISOString();
+    const createdDate = new Date(createdTimestamp);
+    const year = Number.isNaN(createdDate.getTime())
+      ? new Date().getUTCFullYear().toString()
+      : createdDate.getUTCFullYear().toString();
+    const relativePath = join(
+      'records',
+      record.type,
+      year,
+      `${record.id}.md`
+    ).replace(/\\/g, '/');
+    record.path = relativePath;
+
+    const filePath = join(
+      config.dataDir,
+      relativePath.replace(/^records\//, '')
+    );
+    mkdirSync(join(filePath, '..'), { recursive: true });
+
+    const recordData: RecordData = {
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      author: record.metadata?.author || 'system',
+      authors: [
+        {
+          name: record.metadata?.authorName || 'System',
+          username: record.metadata?.author || 'system',
+          role: 'clerk',
+        },
+      ],
+      created_at: record.metadata?.created || new Date().toISOString(),
+      updated_at: record.metadata?.created || new Date().toISOString(),
+      metadata: record.metadata,
+    };
+
+    const markdown = RecordParser.serializeToMarkdown(recordData);
+    writeFileSync(filePath, markdown);
   });
 
   return extendedRecords;
@@ -947,7 +1427,11 @@ export async function createCLITestContext(): Promise<CLITestContext> {
   createCivicConfig(config);
   createWorkflowConfig(config);
   createRolesConfig(config);
+  createStorageConfig(config);
   createSampleRecords(config);
+
+  // Ensure CLI is built before executing commands
+  ensureCliBuilt();
 
   // Initialize Git repository for the test directory
   const { simpleGit } = await import('simple-git');
@@ -968,46 +1452,49 @@ export async function createCLITestContext(): Promise<CLITestContext> {
       { encoding: 'utf8' }
     );
 
-    // Extract JSON from the output (it's at the end after initialization messages)
-    const lines = authResult.split('\n');
+    // Extract JSON from the output - the CLI might output warnings before JSON
+    // Look for JSON object in the output (might be on single line or multiple lines)
+    const fullOutput = authResult.trim();
 
-    // Find the JSON object in the output
-    let jsonStart = -1;
+    // Try to find JSON object by looking for '{' and matching '}'
+    const firstBrace = fullOutput.indexOf('{');
+    if (firstBrace === -1) {
+      throw new Error('No JSON output found in simulated authentication');
+    }
+
+    // Find the matching closing brace
+    let braceDepth = 0;
     let jsonEnd = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim().startsWith('{')) {
-        jsonStart = i;
-        break;
+
+    for (let i = firstBrace; i < fullOutput.length; i++) {
+      if (fullOutput[i] === '{') braceDepth++;
+      if (fullOutput[i] === '}') {
+        braceDepth--;
+        if (braceDepth === 0) {
+          jsonEnd = i + 1;
+          break;
+        }
       }
     }
 
-    if (jsonStart !== -1) {
-      // Find the closing brace
-      let braceCount = 0;
-      for (let i = jsonStart; i < lines.length; i++) {
-        const line = lines[i];
-        for (const char of line) {
-          if (char === '{') braceCount++;
-          if (char === '}') braceCount--;
-          if (braceCount === 0) {
-            jsonEnd = i;
-            break;
-          }
-        }
-        if (jsonEnd !== -1) break;
-      }
+    if (jsonEnd === -1) {
+      throw new Error(
+        'Incomplete JSON object in simulated authentication output'
+      );
+    }
 
-      if (jsonEnd !== -1) {
-        const jsonText = lines.slice(jsonStart, jsonEnd + 1).join('\n');
-        const authJson = JSON.parse(jsonText);
+    const jsonText = fullOutput.substring(firstBrace, jsonEnd);
+    try {
+      const authJson = JSON.parse(jsonText);
+      if (authJson.success && authJson.session && authJson.session.token) {
         adminToken = authJson.session.token;
       } else {
-        throw new Error(
-          'Could not find complete JSON object in simulated authentication'
-        );
+        throw new Error('Invalid JSON structure from auth:simulated');
       }
-    } else {
-      throw new Error('No JSON output found in simulated authentication');
+    } catch (parseError: any) {
+      throw new Error(
+        `Failed to parse JSON from auth:simulated: ${parseError.message}`
+      );
     }
   } catch (error) {
     // If admin user creation failed, we'll continue without admin token
@@ -1037,6 +1524,7 @@ export async function createAPITestContext(): Promise<APITestContext> {
   createCivicConfig(config);
   createWorkflowConfig(config);
   createRolesConfig(config);
+  createStorageConfig(config);
   createSampleRecords(config);
 
   // Initialize Git repository for the test directory
@@ -1048,51 +1536,77 @@ export async function createAPITestContext(): Promise<APITestContext> {
   const dataGit = simpleGit(config.dataDir);
   await dataGit.init();
 
-  // Add some sample commits to the Git repository for testing
-  await dataGit.add('.');
-  await dataGit.commit('Initial commit');
-
   // Add sample record files and commit them
   const bylawDir = join(config.dataDir, 'records', 'bylaw');
   await (await import('fs/promises')).mkdir(bylawDir, { recursive: true });
 
-  // Add the test record
+  // Add the test record (using new standardized format)
   const sampleRecordPath = join(bylawDir, 'test-record.md');
-  const sampleRecordContent = `---
-id: test-record
-title: Test Record
-type: bylaw
-status: archived
-author: test
----
-
-# Test Record
-
-This is a test record for API testing.`;
+  const sampleRecord: RecordData = {
+    id: 'test-record',
+    title: 'Test Record',
+    type: 'bylaw',
+    status: 'archived',
+    content: '# Test Record\n\nThis is a test record for API testing.',
+    author: 'test',
+    authors: [
+      {
+        name: 'Test User',
+        username: 'test',
+        role: 'clerk',
+      },
+    ],
+    created_at: '2025-01-01T10:00:00Z',
+    updated_at: '2025-01-01T10:00:00Z',
+  };
+  const sampleRecordContent = RecordParser.serializeToMarkdown(sampleRecord);
   await (
     await import('fs/promises')
   ).writeFile(sampleRecordPath, sampleRecordContent);
 
-  // Add an archived record for indexing tests
+  // Add an archived record for indexing tests (using new standardized format)
   const archivedRecordPath = join(bylawDir, 'old-regulation.md');
-  const archivedRecordContent = `---
-id: old-regulation
-title: Old Regulation
-type: bylaw
-status: archived
-author: Historical Department
----
-
-# Old Regulation
-
-This regulation has been archived.`;
+  const archivedRecord: RecordData = {
+    id: 'old-regulation',
+    title: 'Old Regulation',
+    type: 'bylaw',
+    status: 'archived',
+    content: '# Old Regulation\n\nThis regulation has been archived.',
+    author: 'historical',
+    authors: [
+      {
+        name: 'Historical Department',
+        username: 'historical',
+        role: 'clerk',
+      },
+    ],
+    created_at: '2024-01-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z',
+  };
+  const archivedRecordContent =
+    RecordParser.serializeToMarkdown(archivedRecord);
   await (
     await import('fs/promises')
   ).writeFile(archivedRecordPath, archivedRecordContent);
 
   await dataGit.add(sampleRecordPath);
+  await dataGit.commit('feat(bylaw): Add test-record for API testing');
+
   await dataGit.add(archivedRecordPath);
-  await dataGit.commit('feat(admin): Add test records for API tests');
+  await dataGit.commit('feat(bylaw): Add old-regulation (archived)');
+
+  // Add some additional commits to create more history
+  await dataGit.add(sampleRecordPath);
+  await dataGit.commit('update(bylaw): Update test-record content');
+
+  await dataGit.add(archivedRecordPath);
+  await dataGit.commit('update(bylaw): Update old-regulation metadata');
+
+  // Add a commit that affects both records
+  await dataGit.add('.');
+  await dataGit.commit(
+    'chore(bylaw): Update both test-record and old-regulation'
+  );
 
   // Initialize API with dynamic port
   const { CivicPressAPI } = await import('../../modules/api/src/index.js');
@@ -1127,6 +1641,7 @@ This regulation has been archived.`;
 
   return {
     api,
+    civic: api.getCivicPress(),
     testDir: config.testDir,
     port, // Include port in context for tests that need it
   };
@@ -1153,6 +1668,7 @@ export async function createExtendedAPITestContext(): Promise<APITestContext> {
   // Create extended configuration
   createExtendedCivicConfig(config);
   createWorkflowConfig(config);
+  createStorageConfig(config);
   createExtendedSampleRecords(config);
 
   // Initialize API with dynamic port
@@ -1285,8 +1801,8 @@ export async function setupGlobalTestEnvironment() {
   const logger = new loggerModule.Logger({ level: 4 }); // DEBUG level
   loggerModule.setLogger(logger);
 
-  // Setup core mocks - COMMENTED OUT FOR INTEGRATION TESTS
-  // setupCoreMocks();
+  // Integration tests use real CivicPress instances, not mocks
+  // setupCoreMocks(); // No longer needed
 
   // Global cleanup
   afterAll(() => {
@@ -1294,75 +1810,11 @@ export async function setupGlobalTestEnvironment() {
   });
 }
 
-// Example: How to update the main mock setup when new services are added - COMMENTED OUT FOR INTEGRATION TESTS
+// Extended mock setup - Removed for integration tests
+// Integration tests now use the real CivicPress instance instead of mocks
 export function setupExtendedCoreMocks() {
-  // vi.mock('@civicpress/core', () => ({
-  //   CivicPress: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     shutdown: vi.fn().mockResolvedValue(undefined),
-  //     getRecordManager: vi.fn(() => createMockRecordManager()),
-  //     getTemplateManager: vi.fn(() => createMockTemplateManager()),
-  //     getHookSystem: vi.fn(() => createMockHookSystem()),
-  //     getWorkflowEngine: vi.fn(() => createMockWorkflowEngine()),
-  //     getImportExportManager: vi.fn(() => createMockImportExportManager()),
-  //     getSearchManager: vi.fn(() => createMockSearchManager()),
-  //     getAuthService: vi.fn(() => createMockAuthService()),
-  //     getIndexingService: vi.fn(() => createMockIndexingService()),
-  //     // New services can be added here
-  //     getNotificationService: vi.fn(() => createMockNotificationService()),
-  //     getAuditService: vi.fn(() => createMockAuditService()),
-  //   })),
-  //   WorkflowConfigManager: vi.fn().mockImplementation(() => ({
-  //     initialize: vi.fn().mockResolvedValue(undefined),
-  //     loadWorkflows: vi.fn().mockResolvedValue([]),
-  //     getWorkflow: vi.fn().mockReturnValue(null),
-  //     listWorkflows: vi.fn().mockReturnValue([]),
-  //     validateAction: vi.fn().mockResolvedValue({ valid: true }),
-  //   })),
-  //   AuthConfigManager: {
-  //     getInstance: vi.fn().mockReturnValue({
-  //       loadConfig: vi.fn().mockResolvedValue(undefined),
-  //     }),
-  //   },
-  //   Logger: vi.fn().mockImplementation(() => ({
-  //     info: vi.fn(),
-  //     warn: vi.fn(),
-  //     error: vi.fn(),
-  //     debug: vi.fn(),
-  //   })),
-  //   CentralConfigManager: {
-  //     getDatabaseConfig: vi.fn().mockReturnValue({
-  //       type: 'sqlite',
-  //       database: ':memory:',
-  //     }),
-  //   },
-  //   userCan: vi
-  //     .fn()
-  //     .mockImplementation(async (user: any, permission: string) => {
-  //       const role = user?.role || 'public';
-  //       if (role === 'admin') return true;
-  //       if (role === 'clerk') {
-  //         if (
-  //           permission.includes('delete') ||
-  //           permission.includes('import') ||
-  //           permission.includes('export') ||
-  //           permission.includes('templates:manage') ||
-  //           permission.includes('hooks:manage') ||
-  //           permission.includes('workflows:manage')
-  //         ) {
-  //           return false;
-  //         }
-  //         return true;
-  //       }
-  //       if (role === 'public') {
-  //         if (permission.includes('view') || permission.includes('search')) {
-  //           return true;
-  //         }
-  //         return false;
-  //       }
-  //       return false;
-  //     }),
-  // }));
+  // This function is kept for API compatibility but does nothing
+  // Integration tests use real CivicPress instances
 }
 
 // Export test utilities for use in individual test files

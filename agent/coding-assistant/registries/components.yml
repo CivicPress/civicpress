@@ -1,0 +1,98 @@
+# Canonical registry of shared/reusable Vue components.
+
+components:
+  # UI components from modules/ui/app/components
+  - name: AvatarSkeleton
+    file: modules/ui/app/components/AvatarSkeleton.vue
+    purpose: Placeholder avatar while loading
+    status: stable
+
+  - name: ConfigurationField
+    file: modules/ui/app/components/ConfigurationField.vue
+    purpose: Render a configuration field based on metadata
+    status: stable
+
+  - name: DashboardCardSkeleton
+    file: modules/ui/app/components/DashboardCardSkeleton.vue
+    purpose: Placeholder dashboard card while loading
+    status: stable
+
+  - name: FormSkeleton
+    file: modules/ui/app/components/FormSkeleton.vue
+    purpose: Placeholder form while loading
+    status: stable
+
+  - name: HeaderActions
+    file: modules/ui/app/components/HeaderActions.vue
+    purpose: Container for page header action buttons
+    status: stable
+
+  - name: Logo
+    file: modules/ui/app/components/Logo.vue
+    purpose: Application logo component
+    status: stable
+
+  - name: RecordCardSkeleton
+    file: modules/ui/app/components/RecordCardSkeleton.vue
+    purpose: Placeholder record card while loading
+    status: stable
+
+  - name: RecordForm
+    file: modules/ui/app/components/RecordForm.vue
+    purpose:
+      Create or edit a record with geography data, file attachments, template
+      loading, and validation
+    status: stable
+
+  - name: RecordList
+    file: modules/ui/app/components/RecordList.vue
+    purpose: Paginated list of records with search and basic filters
+    status: stable
+
+  - name: RecordSearch
+    file: modules/ui/app/components/RecordSearch.vue
+    purpose: Search UI for records
+    status: stable
+
+  - name: UserAvatar
+    file: modules/ui/app/components/UserAvatar.vue
+    purpose: Display a user's avatar image
+    status: stable
+
+  - name: UserCardSkeleton
+    file: modules/ui/app/components/UserCardSkeleton.vue
+    purpose: Placeholder user card while loading
+    status: stable
+
+  - name: UserForm
+    file: modules/ui/app/components/UserForm.vue
+    purpose: Create or edit a user (inline validation, role + basic fields)
+    status: stable
+
+  - name: UserMenu
+    file: modules/ui/app/components/UserMenu.vue
+    purpose: User profile dropdown and actions
+    status: stable
+
+  # Storage Components
+  - name: FileBrowser
+    file: modules/ui/app/components/storage/FileBrowser.vue
+    purpose:
+      Browse, search, upload, and manage files with UUID support and refresh
+    status: stable
+
+  - name: FileUpload
+    file: modules/ui/app/components/storage/FileUpload.vue
+    purpose: Upload files to multi-cloud storage with UUID tracking
+    status: stable
+
+  - name: MediaPlayer
+    file: modules/ui/app/components/storage/MediaPlayer.vue
+    purpose: Preview and play various media types from UUID storage
+    status: stable
+
+  - name: FileBrowserPopover
+    file: modules/ui/app/components/storage/FileBrowserPopover.vue
+    purpose:
+      Minimal file browser in a popover for selecting files to attach to records
+    status: stable

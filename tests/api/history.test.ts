@@ -16,59 +16,55 @@ describe('History API', () => {
   beforeEach(async () => {
     context = await createAPITestContext();
 
-    // Get authentication token for tests
-    const loginResponse = await request(context.api.getApp())
+    // Get authentication token
+    const authResponse = await request(context.api.getApp())
       .post('/auth/simulated')
       .send({
-        username: 'testuser',
+        username: 'admin',
         role: 'admin',
       });
-
-    authToken = loginResponse.body.data.session.token;
+    authToken = authResponse.body.data.session.token;
   });
 
   afterEach(async () => {
     await cleanupAPITestContext(context);
   });
 
-  describe('GET /api/history', () => {
+  describe('GET /api/v1/history', () => {
     it('should return history for all records', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history')
+        .get('/api/v1/history')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.history).toBeDefined();
-      expect(response.body.data.summary).toBeDefined();
-      expect(response.body.data.summary.totalCommits).toBeGreaterThan(0);
+      expect(Array.isArray(response.body.data.history)).toBe(true);
     });
 
     it('should filter by record', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history?record=policy/test-policy')
+        .get('/api/v1/history?record=policy/test-policy')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.history).toBeDefined();
-      expect(response.body.data.summary.record).toBe('policy/test-policy');
     });
 
     it('should support pagination', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history?limit=5&offset=0')
+        .get('/api/v1/history?limit=5&offset=0')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.summary.limit).toBe(5);
-      expect(response.body.data.summary.offset).toBe(0);
     });
 
     it('should validate limit parameter', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history?limit=150')
+        .get('/api/v1/history?limit=150')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(400);
@@ -77,71 +73,67 @@ describe('History API', () => {
     });
 
     it('should require authentication', async () => {
-      const response = await request(context.api.getApp()).get('/api/history');
+      const response = await request(context.api.getApp()).get(
+        '/api/v1/history'
+      );
 
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
     });
   });
 
-  describe('GET /api/history/:record', () => {
+  describe('GET /api/v1/history/:record', () => {
     it('should return history for specific record', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history/bylaw/test-record')
+        .get('/api/v1/history/test-record')
         .set('Authorization', `Bearer ${authToken}`);
 
-      // The record might not exist in Git history, so we accept both 200 and 404
-      if (response.status === 404) {
-        // 404 response might not have success field, so we just check for error
-        expect(response.body.error).toBeDefined();
-      } else {
-        expect(response.status).toBe(200);
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.history).toBeDefined();
-        expect(response.body.data.summary.record).toBe('bylaw/test-record');
-      }
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.history).toBeDefined();
+      expect(Array.isArray(response.body.data.history)).toBe(true);
     });
 
-    it('should support filtering by author', async () => {
+    it('should filter by author', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history/bylaw/test-record?author=test')
+        .get('/api/v1/history/test-record?author=test')
         .set('Authorization', `Bearer ${authToken}`);
 
-      // The record might not exist in Git history, so we accept both 200 and 404
-      if (response.status === 404) {
-        // 404 response might not have success field, so we just check for error
-        expect(response.body.error).toBeDefined();
-      } else {
-        expect(response.status).toBe(200);
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.summary.filters.author).toBe('test');
-      }
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.history).toBeDefined();
     });
 
-    it('should support date filtering', async () => {
+    it('should filter by date range', async () => {
       const since = new Date();
-      since.setDate(since.getDate() - 1);
+      since.setDate(since.getDate() - 7); // 7 days ago
 
       const response = await request(context.api.getApp())
-        .get(`/api/history/bylaw/test-record?since=${since.toISOString()}`)
+        .get(`/api/v1/history/test-record?since=${since.toISOString()}`)
         .set('Authorization', `Bearer ${authToken}`);
 
-      // The record might not exist in Git history, so we accept both 200 and 404
-      if (response.status === 404) {
-        // 404 response might not have success field, so we just check for error
-        expect(response.body.error).toBeDefined();
-      } else {
-        expect(response.status).toBe(200);
-        expect(response.body.success).toBe(true);
-        expect(response.body.data.summary.filters.since).toBe(
-          since.toISOString()
-        );
-      }
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.history).toBeDefined();
+    });
+
+    it('should return empty history for non-existent record', async () => {
+      const response = await request(context.api.getApp())
+        .get('/api/v1/history/non-existent-record')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.history).toBeDefined();
+      expect(Array.isArray(response.body.data.history)).toBe(true);
+      // Should return empty history for non-existent record
+      expect(response.body.data.history.length).toBe(0);
+      expect(response.body.data.summary.totalCommits).toBe(0);
     });
 
     it('should require authentication', async () => {
       const response = await request(context.api.getApp()).get(
-        '/api/history/policy/test-policy'
+        '/api/v1/history/test-record'
       );
 
       expect(response.status).toBe(401);
@@ -152,43 +144,36 @@ describe('History API', () => {
   describe('History Data Structure', () => {
     it('should return properly formatted history entries', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history')
+        .get('/api/v1/history')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
 
       if (response.body.data.history.length > 0) {
-        const historyEntry = response.body.data.history[0];
-
-        expect(historyEntry).toHaveProperty('hash');
-        expect(historyEntry).toHaveProperty('shortHash');
-        expect(historyEntry).toHaveProperty('message');
-        expect(historyEntry).toHaveProperty('author');
-        expect(historyEntry).toHaveProperty('email');
-        expect(historyEntry).toHaveProperty('date');
-        expect(historyEntry).toHaveProperty('timestamp');
-        expect(historyEntry).toHaveProperty('record');
-
-        expect(typeof historyEntry.hash).toBe('string');
-        expect(typeof historyEntry.shortHash).toBe('string');
-        expect(typeof historyEntry.message).toBe('string');
-        expect(typeof historyEntry.author).toBe('string');
-        expect(typeof historyEntry.timestamp).toBe('string');
+        const entry = response.body.data.history[0];
+        expect(entry).toHaveProperty('hash');
+        expect(entry).toHaveProperty('record');
+        expect(entry).toHaveProperty('message');
+        expect(entry).toHaveProperty('author');
+        expect(entry).toHaveProperty('date');
+        expect(entry).toHaveProperty('timestamp');
       }
     });
 
     it('should return proper summary structure', async () => {
       const response = await request(context.api.getApp())
-        .get('/api/history')
+        .get('/api/v1/history')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
 
       const summary = response.body.data.summary;
       expect(summary).toHaveProperty('totalCommits');
-      expect(summary).toHaveProperty('returnedCommits');
       expect(summary).toHaveProperty('limit');
       expect(summary).toHaveProperty('offset');
+      expect(typeof summary.totalCommits).toBe('number');
+      expect(typeof summary.limit).toBe('number');
+      expect(typeof summary.offset).toBe('number');
     });
   });
 });

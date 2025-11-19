@@ -1,0 +1,52 @@
+{
+  "include": [
+    "agent/coding-assistant/project.yml",
+    "agent/coding-assistant/glossary.yml",
+    "agent/coding-assistant/conventions.md",
+    "agent/coding-assistant/prompts/**/*.md",
+    "agent/coding-assistant/registries/**/*.yml",
+    "agent/context.md",
+    "agent/goals.md",
+    "agent/testing-decisions.md",
+    "agent/memory/**/*.md",
+    "agent/knowledge/**/*.md",
+    ".cursor/rules.md",
+    "core/src/**/*",
+    "cli/src/**/*",
+    "modules/api/src/**/*",
+    "modules/ui/app/**/*",
+    "docs/**/*.md",
+    "tests/**/*",
+    "scripts/**/*",
+    "tools/generate/**/*",
+    "core/src/defaults/**/*",
+    "README*.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "exclude": [
+    "node_modules/**",
+    ".git/**",
+    "**/*.map",
+    "**/dist/**",
+    "**/.nuxt/**",
+    "**/.output/**",
+    "**/coverage/**"
+  ],
+  "ranking": {
+    "boost_exact_paths": [
+      "agent/coding-assistant/project.yml",
+      "agent/coding-assistant/glossary.yml",
+      "agent/coding-assistant/conventions.md",
+      "agent/memory/architecture.md",
+      "agent/context.md",
+      "agent/goals.md",
+      "docs/specs-index.md",
+      "docs/api.md",
+      "docs/cli.md"
+    ],
+    "deboost_dirs": [
+      "tests/**"
+    ]
+  }
+}

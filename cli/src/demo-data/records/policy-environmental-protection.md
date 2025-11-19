@@ -1,17 +1,37 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1718822400000"
 title: 'Environmental Protection Policy'
 type: policy
-status: adopted
-module: legal-register
-tags: ['environment', 'sustainability', 'green', 'climate']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "jgreen"
 authors:
   - name: 'Jennifer Green'
+    username: 'jgreen'
     role: 'environmental-coordinator'
   - name: 'Robert Wilson'
+    username: 'rwilson'
     role: 'council'
-created: '2024-06-20'
-updated: '2024-12-10'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2024-06-20T10:00:00Z"
+updated: "2024-12-10T15:30:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['environment', 'sustainability', 'green', 'climate']
+module: legal-register
 slug: 'environmental-protection-policy'
+version: "1.0.0"
 ---
 
 # Environmental Protection Policy

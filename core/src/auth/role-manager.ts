@@ -8,23 +8,37 @@ import { AuthUser } from './auth-service.js';
 const logger = getLogger();
 
 export interface RoleConfig {
-  name: string;
-  description: string;
-  permissions: string[];
+  name:
+    | string
+    | { value: string; type: string; description: string; required: boolean };
+  description:
+    | string
+    | { value: string; type: string; description: string; required: boolean };
+  permissions:
+    | string[]
+    | { value: string[]; type: string; description: string; required: boolean };
   record_types?: {
     can_create?: string[];
     can_edit?: string[];
     can_delete?: string[];
     can_view?: string[];
   };
-  status_transitions?: Record<string, string[]>;
+  status_transitions?:
+    | Record<string, string[]>
+    | { value: string[]; type: string; description: string; required: boolean };
 }
 
 export interface RolesConfig {
-  default_role: string;
+  default_role:
+    | string
+    | { value: string; type: string; description: string; required: boolean };
   roles: Record<string, RoleConfig>;
   permissions: Record<string, PermissionConfig>;
-  role_hierarchy: Record<string, string[]>;
+  role_hierarchy: Record<
+    string,
+    | string[]
+    | { value: string[]; type: string; description: string; required: boolean }
+  >;
 }
 
 export interface PermissionConfig {
@@ -38,6 +52,16 @@ export class RoleManager {
 
   constructor(dataDir: string) {
     this.configPath = join(dataDir, '.civic', 'roles.yml');
+    logger.debug(`[RoleManager] Constructor called with dataDir: ${dataDir}`);
+    logger.debug(`[RoleManager] Config path set to: ${this.configPath}`);
+  }
+
+  /**
+   * Clear the cached configuration to force a reload
+   */
+  clearCache(): void {
+    this.config = null;
+    logger.debug('[RoleManager] Configuration cache cleared');
   }
 
   /**
@@ -58,17 +82,32 @@ export class RoleManager {
     }
   ): Promise<boolean> {
     try {
+      logger.debug(
+        `[RoleManager] userCan called for user '${user.username}' (role: ${user.role}) with permission: ${JSON.stringify(permission)}`
+      );
+
       const config = await this.loadConfig();
       const userRole = user.role;
 
+      logger.debug(
+        `[RoleManager] Loaded config with roles: ${Object.keys(config.roles).join(', ')}`
+      );
+
       // Handle array of permissions (any permission grants access)
       if (Array.isArray(permission)) {
-        return permission.some((p) =>
-          this.checkPermission(userRole, p, config, context)
+        logger.debug(
+          `[RoleManager] Checking array of permissions: ${permission.join(', ')}`
         );
+        const results = await Promise.all(
+          permission.map((p) =>
+            this.checkPermission(userRole, p, config, context)
+          )
+        );
+        return results.some(Boolean);
       }
 
-      return this.checkPermission(userRole, permission, config, context);
+      logger.debug(`[RoleManager] Checking single permission: ${permission}`);
+      return await this.checkPermission(userRole, permission, config, context);
     } catch (error) {
       logger.error('Role check failed:', error);
       return false;
@@ -115,7 +154,22 @@ export class RoleManager {
   async getDefaultRole(): Promise<string> {
     try {
       const config = await this.loadConfig();
-      return config.default_role || 'public';
+
+      // Handle both old format (direct string) and new format (metadata object)
+      if (typeof config.default_role === 'string') {
+        // Old format: direct string
+        return config.default_role;
+      } else if (
+        config.default_role &&
+        typeof config.default_role === 'object' &&
+        'value' in config.default_role
+      ) {
+        // New format: metadata object with value
+        return config.default_role.value;
+      }
+
+      // Fallback
+      return 'public';
     } catch (error) {
       logger.error('Failed to get default role:', error);
       return 'public';
@@ -204,16 +258,27 @@ export class RoleManager {
       const fileExists = fs.existsSync(this.configPath);
       logger.debug(`[RoleManager] roles.yml exists: ${fileExists}`);
       if (!fileExists) {
-        logger.debug(`[RoleManager] roles.yml not found, using default config`);
+        logger.info(`[RoleManager] roles.yml not found, using default config`);
         this.config = this.getDefaultConfig();
         return this.config;
       }
 
       const content = await readFile(this.configPath, 'utf-8');
+      logger.debug(
+        `[RoleManager] File content length: ${content.length} characters`
+      );
+      // omit preview for less verbosity
+
       const parsedConfig = yaml.load(content) as RolesConfig;
       logger.debug(
         `[RoleManager] Loaded roles: ${Object.keys(parsedConfig.roles).join(', ')}`
       );
+
+      // Reduce verbose debug output: keep only essential info-level logs
+      if (!parsedConfig.roles.admin) {
+        logger.warn(`[RoleManager] Admin role not found in parsed config`);
+      }
+
       this.config = parsedConfig;
       return this.config;
     } catch (error) {
@@ -226,7 +291,7 @@ export class RoleManager {
     }
   }
 
-  private checkPermission(
+  private async checkPermission(
     userRole: string,
     permission: string,
     config: RolesConfig,
@@ -236,17 +301,35 @@ export class RoleManager {
       fromStatus?: string;
       toStatus?: string;
     }
-  ): boolean {
+  ): Promise<boolean> {
+    logger.info(
+      `[RoleManager] Checking permission '${permission}' for role '${userRole}'`
+    );
+
     // If status transition context is present, only check status_transitions
     if (context?.fromStatus && context?.toStatus) {
       const roleConfig = config.roles[userRole];
       if (roleConfig) {
         if (roleConfig.status_transitions) {
+          // Handle both old format (direct array) and new format (metadata with value)
+          const statusTransitions = Array.isArray(roleConfig.status_transitions)
+            ? roleConfig.status_transitions
+            : roleConfig.status_transitions.value;
+
+          // statusTransitions should be an object with status keys, not an array
+          if (Array.isArray(statusTransitions)) {
+            // If it's an array, it's the old format - no status-specific transitions
+            return false;
+          }
+
           const allowedTransitions =
-            roleConfig.status_transitions[context.fromStatus] ||
-            roleConfig.status_transitions['any'] ||
+            statusTransitions[context.fromStatus] ||
+            statusTransitions['any'] ||
             [];
-          if (allowedTransitions.includes(context.toStatus)) {
+          if (
+            Array.isArray(allowedTransitions) &&
+            (allowedTransitions as string[]).includes(context.toStatus)
+          ) {
             return true;
           }
         }
@@ -256,27 +339,52 @@ export class RoleManager {
       // If role doesn't exist, check public role for status transitions
       const publicRole = config.roles['public'];
       if (publicRole?.status_transitions) {
+        // Handle both old format (direct array) and new format (metadata with value)
+        const publicStatusTransitions = Array.isArray(
+          publicRole.status_transitions
+        )
+          ? publicRole.status_transitions
+          : publicRole.status_transitions.value;
+
+        // publicStatusTransitions should be an object with status keys, not an array
+        if (Array.isArray(publicStatusTransitions)) {
+          // If it's an array, it's the old format - no status-specific transitions
+          return false;
+        }
+
         const publicAllowedTransitions =
-          publicRole.status_transitions[context.fromStatus] ||
-          publicRole.status_transitions['any'] ||
+          publicStatusTransitions[context.fromStatus] ||
+          publicStatusTransitions['any'] ||
           [];
-        if (publicAllowedTransitions.includes(context.toStatus)) {
+        if (
+          Array.isArray(publicAllowedTransitions) &&
+          (publicAllowedTransitions as string[]).includes(context.toStatus)
+        ) {
           return true;
         }
       }
       return false;
     }
 
-    // Get all permissions for the user role (including inherited)
-    const userPermissions = this.getRolePermissions(userRole, config);
+    // Get all permissions for the user role (including inherited permissions)
+    const userPermissions = await this.getRolePermissions(userRole, config);
+    logger.debug(`[RoleManager] Computed permissions for role '${userRole}'`);
+
+    // Remove verbose debug output of permissions content
 
     // Check if user has the specific permission
     if (userPermissions.includes(permission)) {
+      logger.debug(
+        `[RoleManager] Permission '${permission}' granted - found in user permissions`
+      );
       return true;
     }
 
     // Check if user has wildcard permission ('*')
     if (userPermissions.includes('*')) {
+      logger.debug(
+        `[RoleManager] Permission '${permission}' granted - user has wildcard '*' permission`
+      );
       return true;
     }
 
@@ -304,41 +412,171 @@ export class RoleManager {
       }
     }
 
+    logger.debug(
+      `[RoleManager] Permission '${permission}' denied for role '${userRole}'`
+    );
     return false;
   }
 
   private getRolePermissions(role: string, config: RolesConfig): string[] {
     const permissions = new Set<string>();
 
+    logger.debug(`[RoleManager] Getting permissions for role: ${role}`);
+
     // Get direct permissions for the role
     const roleConfig = config.roles[role];
+    logger.debug(
+      `[RoleManager] Role config for ${role}:`,
+      JSON.stringify(roleConfig, null, 2)
+    );
+
     if (roleConfig?.permissions) {
-      roleConfig.permissions.forEach((p) => permissions.add(p));
+      logger.debug(
+        `[RoleManager] Role ${role} has permissions field:`,
+        roleConfig.permissions
+      );
+
+      // Handle both old format (direct array) and new format (metadata with value)
+      let permissionArray: string[] | undefined;
+
+      if (Array.isArray(roleConfig.permissions)) {
+        logger.debug(
+          `[RoleManager] Role ${role} permissions is direct array format`
+        );
+        // Old format: direct array
+        permissionArray = roleConfig.permissions;
+      } else if (
+        roleConfig.permissions &&
+        typeof roleConfig.permissions === 'object' &&
+        roleConfig.permissions.value &&
+        Array.isArray(roleConfig.permissions.value)
+      ) {
+        logger.debug(
+          `[RoleManager] Role ${role} permissions is metadata format with value:`,
+          roleConfig.permissions.value
+        );
+        // New format: metadata object with value
+        permissionArray = roleConfig.permissions.value;
+
+        // Reduced: no direct dump of permission array
+      } else {
+        logger.debug(
+          `[RoleManager] Role ${role} permissions is neither array nor metadata format:`,
+          typeof roleConfig.permissions
+        );
+        // Reduced: no direct dump of permissions object
+      }
+
+      if (Array.isArray(permissionArray)) {
+        logger.debug(
+          `[RoleManager] Role ${role} permission array:`,
+          permissionArray
+        );
+        permissionArray.forEach((p) => permissions.add(p));
+      } else {
+        logger.debug(
+          `[RoleManager] Role ${role} permission array is not an array:`,
+          permissionArray
+        );
+      }
+    } else {
+      logger.debug(`[RoleManager] Role ${role} has no permissions field`);
     }
 
     // Get inherited permissions from role hierarchy (handle missing role_hierarchy)
-    const roleHierarchy = config.role_hierarchy || {};
-    const inheritedRoles = roleHierarchy[role] || [];
-    for (const inheritedRole of inheritedRoles) {
-      const inheritedPermissions = this.getRolePermissions(
-        inheritedRole,
-        config
+    try {
+      const roleHierarchy = config.role_hierarchy || {};
+      // No verbose output
+
+      // Handle both old format (direct array) and new format (metadata with value)
+      let inheritedRoles: string[] = [];
+      const hierarchyEntry = roleHierarchy[role];
+
+      if (Array.isArray(hierarchyEntry)) {
+        // Old format: direct array
+        inheritedRoles = hierarchyEntry;
+      } else if (
+        hierarchyEntry &&
+        typeof hierarchyEntry === 'object' &&
+        'value' in hierarchyEntry &&
+        Array.isArray(hierarchyEntry.value)
+      ) {
+        // New format: metadata object with value
+        inheritedRoles = hierarchyEntry.value;
+      }
+
+      // No verbose output
+
+      for (const inheritedRole of inheritedRoles) {
+        const inheritedPermissions = this.getRolePermissions(
+          inheritedRole,
+          config
+        );
+        inheritedPermissions.forEach((p) => permissions.add(p));
+      }
+    } catch (error) {
+      logger.error(
+        `[RoleManager] CRITICAL: Error in role hierarchy processing:`,
+        error
       );
-      inheritedPermissions.forEach((p) => permissions.add(p));
+      throw error;
     }
 
     // If role doesn't exist or has no permissions, fallback to public permissions
+    // No verbose fallback logs
+
     if (!roleConfig || permissions.size === 0) {
       logger.warn(
         `Role '${role}' not found or has no permissions, falling back to public role`
       );
-      const publicRole = config.roles['public'];
-      if (publicRole?.permissions) {
-        publicRole.permissions.forEach((p) => permissions.add(p));
+      try {
+        const publicRole = config.roles['public'];
+        logger.output(`Public role exists: ${!!publicRole}`);
+        if (publicRole?.permissions) {
+          // Handle both old format (direct array) and new format (metadata with value)
+          let publicPermissionArray: string[] | undefined;
+
+          if (Array.isArray(publicRole.permissions)) {
+            // Old format: direct array
+            publicPermissionArray = publicRole.permissions;
+          } else if (
+            publicRole.permissions &&
+            typeof publicRole.permissions === 'object' &&
+            'value' in publicRole.permissions
+          ) {
+            // New format: metadata object with value
+            publicPermissionArray = publicRole.permissions.value;
+          }
+
+          if (Array.isArray(publicPermissionArray)) {
+            publicPermissionArray.forEach((p) => permissions.add(p));
+          }
+        }
+      } catch (error) {
+        logger.error(
+          `[RoleManager] CRITICAL: Error in fallback processing:`,
+          error
+        );
+        throw error;
       }
     }
 
-    return Array.from(permissions);
+    // Proceed to conversion without verbose debug
+
+    // No verbose conversion logs
+
+    try {
+      const finalPermissions = Array.from(permissions);
+
+      logger.debug(
+        `[RoleManager] Final permissions for role ${role}`
+      );
+
+      return finalPermissions;
+    } catch (error) {
+      logger.error(`[RoleManager] CRITICAL: Error in Array.from:`, error);
+      throw error;
+    }
   }
 
   private getDefaultConfig(): RolesConfig {

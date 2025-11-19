@@ -4,6 +4,85 @@ export { CreateRecordRequest, UpdateRecordRequest } from './civic-core.js';
 
 // Export record management
 export { RecordManager, RecordData } from './records/record-manager.js';
+export { RecordParser } from './records/record-parser.js';
+export { RecordValidator } from './records/record-validator.js';
+export { RecordSchemaBuilder } from './records/record-schema-builder.js';
+export { RecordSchemaValidator } from './records/record-schema-validator.js';
+export {
+  buildRecordRelativePath,
+  buildArchiveRelativePath,
+  ensureDirectoryForRecordPath,
+  findRecordFileSync,
+  getRecordYear,
+  listRecordFilesSync,
+  parseRecordRelativePath,
+} from './utils/record-paths.js';
+export type {
+  ValidationError,
+  ValidationResult,
+} from './records/record-validator.js';
+
+// Export geography types and utilities
+export {
+  validateGeography,
+  normalizeGeography,
+  isEmptyGeography,
+  getGeographySummary,
+  GEOGRAPHY_CONSTANTS,
+} from './types/geography.js';
+export type {
+  Geography,
+  GeographyPoint,
+  GeographyBBox,
+  GeographyAttachment,
+  GeographyValidationResult,
+} from './types/geography.js';
+
+// Export new geography data system
+export { GeographyManager } from './geography/geography-manager.js';
+export { GeographyParser } from './geography/geography-parser.js';
+export {
+  validateColor,
+  colorToHex,
+  DEFAULT_COLOR_PALETTE,
+  getDefaultColor,
+} from './geography/geography-colors.js';
+export {
+  getGeographyPresets,
+  getGeographyPreset,
+  listGeographyPresets,
+  applyGeographyPreset,
+} from './geography/geography-presets.js';
+export type {
+  GeographyPreset,
+  GeographyPresetsConfig,
+} from './geography/geography-presets.js';
+export type {
+  GeographyFile,
+  GeographyFileType,
+  GeographyCategory,
+  GeographyRelationshipType,
+  SRID,
+  BoundingBox,
+  CenterCoordinates,
+  GeographyMetadata,
+  GeographyRelationship,
+  LinkedGeography,
+  RecordGeography,
+  CreateGeographyRequest,
+  UpdateGeographyRequest,
+  GeographyValidationResult as NewGeographyValidationResult,
+  ParsedGeographyData,
+  GeographyFormData,
+  GeographyFormErrors,
+  GeographyPreviewData,
+  GeographyError,
+  GeographyValidationError,
+  GeographyNotFoundError,
+  ColorMapping,
+  IconMapping,
+  IconConfig,
+} from './types/geography.js';
 
 // Export database services
 export { DatabaseService } from './database/database-service.js';
@@ -21,6 +100,11 @@ export {
 } from './auth/oauth-provider.js';
 export { AuthConfigManager } from './auth/auth-config.js';
 export { RoleManager } from './auth/role-manager.js';
+export {
+  EmailValidationService,
+  EmailChangeRequest,
+  EmailValidationResult,
+} from './auth/email-validation-service.js';
 
 // Export role-based authorization utilities
 export {
@@ -43,6 +127,17 @@ export { WorkflowConfigManager } from './config/workflow-config.js';
 export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
+export { AuditLogger } from './audit/audit-logger.js';
+export { DocumentNumberGenerator } from './utils/document-number-generator.js';
+export { ComplianceFieldHelpers } from './utils/compliance-helpers.js';
+export {
+  BackupService,
+  type BackupCreateOptions,
+  type BackupCreateResult,
+  type BackupRestoreOptions,
+  type BackupRestoreResult,
+  type BackupMetadata,
+} from './backup/backup-service.js';
 
 // Export utility functions for CLI use
 export async function loadConfig() {
@@ -84,6 +179,12 @@ export type {
   RecordStatusMetadata,
 } from './config/record-statuses.js';
 
+// Export document number format types
+export type {
+  DocumentNumberFormat,
+  DocumentNumberFormats,
+} from './config/central-config.js';
+
 // Export indexing services
 export { IndexingService } from './indexing/indexing-service.js';
 export type {
@@ -120,3 +221,14 @@ export type {
   SecurityValidationResult,
   LogEntry,
 } from './notifications/index.js';
+
+// Configuration Management
+export {
+  configurationService,
+  ConfigurationService,
+} from './config/configuration-service.js';
+export type {
+  ConfigurationServiceOptions,
+  ConfigurationMetadata,
+  ConfigurationFile,
+} from './config/configuration-service.js';

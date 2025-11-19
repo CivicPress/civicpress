@@ -27,7 +27,7 @@ agent/
 ├── context/                  # Contextual information
 │   ├── goals.md             # Current development goals
 │   ├── priorities.md        # Development priorities
-│   └── blockers.md          # Current blockers and issues
+│   # Note: blockers.md was removed (all blockers resolved)
 ├── knowledge/               # Domain knowledge base
 │   ├── patterns.md          # Development patterns and conventions
 │   ├── references.md        # External references and resources
@@ -128,6 +128,9 @@ assistance aligns with the project's comprehensive specification system.
 Feel free to ignore it if working solo — or expand it if using AI tools.
 
 ---
+
+**🌐 [civicpress.io](https://civicpress.io)** | **📧
+[hello@civicpress.io](mailto:hello@civicpress.io)**
 
 **NOTE:** This memory system is inspired by the
 [Agentic Project Management (APM)](https://github.com/sdi2200262/agentic-project-management)

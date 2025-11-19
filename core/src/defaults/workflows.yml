@@ -1,79 +1,171 @@
-statuses:
-  - draft
-  - proposed
-  - reviewed
-  - approved
-  - archived
+# Workflow Configuration
+# This file defines record statuses, transitions, and role-based permissions
 
-transitions:
-  draft:
+_metadata:
+  name: "Workflow & Status Management"
+  description: "Define record statuses, transitions, and role-based permissions"
+  version: "1.0.0"
+  editable: true
+
+# Available Record Statuses
+statuses:
+  value:
+    - draft
     - proposed
-    - archived
-  proposed:
     - reviewed
-    - archived
-  reviewed:
     - approved
     - archived
-  approved:
-    - archived
-  archived: []
+  type: 'array'
+  description: 'Available record statuses in the system'
+  required: true
 
+# Status Transitions (what statuses can transition to what)
+transitions:
+  draft:
+    value:
+      - proposed
+      - archived
+    type: 'array'
+    description: 'Statuses that draft can transition to'
+    required: true
+  proposed:
+    value:
+      - reviewed
+      - archived
+    type: 'array'
+    description: 'Statuses that proposed can transition to'
+    required: true
+  reviewed:
+    value:
+      - approved
+      - archived
+    type: 'array'
+    description: 'Statuses that reviewed can transition to'
+    required: true
+  approved:
+    value:
+      - archived
+    type: 'array'
+    description: 'Statuses that approved can transition to'
+    required: true
+  archived:
+    value: []
+    type: 'array'
+    description: 'Statuses that archived can transition to (usually none)'
+    required: true
+
+# Role-Based Permissions
 roles:
   admin:
     can_create:
-      - bylaw
-      - policy
-      - resolution
-      - proclamation
-      - ordinance
+      value:
+        - bylaw
+        - policy
+        - resolution
+        - proclamation
+        - ordinance
+      type: 'array'
+      description: 'Record types admin can create'
+      required: true
     can_edit:
-      - bylaw
-      - policy
-      - resolution
-      - proclamation
-      - ordinance
+      value:
+        - bylaw
+        - policy
+        - resolution
+        - proclamation
+        - ordinance
+      type: 'array'
+      description: 'Record types admin can edit'
+      required: true
     can_delete:
-      - bylaw
-      - policy
-      - resolution
-      - proclamation
-      - ordinance
+      value:
+        - bylaw
+        - policy
+        - resolution
+        - proclamation
+        - ordinance
+      type: 'array'
+      description: 'Record types admin can delete'
+      required: true
     can_view:
-      - bylaw
-      - policy
-      - resolution
-      - proclamation
-      - ordinance
+      value:
+        - bylaw
+        - policy
+        - resolution
+        - proclamation
+        - ordinance
+      type: 'array'
+      description: 'Record types admin can view'
+      required: true
     can_transition:
-      draft: [proposed, archived]
-      proposed: [reviewed, archived]
-      reviewed: [approved, archived]
-      approved: [archived]
-      any: [archived]
+      draft:
+        value: [proposed, archived]
+        type: 'array'
+        description: 'Statuses admin can transition draft records to'
+        required: true
+      proposed:
+        value: [reviewed, archived]
+        type: 'array'
+        description: 'Statuses admin can transition proposed records to'
+        required: true
+      reviewed:
+        value: [approved, archived]
+        type: 'array'
+        description: 'Statuses admin can transition reviewed records to'
+        required: true
+      approved:
+        value: [archived]
+        type: 'array'
+        description: 'Statuses admin can transition approved records to'
+        required: true
+      any:
+        value: [archived]
+        type: 'array'
+        description: 'Statuses admin can transition any record to'
+        required: true
 
   clerk:
     can_create:
-      - bylaw
-      - policy
-      - resolution
+      value:
+        - bylaw
+        - policy
+        - resolution
+      type: 'array'
+      description: 'Record types clerk can create'
+      required: true
     can_edit:
-      - bylaw
-      - policy
-      - resolution
+      value:
+        - bylaw
+        - policy
+        - resolution
+      type: 'array'
+      description: 'Record types clerk can edit'
+      required: true
     can_view:
-      - bylaw
-      - policy
-      - resolution
-      - proclamation
-      - ordinance
+      value:
+        - bylaw
+        - policy
+        - resolution
+        - proclamation
+        - ordinance
+      type: 'array'
+      description: 'Record types clerk can view'
+      required: true
     can_transition:
-      draft: [proposed]
+      draft:
+        value: [proposed]
+        type: 'array'
+        description: 'Statuses clerk can transition draft records to'
+        required: true
 
   public:
     can_view:
-      - bylaw
-      - policy
-      - resolution
-      - proclamation
-      - ordinance
+      value:
+        - bylaw
+        - policy
+        - resolution
+        - proclamation
+        - ordinance
+      type: 'array'
+      description: 'Record types public users can view'
+      required: true

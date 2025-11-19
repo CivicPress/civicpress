@@ -1,15 +1,34 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1705276800000"
 title: 'Règlement sur les restrictions de bruit'
 type: bylaw
-status: adopted
-module: legal-register
-tags: ['noise', 'nighttime', 'curfew', 'bruit', 'nuit']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "mctremblay"
 authors:
   - name: 'Marie-Claude Tremblay'
+    username: 'mctremblay'
     role: 'clerk'
-created: '2025-01-15'
-updated: '2025-02-01'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2025-01-15T10:00:00Z"
+updated: "2025-02-01T14:30:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['noise', 'nighttime', 'curfew', 'bruit', 'nuit']
+module: legal-register
 slug: 'noise-restrictions'
+version: "1.0.0"
 ---
 
 # Règlement sur les restrictions de bruit

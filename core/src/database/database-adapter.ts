@@ -5,7 +5,7 @@ import * as fs from 'fs';
 export interface DatabaseAdapter {
   connect(): Promise<void>;
   query(sql: string, params?: any[]): Promise<any[]>;
-  execute(sql: string, params?: any[]): Promise<void>;
+  execute(sql: string, params?: any[]): Promise<any>;
   close(): Promise<void>;
   initialize(): Promise<void>;
 }
@@ -66,18 +66,18 @@ export class SQLiteAdapter implements DatabaseAdapter {
     });
   }
 
-  async execute(sql: string, params: any[] = []): Promise<void> {
+  async execute(sql: string, params: any[] = []): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not connected'));
         return;
       }
 
-      this.db.run(sql, params, (err) => {
+      this.db.run(sql, params, function (err) {
         if (err) {
           reject(err);
         } else {
-          resolve();
+          resolve(this);
         }
       });
     });
@@ -112,6 +112,11 @@ export class SQLiteAdapter implements DatabaseAdapter {
         name TEXT,
         avatar_url TEXT,
         password_hash TEXT,
+        auth_provider TEXT DEFAULT 'password',
+        email_verified BOOLEAN DEFAULT FALSE,
+        pending_email TEXT,
+        pending_email_token TEXT,
+        pending_email_expires DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`,
@@ -157,6 +162,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
         status TEXT DEFAULT 'draft',
         content TEXT,
         metadata TEXT,
+        geography TEXT,
+        attached_files TEXT,
+        linked_records TEXT,
         path TEXT,
         author TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -175,10 +183,139 @@ export class SQLiteAdapter implements DatabaseAdapter {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
       )`,
+
+      // Storage files table for UUID-based file tracking
+      `CREATE TABLE IF NOT EXISTS storage_files (
+        id TEXT PRIMARY KEY, -- UUID
+        original_name TEXT NOT NULL,
+        stored_filename TEXT NOT NULL,
+        folder TEXT NOT NULL,
+        relative_path TEXT NOT NULL, -- folder/stored_filename
+        provider_path TEXT NOT NULL, -- full path in storage provider
+        size INTEGER NOT NULL,
+        mime_type TEXT NOT NULL,
+        description TEXT,
+        uploaded_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      // Email verification tokens table
+      `CREATE TABLE IF NOT EXISTS email_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('initial', 'change')),
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+      )`,
     ];
 
     for (const table of tables) {
-      await this.execute(table);
+      try {
+        await this.execute(table);
+      } catch (error) {
+        console.error('Error creating table:', error);
+        console.error('Table SQL:', table);
+        throw error;
+      }
+    }
+
+    // Add geography column to existing records table if it doesn't exist
+    try {
+      await this.execute('ALTER TABLE records ADD COLUMN geography TEXT');
+    } catch (error) {
+      // Column already exists, ignore error
+      console.log('Geography column already exists or migration not needed');
+    }
+
+    // Add attached_files column to existing records table if it doesn't exist
+    try {
+      await this.execute('ALTER TABLE records ADD COLUMN attached_files TEXT');
+    } catch (error) {
+      // Column already exists, ignore error
+      console.log(
+        'Attached files column already exists or migration not needed'
+      );
+    }
+
+    // Add linked_records column to existing records table if it doesn't exist
+    try {
+      await this.execute('ALTER TABLE records ADD COLUMN linked_records TEXT');
+    } catch (error) {
+      // Column already exists, ignore error
+      console.log(
+        'Linked records column already exists or migration not needed'
+      );
+    }
+
+    // Add linked_geography_files column to existing records table if it doesn't exist
+    try {
+      await this.execute(
+        'ALTER TABLE records ADD COLUMN linked_geography_files TEXT'
+      );
+    } catch (error) {
+      // Column already exists, ignore error
+      console.log(
+        'Linked geography files column already exists or migration not needed'
+      );
+    }
+
+    // Security Enhancement Migrations - Add new user security fields
+    const userSecurityMigrations = [
+      {
+        column: 'auth_provider',
+        sql: 'ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT "password"',
+        description: 'Authentication provider tracking',
+      },
+      {
+        column: 'email_verified',
+        sql: 'ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE',
+        description: 'Email verification status',
+      },
+      {
+        column: 'pending_email',
+        sql: 'ALTER TABLE users ADD COLUMN pending_email TEXT',
+        description: 'Pending email change',
+      },
+      {
+        column: 'pending_email_token',
+        sql: 'ALTER TABLE users ADD COLUMN pending_email_token TEXT',
+        description: 'Email change verification token',
+      },
+      {
+        column: 'pending_email_expires',
+        sql: 'ALTER TABLE users ADD COLUMN pending_email_expires DATETIME',
+        description: 'Email change token expiration',
+      },
+    ];
+
+    for (const migration of userSecurityMigrations) {
+      try {
+        await this.execute(migration.sql);
+        console.log(
+          `✓ Added ${migration.column} column for ${migration.description}`
+        );
+      } catch (error) {
+        // Column already exists, ignore error
+        console.log(
+          `${migration.column} column already exists or migration not needed`
+        );
+      }
+    }
+
+    // Set default auth_provider for existing users with password_hash
+    try {
+      await this.execute(`
+        UPDATE users 
+        SET auth_provider = 'password', email_verified = TRUE 
+        WHERE password_hash IS NOT NULL AND auth_provider IS NULL
+      `);
+      console.log('✓ Updated existing password users with auth_provider');
+    } catch (error) {
+      console.log('Auth provider update not needed or already completed');
     }
   }
 }

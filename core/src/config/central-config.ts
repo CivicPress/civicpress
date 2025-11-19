@@ -16,6 +16,13 @@ import {
   getRecordStatusesWithMetadata,
 } from './record-statuses.js';
 
+export interface AnalyticsConfig {
+  enabled?: boolean;
+  inject_head?: string;
+  inject_body_start?: string;
+  inject_body_end?: string;
+}
+
 export interface OrgConfig {
   // Basic Organization Information
   name?: string;
@@ -40,6 +47,9 @@ export interface OrgConfig {
   tagline?: string | null;
   mission?: string | null;
 
+  // Demo Information
+  about_intro?: string | null;
+
   // Social Media
   social?: {
     twitter?: string | null;
@@ -61,6 +71,17 @@ export interface OrgConfig {
   updated?: string;
 }
 
+export interface DocumentNumberFormat {
+  prefix: string;
+  year_format: 'full' | 'short';
+  separator: string;
+  sequence_padding: number;
+}
+
+export interface DocumentNumberFormats {
+  [recordType: string]: DocumentNumberFormat;
+}
+
 export interface CentralConfig {
   dataDir?: string;
   // System configuration (from .civicrc)
@@ -68,6 +89,7 @@ export interface CentralConfig {
   record_types?: string[];
   record_types_config?: RecordTypesConfig;
   record_statuses_config?: RecordStatusesConfig;
+  document_number_formats?: DocumentNumberFormats;
   default_role?: string;
   hooks?: {
     enabled?: boolean;
@@ -213,6 +235,23 @@ export class CentralConfigManager {
       };
     }
 
+    // Deprecation notices for legacy fields
+    const deprecated: Array<keyof CentralConfig> = [
+      'modules',
+      'record_types',
+      'record_types_config',
+      'record_statuses_config',
+    ];
+    for (const key of deprecated) {
+      if ((mergedConfig as any)[key] && process.env.NODE_ENV !== 'test') {
+        this.logger.warn(
+          `Deprecated: '${String(
+            key
+          )}' in .civicrc is deprecated. Prefer data/.civic/config.yml.`
+        );
+      }
+    }
+
     this.config = mergedConfig;
     return this.config;
   }
@@ -226,6 +265,21 @@ export class CentralConfigManager {
       throw new Error('dataDir is not configured');
     }
     return config.dataDir;
+  }
+
+  /**
+   * Load YAML if it exists; otherwise return null
+   */
+  private static loadYamlIfExists(filePath: string): any | null {
+    try {
+      if (fs.existsSync(filePath)) {
+        const txt = fs.readFileSync(filePath, 'utf8');
+        return yaml.parse(txt);
+      }
+    } catch (err) {
+      this.logger.warn(`Warning: Could not parse ${filePath}:`, err);
+    }
+    return null;
   }
 
   /**
@@ -248,17 +302,56 @@ export class CentralConfigManager {
         return yaml.parse(configContent) as OrgConfig;
       } catch (error) {
         this.logger.warn(`Warning: Could not parse ${orgConfigPath}:`, error);
+        throw new Error(
+          `Invalid org-config.yml. Fix ${orgConfigPath} or copy from core/src/defaults/org-config.yml`
+        );
       }
     }
 
-    // Return default values if org config doesn't exist
+    // Do not run from defaults silently; require explicit user config
+    const msg =
+      `Organization config not found at ${orgConfigPath}. ` +
+      `Please create it (e.g., copy core/src/defaults/org-config.yml to data/.civic/org-config.yml).`;
+    this.logger.warn(msg);
+    throw new Error(msg);
+  }
+
+  /**
+   * Get analytics configuration
+   * Returns config from analytics.yml, or defaults if not found
+   */
+  static getAnalyticsConfig(): AnalyticsConfig {
+    const dataDir = this.getDataDir();
+    const analyticsConfigPath = path.join(dataDir, '.civic', 'analytics.yml');
+
+    const userConfig = this.loadYamlIfExists(analyticsConfigPath);
+
+    if (userConfig) {
+      // Extract values from metadata format if present
+      const enabled = userConfig.enabled?.value ?? userConfig.enabled ?? false;
+      const inject_head =
+        userConfig.inject_head?.value ?? userConfig.inject_head ?? '';
+      const inject_body_start =
+        userConfig.inject_body_start?.value ??
+        userConfig.inject_body_start ??
+        '';
+      const inject_body_end =
+        userConfig.inject_body_end?.value ?? userConfig.inject_body_end ?? '';
+
+      return {
+        enabled: enabled === true || enabled === 'true',
+        inject_head: inject_head || '',
+        inject_body_start: inject_body_start || '',
+        inject_body_end: inject_body_end || '',
+      };
+    }
+
+    // Return defaults if config doesn't exist
     return {
-      name: 'Civic Records',
-      city: 'Richmond',
-      state: 'Quebec',
-      country: 'Canada',
-      timezone: 'America/Montreal',
-      repo_url: null,
+      enabled: false,
+      inject_head: '',
+      inject_body_start: '',
+      inject_body_end: '',
     };
   }
 
@@ -285,43 +378,45 @@ export class CentralConfigManager {
   }
 
   /**
-   * Get organization name
-   */
-  static getOrganizationName(): string | undefined {
-    return this.getOrgConfig().name;
-  }
-
-  /**
-   * Get organization location (city, state, country)
-   */
-  static getOrganizationLocation(): {
-    city?: string;
-    state?: string;
-    country?: string;
-  } {
-    const orgConfig = this.getOrgConfig();
-    return {
-      city: orgConfig.city,
-      state: orgConfig.state,
-      country: orgConfig.country,
-    };
-  }
-
-  /**
-   * Get record types configuration
+   * Get record types configuration (prefers data/.civic/config.yml, then defaults, then deprecated .civicrc)
    */
   static getRecordTypesConfig(): RecordTypesConfig {
     const config = this.getConfig();
+    const dataDir = this.getDataDir();
 
-    // Start with default record types
-    let recordTypes = { ...DEFAULT_RECORD_TYPES };
+    // Prefer user data/.civic/config.yml
+    const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
+    const userConfig = this.loadYamlIfExists(userConfigPath);
 
-    // Merge with config if present
-    if (config.record_types_config) {
-      recordTypes = mergeRecordTypes(recordTypes, config.record_types_config);
+    // If user config present, use it
+    if (userConfig && userConfig.record_types_config) {
+      return mergeRecordTypes(
+        { ...DEFAULT_RECORD_TYPES },
+        userConfig.record_types_config as RecordTypesConfig
+      );
     }
 
-    return recordTypes;
+    // Accept deprecated .civicrc fields as last resort (with prior warning)
+    if (config.record_types_config) {
+      return mergeRecordTypes(
+        { ...DEFAULT_RECORD_TYPES },
+        config.record_types_config
+      );
+    }
+
+    // If no config found, return defaults (don't throw in test environment)
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+      this.logger.warn(
+        `Record types config not found at ${userConfigPath}, using defaults`
+      );
+      return { ...DEFAULT_RECORD_TYPES };
+    }
+
+    const msg =
+      `Record types config not found at ${userConfigPath}. ` +
+      `Please create it (copy from core/src/defaults/config.yml → record_types_config) or migrate from .civicrc.`;
+    this.logger.warn(msg);
+    throw new Error(msg);
   }
 
   /**
@@ -341,18 +436,42 @@ export class CentralConfigManager {
   }
 
   /**
-   * Get record statuses configuration
+   * Get record statuses configuration (prefers data/.civic/config.yml, then defaults, then deprecated .civicrc)
    */
   static getRecordStatusesConfig(): RecordStatusesConfig {
     const config = this.getConfig();
-    let recordStatuses = { ...DEFAULT_RECORD_STATUSES };
+    const dataDir = this.getDataDir();
+
+    const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
+    const userConfig = this.loadYamlIfExists(userConfigPath);
+
+    if (userConfig && userConfig.record_statuses_config) {
+      return mergeRecordStatuses(
+        { ...DEFAULT_RECORD_STATUSES },
+        userConfig.record_statuses_config as RecordStatusesConfig
+      );
+    }
+
     if (config.record_statuses_config) {
-      recordStatuses = mergeRecordStatuses(
-        recordStatuses,
+      return mergeRecordStatuses(
+        { ...DEFAULT_RECORD_STATUSES },
         config.record_statuses_config
       );
     }
-    return recordStatuses;
+
+    // If no config found, return defaults (don't throw in test environment)
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+      this.logger.warn(
+        `Record statuses config not found at ${userConfigPath}, using defaults`
+      );
+      return { ...DEFAULT_RECORD_STATUSES };
+    }
+
+    const msg =
+      `Record statuses config not found at ${userConfigPath}. ` +
+      `Please create it (copy from core/src/defaults/config.yml → record_statuses_config) or migrate from .civicrc.`;
+    this.logger.warn(msg);
+    throw new Error(msg);
   }
 
   /**
@@ -361,6 +480,64 @@ export class CentralConfigManager {
   static validateRecordStatuses(): string[] {
     const recordStatuses = this.getRecordStatusesConfig();
     return validateRecordStatusConfig(recordStatuses);
+  }
+
+  /**
+   * Get document number formats configuration
+   * Returns formats from config.yml (prefers data/.civic/config.yml, then defaults)
+   */
+  static getDocumentNumberFormats(): DocumentNumberFormats {
+    const config = this.getConfig();
+    const dataDir = this.getDataDir();
+
+    const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
+    const userConfig = this.loadYamlIfExists(userConfigPath);
+
+    if (userConfig && userConfig.document_number_formats) {
+      return userConfig.document_number_formats as DocumentNumberFormats;
+    }
+
+    if (config.document_number_formats) {
+      return config.document_number_formats;
+    }
+
+    // Return empty object if not configured (will use defaults in DocumentNumberGenerator)
+    return {};
+  }
+
+  /**
+   * Validate document number formats configuration
+   */
+  static validateDocumentNumberFormats(): string[] {
+    const formats = this.getDocumentNumberFormats();
+    const errors: string[] = [];
+
+    for (const [recordType, format] of Object.entries(formats)) {
+      if (!format.prefix || typeof format.prefix !== 'string') {
+        errors.push(
+          `Document number format for ${recordType}: missing or invalid prefix`
+        );
+      }
+      if (
+        format.year_format &&
+        !['full', 'short'].includes(format.year_format)
+      ) {
+        errors.push(
+          `Document number format for ${recordType}: year_format must be 'full' or 'short'`
+        );
+      }
+      if (
+        format.sequence_padding &&
+        (typeof format.sequence_padding !== 'number' ||
+          format.sequence_padding < 1)
+      ) {
+        errors.push(
+          `Document number format for ${recordType}: sequence_padding must be a positive number`
+        );
+      }
+    }
+
+    return errors;
   }
 
   /**

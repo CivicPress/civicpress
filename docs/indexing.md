@@ -259,5 +259,5 @@ The indexing system integrates with:
 
 - [CLI Usage Guide](cli.md)
 - [API Integration Guide](api-integration-guide.md)
-- [Data Structure Spec](../.civic/specs/public-data-structure.md)
-- [Indexing Spec](../.civic/specs/indexing.md)
+- [Data Structure Spec](specs/public-data-structure.md)
+- [Indexing Spec](specs/indexing.md)

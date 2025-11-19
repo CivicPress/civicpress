@@ -1,137 +1,174 @@
 <script setup lang="ts">
-import type { DropdownMenuItem } from '@nuxt/ui'
+import type { DropdownMenuItem } from '@nuxt/ui';
 
 interface Props {
-    collapsed?: boolean
+  collapsed?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    collapsed: false
-})
+  collapsed: false,
+});
 
-const authStore = useAuthStore()
-const colorMode = useColorMode()
+const authStore = useAuthStore();
+const colorMode = useColorMode();
+const { locale, locales, setLocale, t } = useI18n();
+
+// Load saved locale from localStorage on mount
+onMounted(async () => {
+  if (process.client) {
+    const savedLocale = localStorage.getItem('i18n_locale');
+    if (savedLocale && (savedLocale === 'en' || savedLocale === 'fr')) {
+      await setLocale(savedLocale);
+    }
+  }
+});
+
+// Watch for locale changes and persist to localStorage
+watch(locale, (newLocale) => {
+  if (process.client) {
+    localStorage.setItem('i18n_locale', newLocale);
+  }
+});
 
 const generateAvatar = () => {
-
-    if (authStore.currentUser?.avatar_url) {
-        if (authStore.currentUser.avatar_url.includes('https://')) {
-            return {
-                src: authStore.currentUser.avatar_url,
-                alt: authStore.currentUser.name
-            }
-        } else {
-            return {
-                src: authStore.currentUser.avatar_url,
-                alt: authStore.currentUser.name
-            }
-        }
+  if (authStore.currentUser?.avatar_url) {
+    if (authStore.currentUser.avatar_url.includes('https://')) {
+      return {
+        src: authStore.currentUser.avatar_url,
+        alt: authStore.currentUser.name,
+      };
     } else {
-        return {
-            src: undefined,
-            alt: authStore.currentUser?.name || 'User'
-        }
+      return {
+        src: authStore.currentUser.avatar_url,
+        alt: authStore.currentUser.name,
+      };
     }
-}
+  } else {
+    return {
+      src: undefined,
+      alt: authStore.currentUser?.name || 'User',
+    };
+  }
+};
 
 const items = computed<DropdownMenuItem[][]>(() => {
-    const menuItems: DropdownMenuItem[][] = []
+  const menuItems: DropdownMenuItem[][] = [];
 
-    // User info section (only if logged in)
-    if (authStore.isLoggedIn && authStore.currentUser) {
+  if (authStore.isLoggedIn && authStore.currentUser) {
+    // User label
 
-        menuItems.push([{
-            type: 'label',
-            label: authStore.currentUser.name,
-            avatar: generateAvatar()
-        }])
+    // Direct profile + (optional) settings link
+    menuItems.push([
+      {
+        label: t('common.profile'),
+        icon: 'i-lucide-user',
+        onClick: () => navigateTo('/settings/profile'),
+      },
+      {
+        label: t('common.settings'),
+        icon: 'i-lucide-settings',
+        onClick: () => navigateTo('/settings'),
+      },
+    ]);
+  }
 
-        // Settings section (only if logged in)
-        menuItems.push([{
-            label: 'Settings',
-            icon: 'i-lucide-settings',
-            children: [{
-                label: 'Profile',
-                icon: 'i-lucide-user',
-                onClick: () => navigateTo('/settings/profile')
-            },
-            // Only show Users link for admin and clerk users
-            ...(authStore.currentUser?.role === 'admin' || authStore.currentUser?.role === 'clerk' ? [{
-                label: 'Users',
-                icon: 'i-lucide-users',
-                onClick: () => navigateTo('/settings/users')
-            }] : [])
-            ]
-        }])
-    }
+  // Appearance (light/dark) – always available
+  menuItems.push([
+    {
+      label: t('common.appearance'),
+      icon: 'i-lucide-sun-moon',
+      children: [
+        {
+          label: t('common.light'),
+          icon: 'i-lucide-sun',
+          type: 'checkbox',
+          checked: colorMode.value === 'light',
+          onSelect(e: Event) {
+            e.preventDefault();
+            colorMode.preference = 'light';
+          },
+        },
+        {
+          label: t('common.dark'),
+          icon: 'i-lucide-moon',
+          type: 'checkbox',
+          checked: colorMode.value === 'dark',
+          onSelect(e: Event) {
+            e.preventDefault();
+            colorMode.preference = 'dark';
+            // or use onUpdateChecked if you prefer
+          },
+        },
+      ],
+    },
+    {
+      label: t('common.language'),
+      icon: 'i-lucide-languages',
+      children: (locales.value as any[]).map((loc: any) => ({
+        label: loc.name,
+        icon: loc.code === 'en' ? 'i-lucide-languages' : 'i-lucide-languages',
+        type: 'checkbox',
+        checked: locale.value === loc.code,
+        async onSelect(e: Event) {
+          e.preventDefault();
+          await setLocale(loc.code);
+        },
+      })),
+    },
+  ]);
 
-    // Appearance section (always available)
-    menuItems.push([{
-        label: 'Appearance',
-        icon: 'i-lucide-sun-moon',
-        children: [{
-            label: 'Light',
-            icon: 'i-lucide-sun',
-            type: 'checkbox',
-            checked: colorMode.value === 'light',
-            onSelect(e: Event) {
-                e.preventDefault()
-                colorMode.preference = 'light'
-            }
-        }, {
-            label: 'Dark',
-            icon: 'i-lucide-moon',
-            type: 'checkbox',
-            checked: colorMode.value === 'dark',
-            onUpdateChecked(checked: boolean) {
-                if (checked) {
-                    colorMode.preference = 'dark'
-                }
-            },
-            onSelect(e: Event) {
-                e.preventDefault()
-            }
-        }]
-    }])
+  // Auth actions
+  if (authStore.isLoggedIn) {
+    menuItems.push([
+      {
+        label: t('common.logOut'),
+        icon: 'i-lucide-log-out',
+        onClick: () => navigateTo('/auth/logout'),
+      },
+    ]);
+  } else {
+    menuItems.push([
+      {
+        label: t('common.logIn'),
+        icon: 'i-lucide-log-in',
+        onClick: () => navigateTo('/auth/login'),
+      },
+    ]);
+  }
 
-    // Login/Logout options based on auth state
-    if (authStore.isLoggedIn) {
-        menuItems.push([{
-            label: 'Log out',
-            icon: 'i-lucide-log-out',
-            onClick: () => navigateTo('/auth/logout')
-        }])
-    } else {
-        menuItems.push([{
-            label: 'Log in',
-            icon: 'i-lucide-log-in',
-            onClick: () => {
-                navigateTo('/auth/login')
-            }
-        }])
-    }
-
-    return menuItems
-})
-
+  return menuItems;
+});
 </script>
 
 <template>
-    <UDropdownMenu :items="items" :content="{ align: 'center', collisionPadding: 12 }"
-        :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }">
-        <UButton v-bind="{
-            label: collapsed ? undefined : authStore.currentUser?.name || 'Guest',
-            avatar: generateAvatar(),
-            trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down'
-        }" color="neutral" variant="ghost" block :square="collapsed" class="data-[state=open]:bg-elevated" :ui="{
-            trailingIcon: 'text-dimmed'
-        }" />
+  <UDropdownMenu
+    :items="items"
+    :content="{ align: 'center', collisionPadding: 12 }"
+    :ui="{
+      content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)',
+    }"
+  >
+    <UButton
+      v-bind="{
+        label: collapsed ? undefined : authStore.currentUser?.name || 'Guest',
+        avatar: generateAvatar(),
+        trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down',
+      }"
+      color="neutral"
+      variant="ghost"
+      block
+      :square="collapsed"
+      class="data-[state=open]:bg-elevated"
+      :ui="{
+        trailingIcon: 'text-dimmed',
+      }"
+    />
 
-        <!-- <template #chip-leading="{ item }">
+    <!-- <template #chip-leading="{ item }">
             <span :style="{
                 '--chip-light': `var(--color-${(item as any).chip}-500)`,
                 '--chip-dark': `var(--color-${(item as any).chip}-400)`
             }" class="ms-0.5 size-2 rounded-full bg-(--chip-light) dark:bg-(--chip-dark)" />
         </template> -->
-    </UDropdownMenu>
+  </UDropdownMenu>
 </template>

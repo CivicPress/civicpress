@@ -1,6 +1,9 @@
-# 🚀 **START HERE - Agent Session Guide**
+# 🚀 START HERE - Agent Session Guide
 
-**Read this before starting any work on CivicPress**
+> Read this before starting any work on CivicPress
+
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
 
 ## 📋 **Quick Project Overview**
 
@@ -56,11 +59,11 @@ cat agent/sessions/current-session.md
 
 ### **Project State**
 
-- `PROJECT_STATUS.md` - Current project health and roadmap
+- `docs/project-status.md` - Current project health and roadmap
 - `README.md` - Platform overview and getting started
-- `TODO.md` - Current priorities and next steps
+- `docs/todo.md` - Current priorities and next steps
 
-### **Agent Memory**
+### Agent Memory Files
 
 - `agent/memory/project-state.md` - Detailed project status
 - `agent/memory/lessons.md` - Technical insights and patterns
@@ -101,13 +104,13 @@ cat agent/sessions/current-session.md
 
 ## 🆘 **Need Help?**
 
-- **Project Status**: Check `PROJECT_STATUS.md`
+- **Project Status**: Check `docs/project-status.md`
 - **Technical Decisions**: Review `agent/memory/decisions.md`
 - **Lessons Learned**: See `agent/memory/lessons.md`
 - **Specifications**: Browse `docs/specs-index.md`
 
 ---
 
-**Ready to work on CivicPress! 🚀**
+Ready to work on CivicPress! 🚀
 
 _Remember: Save your memory before ending the session!_

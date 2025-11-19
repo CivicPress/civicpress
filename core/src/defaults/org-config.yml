@@ -2,43 +2,177 @@
 # This file contains branding and organization information
 # It is versioned with your repository and can evolve over time
 
+_metadata:
+  name: 'Organization Configuration'
+  description: 'Organization branding, contact information, and system settings'
+  version: '1.0.0'
+  editable: true
+
 # Basic Organization Information
-name: Civic Records
-city: Richmond
-state: Quebec
-country: Canada
-timezone: America/Montreal
+name:
+  value: 'Civic Records'
+  type: 'string'
+  description: 'Official organization name'
+  required: true
+
+city:
+  value: 'Richmond'
+  type: 'string'
+  description: 'City or municipality name'
+  required: true
+
+state:
+  value: 'Quebec'
+  type: 'string'
+  description: 'State, province, or region'
+  required: true
+
+country:
+  value: 'Canada'
+  type: 'string'
+  description: 'Country name'
+  required: true
+
+timezone:
+  value: 'America/Montreal'
+  type: 'array'
+  options:
+    [
+      { value: 'America/New_York', label: 'Eastern Time (ET)' },
+      { value: 'America/Chicago', label: 'Central Time (CT)' },
+      { value: 'America/Denver', label: 'Mountain Time (MT)' },
+      { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+      { value: 'America/Halifax', label: 'Atlantic Time (AT)' },
+      { value: 'America/St_Johns', label: 'Newfoundland Time (NT)' },
+      { value: 'Europe/London', label: 'Greenwich Mean Time (GMT)' },
+      { value: 'Europe/Paris', label: 'Central European Time (CET)' },
+      { value: 'Europe/Athens', label: 'Eastern European Time (EET)' },
+      { value: 'Asia/Tokyo', label: 'Japan Standard Time (JST)' },
+      { value: 'Asia/Shanghai', label: 'China Standard Time (CST)' },
+      { value: 'Asia/Kolkata', label: 'India Standard Time (IST)' },
+      { value: 'Australia/Sydney', label: 'Australian Eastern Time (AET)' },
+      { value: 'Pacific/Auckland', label: 'New Zealand Standard Time (NZST)' },
+      { value: 'America/Montreal', label: 'Eastern Time - Montreal' },
+    ]
+  description: 'Primary timezone for the organization'
+  required: true
 
 # Contact and Online Presence
-website: null
-repo_url: null
-email: null
-phone: null
+website:
+  value: null
+  type: 'string:url'
+  description: 'Official organization website'
+  required: false
+
+repo_url:
+  value: null
+  type: 'string:url'
+  description: 'Git repository for civic records'
+  required: false
+
+email:
+  value: null
+  type: 'string:email'
+  description: 'Primary contact email'
+  required: false
+
+phone:
+  value: null
+  type: 'string:phone'
+  description: 'Primary contact phone number'
+  required: false
 
 # Branding Assets (relative paths from data/.civic/)
-logo: null
-favicon: null
-banner: null
+logo:
+  value: null
+  type: 'string'
+  description: 'Path to organization logo (relative to .civic/brand-assets/)'
+  required: false
+
+favicon:
+  value: null
+  type: 'string'
+  description: 'Path to organization favicon'
+  required: false
+
+banner:
+  value: null
+  type: 'string'
+  description: 'Path to organization banner image'
+  required: false
 
 # Additional Branding Information
-description: null
-tagline: null
-mission: null
+description:
+  value: null
+  type: 'string:textarea'
+  description: 'Brief description of your organization'
+  required: false
+
+about_intro:
+  value: |
+    This is an example CivicPress deployment. It includes sample bylaws, meeting minutes, and geography layers to demonstrate how documents, sessions, and zones appear in an open, transparent civic registry.
+
+    You can customize this text by editing the about_intro field in data/.civic/org-config.yml.
+  type: 'string:textarea'
+  description: 'Homepage introduction copy for the public demo'
+  required: false
+
+tagline:
+  value: null
+  type: 'string'
+  description: 'Short, memorable tagline'
+  required: false
+
+mission:
+  value: null
+  type: 'string:textarea'
+  description: 'Detailed mission statement'
+  required: false
 
 # Social Media (optional)
 social:
-  twitter: null
-  facebook: null
-  linkedin: null
-  instagram: null
+  twitter:
+    value: null
+    type: 'string:url'
+    description: 'Twitter/X profile URL'
+    required: false
+  facebook:
+    value: null
+    type: 'string:url'
+    description: 'Facebook page URL'
+    required: false
+  linkedin:
+    value: null
+    type: 'string:url'
+    description: 'LinkedIn company page URL'
+    required: false
+  instagram:
+    value: null
+    type: 'string:url'
+    description: 'Instagram profile URL'
+    required: false
 
 # Custom Branding Fields (can be extended)
 custom:
-  primary_color: null
-  secondary_color: null
-  font_family: null
+  primary_color:
+    value: null
+    type: 'string'
+    description: 'Primary brand color (hex code)'
+    required: false
+  secondary_color:
+    value: null
+    type: 'string'
+    description: 'Secondary brand color (hex code)'
+    required: false
+  font_family:
+    value: null
+    type: 'string'
+    description: 'Preferred font family'
+    required: false
 
-# Metadata
-version: 1.0.0
-created: null
-updated: null
+# Public Demo Metadata
+version:
+  value: '0.1.1'
+  type: 'string'
+  description: 'Public-facing release version label for this deployment'
+  required: false

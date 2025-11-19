@@ -10,7 +10,7 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - security considerations fixes: [] migration_guide: null compatibility:
   min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
   - 'public-data-structure.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -235,6 +235,18 @@ Errors are shown with file, line, and reason:
 - Test role validation against `.civic/roles.yml`
 - Ensure proper error messages and formatting
 - Test CLI integration with other commands
+
+---
+
+## 🐞 Known Issues
+
+- **CLI re-serialization bug**: `civic validate <record>` currently rebuilds the
+  markdown via `RecordParser.serializeToMarkdown()` before running schema
+  checks. When validating files outside `data/records/`, this conversion turns
+  ISO 8601 strings into `Date` objects, so Ajv reports type errors for `date`,
+  `created`, `updated`, and `source.imported_at`. Copy the file into
+  `data/records/` or call `RecordSchemaValidator.validate()` directly until the
+  CLI helper is patched.
 
 ---
 

@@ -137,13 +137,15 @@ export default function setupUsersCommand(cli: CAC) {
         const saltRounds = 12;
         const passwordHash = await bcrypt.hash(password, saltRounds);
 
-        // Create user
+        // Create user with password authentication
         const newUser = await authService.createUserWithPassword({
           username,
           email,
           name,
           role,
           passwordHash,
+          auth_provider: 'password', // Explicitly set for CLI-created users
+          email_verified: false, // Require email verification for new users
         });
 
         if (options.json) {
@@ -325,11 +327,27 @@ export default function setupUsersCommand(cli: CAC) {
           if (!options.silent) console.error('User not found');
           process.exit(1);
         }
+        const authService = civic.getAuthService();
+
         const updates: any = {};
         if (email) updates.email = email;
         if (name) updates.name = name;
         if (role) updates.role = role;
         if (password) {
+          // SECURITY GUARD: Check if user can set password
+          if (!authService.canSetPassword(targetUser)) {
+            const provider = authService.getUserAuthProvider(targetUser);
+            if (!options.silent) {
+              console.error(
+                `Error: User '${targetUser.username}' is authenticated via ${provider}`
+              );
+              console.error(
+                'Password management is handled by the external provider'
+              );
+            }
+            process.exit(1);
+          }
+
           const bcrypt = await import('bcrypt');
           updates.passwordHash = await bcrypt.hash(password, 12);
         }
@@ -527,6 +545,681 @@ export default function setupUsersCommand(cli: CAC) {
             '❌ Failed to delete test users:',
             error instanceof Error ? error.message : 'Unknown error'
           );
+        }
+        process.exit(1);
+      }
+    });
+
+  // ===============================
+  // NEW SECURITY COMMANDS
+  // ===============================
+
+  cli
+    .command('users:change-password <username>', 'Change user password')
+    .option('--token <token>', 'Session token for authentication')
+    .option('--current-password <password>', 'Current password')
+    .option('--new-password <password>', 'New password')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (username, options) => {
+      try {
+        // Validate authentication
+        const authInfo = await AuthUtils.validateAuth(options.token);
+        if (!authInfo.isValid) {
+          if (!options.silent) {
+            console.error('Error: Authentication required');
+          }
+          process.exit(1);
+        }
+
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Get user by username
+        const user = await authService.getUserByUsername(username);
+        if (!user) {
+          if (!options.silent) {
+            console.error(`Error: User '${username}' not found`);
+          }
+          process.exit(1);
+        }
+
+        // Check if user can set password
+        if (!authService.canSetPassword(user)) {
+          const provider = authService.getUserAuthProvider(user);
+          if (!options.silent) {
+            console.error(
+              `Error: User '${username}' is authenticated via ${provider}`
+            );
+            console.error(
+              'Password changes must be done through the external provider'
+            );
+          }
+          process.exit(1);
+        }
+
+        let currentPassword = options.currentPassword;
+        let newPassword = options.newPassword;
+
+        // Interactive prompts if not provided
+        if (!currentPassword || !newPassword) {
+          const inquirer = await import('inquirer');
+          const prompts = [];
+
+          if (!currentPassword) {
+            prompts.push({
+              type: 'password',
+              name: 'currentPassword',
+              message: 'Current password:',
+              validate: (input: string) => {
+                if (!input.trim()) return 'Current password is required';
+                return true;
+              },
+            });
+          }
+
+          if (!newPassword) {
+            prompts.push({
+              type: 'password',
+              name: 'newPassword',
+              message: 'New password:',
+              validate: (input: string) => {
+                if (!input.trim()) return 'New password is required';
+                if (input.length < 8)
+                  return 'Password must be at least 8 characters';
+                return true;
+              },
+            });
+          }
+
+          if (prompts.length > 0) {
+            const answers = await inquirer.default.prompt(prompts);
+            currentPassword = currentPassword || answers.currentPassword;
+            newPassword = newPassword || answers.newPassword;
+          }
+        }
+
+        // Change password
+        const result = await authService.changePassword(
+          user.id,
+          newPassword,
+          currentPassword
+        );
+
+        if (result.success) {
+          const output = {
+            success: true,
+            message: result.message,
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+            },
+          };
+
+          if (options.json) {
+            console.log(JSON.stringify(output, null, 2));
+          } else if (!options.silent) {
+            console.log(
+              `✓ Password changed successfully for user '${username}'`
+            );
+          }
+        } else {
+          if (!options.silent) {
+            console.error(`Error: ${result.message}`);
+          }
+          process.exit(1);
+        }
+      } catch (error: any) {
+        if (!options.silent) {
+          console.error(`Error changing password: ${error.message}`);
+        }
+        process.exit(1);
+      }
+    });
+
+  cli
+    .command(
+      'users:set-password <username>',
+      'Set password for user (admin only)'
+    )
+    .option('--token <token>', 'Session token for authentication')
+    .option('--password <password>', 'New password')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (username, options) => {
+      try {
+        // Validate authentication
+        const authInfo = await AuthUtils.validateAuth(options.token);
+        if (!authInfo.isValid) {
+          if (!options.silent) {
+            console.error('Error: Authentication required');
+          }
+          process.exit(1);
+        }
+
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Check admin permissions
+        const adminUser = await authService.getUserById(authInfo.userId);
+        if (
+          !adminUser ||
+          !(await authService.userCan(adminUser, 'users:manage'))
+        ) {
+          if (!options.silent) {
+            console.error('Error: Admin privileges required');
+          }
+          process.exit(1);
+        }
+
+        // Get target user
+        const user = await authService.getUserByUsername(username);
+        if (!user) {
+          if (!options.silent) {
+            console.error(`Error: User '${username}' not found`);
+          }
+          process.exit(1);
+        }
+
+        // Check if user can set password
+        if (!authService.canSetPassword(user)) {
+          const provider = authService.getUserAuthProvider(user);
+          if (!options.silent) {
+            console.error(
+              `Error: User '${username}' is authenticated via ${provider}`
+            );
+            console.error(
+              'Password management is handled by the external provider'
+            );
+          }
+          process.exit(1);
+        }
+
+        let password = options.password;
+
+        // Interactive prompt if not provided
+        if (!password) {
+          const inquirer = await import('inquirer');
+          const answers = await inquirer.default.prompt([
+            {
+              type: 'password',
+              name: 'password',
+              message: 'New password:',
+              validate: (input: string) => {
+                if (!input.trim()) return 'Password is required';
+                if (input.length < 8)
+                  return 'Password must be at least 8 characters';
+                return true;
+              },
+            },
+          ]);
+          password = answers.password;
+        }
+
+        // Set password
+        const result = await authService.setUserPassword(
+          user.id,
+          password,
+          adminUser.id
+        );
+
+        if (result.success) {
+          const output = {
+            success: true,
+            message: result.message,
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+            },
+          };
+
+          if (options.json) {
+            console.log(JSON.stringify(output, null, 2));
+          } else if (!options.silent) {
+            console.log(`✓ Password set successfully for user '${username}'`);
+          }
+        } else {
+          if (!options.silent) {
+            console.error(`Error: ${result.message}`);
+          }
+          process.exit(1);
+        }
+      } catch (error: any) {
+        if (!options.silent) {
+          console.error(`Error setting password: ${error.message}`);
+        }
+        process.exit(1);
+      }
+    });
+
+  cli
+    .command(
+      'users:request-email-change <username>',
+      'Request email change for user'
+    )
+    .option('--token <token>', 'Session token for authentication')
+    .option('--email <email>', 'New email address')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (username, options) => {
+      try {
+        // Validate authentication
+        const authInfo = await AuthUtils.validateAuth(options.token);
+        if (!authInfo.isValid) {
+          if (!options.silent) {
+            console.error('Error: Authentication required');
+          }
+          process.exit(1);
+        }
+
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Get user by username
+        const user = await authService.getUserByUsername(username);
+        if (!user) {
+          if (!options.silent) {
+            console.error(`Error: User '${username}' not found`);
+          }
+          process.exit(1);
+        }
+
+        // Check permissions (self or admin)
+        const requestingUser = await authService.getUserById(authInfo.userId);
+        if (!requestingUser) {
+          if (!options.silent) {
+            console.error('Error: Invalid authentication');
+          }
+          process.exit(1);
+        }
+
+        const isAdmin = await authService.userCan(
+          requestingUser,
+          'users:manage'
+        );
+        if (user.id !== requestingUser.id && !isAdmin) {
+          if (!options.silent) {
+            console.error('Error: You can only change your own email address');
+          }
+          process.exit(1);
+        }
+
+        let email = options.email;
+
+        // Interactive prompt if not provided
+        if (!email) {
+          const inquirer = await import('inquirer');
+          const answers = await inquirer.default.prompt([
+            {
+              type: 'input',
+              name: 'email',
+              message: 'New email address:',
+              validate: (input: string) => {
+                if (!input.trim()) return 'Email address is required';
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(input)) return 'Invalid email format';
+                return true;
+              },
+            },
+          ]);
+          email = answers.email;
+        }
+
+        // Request email change
+        const result = await authService.requestEmailChange(user.id, email);
+
+        if (result.success) {
+          const output = {
+            success: true,
+            message: result.message,
+            requiresVerification: result.requiresVerification,
+            user: {
+              id: user.id,
+              username: user.username,
+              currentEmail: user.email,
+              pendingEmail: email,
+            },
+          };
+
+          if (options.json) {
+            console.log(JSON.stringify(output, null, 2));
+          } else if (!options.silent) {
+            console.log(`✓ Email change requested for user '${username}'`);
+            console.log(`  Current email: ${user.email}`);
+            console.log(`  Pending email: ${email}`);
+            console.log(
+              '  A verification email has been sent to the new address'
+            );
+          }
+        } else {
+          if (!options.silent) {
+            console.error(`Error: ${result.message}`);
+          }
+          process.exit(1);
+        }
+      } catch (error: any) {
+        if (!options.silent) {
+          console.error(`Error requesting email change: ${error.message}`);
+        }
+        process.exit(1);
+      }
+    });
+
+  cli
+    .command('users:verify-email <token>', 'Verify email change with token')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (token, options) => {
+      try {
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Verify email change
+        const result = await authService.completeEmailChange(token);
+
+        if (result.success) {
+          const output = {
+            success: true,
+            message: result.message,
+          };
+
+          if (options.json) {
+            console.log(JSON.stringify(output, null, 2));
+          } else if (!options.silent) {
+            console.log(`✓ ${result.message}`);
+          }
+        } else {
+          if (!options.silent) {
+            console.error(`Error: ${result.message}`);
+          }
+          process.exit(1);
+        }
+      } catch (error: any) {
+        if (!options.silent) {
+          console.error(`Error verifying email: ${error.message}`);
+        }
+        process.exit(1);
+      }
+    });
+
+  cli
+    .command(
+      'users:cancel-email-change <username>',
+      'Cancel pending email change'
+    )
+    .option('--token <token>', 'Session token for authentication')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (username, options) => {
+      try {
+        // Validate authentication
+        const authInfo = await AuthUtils.validateAuth(options.token);
+        if (!authInfo.isValid) {
+          if (!options.silent) {
+            console.error('Error: Authentication required');
+          }
+          process.exit(1);
+        }
+
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Get user by username
+        const user = await authService.getUserByUsername(username);
+        if (!user) {
+          if (!options.silent) {
+            console.error(`Error: User '${username}' not found`);
+          }
+          process.exit(1);
+        }
+
+        // Check permissions (self or admin)
+        const requestingUser = await authService.getUserById(authInfo.userId);
+        if (!requestingUser) {
+          if (!options.silent) {
+            console.error('Error: Invalid authentication');
+          }
+          process.exit(1);
+        }
+
+        const isAdmin = await authService.userCan(
+          requestingUser,
+          'users:manage'
+        );
+        if (user.id !== requestingUser.id && !isAdmin) {
+          if (!options.silent) {
+            console.error(
+              'Error: You can only cancel your own email change request'
+            );
+          }
+          process.exit(1);
+        }
+
+        // Cancel email change
+        const result = await authService.cancelEmailChange(user.id);
+
+        if (result.success) {
+          const output = {
+            success: true,
+            message: result.message,
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+            },
+          };
+
+          if (options.json) {
+            console.log(JSON.stringify(output, null, 2));
+          } else if (!options.silent) {
+            console.log(`✓ Email change cancelled for user '${username}'`);
+          }
+        } else {
+          if (!options.silent) {
+            console.error(`Error: ${result.message}`);
+          }
+          process.exit(1);
+        }
+      } catch (error: any) {
+        if (!options.silent) {
+          console.error(`Error cancelling email change: ${error.message}`);
+        }
+        process.exit(1);
+      }
+    });
+
+  cli
+    .command('users:security-info <username>', 'Get user security information')
+    .option('--token <token>', 'Session token for authentication')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(async (username, options) => {
+      try {
+        // Validate authentication
+        const authInfo = await AuthUtils.validateAuth(options.token);
+        if (!authInfo.isValid) {
+          if (!options.silent) {
+            console.error('Error: Authentication required');
+          }
+          process.exit(1);
+        }
+
+        // Get configuration from central config
+        const { CentralConfigManager } = await import('@civicpress/core');
+        const dataDir = CentralConfigManager.getDataDir();
+        const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+        // Initialize CivicPress
+        const civic = new CivicPress({
+          dataDir,
+          database: dbConfig,
+          logger: {
+            json: options.json,
+            silent: options.silent,
+          },
+        });
+        await civic.initialize();
+
+        const authService = civic.getAuthService();
+
+        // Get user by username
+        const user = await authService.getUserByUsername(username);
+        if (!user) {
+          if (!options.silent) {
+            console.error(`Error: User '${username}' not found`);
+          }
+          process.exit(1);
+        }
+
+        // Check permissions (self or admin)
+        const requestingUser = await authService.getUserById(authInfo.userId);
+        if (!requestingUser) {
+          if (!options.silent) {
+            console.error('Error: Invalid authentication');
+          }
+          process.exit(1);
+        }
+
+        const isAdmin = await authService.userCan(
+          requestingUser,
+          'users:manage'
+        );
+        if (user.id !== requestingUser.id && !isAdmin) {
+          if (!options.silent) {
+            console.error(
+              'Error: You can only view your own security information'
+            );
+          }
+          process.exit(1);
+        }
+
+        // Get pending email change info
+        const pendingEmailChange = await authService.getPendingEmailChange(
+          user.id
+        );
+
+        const securityInfo = {
+          userId: user.id,
+          username: user.username,
+          email: user.email,
+          authProvider: authService.getUserAuthProvider(user),
+          emailVerified: user.email_verified || false,
+          canSetPassword: authService.canSetPassword(user),
+          isExternalAuth: authService.isExternalAuthUser(user),
+          pendingEmailChange: {
+            email: pendingEmailChange.pendingEmail,
+            expiresAt: pendingEmailChange.expiresAt,
+          },
+        };
+
+        if (options.json) {
+          console.log(JSON.stringify(securityInfo, null, 2));
+        } else if (!options.silent) {
+          console.log(`Security Information for '${username}':`);
+          console.log(`  User ID: ${securityInfo.userId}`);
+          console.log(`  Email: ${securityInfo.email}`);
+          console.log(
+            `  Email Verified: ${securityInfo.emailVerified ? '✓' : '✗'}`
+          );
+          console.log(`  Auth Provider: ${securityInfo.authProvider}`);
+          console.log(
+            `  Can Set Password: ${securityInfo.canSetPassword ? '✓' : '✗'}`
+          );
+          console.log(
+            `  External Auth: ${securityInfo.isExternalAuth ? '✓' : '✗'}`
+          );
+
+          if (securityInfo.pendingEmailChange.email) {
+            console.log(
+              `  Pending Email: ${securityInfo.pendingEmailChange.email}`
+            );
+            console.log(
+              `  Expires At: ${securityInfo.pendingEmailChange.expiresAt}`
+            );
+          } else {
+            console.log(`  Pending Email: None`);
+          }
+        }
+      } catch (error: any) {
+        if (!options.silent) {
+          console.error(`Error getting security info: ${error.message}`);
         }
         process.exit(1);
       }

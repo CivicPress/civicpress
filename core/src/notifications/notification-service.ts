@@ -73,6 +73,12 @@ export class NotificationService {
     const notificationId = this.generateNotificationId();
 
     try {
+      console.log(`  - Notification ID: ${notificationId}`);
+      console.log(`  - Template: ${request.template}`);
+      console.log(`  - Channels: ${request.channels.join(', ')}`);
+      console.log(`  - Email: ${request.email}`);
+      console.log(`  - Data:`, request.data);
+
       // Security checks
       await this.security.validateRequest(request);
 
@@ -81,6 +87,7 @@ export class NotificationService {
 
       // Get template
       const template = this.templates.get(request.template);
+
       if (!template) {
         throw new Error(`Template not found: ${request.template}`);
       }
@@ -135,9 +142,11 @@ export class NotificationService {
         errors: errors.length > 0 ? errors : undefined,
       };
 
+      console.log(`✅ [DEBUG] Notification response:`, response);
       this.logger.info(`Notification sent: ${notificationId}`, response);
       return response;
     } catch (error) {
+      console.log(`❌ [DEBUG] Notification failed:`, error);
       this.logger.error(
         `Notification failed: ${notificationId}`,
         error as Error
@@ -154,22 +163,28 @@ export class NotificationService {
     request: NotificationRequest & { content: any; data: Record<string, any> }
   ): Promise<void> {
     const channel = this.channels.get(channelName);
+
     if (!channel) {
       throw new Error(`Channel not found: ${channelName}`);
     }
 
     // Check if channel is enabled
-    if (!this.config.isChannelEnabled(channelName)) {
+    const isEnabled = this.config.isChannelEnabled(channelName);
+    if (!isEnabled) {
       throw new Error(`Channel disabled: ${channelName}`);
     }
 
+    const recipient = this.getChannelRecipient(request, channelName);
+
     // Send via channel
     await channel.send({
-      to: this.getChannelRecipient(request, channelName),
+      to: recipient,
       content: request.content,
       data: request.data,
       priority: request.priority || 'normal',
     });
+
+    console.log(`✅ [DEBUG] Channel ${channelName} sent successfully`);
   }
 
   /**

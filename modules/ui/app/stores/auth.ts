@@ -9,6 +9,13 @@ export interface User {
   role: string;
   avatar_url?: string;
   permissions: string[];
+  // Security fields
+  authProvider?: string;
+  emailVerified?: boolean;
+  canSetPassword?: boolean;
+  isExternalAuth?: boolean;
+  pendingEmail?: string;
+  pendingEmailExpiresAt?: string;
 }
 
 export interface AuthState {
@@ -18,6 +25,7 @@ export interface AuthState {
   sessionExpiresAt: string | null;
   loading: boolean;
   error: string | null;
+  initialized: boolean;
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -30,6 +38,7 @@ export const useAuthStore = defineStore('auth', {
       sessionExpiresAt: null,
       loading: false,
       error: null,
+      initialized: false,
     };
 
     if (process.client) {
@@ -85,12 +94,15 @@ export const useAuthStore = defineStore('auth', {
     currentUser: (state) => state.user,
     isLoggedIn: (state) => state.isAuthenticated && !!state.token,
     hasPermission: (state) => (permission: string) => {
-      return state.user?.permissions.includes(permission) || false;
+      const perms = state.user?.permissions || [];
+      if (perms.includes('*')) return true;
+      return perms.includes(permission);
     },
     hasRole: (state) => (role: string) => {
       return state.user?.role === role;
     },
     isLoading: (state) => state.loading,
+    isInitialized: (state) => state.initialized,
     authError: (state) => state.error,
   },
 
@@ -128,7 +140,9 @@ export const useAuthStore = defineStore('auth', {
         name: session.user.name,
         role: session.user.role,
         avatar_url: session.user.avatar_url,
-        permissions: [], // TODO: Add permissions if available
+        permissions: Array.isArray(session.user.permissions)
+          ? session.user.permissions
+          : [],
       };
 
       // Update user, token and auth state
@@ -152,7 +166,6 @@ export const useAuthStore = defineStore('auth', {
           body: { username, password },
         });
 
-        console.log('response', response);
         return await this.handleLoginResponse(response, 'Login failed');
       } catch (error: any) {
         const { handleError } = useErrorHandler();
@@ -176,7 +189,6 @@ export const useAuthStore = defineStore('auth', {
           body: { token, provider: 'github' },
         });
 
-        console.log('response', response);
         return await this.handleLoginResponse(response, 'Token login failed');
       } catch (error: any) {
         const { handleError } = useErrorHandler();
@@ -276,7 +288,17 @@ export const useAuthStore = defineStore('auth', {
       if (!this.token) return false;
 
       try {
-        const response = (await useNuxtApp().$civicApi('/auth/me', {
+        // Check if $civicApi is available
+        const nuxtApp = useNuxtApp();
+        if (!nuxtApp.$civicApi) {
+          console.log(
+            '$civicApi not available yet, deferring token validation'
+          );
+          // Return true to preserve current state, validation will happen later
+          return !!this.user;
+        }
+
+        const response = (await nuxtApp.$civicApi('/auth/me', {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${this.token}`,
@@ -294,9 +316,46 @@ export const useAuthStore = defineStore('auth', {
           this.clearAuth();
           return false;
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn('Token validation failed:', error);
-        this.clearAuth();
+        // Only clear auth for explicit invalid token responses; keep session on network/other errors
+        const status = error?.status ?? error?.response?.status;
+        if (status === 401) {
+          this.clearAuth();
+          return false;
+        }
+        // Preserve current state on transient errors
+        return !!this.user;
+      }
+    },
+
+    // Refresh user data from server
+    async refreshUser() {
+      if (!this.token) {
+        console.warn('No token available for user refresh');
+        return false;
+      }
+
+      try {
+        const response = (await useNuxtApp().$civicApi('/auth/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+          },
+        })) as any;
+
+        if (response.success) {
+          // Update user data from server
+          this.user = response.data.user;
+          this.saveAuthState();
+          console.log('User data refreshed successfully');
+          return true;
+        } else {
+          console.warn('Failed to refresh user data:', response);
+          return false;
+        }
+      } catch (error: any) {
+        console.warn('Failed to refresh user data:', error);
         return false;
       }
     },
@@ -310,11 +369,15 @@ export const useAuthStore = defineStore('auth', {
         isAuthenticated: this.isAuthenticated,
       });
 
-      // If we have a token but no user, try to validate the token
-      if (this.token && !this.user) {
-        console.log('Token found but no user, validating token...');
+      // Always validate if we have a token to refresh permissions/user
+      if (this.token) {
+        console.log(
+          'Token found, validating token to refresh user/permissions...'
+        );
         await this.validateToken();
       }
+
+      this.initialized = true;
     },
   },
 });

@@ -136,9 +136,18 @@ async function listHooks(
   logger.info('\n📋 Registered Hooks:');
   for (const hook of registeredHooks) {
     const hookConfig = config?.hooks[hook];
-    const status = hookConfig?.enabled ? '✅ Enabled' : '❌ Disabled';
-    const workflows = hookConfig?.workflows?.length
-      ? `(${hookConfig.workflows.join(', ')})`
+    // Handle both old and new metadata formats
+    const enabled =
+      typeof hookConfig?.enabled === 'boolean'
+        ? hookConfig.enabled
+        : (hookConfig?.enabled?.value ?? false);
+    const workflowsArray = Array.isArray(hookConfig?.workflows)
+      ? hookConfig.workflows
+      : (hookConfig?.workflows?.value ?? []);
+
+    const status = enabled ? '✅ Enabled' : '❌ Disabled';
+    const workflows = workflowsArray.length
+      ? `(${workflowsArray.join(', ')})`
       : '(no workflows)';
 
     logger.info(`  ${hook} ${status} ${workflows}`);
@@ -197,10 +206,23 @@ async function showConfig(
   // Show hooks
   logger.info('\n🪝 Hooks:');
   for (const [hookName, hookConfig] of Object.entries(config.hooks)) {
-    const status = hookConfig.enabled ? '✅' : '❌';
+    // Handle both old and new metadata formats
+    const enabled =
+      typeof hookConfig.enabled === 'boolean'
+        ? hookConfig.enabled
+        : (hookConfig.enabled?.value ?? false);
+    const workflowsArray = Array.isArray(hookConfig.workflows)
+      ? hookConfig.workflows
+      : (hookConfig.workflows?.value ?? []);
+    const audit =
+      typeof hookConfig.audit === 'boolean'
+        ? hookConfig.audit
+        : (hookConfig.audit?.value ?? false);
+
+    const status = enabled ? '✅' : '❌';
     logger.info(`  ${status} ${hookName}`);
-    logger.info(`    Workflows: ${hookConfig.workflows.join(', ') || 'none'}`);
-    logger.info(`    Audit: ${hookConfig.audit ? 'yes' : 'no'}`);
+    logger.info(`    Workflows: ${workflowsArray.join(', ') || 'none'}`);
+    logger.info(`    Audit: ${audit ? 'yes' : 'no'}`);
     if (hookConfig.description) {
       logger.info(`    Description: ${hookConfig.description}`);
     }
@@ -478,7 +500,11 @@ async function listWorkflows(
   // Collect all workflows from hook configurations
   if (config?.hooks) {
     for (const hookConfig of Object.values(config.hooks)) {
-      hookConfig.workflows.forEach((w) => workflows.add(w));
+      // Handle both old and new metadata formats
+      const workflowsArray = Array.isArray(hookConfig.workflows)
+        ? hookConfig.workflows
+        : (hookConfig.workflows?.value ?? []);
+      workflowsArray.forEach((w: string) => workflows.add(w));
     }
   }
 

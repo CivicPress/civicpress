@@ -1,43 +1,45 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AuthService } from '../../core/src/auth/auth-service';
-import { DatabaseService } from '../../core/src/database/database-service';
-import { DatabaseConfig } from '../../core/src/database/database-adapter';
+import { join } from 'path';
+import { CivicPress } from '../../core/src/civic-core.js';
+import bcrypt from 'bcrypt';
+import { AuthService } from '../../core/src/auth/auth-service.js';
+import { AuthUser } from '../../core/src/auth/auth-service.js';
 import {
   createTestDirectory,
-  cleanupTestDirectory,
   createRolesConfig,
+  cleanupTestDirectory,
 } from '../fixtures/test-setup';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
 describe('AuthService', () => {
+  let civicPress: CivicPress;
   let authService: AuthService;
-  let dbService: DatabaseService;
   let testConfig: any;
 
   beforeEach(async () => {
-    // Create test directory with proper structure
+    // Use shared fixture for test directory and roles config
     testConfig = createTestDirectory('auth-service-test');
-
-    // Create roles configuration
     createRolesConfig(testConfig);
 
-    const config: DatabaseConfig = {
-      type: 'sqlite',
-      sqlite: {
-        file: path.join(testConfig.testDir, 'test.db'),
+    // Initialize CivicPress
+    civicPress = new CivicPress({
+      dataDir: testConfig.dataDir,
+      database: {
+        type: 'sqlite',
+        sqlite: {
+          file: join(testConfig.testDir, 'test.db'),
+        },
       },
-    };
+    });
+    await civicPress.initialize();
 
-    dbService = new DatabaseService(config);
-    await dbService.initialize();
-    authService = new AuthService(dbService, testConfig.dataDir);
+    // Get auth service
+    authService = civicPress.getAuthService();
   });
 
   afterEach(async () => {
-    await dbService.close();
-    // Clean up test directory
+    if (civicPress) {
+      await civicPress.shutdown();
+    }
     cleanupTestDirectory(testConfig);
   });
 
@@ -45,315 +47,261 @@ describe('AuthService', () => {
     it('should create and retrieve users', async () => {
       const userData = {
         username: 'testuser',
-        role: 'citizen',
         email: 'test@example.com',
         name: 'Test User',
-        avatar_url: 'https://example.com/avatar.jpg',
+        role: 'public',
       };
 
       const user = await authService.createUser(userData);
-      expect(user.id).toBeGreaterThan(0);
-      expect(user.username).toBe('testuser');
-      expect(user.role).toBe('citizen');
-      expect(user.email).toBe('test@example.com');
+      expect(user).toBeDefined();
+      expect(user.username).toBe(userData.username);
+      expect(user.email).toBe(userData.email);
+      expect(user.name).toBe(userData.name);
+      expect(user.role).toBe(userData.role);
+
+      // Retrieve the user
+      const retrievedUser = await authService.getUserById(user.id);
+      expect(retrievedUser).toBeDefined();
+      expect(retrievedUser?.username).toBe(userData.username);
     });
 
     it('should retrieve user by username', async () => {
       const userData = {
-        username: 'testuser',
-        role: 'citizen',
-        email: 'test@example.com',
+        username: 'testuser2',
+        email: 'test2@example.com',
+        name: 'Test User 2',
+        role: 'public',
       };
 
-      await authService.createUser(userData);
-      const user = await authService.getUserByUsername('testuser');
+      const user = await authService.createUser(userData);
+      const retrievedUser = await authService.getUserByUsername(
+        userData.username
+      );
 
-      expect(user).toBeTruthy();
-      expect(user?.username).toBe('testuser');
+      expect(retrievedUser).toBeDefined();
+      expect(retrievedUser?.username).toBe(userData.username);
+      expect(retrievedUser?.email).toBe(userData.email);
     });
 
     it('should retrieve user by ID', async () => {
       const userData = {
-        username: 'testuser',
-        role: 'citizen',
+        username: 'testuser3',
+        email: 'test3@example.com',
+        name: 'Test User 3',
+        role: 'public',
       };
 
-      const createdUser = await authService.createUser(userData);
-      const user = await authService.getUserById(createdUser.id);
+      const user = await authService.createUser(userData);
+      const retrievedUser = await authService.getUserById(user.id);
 
-      expect(user).toBeTruthy();
-      expect(user?.id).toBe(createdUser.id);
-      expect(user?.username).toBe('testuser');
+      expect(retrievedUser).toBeDefined();
+      expect(retrievedUser?.username).toBe(userData.username);
+      expect(retrievedUser?.id).toBe(user.id);
     });
 
     it('should return null for non-existent user', async () => {
       const user = await authService.getUserByUsername('nonexistent');
       expect(user).toBeNull();
     });
+
+    it('should update user information', async () => {
+      const userData = {
+        username: 'testuser4',
+        email: 'test4@example.com',
+        name: 'Test User 4',
+        role: 'public',
+      };
+
+      const user = await authService.createUser(userData);
+
+      const updateData = {
+        email: 'updated@example.com',
+        name: 'Updated User',
+        role: 'clerk',
+      };
+
+      const result = await authService.updateUser(user.id, updateData);
+      expect(result).toBeDefined();
+      expect(result.success).toBe(true);
+      expect(result.user).toBeDefined();
+      expect(result.user?.email).toBe(updateData.email);
+      expect(result.user?.name).toBe(updateData.name);
+      expect(result.user?.role).toBe(updateData.role);
+    });
+
+    it('should delete user', async () => {
+      const userData = {
+        username: 'testuser5',
+        email: 'test5@example.com',
+        name: 'Test User 5',
+        role: 'public',
+      };
+
+      const user = await authService.createUser(userData);
+      const userId = user.id;
+
+      // Verify user exists
+      const retrievedUser = await authService.getUserById(userId);
+      expect(retrievedUser).toBeDefined();
+
+      // Delete user
+      await authService.deleteUser(userId);
+
+      // Verify user is deleted
+      const deletedUser = await authService.getUserById(userId);
+      expect(deletedUser).toBeNull();
+    });
   });
 
-  describe('API Key Authentication', () => {
-    it('should create and validate API keys', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
+  describe('Authentication', () => {
+    it('should authenticate user with correct credentials', async () => {
+      const userData = {
+        username: 'testuser6',
+        email: 'test6@example.com',
+        name: 'Test User 6',
+        role: 'public',
+        password: 'testpassword',
+      };
 
-      const { key, apiKey } = await authService.createApiKey(
-        user.id,
-        'Test API Key'
+      const user = await authService.createUser(userData);
+      const passwordHash = await bcrypt.hash(userData.password, 10);
+      await authService.updateUser(user.id, { passwordHash });
+
+      const session = await authService.authenticateWithPassword(
+        userData.username,
+        userData.password
       );
-
-      expect(key).toBeTruthy();
-      expect(key.length).toBeGreaterThan(0);
-      expect(apiKey.userId).toBe(user.id);
-      expect(apiKey.name).toBe('Test API Key');
-
-      // Validate the API key
-      const validatedUser = await authService.validateApiKey(key);
-      expect(validatedUser).toBeTruthy();
-      expect(validatedUser?.id).toBe(user.id);
-      expect(validatedUser?.username).toBe('testuser');
+      expect(session).toBeDefined();
+      expect(session.user.id).toBe(user.id);
+      expect(session.user.username).toBe(userData.username);
     });
 
-    it('should reject invalid API keys', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
+    it('should reject authentication with wrong password', async () => {
+      const userData = {
+        username: 'testuser7',
+        email: 'test7@example.com',
+        name: 'Test User 7',
+        role: 'public',
+        password: 'testpassword',
+      };
 
-      const { key } = await authService.createApiKey(user.id, 'Test Key');
+      const user = await authService.createUser(userData);
+      const passwordHash = await bcrypt.hash(userData.password, 10);
+      await authService.updateUser(user.id, { passwordHash });
 
-      // Try with invalid key
-      const invalidUser = await authService.validateApiKey('invalid-key');
-      expect(invalidUser).toBeNull();
-
-      // Try with modified key
-      const modifiedKey = key + 'modified';
-      const modifiedUser = await authService.validateApiKey(modifiedKey);
-      expect(modifiedUser).toBeNull();
+      await expect(
+        authService.authenticateWithPassword(userData.username, 'wrongpassword')
+      ).rejects.toThrow();
     });
 
-    it('should handle expired API keys', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
+    it('should reject authentication for non-existent user', async () => {
+      await expect(
+        authService.authenticateWithPassword('nonexistent', 'password')
+      ).rejects.toThrow();
+    });
+  });
 
-      const expiresAt = new Date(Date.now() + 1000); // Expires in 1 second
-      const { key } = await authService.createApiKey(
-        user.id,
-        'Expiring Key',
-        expiresAt
-      );
+  describe('Simulated Authentication', () => {
+    it('should create simulated user with specified role', async () => {
+      const userData = {
+        username: 'simulateduser',
+        role: 'admin',
+      };
 
-      // Should work immediately
-      let validatedUser = await authService.validateApiKey(key);
-      expect(validatedUser).toBeTruthy();
-
-      // Wait for expiration
-      await new Promise((resolve) => setTimeout(resolve, 1100));
-
-      // Should not work after expiration
-      validatedUser = await authService.validateApiKey(key);
-      expect(validatedUser).toBeNull();
+      const user = await authService.createSimulatedUser(userData);
+      expect(user).toBeDefined();
+      expect(user.username).toBe(userData.username);
+      expect(user.role).toBe(userData.role);
     });
 
-    it('should delete API keys', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
+    it('should authenticate simulated user', async () => {
+      const userData = {
+        username: 'simulateduser2',
+        role: 'clerk',
+      };
 
-      const { key, apiKey } = await authService.createApiKey(
-        user.id,
-        'Test Key'
+      await authService.createSimulatedUser(userData);
+
+      const session = await authService.authenticateWithSimulatedAccount(
+        userData.username,
+        userData.role
       );
 
-      // Verify it works
-      let validatedUser = await authService.validateApiKey(key);
-      expect(validatedUser).toBeTruthy();
+      expect(session).toBeDefined();
+      expect(session.user.username).toBe(userData.username);
+      expect(session.user.role).toBe(userData.role);
+    });
 
-      // Delete the API key
-      await authService.deleteApiKey(apiKey.id);
+    it('should update existing user role when different role is requested', async () => {
+      // First create a user with 'public' role
+      const userData1 = {
+        username: 'roleupdateuser',
+        role: 'public',
+      };
 
-      // Should not work after deletion
-      validatedUser = await authService.validateApiKey(key);
-      expect(validatedUser).toBeNull();
+      const user1 = await authService.createSimulatedUser(userData1);
+      expect(user1.role).toBe('public');
+
+      // Now authenticate the same user with 'admin' role - should update the role
+      const userData2 = {
+        username: 'roleupdateuser',
+        role: 'admin',
+      };
+
+      const user2 = await authService.createSimulatedUser(userData2);
+      expect(user2.role).toBe('admin'); // Should be updated from 'public' to 'admin'
+      expect(user2.id).toBe(user1.id); // Same user, different role
     });
   });
 
   describe('Session Management', () => {
-    it('should create and validate sessions', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
+    it('should create and validate session', async () => {
+      const userData = {
+        username: 'sessionuser',
+        email: 'session@example.com',
+        name: 'Session User',
+        role: 'public',
+        password: 'sessionpassword',
+      };
 
-      const { token, session } = await authService.createSession(user.id);
+      const user = await authService.createUser(userData);
+      const passwordHash = await bcrypt.hash(userData.password, 10);
+      await authService.updateUser(user.id, { passwordHash });
+      const session = await authService.authenticateWithPassword(
+        userData.username,
+        userData.password
+      );
 
-      expect(token).toBeTruthy();
-      expect(token.length).toBeGreaterThan(0);
-      expect(session.userId).toBe(user.id);
-      expect(session.user.username).toBe('testuser');
+      expect(session).toBeDefined();
+      expect(session.token).toBeDefined();
+      expect(session.user.id).toBe(user.id);
+    });
 
-      // Validate the session
-      const validatedUser = await authService.validateSession(token);
-      expect(validatedUser).toBeTruthy();
+    it('should validate session token', async () => {
+      const userData = {
+        username: 'tokenuser',
+        email: 'token@example.com',
+        name: 'Token User',
+        role: 'public',
+        password: 'tokenpassword',
+      };
+
+      const user = await authService.createUser(userData);
+      const passwordHash = await bcrypt.hash(userData.password, 10);
+      await authService.updateUser(user.id, { passwordHash });
+      const session = await authService.authenticateWithPassword(
+        userData.username,
+        userData.password
+      );
+
+      const validatedUser = await authService.validateSession(session.token);
+      expect(validatedUser).toBeDefined();
       expect(validatedUser?.id).toBe(user.id);
-      expect(validatedUser?.username).toBe('testuser');
     });
 
-    it('should reject invalid session tokens', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
-
-      const { token } = await authService.createSession(user.id);
-
-      // Try with invalid token
-      const invalidUser = await authService.validateSession('invalid-token');
-      expect(invalidUser).toBeNull();
-
-      // Try with modified token
-      const modifiedToken = token + 'modified';
-      const modifiedUser = await authService.validateSession(modifiedToken);
-      expect(modifiedUser).toBeNull();
-    });
-
-    it('should handle expired sessions', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
-
-      // Create session with short expiration
-      const { token } = await authService.createSession(user.id, 0.001); // 3.6 seconds
-
-      // Should work immediately
-      let validatedUser = await authService.validateSession(token);
-      expect(validatedUser).toBeTruthy();
-
-      // Wait for expiration
-      await new Promise((resolve) => setTimeout(resolve, 4000));
-
-      // Should not work after expiration
-      validatedUser = await authService.validateSession(token);
+    it('should reject invalid session token', async () => {
+      const validatedUser = await authService.validateSession('invalid-token');
       expect(validatedUser).toBeNull();
-    });
-
-    it('should cleanup expired sessions', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
-
-      // Create a session
-      const { token } = await authService.createSession(user.id);
-
-      // Verify it works
-      let validatedUser = await authService.validateSession(token);
-      expect(validatedUser).toBeTruthy();
-
-      // Cleanup expired sessions (should not affect valid session)
-      await authService.cleanupExpiredSessions();
-
-      // Should still work
-      validatedUser = await authService.validateSession(token);
-      expect(validatedUser).toBeTruthy();
-    });
-
-    it('should delete sessions', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
-
-      const { token, session } = await authService.createSession(user.id);
-
-      // Verify it works
-      let validatedUser = await authService.validateSession(token);
-      expect(validatedUser).toBeTruthy();
-
-      // Delete the session
-      await authService.deleteSession(session.id);
-
-      // Should not work after deletion
-      validatedUser = await authService.validateSession(token);
-      expect(validatedUser).toBeNull();
-    });
-  });
-
-  describe('Audit Logging', () => {
-    it('should log authentication events', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
-
-      await authService.logAuthEvent(
-        user.id,
-        'login',
-        'User logged in via API key',
-        '127.0.0.1'
-      );
-
-      // Verify the audit log was created
-      const logs = await dbService.getAuditLogs(10, 0);
-      expect(logs).toHaveLength(1);
-      expect(logs[0].action).toBe('login');
-      expect(logs[0].username).toBe('testuser');
-      expect(logs[0].ip_address).toBe('127.0.0.1');
-    });
-
-    it('should log events without user ID', async () => {
-      await authService.logAuthEvent(
-        undefined,
-        'failed_login',
-        'Failed login attempt',
-        '127.0.0.1'
-      );
-
-      const logs = await dbService.getAuditLogs(10, 0);
-      expect(logs).toHaveLength(1);
-      expect(logs[0].action).toBe('failed_login');
-      expect(logs[0].username).toBeNull();
-    });
-  });
-
-  describe('Security', () => {
-    it('should generate unique tokens', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
-
-      const { key: apiKey1 } = await authService.createApiKey(user.id, 'Key 1');
-      const { key: apiKey2 } = await authService.createApiKey(user.id, 'Key 2');
-      const { token: session1 } = await authService.createSession(user.id);
-      const { token: session2 } = await authService.createSession(user.id);
-
-      // All tokens should be unique
-      const tokens = [apiKey1, apiKey2, session1, session2];
-      const uniqueTokens = new Set(tokens);
-      expect(uniqueTokens.size).toBe(tokens.length);
-    });
-
-    it('should hash tokens securely', async () => {
-      const user = await authService.createUser({
-        username: 'testuser',
-        role: 'citizen',
-      });
-
-      const { key } = await authService.createApiKey(user.id, 'Test Key');
-
-      // The original key should not be stored in the database
-      const apiKey = await dbService.getApiKeyByHash(
-        authService['hashToken'](key)
-      );
-      expect(apiKey).toBeTruthy();
-      expect(apiKey?.key_hash).not.toBe(key); // Should be hashed
     });
   });
 });

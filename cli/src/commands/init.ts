@@ -1,6 +1,10 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import {
+  CivicPress,
+  BackupService,
+  CentralConfigManager,
+} from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
@@ -49,7 +53,7 @@ export const initCommand = (cli: CAC) => {
 
         if (skipPrompts) {
           // Use all defaults for prompts
-          const config = {
+          config = {
             version: '1.0.0',
             name: 'Civic Records',
             city: 'Richmond',
@@ -176,7 +180,119 @@ export const initCommand = (cli: CAC) => {
         if (options.dataDir) {
           dataDir = options.dataDir;
           // Skip interactive prompts when --data-dir is provided
-          config = { dataDir }; // Create minimal config to skip prompts
+          // Use default config similar to skipPrompts
+          config = {
+            version: '1.0.0',
+            name: 'Civic Records',
+            city: 'Richmond',
+            state: 'Quebec',
+            country: 'Canada',
+            timezone: 'America/Montreal',
+            repo_url: null,
+            modules: ['legal-register'],
+            record_types: ['bylaw', 'policy'],
+            record_types_config: {
+              bylaw: {
+                label: 'Bylaws',
+                description: 'Municipal bylaws and regulations',
+                source: 'core',
+                priority: 1,
+              },
+              ordinance: {
+                label: 'Ordinances',
+                description: 'Local ordinances and laws',
+                source: 'core',
+                priority: 2,
+              },
+              policy: {
+                label: 'Policies',
+                description: 'Administrative policies',
+                source: 'core',
+                priority: 3,
+              },
+              proclamation: {
+                label: 'Proclamations',
+                description: 'Official proclamations',
+                source: 'core',
+                priority: 4,
+              },
+              resolution: {
+                label: 'Resolutions',
+                description: 'Council resolutions',
+                source: 'core',
+                priority: 5,
+              },
+            },
+            record_statuses_config: {
+              draft: {
+                label: 'Draft',
+                description:
+                  'Initial working version, not yet ready for review',
+                source: 'core',
+                priority: 1,
+              },
+              pending_review: {
+                label: 'Pending Review',
+                description: 'Submitted for review and awaiting approval',
+                source: 'core',
+                priority: 2,
+              },
+              under_review: {
+                label: 'Under Review',
+                description:
+                  'Currently under active review by authorized personnel',
+                source: 'core',
+                priority: 3,
+              },
+              approved: {
+                label: 'Approved',
+                description: 'Approved and currently in effect',
+                source: 'core',
+                priority: 4,
+              },
+              published: {
+                label: 'Published',
+                description: 'Publicly available and in effect',
+                source: 'core',
+                priority: 5,
+              },
+              rejected: {
+                label: 'Rejected',
+                description: 'Rejected and not approved',
+                source: 'core',
+                priority: 6,
+              },
+              archived: {
+                label: 'Archived',
+                description: 'No longer active but preserved for reference',
+                source: 'core',
+                priority: 7,
+              },
+              expired: {
+                label: 'Expired',
+                description: 'Past its effective date and no longer in force',
+                source: 'core',
+                priority: 8,
+              },
+            },
+            default_role: 'clerk',
+            hooks: {
+              enabled: true,
+            },
+            workflows: {
+              enabled: true,
+            },
+            audit: {
+              enabled: true,
+            },
+            database: {
+              type: 'sqlite',
+              sqlite: {
+                file: path.join(process.cwd(), '.system-data/civic.db'),
+              },
+            },
+            storage_path: path.join(process.cwd(), 'storage'),
+          };
         } else if (options.config) {
           // Load config from file
           const configPath = path.resolve(options.config);
@@ -282,6 +398,45 @@ export const initCommand = (cli: CAC) => {
           }
         }
 
+        // Copy config.yml (contains record_types_config and record_statuses_config)
+        const configSrc = path.join(defaultsDir, 'config.yml');
+        const configDest = path.join(civicDir, 'config.yml');
+        if (!fs.existsSync(configDest) && fs.existsSync(configSrc)) {
+          fs.copyFileSync(configSrc, configDest);
+          if (!shouldOutputJson) {
+            logger.success('📋 Default config.yml created');
+          }
+        }
+
+        // Copy analytics.yml
+        const analyticsSrc = path.join(defaultsDir, 'analytics.yml');
+        const analyticsDest = path.join(civicDir, 'analytics.yml');
+        if (!fs.existsSync(analyticsDest) && fs.existsSync(analyticsSrc)) {
+          fs.copyFileSync(analyticsSrc, analyticsDest);
+          if (!shouldOutputJson) {
+            logger.success('📊 Default analytics.yml created');
+          }
+        }
+
+        // Copy geography-presets.yml
+        const geographyPresetsSrc = path.join(
+          defaultsDir,
+          'geography-presets.yml'
+        );
+        const geographyPresetsDest = path.join(
+          civicDir,
+          'geography-presets.yml'
+        );
+        if (
+          !fs.existsSync(geographyPresetsDest) &&
+          fs.existsSync(geographyPresetsSrc)
+        ) {
+          fs.copyFileSync(geographyPresetsSrc, geographyPresetsDest);
+          if (!shouldOutputJson) {
+            logger.success('🗺️  Default geography-presets.yml created');
+          }
+        }
+
         // Copy default templates
         const templatesSrc = path.join(defaultsDir, 'templates');
         const templatesDest = path.join(civicDir, 'templates');
@@ -362,7 +517,15 @@ export const initCommand = (cli: CAC) => {
           if (!overwrite) {
             logger.warn('⏭️  Skipping .civicrc setup');
           } else {
-            await setupCivicrc(civicrcPath, dataDir, logger);
+            const storagePath = await setupCivicrc(
+              civicrcPath,
+              dataDir,
+              logger
+            );
+            // Update config with storage path for setupStorage
+            if (storagePath) {
+              config = { ...config, storage_path: storagePath };
+            }
           }
         } else if (!civicrcExists || options.config || options.dataDir) {
           if (options.config) {
@@ -372,7 +535,15 @@ export const initCommand = (cli: CAC) => {
             // Use non-interactive setup when --data-dir is provided
             await setupCivicrcNonInteractive(civicrcPath, dataDir, logger);
           } else {
-            await setupCivicrc(civicrcPath, dataDir, logger);
+            const storagePath = await setupCivicrc(
+              civicrcPath,
+              dataDir,
+              logger
+            );
+            // Update config with storage path for setupStorage
+            if (storagePath) {
+              config = { ...config, storage_path: storagePath };
+            }
           }
         }
 
@@ -388,6 +559,14 @@ export const initCommand = (cli: CAC) => {
           systemDataDir,
           logger,
           shouldOutputJson || false
+        );
+
+        // Setup storage configuration
+        await setupStorage(
+          systemDataDir,
+          logger,
+          shouldOutputJson || false,
+          config?.storage_path
         );
 
         // Create admin user if not already specified
@@ -499,11 +678,11 @@ export const initCommand = (cli: CAC) => {
                 message: 'Which demo city would you like to load?',
                 choices: [
                   {
-                    name: 'Richmond, Quebec (Bilingual)',
+                    name: 'Richmond, QC, Canada - Francais',
                     value: 'richmond-quebec',
                   },
                   {
-                    name: 'Springfield, Illinois (Comprehensive)',
+                    name: 'Springfield, VA, USA - English',
                     value: 'springfield-usa',
                   },
                   // Future: Add more cities here
@@ -876,101 +1055,72 @@ async function loadDemoData(
     const projectRoot = path.resolve(path.dirname(__filename), '../../../');
     const demoDataDir = path.join(projectRoot, 'cli', 'src', 'demo-data');
 
-    // Load demo config
-    const configPath = path.join(demoDataDir, 'config', `${demoCity}.yml`);
-    if (!fs.existsSync(configPath)) {
+    // Map demo city name to backup filename
+    const backupFileName = `${demoCity}.tar.gz`;
+    const backupPath = path.join(demoDataDir, backupFileName);
+
+    // Check if backup file exists
+    if (!fs.existsSync(backupPath)) {
       throw new Error(
-        `Demo city '${demoCity}' not found. Available cities: richmond-quebec`
+        `Demo backup file not found: ${backupFileName}. Available backups: ${fs
+          .readdirSync(demoDataDir)
+          .filter((f) => f.endsWith('.tar.gz'))
+          .join(', ')}`
       );
     }
 
-    const configContent = fs.readFileSync(configPath, 'utf8');
-    const demoConfig = yaml.parse(configContent);
+    logger.info(`📦 Found backup file: ${backupFileName}`);
 
-    // Create records directory
+    // Get system data directory (defaults to .system-data in project root)
+    // During init, systemDataDir is at process.cwd() level, same as dataDir's parent
+    const systemDataDir = path.join(process.cwd(), '.system-data');
+
+    // Get database config if available (for storage file restoration)
+    let dbConfig;
+    try {
+      dbConfig = CentralConfigManager.getDatabaseConfig();
+    } catch (error) {
+      // Database config might not be available during init, that's okay
+      logger.info(
+        '⚠️  Database config not available, storage file metadata will not be restored'
+      );
+    }
+
+    // Restore backup using BackupService
+    logger.info(`🔄 Restoring backup from ${backupFileName}...`);
+    const restoreResult = await BackupService.restoreBackup({
+      backupDir: backupPath, // BackupService handles .tar.gz files automatically
+      dataDir: dataDir,
+      systemDataDir: systemDataDir,
+      restoreStorage: true, // Include storage files
+      overwrite: true, // Overwrite existing data
+      logger: logger,
+      databaseConfig: dbConfig,
+    });
+
+    // Log warnings if any
+    if (restoreResult.warnings && restoreResult.warnings.length > 0) {
+      for (const warning of restoreResult.warnings) {
+        logger.warn(`⚠️  ${warning}`);
+      }
+    }
+
+    // Count records loaded
     const recordsDir = path.join(dataDir, 'records');
-    if (!fs.existsSync(recordsDir)) {
-      fs.mkdirSync(recordsDir, { recursive: true });
+    let recordCount = 0;
+    if (fs.existsSync(recordsDir)) {
+      const recordFiles = fs
+        .readdirSync(recordsDir, { recursive: true })
+        .filter((f): f is string => typeof f === 'string' && f.endsWith('.md'));
+      recordCount = recordFiles.length;
     }
 
-    // Copy demo records
-    const recordsSrc = path.join(demoDataDir, 'records');
-    let copiedCount = 0;
-
-    for (const recordFile of demoConfig.demo_data.records) {
-      const srcPath = path.join(recordsSrc, recordFile);
-      const destPath = path.join(recordsDir, recordFile);
-
-      if (fs.existsSync(srcPath)) {
-        fs.copyFileSync(srcPath, destPath);
-        copiedCount++;
-      } else {
-        logger.warn(`⚠️  Demo record not found: ${recordFile}`);
-      }
-    }
-
-    // Copy hooks if they exist
-    if (demoConfig.demo_data.hooks) {
-      const hooksSrc = path.join(demoDataDir, 'hooks');
-      const hooksDest = path.join(dataDir, '.civic', 'hooks');
-      if (!fs.existsSync(hooksDest)) {
-        fs.mkdirSync(hooksDest, { recursive: true });
-      }
-
-      for (const hookFile of demoConfig.demo_data.hooks) {
-        const srcPath = path.join(hooksSrc, hookFile);
-        const destPath = path.join(hooksDest, hookFile);
-
-        if (fs.existsSync(srcPath)) {
-          fs.copyFileSync(srcPath, destPath);
-          logger.info(`📋 Copied hook: ${hookFile}`);
-        }
-      }
-    }
-
-    // Copy templates if they exist
-    if (demoConfig.demo_data.templates) {
-      const templatesSrc = path.join(demoDataDir, 'templates');
-      const templatesDest = path.join(dataDir, '.civic', 'templates');
-      if (!fs.existsSync(templatesDest)) {
-        fs.mkdirSync(templatesDest, { recursive: true });
-      }
-
-      for (const templateFile of demoConfig.demo_data.templates) {
-        const srcPath = path.join(templatesSrc, templateFile);
-        const destPath = path.join(templatesDest, templateFile);
-
-        if (fs.existsSync(srcPath)) {
-          fs.copyFileSync(srcPath, destPath);
-          logger.info(`📄 Copied template: ${templateFile}`);
-        }
-      }
-    }
-
-    // Copy workflows if they exist
-    if (demoConfig.demo_data.workflows) {
-      const workflowsSrc = path.join(demoDataDir, 'workflows');
-      const workflowsDest = path.join(dataDir, '.civic', 'workflows');
-      if (!fs.existsSync(workflowsDest)) {
-        fs.mkdirSync(workflowsDest, { recursive: true });
-      }
-
-      for (const workflowFile of demoConfig.demo_data.workflows) {
-        const srcPath = path.join(workflowsSrc, workflowFile);
-        const destPath = path.join(workflowsDest, workflowFile);
-
-        if (fs.existsSync(srcPath)) {
-          fs.copyFileSync(srcPath, destPath);
-          logger.info(`⚙️  Copied workflow: ${workflowFile}`);
-        }
-      }
-    }
-
-    logger.success(`✅ Loaded ${copiedCount} demo records for ${demoCity}`);
+    logger.success(
+      `✅ Restored demo data for ${demoCity} (${recordCount} records)`
+    );
 
     // Trigger hooks for demo data loading
     try {
-      const { CivicPress } = await import('@civicpress/core');
       const civic = new CivicPress({ dataDir });
       await civic.initialize();
 
@@ -981,11 +1131,8 @@ async function loadDemoData(
         'demo:data:loaded',
         {
           demoCity,
-          recordCount: copiedCount,
-          records: demoConfig.demo_data.records,
-          hooks: demoConfig.demo_data.hooks || [],
-          templates: demoConfig.demo_data.templates || [],
-          workflows: demoConfig.demo_data.workflows || [],
+          recordCount: recordCount,
+          source: 'backup-restore',
         },
         {
           user: 'system',
@@ -993,45 +1140,10 @@ async function loadDemoData(
           metadata: {
             demoCity,
             source: 'init-command',
+            backupFile: backupFileName,
           },
         }
       );
-
-      // Trigger individual record created hooks for each loaded record
-      for (const recordFile of demoConfig.demo_data.records) {
-        const recordPath = path.join(recordsDir, recordFile);
-        if (fs.existsSync(recordPath)) {
-          const recordContent = fs.readFileSync(recordPath, 'utf8');
-          const frontmatterMatch = recordContent.match(/^---\n([\s\S]*?)\n---/);
-
-          if (frontmatterMatch) {
-            const frontmatter = yaml.parse(frontmatterMatch[1]);
-            await hookSystem.emit(
-              'record:created',
-              {
-                record: {
-                  title: frontmatter.title,
-                  type: frontmatter.type,
-                  status: frontmatter.status,
-                  path: recordPath,
-                  slug: frontmatter.slug,
-                  authors: frontmatter.authors,
-                  tags: frontmatter.tags,
-                },
-                demoData: true,
-              },
-              {
-                user: 'system',
-                action: 'demo-record-created',
-                metadata: {
-                  demoCity,
-                  recordFile,
-                },
-              }
-            );
-          }
-        }
-      }
 
       logger.info(`🎯 Triggered hooks for demo data loading`);
     } catch (hookError: any) {
@@ -1048,7 +1160,7 @@ async function setupCivicrc(
   civicrcPath: string,
   dataDir: string,
   logger: any
-): Promise<void> {
+): Promise<string | undefined> {
   logger.info('⚙️  Setting up configuration...');
 
   const answers = await inquirer.prompt([
@@ -1103,12 +1215,6 @@ async function setupCivicrc(
       },
     },
     {
-      type: 'input',
-      name: 'repo_url',
-      message: 'Repository URL (optional):',
-      default: '',
-    },
-    {
       type: 'list',
       name: 'database_type',
       message: 'Select database type:',
@@ -1134,6 +1240,18 @@ async function setupCivicrc(
       message: 'PostgreSQL connection URL:',
       default: 'postgres://user:password@localhost:5432/civicpress',
       when: (answers: any) => answers.database_type === 'postgres',
+    },
+    {
+      type: 'input',
+      name: 'storage_path',
+      message: 'Where should files be stored?',
+      default: path.join(process.cwd(), 'storage'),
+      validate: (input: string) => {
+        const trimmed = input.trim();
+        if (trimmed.length === 0) return 'Storage path is required';
+        if (trimmed.includes('..')) return 'Storage path cannot contain ".."';
+        return true;
+      },
     },
   ]);
 
@@ -1211,7 +1329,7 @@ async function setupCivicrc(
 
     // Contact and Online Presence
     website: null,
-    repo_url: answers.repo_url || null,
+    repo_url: null,
     email: null,
     phone: null,
 
@@ -1251,6 +1369,9 @@ async function setupCivicrc(
   const orgConfigYaml = yaml.stringify(orgConfig);
   fs.writeFileSync(orgConfigPath, orgConfigYaml);
   logger.success('🏢 org-config.yml saved (organization configuration)');
+
+  // Return the storage path for use in setupStorage
+  return answers.storage_path;
 }
 
 async function setupNotifications(
@@ -1374,6 +1495,184 @@ async function setupNotifications(
       logger.warn(`⚠️  Failed to setup notifications: ${error.message}`);
       logger.info(
         '💡 You can configure notifications later in .system-data/notifications.yml'
+      );
+    }
+  }
+}
+
+async function setupStorage(
+  systemDataDir: string,
+  logger: any,
+  shouldOutputJson: boolean,
+  storagePath?: string
+): Promise<void> {
+  try {
+    // Create storage.yml file in .system-data directory
+    const storageConfigPath = path.join(systemDataDir, 'storage.yml');
+
+    // Check if storage.yml already exists
+    if (fs.existsSync(storageConfigPath)) {
+      if (!shouldOutputJson) {
+        logger.info('📁 Storage configuration already exists');
+      }
+      return;
+    }
+
+    // Use provided storage path or default to 'storage' in project root
+    const userStoragePath = storagePath || path.join(process.cwd(), 'storage');
+
+    // Load default storage configuration
+    const __filename = fileURLToPath(import.meta.url);
+    const projectRoot = path.resolve(path.dirname(__filename), '../../../');
+    const defaultStorageTemplatePath = path.join(
+      projectRoot,
+      'core',
+      'src',
+      'defaults',
+      'storage.yml'
+    );
+
+    if (fs.existsSync(defaultStorageTemplatePath)) {
+      // Copy default storage configuration and update the storage path
+      const defaultConfig = fs.readFileSync(defaultStorageTemplatePath, 'utf8');
+      const configObj = yaml.parse(defaultConfig);
+
+      // Update the storage path in the configuration
+      // Store absolute path like database configuration
+      const absoluteStoragePath = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      if (configObj.backend) {
+        configObj.backend.path = absoluteStoragePath;
+      }
+      if (configObj.providers?.local) {
+        configObj.providers.local.path = absoluteStoragePath;
+      }
+
+      const updatedConfig = yaml.stringify(configObj);
+      fs.writeFileSync(storageConfigPath, updatedConfig);
+
+      // Create storage directories
+      const storageDir = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+        if (!shouldOutputJson) {
+          logger.success(`📁 Created storage directory: ${storageDir}`);
+        }
+      }
+
+      // Create default storage folders
+      const folders = ['public', 'sessions', 'permits', 'private', 'icons'];
+      for (const folder of folders) {
+        const folderPath = path.join(storageDir, folder);
+        if (!fs.existsSync(folderPath)) {
+          fs.mkdirSync(folderPath, { recursive: true });
+        }
+      }
+
+      if (!shouldOutputJson) {
+        logger.success('📁 Created storage.yml (local storage enabled)');
+        logger.info(`📁 Created storage directory: ${userStoragePath}`);
+        logger.info(
+          '💡 Configure storage providers in .system-data/storage.yml'
+        );
+        logger.info('💡 Test with: civic storage:list');
+      }
+    } else {
+      // Create basic storage configuration if default doesn't exist
+      // Store absolute path like database configuration
+      const absoluteStoragePath = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      const basicStorageConfig = {
+        backend: {
+          type: 'local',
+          path: absoluteStoragePath,
+        },
+        providers: {
+          local: {
+            type: 'local',
+            path: absoluteStoragePath,
+            enabled: true,
+          },
+        },
+        active_provider: 'local',
+        failover_providers: ['local'],
+        global: {
+          max_file_size: '100MB',
+          health_checks: true,
+          health_check_interval: 5,
+          retry_attempts: 3,
+          cross_provider_backup: false,
+          backup_providers: [],
+        },
+        folders: {
+          public: {
+            path: 'public',
+            access: 'public',
+            allowed_types: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'txt', 'md'],
+            max_size: '10MB',
+            description: 'Public files for testing',
+          },
+          icons: {
+            path: 'icons',
+            access: 'public',
+            allowed_types: ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp', 'ico'],
+            max_size: '2MB',
+            description: 'Icons and map-related images for geography records',
+          },
+        },
+        metadata: {
+          auto_generate_thumbnails: true,
+          store_exif: true,
+          compress_images: true,
+          backup_included: true,
+        },
+      };
+
+      const storageYaml = yaml.stringify(basicStorageConfig);
+      fs.writeFileSync(storageConfigPath, storageYaml);
+
+      // Create storage directories
+      const storageDir = path.isAbsolute(userStoragePath)
+        ? userStoragePath
+        : path.resolve(process.cwd(), userStoragePath);
+
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+        if (!shouldOutputJson) {
+          logger.success(`📁 Created storage directory: ${storageDir}`);
+        }
+      }
+
+      // Create default storage folders
+      const folders = ['public', 'sessions', 'permits', 'private', 'icons'];
+      for (const folder of folders) {
+        const folderPath = path.join(storageDir, folder);
+        if (!fs.existsSync(folderPath)) {
+          fs.mkdirSync(folderPath, { recursive: true });
+        }
+      }
+
+      if (!shouldOutputJson) {
+        logger.success('📁 Created storage.yml (local storage enabled)');
+        logger.info(`📁 Created storage directory: ${userStoragePath}`);
+        logger.info(
+          '💡 Configure storage providers in .system-data/storage.yml'
+        );
+        logger.info('💡 Test with: civic storage:list');
+      }
+    }
+  } catch (error: any) {
+    if (!shouldOutputJson) {
+      logger.warn(`⚠️  Failed to setup storage: ${error.message}`);
+      logger.info(
+        '💡 You can configure storage later in .system-data/storage.yml'
       );
     }
   }

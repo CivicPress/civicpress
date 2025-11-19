@@ -456,4 +456,4 @@ private validateAdvancedRule(
 - [Template System Guide](templates.md)
 - [CLI Usage Guide](cli.md)
 - [Validation Rules](../core/src/utils/template-engine.ts)
-- [Template Examples](../.civic/templates/)
+- [Template Examples](../core/src/defaults/templates/)

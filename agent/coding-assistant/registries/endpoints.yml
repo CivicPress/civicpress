@@ -1,0 +1,578 @@
+# Canonical registry of API endpoints (Express API in modules/api).
+# The assistant MUST check here before creating new endpoints.
+
+endpoints:
+  # Auth (mounted at /auth)
+  - id: auth:login
+    method: POST
+    path: /auth/login
+    file: modules/api/src/routes/auth.ts
+    desc: Authenticate with OAuth provider token
+    status: stable
+
+  - id: auth:password
+    method: POST
+    path: /auth/password
+    file: modules/api/src/routes/auth.ts
+    desc: Authenticate with username and password
+    status: stable
+
+  - id: auth:providers
+    method: GET
+    path: /auth/providers
+    file: modules/api/src/routes/auth.ts
+    desc: List available OAuth providers
+    status: stable
+
+  - id: auth:me
+    method: GET
+    path: /auth/me
+    file: modules/api/src/routes/auth.ts
+    desc: Get current authenticated user
+    status: stable
+
+  - id: auth:logout
+    method: POST
+    path: /auth/logout
+    file: modules/api/src/routes/auth.ts
+    desc: Logout (stateless)
+    status: stable
+
+  - id: auth:simulated
+    method: POST
+    path: /auth/simulated
+    file: modules/api/src/routes/auth.ts
+    desc: Authenticate with simulated account (disabled in production)
+    status: stable
+
+  # Public registration/auth helpers (mounted directly under /api)
+  - id: users:register
+    method: POST
+    path: /api/users/register
+    file: modules/api/src/routes/users.ts
+    desc: Public user registration
+    status: stable
+
+  - id: users:password-auth
+    method: POST
+    path: /api/users/auth/password
+    file: modules/api/src/routes/users.ts
+    desc: Password authentication (public)
+    status: stable
+
+  # Health and docs
+  - id: health:basic
+    method: GET
+    path: /health
+    file: modules/api/src/routes/health.ts
+    desc: Health check
+    status: stable
+
+  - id: health:detailed
+    method: GET
+    path: /health/detailed
+    file: modules/api/src/routes/health.ts
+    desc: Detailed health info
+    status: stable
+
+  - id: health:test-error
+    method: POST
+    path: /health/test-error
+    file: modules/api/src/routes/health.ts
+    desc: Emit a test error (diagnostics)
+    status: stable
+
+  - id: docs:swagger
+    method: GET
+    path: /docs/api-docs.json
+    file: modules/api/src/routes/docs.ts
+    desc: OpenAPI schema JSON
+    status: stable
+
+  # Info (no auth)
+  - id: info:root
+    method: GET
+    path: /info
+    file: modules/api/src/routes/info.ts
+    desc: System/organization info
+    status: stable
+
+  # Public records/search/status/validation/config/system (mounted under /api/v1)
+  - id: records:list
+    method: GET
+    path: /api/v1/records
+    file: modules/api/src/routes/records.ts
+    desc: List records (public or authenticated)
+    status: stable
+
+  - id: records:get
+    method: GET
+    path: /api/v1/records/:id
+    file: modules/api/src/routes/records.ts
+    desc: Get a record by id (public or authenticated)
+    status: stable
+
+  - id: records:get-raw
+    method: GET
+    path: /api/v1/records/:id/raw
+    file: modules/api/src/routes/records.ts
+    desc: Get raw record content (public or authenticated)
+    status: stable
+
+  - id: records:list-drafts
+    method: GET
+    path: /api/v1/records/drafts
+    file: modules/api/src/routes/records.ts
+    desc: List drafts (authenticated)
+    status: stable
+
+  - id: records:create
+    method: POST
+    path: /api/v1/records
+    file: modules/api/src/routes/records.ts
+    desc: Create record (authenticated)
+    status: stable
+
+  - id: records:update
+    method: PUT
+    path: /api/v1/records/:id
+    file: modules/api/src/routes/records.ts
+    desc: Update record (authenticated)
+    status: stable
+
+  - id: records:delete
+    method: DELETE
+    path: /api/v1/records/:id
+    file: modules/api/src/routes/records.ts
+    desc: Archive/delete record (authenticated)
+    status: stable
+
+  - id: records:status
+    method: POST
+    path: /api/v1/records/:id/status
+    file: modules/api/src/routes/records.ts
+    desc: Change record status (authenticated)
+    status: stable
+
+  - id: search:query
+    method: GET
+    path: /api/v1/search
+    file: modules/api/src/routes/search.ts
+    desc: Search records
+    status: stable
+
+  - id: search:suggestions
+    method: GET
+    path: /api/v1/search/suggestions
+    file: modules/api/src/routes/search.ts
+    desc: Search suggestions
+    status: stable
+
+  - id: status:system
+    method: GET
+    path: /api/v1/status
+    file: modules/api/src/routes/status.ts
+    desc: Comprehensive system status
+    status: stable
+
+  - id: status:git
+    method: GET
+    path: /api/v1/status/git
+    file: modules/api/src/routes/status.ts
+    desc: Detailed git status
+    status: stable
+
+  - id: status:records
+    method: GET
+    path: /api/v1/status/records
+    file: modules/api/src/routes/status.ts
+    desc: Record statistics
+    status: stable
+
+  - id: validation:record
+    method: POST
+    path: /api/v1/validation/record
+    file: modules/api/src/routes/validation.ts
+    desc: Validate a single record (by id)
+    status: stable
+
+  - id: validation:bulk
+    method: POST
+    path: /api/v1/validation/bulk
+    file: modules/api/src/routes/validation.ts
+    desc: Validate multiple records
+    status: stable
+
+  - id: validation:status
+    method: GET
+    path: /api/v1/validation/status
+    file: modules/api/src/routes/validation.ts
+    desc: Validation status and issues
+    status: stable
+
+  - id: validation:get-record
+    method: GET
+    path: /api/v1/validation/record/:recordId
+    file: modules/api/src/routes/validation.ts
+    desc: Get validation for a specific record
+    status: stable
+
+  - id: config:list
+    method: GET
+    path: /api/v1/config/list
+    file: modules/api/src/routes/config.ts
+    desc: List available configurations
+
+  # Storage (mounted at /api/v1/storage)
+  - id: storage:config
+    method: GET
+    path: /api/v1/storage/config
+    file: modules/api/src/routes/storage.ts
+    desc: Get storage configuration
+    status: stable
+
+  - id: storage:update-config
+    method: PUT
+    path: /api/v1/storage/config
+    file: modules/api/src/routes/storage.ts
+    desc: Update storage configuration
+    status: stable
+
+  - id: storage:upload
+    method: POST
+    path: /api/v1/storage/upload/:folder
+    file: modules/api/src/routes/storage.ts
+    desc: Upload file to storage folder
+    status: stable
+
+  - id: storage:list-files
+    method: GET
+    path: /api/v1/storage/files/:folder
+    file: modules/api/src/routes/storage.ts
+    desc: List files in storage folder
+    status: stable
+
+  - id: storage:download
+    method: GET
+    path: /api/v1/storage/download/:folder/:filename
+    file: modules/api/src/routes/storage.ts
+    desc: Download file from storage
+    status: stable
+
+  - id: storage:delete-file
+    method: DELETE
+    path: /api/v1/storage/files/:folder/:filename
+    file: modules/api/src/routes/storage.ts
+    desc: Delete file from storage
+    status: stable
+
+  - id: storage:file-info
+    method: GET
+    path: /api/v1/storage/files/:folder/:filename/info
+    file: modules/api/src/routes/storage.ts
+    desc: Get file information
+    status: stable
+
+  - id: storage:add-folder
+    method: POST
+    path: /api/v1/storage/folders
+    file: modules/api/src/routes/storage.ts
+    desc: Add new storage folder
+    status: stable
+
+  - id: storage:update-folder
+    method: PUT
+    path: /api/v1/storage/folders/:name
+    file: modules/api/src/routes/storage.ts
+    desc: Update storage folder configuration
+    status: stable
+
+  - id: storage:remove-folder
+    method: DELETE
+    path: /api/v1/storage/folders/:name
+    file: modules/api/src/routes/storage.ts
+    desc: Remove storage folder
+    status: stable
+
+  # UUID Storage System (New Multi-Cloud Implementation)
+  - id: storage:upload:uuid
+    method: POST
+    path: /api/v1/storage/files
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Upload file with UUID tracking (supports local, S3, Azure)
+    status: stable
+
+  - id: storage:download:uuid
+    method: GET
+    path: /api/v1/storage/files/:id
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Download file by UUID
+    status: stable
+
+  - id: storage:info:uuid
+    method: GET
+    path: /api/v1/storage/files/:id/info
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Get file metadata by UUID
+    status: stable
+
+  - id: storage:delete:uuid
+    method: DELETE
+    path: /api/v1/storage/files/:id
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Delete file by UUID
+    status: stable
+
+  - id: storage:list:folder:uuid
+    method: GET
+    path: /api/v1/storage/folders/:folder/files
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: List files in folder with UUID metadata
+    status: stable
+
+  - id: config:metadata
+    method: GET
+    path: /api/v1/config/metadata/:type
+    file: modules/api/src/routes/config.ts
+    desc: Get configuration metadata
+    status: stable
+
+  - id: config:status
+    method: GET
+    path: /api/v1/config/status
+    file: modules/api/src/routes/config.ts
+    desc: Get configuration status
+    status: stable
+
+  - id: config:get
+    method: GET
+    path: /api/v1/config/:type
+    file: modules/api/src/routes/config.ts
+    desc: Load configuration
+    status: stable
+
+  - id: config:save
+    method: PUT
+    path: /api/v1/config/:type
+    file: modules/api/src/routes/config.ts
+    desc: Save configuration
+    status: stable
+
+  - id: config:reset
+    method: POST
+    path: /api/v1/config/:type/reset
+    file: modules/api/src/routes/config.ts
+    desc: Reset configuration to defaults
+    status: stable
+
+  - id: config:validate
+    method: POST
+    path: /api/v1/config/:type/validate
+    file: modules/api/src/routes/config.ts
+    desc: Validate configuration
+    status: stable
+
+  - id: config:validate-all
+    method: GET
+    path: /api/v1/config/validate/all
+    file: modules/api/src/routes/config.ts
+    desc: Validate all configurations
+    status: stable
+
+  - id: system:record-types
+    method: GET
+    path: /api/v1/system/record-types
+    file: modules/api/src/routes/system.ts
+    desc: List available record types
+    status: stable
+
+  - id: system:record-statuses
+    method: GET
+    path: /api/v1/system/record-statuses
+    file: modules/api/src/routes/system.ts
+    desc: List available record statuses
+    status: stable
+
+  # Protected routers mounted under /api/v1
+  - id: users:list
+    method: GET
+    path: /api/v1/users
+    file: modules/api/src/routes/users.ts
+    desc: List users (admin)
+    status: stable
+
+  - id: users:create
+    method: POST
+    path: /api/v1/users
+    file: modules/api/src/routes/users.ts
+    desc: Create user (admin)
+    status: stable
+
+  - id: users:get
+    method: GET
+    path: /api/v1/users/:id
+    file: modules/api/src/routes/users.ts
+    desc: Get user by id or username (admin or self)
+    status: stable
+
+  - id: users:update
+    method: PUT
+    path: /api/v1/users/:id
+    file: modules/api/src/routes/users.ts
+    desc: Update user (admin or self)
+    status: stable
+
+  - id: users:delete
+    method: DELETE
+    path: /api/v1/users/:id
+    file: modules/api/src/routes/users.ts
+    desc: Delete user (admin)
+    status: stable
+
+  - id: templates:list
+    method: GET
+    path: /api/v1/templates
+    file: modules/api/src/routes/templates.ts
+    desc: List templates
+    status: stable
+
+  - id: templates:get
+    method: GET
+    path: /api/v1/templates/:id
+    file: modules/api/src/routes/templates.ts
+    desc: Get a template
+    status: stable
+
+  - id: templates:create
+    method: POST
+    path: /api/v1/templates
+    file: modules/api/src/routes/templates.ts
+    desc: Create template
+    status: stable
+
+  - id: templates:update
+    method: PUT
+    path: /api/v1/templates/:id
+    file: modules/api/src/routes/templates.ts
+    desc: Update template
+    status: stable
+
+  - id: templates:delete
+    method: DELETE
+    path: /api/v1/templates/:id
+    file: modules/api/src/routes/templates.ts
+    desc: Delete template
+    status: stable
+
+  - id: workflows:list
+    method: GET
+    path: /api/v1/workflows
+    file: modules/api/src/routes/workflows.ts
+    desc: List workflows
+    status: stable
+
+  - id: workflows:get
+    method: GET
+    path: /api/v1/workflows/:id
+    file: modules/api/src/routes/workflows.ts
+    desc: Get workflow
+    status: stable
+
+  - id: workflows:create
+    method: POST
+    path: /api/v1/workflows
+    file: modules/api/src/routes/workflows.ts
+    desc: Create workflow
+    status: stable
+
+  - id: workflows:update
+    method: PUT
+    path: /api/v1/workflows/:id
+    file: modules/api/src/routes/workflows.ts
+    desc: Update workflow
+    status: stable
+
+  - id: workflows:delete
+    method: DELETE
+    path: /api/v1/workflows/:id
+    file: modules/api/src/routes/workflows.ts
+    desc: Delete workflow
+    status: stable
+
+  - id: hooks:list
+    method: GET
+    path: /api/v1/hooks
+    file: modules/api/src/routes/hooks.ts
+    desc: List hooks
+    status: stable
+
+  - id: hooks:get
+    method: GET
+    path: /api/v1/hooks/:id
+    file: modules/api/src/routes/hooks.ts
+    desc: Get hook
+    status: stable
+
+  - id: hooks:create
+    method: POST
+    path: /api/v1/hooks
+    file: modules/api/src/routes/hooks.ts
+    desc: Create hook
+    status: stable
+
+  - id: hooks:update
+    method: PUT
+    path: /api/v1/hooks/:id
+    file: modules/api/src/routes/hooks.ts
+    desc: Update hook
+    status: stable
+
+  - id: hooks:delete
+    method: DELETE
+    path: /api/v1/hooks/:id
+    file: modules/api/src/routes/hooks.ts
+    desc: Delete hook
+    status: stable
+
+  # The following routers exist but have many subroutes; refer to their files for details
+  - id: export:router
+    method: MIXED
+    path: /api/v1/export/*
+    file: modules/api/src/routes/export.ts
+    desc: Export endpoints
+    status: stable
+
+  - id: import:router
+    method: MIXED
+    path: /api/v1/import/*
+    file: modules/api/src/routes/import.ts
+    desc: Import endpoints
+    status: stable
+
+  - id: indexing:router
+    method: MIXED
+    path: /api/v1/indexing/*
+    file: modules/api/src/routes/indexing.ts
+    desc: Indexing endpoints (generate, search, validate, stats)
+    status: stable
+
+  - id: history:router
+    method: MIXED
+    path: /api/v1/history/*
+    file: modules/api/src/routes/history.ts
+    desc: History endpoints
+    status: stable
+
+  - id: diff:router
+    method: MIXED
+    path: /api/v1/diff/*
+    file: modules/api/src/routes/diff.ts
+    desc: Record diff endpoints
+    status: stable
+
+  - id: config:attachment-types
+    method: GET
+    path: /api/v1/config/attachment-types
+    file: modules/api/src/routes/config.ts
+    desc: Get attachment type categories for file attachments
+    status: stable

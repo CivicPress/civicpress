@@ -1,13 +1,20 @@
 import { CAC } from 'cac';
-import { WorkflowConfigManager, userCan } from '@civicpress/core';
+import {
+  WorkflowConfigManager,
+  userCan,
+  RecordParser,
+  RecordData,
+  RecordSchemaValidator,
+  getRecordYear,
+} from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yaml from 'yaml';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import matter from 'gray-matter';
 
 export const createCommand = (cli: CAC) => {
   cli
@@ -38,6 +45,8 @@ export const createCommand = (cli: CAC) => {
         options.token,
         shouldOutputJson
       );
+      const coreMod: any = await import('@civicpress/core');
+      const audit = new coreMod.AuditLogger();
       // Get data directory from civic instance
       const dataDir = civic.getDataDir();
 
@@ -70,7 +79,7 @@ export const createCommand = (cli: CAC) => {
           logger.info(`📝 Creating ${type}: ${title}`);
         }
 
-        // Validate record type
+        // Validate record type (includes new types)
         const validTypes = [
           'bylaw',
           'policy',
@@ -78,6 +87,8 @@ export const createCommand = (cli: CAC) => {
           'resolution',
           'proclamation',
           'ordinance',
+          'geography',
+          'session',
         ];
         if (!validTypes.includes(type)) {
           if (shouldOutputJson) {
@@ -175,8 +186,11 @@ export const createCommand = (cli: CAC) => {
           .replace(/-+/g, '-')
           .trim();
 
+        const createdAt = new Date().toISOString();
+        const recordYear = getRecordYear(createdAt);
+
         // Create directory structure
-        const recordsDir = path.join(dataDir, 'records', type);
+        const recordsDir = path.join(dataDir, 'records', type, recordYear);
         if (!fs.existsSync(recordsDir)) {
           fs.mkdirSync(recordsDir, { recursive: true });
         }
@@ -191,8 +205,8 @@ export const createCommand = (cli: CAC) => {
           status: 'draft',
           author: 'system', // TODO: Get from user context
           version: '1.0.0',
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
+          created: createdAt,
+          updated: createdAt,
         };
 
         // Process template with context
@@ -201,19 +215,87 @@ export const createCommand = (cli: CAC) => {
           context
         );
 
-        // Create YAML frontmatter
-        const frontmatter = {
+        // Generate record ID
+        const recordId = `record-${Date.now()}`;
+
+        // Create RecordData object following standard format
+        const recordData: RecordData = {
+          id: recordId,
           title: title,
           type: type,
           status: 'draft',
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
-          author: 'system', // TODO: Get from user context
-          version: '1.0.0',
+          content: processedContent,
+          author: user.username,
+          authors: [
+            {
+              name: user.name || user.username,
+              username: user.username,
+              role: user.role,
+              email: user.email,
+            },
+          ],
+          created_at: createdAt,
+          updated_at: createdAt,
+          metadata: {
+            version: '1.0.0',
+          },
         };
 
-        // Combine frontmatter and processed content
-        const fullContent = `---\n${yaml.stringify(frontmatter)}---\n${processedContent}`;
+        // Use RecordParser to serialize to properly formatted markdown
+        const fullContent = RecordParser.serializeToMarkdown(recordData);
+
+        // Validate schema before saving (fail fast)
+        const { data: frontmatter } = matter(fullContent);
+        const schemaValidation = RecordSchemaValidator.validate(
+          frontmatter,
+          type,
+          {
+            includeModuleExtensions: true,
+            includeTypeExtensions: true,
+            strict: false,
+          }
+        );
+
+        if (!schemaValidation.isValid && schemaValidation.errors.length > 0) {
+          const errorMessages = schemaValidation.errors
+            .map((err) => `${err.field}: ${err.message}`)
+            .join('; ');
+
+          if (shouldOutputJson) {
+            console.log(
+              JSON.stringify(
+                {
+                  success: false,
+                  error: 'Schema validation failed',
+                  details: errorMessages,
+                  errors: schemaValidation.errors,
+                },
+                null,
+                2
+              )
+            );
+          } else {
+            logger.error('❌ Schema validation failed:');
+            for (const error of schemaValidation.errors) {
+              logger.error(`  ${error.field}: ${error.message}`);
+              if (error.suggestion) {
+                logger.info(`    💡 ${error.suggestion}`);
+              }
+            }
+          }
+          process.exit(1);
+        }
+
+        // Log schema validation warnings if any
+        if (schemaValidation.warnings.length > 0 && !shouldOutputJson) {
+          logger.warn('⚠️  Schema validation warnings:');
+          for (const warning of schemaValidation.warnings) {
+            logger.warn(`  ${warning.field}: ${warning.message}`);
+            if (warning.suggestion) {
+              logger.info(`    💡 ${warning.suggestion}`);
+            }
+          }
+        }
 
         // Handle dry-run modes
         const isCompleteDryRun = options.dryRun;
@@ -318,7 +400,27 @@ export const createCommand = (cli: CAC) => {
           logger.info(`📁 Location: ${filePath}`);
           logger.info(`📋 Template: ${type}/${templateName}`);
         }
+        await audit.log({
+          source: 'cli',
+          actor: { username: user.username, role: user.role },
+          action: 'record_create',
+          target: {
+            type: 'record',
+            name: `${type}/${filename}`,
+            path: filePath,
+          },
+          outcome: 'success',
+          metadata: { type, title, dryRun: isCompleteDryRun },
+        });
       } catch (error) {
+        await audit.log({
+          source: 'cli',
+          actor: { username: user.username, role: user.role },
+          action: 'record_create',
+          target: { type: 'record', name: `${type}/${title}` },
+          outcome: 'failure',
+          message: error instanceof Error ? error.message : String(error),
+        });
         if (shouldOutputJson) {
           console.log(
             JSON.stringify(

@@ -44,12 +44,14 @@ router.post('/login', async (req, res) => {
 
     // Authenticate with OAuth provider
     const session = await authService.authenticateWithOAuth(provider, token);
+    // Attach permissions to user payload
+    const permissions = await authService.getUserPermissions(session.user);
 
     sendSuccess(
       {
         session: {
           token: session.token,
-          user: session.user,
+          user: { ...session.user, permissions },
           expiresAt: session.expiresAt,
         },
       },
@@ -91,12 +93,14 @@ router.post('/password', async (req, res) => {
       username,
       password
     );
+    // Attach permissions to user payload
+    const permissions = await authService.getUserPermissions(session.user);
 
     sendSuccess(
       {
         session: {
           token: session.token,
-          user: session.user,
+          user: { ...session.user, permissions },
           expiresAt: session.expiresAt,
         },
       },
@@ -168,6 +172,8 @@ router.get('/me', async (req, res) => {
       return handleApiError('get_me', error, req, res);
     }
 
+    // Include permissions in response
+    const permissions = await authService.getUserPermissions(user);
     sendSuccess(
       {
         user: {
@@ -177,7 +183,8 @@ router.get('/me', async (req, res) => {
           email: user.email,
           name: user.name,
           avatar_url: user.avatar_url,
-          permissions: [], // TODO: Add permissions to AuthUser interface
+          email_verified: user.email_verified,
+          permissions,
         },
       },
       req,
@@ -273,12 +280,14 @@ router.post('/simulated', async (req, res) => {
       username,
       role
     );
+    // Attach permissions to user payload
+    const permissions = await authService.getUserPermissions(session.user);
 
     sendSuccess(
       {
         session: {
           token: session.token,
-          user: session.user,
+          user: { ...session.user, permissions },
           expiresAt: session.expiresAt,
         },
       },

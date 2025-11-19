@@ -3,6 +3,9 @@
 **For**: Cursor, Copilot, ChatGPT, and other AI agents  
 **Purpose**: How to effectively use the CivicPress memory system
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 🎯 **Quick Start for AI Agents**
 
 ### 1. **Initial Context Loading**
@@ -14,7 +17,7 @@ When starting work on CivicPress, always read these files first:
 agent/memory/project-state.md      # Current implementation status
 agent/context/goals.md             # Development goals and priorities
 agent/memory/architecture.md       # System architecture and patterns
-agent/context/blockers.md          # Current blockers and issues
+# Note: blockers.md was removed as it was outdated (all blockers resolved)
 
 # Critical specifications (read as needed for specific work)
 docs/specs/README.md               # Specifications overview and index
@@ -84,7 +87,7 @@ agent/knowledge/examples.md        # Code examples
 
 - **goals.md**: Current development goals and priorities
 - **priorities.md**: Development priorities and focus areas
-- **blockers.md**: Current blockers and issues
+- **Note**: `blockers.md` was removed as it was outdated (all blockers resolved)
 
 ### **Knowledge** (`agent/knowledge/`)
 
@@ -188,7 +191,8 @@ When switching between AI agents:
 
 ### **Debugging Issues**
 
-1. **Check**: `agent/context/blockers.md` for known issues
+1. **Check**: Project status in `agent/memory/project-state.md` for current
+   issues
 2. **Review**: `agent/memory/lessons.md` for similar problems
 3. **Reference**: `agent/knowledge/patterns.md` for solutions
 4. **Update**: Blockers list with new issues

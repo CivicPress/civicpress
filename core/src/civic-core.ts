@@ -14,6 +14,7 @@ import {
   NotificationService,
   NotificationConfig,
 } from './notifications/index.js';
+import { Geography } from './types/geography.js';
 
 export interface CivicPressConfig {
   dataDir: string;
@@ -35,19 +36,109 @@ export interface CivicPressConfig {
   };
 }
 
+export interface LinkedRecord {
+  id: string;
+  type: string;
+  description: string;
+  path?: string;
+  category?: string;
+}
+
+export interface LinkedGeographyFile {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export interface CreateRecordRequest {
   title: string;
   type: string;
   content?: string;
   metadata?: Record<string, any>;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  relativePath?: string;
+  skipFileGeneration?: boolean;
+  geography?: Geography;
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
+  linkedRecords?: LinkedRecord[];
+  linkedGeographyFiles?: LinkedGeographyFile[];
   role?: string;
+
+  // Authorship - support both formats
+  authors?: Array<{
+    name: string;
+    username: string;
+    role?: string;
+    email?: string;
+  }>;
+
+  // Source & Origin - for imported/legacy documents
+  source?: {
+    reference: string;
+    original_title?: string;
+    original_filename?: string;
+    url?: string;
+    type?: 'legacy' | 'import' | 'external';
+    imported_at?: string;
+    imported_by?: string;
+  };
 }
 
 export interface UpdateRecordRequest {
   title?: string;
   content?: string;
   status?: string;
+  relativePath?: string;
   metadata?: Record<string, any>;
+  geography?: Geography;
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
+  linkedRecords?: LinkedRecord[];
+  linkedGeographyFiles?: LinkedGeographyFile[];
+
+  // Authorship - support both formats
+  authors?: Array<{
+    name: string;
+    username: string;
+    role?: string;
+    email?: string;
+  }>;
+
+  // Source & Origin - for imported/legacy documents
+  source?: {
+    reference: string;
+    original_title?: string;
+    original_filename?: string;
+    url?: string;
+    type?: 'legacy' | 'import' | 'external';
+    imported_at?: string;
+    imported_by?: string;
+  };
 }
 
 export class CivicPress {

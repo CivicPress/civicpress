@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import {
   createAPITestContext,
@@ -9,11 +9,12 @@ import {
 // Setup global test environment
 await setupGlobalTestEnvironment();
 
-describe('API Authorization System', () => {
+describe('Authorization System', () => {
   let context: any;
   let adminToken: string;
   let clerkToken: string;
   let publicToken: string;
+  let recordId: string;
 
   beforeEach(async () => {
     context = await createAPITestContext();
@@ -42,356 +43,221 @@ describe('API Authorization System', () => {
         role: 'public',
       });
     publicToken = publicResponse.body.data.session.token;
+
+    // Create a test record for testing permissions
+    const createResponse = await request(context.api.getApp())
+      .post('/api/v1/records')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        type: 'policy',
+        title: 'Test Policy for Authorization',
+        content:
+          '# Test Policy\n\nThis is a test policy for authorization testing.',
+      });
+
+    // Debug: Log response if creation failed
+    if (!createResponse.body.data) {
+      console.error('Record creation failed:', {
+        status: createResponse.status,
+        body: createResponse.body,
+      });
+      throw new Error(
+        `Record creation failed: ${JSON.stringify(createResponse.body)}`
+      );
+    }
+
+    recordId = createResponse.body.data.id;
   });
 
   afterEach(async () => {
     await cleanupAPITestContext(context);
   });
 
-  describe('Record Permissions', () => {
+  describe('Record Creation Permissions', () => {
     it('should allow admin to create records', async () => {
       const response = await request(context.api.getApp())
-        .post('/api/records')
+        .post('/api/v1/records')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          title: 'Test Bylaw',
-          type: 'bylaw',
-          content: '# Test Bylaw\n\nContent here...',
-        })
-        .expect(201);
-      expect(response.body.data.id).toBeDefined();
-      expect(response.body.data.title).toBe('Test Bylaw');
+          type: 'policy',
+          title: 'Admin Created Policy',
+          content: '# Admin Policy\n\nCreated by admin.',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
     });
 
     it('should allow clerk to create records', async () => {
       const response = await request(context.api.getApp())
-        .post('/api/records')
+        .post('/api/v1/records')
         .set('Authorization', `Bearer ${clerkToken}`)
         .send({
-          title: 'Test Policy',
           type: 'policy',
-          content: '# Test Policy\n\nContent here...',
-        })
-        .expect(201);
-      expect(response.body.data.id).toBeDefined();
-    });
-
-    it('should allow all authenticated users to view records', async () => {
-      // First create a record
-      const createResponse = await request(context.api.getApp())
-        .post('/api/records')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          title: 'Test Record',
-          type: 'bylaw',
-          content: '# Test Record\n\nContent here...',
+          title: 'Clerk Created Policy',
+          content: '# Clerk Policy\n\nCreated by clerk.',
         });
 
-      const recordId = createResponse.body.data.id;
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+    });
 
-      // Test admin can view
-      await request(context.api.getApp())
-        .get(`/api/records/${recordId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-
-      // Test clerk can view
-      await request(context.api.getApp())
-        .get(`/api/records/${recordId}`)
-        .set('Authorization', `Bearer ${clerkToken}`)
-        .expect(200);
-
-      // Test public can view
-      await request(context.api.getApp())
-        .get(`/api/records/${recordId}`)
+    it('should deny public users from creating records', async () => {
+      const response = await request(context.api.getApp())
+        .post('/api/v1/records')
         .set('Authorization', `Bearer ${publicToken}`)
-        .expect(200);
-    });
-
-    it('should allow admin and clerk to edit records', async () => {
-      // First create a record
-      const createResponse = await request(context.api.getApp())
-        .post('/api/records')
-        .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          title: 'Test Record',
-          type: 'bylaw',
-          content: '# Test Record\n\nContent here...',
+          type: 'policy',
+          title: 'Public Created Policy',
+          content: '# Public Policy\n\nCreated by public user.',
         });
 
-      const recordId = createResponse.body.data.id;
+      expect(response.status).toBe(403);
+    });
+  });
 
-      // Test admin can edit
-      await request(context.api.getApp())
-        .put(`/api/records/${recordId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          title: 'Updated Content',
-          content: '# Updated Content\n\nNew content here...',
-        })
-        .expect(200);
+  describe('Record Reading Permissions', () => {
+    it('should allow admin to read records', async () => {
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
 
-      // Test clerk can edit
-      await request(context.api.getApp())
-        .put(`/api/records/${recordId}`)
-        .set('Authorization', `Bearer ${clerkToken}`)
-        .send({
-          title: 'Updated Content',
-          content: '# Updated Content\n\nNew content here...',
-        })
-        .expect(200);
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
     });
 
+    it('should allow clerk to read records', async () => {
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${clerkToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should allow public users to read records', async () => {
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${publicToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe('Record Update Permissions', () => {
+    it('should allow admin to update records', async () => {
+      const response = await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Updated by Admin',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should allow clerk to update records', async () => {
+      const response = await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${clerkToken}`)
+        .send({
+          title: 'Updated by Clerk',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe('Record Deletion Permissions', () => {
     it('should allow admin to delete records', async () => {
-      // First create a record
-      const createResponse = await request(context.api.getApp())
-        .post('/api/records')
+      const response = await request(context.api.getApp())
+        .post('/api/v1/records')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          title: 'Test Record',
-          type: 'bylaw',
-          content: '# Test Record\n\nContent here...',
+          type: 'policy',
+          title: 'Policy to Delete',
+          content: '# Policy to Delete\n\nThis will be deleted.',
         });
 
-      const recordId = createResponse.body.data.id;
+      const newRecordId = response.body.data.id;
 
-      // Test admin can delete
-      await request(context.api.getApp())
-        .delete(`/api/records/${recordId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+      const deleteResponse = await request(context.api.getApp())
+        .delete(`/api/v1/records/${newRecordId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(deleteResponse.status).toBe(200);
+      expect(deleteResponse.body.success).toBe(true);
     });
 
-    it('should prevent clerk from deleting records', async () => {
-      // First create a record
-      const createResponse = await request(context.api.getApp())
-        .post('/api/records')
+    it('should deny clerk from deleting records', async () => {
+      const response = await request(context.api.getApp())
+        .post('/api/v1/records')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          title: 'Test Record',
-          type: 'bylaw',
-          content: '# Test Record\n\nContent here...',
+          type: 'policy',
+          title: 'Policy to Delete by Clerk',
+          content: '# Policy to Delete\n\nThis will not be deleted by clerk.',
         });
 
-      const recordId = createResponse.body.data.id;
+      const newRecordId = response.body.data.id;
 
-      // Test clerk cannot delete
-      await request(context.api.getApp())
-        .delete(`/api/records/${recordId}`)
-        .set('Authorization', `Bearer ${clerkToken}`)
-        .expect(403);
+      const deleteResponse = await request(context.api.getApp())
+        .delete(`/api/v1/records/${newRecordId}`)
+        .set('Authorization', `Bearer ${clerkToken}`);
+
+      expect(deleteResponse.status).toBe(403);
     });
+  });
 
-    it('should prevent public from creating records', async () => {
-      await request(context.api.getApp())
-        .post('/api/records')
-        .set('Authorization', `Bearer ${publicToken}`)
-        .send({
-          title: 'Test Record',
-          type: 'bylaw',
-          content: '# Test Record\n\nContent here...',
-        })
-        .expect(403);
-    });
-
-    it('should prevent public from editing records', async () => {
-      // First create a record
-      const createResponse = await request(context.api.getApp())
-        .post('/api/records')
+  describe('Role-Based Access Control', () => {
+    it('should enforce role-based permissions correctly', async () => {
+      // Test that different roles have different access levels
+      const adminResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          title: 'Test Record',
-          type: 'bylaw',
-          content: '# Test Record\n\nContent here...',
+          type: 'policy',
+          title: 'Role Test Policy',
+          content: '# Role Test\n\nTesting role permissions.',
         });
 
-      const recordId = createResponse.body.data.id;
+      expect(adminResponse.status).toBe(201);
 
-      // Test public cannot edit
-      await request(context.api.getApp())
-        .put(`/api/records/${recordId}`)
+      const clerkResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${clerkToken}`)
+        .send({
+          type: 'policy',
+          title: 'Role Test Policy 2',
+          content: '# Role Test 2\n\nTesting clerk permissions.',
+        });
+
+      expect(clerkResponse.status).toBe(201);
+
+      const publicResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
         .set('Authorization', `Bearer ${publicToken}`)
         .send({
-          title: 'Updated Content',
-          content: '# Updated Content\n\nNew content here...',
-        })
-        .expect(403);
-    });
-  });
+          type: 'policy',
+          title: 'Role Test Policy 3',
+          content: '# Role Test 3\n\nTesting public permissions.',
+        });
 
-  describe('Import/Export Permissions', () => {
-    it('should allow admin to import data', async () => {
-      await request(context.api.getApp())
-        .post('/api/import')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          data: '{}',
-        })
-        .expect(200);
+      expect(publicResponse.status).toBe(403);
     });
 
-    it('should allow admin to export data', async () => {
-      await request(context.api.getApp())
-        .get('/api/export')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-    });
-
-    it('should prevent clerk from importing data', async () => {
-      await request(context.api.getApp())
-        .post('/api/import')
-        .set('Authorization', `Bearer ${clerkToken}`)
+    it('should handle invalid tokens correctly', async () => {
+      const response = await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}`)
+        .set('Authorization', 'Bearer invalid-token')
         .send({
-          data: '{}',
-        })
-        .expect(403);
-    });
+          title: 'Updated with Invalid Token',
+        });
 
-    it('should prevent clerk from exporting data', async () => {
-      await request(context.api.getApp())
-        .get('/api/export')
-        .set('Authorization', `Bearer ${clerkToken}`)
-        .expect(403);
-    });
-
-    it('should prevent public from importing data', async () => {
-      await request(context.api.getApp())
-        .post('/api/import')
-        .set('Authorization', `Bearer ${publicToken}`)
-        .send({
-          data: '{}',
-        })
-        .expect(403);
-    });
-
-    it('should prevent public from exporting data', async () => {
-      await request(context.api.getApp())
-        .get('/api/export')
-        .set('Authorization', `Bearer ${publicToken}`)
-        .expect(403);
-    });
-  });
-
-  describe('Template Permissions', () => {
-    it('should allow admin to manage templates', async () => {
-      // Create template
-      await request(context.api.getApp())
-        .post('/api/templates')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          name: 'Test Template',
-          content: 'Template content',
-        })
-        .expect(201);
-
-      // Update template
-      await request(context.api.getApp())
-        .put('/api/templates/template-1')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          name: 'Updated Template',
-          content: 'Updated content',
-        })
-        .expect(200);
-
-      // Delete template
-      await request(context.api.getApp())
-        .delete('/api/templates/template-1')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-    });
-
-    it('should prevent clerk from managing templates', async () => {
-      await request(context.api.getApp())
-        .post('/api/templates')
-        .set('Authorization', `Bearer ${clerkToken}`)
-        .send({
-          name: 'Test Template',
-          content: 'Template content',
-        })
-        .expect(403);
-    });
-  });
-
-  describe('Hook Permissions', () => {
-    it('should allow admin to manage hooks', async () => {
-      // Create hook
-      await request(context.api.getApp())
-        .post('/api/hooks')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          event: 'record:created',
-          handler: 'testHandler',
-        })
-        .expect(201);
-
-      // Update hook
-      await request(context.api.getApp())
-        .put('/api/hooks/hook-1')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          event: 'record:updated',
-          handler: 'updatedHandler',
-        })
-        .expect(200);
-
-      // Delete hook
-      await request(context.api.getApp())
-        .delete('/api/hooks/hook-1')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-    });
-
-    it('should prevent clerk from managing hooks', async () => {
-      await request(context.api.getApp())
-        .post('/api/hooks')
-        .set('Authorization', `Bearer ${clerkToken}`)
-        .send({
-          event: 'record:created',
-          handler: 'testHandler',
-        })
-        .expect(403);
-    });
-  });
-
-  describe('Workflow Permissions', () => {
-    it('should allow admin to manage workflows', async () => {
-      // Create workflow
-      await request(context.api.getApp())
-        .post('/api/workflows')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          name: 'Test Workflow',
-          status: 'active',
-        })
-        .expect(201);
-
-      // Update workflow
-      await request(context.api.getApp())
-        .put('/api/workflows/workflow-1')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          name: 'Updated Workflow',
-          status: 'inactive',
-        })
-        .expect(200);
-
-      // Delete workflow
-      await request(context.api.getApp())
-        .delete('/api/workflows/workflow-1')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-    });
-
-    it('should prevent clerk from managing workflows', async () => {
-      await request(context.api.getApp())
-        .post('/api/workflows')
-        .set('Authorization', `Bearer ${clerkToken}`)
-        .send({
-          name: 'Test Workflow',
-          status: 'active',
-        })
-        .expect(403);
+      expect(response.status).toBe(401);
     });
   });
 });

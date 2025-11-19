@@ -13,7 +13,33 @@ export function useTemplates() {
   const loading = ref(false);
   const error = ref<string | null>(null);
 
+  // TODO: Fetch templates from API endpoint /api/v1/templates instead of using hardcoded defaults
+  // The API should load templates from data/.civic/templates/ directory structure
+  // Example structure: data/.civic/templates/{type}/{name}.md
+  // See: modules/api/src/routes/templates.ts (currently stubbed)
+  // See: core/src/utils/template-engine.ts (has file system loading logic)
+
+  // FUTURE IMPLEMENTATION: Fetch templates from API
+  // const fetchTemplates = async (recordType?: string) => {
+  //   loading.value = true;
+  //   error.value = null;
+  //   try {
+  //     const url = recordType
+  //       ? `/api/v1/templates?type=${recordType}`
+  //       : '/api/v1/templates';
+  //     const response = await $fetch<{ templates: Template[]; total: number }>(url);
+  //     templates.value = response.templates;
+  //   } catch (err: any) {
+  //     error.value = err.message || 'Failed to fetch templates';
+  //     templates.value = [];
+  //   } finally {
+  //     loading.value = false;
+  //   }
+  // };
+
   // Default templates for each record type
+  // COMMENTED OUT: These are hardcoded defaults. Should be replaced with API fetch.
+  /* eslint-disable */
   const defaultTemplates = {
     bylaw: {
       id: 'bylaw-default',
@@ -371,27 +397,99 @@ _This proclamation was created using CivicPress on {{timestamp}}_`,
       description:
         'Standard proclamation template with sections for background, recognition, and calls to action',
     },
+    session: {
+      id: 'session-default',
+      name: 'Default Session Template',
+      type: 'session',
+      content: `---
+title: "{{title}}"
+type: session
+status: draft
+author: "{{user}}"
+created: "{{timestamp}}"
+updated: "{{timestamp}}"
+session_type: regular
+date: "{{timestamp}}"
+location: "[Meeting location]"
+attendees:
+  - name: "[Name]"
+    role: "[Role]"
+    present: true
+tags: ['meeting', 'council']
+---
+
+# {{title}}
+
+## 1. Ouverture de la réunion et constatation du quorum
+
+[Description de l'ouverture de la réunion et de la vérification du quorum]
+
+## 2. Adoption de l'ordre du jour
+
+[Description de l'adoption de l'ordre du jour]
+
+## 3. Adoption du procès-verbal de la réunion précédente
+
+[Description de l'adoption du procès-verbal précédent]
+
+## 4. Présentations et communications
+
+[Description des présentations et communications]
+
+## 5. Questions des citoyens
+
+[Description des questions des citoyens]
+
+## 6. Points à l'ordre du jour
+
+### 6.1 [Point 1]
+
+[Description du premier point]
+
+### 6.2 [Point 2]
+
+[Description du deuxième point]
+
+## 7. Questions diverses
+
+[Description des questions diverses]
+
+## 8. Levée de séance
+
+[Description de la levée de séance]
+
+---
+
+_Procès-verbal créé avec CivicPress le {{timestamp}}_`,
+      description:
+        'Standard session template with sections for meeting opening, agenda, and minutes',
+    },
   };
+  /* eslint-enable */
 
   // Get templates for a specific record type
+  // TODO: Replace with API call to /api/v1/templates?type={recordType}
+  // DISABLED: Hardcoded templates are commented out. Implement API fetch instead.
   const getTemplatesForType = (recordType: string): Template[] => {
-    const defaultTemplate =
-      defaultTemplates[recordType as keyof typeof defaultTemplates];
-    if (defaultTemplate) {
-      return [defaultTemplate];
-    }
+    // TODO: Implement API fetch
+    // const response = await $fetch(`/api/v1/templates?type=${recordType}`);
+    // return response.templates || [];
+
+    // TEMPORARY: Returning empty array until API is implemented
+    // Previously used hardcoded defaults from defaultTemplates object
     return [];
   };
 
   // Get a specific template by ID
+  // TODO: Replace with API call to /api/v1/templates/:id
+  // DISABLED: Hardcoded templates are commented out. Implement API fetch instead.
   const getTemplateById = (templateId: string): Template | null => {
-    // Search through all default templates
-    for (const type in defaultTemplates) {
-      const template = defaultTemplates[type as keyof typeof defaultTemplates];
-      if (template.id === templateId) {
-        return template;
-      }
-    }
+    // TODO: Implement API fetch
+    // const response = await $fetch(`/api/v1/templates/${templateId}`);
+    // return response.template || null;
+
+    // TEMPORARY: Returning null until API is implemented
+    // Previously used hardcoded defaults from defaultTemplates object
     return null;
   };
 

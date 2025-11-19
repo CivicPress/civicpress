@@ -83,6 +83,15 @@ await api.initialize(config.testDir);
 - ✅ **No interference between tests**
 - ✅ **Automatic cleanup** after each test
 - ✅ **Unique timestamps** prevent conflicts
+- ✅ **Isolated storage directories** - each test gets its own storage folder
+  with absolute paths
+
+**Storage Isolation:**
+
+Storage operations in tests use absolute paths within the test directory to
+ensure complete isolation. The storage configuration is set up with absolute
+paths (`{testDir}/storage`) rather than relative paths, preventing tests from
+interfering with each other or the working directory.
 
 **Example Test Directory:**
 
@@ -90,9 +99,14 @@ await api.initialize(config.testDir);
 /tmp/civicpress-test-1703123456789-abc123def-12345/
 ├── .civicrc
 ├── test.db
+├── storage/                    # Isolated storage directory (absolute path)
+│   ├── public/
+│   ├── sessions/
+│   └── icons/
 └── data/
     ├── .civic/
-    │   └── workflow.yml
+    │   ├── workflow.yml
+    │   └── storage.yml          # Storage configuration
     └── records/
         ├── bylaw-noise-restrictions.md
         ├── policy-data-privacy.md

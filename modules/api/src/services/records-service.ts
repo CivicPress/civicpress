@@ -19,6 +19,43 @@ export class RecordsService {
   private workflowManager: WorkflowConfigManager;
   private dataDir: string | null = null;
 
+  private buildFilterClause(filters: { type?: string; status?: string } = {}) {
+    const clauses: string[] = [];
+    const params: any[] = [];
+
+    if (filters.type) {
+      const types = filters.type
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (types.length === 1) {
+        clauses.push('type = ?');
+        params.push(types[0]);
+      } else if (types.length > 1) {
+        clauses.push(`type IN (${types.map(() => '?').join(',')})`);
+        params.push(...types);
+      }
+    }
+
+    if (filters.status) {
+      const statuses = filters.status
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (statuses.length === 1) {
+        clauses.push('status = ?');
+        params.push(statuses[0]);
+      } else if (statuses.length > 1) {
+        clauses.push(`status IN (${statuses.map(() => '?').join(',')})`);
+        params.push(...statuses);
+      }
+    }
+
+    const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    return { whereClause, params };
+  }
+
   constructor(
     civicPress: CivicPress,
     recordManager?: RecordManager,
@@ -50,6 +87,47 @@ export class RecordsService {
       type: string;
       content?: string;
       metadata?: Record<string, any>;
+      geography?: any;
+      attachedFiles?: Array<{
+        id: string;
+        path: string;
+        original_name: string;
+        description?: string;
+        category?:
+          | string
+          | {
+              label: string;
+              value: string;
+              description: string;
+            };
+      }>;
+      linkedRecords?: Array<{
+        id: string;
+        type: string;
+        description: string;
+        path?: string;
+        category?: string;
+      }>;
+      linkedGeographyFiles?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+      }>;
+      authors?: Array<{
+        name: string;
+        username: string;
+        role?: string;
+        email?: string;
+      }>;
+      source?: {
+        reference: string;
+        original_title?: string;
+        original_filename?: string;
+        url?: string;
+        type?: 'legacy' | 'import' | 'external';
+        imported_at?: string;
+        imported_by?: string;
+      };
     },
     user: any
   ): Promise<any> {
@@ -71,6 +149,12 @@ export class RecordsService {
       type: data.type,
       content: data.content,
       metadata: data.metadata,
+      geography: data.geography,
+      attachedFiles: data.attachedFiles,
+      linkedRecords: data.linkedRecords,
+      linkedGeographyFiles: data.linkedGeographyFiles,
+      authors: data.authors,
+      source: data.source,
     };
 
     // Create the record using CivicCore
@@ -82,20 +166,19 @@ export class RecordsService {
       type: record.type,
       status: record.status,
       content: record.content,
-      metadata: {
-        ...record.metadata,
-        author:
-          typeof record.metadata?.author === 'object' &&
-          record.metadata.author?.username
-            ? record.metadata.author.username
-            : record.metadata?.author,
-      },
+      metadata: record.metadata || {},
+      authors: record.authors,
+      source: record.source,
+      geography: record.geography,
+      attachedFiles: record.attachedFiles || [],
+      linkedRecords: record.linkedRecords || [],
+      linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
-      created: record.created_at,
-      author:
-        typeof record.author === 'object' && record.author && typeof record.author === 'object' && 'username' in record.author
-          ? (record.author as any).username
-          : record.author,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      author: record.author,
+      commit_ref: record.commit_ref,
+      commit_signature: record.commit_signature,
     };
   }
 
@@ -115,9 +198,18 @@ export class RecordsService {
       status: record.status,
       content: record.content,
       metadata: record.metadata || {},
+      authors: record.authors,
+      source: record.source,
+      geography: record.geography,
+      attachedFiles: record.attachedFiles || [],
+      linkedRecords: record.linkedRecords || [],
+      linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
-      created: record.created_at,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
       author: record.author,
+      commit_ref: record.commit_ref,
+      commit_signature: record.commit_signature,
     };
   }
 
@@ -178,6 +270,47 @@ export class RecordsService {
       content?: string;
       status?: string;
       metadata?: Record<string, any>;
+      geography?: any;
+      attachedFiles?: Array<{
+        id: string;
+        path: string;
+        original_name: string;
+        description?: string;
+        category?:
+          | string
+          | {
+              label: string;
+              value: string;
+              description: string;
+            };
+      }>;
+      linkedRecords?: Array<{
+        id: string;
+        type: string;
+        description: string;
+        path?: string;
+        category?: string;
+      }>;
+      linkedGeographyFiles?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+      }>;
+      authors?: Array<{
+        name: string;
+        username: string;
+        role?: string;
+        email?: string;
+      }>;
+      source?: {
+        reference: string;
+        original_title?: string;
+        original_filename?: string;
+        url?: string;
+        type?: 'legacy' | 'import' | 'external';
+        imported_at?: string;
+        imported_by?: string;
+      };
     },
     user: any
   ): Promise<any | null> {
@@ -205,6 +338,12 @@ export class RecordsService {
       content: data.content,
       status: data.status,
       metadata: data.metadata,
+      geography: data.geography,
+      attachedFiles: data.attachedFiles,
+      linkedRecords: data.linkedRecords,
+      linkedGeographyFiles: data.linkedGeographyFiles,
+      authors: data.authors,
+      source: data.source,
     };
 
     // Update the record using CivicCore
@@ -225,9 +364,18 @@ export class RecordsService {
       status: updatedRecord.status,
       content: updatedRecord.content,
       metadata: updatedRecord.metadata || {},
+      authors: updatedRecord.authors,
+      source: updatedRecord.source,
+      geography: updatedRecord.geography,
+      attachedFiles: updatedRecord.attachedFiles || [],
+      linkedRecords: updatedRecord.linkedRecords || [],
+      linkedGeographyFiles: updatedRecord.linkedGeographyFiles || [],
       path: updatedRecord.path,
-      created: updatedRecord.created_at,
+      created_at: updatedRecord.created_at,
+      updated_at: updatedRecord.updated_at,
       author: updatedRecord.author,
+      commit_ref: updatedRecord.commit_ref,
+      commit_signature: updatedRecord.commit_signature,
     };
   }
 
@@ -342,6 +490,26 @@ export class RecordsService {
   }
 
   /**
+   * Get allowed transitions for a record based on current status and user role
+   */
+  async getAllowedTransitions(id: string, user: any): Promise<string[]> {
+    // Get the current record
+    const record = await this.recordManager.getRecord(id);
+    if (!record) {
+      return [];
+    }
+
+    // Compute transitions for the user's role
+    const fromStatus = record.status;
+    const role = user?.role;
+    const allowed = await this.workflowManager.getAvailableTransitions(
+      fromStatus,
+      role
+    );
+    return allowed || [];
+  }
+
+  /**
    * List records with cursor-based pagination
    */
   async listRecords(
@@ -421,6 +589,8 @@ export class RecordsService {
       created_at: record.created_at,
       updated_at: record.updated_at,
       author: record.author,
+      commit_ref: record.commit_ref,
+      commit_signature: record.commit_signature,
     }));
 
     return {
@@ -488,6 +658,51 @@ export class RecordsService {
       records: transformedRecords,
       nextCursor,
       hasMore,
+    };
+  }
+
+  /**
+   * Get aggregate record summary
+   */
+  async getRecordSummary(filters: { type?: string; status?: string }): Promise<{
+    total: number;
+    types: Record<string, number>;
+    statuses: Record<string, number>;
+  }> {
+    const db = this.civicPress.getDatabaseService();
+    const { whereClause, params } = this.buildFilterClause(filters || {});
+
+    const typeRows = await db.query(
+      `SELECT type, COUNT(*) as count FROM records ${whereClause} GROUP BY type`,
+      [...params]
+    );
+    const statusRows = await db.query(
+      `SELECT status, COUNT(*) as count FROM records ${whereClause} GROUP BY status`,
+      [...params]
+    );
+    const totalRows = await db.query(
+      `SELECT COUNT(*) as count FROM records ${whereClause}`,
+      [...params]
+    );
+
+    const types: Record<string, number> = {};
+    typeRows.forEach((row: any) => {
+      if (row.type) {
+        types[row.type] = Number(row.count) || 0;
+      }
+    });
+
+    const statuses: Record<string, number> = {};
+    statusRows.forEach((row: any) => {
+      if (row.status) {
+        statuses[row.status] = Number(row.count) || 0;
+      }
+    });
+
+    return {
+      total: totalRows?.[0]?.count ? Number(totalRows[0].count) : 0,
+      types,
+      statuses,
     };
   }
 }

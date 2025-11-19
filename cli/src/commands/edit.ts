@@ -8,6 +8,10 @@ import {
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import { userCan } from '@civicpress/core';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 export const editCommand = (cli: CAC) => {
   cli
@@ -79,35 +83,11 @@ export const editCommand = (cli: CAC) => {
           process.exit(1);
         }
 
-        // Find the record file
-        let recordPath: string | null = null;
-        let recordType: string | null = null;
+        const resolvedRecord = resolveRecordReference(dataDir, recordName);
 
-        // Search through all record types
-        const recordTypes = fs
-          .readdirSync(recordsDir, { withFileTypes: true })
-          .filter((dirent) => dirent.isDirectory())
-          .map((dirent) => dirent.name);
+        if (!resolvedRecord) {
+          const availableRecords = getAvailableRecords(dataDir);
 
-        for (const type of recordTypes) {
-          const typeDir = path.join(recordsDir, type);
-          const files = fs
-            .readdirSync(typeDir)
-            .filter((file) => file.endsWith('.md'))
-            .map((file) => path.join(typeDir, file));
-
-          for (const filePath of files) {
-            const filename = path.basename(filePath, '.md');
-            if (filename === recordName || filePath.includes(recordName)) {
-              recordPath = filePath;
-              recordType = type;
-              break;
-            }
-          }
-          if (recordPath) break;
-        }
-
-        if (!recordPath) {
           if (shouldOutputJson) {
             console.log(
               JSON.stringify(
@@ -115,20 +95,7 @@ export const editCommand = (cli: CAC) => {
                   success: false,
                   error: 'Record not found',
                   details: `Record "${recordName}" not found`,
-                  availableRecords: recordTypes.reduce(
-                    (acc, type) => {
-                      const typeDir = path.join(recordsDir, type);
-                      const files = fs
-                        .readdirSync(typeDir)
-                        .filter((file) => file.endsWith('.md'))
-                        .map((file) => path.basename(file, '.md'));
-                      if (files.length > 0) {
-                        acc[type] = files;
-                      }
-                      return acc;
-                    },
-                    {} as Record<string, string[]>
-                  ),
+                  availableRecords,
                 },
                 null,
                 2
@@ -138,14 +105,7 @@ export const editCommand = (cli: CAC) => {
             logger.error(`❌ Record "${recordName}" not found.`);
             logger.info('Available records:');
 
-            // List available records
-            for (const type of recordTypes) {
-              const typeDir = path.join(recordsDir, type);
-              const files = fs
-                .readdirSync(typeDir)
-                .filter((file) => file.endsWith('.md'))
-                .map((file) => path.basename(file, '.md'));
-
+            for (const [type, files] of Object.entries(availableRecords)) {
               if (files.length > 0) {
                 logger.info(`  ${type}:`);
                 for (const file of files) {
@@ -157,10 +117,17 @@ export const editCommand = (cli: CAC) => {
           process.exit(1);
         }
 
+        const recordPath = resolvedRecord.absolutePath;
+        const parsedRecord = resolvedRecord.parsed;
+        const recordType = parsedRecord.type;
+
         // Display record info before editing
         if (!shouldOutputJson) {
           logger.info(`📄 Opening: ${path.basename(recordPath)}`);
           logger.debug(`📁 Type: ${recordType}`);
+          if (parsedRecord.year) {
+            logger.debug(`📅 Year: ${parsedRecord.year}`);
+          }
           logger.debug(`📂 Path: ${path.relative(dataDir, recordPath)}`);
         }
 

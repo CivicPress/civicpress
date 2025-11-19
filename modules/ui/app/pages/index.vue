@@ -1,128 +1,184 @@
 <script setup lang="ts">
-import type { CivicRecord } from '~/stores/records'
+import type { CivicRecord } from '~/stores/records';
+import { getFieldValue as normalizeValue } from '~/utils/config';
+import SystemFooter from '~/components/SystemFooter.vue';
 
-// Store
-const recordsStore = useRecordsStore()
-const authStore = useAuthStore()
+// Stores
+const authStore = useAuthStore();
 
 // Composables
-const { $civicApi } = useNuxtApp()
-const { formatDate, getStatusColor, getTypeIcon } = useRecordUtils()
+const { $civicApi } = useNuxtApp();
+const { formatDate } = useRecordUtils();
+const runtimeConfig = useRuntimeConfig();
+const { t } = useI18n();
 
 // Reactive state
-const organizationInfo = ref<any>(null)
-const recentRecords = ref<CivicRecord[]>([])
-const loading = ref(true)
-const error = ref('')
-const isAuthenticated = computed(() => authStore.isAuthenticated)
+const organizationInfo = ref<any>(null);
+const recentRecords = ref<CivicRecord[]>([]);
+const loading = ref(true);
+const error = ref('');
+const homeSearchQuery = ref('');
+const aboutSectionRef = ref<HTMLElement | null>(null);
 
-// Computed properties
-const defaultDescription = computed(() => 'A modern civic technology platform for transparent, accessible, and accountable local government.')
+// Auth
+const isAuthenticated = computed(() => authStore.isAuthenticated);
+const isAdmin = computed(() => authStore.currentUser?.role === 'admin');
 
-const isAdmin = computed(() => {
-  return authStore.currentUser?.role === 'admin'
-})
+// Default copy
+const defaultAboutIntro =
+  'This is an example CivicPress deployment. It includes sample bylaws, meeting minutes, and geography layers to demonstrate how documents, sessions, and zones appear in an open, transparent civic registry.\n\nYou can customize this text by editing the about_intro field in data/.civic/org-config.yml.';
+
+// Normalized organization fields
+const orgName = computed(
+  () => normalizeValue<string>(organizationInfo.value?.name) || 'CivicPress'
+);
+const orgCity = computed(() =>
+  normalizeValue<string | undefined>(organizationInfo.value?.city)
+);
+const orgState = computed(() =>
+  normalizeValue<string | undefined>(organizationInfo.value?.state)
+);
+const orgCountry = computed(() =>
+  normalizeValue<string | undefined>(organizationInfo.value?.country)
+);
+const orgTimezone = computed(() =>
+  normalizeValue<string | undefined>(organizationInfo.value?.timezone)
+);
+const orgAboutIntro = computed(
+  () =>
+    normalizeValue<string | undefined>(organizationInfo.value?.about_intro) ||
+    defaultAboutIntro
+);
+const orgVersionLabel = computed(
+  () =>
+    normalizeValue<string | undefined>(organizationInfo.value?.version) ||
+    runtimeConfig.public.appVersion ||
+    '1.0.0'
+);
+
+// Search submit
+const submitHomeSearch = () => {
+  const query = homeSearchQuery.value.trim();
+
+  if (!query) {
+    navigateTo('/records');
+    return;
+  }
+
+  navigateTo({
+    path: '/records',
+    query: { search: query },
+  });
+};
 
 // Fetch organization info (public endpoint)
 const fetchOrganizationInfo = async () => {
   try {
-    const response = await $civicApi('/info') as any
+    const response = (await $civicApi('/info')) as any;
     if (response.success) {
-      organizationInfo.value = response.organization
+      organizationInfo.value = response.organization;
     }
   } catch (err: any) {
-    console.error('Error fetching organization info:', err)
-    // Don't set error for organization info - it's not critical
+    console.error('Error fetching organization info:', err);
+    // Non-critical, so no error UI
   }
-}
+};
 
-
-
-// Fetch recent records (public - available to all users)
+// Fetch recent records (public)
 const fetchRecentRecords = async () => {
   try {
-    const response = await $civicApi('/api/records?limit=5') as any
+    const response = (await $civicApi('/api/v1/records?limit=5')) as any;
     if (response.success) {
-      recentRecords.value = response.data.records || []
+      recentRecords.value = response.data.records || [];
     }
   } catch (err: any) {
-    console.error('Error fetching recent records:', err)
-    // Don't set error for recent records - it's not critical
+    console.error('Error fetching recent records:', err);
+    // Non-critical, so no error UI
   }
-}
+};
 
 // Load all data
 const loadDashboardData = async () => {
-  loading.value = true
-  error.value = ''
+  loading.value = true;
+  error.value = '';
 
   try {
-    // Always fetch organization info (public)
-    await fetchOrganizationInfo()
-
-    // Fetch recent records for all users (public data)
-    await fetchRecentRecords()
+    await fetchOrganizationInfo();
+    await fetchRecentRecords();
   } catch (err: any) {
-    error.value = err.message || 'Failed to load dashboard data'
-    console.error('Error loading dashboard data:', err)
+    error.value = err.message || t('home.failedToLoad');
+    console.error('Error loading dashboard data:', err);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // Quick actions
 const navigateToRecords = () => {
-  navigateTo('/records')
-}
-
+  navigateTo('/records');
+};
 const navigateToCreate = () => {
-  navigateTo('/records/new')
-}
-
+  navigateTo('/records/new');
+};
 const navigateToLogin = () => {
-  navigateTo('/auth/login')
-}
-
+  navigateTo('/auth/login');
+};
 const navigateToSettings = () => {
-  navigateTo('/settings')
-}
-
+  navigateTo('/settings');
+};
 const navigateToProfile = () => {
-  navigateTo('/settings/profile')
-}
+  navigateTo('/settings/profile');
+};
 
-// Load data on mount
+const scrollToAboutSection = () => {
+  if (aboutSectionRef.value) {
+    aboutSectionRef.value.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+};
+
+// Init
 onMounted(() => {
-  loadDashboardData()
-})
+  loadDashboardData();
+});
 
-// Watch for authentication changes
+// Watch auth changes
 watch(isAuthenticated, (newValue) => {
   if (newValue) {
-    // User just logged in, reload authenticated data
-    loadDashboardData()
+    // User just logged in, reload any auth-dependent data in future
+    loadDashboardData();
   }
-})
+});
 </script>
 
 <template>
   <UDashboardPanel>
-
-
     <template #body>
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center items-center h-64">
         <div class="text-center">
-          <UIcon name="i-lucide-loader-2" class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
-          <p class="text-gray-600">Loading dashboard...</p>
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4"
+          />
+          <p class="text-gray-600">{{ t('home.loadingDashboard') }}</p>
         </div>
       </div>
 
       <!-- Error State -->
-      <UAlert v-else-if="error" color="error" variant="soft" :title="error" icon="i-lucide-alert-circle" class="mb-4">
+      <UAlert
+        v-else-if="error"
+        color="error"
+        variant="soft"
+        :title="error"
+        icon="i-lucide-alert-circle"
+        class="mb-4"
+      >
         <template #footer>
           <UButton color="error" variant="soft" @click="loadDashboardData">
-            Try Again
+            {{ t('common.tryAgain') }}
           </UButton>
         </template>
       </UAlert>
@@ -130,99 +186,261 @@ watch(isAuthenticated, (newValue) => {
       <!-- Dashboard Content -->
       <div v-else class="space-y-8">
         <!-- Welcome Section -->
-        <div class="text-center py-12">
-          <div class="flex justify-center items-center">
-            <Logo size="2xl" class="my-16" />
-          </div>
-          <h2 class="text-4xl font-bold mb-4">
-            {{ organizationInfo?.name || 'CivicPress' }}
-          </h2>
-          <p class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-lg">
-            {{ organizationInfo?.description || defaultDescription }}
+        <div class="text-center py-12 space-y-6">
+          <h2 class="text-4xl font-bold">{{ t('home.title') }}</h2>
+          <p
+            class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-lg mb-10"
+          >
+            {{ t('home.tagline') }}
           </p>
+
+          <!-- Hero search -->
+          <form
+            class="max-w-xl mx-auto mt-6 mb-12"
+            @submit.prevent="submitHomeSearch"
+          >
+            <UInput
+              v-model="homeSearchQuery"
+              :placeholder="t('home.searchPlaceholder')"
+              size="lg"
+              icon="i-lucide-search"
+              class="w-full"
+            />
+          </form>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          <UCard class="text-center hover:shadow-lg transition-shadow cursor-pointer" @click="navigateToRecords">
-            <UIcon name="i-lucide-file-text" class="w-12 h-12 text-blue-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold mb-2">Browse Records</h3>
-            <p class="text-gray-600 dark:text-gray-400">View and search through civic records, bylaws, and policies.</p>
-          </UCard>
+        <!-- Quick Actions (logged-out) -->
+        <div v-if="!isAuthenticated" class="max-w-4xl mx-auto mt-6 pb-12">
+          <UCard class="" :ui="{ body: 'p-4 sm:p-6' }">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <!-- Browse Records -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateToRecords"
+              >
+                <UIcon
+                  name="i-lucide-folder-open"
+                  class="w-5 h-5 text-blue-600"
+                />
+                <span>{{ t('home.browseRecordsButton') }}</span>
+              </button>
 
-          <UCard v-if="isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToCreate">
-            <UIcon name="i-lucide-plus-circle" class="w-12 h-12 text-green-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold mb-2">Create Record</h3>
-            <p class="text-gray-600 dark:text-gray-400">Create new civic records, bylaws, or policies.</p>
-          </UCard>
+              <!-- Sign In -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateToLogin"
+              >
+                <UIcon name="i-lucide-log-in" class="w-5 h-5 text-blue-600" />
+                <span>{{ t('common.signIn') }}</span>
+              </button>
 
-          <UCard v-if="!isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToLogin">
-            <UIcon name="i-lucide-log-in" class="w-12 h-12 text-purple-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold mb-2">Sign In</h3>
-            <p class="text-gray-600 dark:text-gray-400">Access administrative features and create records.</p>
-          </UCard>
-
-          <UCard v-if="isAdmin" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToSettings">
-            <UIcon name="i-lucide-settings" class="w-12 h-12 text-orange-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold mb-2">Settings</h3>
-            <p class="text-gray-600 dark:text-gray-400">Manage system settings, users, and configurations.</p>
-          </UCard>
-
-          <UCard v-if="isAuthenticated" class="text-center hover:shadow-lg transition-shadow cursor-pointer"
-            @click="navigateToProfile">
-            <UIcon name="i-lucide-user" class="w-12 h-12 text-indigo-500 mx-auto mb-4" />
-            <h3 class="text-lg font-semibold mb-2">Profile</h3>
-            <p class="text-gray-600 dark:text-gray-400">View and edit your user profile and preferences.</p>
+              <!-- About Demo -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="scrollToAboutSection"
+              >
+                <UIcon name="i-lucide-info" class="w-5 h-5 text-blue-600" />
+                <span>{{ t('home.aboutDemo') }}</span>
+              </button>
+            </div>
           </UCard>
         </div>
 
-        <!-- Recent Records (public - available to all users) -->
-        <div v-if="recentRecords.length > 0" class="space-y-4">
-          <h3 class="text-xl font-semibold">Recent Records</h3>
+        <!-- Quick Actions (logged-in only) -->
+        <div v-if="isAuthenticated" class="max-w-4xl mx-auto mt-6 pb-12">
+          <UCard class="" :ui="{ body: 'p-4 sm:p-6' }">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <!-- Browse Records -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateToRecords"
+              >
+                <UIcon
+                  name="i-lucide-folder-open"
+                  class="w-5 h-5 text-blue-600"
+                />
+                <span>{{ t('home.browseRecordsButton') }}</span>
+              </button>
+
+              <!-- Create Record -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateToCreate"
+              >
+                <UIcon
+                  name="i-lucide-plus-circle"
+                  class="w-5 h-5 text-blue-600"
+                />
+                <span>{{ t('home.createRecord') }}</span>
+              </button>
+
+              <!-- Geography -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateTo('/geography')"
+              >
+                <UIcon name="i-lucide-map" class="w-5 h-5 text-blue-600" />
+                <span>{{ t('home.geography') }}</span>
+              </button>
+
+              <!-- Profile -->
+              <button
+                type="button"
+                class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
+                @click="navigateToProfile"
+              >
+                <UIcon name="i-lucide-user" class="w-5 h-5 text-blue-600" />
+                <span>{{ t('common.profile') }}</span>
+              </button>
+            </div>
+          </UCard>
+        </div>
+
+        <!-- Recent Records -->
+        <div
+          v-if="recentRecords.length > 0"
+          class="space-y-4 border-t border-gray-200 dark:border-gray-800 mt-12 pt-8"
+        >
+          <h3 class="text-xl font-semibold text-center">
+            {{ t('home.latestPublicRecords') }}
+          </h3>
           <div class="grid gap-4">
-            <UCard v-for="record in recentRecords" :key="record.id"
+            <UCard
+              v-for="record in recentRecords"
+              :key="record.id"
               class="hover:shadow-md transition-shadow cursor-pointer"
-              @click="navigateTo(`/records/${record.type}/${record.id}`)">
+              @click="navigateTo(`/records/${record.type}/${record.id}`)"
+            >
               <div class="flex items-start space-x-4">
-                <UIcon name="i-heroicons-document-text" class="w-8 h-8 text-gray-500 flex-shrink-0" />
+                <UIcon
+                  name="i-heroicons-document-text"
+                  class="w-4 h-4 text-gray-400 flex-shrink-0 mt-1"
+                />
                 <div class="flex-1 min-w-0">
-                  <h4 class="text-sm font-medium truncate">{{ record.title }}</h4>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ formatDate(record.created_at) }}</p>
-                  <UBadge :color="getStatusColor(record.status) as any" variant="soft" size="sm">
-                    {{ record.status }}
-                  </UBadge>
+                  <h4 class="text-sm font-medium truncate">
+                    {{ record.title }}
+                  </h4>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ formatDate(record.created_at) }}
+                  </p>
                 </div>
               </div>
             </UCard>
           </div>
         </div>
 
-
-
-        <!-- Public Information -->
-        <div v-if="organizationInfo" class="space-y-4">
-          <h3 class="text-xl font-semibold">About {{ organizationInfo.name }}</h3>
-          <UCard>
-            <div class="space-y-2">
-              <div v-if="organizationInfo.city && organizationInfo.state" class="flex items-center space-x-2">
-                <UIcon name="i-lucide-map-pin" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.city }}, {{ organizationInfo.state
-                  }}</span>
+        <!-- Environment Information -->
+        <div
+          ref="aboutSectionRef"
+          class="space-y-4 border-t border-gray-200 dark:border-gray-800 mt-12 pt-8"
+        >
+          <h3 class="text-xl font-semibold text-center">
+            {{ t('home.aboutEnvironment') }}
+          </h3>
+          <UCard class="border-gray-200 dark:border-gray-800">
+            <div class="space-y-4">
+              <div class="text-left">
+                <p class="text-gray-700 dark:text-gray-300">
+                  {{ orgAboutIntro }}
+                </p>
               </div>
-              <div v-if="organizationInfo.country" class="flex items-center space-x-2">
-                <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.country }}</span>
-              </div>
-              <div v-if="organizationInfo.timezone" class="flex items-center space-x-2">
-                <UIcon name="i-lucide-clock" class="w-4 h-4 text-gray-500" />
-                <span class="text-gray-700 dark:text-gray-300">{{ organizationInfo.timezone }}</span>
+
+              <div class="space-y-2 text-sm">
+                <div v-if="orgName" class="flex items-center gap-2">
+                  <UIcon
+                    name="i-lucide-building-2"
+                    class="w-4 h-4 text-gray-500"
+                  />
+                  <span class="text-gray-700 dark:text-gray-300">
+                    {{ orgName }}
+                  </span>
+                </div>
+                <div v-if="orgCity && orgState" class="flex items-center gap-2">
+                  <UIcon
+                    name="i-lucide-map-pin"
+                    class="w-4 h-4 text-gray-500"
+                  />
+                  <span class="text-gray-700 dark:text-gray-300">
+                    {{ orgCity }}, {{ orgState }}
+                  </span>
+                </div>
+                <div v-if="orgCountry" class="flex items-center gap-2">
+                  <UIcon name="i-lucide-globe" class="w-4 h-4 text-gray-500" />
+                  <span class="text-gray-700 dark:text-gray-300">
+                    {{ orgCountry }}
+                  </span>
+                </div>
+                <div v-if="orgTimezone" class="flex items-center gap-2">
+                  <UIcon name="i-lucide-clock" class="w-4 h-4 text-gray-500" />
+                  <span class="text-gray-700 dark:text-gray-300">
+                    {{ orgTimezone }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <UIcon
+                    name="i-lucide-badge-check"
+                    class="w-4 h-4 text-gray-500"
+                  />
+                  <span class="text-gray-700 dark:text-gray-300">
+                    {{ t('home.versionLabel', { version: orgVersionLabel }) }}
+                  </span>
+                </div>
               </div>
             </div>
           </UCard>
         </div>
+
+        <!-- System / Workspace Info (Admin only) -->
+        <div
+          v-if="isAuthenticated && isAdmin"
+          class="space-y-4 border-t border-gray-200 dark:border-gray-800 pt-8"
+        >
+          <h3 class="text-xl font-semibold text-center">
+            {{ t('home.workspaceInformation') }}
+          </h3>
+
+          <UCard class="border-gray-200 dark:border-gray-800">
+            <div class="space-y-2 text-sm">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-lucide-server" class="w-4 h-4 text-gray-500" />
+                <span
+                  >{{ t('home.environment') }}:
+                  {{ runtimeConfig.public.environment || 'Demo' }}</span
+                >
+              </div>
+
+              <div class="flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-user-check"
+                  class="w-4 h-4 text-gray-500"
+                />
+                <span
+                  >{{ t('home.role') }}: {{ authStore.currentUser?.role }}</span
+                >
+              </div>
+
+              <div class="flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-git-branch"
+                  class="w-4 h-4 text-gray-500"
+                />
+                <span
+                  >{{ t('home.title') }} {{ t('home.version') }}
+                  {{ orgVersionLabel }}</span
+                >
+              </div>
+            </div>
+          </UCard>
+        </div>
+
+        <!-- Footer -->
+        <SystemFooter />
       </div>
     </template>
   </UDashboardPanel>

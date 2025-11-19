@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node16",
+    "types": ["node"],
+    "moduleDetection": "force"
+  },
+  "references": [
+    { "path": "./core" },
+    { "path": "./cli" },
+    { "path": "./modules/api" },
+    { "path": "./modules/ui" },
+    { "path": "./modules/storage" }
+  ],
+  "files": [],
+  "include": []
+}

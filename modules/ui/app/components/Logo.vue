@@ -28,11 +28,12 @@ const fetchOrgInfo = async () => {
     if (!organizationInfo.value) {
         try {
             const response = await $civicApi('/info') as any
-            if (response.success) {
+            if (response?.success && response.organization) {
                 organizationInfo.value = response.organization
             }
         } catch (err) {
             console.error('Error fetching organization info for logo:', err)
+            // Don't set organizationInfo to avoid repeated failed calls
         }
     }
 }
@@ -43,13 +44,15 @@ const logoSrc = computed(() => {
     }
 
     // Use configurable logo from organization config if available
-    if (organizationInfo.value?.logo) {
+    if (organizationInfo.value?.logo && typeof organizationInfo.value.logo === 'string') {
         // Convert relative path to API endpoint
-        const logoPath = organizationInfo.value.logo
-        if (logoPath.startsWith('brand-assets/')) {
+        const logoPath = organizationInfo.value.logo.trim()
+        if (logoPath && logoPath.startsWith('brand-assets/')) {
             return `/brand-assets/${logoPath.replace('brand-assets/', '')}`
         }
-        return logoPath
+        if (logoPath) {
+            return logoPath
+        }
     }
 
     // Fallback to default logo

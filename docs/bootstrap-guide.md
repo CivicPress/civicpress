@@ -26,15 +26,21 @@ cd civicpress
 # Install dependencies
 pnpm install
 
-# Build the CLI
-cd cli && pnpm run build && cd ..
+# Build the project (required before using CLI)
+pnpm run build
+
+# Make CLI executable (fixes permission issues on Unix systems)
+chmod +x cli/dist/index.js
 ```
+
+**Note**: The `chmod +x` step is required on Unix-like systems (macOS, Linux) to
+make the CLI executable. Without it, you'll get a "permission denied" error.
 
 ### Verify Installation
 
 ```bash
 # Test that the CLI works
-node cli/dist/index.js --help
+./cli/dist/index.js --help
 ```
 
 You should see the CivicPress CLI help output with all available commands.
@@ -58,13 +64,13 @@ dataDir: data
 database:
   type: sqlite
   sqlite:
-    file: .civic/civic.db
+    file: .system-data/civic.db
 ```
 
 - `dataDir`: Path to your civic data directory (relative to project root)
 - `database.type`: Set to `sqlite` for local development
-- `database.sqlite.file`: Path to the SQLite database file (recommended: inside
-  `.civic/`)
+- `database.sqlite.file`: Path to the SQLite database file (default:
+  `.system-data/civic.db` for private system data)
 
 ### Example: .civicrc for PostgreSQL (future)
 
@@ -92,7 +98,7 @@ database:
 - **Database is a performance layer**: Used for fast search, user sessions, API
   keys, and caching. The database can always be rebuilt from the files.
 
-For more details, see [database.md](../.civic/specs/database.md) and the
+For more details, see [database.md](specs/database.md) and the
 [architecture decision](../agent/memory/decisions.md).
 
 ---
@@ -102,14 +108,30 @@ For more details, see [database.md](../.civic/specs/database.md) and the
 ### Basic Initialization
 
 ```bash
-# Initialize a new CivicPress repository
-node cli/dist/index.js init
+# Initialize a new CivicPress repository (interactive)
+./cli/dist/index.js init
 ```
 
 When prompted, you can use the defaults:
 
 - **Data directory**: `data` (press Enter)
 - **Git repository**: `yes` (press Enter)
+
+### Initialize with Demo Data
+
+For the fastest way to see CivicPress in action, you can initialize with
+pre-configured demo data:
+
+```bash
+# Initialize with Richmond demo data (French/English)
+./cli/dist/index.js init --yes --demo-data richmond-quebec
+
+# Or initialize with Springfield demo data (English)
+./cli/dist/index.js init --yes --demo-data springfield-usa
+```
+
+The demo data includes sample bylaws, meeting minutes, and geography layers to
+demonstrate how documents, sessions, and zones appear in the system.
 
 ### Verify Initialization
 
@@ -130,7 +152,7 @@ You should see:
 
 ```bash
 # Create a simple bylaw
-node cli/dist/index.js create bylaw "Public Meeting Procedures"
+./cli/dist/index.js create bylaw "Public Meeting Procedures"
 ```
 
 This will create a new bylaw record with a default template.
@@ -139,27 +161,27 @@ This will create a new bylaw record with a default template.
 
 ```bash
 # Create a policy
-node cli/dist/index.js create policy "Data Privacy Policy"
+./cli/dist/index.js create policy "Data Privacy Policy"
 ```
 
 ### Create a Resolution
 
 ```bash
 # Create a resolution
-node cli/dist/index.js create resolution "Budget Approval 2024"
+./cli/dist/index.js create resolution "Budget Approval 2024"
 ```
 
 ### List Your Records
 
 ```bash
 # View all records
-node cli/dist/index.js list
+./cli/dist/index.js list
 
 # View only bylaws
-node cli/dist/index.js list --type bylaw
+./cli/dist/index.js list --type bylaw
 
 # View only draft records
-node cli/dist/index.js list --status draft
+./cli/dist/index.js list --status draft
 ```
 
 ## 👀 4. View and Edit Records
@@ -168,17 +190,17 @@ node cli/dist/index.js list --status draft
 
 ```bash
 # View a specific record (replace with your record name)
-node cli/dist/index.js view "public-meeting-procedures"
+./cli/dist/index.js view "public-meeting-procedures"
 
 # View with JSON output
-node cli/dist/index.js view "public-meeting-procedures" --json
+./cli/dist/index.js view "public-meeting-procedures" --json
 ```
 
 ### Edit a Record
 
 ```bash
 # Edit a record (opens in your default editor)
-node cli/dist/index.js edit "public-meeting-procedures"
+./cli/dist/index.js edit "public-meeting-procedures"
 ```
 
 ## 🔍 5. Search and Explore
@@ -187,33 +209,33 @@ node cli/dist/index.js edit "public-meeting-procedures"
 
 ```bash
 # Search by content
-node cli/dist/index.js search "privacy"
+./cli/dist/index.js search "privacy"
 
 # Search by type
-node cli/dist/index.js search "meeting" --type bylaw
+./cli/dist/index.js search "meeting" --type bylaw
 
 # Search with JSON output
-node cli/dist/index.js search "policy" --json
+./cli/dist/index.js search "policy" --json
 ```
 
 ### View Record History
 
 ```bash
 # View history of a record
-node cli/dist/index.js history "public-meeting-procedures"
+./cli/dist/index.js history "public-meeting-procedures"
 
 # View history with JSON output
-node cli/dist/index.js history "public-meeting-procedures" --json
+./cli/dist/index.js history "public-meeting-procedures" --json
 ```
 
 ### Compare Versions
 
 ```bash
 # Show differences between versions
-node cli/dist/index.js diff "public-meeting-procedures"
+./cli/dist/index.js diff "public-meeting-procedures"
 
 # Compare specific commits
-node cli/dist/index.js diff "public-meeting-procedures" --from HEAD~1 --to HEAD
+./cli/dist/index.js diff "public-meeting-procedures" --from HEAD~1 --to HEAD
 ```
 
 ## 🎨 6. Template System
@@ -222,30 +244,30 @@ node cli/dist/index.js diff "public-meeting-procedures" --from HEAD~1 --to HEAD
 
 ```bash
 # List all templates
-node cli/dist/index.js template --list
+./cli/dist/index.js template --list
 
 # Show template details
-node cli/dist/index.js template --show bylaw/default
+./cli/dist/index.js template --show bylaw/default
 ```
 
 ### Create a Custom Template
 
 ```bash
 # Create a custom bylaw template
-node cli/dist/index.js template --create "custom-bylaw" --type bylaw
+./cli/dist/index.js template --create "custom-bylaw" --type bylaw
 
 # Create a custom policy template
-node cli/dist/index.js template --create "detailed-policy" --type policy
+./cli/dist/index.js template --create "detailed-policy" --type policy
 ```
 
 ### Use Custom Templates
 
 ```bash
 # Create a record with a custom template
-node cli/dist/index.js create bylaw "Advanced Zoning Regulations" --template custom-bylaw
+./cli/dist/index.js create bylaw "Advanced Zoning Regulations" --template custom-bylaw
 
 # Create a policy with a custom template
-node cli/dist/index.js create policy "Comprehensive IT Policy" --template detailed-policy
+./cli/dist/index.js create policy "Comprehensive IT Policy" --template detailed-policy
 ```
 
 ## ✅ 7. Validation
@@ -254,20 +276,20 @@ node cli/dist/index.js create policy "Comprehensive IT Policy" --template detail
 
 ```bash
 # Validate a single record
-node cli/dist/index.js validate "public-meeting-procedures"
+./cli/dist/index.js validate "public-meeting-procedures"
 
 # Validate all records
-node cli/dist/index.js validate --all
+./cli/dist/index.js validate --all
 
 # Validate with JSON output
-node cli/dist/index.js validate --all --json
+./cli/dist/index.js validate --all --json
 ```
 
 ### Check Template Validation
 
 ```bash
 # Validate template structure
-node cli/dist/index.js template --validate bylaw/default
+./cli/dist/index.js template --validate bylaw/default
 ```
 
 ## 🔄 8. Status Management
@@ -276,20 +298,20 @@ node cli/dist/index.js template --validate bylaw/default
 
 ```bash
 # Change status to proposed
-node cli/dist/index.js status "public-meeting-procedures" proposed
+./cli/dist/index.js status "public-meeting-procedures" proposed
 
 # Change status to approved
-node cli/dist/index.js status "public-meeting-procedures" approved
+./cli/dist/index.js status "public-meeting-procedures" approved
 
 # Change status to archived
-node cli/dist/index.js status "public-meeting-procedures" archived
+./cli/dist/index.js status "public-meeting-procedures" archived
 ```
 
 ### View Status Transitions
 
 ```bash
 # See what status changes are allowed
-node cli/dist/index.js status "public-meeting-procedures"
+./cli/dist/index.js status "public-meeting-procedures"
 ```
 
 ## 📤 9. Export and Import
@@ -298,35 +320,35 @@ node cli/dist/index.js status "public-meeting-procedures"
 
 ```bash
 # Export a single record to JSON
-node cli/dist/index.js export "public-meeting-procedures" --format json
+./cli/dist/index.js export "public-meeting-procedures" --format json
 
 # Export all records to JSON
-node cli/dist/index.js export --format json
+./cli/dist/index.js export --format json
 
 # Export to CSV
-node cli/dist/index.js export --format csv
+./cli/dist/index.js export --format csv
 
 # Export to Markdown
-node cli/dist/index.js export --format markdown
+./cli/dist/index.js export --format markdown
 
 # Export to a specific directory
-node cli/dist/index.js export --format json --output exports/
+./cli/dist/index.js export --format json --output exports/
 ```
 
 ### Import Records
 
 ```bash
 # Import from a single file
-node cli/dist/index.js import path/to/record.json
+./cli/dist/index.js import path/to/record.json
 
 # Import from a directory
-node cli/dist/index.js import path/to/records/
+./cli/dist/index.js import path/to/records/
 
 # Import with overwrite
-node cli/dist/index.js import path/to/records/ --overwrite
+./cli/dist/index.js import path/to/records/ --overwrite
 
 # Import with dry-run (preview)
-node cli/dist/index.js import path/to/records/ --dry-run
+./cli/dist/index.js import path/to/records/ --dry-run
 ```
 
 ## 🪝 10. Hooks and Workflows
@@ -335,16 +357,16 @@ node cli/dist/index.js import path/to/records/ --dry-run
 
 ```bash
 # List current hooks
-node cli/dist/index.js hook --list
+./cli/dist/index.js hook --list
 
 # Enable a hook
-node cli/dist/index.js hook --enable "record:created"
+./cli/dist/index.js hook --enable "record:created"
 
 # Disable a hook
-node cli/dist/index.js hook --disable "record:updated"
+./cli/dist/index.js hook --disable "record:updated"
 
 # Show hook configuration
-node cli/dist/index.js hook --show
+./cli/dist/index.js hook --show
 ```
 
 ### Configure Workflows
@@ -390,36 +412,36 @@ roles:
 
 ```bash
 # Commit all changes
-node cli/dist/index.js commit
+./cli/dist/index.js commit
 
 # Commit a specific record
-node cli/dist/index.js commit "public-meeting-procedures"
+./cli/dist/index.js commit "public-meeting-procedures"
 
 # Commit with a custom message
-node cli/dist/index.js commit --message "Updated meeting procedures"
+./cli/dist/index.js commit --message "Updated meeting procedures"
 ```
 
 ### Silent and JSON Output
 
 ```bash
 # Silent mode (no output except errors)
-node cli/dist/index.js list --silent
+./cli/dist/index.js list --silent
 
 # JSON output for scripting
-node cli/dist/index.js list --json
+./cli/dist/index.js list --json
 
 # Combine silent and JSON
-node cli/dist/index.js list --silent --json
+./cli/dist/index.js list --silent --json
 ```
 
 ### Verbose Debugging
 
 ```bash
 # Verbose output for debugging
-node cli/dist/index.js create bylaw "Test Bylaw" --verbose
+./cli/dist/index.js create bylaw "Test Bylaw" --verbose
 
 # Quiet mode (errors and warnings only)
-node cli/dist/index.js list --quiet
+./cli/dist/index.js list --quiet
 ```
 
 ## 🧪 12. Testing and Validation
@@ -441,10 +463,10 @@ pnpm run test tests/cli/create.test.ts
 
 ```bash
 # Validate workflow configuration
-node cli/dist/index.js validate --config
+./cli/dist/index.js validate --config
 
 # Validate templates
-node cli/dist/index.js template --validate-all
+./cli/dist/index.js template --validate-all
 ```
 
 ## 📊 13. Monitoring and Maintenance
@@ -453,23 +475,23 @@ node cli/dist/index.js template --validate-all
 
 ```bash
 # List all records with status
-node cli/dist/index.js list --status all
+./cli/dist/index.js list --status all
 
 # Check for validation errors
-node cli/dist/index.js validate --all --json | jq '.errors'
+./cli/dist/index.js validate --all --json | jq '.errors'
 
 # View recent activity
-node cli/dist/index.js history --recent
+./cli/dist/index.js history --recent
 ```
 
 ### Backup and Restore
 
 ```bash
 # Export all data for backup
-node cli/dist/index.js export --all --format json --output backup/
+./cli/dist/index.js export --all --format json --output backup/
 
 # Import from backup
-node cli/dist/index.js import backup/ --overwrite
+./cli/dist/index.js import backup/ --overwrite
 ```
 
 ## 🎯 14. Common Workflows
@@ -478,38 +500,38 @@ node cli/dist/index.js import backup/ --overwrite
 
 ```bash
 # 1. Create a new bylaw
-node cli/dist/index.js create bylaw "Traffic Safety Regulations"
+./cli/dist/index.js create bylaw "Traffic Safety Regulations"
 
 # 2. Edit the record
-node cli/dist/index.js edit "traffic-safety-regulations"
+./cli/dist/index.js edit "traffic-safety-regulations"
 
 # 3. Validate the record
-node cli/dist/index.js validate "traffic-safety-regulations"
+./cli/dist/index.js validate "traffic-safety-regulations"
 
 # 4. Change status to proposed
-node cli/dist/index.js status "traffic-safety-regulations" proposed
+./cli/dist/index.js status "traffic-safety-regulations" proposed
 
 # 5. Commit changes
-node cli/dist/index.js commit "traffic-safety-regulations"
+./cli/dist/index.js commit "traffic-safety-regulations"
 
 # 6. Export for sharing
-node cli/dist/index.js export "traffic-safety-regulations" --format json
+./cli/dist/index.js export "traffic-safety-regulations" --format json
 ```
 
 ### Template Development
 
 ```bash
 # 1. Create a custom template
-node cli/dist/index.js template --create "detailed-bylaw" --type bylaw
+./cli/dist/index.js template --create "detailed-bylaw" --type bylaw
 
 # 2. Edit the template
 nano .civic/templates/bylaw/detailed-bylaw.md
 
 # 3. Validate the template
-node cli/dist/index.js template --validate bylaw/detailed-bylaw
+./cli/dist/index.js template --validate bylaw/detailed-bylaw
 
 # 4. Create a record with the template
-node cli/dist/index.js create bylaw "Test Bylaw" --template detailed-bylaw
+./cli/dist/index.js create bylaw "Test Bylaw" --template detailed-bylaw
 ```
 
 ### Bulk Import
@@ -520,13 +542,13 @@ mkdir imports/
 # Add your JSON/CSV/Markdown files to imports/
 
 # 2. Preview the import
-node cli/dist/index.js import imports/ --dry-run
+./cli/dist/index.js import imports/ --dry-run
 
 # 3. Perform the import
-node cli/dist/index.js import imports/ --overwrite
+./cli/dist/index.js import imports/ --overwrite
 
 # 4. Validate imported records
-node cli/dist/index.js validate --all
+./cli/dist/index.js validate --all
 ```
 
 ## 🆘 15. Troubleshooting
@@ -536,8 +558,11 @@ node cli/dist/index.js validate --all
 **CLI not found:**
 
 ```bash
-# Rebuild the CLI
-cd cli && pnpm run build && cd ..
+# Rebuild the project
+pnpm run build
+
+# Make CLI executable again
+chmod +x cli/dist/index.js
 ```
 
 **Permission errors:**
@@ -552,10 +577,10 @@ chmod 644 .civic/*.yml
 
 ```bash
 # Check record syntax
-node cli/dist/index.js validate --verbose
+./cli/dist/index.js validate --verbose
 
 # Check template syntax
-node cli/dist/index.js template --validate-all
+./cli/dist/index.js template --validate-all
 ```
 
 **Git issues:**
@@ -574,15 +599,15 @@ git commit -m "Initial commit"
 
 ```bash
 # General help
-node cli/dist/index.js --help
+./cli/dist/index.js --help
 
 # Command-specific help
-node cli/dist/index.js create --help
-node cli/dist/index.js validate --help
-node cli/dist/index.js template --help
+./cli/dist/index.js create --help
+./cli/dist/index.js validate --help
+./cli/dist/index.js template --help
 ```
 
-## 🎉 Congratulations!
+## 🎉 Congratulations
 
 You've successfully set up and used CivicPress! You now have:
 
@@ -603,10 +628,10 @@ You've successfully set up and used CivicPress! You now have:
 
 ### Resources
 
-- [CLI Documentation](docs/cli.md)
-- [Template System Guide](docs/templates.md)
-- [Validation Guide](docs/validation.md)
-- [Workflow Configuration](docs/workflows.md)
-- [Contributing Guide](CONTRIBUTING.md)
+- [CLI Documentation](cli.md)
+- [Template System Guide](templates.md)
+- [Validation Guide](validation.md)
+- [Workflow Configuration](workflows.md)
+- [Contributing Guide](../.github/CONTRIBUTING.md)
 
 Happy governing! 🌱

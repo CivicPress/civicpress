@@ -99,12 +99,43 @@ export class WorkflowConfigManager {
   ): Promise<{ valid: boolean; reason?: string }> {
     const config = await this.loadConfig();
 
-    // Check if transition is allowed
-    const allowedTransitions = config.transitions[fromStatus] || [];
+    // Check if transition is allowed - handle both old and new metadata formats
+    let allowedTransitions: string[] = [];
+    if (config.transitions[fromStatus]) {
+      if (Array.isArray(config.transitions[fromStatus])) {
+        allowedTransitions = config.transitions[fromStatus] as string[];
+      } else if (
+        config.transitions[fromStatus] &&
+        typeof config.transitions[fromStatus] === 'object' &&
+        'value' in config.transitions[fromStatus]
+      ) {
+        allowedTransitions =
+          (config.transitions[fromStatus] as any).value || [];
+      }
+    }
+
     if (!allowedTransitions.includes(toStatus)) {
+      const transitionsText =
+        allowedTransitions.length > 0
+          ? allowedTransitions.join(', ')
+          : 'none (final status)';
+
+      // Check if this might be a typo (e.g., "review" instead of "reviewed")
+      const availableStatuses = await this.getAvailableStatuses();
+      const similarStatus = availableStatuses.find(
+        (status) =>
+          status.toLowerCase().includes(toStatus.toLowerCase()) ||
+          toStatus.toLowerCase().includes(status.toLowerCase())
+      );
+
+      const suggestion =
+        similarStatus && similarStatus !== toStatus
+          ? ` Did you mean '${similarStatus}'?`
+          : '';
+
       return {
         valid: false,
-        reason: `Transition from '${fromStatus}' to '${toStatus}' is not allowed. Allowed transitions: ${allowedTransitions.join(', ')}`,
+        reason: `Transition from '${fromStatus}' to '${toStatus}' is not allowed. Allowed transitions: ${transitionsText}.${suggestion}`,
       };
     }
 
@@ -118,9 +149,36 @@ export class WorkflowConfigManager {
         };
       }
 
-      const roleTransitions = roleConfig.can_transition;
-      const allowedForRole =
-        roleTransitions[fromStatus] || roleTransitions['any'] || [];
+      let allowedForRole: string[] = [];
+      if (roleConfig.can_transition) {
+        if (roleConfig.can_transition[fromStatus]) {
+          if (Array.isArray(roleConfig.can_transition[fromStatus])) {
+            allowedForRole = roleConfig.can_transition[fromStatus] as string[];
+          } else if (
+            roleConfig.can_transition[fromStatus] &&
+            typeof roleConfig.can_transition[fromStatus] === 'object' &&
+            'value' in roleConfig.can_transition[fromStatus]
+          ) {
+            allowedForRole =
+              (roleConfig.can_transition[fromStatus] as any).value || [];
+          }
+        }
+
+        if (roleConfig.can_transition['any']) {
+          let anyTransitions: string[] = [];
+          if (Array.isArray(roleConfig.can_transition['any'])) {
+            anyTransitions = roleConfig.can_transition['any'] as string[];
+          } else if (
+            roleConfig.can_transition['any'] &&
+            typeof roleConfig.can_transition['any'] === 'object' &&
+            'value' in roleConfig.can_transition['any']
+          ) {
+            anyTransitions =
+              (roleConfig.can_transition['any'] as any).value || [];
+          }
+          allowedForRole = [...allowedForRole, ...anyTransitions];
+        }
+      }
 
       if (!allowedForRole.includes(toStatus)) {
         return {
@@ -160,7 +218,20 @@ export class WorkflowConfigManager {
       };
     }
 
-    const allowedTypes = roleConfig[`can_${action}`] || [];
+    // Handle both old and new metadata formats
+    let allowedTypes: string[] = [];
+    const actionPermissions = roleConfig[`can_${action}`];
+    if (actionPermissions) {
+      if (Array.isArray(actionPermissions)) {
+        allowedTypes = actionPermissions;
+      } else if (
+        actionPermissions &&
+        typeof actionPermissions === 'object' &&
+        'value' in actionPermissions
+      ) {
+        allowedTypes = (actionPermissions as any).value || [];
+      }
+    }
 
     // If the role has specific permissions defined, check if the action is allowed
     if (allowedTypes.length > 0) {
@@ -185,10 +256,31 @@ export class WorkflowConfigManager {
     const config = await this.loadConfig();
 
     if (recordType && config.recordTypes?.[recordType]?.statuses) {
-      return config.recordTypes[recordType].statuses!;
+      const typeStatuses = config.recordTypes[recordType].statuses!;
+      if (Array.isArray(typeStatuses)) {
+        return typeStatuses;
+      } else if (
+        typeStatuses &&
+        typeof typeStatuses === 'object' &&
+        'value' in typeStatuses
+      ) {
+        return (typeStatuses as any).value || [];
+      }
+      return [];
     }
 
-    return config.statuses;
+    // Handle both old and new metadata formats for global statuses
+    if (Array.isArray(config.statuses)) {
+      return config.statuses;
+    } else if (
+      config.statuses &&
+      typeof config.statuses === 'object' &&
+      'value' in config.statuses
+    ) {
+      return (config.statuses as any).value || [];
+    }
+
+    return [];
   }
 
   async getAvailableTransitions(
@@ -196,7 +288,22 @@ export class WorkflowConfigManager {
     role?: string
   ): Promise<string[]> {
     const config = await this.loadConfig();
-    const allTransitions = config.transitions[fromStatus] || [];
+
+    // Handle both old and new metadata formats
+    let allTransitions: string[] = [];
+    if (config.transitions[fromStatus]) {
+      if (Array.isArray(config.transitions[fromStatus])) {
+        // Old format: direct array
+        allTransitions = config.transitions[fromStatus] as string[];
+      } else if (
+        config.transitions[fromStatus] &&
+        typeof config.transitions[fromStatus] === 'object' &&
+        'value' in config.transitions[fromStatus]
+      ) {
+        // New format: { value: string[], type: string, description: string, required: boolean }
+        allTransitions = (config.transitions[fromStatus] as any).value || [];
+      }
+    }
 
     if (!role) {
       return allTransitions;
@@ -207,10 +314,45 @@ export class WorkflowConfigManager {
       return [];
     }
 
-    const roleTransitions =
-      roleConfig.can_transition[fromStatus] ||
-      roleConfig.can_transition['any'] ||
-      [];
+    let roleTransitions: string[] = [];
+    if (roleConfig.can_transition) {
+      if (roleConfig.can_transition[fromStatus]) {
+        if (Array.isArray(roleConfig.can_transition[fromStatus])) {
+          // Old format: direct array
+          roleTransitions = roleConfig.can_transition[fromStatus] as string[];
+        } else if (
+          roleConfig.can_transition[fromStatus] &&
+          typeof roleConfig.can_transition[fromStatus] === 'object' &&
+          'value' in roleConfig.can_transition[fromStatus]
+        ) {
+          // New format: { value: string[], type: string, description: string, required: boolean }
+          roleTransitions =
+            (roleConfig.can_transition[fromStatus] as any).value || [];
+        }
+      }
+
+      if (roleConfig.can_transition['any']) {
+        let anyTransitions: string[] = [];
+        if (Array.isArray(roleConfig.can_transition['any'])) {
+          anyTransitions = roleConfig.can_transition['any'] as string[];
+        } else if (
+          roleConfig.can_transition['any'] &&
+          typeof roleConfig.can_transition['any'] === 'object' &&
+          'value' in roleConfig.can_transition['any']
+        ) {
+          anyTransitions =
+            (roleConfig.can_transition['any'] as any).value || [];
+        }
+        roleTransitions = [...roleTransitions, ...anyTransitions];
+      }
+    }
+
+    // Return the intersection of all possible transitions and role-allowed transitions
+    // If no role restrictions, return all transitions
+    if (roleTransitions.length === 0) {
+      return allTransitions;
+    }
+
     return allTransitions.filter((transition) =>
       roleTransitions.includes(transition)
     );

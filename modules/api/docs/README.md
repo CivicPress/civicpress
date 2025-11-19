@@ -82,7 +82,6 @@ router.get('/records', async (req, res) => {
   guide to the response system
 - [Quick Reference](./quick-reference.md) - Developer quick reference
 - [Error Handling](./error-handling.md) - Error handling patterns
-- [API Standards](./api-standards.md) - API design standards
 - [History API](./history-api.md) - Git commit history endpoints
 
 ## Available Endpoints
@@ -302,6 +301,6 @@ exampleRouter.get('/', async (req, res) => {
 
 ## Related Documentation
 
-- [Core Module](../core/README.md) - Core functionality
-- [CLI Module](../cli/README.md) - Command-line interface
-- [Project Overview](../../README.md) - Overall project documentation
+- [Core Module](/core/README.md) - Core functionality
+- [CLI Module](/cli/README.md) - Command-line interface
+- [Project Overview](/README.md) - Overall project documentation

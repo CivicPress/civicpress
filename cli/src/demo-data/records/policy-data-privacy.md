@@ -1,15 +1,34 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1737360000000"
 title: 'Politique de protection des données personnelles'
 type: policy
 status: draft
-module: legal-register
-tags: ['privacy', 'data', 'technology', 'protection', 'données']
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "jfbouchard"
 authors:
   - name: 'Jean-François Bouchard'
+    username: 'jfbouchard'
     role: 'council'
-created: '2025-01-20'
-updated: '2025-01-20'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2025-01-20T10:00:00Z"
+updated: "2025-01-20T10:00:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['privacy', 'data', 'technology', 'protection', 'données']
+module: legal-register
 slug: 'data-privacy-policy'
+version: "1.0.0"
 ---
 
 # Politique de protection des données personnelles

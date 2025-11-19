@@ -18,7 +18,7 @@ deprecated: false sunset_date: null additions:
   - 'plugins.md: >=1.5.0'
   - 'auth.md: >=1.2.0'
   - 'permissions.md: >=1.1.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

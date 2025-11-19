@@ -508,5 +508,3 @@ civic index --rebuild --verbose
 - [Authentication System](auth-system.md)
 - [API Documentation](api.md)
 - [CLI Commands](cli.md)
-- [Record Format](records.md)
-- [Module System](modules.md)

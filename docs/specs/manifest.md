@@ -9,7 +9,7 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive field documentation fixes: [] migration_guide: null
   compatibility: min_civicpress: 1.0.0 max_civicpress: 'null' dependencies: []
   authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

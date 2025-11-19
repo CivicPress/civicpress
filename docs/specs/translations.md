@@ -10,7 +10,7 @@ deprecated: false sunset_date: null additions:
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
   'null' dependencies:
   - 'ui.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -242,8 +242,53 @@ quality:
 
 - Toggle language in UI and verify translations load
 - Confirm fallback to default language if missing
-- Validate `i18n/` YAML parsing in CLI and frontend
+- Validate `i18n/` JSON parsing in frontend
 - Ensure civic records link to each other via frontmatter
+
+## ✅ Implementation Status (December 2025)
+
+### Completed Implementation
+
+- ✅ **UI Internationalization**: Complete translation system implemented using
+  `@nuxtjs/i18n` and `vue-i18n`
+- ✅ **Translation Files**: JSON-based translation files (`en.json`, `fr.json`)
+  in `modules/ui/i18n/locales/`
+- ✅ **Full Coverage**: All UI components, pages, forms, modals, and messages
+  translated
+- ✅ **Pluralization**: ICU MessageFormat support for proper plural forms
+- ✅ **Dynamic Content**: `useConfigTranslations` composable for translating
+  configuration-driven values
+- ✅ **Consistent Patterns**: Translation keys follow organized structure by
+  feature area
+
+### Translation Coverage
+
+- ✅ **Pages**: Records, Geography, Settings (all sub-pages), Authentication
+- ✅ **Components**: Forms, Selectors, Browsers, Modals, Alerts, Toasts
+- ✅ **Navigation**: Sidebar, breadcrumbs, buttons, labels
+- ✅ **Messages**: Error messages, validation feedback, success notifications
+- ✅ **Footer**: System footer component
+
+### Current Languages
+
+- English (en) - Default
+- French (fr) - Complete translation
+
+### File Structure
+
+```
+modules/ui/i18n/locales/
+├── en.json  # English translations
+└── fr.json  # French translations
+```
+
+### Key Features Implemented
+
+- Pluralization support for counts (files, records, etc.)
+- Context-aware translations (e.g., proper French civic terminology)
+- Fallback mechanisms for missing translations
+- Type-safe translation keys with TypeScript
+- Organized translation structure by feature area
 
 ---
 

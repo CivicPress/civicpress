@@ -4,12 +4,20 @@ import { join, dirname } from 'path';
 import * as fs from 'fs';
 import matter = require('gray-matter');
 import { glob } from 'glob';
-import { userCan } from '@civicpress/core';
+import {
+  userCan,
+  RecordParser,
+  parseRecordRelativePath,
+} from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 interface ExportOptions {
   token?: string;
@@ -102,10 +110,9 @@ export function registerExportCommand(cli: CAC) {
 
         // If specific record is provided, export just that record
         if (record) {
-          const recordPath = record.endsWith('.md') ? record : `${record}.md`;
           await exportSingleRecord(
             dataDir,
-            recordPath,
+            record,
             exportOptions,
             shouldOutputJson
           );
@@ -122,12 +129,42 @@ export function registerExportCommand(cli: CAC) {
 
 async function exportSingleRecord(
   dataDir: string,
-  recordPath: string,
+  recordRef: string,
   options: ExportOptions,
   shouldOutputJson?: boolean
 ) {
   const logger = initializeLogger();
-  const fullPath = join(dataDir, 'records', recordPath);
+  const resolvedRecord = resolveRecordReference(dataDir, recordRef);
+
+  if (!resolvedRecord) {
+    const availableRecords = getAvailableRecords(dataDir);
+
+    const errorPayload = {
+      error: `Record not found: ${recordRef}`,
+      availableRecords,
+    };
+
+    if (shouldOutputJson) {
+      console.log(JSON.stringify(errorPayload, null, 2));
+    } else {
+      logger.error(`❌ Record not found: ${recordRef}`);
+      logger.info('Available records:');
+      for (const [type, files] of Object.entries(availableRecords)) {
+        if (files.length > 0) {
+          logger.info(`  ${type}:`);
+          for (const file of files) {
+            logger.debug(`    ${file}`);
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  const displayPath = resolvedRecord.relativePath.replace(/\\/g, '/');
+  const normalizedPath = displayPath.replace(/^records\//, '');
+  const pathSegments = displayPath.split('/').filter(Boolean);
+  const fullPath = join(dataDir, ...pathSegments);
 
   try {
     if (!fs.existsSync(fullPath)) {
@@ -135,7 +172,7 @@ async function exportSingleRecord(
         console.log(
           JSON.stringify(
             {
-              error: `Record not found: ${recordPath}`,
+              error: `Record not found: ${recordRef}`,
             },
             null,
             2
@@ -143,24 +180,37 @@ async function exportSingleRecord(
         );
         return;
       } else {
-        logger.error(`❌ Record not found: ${recordPath}`);
+        logger.error(`❌ Record not found: ${recordRef}`);
         process.exit(1);
       }
     }
 
     const content = await readFile(fullPath, 'utf-8');
-    const { data: metadata, content: markdownContent } = matter(content);
+
+    // Use RecordParser for consistent parsing (handles both old and new formats)
+    const record = RecordParser.parseFromMarkdown(content, displayPath);
+    const parsedPathInfo = parseRecordRelativePath(displayPath);
 
     const exportRecord: ExportRecord = {
-      path: recordPath,
-      type: metadata.type || recordPath.split('/')[0],
-      title: metadata.title || recordPath.replace(/\.md$/, ''),
-      status: metadata.status || 'draft',
-      created: metadata.created || '',
-      updated: metadata.updated || '',
-      author: metadata.author || 'unknown',
-      content: options.includeContent ? markdownContent : undefined,
-      metadata: options.includeMetadata ? metadata : {},
+      path: normalizedPath,
+      type: record.type || parsedPathInfo.type || normalizedPath.split('/')[0],
+      title: record.title || normalizedPath.replace(/\.md$/, ''),
+      status: record.status || 'draft',
+      created: record.created_at || '',
+      updated: record.updated_at || '',
+      author: record.author || 'unknown',
+      content: options.includeContent ? record.content : undefined,
+      metadata: options.includeMetadata
+        ? {
+            ...record.metadata,
+            authors: record.authors,
+            source: record.source,
+            geography: record.geography,
+            attachedFiles: record.attachedFiles,
+            linkedRecords: record.linkedRecords,
+            linkedGeographyFiles: record.linkedGeographyFiles,
+          }
+        : {},
     };
 
     if (shouldOutputJson) {
@@ -189,7 +239,7 @@ async function exportSingleRecord(
       console.log(
         JSON.stringify(
           {
-            error: `Error exporting ${recordPath}`,
+            error: `Error exporting ${recordRef}`,
             details: error instanceof Error ? error.message : String(error),
           },
           null,
@@ -197,7 +247,7 @@ async function exportSingleRecord(
         )
       );
     } else {
-      logger.error(`❌ Error exporting ${recordPath}:`, error);
+      logger.error(`❌ Error exporting ${recordRef}:`, error);
       process.exit(1);
     }
   }
@@ -235,30 +285,49 @@ async function exportRecords(
     const records: ExportRecord[] = [];
 
     for (const file of recordFiles) {
-      const filePath = join(recordsDir, file);
+      const normalizedFile = file.replace(/\\/g, '/');
+      const displayPath = `records/${normalizedFile}`;
+      const fileSegments = normalizedFile.split('/');
+      const filePath = join(recordsDir, ...fileSegments);
       const content = await readFile(filePath, 'utf-8');
-      const { data: metadata, content: markdownContent } = matter(content);
+
+      // Use RecordParser for consistent parsing (handles both old and new formats)
+      const record = RecordParser.parseFromMarkdown(content, displayPath);
+      const parsedPathInfo = parseRecordRelativePath(displayPath);
 
       // Apply filters
-      if (options.type && metadata.type !== options.type) continue;
-      if (options.status && metadata.status !== options.status) continue;
-      if (options.author && metadata.author !== options.author) continue;
+      if (options.type && record.type !== options.type) continue;
+      if (options.status && record.status !== options.status) continue;
+      if (options.author && record.author !== options.author) continue;
       if (options.date) {
-        const recordDate = new Date(metadata.created || metadata.updated || '');
+        const recordDate = new Date(
+          record.created_at || record.updated_at || ''
+        );
         const searchDate = parseDateFilter(options.date);
         if (searchDate && recordDate < searchDate) continue;
       }
 
       records.push({
-        path: file,
-        type: metadata.type || file.split('/')[0],
-        title: metadata.title || file.replace(/\.md$/, ''),
-        status: metadata.status || 'draft',
-        created: metadata.created || '',
-        updated: metadata.updated || '',
-        author: metadata.author || 'unknown',
-        content: options.includeContent ? markdownContent : undefined,
-        metadata: options.includeMetadata ? metadata : {},
+        path: normalizedFile,
+        type:
+          record.type || parsedPathInfo.type || normalizedFile.split('/')[0],
+        title: record.title || normalizedFile.replace(/\.md$/, ''),
+        status: record.status || 'draft',
+        created: record.created_at || '',
+        updated: record.updated_at || '',
+        author: record.author || 'unknown',
+        content: options.includeContent ? record.content : undefined,
+        metadata: options.includeMetadata
+          ? {
+              ...record.metadata,
+              authors: record.authors,
+              source: record.source,
+              geography: record.geography,
+              attachedFiles: record.attachedFiles,
+              linkedRecords: record.linkedRecords,
+              linkedGeographyFiles: record.linkedGeographyFiles,
+            }
+          : {},
       });
     }
 

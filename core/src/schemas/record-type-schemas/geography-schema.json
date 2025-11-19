@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://civicpress.org/schemas/record-type-schemas/geography-schema.json",
+  "title": "CivicPress Geography Record Type Schema",
+  "description": "JSON Schema extension for geography-type records. This schema validates type-specific fields for geography records as defined in docs/record-format-standard.md",
+  "type": "object",
+  "properties": {
+    "geography_data": {
+      "type": "object",
+      "description": "GeoJSON/KML content object. Can be a GeoJSON FeatureCollection, Feature, or Geometry object, or a KML structure.",
+      "additionalProperties": true
+    },
+    "category": {
+      "type": "string",
+      "enum": ["zone", "boundary", "district", "facility", "route"],
+      "description": "Category of the geography data"
+    }
+  },
+  "additionalProperties": true
+}

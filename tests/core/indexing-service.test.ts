@@ -7,6 +7,7 @@ import {
 import { CivicPress } from '../../core/src/civic-core.js';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import { RecordParser, RecordData } from '@civicpress/core';
 import {
   createTestDirectory,
   cleanupTestDirectory,
@@ -49,73 +50,95 @@ describe('IndexingService', () => {
     const recordsDir = join(testConfig.recordsDir);
     mkdirSync(recordsDir, { recursive: true });
 
-    // Create sample records
-    const sampleRecords = [
+    // Create sample records with new standardized format
+    const sampleRecords: Array<{ file: string; record: RecordData }> = [
       {
         file: 'bylaw-noise-restrictions.md',
-        content: `---
-title: 'Noise Restrictions'
-type: bylaw
-status: adopted
-module: legal-register
-tags: ['noise', 'nighttime', 'curfew']
-authors:
-  - name: 'Ada Lovelace'
-    role: 'clerk'
-created: '2025-06-12'
-updated: '2025-07-01'
-slug: 'noise-restrictions'
----
-
-# Noise Restrictions
-
-This bylaw establishes noise restrictions.`,
+        record: {
+          id: 'record-1718208000000',
+          title: 'Noise Restrictions',
+          type: 'bylaw',
+          status: 'published',
+          content:
+            '# Noise Restrictions\n\nThis bylaw establishes noise restrictions.',
+          author: 'alovelace',
+          authors: [
+            {
+              name: 'Ada Lovelace',
+              username: 'alovelace',
+              role: 'clerk',
+            },
+          ],
+          created_at: '2025-06-12T10:00:00Z',
+          updated_at: '2025-07-01T14:30:00Z',
+          metadata: {
+            tags: ['noise', 'nighttime', 'curfew'],
+            module: 'legal-register',
+            slug: 'noise-restrictions',
+            version: '1.0.0',
+          },
+        },
       },
       {
         file: 'policy-data-privacy.md',
-        content: `---
-title: 'Data Privacy Policy'
-type: policy
-status: draft
-module: legal-register
-tags: ['privacy', 'data', 'technology']
-authors:
-  - name: 'Irène Joliot-Curie'
-    role: 'council'
-created: '2025-07-15'
-updated: '2025-07-15'
-slug: 'data-privacy-policy'
----
-
-# Data Privacy Policy
-
-This policy establishes data privacy guidelines.`,
+        record: {
+          id: 'record-1721059200000',
+          title: 'Data Privacy Policy',
+          type: 'policy',
+          status: 'draft',
+          content:
+            '# Data Privacy Policy\n\nThis policy establishes data privacy guidelines.',
+          author: 'ijoliotcurie',
+          authors: [
+            {
+              name: 'Irène Joliot-Curie',
+              username: 'ijoliotcurie',
+              role: 'council',
+            },
+          ],
+          created_at: '2025-07-15T10:00:00Z',
+          updated_at: '2025-07-15T10:00:00Z',
+          metadata: {
+            tags: ['privacy', 'data', 'technology'],
+            module: 'legal-register',
+            slug: 'data-privacy-policy',
+            version: '1.0.0',
+          },
+        },
       },
       {
         file: 'resolution-budget-2025.md',
-        content: `---
-title: 'Budget Resolution 2025'
-type: resolution
-status: proposed
-module: legal-register
-tags: ['budget', 'finance', '2025']
-authors:
-  - name: 'Luc Lapointe'
-    role: 'mayor'
-created: '2025-07-20'
-updated: '2025-07-20'
-slug: 'budget-resolution-2025'
----
-
-# Budget Resolution 2025
-
-This resolution approves the 2025 budget.`,
+        record: {
+          id: 'record-1721491200000',
+          title: 'Budget Resolution 2025',
+          type: 'resolution',
+          status: 'pending_review',
+          content:
+            '# Budget Resolution 2025\n\nThis resolution approves the 2025 budget.',
+          author: 'llapointe',
+          authors: [
+            {
+              name: 'Luc Lapointe',
+              username: 'llapointe',
+              role: 'mayor',
+            },
+          ],
+          created_at: '2025-07-20T10:00:00Z',
+          updated_at: '2025-07-20T10:00:00Z',
+          metadata: {
+            tags: ['budget', 'finance', '2025'],
+            module: 'legal-register',
+            slug: 'budget-resolution-2025',
+            version: '1.0.0',
+          },
+        },
       },
     ];
 
     // Write sample records
-    for (const record of sampleRecords) {
-      writeFileSync(join(recordsDir, record.file), record.content);
+    for (const { file, record } of sampleRecords) {
+      const markdown = RecordParser.serializeToMarkdown(record);
+      writeFileSync(join(recordsDir, file), markdown);
     }
 
     indexingService = new IndexingService(civicPress, testConfig.dataDir);
@@ -138,9 +161,9 @@ This resolution approves the 2025 budget.`,
       expect(index.metadata.types).toContain('bylaw');
       expect(index.metadata.types).toContain('policy');
       expect(index.metadata.types).toContain('resolution');
-      expect(index.metadata.statuses).toContain('adopted');
+      expect(index.metadata.statuses).toContain('published');
       expect(index.metadata.statuses).toContain('draft');
-      expect(index.metadata.statuses).toContain('proposed');
+      expect(index.metadata.statuses).toContain('pending_review');
     });
 
     it('should filter by type', async () => {
@@ -268,14 +291,14 @@ This resolution approves the 2025 budget.`,
       expect(noiseEntry?.file).toBe('bylaw-noise-restrictions.md');
       expect(noiseEntry?.title).toBe('Noise Restrictions');
       expect(noiseEntry?.type).toBe('bylaw');
-      expect(noiseEntry?.status).toBe('adopted');
+      expect(noiseEntry?.status).toBe('published'); // Updated to new standard status
       expect(noiseEntry?.module).toBe('legal-register');
       expect(noiseEntry?.tags).toEqual(['noise', 'nighttime', 'curfew']);
       expect(noiseEntry?.authors).toEqual([
         { name: 'Ada Lovelace', role: 'clerk' },
       ]);
-      expect(noiseEntry?.created).toBe('2025-06-12');
-      expect(noiseEntry?.updated).toBe('2025-07-01');
+      expect(noiseEntry?.created).toBe('2025-06-12T10:00:00.000Z'); // Updated to ISO 8601
+      expect(noiseEntry?.updated).toBe('2025-07-01T14:30:00.000Z'); // Updated to ISO 8601
       expect(noiseEntry?.slug).toBe('noise-restrictions');
     });
   });

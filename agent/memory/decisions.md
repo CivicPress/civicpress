@@ -1,6 +1,191 @@
 # CivicPress Development Decisions
 
-## Roles API Endpoint Implementation (Latest)
+## Geography Data System Architecture (Latest)
+
+### **✅ DESIGNED: Complete Geography Data Management System**
+
+**Decision**: Transform CivicPress from document management to spatial document
+management system with centralized geography file management, interactive
+mapping, and public access.
+
+#### **Core Architecture Changes**
+
+1. **Remove Geography File Upload** from record edit forms
+2. **Create Centralized Geography Management** at `/geography/` (public access)
+3. **Implement Text Box Input System** with API validation and file generation
+4. **Add Live Preview** with Leaflet maps showing parsed data
+5. **Store Geography Files** in `data/geography/` (git versioned)
+6. **Add Geography Linking** to records (similar to file attachments)
+
+#### **File Structure**
+
+```
+data/geography/
+├── geojson/          # GeoJSON files (.geojson)
+│   ├── zones/
+│   ├── boundaries/
+│   ├── districts/
+│   └── facilities/
+├── kml/              # KML files (.kml)
+│   ├── municipal-boundaries/
+│   └── service-areas/
+├── gpx/              # GPX files (.gpx)
+│   └── routes/
+└── shp/              # Shapefile data (.shp, .dbf, .shx)
+    └── cadastral/
+```
+
+#### **Admin Interface Structure**
+
+```
+/geography/                    # Public geography files
+├── /                          # Geography files list (public)
+├── /create                    # Create new geography file (admin only)
+├── /[id]/                     # View geography file with map
+├── /[id]/edit                 # Edit geography file (admin only)
+└── /[id]/delete               # Delete geography file (admin only)
+```
+
+#### **Text Box Input System**
+
+- **Paste GeoJSON/KML content** directly into text area
+- **API validates** content (JSON structure, geometry validity)
+- **Extracts metadata** (bounds, SRID, feature count)
+- **Generates standardized filename** based on name + category
+- **Saves to** `data/geography/{category}/{filename}.geojson`
+- **Creates database record** with metadata
+- **Live preview** with Leaflet map showing parsed data
+- **Real-time validation** with error feedback
+- **Data summary panel** (feature count, bounds, SRID)
+
+#### **Record Integration Changes**
+
+```typescript
+// OLD: Embedded geography attachments
+geography: {
+  attachments: [{ id: "uuid", path: "file.pdf", role: "map" }]
+}
+
+// NEW: Linked geography files
+geography: {
+  srid: 4326,
+  zone_ref: "mtl:zone:res-R1",
+  bbox: [-73.65, 45.45, -73.52, 45.55],
+  center: { lon: -73.58, lat: 45.50 },
+  linkedGeography: [
+    {
+      geographyId: "geo-001",
+      role: "zone-boundary",
+      description: "Residential zone boundaries"
+    }
+  ]
+}
+```
+
+#### **Key Features**
+
+1. **Git Versioning**: Built-in through data/ folder version control
+2. **Public Access**: Geography files visible to citizens at `/geography/`
+3. **Role-Based Permissions**: Public view, admin edit, specialized permissions
+4. **Geography Relationships**: Define relationships between geography files
+5. **Standardized Structure**: API enforces consistent data structure
+6. **Interactive Maps**: Leaflet integration throughout system
+7. **Search & Discovery**: Public search by location, category, metadata
+8. **Live Preview**: Real-time map preview with validation
+9. **Future Enhancements**: Import/export, external system integration
+
+#### **Implementation Phases**
+
+##### Phase 1: Core Text Box System
+
+1. Create `/geography` section (public access)
+2. Build text box interface for pasting GeoJSON/KML
+3. Implement API validation and file generation
+4. Add basic map preview with Leaflet
+5. Create geography file listing page
+
+##### Phase 2: Enhanced Features
+
+1. Add geography relationships management
+2. Implement search and filtering
+3. Add role-based permissions
+4. Create geography browser for record forms
+5. Update record forms to use geography linking
+
+##### Phase 3: Advanced Features
+
+1. Add geography data analytics
+2. Implement advanced search (spatial, temporal)
+3. Add geography data validation tools
+4. Create geography data templates
+
+##### Phase 4: Future Enhancements
+
+1. Import/export functionality
+2. External system integration
+3. Advanced analytics and reporting
+4. Disaster recovery features
+
+#### **Technical Implementation**
+
+**Frontend Components:**
+
+- Text box with debounced parsing (500ms)
+- Live Leaflet map preview
+- Data summary panel
+- Validation error display
+- Geography browser for record forms
+
+**Backend API:**
+
+- Geography CRUD operations
+- File validation and generation
+- Metadata extraction
+- Relationship management
+- Search and filtering
+
+**Data Storage:**
+
+- Git versioned files in `data/geography/`
+- Database metadata with relationships
+- Standardized file naming and structure
+
+#### **Benefits**
+
+**For Municipal Users:**
+
+- Centralized geography management
+- Reusable geography resources
+- Visual management with maps
+- Data integrity through validation
+
+**For Citizens:**
+
+- Interactive maps showing regulations
+- Spatial understanding of bylaws
+- Public transparency of boundaries
+- Better navigation by location
+
+**For Developers:**
+
+- Clean separation of concerns
+- Standardized geography data format
+- API access to geography data
+- Extensible architecture
+
+#### **Migration Strategy**
+
+Since we're in development with no production data:
+
+- No migration needed
+- Clean implementation from scratch
+- Remove old geography file upload from record forms
+- Implement new geography linking system
+- Add Leaflet map widgets throughout system
+
+---
+
+## Roles API Endpoint Implementation (Legacy)
 
 ### **✅ IMPLEMENTED: Dynamic Role Management API**
 
@@ -104,7 +289,7 @@ following established patterns:
 - **Consistent Pattern**: Follows established API patterns for maintainability
 - **Production Ready**: Tested with real role configuration data
 
-## Notification System Architecture (Latest)
+## Notification System Architecture (Previous)
 
 ### **✅ IMPLEMENTED: Production-Ready Multi-Provider System**
 
@@ -320,7 +505,7 @@ notifications:
 - Isolated testing for each component
 - Configuration-driven customization
 
-### **Key Implementation Notes**
+### **Notification System Implementation Notes**
 
 - **Configuration Location**: All sensitive notification config in
   `.system-data/notifications.yml`
@@ -332,7 +517,7 @@ notifications:
 - **Hook Integration**: Leverage existing `HookSystem` for event-driven
   notifications
 
-## UI Module Development (Latest)
+## UI Module Development (Previous)
 
 ### Technology Stack Decisions
 
@@ -543,7 +728,7 @@ notifications:
 - **Multi-tenant Support**: Multiple municipality deployments
 - **Advanced Workflows**: Configurable civic approval processes
 
-## User Management Interface Implementation (Latest)
+## User Management Interface Implementation (Previous)
 
 ### **API Architecture Decisions**
 
@@ -649,7 +834,7 @@ notifications:
   - **Implementation**: `useToast()` composable for success/error messages
   - **Benefits**: Consistent feedback, doesn't interrupt user flow
 
-## Roles API Endpoint Implementation (Previous)
+## Roles API Endpoint Implementation (Legacy - Second Instance)
 
 ### **API Endpoint Design**
 
@@ -665,7 +850,7 @@ notifications:
 - **AuthService.getRoleManager()**: Exposed RoleManager instance for API access
 - **Core Export**: Made RoleManager available to other modules
 
-### **Benefits**
+### **Roles API Benefits**
 
 - **Dynamic Role Management**: UI gets roles from platform configuration
 - **Consistent API Pattern**: Follows same structure as record-types/statuses
@@ -673,7 +858,7 @@ notifications:
 - **Platform Integration**: Seamlessly integrates with existing configuration
   system
 
-### **Response Structure**
+### **Roles API Response Structure**
 
 ```json
 {
@@ -694,9 +879,84 @@ notifications:
 }
 ```
 
-### **Next Steps for UI Integration**
+### **Roles API Next Steps for UI Integration**
 
 - **Role Dropdown**: Use role data for user creation/editing forms
 - **Permission Display**: Show role permissions in user management interface
 - **Validation**: Ensure selected roles are valid for current user
 - **Dynamic UI**: Adjust interface based on available roles
+
+## Project Decisions
+
+## Configuration Architecture & Folder Structure
+
+### **Critical Decision: Configuration File Organization**
+
+**Date**: 2025-01-27  
+**Context**: Implementing configuration management system for CivicPress
+platform  
+**Decision**: Establish clear separation between public platform configuration
+and private system data
+
+#### **Folder Structure**
+
+**`data/.civic/` - Public Platform Configuration (Version Controlled)**
+
+- **Purpose**: Single source of truth for all non-sensitive platform
+  configuration
+- **Contents**:
+  - `org-config.yml` (organization branding, contact info)
+  - `hooks.yml` (event hooks, workflow automation)
+  - `notifications.yml` (email, SMS, Slack settings)
+  - `roles.yml` (user permissions, access control)
+  - `workflows.yml` (record statuses, transitions)
+  - `templates/` (content templates)
+- **Git Status**: Committed to repository
+- **Usage**: Active runtime configuration
+
+**`core/src/defaults/` - Default Template Files (Reference Only)**
+
+- **Purpose**: Template files that are NEVER used directly by the running system
+- **Usage**:
+  - Copied during `civic init` to bootstrap new projects
+  - Updated when adding new features to provide latest defaults
+  - Reset functionality when users want to restore defaults
+- **Git Status**: Committed to repository
+- **Important**: These are reference templates, not active configuration
+
+**`.system-data/` - Private System Data (Never Committed)**
+
+- **Purpose**: Sensitive system data and operational configuration
+- **Contents**:
+  - `civic.db` (database files)
+  - User sessions and auth tokens
+  - Sensitive operational configs
+  - Internal system settings
+- **Git Status**: Never committed (in .gitignore)
+- **Usage**: Local system operation only
+
+#### **Configuration Inheritance Flow**
+
+```
+civic init → Copy core/src/defaults/ → data/.civic/
+Running system → Only reads from data/.civic/
+New features → Update core/src/defaults/ → Manual migration
+Reset to default → Copy from core/src/defaults/ → data/.civic/
+```
+
+#### **Key Principles**
+
+1. **Public configuration** = version controlled, collaborative
+2. **Private system data** = local only, secure
+3. **Default templates** = reference only, not runtime
+4. **Single source of truth** = `data/.civic/` for all active configuration
+5. **Security first** = sensitive data never committed
+
+#### **Why This Architecture**
+
+- **Version Controlled**: All platform configuration is tracked in Git
+- **Collaborative**: Team members can see and modify configuration
+- **Reproducible**: Deployments will have consistent behavior
+- **Secure**: Sensitive data stays private in `.system-data/`
+- **Maintainable**: Clear separation between defaults, active config, and system
+  data

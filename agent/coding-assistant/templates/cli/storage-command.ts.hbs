@@ -1,0 +1,47 @@
+import { Command } from 'cac';
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { parse } from 'yaml';
+
+export default function (cli: Command) {
+  cli
+    .command('storage:{{command}}', '{{description}}')
+    .option('--json', 'Output in JSON format')
+    .option('--silent', 'Suppress output')
+    .option('--config <path>', 'Path to storage configuration file')
+    .action(async (options: { 
+      json?: boolean; 
+      silent?: boolean; 
+      config?: string;
+    }) => {
+      try {
+        // Implementation for {{command}}
+        const result = await processStorage{{command}}(options);
+        
+        if (!options.silent) {
+          if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+          } else {
+            console.log(format{{command}}Output(result));
+          }
+        }
+        
+        process.exit(0);
+      } catch (error) {
+        if (!options.silent) {
+          console.error(`❌ Error: ${error.message}`);
+        }
+        process.exit(1);
+      }
+    });
+}
+
+async function processStorage{{command}}(options: any) {
+  // TODO: Implement {{command}} logic
+  throw new Error('Not implemented');
+}
+
+function format{{command}}Output(result: any): string {
+  // TODO: Format output for human consumption
+  return 'Output formatted here';
+}

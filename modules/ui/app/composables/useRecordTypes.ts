@@ -24,6 +24,9 @@ export function useRecordTypes() {
   // Get icons from central registry
   const { getIcon } = useIcons();
 
+  // Get translation functions at top level
+  const { translateRecordType } = useConfigTranslations();
+
   const fetchRecordTypes = async () => {
     // Skip if already fetched globally
     if (globalFetched && globalRecordTypes.length > 0) {
@@ -39,7 +42,7 @@ export function useRecordTypes() {
 
     try {
       const response = (await useNuxtApp().$civicApi(
-        '/api/config/record-types'
+        '/api/v1/system/record-types'
       )) as {
         success: boolean;
         data: {
@@ -48,10 +51,23 @@ export function useRecordTypes() {
         };
       };
 
-      // Extract the record_types from the nested response
-      const recordTypesData = response.data?.record_types || [];
-      recordTypes.value = recordTypesData;
-      globalRecordTypes = recordTypesData;
+      // Helper to unwrap metadata objects { value, ... } to scalars
+      const unwrap = (v: any) =>
+        v && typeof v === 'object' && 'value' in v ? v.value : v;
+
+      // Extract and normalize the record_types from the nested response
+      const recordTypesData = (response.data?.record_types || []).map(
+        (rt: any) => ({
+          ...rt,
+          label: unwrap(rt?.label),
+          description: unwrap(rt?.description),
+          source_name: unwrap(rt?.source_name),
+          priority: unwrap(rt?.priority),
+        })
+      );
+
+      recordTypes.value = recordTypesData as RecordTypeMetadata[];
+      globalRecordTypes = recordTypesData as RecordTypeMetadata[];
       globalError = null;
       globalFetched = true;
       fetched.value = true;
@@ -73,7 +89,15 @@ export function useRecordTypes() {
 
   const getRecordTypeLabel = (key: string): string => {
     const recordType = getRecordTypeByKey(key);
-    return recordType?.label || key;
+
+    // Get fallback label from API/config
+    const fallback = recordType?.label
+      ? recordType.label.charAt(0).toUpperCase() +
+        recordType.label.slice(1).toLowerCase()
+      : key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+
+    // Use translation with fallback
+    return translateRecordType(key, fallback);
   };
 
   const getRecordTypeDescription = (key: string): string => {
@@ -115,13 +139,19 @@ export function useRecordTypes() {
   };
 
   const getRecordTypeOptions = () => {
-    return recordTypes.value.map((type: RecordTypeMetadata) => ({
-      value: type.key,
-      label: type.label,
-      description: type.description,
-      icon: getRecordTypeIcon(type.key),
-      color: getRecordTypeColor(type.key),
-    }));
+    return recordTypes.value.map((type: RecordTypeMetadata) => {
+      // Ensure we have a fallback label
+      const fallbackLabel =
+        type.label ||
+        type.key.charAt(0).toUpperCase() + type.key.slice(1).toLowerCase();
+      return {
+        value: type.key,
+        label: translateRecordType(type.key, fallbackLabel),
+        description: type.description,
+        icon: getRecordTypeIcon(type.key),
+        color: getRecordTypeColor(type.key),
+      };
+    });
   };
 
   const isValidRecordType = (type: string): boolean => {

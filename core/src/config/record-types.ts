@@ -53,6 +53,18 @@ export const DEFAULT_RECORD_TYPES: RecordTypesConfig = {
     source: 'core',
     priority: 5,
   },
+  geography: {
+    label: 'Geography',
+    description: 'Geographic data files (GeoJSON/KML)',
+    source: 'core',
+    priority: 6,
+  },
+  session: {
+    label: 'Session',
+    description: 'Meeting sessions and minutes',
+    source: 'core',
+    priority: 7,
+  },
 };
 
 /**

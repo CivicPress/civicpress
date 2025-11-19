@@ -1,6 +1,10 @@
 import { Router, Response } from 'express';
 import { query, validationResult } from 'express-validator';
-import { Logger } from '@civicpress/core';
+import {
+  Logger,
+  listRecordFilesSync,
+  parseRecordRelativePath,
+} from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -230,8 +234,6 @@ async function getRecordStatistics(
   filterType?: string
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
-  const archiveDir = path.join(dataDir, 'archive');
-
   if (!fs.existsSync(recordsDir)) {
     return {
       totalRecords: 0,
@@ -244,11 +246,6 @@ async function getRecordStatistics(
     };
   }
 
-  const recordTypes = fs
-    .readdirSync(recordsDir, { withFileTypes: true })
-    .filter((dirent) => dirent.isDirectory())
-    .map((dirent) => dirent.name);
-
   const stats = {
     totalRecords: 0,
     byType: {} as Record<string, any>,
@@ -259,63 +256,65 @@ async function getRecordStatistics(
     },
   };
 
-  // Process active records
-  for (const type of recordTypes) {
-    if (filterType && type !== filterType) continue;
+  const activeRecords = listRecordFilesSync(dataDir, {
+    type: filterType,
+  }).filter((relPath) => relPath.startsWith('records/'));
 
-    const typeDir = path.join(recordsDir, type);
-    const files = fs
-      .readdirSync(typeDir)
-      .filter((file) => file.endsWith('.md'))
-      .map((file) => path.join(typeDir, file));
+  for (const relPath of activeRecords) {
+    const parsed = parseRecordRelativePath(relPath);
+    if (!parsed.type) continue;
+    if (filterType && parsed.type !== filterType) continue;
 
-    stats.byType[type] = {
-      count: files.length,
-      files: files.map((file) => path.basename(file, '.md')),
-    };
+    const typeKey = parsed.type;
+    if (!stats.byType[typeKey]) {
+      stats.byType[typeKey] = { count: 0, files: [] as string[] };
+    }
 
-    stats.totalRecords += files.length;
+    const displayName = parsed.year ? `${parsed.year}/${parsed.id}` : parsed.id;
+    stats.byType[typeKey].count += 1;
+    stats.byType[typeKey].files.push(displayName);
+    stats.totalRecords += 1;
 
-    // Analyze status from file content
-    for (const file of files) {
-      try {
-        const content = fs.readFileSync(file, 'utf-8');
-        const statusMatch = content.match(/status:\s*(\w+)/i);
-        const status = statusMatch ? statusMatch[1].toLowerCase() : 'unknown';
+    const absolutePath = path.join(
+      dataDir,
+      ...relPath.replace(/^records\//, '').split('/')
+    );
 
-        stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
-      } catch (error) {
-        logger.warn('Failed to read record file', {
-          file,
-          error: (error as Error).message,
-        });
-      }
+    try {
+      const content = fs.readFileSync(absolutePath, 'utf-8');
+      const statusMatch = content.match(/status:\s*(\w+)/i);
+      const status = statusMatch ? statusMatch[1].toLowerCase() : 'unknown';
+
+      stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
+    } catch (error) {
+      logger.warn('Failed to read record file', {
+        file: absolutePath,
+        error: (error as Error).message,
+      });
     }
   }
 
   // Process archived records
-  if (fs.existsSync(archiveDir)) {
-    const archiveTypes = fs
-      .readdirSync(archiveDir, { withFileTypes: true })
-      .filter((dirent) => dirent.isDirectory())
-      .map((dirent) => dirent.name);
+  const archiveRecords = listRecordFilesSync(dataDir, {
+    includeArchive: true,
+  }).filter((relPath) => relPath.startsWith('archive/'));
 
-    for (const type of archiveTypes) {
-      if (filterType && type !== filterType) continue;
+  for (const relPath of archiveRecords) {
+    const parsed = parseRecordRelativePath(relPath);
+    if (!parsed.type) continue;
+    if (filterType && parsed.type !== filterType) continue;
 
-      const typeDir = path.join(archiveDir, type);
-      const files = fs
-        .readdirSync(typeDir)
-        .filter((file) => file.endsWith('.md'))
-        .map((file) => path.join(typeDir, file));
-
-      stats.archive.byType[type] = {
-        count: files.length,
-        files: files.map((file) => path.basename(file, '.md')),
+    if (!stats.archive.byType[parsed.type]) {
+      stats.archive.byType[parsed.type] = {
+        count: 0,
+        files: [] as string[],
       };
-
-      stats.archive.totalRecords += files.length;
     }
+
+    const displayName = parsed.year ? `${parsed.year}/${parsed.id}` : parsed.id;
+    stats.archive.byType[parsed.type].count += 1;
+    stats.archive.byType[parsed.type].files.push(displayName);
+    stats.archive.totalRecords += 1;
   }
 
   return stats;

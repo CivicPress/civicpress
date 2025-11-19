@@ -1,38 +1,154 @@
+# Event Hooks Configuration
+# This file defines event-driven hooks, their workflows, and settings
+
+_metadata:
+  name: "Event Hooks & Workflows"
+  description: "Configure event-driven hooks, associated workflows, and execution settings"
+  version: "1.0.0"
+  editable: true
+
+# Event Hooks Definition
 hooks:
   record:created:
-    enabled: true
+    enabled:
+      value: true
+      type: 'boolean'
+      description: 'Enable this hook'
+      required: true
     workflows:
-      - validate-record
-      - notify-council
-    audit: true
-    description: 'Triggered when a new record is created'
+      value:
+        - validate-record
+        - notify-council
+      type: 'array'
+      description: 'Workflows to execute when this hook triggers'
+      required: true
+    audit:
+      value: true
+      type: 'boolean'
+      description: 'Enable audit logging for this hook'
+      required: true
+    description:
+      value: 'Triggered when a new record is created'
+      type: 'string'
+      description: 'Human-readable description of when this hook triggers'
+      required: true
+
   record:updated:
-    enabled: true
+    enabled:
+      value: true
+      type: 'boolean'
+      description: 'Enable this hook'
+      required: true
     workflows:
-      - validate-record
-      - update-index
-    audit: true
-    description: 'Triggered when a record is updated'
+      value:
+        - validate-record
+        - update-index
+      type: 'array'
+      description: 'Workflows to execute when this hook triggers'
+      required: true
+    audit:
+      value: true
+      type: 'boolean'
+      description: 'Enable audit logging for this hook'
+      required: true
+    description:
+      value: 'Triggered when a record is updated'
+      type: 'string'
+      description: 'Human-readable description of when this hook triggers'
+      required: true
+
   record:committed:
-    enabled: true
+    enabled:
+      value: true
+      type: 'boolean'
+      description: 'Enable this hook'
+      required: true
     workflows:
-      - validate-record
-    audit: true
-    description: 'Triggered when a record is committed to Git'
+      value:
+        - validate-record
+      type: 'array'
+      description: 'Workflows to execute when this hook triggers'
+      required: true
+    audit:
+      value: true
+      type: 'boolean'
+      description: 'Enable audit logging for this hook'
+      required: true
+    description:
+      value: 'Triggered when a record is committed to Git'
+      type: 'string'
+      description: 'Human-readable description of when this hook triggers'
+      required: true
+
   status:changed:
-    enabled: true
+    enabled:
+      value: true
+      type: 'boolean'
+      description: 'Enable this hook'
+      required: true
     workflows:
-      - notify-stakeholders
-    audit: true
-    description: 'Triggered when a record status changes'
+      value:
+        - notify-stakeholders
+      type: 'array'
+      description: 'Workflows to execute when this hook triggers'
+      required: true
+    audit:
+      value: true
+      type: 'boolean'
+      description: 'Enable audit logging for this hook'
+      required: true
+    description:
+      value: 'Triggered when a record status changes'
+      type: 'string'
+      description: 'Human-readable description of when this hook triggers'
+      required: true
+
   validation:failed:
-    enabled: true
+    enabled:
+      value: true
+      type: 'boolean'
+      description: 'Enable this hook'
+      required: true
     workflows:
-      - notify-author
-    audit: true
-    description: 'Triggered when record validation fails'
+      value:
+        - notify-author
+      type: 'array'
+      description: 'Workflows to execute when this hook triggers'
+      required: true
+    audit:
+      value: true
+      type: 'boolean'
+      description: 'Enable audit logging for this hook'
+      required: true
+    description:
+      value: 'Triggered when record validation fails'
+      type: 'string'
+      description: 'Human-readable description of when this hook triggers'
+      required: true
+
+# Global Hook Settings
 settings:
-  maxConcurrent: 5
-  timeout: 30000
-  retryAttempts: 3
-  defaultMode: async 
+  maxConcurrent:
+    value: 5
+    type: 'number'
+    description: 'Maximum number of hooks that can run simultaneously'
+    required: true
+  timeout:
+    value: 30000
+    type: 'number'
+    description: 'Hook execution timeout in milliseconds'
+    required: true
+  retryAttempts:
+    value: 3
+    type: 'number'
+    description: 'Number of retry attempts for failed hooks'
+    required: true
+  defaultMode:
+    value: 'async'
+    type: 'array'
+    options: [
+      { value: 'sync', label: 'Synchronous' },
+      { value: 'async', label: 'Asynchronous' }
+    ]
+    description: 'Default execution mode for hooks'
+    required: true 

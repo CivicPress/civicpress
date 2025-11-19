@@ -192,6 +192,41 @@ civic create bylaw "New Bylaw" --role clerk
 civic view my-bylaw --role public
 ```
 
+## Web UI Integration
+
+The workflow configuration is also enforced in the web interface through
+**Status Transition Controls**:
+
+### Status Transition Controls
+
+When viewing a record in the web UI, users see a **Status Transitions** section
+that:
+
+- **Shows Only Valid Transitions**: Displays only status changes allowed for the
+  current user's role and record status
+- **Prevents Invalid Changes**: Users cannot attempt transitions that violate
+  workflow rules
+- **Provides Clear Feedback**: Shows helpful error messages when transitions
+  fail
+
+### Example UI Flow
+
+1. **Draft Record**: Clerk sees options to move to "Proposed" or "Archived"
+2. **Proposed Record**: Clerk sees options to move to "Reviewed" or "Archived"
+3. **Reviewed Record**: Council sees options to move to "Approved" or "Archived"
+4. **Approved Record**: Admin sees option to move to "Archived"
+5. **Archived Record**: No transitions available (final status)
+
+### Error Handling
+
+The UI provides clear, helpful error messages:
+
+- **Invalid Transitions**: "Transition from 'draft' to 'approved' is not
+  allowed. Allowed transitions: proposed, archived."
+- **Typo Suggestions**: "Did you mean 'reviewed'?" when users type "review"
+- **Final Status**: "Allowed transitions: none (final status)" for archived
+  records
+
 ## Validation
 
 CivicPress validates all actions against the workflow configuration:
@@ -200,8 +235,20 @@ CivicPress validates all actions against the workflow configuration:
 2. **Role Permissions**: Only authorized roles can perform actions
 3. **Record Types**: Only allowed record types can be created/edited
 
-If validation fails, you'll see clear error messages explaining what's not
-allowed.
+### Error Messages
+
+If validation fails, you'll see clear, helpful error messages:
+
+- **Workflow Violations**: "Transition from 'draft' to 'approved' is not
+  allowed. Allowed transitions: proposed, archived."
+- **Typo Detection**: "Did you mean 'reviewed'?" when users type "review"
+  instead of "reviewed"
+- **Status Context**: "Allowed transitions: none (final status)" for archived
+  records
+- **Role Restrictions**: "Role 'clerk' cannot transition from 'reviewed' to
+  'approved'"
+
+These messages help users understand what went wrong and how to fix it.
 
 ## Default Configuration
 

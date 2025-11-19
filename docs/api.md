@@ -21,22 +21,22 @@ standard HTTP status codes.
 These endpoints are accessible without authentication and are used by the UI for
 initial configuration:
 
-- `GET /api/config/roles` - Get available user roles
-- `GET /api/config/record-types` - Get available record types
-- `GET /api/config/record-statuses` - Get available record statuses
-- `GET /api/status` - Get system status
-- `GET /api/status/git` - Get Git repository status
-- `GET /api/status/records` - Get records statistics
-- `GET /api/records` - List records (read-only)
-- `GET /api/records/:id` - Get specific record (read-only)
-- `GET /api/search` - Search records (read-only)
+- `GET /api/v1/config/roles` - Get available user roles
+- `GET /api/v1/system/record-types` - Get available record types
+- `GET /api/v1/system/record-statuses` - Get available record statuses
+- `GET /api/v1/status` - Get system status
+- `GET /api/v1/status/git` - Get Git repository status
+- `GET /api/v1/status/records` - Get records statistics
+- `GET /api/v1/records` - List records (read-only)
+- `GET /api/v1/records/:id` - Get specific record (read-only)
+- `GET /api/v1/search` - Search records (read-only)
 
 #### **Protected Endpoints** (Authentication Required)
 
 These endpoints require valid authentication and appropriate permissions:
 
-- **User Management**: All `/api/users/*` endpoints (admin only)
-- **Record Management**: POST, PUT, DELETE on `/api/records/*`
+- **User Management**: All `/api/v1/users/*` endpoints (admin only)
+- **Record Management**: POST, PUT, DELETE on `/api/v1/records/*`
   (permission-based)
 - **Authentication**: `/auth/*` endpoints for login/logout
 - **System Operations**: Export, import, hooks, etc. (role-based)
@@ -52,7 +52,7 @@ Protected endpoints use role-based permissions:
 
 ## Endpoints
 
-### Authentication
+### Authentication Endpoints
 
 #### POST /auth/login
 
@@ -141,7 +141,7 @@ Logout and invalidate current session.
 
 ### Records
 
-#### GET /api/records
+#### GET /api/v1/records
 
 List all records (public endpoint).
 
@@ -184,7 +184,7 @@ List all records (public endpoint).
 }
 ```
 
-#### GET /api/records/:id
+#### GET /api/v1/records/:id
 
 Get a specific record by ID (public endpoint).
 
@@ -209,13 +209,15 @@ Get a specific record by ID (public endpoint).
       "path": "records/bylaw/noise-restrictions.md",
       "author": "admin",
       "created_at": "2025-07-18 20:50:14",
-      "updated_at": "2025-07-23 21:15:08"
+      "updated_at": "2025-07-23 21:15:08",
+      "commit_ref": null,
+      "commit_signature": null
     }
   }
 }
 ```
 
-#### POST /api/records
+#### POST /api/v1/records
 
 Create a new record (requires authentication).
 
@@ -253,14 +255,16 @@ Create a new record (requires authentication).
       "path": "records/policy/new-policy-document.md",
       "author": "admin",
       "created_at": "2025-07-30 21:33:40",
-      "updated_at": "2025-07-30 21:33:40"
+      "updated_at": "2025-07-30 21:33:40",
+      "commit_ref": null,
+      "commit_signature": null
     },
     "message": "Record created successfully"
   }
 }
 ```
 
-#### PUT /api/records/:id
+#### PUT /api/v1/records/:id
 
 Update an existing record (requires authentication).
 
@@ -297,14 +301,16 @@ Update an existing record (requires authentication).
       "path": "records/bylaw/noise-restrictions.md",
       "author": "admin",
       "created_at": "2025-07-18 20:50:14",
-      "updated_at": "2025-07-30 21:35:20"
+      "updated_at": "2025-07-30 21:35:20",
+      "commit_ref": null,
+      "commit_signature": null
     },
     "message": "Record updated successfully"
   }
 }
 ```
 
-#### DELETE /api/records/:id
+#### DELETE /api/v1/records/:id
 
 Delete a record (requires authentication).
 
@@ -322,9 +328,208 @@ Delete a record (requires authentication).
 }
 ```
 
+### Validation
+
+CivicPress provides comprehensive validation endpoints for records using JSON
+Schema validation. All validation endpoints require authentication.
+
+#### POST /api/v1/validation/record
+
+Validate a single record by ID.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "recordId": "record-1234567890",
+  "type": "bylaw"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "recordId": "record-1234567890",
+    "isValid": true,
+    "issues": [],
+    "metadata": {
+      "title": "Noise Restrictions Bylaw",
+      "type": "bylaw",
+      "status": "published",
+      "author": "mctremblay",
+      "created": "2025-01-15T10:00:00Z",
+      "updated": "2025-02-01T14:30:00Z",
+      "schemaValid": true,
+      "schemaErrors": 0,
+      "schemaWarnings": 0
+    }
+  }
+}
+```
+
+**Error Response (Invalid Record):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "recordId": "record-1234567890",
+    "isValid": false,
+    "issues": [
+      {
+        "severity": "error",
+        "code": "MISSING_REQUIRED_FIELD",
+        "message": "Missing required field: author",
+        "field": "author",
+        "suggestion": "Add the \"author\" field to the frontmatter"
+      },
+      {
+        "severity": "warning",
+        "code": "INVALID_FORMAT",
+        "message": "Field \"created\" must be a valid date-time",
+        "field": "created",
+        "suggestion": "Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ"
+      }
+    ],
+    "metadata": {
+      "schemaValid": false,
+      "schemaErrors": 1,
+      "schemaWarnings": 1
+    }
+  }
+}
+```
+
+#### POST /api/v1/validation/bulk
+
+Validate multiple records at once.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "recordIds": ["record-1", "record-2", "record-3"],
+  "types": ["bylaw", "policy", "bylaw"],
+  "includeContent": false
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "recordId": "record-1",
+        "isValid": true,
+        "issues": []
+      },
+      {
+        "recordId": "record-2",
+        "isValid": false,
+        "issues": [
+          {
+            "severity": "error",
+            "code": "MISSING_REQUIRED_FIELD",
+            "message": "Missing required field: title",
+            "field": "title"
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "totalRecords": 3,
+      "validCount": 2,
+      "invalidCount": 1,
+      "bySeverity": {
+        "error": 1,
+        "warning": 0,
+        "info": 0
+      }
+    }
+  }
+}
+```
+
+#### GET /api/v1/validation/record/:recordId
+
+Get validation results for a specific record.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+
+- `type` - Record type (optional, helps locate the record faster)
+
+**Response:** Same format as `POST /api/v1/validation/record`
+
+#### GET /api/v1/validation/status
+
+Get validation status across all records.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+
+- `type` - Filter by record type (optional)
+- `severity` - Filter by severity: `error`, `warning`, or `info` (optional)
+- `limit` - Maximum number of issues to return (optional, default: 50, max: 100)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "issues": [
+      {
+        "severity": "error",
+        "code": "MISSING_REQUIRED_FIELD",
+        "message": "Missing required field: author",
+        "field": "author",
+        "recordId": "record-123",
+        "recordType": "bylaw",
+        "file": "records/bylaw/record-123.md"
+      }
+    ],
+    "summary": {
+      "totalIssues": 5,
+      "bySeverity": {
+        "error": 3,
+        "warning": 2,
+        "info": 0
+      },
+      "byType": {
+        "bylaw": 2,
+        "policy": 3
+      }
+    }
+  }
+}
+```
+
+**Validation Features:**
+
+- **Schema Validation**: Validates frontmatter against JSON Schema (base +
+  type + module + plugin schemas)
+- **Business Rule Validation**: Validates relationships, compliance fields, and
+  business logic
+- **Clear Error Messages**: Field-level errors with suggestions for fixing
+- **Metadata Extraction**: Returns parsed record metadata if validation succeeds
+- **Bulk Operations**: Validate multiple records efficiently
+
 ### Search
 
-#### GET /api/search
+#### GET /api/v1/search
 
 Search records with full-text search capabilities.
 
@@ -365,7 +570,7 @@ Search records with full-text search capabilities.
 
 ### User Management
 
-#### GET /api/users
+#### GET /api/v1/users
 
 List all users (admin only).
 
@@ -401,7 +606,7 @@ List all users (admin only).
 }
 ```
 
-#### GET /api/users/:id
+#### GET /api/v1/users/:id
 
 Get a specific user by ID (admin only).
 
@@ -427,7 +632,7 @@ Get a specific user by ID (admin only).
 }
 ```
 
-#### POST /api/users
+#### POST /api/v1/users
 
 Create a new user (admin only).
 
@@ -466,7 +671,7 @@ Create a new user (admin only).
 }
 ```
 
-#### PUT /api/users/:id
+#### PUT /api/v1/users/:id
 
 Update an existing user (admin only).
 
@@ -505,7 +710,7 @@ Update an existing user (admin only).
 }
 ```
 
-#### DELETE /api/users/:id
+#### DELETE /api/v1/users/:id
 
 Delete a user (admin only).
 
@@ -523,9 +728,189 @@ Delete a user (admin only).
 }
 ```
 
+### User Security Management
+
+#### POST /api/v1/users/:id/change-password
+
+Change user password (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "currentPassword": "string (required)",
+  "newPassword": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Password changed successfully"
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Invalid password format or incorrect current password
+- `403 Forbidden`: User authenticated via external provider (GitHub, Google,
+  etc.)
+- `401 Unauthorized`: Missing or invalid authentication
+
+#### POST /api/v1/users/:id/set-password
+
+Set user password (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "password": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Password set successfully"
+}
+```
+
+**Error Responses:**
+
+- `403 Forbidden`: User authenticated via external provider or insufficient
+  admin privileges
+- `404 Not Found`: User not found
+
+#### POST /api/v1/users/:id/request-email-change
+
+Request email address change (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "email": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Email change requested successfully",
+  "requiresVerification": true
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Invalid email format or email already in use
+- `403 Forbidden`: Insufficient permissions (can only change own email unless
+  admin)
+
+#### POST /api/v1/users/verify-email-change
+
+Complete email verification (no authentication required).
+
+**Request Body:**
+
+```json
+{
+  "token": "string (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Email address verified successfully"
+}
+```
+
+**Error Responses:**
+
+- `400 Bad Request`: Invalid or expired verification token
+
+#### POST /api/v1/users/:id/cancel-email-change
+
+Cancel pending email change (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Email change cancelled successfully"
+}
+```
+
+#### GET /api/v1/users/:id/security-info
+
+Get user security information (self-service or admin).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userId": 1,
+    "username": "user123",
+    "email": "user@example.com",
+    "authProvider": "password",
+    "emailVerified": true,
+    "canSetPassword": true,
+    "isExternalAuth": false,
+    "pendingEmailChange": {
+      "email": null,
+      "expiresAt": null
+    }
+  }
+}
+```
+
+**Response for External Auth User:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userId": 2,
+    "username": "githubuser",
+    "email": "user@github.com",
+    "authProvider": "github",
+    "emailVerified": true,
+    "canSetPassword": false,
+    "isExternalAuth": true,
+    "pendingEmailChange": {
+      "email": null,
+      "expiresAt": null
+    }
+  }
+}
+```
+
 ### Configuration
 
-#### GET /api/config/roles
+#### GET /api/v1/config/roles
 
 Get available user roles (public endpoint).
 
@@ -573,7 +958,7 @@ Get available user roles (public endpoint).
 }
 ```
 
-#### GET /api/config/record-types
+#### GET /api/v1/system/record-types
 
 Get available record types (public endpoint).
 
@@ -610,7 +995,7 @@ Get available record types (public endpoint).
 }
 ```
 
-#### GET /api/config/record-statuses
+#### GET /api/v1/system/record-statuses
 
 Get available record statuses (public endpoint).
 
@@ -656,7 +1041,7 @@ Get available record statuses (public endpoint).
 
 ### Status
 
-#### GET /api/status
+#### GET /api/v1/status
 
 Get system status (public endpoint).
 
@@ -679,7 +1064,7 @@ Get system status (public endpoint).
 }
 ```
 
-#### GET /api/status/git
+#### GET /api/v1/status/git
 
 Get Git repository status (public endpoint).
 
@@ -703,7 +1088,7 @@ Get Git repository status (public endpoint).
 }
 ```
 
-#### GET /api/status/records
+#### GET /api/v1/status/records
 
 Get records statistics (public endpoint).
 
@@ -771,6 +1156,339 @@ The API version is included in the response headers:
 ```
 X-API-Version: 1.0.0
 ```
+
+## Audit Trail
+
+### Audit Trail Overview
+
+The platform records key actions across API and CLI into a JSONL audit log
+stored at `.system-data/activity.log` under the active `dataDir`.
+
+- Sources: `api`, `cli`, `ui`, `system`
+- Typical actions logged: config updates/resets/validations, user
+  create/update/delete, record create/update/delete/status changes
+- Each log line is a JSON object with stable fields for downstream processing
+
+### Log Entry Format
+
+```
+{
+  "id": "uuid",
+  "timestamp": "2025-01-01T12:34:56.789Z",
+  "source": "api|cli|ui|system",
+  "actor": { "id": 1, "username": "admin", "role": "admin", "ip": "127.0.0.1" },
+  "action": "config_put|config_reset|record_create|record_update|record_delete|status_change|user_create|user_update|user_delete|...",
+  "target": { "type": "config|record|user|...", "id": "...", "name": "...", "path": "..." },
+  "outcome": "success|failure|warning",
+  "message": "optional short message",
+  "metadata": { "any": "additional context" }
+}
+```
+
+### Geography Endpoints
+
+#### GET /api/v1/geography
+
+List all geography files (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": [
+      {
+        "id": "geo-001",
+        "name": "Residential Zones",
+        "type": "geojson",
+        "category": "zone",
+        "description": "Residential zoning boundaries for the city",
+        "srid": 4326,
+        "bounds": {
+          "minLon": -73.65,
+          "minLat": 45.45,
+          "maxLon": -73.52,
+          "maxLat": 45.55
+        },
+        "metadata": {
+          "source": "City Planning Department",
+          "created": "2025-01-27T10:00:00.000Z",
+          "updated": "2025-01-27T10:00:00.000Z",
+          "version": "1.0",
+          "accuracy": "high"
+        },
+        "file_path": "data/geography/zones/residential-zones-1763155301879.md",
+        "created_at": "2025-01-27T10:00:00.000Z",
+        "updated_at": "2025-01-27T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+#### POST /api/v1/geography
+
+Create a new geography file (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "name": "string (required)",
+  "type": "geojson|kml|gpx|shapefile (required)",
+  "category": "zone|boundary|district|facility|route (required)",
+  "description": "string (required)",
+  "content": "string (required)",
+  "srid": "number (optional, default: 4326)",
+  "metadata": {
+    "source": "string (optional)",
+    "version": "string (optional)",
+    "accuracy": "string (optional)"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": {
+      "id": "geo-002",
+      "name": "Commercial Zones",
+      "type": "geojson",
+      "category": "zone",
+      "description": "Commercial zoning boundaries",
+      "srid": 4326,
+      "bounds": {
+        "minLon": -73.60,
+        "minLat": 45.40,
+        "maxLon": -73.50,
+        "maxLat": 45.60
+      },
+      "metadata": {
+        "source": "City Planning Department",
+        "created": "2025-01-27T11:00:00.000Z",
+        "updated": "2025-01-27T11:00:00.000Z",
+        "version": "1.0",
+        "accuracy": "high"
+      },
+      "file_path": "data/geography/zones/commercial-zones-1763155301880.md",
+      "created_at": "2025-01-27T11:00:00.000Z",
+      "updated_at": "2025-01-27T11:00:00.000Z"
+    }
+  }
+}
+```
+
+#### GET /api/v1/geography/:id
+
+Get a specific geography file (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": {
+      "id": "geo-001",
+      "name": "Residential Zones",
+      "type": "geojson",
+      "category": "zone",
+      "description": "Residential zoning boundaries for the city",
+      "srid": 4326,
+      "bounds": {
+        "minLon": -73.65,
+        "minLat": 45.45,
+        "maxLon": -73.52,
+        "maxLat": 45.55
+      },
+      "metadata": {
+        "source": "City Planning Department",
+        "created": "2025-01-27T10:00:00.000Z",
+        "updated": "2025-01-27T10:00:00.000Z",
+        "version": "1.0",
+        "accuracy": "high"
+      },
+      "file_path": "data/geography/geojson/zones/residential-zones.geojson",
+      "content": "{\"type\":\"FeatureCollection\",\"features\":[...]}",
+      "created_at": "2025-01-27T10:00:00.000Z",
+      "updated_at": "2025-01-27T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### PUT /api/v1/geography/:id
+
+Update a geography file (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "name": "string (optional)",
+  "category": "zone|boundary|district|facility|route (optional)",
+  "description": "string (optional)",
+  "content": "string (optional)",
+  "metadata": {
+    "source": "string (optional)",
+    "version": "string (optional)",
+    "accuracy": "string (optional)"
+  }
+}
+```
+
+#### DELETE /api/v1/geography/:id
+
+Delete a geography file (admin only).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Geography file deleted successfully"
+}
+```
+
+#### POST /api/v1/geography/validate
+
+Validate geography content without saving (public endpoint).
+
+**Request Body:**
+
+```json
+{
+  "content": "string (required)",
+  "type": "geojson|kml|gpx|shapefile (required)"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "metadata": {
+        "featureCount": 3,
+        "bounds": {
+          "minLon": -73.65,
+          "minLat": 45.45,
+          "maxLon": -73.52,
+          "maxLat": 45.55
+        },
+        "srid": 4326,
+        "geometryTypes": ["Polygon"]
+      }
+    }
+  }
+}
+```
+
+#### GET /api/v1/geography/search
+
+Search geography files (public endpoint).
+
+**Query Parameters:**
+
+- `q` - Search query (optional)
+- `category` - Filter by category (optional)
+- `type` - Filter by file type (optional)
+- `limit` - Number of results (optional, default: 20)
+- `offset` - Offset for pagination (optional, default: 0)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "geography": [
+      {
+        "id": "geo-001",
+        "name": "Residential Zones",
+        "type": "geojson",
+        "category": "zone",
+        "description": "Residential zoning boundaries for the city",
+        "srid": 4326,
+        "bounds": {
+          "minLon": -73.65,
+          "minLat": 45.45,
+          "maxLon": -73.52,
+          "maxLat": 45.55
+        },
+        "metadata": {
+          "source": "City Planning Department",
+          "created": "2025-01-27T10:00:00.000Z",
+          "updated": "2025-01-27T10:00:00.000Z",
+          "version": "1.0",
+          "accuracy": "high"
+        },
+        "file_path": "data/geography/zones/residential-zones-1763155301879.md",
+        "created_at": "2025-01-27T10:00:00.000Z",
+        "updated_at": "2025-01-27T10:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "total": 1,
+      "limit": 20,
+      "offset": 0
+    }
+  }
+}
+```
+
+### Audit Endpoints
+
+#### GET /api/v1/audit
+
+List recent audit entries. Admin-only.
+
+Headers: `Authorization: Bearer <token>`
+
+Query Parameters:
+
+- `limit` (optional, default: 100, max: 1000)
+- `offset` (optional, default: 0)
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "entries": [ { "id": "...", "timestamp": "...", "source": "api", "action": "config_put", "outcome": "success" } ],
+    "pagination": { "total": 123, "limit": 100, "offset": 0 }
+  }
+}
+```
+
+Permissions:
+
+- Requires `system:admin` (enforced by route middleware)
+
+### What Gets Logged (API)
+
+- Configuration routes: raw PUT/save, reset, validate
+- Users routes: create, update, delete
+- Records routes: create, update, delete, status changes
+
+Failures are also logged with `outcome: "failure"` and an error `message`.
 
 ## SDKs and Libraries
 

@@ -4,6 +4,7 @@ import {
   createDatabaseAdapter,
 } from './database-adapter.js';
 import { Logger } from '../utils/logger.js';
+import * as process from 'process';
 
 export class DatabaseService {
   private adapter: DatabaseAdapter;
@@ -41,6 +42,15 @@ export class DatabaseService {
     }
   }
 
+  // Direct database access methods
+  async query(sql: string, params: any[] = []): Promise<any[]> {
+    return await this.adapter.query(sql, params);
+  }
+
+  async execute(sql: string, params: any[] = []): Promise<any> {
+    return await this.adapter.execute(sql, params);
+  }
+
   // User management
   async createUser(userData: {
     username: string;
@@ -48,15 +58,19 @@ export class DatabaseService {
     email?: string;
     name?: string;
     avatar_url?: string;
+    auth_provider?: string;
+    email_verified?: boolean;
   }): Promise<number> {
     await this.adapter.execute(
-      'INSERT INTO users (username, role, email, name, avatar_url) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO users (username, role, email, name, avatar_url, auth_provider, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [
         userData.username,
         userData.role,
         userData.email,
         userData.name,
         userData.avatar_url,
+        userData.auth_provider || 'password',
+        userData.email_verified || false,
       ]
     );
 
@@ -80,6 +94,14 @@ export class DatabaseService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  async getUserByEmail(email: string): Promise<any | null> {
+    const rows = await this.adapter.query(
+      'SELECT * FROM users WHERE email = ?',
+      [email]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
   async getUserWithPassword(username: string): Promise<any | null> {
     const rows = await this.adapter.query(
       'SELECT * FROM users WHERE username = ?',
@@ -95,9 +117,15 @@ export class DatabaseService {
     name?: string;
     avatar_url?: string;
     passwordHash?: string;
-  }): Promise<number> {
-    await this.adapter.execute(
-      'INSERT INTO users (username, role, email, name, avatar_url, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
+    auth_provider?: string;
+    email_verified?: boolean;
+    pending_email?: string;
+    pending_email_token?: string;
+    pending_email_expires?: Date;
+  }): Promise<any> {
+    // Use a transaction to ensure atomicity
+    const result = await this.adapter.execute(
+      'INSERT INTO users (username, role, email, name, avatar_url, password_hash, auth_provider, email_verified, pending_email, pending_email_token, pending_email_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         userData.username,
         userData.role,
@@ -105,12 +133,26 @@ export class DatabaseService {
         userData.name,
         userData.avatar_url,
         userData.passwordHash,
+        userData.auth_provider || 'password',
+        userData.email_verified || false,
+        userData.pending_email || null,
+        userData.pending_email_token || null,
+        userData.pending_email_expires || null,
       ]
     );
 
-    // Get the inserted ID
-    const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
-    return rows[0].id;
+    // Get the inserted ID using last_insert_rowid() - this should work in SQLite
+    const idRows = await this.adapter.query('SELECT last_insert_rowid() as id');
+    const userId = idRows[0].id;
+
+    // Verify the user exists by querying it
+    const userRows = await this.adapter.query(
+      'SELECT id, username FROM users WHERE id = ?',
+      [userId]
+    );
+
+    // Return just the user ID
+    return userId;
   }
 
   async updateUser(
@@ -121,6 +163,11 @@ export class DatabaseService {
       role?: string;
       passwordHash?: string;
       avatar_url?: string;
+      auth_provider?: string;
+      email_verified?: boolean;
+      pending_email?: string;
+      pending_email_token?: string;
+      pending_email_expires?: string;
     }
   ): Promise<boolean> {
     const updates: string[] = [];
@@ -145,6 +192,26 @@ export class DatabaseService {
     if (userData.avatar_url !== undefined) {
       updates.push('avatar_url = ?');
       values.push(userData.avatar_url);
+    }
+    if (userData.auth_provider !== undefined) {
+      updates.push('auth_provider = ?');
+      values.push(userData.auth_provider);
+    }
+    if (userData.email_verified !== undefined) {
+      updates.push('email_verified = ?');
+      values.push(userData.email_verified);
+    }
+    if (userData.pending_email !== undefined) {
+      updates.push('pending_email = ?');
+      values.push(userData.pending_email);
+    }
+    if (userData.pending_email_token !== undefined) {
+      updates.push('pending_email_token = ?');
+      values.push(userData.pending_email_token);
+    }
+    if (userData.pending_email_expires !== undefined) {
+      updates.push('pending_email_expires = ?');
+      values.push(userData.pending_email_expires);
     }
 
     if (updates.length === 0) {
@@ -337,11 +404,15 @@ export class DatabaseService {
     status?: string;
     content?: string;
     metadata?: string;
+    geography?: string;
+    attached_files?: string;
+    linked_records?: string;
+    linked_geography_files?: string;
     path?: string;
     author: string;
   }): Promise<void> {
     await this.adapter.execute(
-      'INSERT INTO records (id, title, type, status, content, metadata, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO records (id, title, type, status, content, metadata, geography, attached_files, linked_records, linked_geography_files, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         recordData.id,
         recordData.title,
@@ -349,6 +420,10 @@ export class DatabaseService {
         recordData.status || 'draft',
         recordData.content,
         recordData.metadata,
+        recordData.geography,
+        recordData.attached_files,
+        recordData.linked_records,
+        recordData.linked_geography_files,
         recordData.path,
         recordData.author,
       ]
@@ -367,7 +442,7 @@ export class DatabaseService {
 
   async getRecord(id: string): Promise<any | null> {
     const rows = await this.adapter.query(
-      'SELECT * FROM records WHERE id = ?',
+      'SELECT *, attached_files FROM records WHERE id = ?',
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -380,6 +455,11 @@ export class DatabaseService {
       status?: string;
       content?: string;
       metadata?: string;
+      geography?: string;
+      attached_files?: string;
+      linked_records?: string;
+      linked_geography_files?: string;
+      path?: string;
     }
   ): Promise<void> {
     const fields = [];
@@ -400,6 +480,26 @@ export class DatabaseService {
     if (updates.metadata !== undefined) {
       fields.push('metadata = ?');
       values.push(updates.metadata);
+    }
+    if (updates.path !== undefined) {
+      fields.push('path = ?');
+      values.push(updates.path);
+    }
+    if (updates.geography !== undefined) {
+      fields.push('geography = ?');
+      values.push(updates.geography);
+    }
+    if (updates.attached_files !== undefined) {
+      fields.push('attached_files = ?');
+      values.push(updates.attached_files);
+    }
+    if (updates.linked_records !== undefined) {
+      fields.push('linked_records = ?');
+      values.push(updates.linked_records);
+    }
+    if (updates.linked_geography_files !== undefined) {
+      fields.push('linked_geography_files = ?');
+      values.push(updates.linked_geography_files);
     }
 
     fields.push('updated_at = CURRENT_TIMESTAMP');
@@ -525,6 +625,152 @@ export class DatabaseService {
   }
 
   // Health check
+  // Storage file management
+  async createStorageFile(file: {
+    id: string;
+    original_name: string;
+    stored_filename: string;
+    folder: string;
+    relative_path: string;
+    provider_path: string;
+    size: number;
+    mime_type: string;
+    description?: string;
+    uploaded_by?: string;
+  }): Promise<void> {
+    await this.adapter.execute(
+      `INSERT INTO storage_files 
+       (id, original_name, stored_filename, folder, relative_path, provider_path, 
+        size, mime_type, description, uploaded_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      [
+        file.id,
+        file.original_name,
+        file.stored_filename,
+        file.folder,
+        file.relative_path,
+        file.provider_path,
+        file.size,
+        file.mime_type,
+        file.description || null,
+        file.uploaded_by || null,
+      ]
+    );
+  }
+
+  /**
+   * Upsert (insert or replace) a storage file record.
+   * Used during backup restore to handle existing records gracefully.
+   */
+  async upsertStorageFile(file: {
+    id: string;
+    original_name: string;
+    stored_filename: string;
+    folder: string;
+    relative_path: string;
+    provider_path: string;
+    size: number;
+    mime_type: string;
+    description?: string;
+    uploaded_by?: string;
+    created_at?: string;
+    updated_at?: string;
+  }): Promise<void> {
+    await this.adapter.execute(
+      `INSERT OR REPLACE INTO storage_files 
+       (id, original_name, stored_filename, folder, relative_path, provider_path, 
+        size, mime_type, description, uploaded_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))`,
+      [
+        file.id,
+        file.original_name,
+        file.stored_filename,
+        file.folder,
+        file.relative_path,
+        file.provider_path,
+        file.size,
+        file.mime_type,
+        file.description || null,
+        file.uploaded_by || null,
+        file.created_at || null,
+      ]
+    );
+  }
+
+  async getStorageFileById(id: string): Promise<any | null> {
+    const results = await this.adapter.query(
+      'SELECT * FROM storage_files WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? results[0] : null;
+  }
+
+  async getStorageFilesByFolder(folder: string): Promise<any[]> {
+    return await this.adapter.query(
+      'SELECT * FROM storage_files WHERE folder = ? ORDER BY created_at DESC',
+      [folder]
+    );
+  }
+
+  async getAllStorageFiles(): Promise<any[]> {
+    return await this.adapter.query(
+      'SELECT * FROM storage_files ORDER BY created_at DESC'
+    );
+  }
+
+  async deleteStorageFile(id: string): Promise<boolean> {
+    try {
+      await this.adapter.execute('DELETE FROM storage_files WHERE id = ?', [
+        id,
+      ]);
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to delete storage file:', error);
+      return false;
+    }
+  }
+
+  async updateStorageFile(
+    id: string,
+    updates: {
+      description?: string;
+      updated_by?: string;
+    }
+  ): Promise<boolean> {
+    try {
+      const setParts: string[] = [];
+      const params: any[] = [];
+
+      if (updates.description !== undefined) {
+        setParts.push('description = ?');
+        params.push(updates.description);
+      }
+
+      setParts.push("updated_at = datetime('now')");
+      params.push(id);
+
+      if (setParts.length > 1) {
+        // More than just updated_at
+        await this.adapter.execute(
+          `UPDATE storage_files SET ${setParts.join(', ')} WHERE id = ?`,
+          params
+        );
+      }
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to update storage file:', error);
+      return false;
+    }
+  }
+
+  async findStorageFileByPath(relativePath: string): Promise<any | null> {
+    const results = await this.adapter.query(
+      'SELECT * FROM storage_files WHERE relative_path = ?',
+      [relativePath]
+    );
+    return results.length > 0 ? results[0] : null;
+  }
+
   async healthCheck(): Promise<boolean> {
     try {
       await this.adapter.query('SELECT 1');

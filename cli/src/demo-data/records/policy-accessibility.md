@@ -1,15 +1,34 @@
 ---
+# ============================================
+# CORE IDENTIFICATION (Required)
+# ============================================
+id: "record-1704729600000"
 title: "Politique d'accessibilité universelle"
 type: policy
-status: adopted
-module: legal-register
-tags: ['accessibility', 'disability', 'universal', 'accessibilité', 'handicap']
+status: published
+
+# ============================================
+# AUTHORSHIP & ATTRIBUTION (Required)
+# ============================================
+author: "ibouchard"
 authors:
   - name: 'Isabelle Bouchard'
+    username: 'ibouchard'
     role: 'council'
-created: '2025-01-08'
-updated: '2025-01-25'
+
+# ============================================
+# TIMESTAMPS (Required)
+# ============================================
+created: "2025-01-08T11:00:00Z"
+updated: "2025-01-25T15:20:00Z"
+
+# ============================================
+# CLASSIFICATION (Optional but recommended)
+# ============================================
+tags: ['accessibility', 'disability', 'universal', 'accessibilité', 'handicap']
+module: legal-register
 slug: 'accessibility-policy'
+version: "1.0.0"
 ---
 
 # Politique d'accessibilité universelle

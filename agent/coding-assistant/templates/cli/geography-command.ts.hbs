@@ -1,0 +1,43 @@
+import { Command } from 'cac';
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { parse } from 'yaml';
+import { validateGeography, normalizeGeography } from '@civicpress/core';
+
+export default function (cli: Command) {
+  cli
+    .command('geography:{{command}}', '{{description}}')
+    .option('--json', 'Output in JSON format')
+    .option('--silent', 'Suppress output')
+    .action(async (options: { json?: boolean; silent?: boolean }) => {
+      try {
+        // Implementation for {{command}}
+        const result = await processGeography{{command}}();
+        
+        if (!options.silent) {
+          if (options.json) {
+            console.log(JSON.stringify(result, null, 2));
+          } else {
+            console.log(format{{command}}Output(result));
+          }
+        }
+        
+        process.exit(0);
+      } catch (error) {
+        if (!options.silent) {
+          console.error(`❌ Error: ${error.message}`);
+        }
+        process.exit(1);
+      }
+    });
+}
+
+async function processGeography{{command}}() {
+  // TODO: Implement {{command}} logic
+  throw new Error('Not implemented');
+}
+
+function format{{command}}Output(result: any): string {
+  // TODO: Format output for human consumption
+  return 'Output formatted here';
+}

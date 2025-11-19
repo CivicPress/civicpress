@@ -1,17 +1,28 @@
 import { CAC } from 'cac';
 import { readFile, readdir } from 'fs/promises';
-import { join, extname } from 'path';
+import { join, extname, dirname, resolve } from 'path';
 import { loadConfig } from '@civicpress/core';
 import chalk from 'chalk';
 import * as fs from 'fs';
-import matter = require('gray-matter');
 import { glob } from 'glob';
 import * as yaml from 'yaml';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
 } from '../utils/global-options.js';
-import { Logger, TemplateEngine } from '@civicpress/core';
+import {
+  Logger,
+  TemplateEngine,
+  RecordValidator,
+  RecordParser,
+  RecordSchemaValidator,
+  parseRecordRelativePath,
+} from '@civicpress/core';
+import matter from 'gray-matter';
+import {
+  getAvailableRecords,
+  resolveRecordReference,
+} from '../utils/record-locator.js';
 
 interface ValidationResult {
   record: string;
@@ -149,10 +160,48 @@ async function validateSingleRecord(
   shouldOutputJson?: boolean
 ) {
   const logger = new Logger();
-  const fullPath = recordPath.endsWith('.md') ? recordPath : `${recordPath}.md`;
+  const resolvedRecord = resolveRecordReference(dataDir, recordPath);
+
+  if (!resolvedRecord) {
+    const availableRecords = getAvailableRecords(dataDir);
+
+    if (shouldOutputJson) {
+      console.log(
+        JSON.stringify(
+          {
+            error: `Record "${recordPath}" not found`,
+            availableRecords,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      logger.error(`❌ Record "${recordPath}" not found.`);
+      logger.info('Available records:');
+      for (const [type, files] of Object.entries(availableRecords)) {
+        if (files.length > 0) {
+          logger.info(`  ${type}:`);
+          for (const file of files) {
+            logger.debug(`    ${file}`);
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  const displayPath = resolvedRecord.relativePath.replace(/\\/g, '/');
+  const normalizedPath = displayPath.replace(/^records\//, '');
+  const fullPath = join(dataDir, ...displayPath.split('/').filter(Boolean));
 
   try {
-    const result = await validateRecord(dataDir, fullPath, options);
+    const result = await validateRecord(
+      dataDir,
+      normalizedPath,
+      options,
+      fullPath
+    );
     displayValidationResults([result], options, shouldOutputJson);
   } catch (error) {
     logger.error(`❌ Error validating ${recordPath}:`, error);
@@ -162,14 +211,20 @@ async function validateSingleRecord(
 async function validateRecord(
   dataDir: string,
   recordPath: string,
-  options: any
+  options: any,
+  absoluteOverride?: string
 ): Promise<ValidationResult> {
   const logger = new Logger();
-  const fullPath = join(dataDir, 'records', recordPath);
+  const normalizedPathRaw = recordPath.startsWith('records/')
+    ? recordPath.replace(/^records\//, '')
+    : recordPath;
+  const normalizedPath = normalizedPathRaw.replace(/\\/g, '/');
+  const displayPath = ['records', normalizedPath].join('/');
+  const fullPath = absoluteOverride ?? join(dataDir, 'records', normalizedPath);
 
   if (!fs.existsSync(fullPath)) {
     return {
-      record: recordPath,
+      record: displayPath,
       isValid: false,
       errors: [
         {
@@ -187,15 +242,38 @@ async function validateRecord(
   const templateEngine = new TemplateEngine(dataDir);
 
   const content = await readFile(fullPath, 'utf-8');
-  const { data: metadata, content: markdownContent } = matter(content);
 
-  const recordType = metadata.type || recordPath.split('/')[0];
+  // Use RecordParser for consistent parsing
+  let record;
+  try {
+    const parserPath = ['records', normalizedPath].join('/');
+    record = RecordParser.parseFromMarkdown(content, parserPath);
+  } catch (error) {
+    return {
+      record: displayPath,
+      isValid: false,
+      errors: [
+        {
+          field: 'parse',
+          message: `Failed to parse record: ${error instanceof Error ? error.message : String(error)}`,
+          severity: 'error',
+        },
+      ],
+      warnings: [],
+      suggestions: [],
+    };
+  }
+
+  const parsedPathInfo = parseRecordRelativePath(
+    ['records', normalizedPath].join('/')
+  );
+  const recordType = record.type || parsedPathInfo.type;
 
   // Try to load the template using the template engine
   let template: any | null = null;
   try {
     // First try to load the specific template if specified in metadata
-    const templateName = metadata.template || 'default';
+    const templateName = record.metadata?.template || 'default';
     template = await templateEngine.loadTemplate(recordType, templateName);
   } catch (error) {
     // Fall back to default template
@@ -210,38 +288,108 @@ async function validateRecord(
   const warnings: ValidationWarning[] = [];
   const suggestions: string[] = [];
 
-  // Use template engine's advanced validation if template is available
-  if (template) {
-    const validationResult = templateEngine.validateRecord(fullPath, template);
-
-    // Convert template engine validation results to CLI format
-    for (const error of validationResult.errors) {
-      errors.push({
-        field: 'validation',
-        message: String(error),
-        severity: 'error',
-      });
+  // STEP 1: Schema validation (explicit for CLI output)
+  const { data: frontmatter } = matter(content);
+  const schemaValidation = RecordSchemaValidator.validate(
+    frontmatter,
+    record.type,
+    {
+      includeModuleExtensions: true,
+      includeTypeExtensions: true,
+      strict: false,
     }
+  );
 
-    for (const warning of validationResult.warnings) {
-      warnings.push({
-        field: 'validation',
-        message: String(warning),
-      });
+  // Add schema validation results
+  for (const error of schemaValidation.errors) {
+    errors.push({
+      field: error.field,
+      message: `[Schema] ${error.message}`,
+      severity: 'error',
+    });
+    if (error.suggestion) {
+      suggestions.push(`${error.field}: ${error.suggestion}`);
     }
-  } else {
-    // Fall back to basic validation
-    validateBasicMetadata(metadata, errors, warnings);
   }
 
-  // Check for common issues
+  for (const warning of schemaValidation.warnings) {
+    warnings.push({
+      field: warning.field,
+      message: `[Schema] ${warning.message}`,
+    });
+    if (warning.suggestion) {
+      suggestions.push(`${warning.field}: ${warning.suggestion}`);
+    }
+  }
+
+  // STEP 2: Use RecordValidator for comprehensive validation (includes schema + business rules)
+  const validationResult = RecordValidator.validateRecord(record, {
+    strict: options.strict || false,
+    checkFormat: true,
+    checkContent: true,
+  });
+
+  // Convert RecordValidator results to CLI format
+  for (const error of validationResult.errors) {
+    errors.push({
+      field: error.field,
+      message: error.message,
+      severity: error.severity === 'error' ? 'error' : 'warning',
+    });
+    if (error.suggestion) {
+      suggestions.push(`${error.field}: ${error.suggestion}`);
+    }
+  }
+
+  for (const warning of validationResult.warnings) {
+    warnings.push({
+      field: warning.field,
+      message: warning.message,
+    });
+    if (warning.suggestion) {
+      suggestions.push(`${warning.field}: ${warning.suggestion}`);
+    }
+  }
+
+  // Use template engine's additional validation if template is available
+  if (template) {
+    try {
+      const templateValidationResult = templateEngine.validateRecord(
+        fullPath,
+        template
+      );
+
+      // Add template-specific validation results
+      for (const error of templateValidationResult.errors) {
+        errors.push({
+          field: 'template',
+          message: String(error),
+          severity: 'error',
+        });
+      }
+
+      for (const warning of templateValidationResult.warnings) {
+        warnings.push({
+          field: 'template',
+          message: String(warning),
+        });
+      }
+    } catch (templateError) {
+      // Template validation failed, skip it
+    }
+  }
+
+  // Check for common content issues
   validateCommonIssues(
-    metadata,
-    markdownContent,
+    record.title || '',
+    record.metadata || {},
+    record.content || '',
     errors,
     warnings,
     suggestions
   );
+
+  validateMarkdownLinks(fullPath, dataDir, record.content || '', warnings);
 
   const isValid = errors.filter((e) => e.severity === 'error').length === 0;
   if (options.strict) {
@@ -256,7 +404,7 @@ async function validateRecord(
   }
 
   return {
-    record: recordPath,
+    record: displayPath,
     isValid,
     errors,
     warnings: options.strict ? [] : warnings,
@@ -475,18 +623,23 @@ function validateBasicMetadata(
 }
 
 function validateCommonIssues(
+  title: string,
   metadata: Record<string, any>,
   content: string,
   errors: ValidationError[],
   warnings: ValidationWarning[],
   suggestions: string[]
 ) {
-  // Check for placeholder content
-  const placeholders = content.match(/\[.*?\]/g);
-  if (placeholders && placeholders.length > 0) {
+  // Check for placeholder content (exclude markdown links)
+  const linkRegex = /\[[^\]]+\]\([^)]+\)/g;
+  const contentWithoutLinks = content.replace(linkRegex, '');
+  const placeholderRegex = /\[[^\]]+\]/g;
+  const placeholderMatches = contentWithoutLinks.match(placeholderRegex);
+
+  if (placeholderMatches && placeholderMatches.length > 0) {
     warnings.push({
       field: 'content',
-      message: `Found ${placeholders.length} placeholder(s) in content`,
+      message: `Found ${placeholderMatches.length} placeholder(s) in content`,
       suggestion: 'Replace placeholders with actual content',
     });
   }
@@ -500,12 +653,89 @@ function validateCommonIssues(
     });
   }
 
-  // Check for missing title in content
-  if (!content.includes(`# ${metadata.title}`)) {
+  const normalizedTitle = title.trim();
+  if (normalizedTitle.length > 0) {
+    const firstHeadingLine = content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('#'));
+
+    if (!firstHeadingLine) {
+      warnings.push({
+        field: 'content',
+        message: 'Content does not include a top-level heading',
+        suggestion: `Add "# ${normalizedTitle}" near the top of the document`,
+      });
+    } else {
+      const headingText = firstHeadingLine.replace(/^#+\s*/, '').trim();
+      if (
+        headingText.localeCompare(normalizedTitle, undefined, {
+          sensitivity: 'base',
+          usage: 'search',
+        }) !== 0
+      ) {
+        warnings.push({
+          field: 'content',
+          message: 'Content does not start with the record title',
+          suggestion: `Start content with "# ${normalizedTitle}"`,
+        });
+      }
+    }
+  } else if (!content.includes('# ')) {
     warnings.push({
       field: 'content',
-      message: 'Content does not start with the record title',
-      suggestion: `Start content with "# ${metadata.title}"`,
+      message: 'Content does not include a top-level heading',
+      suggestion: 'Add a "# Title" heading near the top of the document',
+    });
+  }
+}
+
+function validateMarkdownLinks(
+  fullPath: string,
+  dataDir: string,
+  content: string,
+  warnings: ValidationWarning[]
+) {
+  if (!content) return;
+
+  const linkPattern = /\[[^\]]+\]\(([^)]+)\)/g;
+  const recordDir = dirname(fullPath);
+  const missingTargets = new Set<string>();
+  let match: RegExpExecArray | null;
+
+  while ((match = linkPattern.exec(content)) !== null) {
+    const rawTarget = match[1]?.trim();
+    if (!rawTarget) continue;
+    if (rawTarget.startsWith('#')) continue;
+    if (
+      /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(rawTarget) &&
+      !rawTarget.startsWith('file:')
+    ) {
+      // Skip absolute URLs (http, https, mailto, etc.)
+      continue;
+    }
+
+    const cleanedTarget = rawTarget.split('#')[0]?.split('?')[0]?.trim();
+    if (!cleanedTarget) continue;
+
+    if (extname(cleanedTarget).toLowerCase() !== '.md') {
+      continue;
+    }
+
+    const resolvedPath = cleanedTarget.startsWith('/')
+      ? join(dataDir, cleanedTarget.replace(/^\/+/, ''))
+      : resolve(recordDir, cleanedTarget);
+
+    if (!fs.existsSync(resolvedPath)) {
+      missingTargets.add(cleanedTarget);
+    }
+  }
+
+  for (const target of missingTargets) {
+    warnings.push({
+      field: 'content',
+      message: `Linked record not found: ${target}`,
+      suggestion: 'Ensure the linked record exists and the path is correct.',
     });
   }
 }

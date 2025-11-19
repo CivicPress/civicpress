@@ -1,0 +1,78 @@
+_metadata:
+  name: 'Record Link Categories'
+  description: 'Define relationship types for linking records to each other'
+  version: '1.0.0'
+  editable: true
+
+categories:
+  related:
+    value: 'related'
+    type: 'string'
+    description: 'Generally related records'
+    required: false
+
+  supersedes:
+    value: 'supersedes'
+    type: 'string'
+    description: 'This record supersedes the linked record'
+    required: false
+
+  superseded_by:
+    value: 'superseded_by'
+    type: 'string'
+    description: 'This record is superseded by the linked record'
+    required: false
+
+  amends:
+    value: 'amends'
+    type: 'string'
+    description: 'This record amends the linked record'
+    required: false
+
+  amended_by:
+    value: 'amended_by'
+    type: 'string'
+    description: 'This record is amended by the linked record'
+    required: false
+
+  references:
+    value: 'references'
+    type: 'string'
+    description: 'This record references the linked record'
+    required: false
+
+  referenced_by:
+    value: 'referenced_by'
+    type: 'string'
+    description: 'This record is referenced by the linked record'
+    required: false
+
+  implements:
+    value: 'implements'
+    type: 'string'
+    description: 'This record implements the linked record'
+    required: false
+
+  implemented_by:
+    value: 'implemented_by'
+    type: 'string'
+    description: 'This record is implemented by the linked record'
+    required: false
+
+  follows:
+    value: 'follows'
+    type: 'string'
+    description: 'This record follows from the linked record'
+    required: false
+
+  precedes:
+    value: 'precedes'
+    type: 'string'
+    description: 'This record precedes the linked record'
+    required: false
+
+  other:
+    value: 'other'
+    type: 'string'
+    description: 'Other relationship type'
+    required: false

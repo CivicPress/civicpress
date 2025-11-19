@@ -7,6 +7,7 @@ import {
 } from '../middleware/auth';
 import { RecordsService } from '../services/records-service';
 import { Logger } from '@civicpress/core';
+import { AuditLogger } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -14,6 +15,7 @@ import {
 } from '../utils/api-logger';
 
 const logger = new Logger();
+const audit = new AuditLogger();
 
 // Custom validation error handler for records API
 function handleRecordsValidationError(
@@ -90,6 +92,47 @@ export function createRecordsRouter(recordsService: RecordsService) {
       sendSuccess(result, req, res, { operation });
     } catch (error) {
       handleApiError(operation, error, req, res, 'Failed to list records');
+    }
+  });
+
+  // GET /api/records/summary - Aggregate counts
+  router.get('/summary', async (req: any, res: Response) => {
+    const isAuthenticated = (req as any).user !== undefined;
+    const operation = isAuthenticated
+      ? 'records_summary_authenticated'
+      : 'records_summary_public';
+
+    logApiRequest(req, { operation });
+
+    try {
+      const { type, status } = req.query;
+
+      logger.info(
+        `Fetching record summary (${isAuthenticated ? 'authenticated' : 'public'})`,
+        {
+          type,
+          status,
+          requestId: (req as any).requestId,
+          userId: (req as any).user?.id,
+          userRole: (req as any).user?.role,
+          isAuthenticated,
+        }
+      );
+
+      const summary = await recordsService.getRecordSummary({
+        type: type as string,
+        status: status as string,
+      });
+
+      sendSuccess(summary, req, res, { operation });
+    } catch (error) {
+      handleApiError(
+        operation,
+        error,
+        req,
+        res,
+        'Failed to get record summary'
+      );
     }
   });
 
@@ -274,6 +317,10 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('content').optional().isString(),
     body('role').optional().isString(),
     body('metadata').optional().isObject(),
+    body('geography').optional().isObject(),
+    body('attachedFiles').optional().isArray(),
+    body('linkedRecords').optional().isArray(),
+    body('linkedGeographyFiles').optional().isArray(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'create_record' });
 
@@ -288,7 +335,18 @@ export function createRecordsRouter(recordsService: RecordsService) {
       }
 
       try {
-        const { title, type, content, metadata } = req.body;
+        const {
+          title,
+          type,
+          content,
+          metadata,
+          geography,
+          attachedFiles,
+          linkedRecords,
+          linkedGeographyFiles,
+          authors,
+          source,
+        } = req.body;
         const user = req.user;
 
         if (!user) {
@@ -338,6 +396,12 @@ export function createRecordsRouter(recordsService: RecordsService) {
             type,
             content,
             metadata,
+            geography,
+            attachedFiles,
+            linkedRecords,
+            linkedGeographyFiles,
+            authors,
+            source,
           },
           cleanUser
         );
@@ -346,7 +410,31 @@ export function createRecordsRouter(recordsService: RecordsService) {
           operation: 'create_record',
           statusCode: 201,
         });
+        await audit.log({
+          source: 'api',
+          actor: {
+            id: user.id,
+            username: (user as any).username,
+            role: user.role,
+          },
+          action: 'records:create',
+          target: {
+            type: 'record',
+            id: (record as any)?.id,
+            name: (record as any)?.title,
+          },
+          outcome: 'success',
+        });
       } catch (error) {
+        const user = (req as any).user || {};
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:create',
+          target: { type: 'record' },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'create_record',
           error,
@@ -368,6 +456,10 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('content').optional().isString(),
     body('status').optional().isString(),
     body('metadata').optional().isObject(),
+    body('geography').optional().isObject(),
+    body('attachedFiles').optional().isArray(),
+    body('linkedRecords').optional().isArray(),
+    body('linkedGeographyFiles').optional().isArray(),
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'update_record' });
 
@@ -402,7 +494,28 @@ export function createRecordsRouter(recordsService: RecordsService) {
         }
 
         sendSuccess(record, req, res, { operation: 'update_record' });
+        await audit.log({
+          source: 'api',
+          actor: {
+            id: user.id,
+            username: (user as any).username,
+            role: user.role,
+          },
+          action: 'records:update',
+          target: { type: 'record', id: id },
+          outcome: 'success',
+        });
       } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:update',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'update_record',
           error,
@@ -466,6 +579,17 @@ export function createRecordsRouter(recordsService: RecordsService) {
             res,
             { operation: 'delete_record' }
           );
+          await audit.log({
+            source: 'api',
+            actor: {
+              id: user.id,
+              username: (user as any).username,
+              role: user.role,
+            },
+            action: 'records:delete',
+            target: { type: 'record', id },
+            outcome: 'success',
+          });
         } else {
           const error = new Error('Failed to delete record');
           (error as any).statusCode = 500;
@@ -474,6 +598,16 @@ export function createRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
       } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:delete',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'delete_record',
           error,
@@ -548,6 +682,21 @@ export function createRecordsRouter(recordsService: RecordsService) {
             res,
             { operation: 'change_record_status' }
           );
+          await audit.log({
+            source: 'api',
+            actor: {
+              id: user.id,
+              username: (user as any).username,
+              role: user.role,
+            },
+            action: 'records:status',
+            target: { type: 'record', id },
+            outcome: 'success',
+            metadata: {
+              previousStatus: existingRecord.status,
+              newStatus: status,
+            },
+          });
         } else {
           const error = new Error(
             result.error || 'Failed to change record status'
@@ -558,12 +707,66 @@ export function createRecordsRouter(recordsService: RecordsService) {
           throw error;
         }
       } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:status',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
         handleApiError(
           'change_record_status',
           error,
           req,
           res,
           'Failed to change record status'
+        );
+      }
+    }
+  );
+
+  // GET /api/records/:id/transitions - List allowed transitions for current user
+  router.get(
+    '/:id/transitions',
+    authMiddleware(recordsService.getCivicPress()),
+    param('id').isString().notEmpty(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'list_allowed_transitions' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'list_allowed_transitions',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params as any;
+        const user = req.user as any;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        const allowed = await recordsService.getAllowedTransitions(id, user);
+        sendSuccess({ transitions: allowed }, req, res, {
+          operation: 'list_allowed_transitions',
+        });
+      } catch (error) {
+        handleApiError(
+          'list_allowed_transitions',
+          error,
+          req,
+          res,
+          'Failed to list allowed transitions'
         );
       }
     }

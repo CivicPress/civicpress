@@ -1,0 +1,189 @@
+<template>
+  <div class="space-y-4">
+    <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{formTitle}}</h3>
+    
+    <!-- Zone Reference -->
+    <UFormField 
+      label="Zone Reference" 
+      :error="errors.zone_ref"
+      required
+    >
+      <UInput 
+        v-model="form.zone_ref" 
+        placeholder="e.g., {{zoneExample}}"
+        :disabled="disabled"
+      />
+    </UFormField>
+
+    <!-- Center Coordinates -->
+    <div class="grid grid-cols-2 gap-4">
+      <UFormField 
+        label="Center Longitude" 
+        :error="errors.center?.lon"
+      >
+        <UInput 
+          v-model.number="form.center.lon" 
+          type="number" 
+          step="0.000001"
+          placeholder="-180 to 180"
+          :disabled="disabled"
+        />
+      </UFormField>
+      
+      <UFormField 
+        label="Center Latitude" 
+        :error="errors.center?.lat"
+      >
+        <UInput 
+          v-model.number="form.center.lat" 
+          type="number" 
+          step="0.000001"
+          placeholder="-90 to 90"
+          :disabled="disabled"
+        />
+      </UFormField>
+    </div>
+
+    <!-- Bounding Box -->
+    <UFormField 
+      label="Bounding Box" 
+      :error="errors.bbox"
+      description="Coordinates: [minLon, minLat, maxLon, maxLat]"
+    >
+      <div class="grid grid-cols-4 gap-2">
+        <UInput 
+          v-model.number="form.bbox[0]" 
+          placeholder="Min Lon"
+          :disabled="disabled"
+        />
+        <UInput 
+          v-model.number="form.bbox[1]" 
+          placeholder="Min Lat"
+          :disabled="disabled"
+        />
+        <UInput 
+          v-model.number="form.bbox[2]" 
+          placeholder="Max Lon"
+          :disabled="disabled"
+        />
+        <UInput 
+          v-model.number="form.bbox[3]" 
+          placeholder="Max Lat"
+          :disabled="disabled"
+        />
+      </div>
+    </UFormField>
+
+    <!-- Attachments -->
+    <UFormField label="Attachments">
+      <div class="space-y-2">
+        <div class="flex items-center gap-2">
+          <UInput 
+            v-model="newAttachment.path" 
+            placeholder="File path"
+            :disabled="disabled"
+            class="flex-1"
+          />
+          <UInput 
+            v-model="newAttachment.role" 
+            placeholder="Role"
+            :disabled="disabled"
+            class="flex-1"
+          />
+          <UButton 
+            @click="addAttachment"
+            :disabled="disabled || !newAttachment.path || !newAttachment.role"
+            size="sm"
+          >
+            Add
+          </UButton>
+        </div>
+        
+        <!-- Existing attachments -->
+        <div v-if="form.attachments.length > 0" class="space-y-2">
+          <div 
+            v-for="(attachment, index) in form.attachments" 
+            :key="index"
+            class="flex items-center justify-between p-2 border rounded-lg bg-white dark:bg-gray-700"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                {{ attachment.path }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                Role: {{ attachment.role }}
+                <span v-if="attachment.description"> - {{ attachment.description }}</span>
+              </p>
+            </div>
+            <UButton 
+              icon="i-lucide-x" 
+              color="error" 
+              variant="ghost" 
+              size="xs" 
+              @click="removeAttachment(index)"
+              :disabled="disabled"
+            />
+          </div>
+        </div>
+      </div>
+    </UFormField>
+  </div>
+</template>
+
+<script setup lang="ts">
+interface GeographyForm {
+  zone_ref: string;
+  center: { lon: number; lat: number };
+  bbox: number[];
+  attachments: Array<{
+    path: string;
+    role: string;
+    description?: string;
+  }>;
+}
+
+interface Props {
+  modelValue: GeographyForm;
+  errors?: Record<string, any>;
+  disabled?: boolean;
+}
+
+interface Emits {
+  (e: 'update:modelValue', value: GeographyForm): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  errors: () => ({}),
+  disabled: false
+});
+
+const emit = defineEmits<Emits>();
+
+const form = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
+});
+
+const newAttachment = ref({
+  path: '',
+  role: '',
+  description: ''
+});
+
+const addAttachment = () => {
+  if (newAttachment.value.path && newAttachment.value.role) {
+    form.value.attachments.push({
+      path: newAttachment.value.path,
+      role: newAttachment.value.role,
+      description: newAttachment.value.description
+    });
+    
+    // Reset form
+    newAttachment.value = { path: '', role: '', description: '' };
+  }
+};
+
+const removeAttachment = (index: number) => {
+  form.value.attachments.splice(index, 1);
+};
+</script>

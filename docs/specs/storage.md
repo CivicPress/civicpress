@@ -2,14 +2,17 @@
 
 ---
 
-version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+version: 2.0.0 status: stable created: '2025-07-03' updated: '2025-09-03'
 deprecated: false sunset_date: null additions:
 
 - comprehensive storage documentation
+- UUID-based file management system
+- multi-provider backend support
+- file attachment system integration
 - data management
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
+- security considerations compatibility: min_civicpress: 2.0.0 max_civicpress:
   'null' dependencies: [] authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -26,6 +29,10 @@ files, PDFs, scanned permits, meeting recordings, and attachments.
 Ensure files are stored predictably, retrievably, and securely — whether
 local-first or backed by remote object storage.
 
+**Version 2.0** introduces UUID-based file management, multi-provider backend
+support, and seamless integration with the file attachment system for linking
+files to civic records.
+
 ---
 
 ## 🧩 Scope & Responsibilities
@@ -37,6 +44,10 @@ local-first or backed by remote object storage.
 - Support static/public + authenticated/private access
 - Allow local disk or S3-style backends
 - Expose storage location to API/UI
+- **UUID-based file tracking** for unique identification
+- **Multi-provider backend support** (local, S3, Azure)
+- **File attachment integration** for linking files to records
+- **Database metadata tracking** for file information
 
 ❌ Out of Scope:
 
@@ -48,11 +59,11 @@ local-first or backed by remote object storage.
 
 ## 🔗 Inputs & Outputs
 
-| Source             | Output                                    |
-| ------------------ | ----------------------------------------- |
-| Uploaded video     | `/storage/public-sessions/2025-06-12.mp4` |
-| Scanned permit PDF | `/storage/permits/2025/perm-1189.pdf`     |
-| Audio feedback     | `/storage/feedback/audio123.ogg`          |
+| Source             | Output                                    | UUID Reference                         |
+| ------------------ | ----------------------------------------- | -------------------------------------- |
+| Uploaded video     | `/storage/public-sessions/2025-06-12.mp4` | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` |
+| Scanned permit PDF | `/storage/permits/2025/perm-1189.pdf`     | `b2c3d4e5-f6g7-8901-bcde-f23456789012` |
+| Audio feedback     | `/storage/feedback/audio123.ogg`          | `c3d4e5f6-g7h8-9012-cdef-345678901234` |
 
 ---
 
@@ -61,6 +72,9 @@ local-first or backed by remote object storage.
 ```
 /storage/               # Public or private non-md assets
 .civic/storage.yml      # Backend config (e.g. type, credentials)
+.system-data/           # Private system data including file metadata
+├── files.db           # SQLite database for file metadata tracking
+└── storage-cache/     # Cached file information
 ```
 
 ## 📝 Example Storage Configuration
@@ -170,13 +184,51 @@ Future versions may define `.civic/backup.yml` for more advanced control.
 
 ---
 
+## ✅ Current Implementation Status
+
+### **Completed Features (Version 2.0)**
+
+- ✅ **UUID-based file management** - Unique identifiers for all files
+- ✅ **Multi-provider backends** - Local, S3, Azure Blob storage support
+- ✅ **File attachment system** - Link files to civic records
+- ✅ **Database metadata tracking** - Complete file information in SQLite
+- ✅ **Enhanced UI components** - FileBrowser, FileUpload, MediaPlayer
+- ✅ **API endpoints** - `/api/v1/storage/files/*` UUID-based operations
+- ✅ **Secure downloads** - Authenticated file access with proper headers
+- ✅ **Configuration management** - Dynamic storage configuration
+
+### **API Endpoints**
+
+```http
+# Upload file
+POST /api/v1/storage/upload/:folder
+Content-Type: multipart/form-data
+
+# Get file by UUID
+GET /api/v1/storage/files/:id
+Authorization: Bearer <token>
+
+# List files in folder
+GET /api/v1/storage/folders/:folder/files
+Authorization: Bearer <token>
+
+# Get file metadata
+GET /api/v1/storage/files/:id/info
+Authorization: Bearer <token>
+
+# Delete file
+DELETE /api/v1/storage/files/:id
+Authorization: Bearer <token>
+```
+
 ## 🛠️ Future Enhancements
 
 - Support encrypted attachments
-- Plug into IPFS, object storage (e.g. S3, MinIO)
 - Auto-cleanup orphaned files
-- UI-based storage manager for clerks
 - Support file deduplication
+- Advanced file versioning
+- Content-based file search
+- Automatic thumbnail generation
 
 ---
 
