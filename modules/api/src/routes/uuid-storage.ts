@@ -134,11 +134,13 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
     // Check if we're in a test environment by checking if contextDataDir is in a temp directory
     // or if .system-data doesn't exist at project root
     const fs = await import('fs/promises');
+    // Only treat as test environment if:
+    // 1. contextDataDir is in /tmp/ (actual test temp directories)
+    // 2. NODE_ENV is explicitly 'test'
+    // Don't match paths just because they contain "test" in the name (like "civicpress-test")
     const isTestEnvironment =
       contextDataDir &&
-      (contextDataDir.includes('/tmp/') ||
-        contextDataDir.includes('test') ||
-        process.env.NODE_ENV === 'test');
+      (contextDataDir.includes('/tmp/') || process.env.NODE_ENV === 'test');
 
     // In test environments, always use test directory to ensure isolation
     if (isTestEnvironment && contextDataDir) {
