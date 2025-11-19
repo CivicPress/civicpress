@@ -363,6 +363,199 @@ folders:
     );
     expect(duplicateErrors.length).toBe(0);
   });
+
+  it('creates tarball by default when compression is enabled', async () => {
+    const { dataDir, systemDataDir, outputDir, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    const result = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      compress: true, // Explicitly enable (default)
+      databaseConfig: dbConfig,
+    });
+
+    // Should have tarball path
+    expect(result.tarballPath).toBeDefined();
+    expect(result.tarballPath).toContain('.tar.gz');
+
+    // Tarball should exist
+    if (result.tarballPath) {
+      expect(await pathExists(result.tarballPath)).toBe(true);
+    }
+
+    // Backup directory should also exist (both are kept)
+    expect(await pathExists(result.backupDir)).toBe(true);
+  });
+
+  it('skips tarball creation when compression is disabled', async () => {
+    const { dataDir, systemDataDir, outputDir, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    const result = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      compress: false, // Disable compression
+      databaseConfig: dbConfig,
+    });
+
+    // Should not have tarball path
+    expect(result.tarballPath).toBeUndefined();
+
+    // Backup directory should exist
+    expect(await pathExists(result.backupDir)).toBe(true);
+  });
+
+  it('restores from tarball when tarball exists', async () => {
+    const { dataDir, systemDataDir, outputDir, recordPath, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    // Create backup with compression
+    const createResult = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      compress: true,
+      databaseConfig: dbConfig,
+    });
+
+    expect(createResult.tarballPath).toBeDefined();
+    if (!createResult.tarballPath) {
+      throw new Error('Tarball was not created');
+    }
+
+    // Restore from tarball path (not directory)
+    const restoreTarget = path.join(tempRoot, 'restore', 'data');
+    const restoreSystem = path.join(tempRoot, 'restore', 'system-data');
+
+    const restoreDbConfig: DatabaseConfig = {
+      type: 'sqlite',
+      sqlite: {
+        file: path.join(restoreSystem, 'civic.db'),
+      },
+    };
+
+    const restoreResult = await BackupService.restoreBackup({
+      backupDir: createResult.tarballPath, // Use tarball path
+      dataDir: restoreTarget,
+      systemDataDir: restoreSystem,
+      restoreStorage: true,
+      overwrite: true,
+      databaseConfig: restoreDbConfig,
+    });
+
+    // Verify restore worked
+    const restoredFile = path.join(restoreTarget, 'records', 'sample.md');
+    expect(await pathExists(restoredFile)).toBe(true);
+
+    const restoredContent = await fs.readFile(restoredFile, 'utf8');
+    const originalContent = await fs.readFile(recordPath, 'utf8');
+    expect(restoredContent).toBe(originalContent);
+  });
+
+  it('restores from directory when tarball does not exist (backward compatibility)', async () => {
+    const { dataDir, systemDataDir, outputDir, recordPath, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    // Create backup without compression
+    const createResult = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      compress: false, // No compression
+      databaseConfig: dbConfig,
+    });
+
+    expect(createResult.tarballPath).toBeUndefined();
+
+    // Restore from directory path
+    const restoreTarget = path.join(tempRoot, 'restore', 'data');
+    const restoreSystem = path.join(tempRoot, 'restore', 'system-data');
+
+    const restoreDbConfig: DatabaseConfig = {
+      type: 'sqlite',
+      sqlite: {
+        file: path.join(restoreSystem, 'civic.db'),
+      },
+    };
+
+    const restoreResult = await BackupService.restoreBackup({
+      backupDir: createResult.backupDir, // Use directory path
+      dataDir: restoreTarget,
+      systemDataDir: restoreSystem,
+      restoreStorage: true,
+      overwrite: true,
+      databaseConfig: restoreDbConfig,
+    });
+
+    // Verify restore worked
+    const restoredFile = path.join(restoreTarget, 'records', 'sample.md');
+    expect(await pathExists(restoredFile)).toBe(true);
+
+    const restoredContent = await fs.readFile(restoredFile, 'utf8');
+    const originalContent = await fs.readFile(recordPath, 'utf8');
+    expect(restoredContent).toBe(originalContent);
+  });
+
+  it('prefers tarball over directory when both exist', async () => {
+    const { dataDir, systemDataDir, outputDir, recordPath, dbConfig } =
+      await createFixtureLayout(tempRoot);
+
+    // Create backup with compression
+    const createResult = await BackupService.createBackup({
+      dataDir,
+      systemDataDir,
+      outputDir,
+      includeStorage: true,
+      includeGitBundle: false,
+      compress: true,
+      databaseConfig: dbConfig,
+    });
+
+    expect(createResult.tarballPath).toBeDefined();
+    if (!createResult.tarballPath) {
+      throw new Error('Tarball was not created');
+    }
+
+    // Restore using directory path, but tarball should be preferred
+    const restoreTarget = path.join(tempRoot, 'restore', 'data');
+    const restoreSystem = path.join(tempRoot, 'restore', 'system-data');
+
+    const restoreDbConfig: DatabaseConfig = {
+      type: 'sqlite',
+      sqlite: {
+        file: path.join(restoreSystem, 'civic.db'),
+      },
+    };
+
+    // Pass directory path, but tarball should be found and used
+    const restoreResult = await BackupService.restoreBackup({
+      backupDir: createResult.backupDir, // Directory path, but tarball exists
+      dataDir: restoreTarget,
+      systemDataDir: restoreSystem,
+      restoreStorage: true,
+      overwrite: true,
+      databaseConfig: restoreDbConfig,
+    });
+
+    // Verify restore worked (from tarball)
+    const restoredFile = path.join(restoreTarget, 'records', 'sample.md');
+    expect(await pathExists(restoredFile)).toBe(true);
+
+    const restoredContent = await fs.readFile(restoredFile, 'utf8');
+    const originalContent = await fs.readFile(recordPath, 'utf8');
+    expect(restoredContent).toBe(originalContent);
+  });
 });
 
 async function createFixtureLayout(tempRoot: string) {

@@ -24,7 +24,7 @@ interface BackupCommandOptions {
   skipStorage?: boolean;
   includeGitBundle?: boolean;
   skipGitBundle?: boolean;
-  archive?: boolean;
+  compress?: boolean; // Default true, set to false by --no-compress
   target?: string;
   systemData?: string;
   overwrite?: boolean;
@@ -46,7 +46,10 @@ export function registerBackupCommand(cli: CAC): void {
       default: true,
     })
     .option('--skip-git-bundle', 'Skip git bundle creation')
-    .option('--archive', 'Create a .tar.gz archive alongside the backup')
+    .option(
+      '--no-compress',
+      'Skip creating .tar.gz tarball (compression is enabled by default)'
+    )
     .option('--target <dir>', 'Target data directory for restore')
     .option('--system-data <dir>', 'System data directory', {
       default: '.system-data',
@@ -112,6 +115,8 @@ async function handleCreate(
   const includeGitBundle = options.skipGitBundle
     ? false
     : options.includeGitBundle !== false;
+  // --no-compress sets compress to false, otherwise default to true
+  const compress = options.compress !== false;
 
   const dbConfig = CentralConfigManager.getDatabaseConfig();
   const result = await BackupService.createBackup({
@@ -120,6 +125,7 @@ async function handleCreate(
     systemDataDir,
     includeStorage,
     includeGitBundle,
+    compress,
     version: civicpressVersion,
     databaseConfig: dbConfig,
     extraMetadata: {
@@ -127,12 +133,12 @@ async function handleCreate(
     },
   });
 
-  let archivePath: string | undefined;
-  if (options.archive) {
-    archivePath = await createArchive(result.backupDir);
-  }
-
-  outputCreateResult(result, archivePath, options.json ?? globalJson, logger);
+  outputCreateResult(
+    result,
+    result.tarballPath,
+    options.json ?? globalJson,
+    logger
+  );
 }
 
 async function handleRestore(
@@ -141,74 +147,35 @@ async function handleRestore(
   globalJson: boolean | undefined,
   logger: ReturnType<typeof initializeLogger>
 ): Promise<void> {
-  const tempExtraction = await maybeExtractArchive(source);
-  const backupDir = tempExtraction?.dir ?? path.resolve(source);
+  // BackupService.restoreBackup now handles tarball extraction automatically
+  const backupDir = path.resolve(source);
 
-  try {
-    const dataDir = path.resolve(
-      options.target ?? CentralConfigManager.getDataDir()
-    );
-    const systemDataDir = path.resolve(options.systemData ?? '.system-data');
-    const restoreStorage = options.skipStorage
-      ? false
-      : options.includeStorage !== false;
-
-    const dbConfig = CentralConfigManager.getDatabaseConfig();
-    const result = await BackupService.restoreBackup({
-      backupDir,
-      dataDir,
-      systemDataDir,
-      restoreStorage,
-      overwrite: options.overwrite === true,
-      databaseConfig: dbConfig,
-    });
-
-    outputRestoreResult(result, options.json ?? globalJson, logger);
-  } finally {
-    if (tempExtraction?.cleanup) {
-      await tempExtraction.cleanup();
-    }
-  }
-}
-
-async function createArchive(backupDir: string): Promise<string> {
-  const entries = await fs.readdir(backupDir);
-  const archivePath = path.join(backupDir, 'archive.tar.gz');
-  await tar.create(
-    {
-      cwd: backupDir,
-      gzip: true,
-      file: archivePath,
-    },
-    entries
+  const dataDir = path.resolve(
+    options.target ?? CentralConfigManager.getDataDir()
   );
-  return archivePath;
+  const systemDataDir = path.resolve(options.systemData ?? '.system-data');
+  const restoreStorage = options.skipStorage
+    ? false
+    : options.includeStorage !== false;
+
+  const dbConfig = CentralConfigManager.getDatabaseConfig();
+  const result = await BackupService.restoreBackup({
+    backupDir,
+    dataDir,
+    systemDataDir,
+    restoreStorage,
+    overwrite: options.overwrite === true,
+    databaseConfig: dbConfig,
+  });
+
+  outputRestoreResult(result, options.json ?? globalJson, logger);
 }
 
-async function maybeExtractArchive(
-  source: string
-): Promise<{ dir: string; cleanup: () => Promise<void> } | null> {
-  const resolved = path.resolve(source);
-  const stats = await fs.stat(resolved);
-
-  if (!stats.isFile()) {
-    return null;
-  }
-
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'civic-backup-'));
-  await tar.extract({ cwd: tempDir, file: resolved });
-
-  return {
-    dir: tempDir,
-    cleanup: async () => {
-      await fs.rm(tempDir, { recursive: true, force: true });
-    },
-  };
-}
+// Archive functions removed - compression is now handled by BackupService
 
 function outputCreateResult(
   result: BackupCreateResult,
-  archivePath: string | undefined,
+  tarballPath: string | undefined,
   jsonOutput: boolean | undefined,
   logger: ReturnType<typeof initializeLogger>
 ): void {
@@ -216,11 +183,11 @@ function outputCreateResult(
     success: true,
     backupDir: result.backupDir,
     metadata: result.metadataPath,
+    tarball: tarballPath ?? null,
     gitBundle: result.gitBundlePath ?? null,
     storageIncluded: result.storageIncluded,
     storageFilesExported: result.storageFilesExported,
     storageConfigExported: result.storageConfigExported,
-    archive: archivePath ?? null,
     warnings: result.warnings,
   };
 
@@ -240,8 +207,8 @@ function outputCreateResult(
   if (result.storageConfigExported) {
     logger.info(`⚙️  Storage configuration exported (storage-config.json)`);
   }
-  if (archivePath) {
-    logger.info(`🗜️  Archive: ${archivePath}`);
+  if (tarballPath) {
+    logger.info(`🗜️  Tarball: ${tarballPath}`);
   }
   if (result.warnings.length > 0) {
     result.warnings.forEach((warning) => logger.warn(`⚠️  ${warning}`));

@@ -2,6 +2,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
+import os from 'os';
+import tar from 'tar';
 import yaml from 'yaml';
 import { Logger } from '../utils/logger.js';
 import { DatabaseService } from '../database/database-service.js';
@@ -71,6 +73,7 @@ export interface BackupCreateOptions {
   systemDataDir?: string;
   includeStorage?: boolean;
   includeGitBundle?: boolean;
+  compress?: boolean; // Create .tar.gz tarball (default: true)
   version?: string;
   extraMetadata?: Record<string, unknown>;
   timestamp?: string;
@@ -83,6 +86,7 @@ export interface BackupCreateResult {
   metadataPath: string;
   timestamp: string;
   gitBundlePath?: string;
+  tarballPath?: string; // Path to .tar.gz file if compression was enabled
   storageIncluded: boolean;
   storageFilesExported: boolean;
   storageConfigExported: boolean;
@@ -409,6 +413,31 @@ export class BackupService {
     const metadataPath = path.join(backupDir, 'metadata.json');
     await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2), 'utf8');
 
+    // Create tarball if compression is enabled (default: true)
+    let tarballPath: string | undefined;
+    const shouldCompress = options.compress !== false; // Default to true
+    if (shouldCompress) {
+      try {
+        tarballPath = `${backupDir}.tar.gz`;
+        await tar.create(
+          {
+            gzip: true,
+            file: tarballPath,
+            cwd: path.dirname(backupDir),
+          },
+          [path.basename(backupDir)]
+        );
+        logger.info(`Compressed backup to ${tarballPath}`);
+      } catch (error) {
+        const warningMessage = `Failed to create tarball: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        warnings.push(warningMessage);
+        logger.warn(warningMessage);
+        // Continue without tarball - backup directory still exists
+      }
+    }
+
     logger.info(`Backup created at ${backupDir}`);
 
     return {
@@ -416,6 +445,7 @@ export class BackupService {
       metadataPath,
       timestamp,
       gitBundlePath,
+      tarballPath,
       storageIncluded,
       storageFilesExported,
       storageConfigExported,
@@ -432,11 +462,65 @@ export class BackupService {
     const logger = createLogger(options.logger);
     const warnings: string[] = [];
 
-    const backupDir = path.resolve(options.backupDir);
+    let backupDir = path.resolve(options.backupDir);
     const targetDataDir = path.resolve(options.dataDir);
     const systemDataDir = path.resolve(options.systemDataDir ?? '.system-data');
     const restoreStorage = options.restoreStorage !== false;
     const overwrite = options.overwrite === true;
+
+    // Check if backup is a tarball (takes precedence over directory)
+    const tarballPath = backupDir.endsWith('.tar.gz')
+      ? backupDir
+      : `${backupDir}.tar.gz`;
+    let tempExtractDir: string | undefined;
+
+    if (await pathExists(tarballPath)) {
+      // Extract tarball to temporary directory
+      try {
+        tempExtractDir = path.join(
+          os.tmpdir(),
+          `civic-restore-${Date.now()}-${Math.random().toString(36).substring(7)}`
+        );
+        await fs.mkdir(tempExtractDir, { recursive: true });
+
+        logger.info(`Extracting backup tarball: ${tarballPath}`);
+        await tar.extract({
+          file: tarballPath,
+          cwd: tempExtractDir,
+        });
+
+        // Find the extracted backup directory
+        const extractedDirs = await fs.readdir(tempExtractDir);
+        if (extractedDirs.length === 1) {
+          backupDir = path.join(tempExtractDir, extractedDirs[0]);
+        } else {
+          // Fallback: assume backup directory name matches tarball name (without .tar.gz)
+          const backupName = path.basename(tarballPath, '.tar.gz');
+          backupDir = path.join(tempExtractDir, backupName);
+        }
+
+        logger.info(`Extracted backup to: ${backupDir}`);
+      } catch (error) {
+        const errorMessage = `Failed to extract tarball: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        warnings.push(errorMessage);
+        logger.error(errorMessage);
+        // Clean up temp directory if it was created
+        if (tempExtractDir && (await pathExists(tempExtractDir))) {
+          await fs
+            .rm(tempExtractDir, { recursive: true, force: true })
+            .catch(() => {
+              // Ignore cleanup errors
+            });
+        }
+        throw new Error(errorMessage);
+      }
+    } else if (!(await pathExists(backupDir))) {
+      throw new Error(
+        `Backup not found at ${backupDir} or ${tarballPath}. Ensure you provided the path to a backup directory or tarball.`
+      );
+    }
 
     const sourceDataDir = path.join(backupDir, 'data');
 
@@ -698,6 +782,23 @@ export class BackupService {
     }
 
     logger.info('Backup restored successfully.');
+
+    // Clean up temporary extraction directory if we extracted from a tarball
+    if (tempExtractDir && (await pathExists(tempExtractDir))) {
+      try {
+        await fs.rm(tempExtractDir, { recursive: true, force: true });
+        logger.debug(
+          `Cleaned up temporary extraction directory: ${tempExtractDir}`
+        );
+      } catch (error) {
+        // Log but don't fail - temp directory cleanup is not critical
+        logger.warn(
+          `Failed to clean up temporary directory ${tempExtractDir}: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
 
     return {
       dataDir: targetDataDir,
