@@ -69,36 +69,76 @@ provides:
 
 ## Quick Start
 
-### Installation
+### Developer Bootstrap
+
+Get up and running quickly with these commands:
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/CivicPress/civicpress.git
 cd civicpress
 
-# Install dependencies
+# 2. Checkout the branch you want to work with
+git checkout release/v0.1.1  # or main, or your feature branch
+
+# 3. Install dependencies
 pnpm install
 
-# Build the project
+# 4. Build the project (required before using CLI)
 pnpm run build
+
+# 5. Make CLI executable (fixes permission issues)
+chmod +x cli/dist/index.js
+
+# 6. Initialize a new CivicPress instance
+./cli/dist/index.js init
+
+# Or initialize with demo data (Richmond or Springfield)
+./cli/dist/index.js init --yes --demo-data richmond-quebec
+# or
+./cli/dist/index.js init --yes --demo-data springfield-usa
+```
+
+**Note**: The `chmod +x` step is required on Unix-like systems (macOS, Linux) to
+make the CLI executable. Without it, you'll get a "permission denied" error.
+
+### Quick Start with Demo Data
+
+For the fastest way to see CivicPress in action:
+
+```bash
+# Clone and setup
+git clone https://github.com/CivicPress/civicpress.git
+cd civicpress
+git checkout release/v0.1.1
+pnpm install
+pnpm run build
+chmod +x cli/dist/index.js
+
+# Initialize with Richmond demo data (French/English)
+./cli/dist/index.js init --yes --demo-data richmond-quebec
+
+# Or initialize with Springfield demo data (English)
+./cli/dist/index.js init --yes --demo-data springfield-usa
+```
+
+### Initialize a New CivicPress Instance
+
+```bash
+# Interactive setup (will prompt for configuration)
+./cli/dist/index.js init
+
+# Non-interactive with demo data
+./cli/dist/index.js init --yes --demo-data richmond-quebec
+./cli/dist/index.js init --yes --demo-data springfield-usa
+
+# With configuration file
+./cli/dist/index.js init --config config.yml
 ```
 
 **Note**: Most operations require authentication. CivicPress supports both
 GitHub OAuth and simulated authentication for development. See
 [Authentication Guide](docs/auth-system.md) for setup instructions.
-
-### Initialize a New CivicPress Instance
-
-```bash
-# Initialize with interactive setup
-civic init
-
-# Or initialize with demo data
-civic init --demo-data "Springfield"
-
-# Or initialize with configuration file
-civic init --config config.yml
-```
 
 ### Development Commands
 
@@ -124,32 +164,39 @@ CivicPress supports multiple authentication methods:
 
 ```bash
 # Simulated authentication (development)
-civic auth:simulated --username admin --role admin
+./cli/dist/index.js auth:simulated --username admin --role admin
 
 # GitHub OAuth (production)
-civic auth:login --token <your_github_token>
+./cli/dist/index.js auth:login --token <your_github_token>
 
 # Username/Password (traditional authentication)
-civic auth:password --username <username> --password <password>
+./cli/dist/index.js auth:password --username <username> --password <password>
 ```
 
 ### Basic Usage
 
 ```bash
 # Create a new record
-civic create bylaw "Noise Ordinance"
+./cli/dist/index.js create bylaw "Noise Ordinance"
 
 # List all records
-civic list
+./cli/dist/index.js list
 
 # Search records
-civic search "budget"
+./cli/dist/index.js search "budget"
 
 # View record history
-civic history bylaw/noise-ordinance
+./cli/dist/index.js history bylaw/noise-ordinance
 
 # Change record status
-civic status bylaw/noise-ordinance proposed
+./cli/dist/index.js status bylaw/noise-ordinance proposed
+```
+
+**Tip**: You can create an alias for convenience:
+
+```bash
+alias civic='./cli/dist/index.js'
+# Then use: civic init, civic list, etc.
 ```
 
 ### Running the UI
