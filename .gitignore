@@ -24,6 +24,9 @@ build/
 *.d.ts
 *.d.ts.map
 
+# TypeScript build cache
+*.tsbuildinfo
+
 # CivicPress Private System Data (never in Git)
 .system-data/
 *.db
