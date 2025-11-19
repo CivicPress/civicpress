@@ -350,26 +350,33 @@ pnpm run build
 # Run all tests
 pnpm run test:run
 
-# API development with file watching (recommended)
-pnpm run dev:api:watch
+# Start both API and UI in watch mode (recommended)
+pnpm run dev
 
-# API development without watch
+# API development (watch mode by default)
 pnpm run dev:api
 
 # UI development
 pnpm run dev:ui
 
-# Combined API + UI with API watching
-pnpm run dev:all:watch
-
 # All services in parallel
 pnpm run dev:parallel
+```
 
+**Note**: Both `pnpm run dev` and `pnpm run dev:api` run in watch mode by
+default, automatically restarting when files change.
+
+### Additional Commands
+
+```bash
 # Lint code
 pnpm run lint
 
 # Type check
 pnpm run type-check
+
+# Clean build artifacts
+pnpm run clean
 ```
 
 ## 📊 Performance Metrics

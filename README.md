@@ -307,8 +307,9 @@ pnpm run lint
 pnpm run type-check
 
 # Start development servers
-pnpm dev:api    # API server on port 3000
-pnpm dev:ui     # UI server on port 3030
+pnpm run dev    # Both API and UI in watch mode (recommended)
+pnpm run dev:api    # API server in watch mode (port 3000)
+pnpm run dev:ui     # UI server (port 3030)
 ```
 
 ## Architecture

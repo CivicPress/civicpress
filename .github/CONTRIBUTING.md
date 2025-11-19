@@ -31,11 +31,20 @@ git clone https://github.com/CivicPress/civicpress.git
 cd civicpress
 
 # Install dependencies
-./setup.sh
+pnpm install
+
+# Build the project (required before using CLI)
+pnpm run build
+
+# Make CLI executable (fixes permission issues on Unix systems)
+chmod +x cli/dist/index.js
 
 # Verify setup
 pnpm run format:check
 ```
+
+**Note**: The `chmod +x` step is required on Unix-like systems (macOS, Linux) to
+make the CLI executable. Without it, you'll get a "permission denied" error.
 
 ## 📝 Development Workflow
 
@@ -189,7 +198,7 @@ civicpress/
 
 - Check existing issues and discussions
 - Join our community discussions
-- Reach out to maintainers at hello@civic-press.org
+- Reach out to maintainers at <hello@civic-press.org>
 - Get involved through our [community form](https://tally.so/r/wAYBvN)
 
 ## 🙏 Thank You
