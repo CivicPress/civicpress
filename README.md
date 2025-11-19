@@ -78,19 +78,16 @@ Get up and running quickly with these commands:
 git clone https://github.com/CivicPress/civicpress.git
 cd civicpress
 
-# 2. Checkout the branch you want to work with
-git checkout release/v0.1.1  # or main, or your feature branch
-
-# 3. Install dependencies
+# 2. Install dependencies
 pnpm install
 
-# 4. Build the project (required before using CLI)
+# 3. Build the project (required before using CLI)
 pnpm run build
 
-# 5. Make CLI executable (fixes permission issues)
+# 4. Make CLI executable (fixes permission issues)
 chmod +x cli/dist/index.js
 
-# 6. Initialize a new CivicPress instance
+# 5. Initialize a new CivicPress instance
 ./cli/dist/index.js init
 
 # Or initialize with demo data (Richmond or Springfield)
@@ -101,26 +98,6 @@ chmod +x cli/dist/index.js
 
 **Note**: The `chmod +x` step is required on Unix-like systems (macOS, Linux) to
 make the CLI executable. Without it, you'll get a "permission denied" error.
-
-### Quick Start with Demo Data
-
-For the fastest way to see CivicPress in action:
-
-```bash
-# Clone and setup
-git clone https://github.com/CivicPress/civicpress.git
-cd civicpress
-git checkout release/v0.1.1
-pnpm install
-pnpm run build
-chmod +x cli/dist/index.js
-
-# Initialize with Richmond demo data (French/English)
-./cli/dist/index.js init --yes --demo-data richmond-quebec
-
-# Or initialize with Springfield demo data (English)
-./cli/dist/index.js init --yes --demo-data springfield-usa
-```
 
 ### Initialize a New CivicPress Instance
 
@@ -145,18 +122,21 @@ GitHub OAuth and simulated authentication for development. See
 CivicPress provides multiple development commands for different workflows:
 
 ```bash
-# API development with file watching (recommended)
-pnpm run dev:api:watch
+# Start both API and UI in watch mode (recommended)
+pnpm run dev
+
+# API development (watch mode by default)
+pnpm run dev:api
 
 # UI development
 pnpm run dev:ui
 
-# Combined API + UI development
-pnpm run dev:all:watch
-
 # All services in parallel
 pnpm run dev:parallel
 ```
+
+**Note**: Both `pnpm run dev` and `pnpm run dev:api` run in watch mode by
+default, automatically restarting when files change.
 
 ### CLI Authentication
 
@@ -254,6 +234,35 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
 curl -H "Authorization: Bearer YOUR_TOKEN" \
   "http://localhost:3000/api/search?q=policy"
 ```
+
+### API Testing with Hoppscotch
+
+CivicPress includes a comprehensive Hoppscotch collection for testing the API.
+The collection is located at `docs/hoppscotch/collection.json` and includes
+pre-configured requests for:
+
+- **Authentication** - Login with GitHub token, username/password, and simulated
+  auth
+- **Records** - CRUD operations for civic records
+- **Search** - Full-text search and filtering
+- **Geography** - Geography file management and operations
+- **Storage** - UUID-based file storage operations
+- **Configuration** - System and organization configuration management
+- **Users** - User management and permissions
+
+**To use the collection:**
+
+1. Install [Hoppscotch](https://hoppscotch.io/) (browser extension or desktop
+   app)
+2. Import the collection: `docs/hoppscotch/collection.json`
+3. Set environment variables:
+   - `baseUrl`: `http://localhost:3000` (or your API URL)
+   - `authGitHubToken`: Your GitHub token (if using GitHub auth)
+4. Start making requests!
+
+The collection includes automatic token management - after logging in, the
+`civicToken` environment variable is automatically set and used for
+authenticated requests.
 
 ## Civic Roles & Permissions
 
