@@ -631,11 +631,12 @@ export class BackupService {
           }
 
           const isLocalProvider = provider?.type === 'local';
-          const newStorageBasePath = isLocalProvider
-            ? path.isAbsolute(provider?.path ?? '')
-              ? provider.path
-              : path.resolve(systemDataDir, provider?.path ?? 'storage')
-            : null;
+          const newStorageBasePath =
+            isLocalProvider && provider
+              ? path.isAbsolute(provider.path ?? '')
+                ? provider.path
+                : path.resolve(systemDataDir, provider.path ?? 'storage')
+              : null;
 
           let restoredCount = 0;
           let skippedCount = 0;
