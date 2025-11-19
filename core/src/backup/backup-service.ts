@@ -47,6 +47,7 @@ export interface BackupMetadata {
     head?: string | null;
     bundle?: string | null;
     warning?: string | null;
+    nested: boolean;
   };
   storage?: {
     included: boolean;
@@ -70,7 +71,6 @@ export interface BackupCreateOptions {
   systemDataDir?: string;
   includeStorage?: boolean;
   includeGitBundle?: boolean;
-  gitRepoDir?: string;
   version?: string;
   extraMetadata?: Record<string, unknown>;
   timestamp?: string;
@@ -138,7 +138,6 @@ export class BackupService {
     const systemDataDir = path.resolve(options.systemDataDir ?? '.system-data');
     const includeStorage = options.includeStorage !== false;
     const includeGitBundle = options.includeGitBundle !== false;
-    const gitRepoDir = path.resolve(options.gitRepoDir ?? process.cwd());
 
     const timestamp = sanitizeTimestamp(
       options.timestamp ?? new Date().toISOString()
@@ -157,29 +156,34 @@ export class BackupService {
     let gitHead: string | null = null;
     let gitBundlePath: string | undefined;
     let gitWarning: string | null = null;
+    let gitNested = false;
 
     if (includeGitBundle) {
-      const dataRelativeToRepo = path.relative(gitRepoDir, dataDir);
+      // Check for nested git repository in data directory
+      const nestedGitRepo = path.join(dataDir, '.git');
+      const hasNestedGit = await pathExists(nestedGitRepo);
 
-      if (
-        dataRelativeToRepo === '' ||
-        dataRelativeToRepo.startsWith('..') ||
-        path.isAbsolute(dataRelativeToRepo)
-      ) {
-        gitWarning =
-          'Data directory is outside the current Git repository; skipping git bundle.';
-        warnings.push(gitWarning);
+      if (!hasNestedGit) {
+        // ERROR: Data directory should have git repo
+        const errorMsg =
+          'Data directory does not contain a git repository. This may indicate a configuration problem.';
+        warnings.push(errorMsg);
+        gitWarning = errorMsg;
+        gitNested = false;
       } else {
+        // Use nested git repo (dataDir is the repo root)
+        gitNested = true;
+
         try {
           gitHead = (
             await execFileAsync('git', ['rev-parse', 'HEAD'], {
-              cwd: gitRepoDir,
+              cwd: dataDir,
             })
           ).stdout
             .trim()
             .replace(/\s+/g, ' ');
         } catch (error) {
-          gitWarning = `Unable to determine git HEAD: ${
+          gitWarning = `Unable to determine git HEAD from data directory: ${
             error instanceof Error ? error.message : String(error)
           }`;
           warnings.push(gitWarning);
@@ -189,20 +193,14 @@ export class BackupService {
           const gitDir = path.join(backupDir, 'git');
           await fs.mkdir(gitDir, { recursive: true });
           gitBundlePath = path.join(gitDir, 'data.bundle');
+          // Bundle entire repo (no path filter needed - dataDir is the repo root)
           await execFileAsync(
             'git',
-            [
-              'bundle',
-              'create',
-              gitBundlePath,
-              'HEAD',
-              '--',
-              dataRelativeToRepo,
-            ],
-            { cwd: gitRepoDir }
+            ['bundle', 'create', gitBundlePath, 'HEAD'],
+            { cwd: dataDir }
           );
         } catch (error) {
-          const warningMessage = `Unable to create git bundle: ${
+          const warningMessage = `Unable to create git bundle from data directory: ${
             error instanceof Error ? error.message : String(error)
           }`;
           gitBundlePath = undefined;
@@ -396,6 +394,7 @@ export class BackupService {
               ? path.relative(backupDir, gitBundlePath)
               : null,
             warning: gitWarning,
+            nested: gitNested,
           }
         : undefined,
       storage: storageInfo,
@@ -459,6 +458,52 @@ export class BackupService {
     await fs.mkdir(path.dirname(targetDataDir), { recursive: true });
     await fs.cp(sourceDataDir, targetDataDir, { recursive: true, force: true });
 
+    // Restore git repository from bundle if available
+    let gitBundlePath = path.join(backupDir, 'git', 'data.bundle');
+    if (await pathExists(gitBundlePath)) {
+      try {
+        // Remove .git if it exists (we'll restore from bundle)
+        const targetGitDir = path.join(targetDataDir, '.git');
+        if (await pathExists(targetGitDir)) {
+          await fs.rm(targetGitDir, { recursive: true, force: true });
+        }
+
+        // Clone bundle to temporary location, then move .git to target
+        const tempClone = path.join(
+          path.dirname(targetDataDir),
+          '.temp-git-restore'
+        );
+        try {
+          await execFileAsync('git', ['clone', gitBundlePath, tempClone], {
+            cwd: path.dirname(targetDataDir),
+          });
+
+          // Move .git from temp clone to target data directory
+          const tempGitDir = path.join(tempClone, '.git');
+          if (await pathExists(tempGitDir)) {
+            await fs.rename(tempGitDir, targetGitDir);
+          }
+
+          // Clean up temp directory
+          await fs.rm(tempClone, { recursive: true, force: true });
+
+          logger.info('Git repository restored from bundle');
+        } catch (cloneError) {
+          // Clean up temp directory if it exists
+          if (await pathExists(tempClone)) {
+            await fs.rm(tempClone, { recursive: true, force: true });
+          }
+          throw cloneError;
+        }
+      } catch (error) {
+        const warningMessage = `Failed to restore git repository from bundle: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        warnings.push(warningMessage);
+        logger.warn(warningMessage);
+      }
+    }
+
     let storageDir: string | undefined;
 
     if (restoreStorage) {
@@ -499,6 +544,19 @@ export class BackupService {
           error instanceof Error ? error.message : String(error)
         }`;
         warnings.push(message);
+      }
+    }
+
+    // Check for git bundle warning if bundle was not found
+    if (!(await pathExists(gitBundlePath))) {
+      if (metadata?.git?.warning) {
+        warnings.push(
+          `Git bundle not found in backup: ${metadata.git.warning}`
+        );
+      } else if (metadata?.git) {
+        warnings.push(
+          'Git bundle not found in backup, but data directory was restored.'
+        );
       }
     }
 
