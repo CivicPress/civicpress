@@ -16,7 +16,7 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
   - 'roles.yml.md: >=1.0.0'
   - 'workflows.md: >=1.0.0'
   - 'git-policy.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

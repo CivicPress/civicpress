@@ -1,5 +1,8 @@
 # 🎯 CivicPress Development Goals
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## ✅ Completed Foundation (100% Complete)
 
 - ✅ **Complete Core Platform**: All major services implemented and functional

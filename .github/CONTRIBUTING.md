@@ -198,7 +198,7 @@ civicpress/
 
 - Check existing issues and discussions
 - Join our community discussions
-- Reach out to maintainers at <hello@civic-press.org>
+- Reach out to maintainers at <hello@civicpress.io>
 - Get involved through our [community form](https://tally.so/r/wAYBvN)
 
 ## 🙏 Thank You

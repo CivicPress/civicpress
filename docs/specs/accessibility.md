@@ -14,7 +14,7 @@ deprecated: false sunset_date: null additions:
   - 'ui.md: >=1.0.0'
   - 'themes.md: >=1.0.0'
   - 'translations.md: >=1.0.0' authors:
-- 'Sophie Germain <sophie@civic-press.org>' reviewers:
+- 'Sophie Germain <sophie@civicpress.io>' reviewers:
 - 'Ada Lovelace'
 - 'Irène Joliot-Curie'
 

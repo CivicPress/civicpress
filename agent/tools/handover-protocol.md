@@ -3,6 +3,9 @@
 **Last Updated**: Current  
 **Protocol Version**: 2.0 (Simplified)
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 🎯 **Simple Handover Protocol**
 
 ### **Core Principle**

@@ -13,7 +13,7 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - standardized geography file structure fixes: [] migration_guide: null
   compatibility: min_civicpress: 1.0.0 max_civicpress: null dependencies: []
   authors:
-- 'AI Assistant <ai@civic-press.org>' reviewers:
+- 'AI Assistant <ai@civicpress.io>' reviewers:
 - 'Development Team'
 
 ---

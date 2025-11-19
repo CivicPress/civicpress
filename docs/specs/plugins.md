@@ -15,7 +15,7 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
   - 'plugin-api.md: >=1.0.0'
   - 'plugin-development.md: >=1.0.0'
   - 'testing-framework.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
@@ -241,7 +241,7 @@ metadata:
   category: 'civic-engagement'
   tags: ['anniversary', 'calendar', 'reminders']
   maintainers:
-    - 'sophie@civic-press.org'
+    - 'sophie@civicpress.io'
   support:
     email: 'support@civicpress.org'
     issues: 'https://github.com/CivicPress/civic-anniversary/issues'
@@ -801,7 +801,7 @@ export class AnniversaryCLI {
     ]
   },
   "keywords": ["civicpress", "plugin", "anniversary", "civic-engagement"],
-  "author": "Sophie Germain <sophie@civic-press.org>",
+  "author": "Sophie Germain <sophie@civicpress.io>",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -11,7 +11,7 @@ deprecated: false sunset_date: null additions:
   'null' dependencies:
   - 'public-data-structure.md: >=1.0.0'
   - 'workflows.md: >=1.3.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 

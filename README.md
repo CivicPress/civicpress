@@ -4,6 +4,9 @@ A comprehensive civic technology platform for managing and publishing civic
 records with Git-based version control, role-based access control, and a modern
 API.
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 🌟 Platform Vision
 
 CivicPress is designed as a **complete civic technology platform** that brings
@@ -403,5 +406,9 @@ Please read our [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 MIT License - see [LICENSE](LICENSE) for details.
 
 ---
+
+**🌐 [civicpress.io](https://civicpress.io)** | **📧
+[hello@civicpress.io](mailto:hello@civicpress.io)** | **💬
+[Community Discussions](https://github.com/CivicPress/civicpress/discussions)**
 
 Built with ❤️ for better governance

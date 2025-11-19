@@ -3,6 +3,9 @@
 **For**: Cursor, Copilot, ChatGPT, and other AI agents  
 **Purpose**: How to effectively use the CivicPress memory system
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 🎯 **Quick Start for AI Agents**
 
 ### 1. **Initial Context Loading**

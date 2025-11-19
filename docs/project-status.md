@@ -5,6 +5,9 @@
 **Test Coverage**: 600+ tests passing (including 85+ security tests)  
 **Implementation**: 90% complete
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 🎯 Current Status
 
 CivicPress is a **fully functional civic technology platform** with a solid

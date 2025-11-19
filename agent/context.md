@@ -1,5 +1,8 @@
 # 🧠 CivicPress Development Context
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 📋 Project Overview
 
 CivicPress – a **fully functional civic technology platform** for

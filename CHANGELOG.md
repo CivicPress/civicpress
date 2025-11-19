@@ -145,6 +145,100 @@ and this project adheres to
 - **Testing**: Comprehensive API test suite for geography and storage systems
   using Vitest and Supertest
 
+## [0.1.1] - 2025-11-19
+
+<!-- markdownlint-disable MD024 -->
+
+### Added
+
+- **Backup Compression**: Added tarball compression support for backups
+  - Backups now create `.tar.gz` archives by default alongside backup
+    directories
+  - Compression enabled by default, can be disabled with `--no-compress` flag
+  - Significantly reduces backup size and simplifies demo data distribution
+  - Restore automatically detects and extracts tarballs when present
+  - Maintains backward compatibility with uncompressed backups
+- **Demo Data Archives**: Created compressed demo data backups for quick
+  onboarding
+  - Richmond, QC, Canada demo data (French) - `richmond-quebec.tar.gz`
+  - Springfield, VA, USA demo data (English) - `springfield-usa.tar.gz`
+  - Both archives include complete data, Git history, storage files, and
+    metadata
+  - Clean Git history with single initial commit for each demo dataset
+  - `civic init` now uses these compressed archives for demo data loading
+- **Developer Bootstrap Documentation**: Enhanced README with comprehensive
+  setup instructions
+  - Added step-by-step developer bootstrap section
+  - Included `chmod +x` command to fix CLI permission issues
+  - Updated development commands documentation (watch mode defaults)
+  - Added Hoppscotch API collections section with usage instructions
+  - Removed outdated branch checkout instructions
+
+### Changed
+
+- **Backup/Restore System**: Enhanced backup and restore functionality
+  - Restore now correctly resolves storage paths from active configuration
+  - Improved storage file metadata restoration during backup restore
+  - Better error handling and warning messages during restore operations
+  - Storage configuration path detection improved for production instances
+- **CLI Init Command**: Streamlined initialization process
+  - Removed `repo_url` prompt (feature not yet implemented)
+  - Updated demo data labels for clarity:
+    - "Richmond, QC, Canada - Francais"
+    - "Springfield, VA, USA - English"
+  - Improved environment detection for file path resolution
+- **Storage Configuration**: Updated default storage settings
+  - Icons folder access changed from `authenticated` to `public` by default
+  - Prevents 401 errors on fresh installs for map icons
+  - Updated in both default templates and StorageConfigManager
+- **Development Workflow**: Improved developer experience
+  - `pnpm run dev` now starts both API and UI in watch mode by default
+  - `pnpm run dev:api` runs in watch mode by default
+  - Removed redundant watch-specific commands from documentation
+- **Home Page Customization**: Added guidance for users
+  - Default home page text now includes note about customization
+  - Directs users to `data/.civic/org-config.yml` for customization
+  - Updated both default config and UI display text
+
+### Fixed
+
+- **Build System**: Fixed TypeScript compilation issues
+  - Removed `composite: true` from `modules/storage/tsconfig.json` to fix build
+    errors
+  - Added `*.tsbuildinfo` to `.gitignore` to prevent merge conflicts
+  - Fixed module resolution for `@civicpress/storage` package
+- **Git Tracking**: Improved repository hygiene
+  - Added `.civicrc` to `.gitignore` (local configuration file)
+  - Added `*.tsbuildinfo` to `.gitignore` (build artifacts)
+  - Prevents machine-specific files from being committed
+- **Storage Path Resolution**: Fixed storage configuration loading
+  - Corrected storage path detection in API routes for production instances
+  - Fixed issue where `civicpress-test` was incorrectly identified as test
+    environment
+  - Storage operations now correctly use `.system-data/storage.yml` at project
+    root
+- **UI Localization**: Fixed untranslated UI elements
+  - Breadcrumbs in records type pages now use translation keys
+  - Properly localized with `t('common.home')` and `t('records.allRecords')`
+- **Backup Restore**: Fixed storage restoration during backup restore
+  - Correctly uses configured storage path from `storage.yml` instead of
+    hardcoded path
+  - Properly handles storage file metadata restoration
+  - Fixed TypeScript error where `provider` was possibly undefined
+
+### Documentation
+
+- **Domain Migration**: Updated all documentation with new domain and email
+  - Changed `civic-press.org` → `civicpress.io` throughout all docs
+  - Changed `hello@civic-press.org` → `hello@civicpress.io` throughout all docs
+  - Updated 61+ files including specs, contributing guide, code of conduct
+  - Added website and contact email to README, project status, and agent
+    documentation
+- **Project Status**: Updated project status and agent documentation
+  - Added website and contact information to all agent documentation files
+  - Updated project status document with current information
+  - Enhanced developer onboarding documentation
+
 ## [1.0.0] - 2025-07-02
 
 ### Initial Release
@@ -165,6 +259,8 @@ and this project adheres to
 
 ## 📝 Version History
 
+- **0.1.1**: Backup compression, demo data improvements, developer experience
+  enhancements
 - **1.0.0**: Initial release with core platform architecture
 - **Unreleased**: Development and feature additions
 

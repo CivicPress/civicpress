@@ -5,7 +5,7 @@
 version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-15'
 deprecated: false sunset_date: null authors:
 
-- 'Sophie Germain <sophie@civic-press.org>' reviewers:
+- 'Sophie Germain <sophie@civicpress.io>' reviewers:
 - 'Ada Lovelace'
 - 'Irène Joliot-Curie'
 
@@ -436,7 +436,7 @@ compatibility:
     - 'auth.md: >=1.2.0'
     - 'permissions.md: >=1.1.0'
 authors:
-  - 'Sophie Germain <sophie@civic-press.org>'
+  - 'Sophie Germain <sophie@civicpress.io>'
 reviewers:
   - 'Ada Lovelace <ada@civicpress.org>'
   - 'Irène Joliot-Curie <irene@civicpress.org>'
@@ -462,7 +462,7 @@ reviewers:
   - `auth.md: >=1.2.0`
   - `permissions.md: >=1.1.0`
 
-**Authors:** Sophie Germain <sophie@civic-press.org>
+**Authors:** Sophie Germain <sophie@civicpress.io>
 **Reviewers:** Ada Lovelace, Irène Joliot-Curie
 ```
 

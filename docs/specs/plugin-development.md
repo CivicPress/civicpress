@@ -13,7 +13,7 @@ deprecated: false sunset_date: null additions:
   - 'plugins.md: >=1.5.0'
   - 'plugin-api.md: >=1.0.0'
   - 'testing-framework.md: >=1.0.0' authors:
-- 'Sophie Germain <sophie@civic-press.org>' reviewers:
+- 'Sophie Germain <sophie@civicpress.io>' reviewers:
 - 'Ada Lovelace'
 - 'Irène Joliot-Curie'
 

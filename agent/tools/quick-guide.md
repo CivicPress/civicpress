@@ -3,6 +3,9 @@
 **Last Updated**: 2025-01-27  
 **For**: Developers and AI agents
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## 🎯 **Quick Start**
 
 ### **First Time Setup**

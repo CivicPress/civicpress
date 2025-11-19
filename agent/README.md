@@ -129,6 +129,9 @@ Feel free to ignore it if working solo — or expand it if using AI tools.
 
 ---
 
+**🌐 [civicpress.io](https://civicpress.io)** | **📧
+[hello@civicpress.io](mailto:hello@civicpress.io)**
+
 **NOTE:** This memory system is inspired by the
 [Agentic Project Management (APM)](https://github.com/sdi2200262/agentic-project-management)
 framework, adapted for CivicPress's specific needs.

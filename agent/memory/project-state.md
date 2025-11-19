@@ -1,5 +1,8 @@
 # Project State
 
+**🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
+
 ## Current Status: November 2025
 
 ### ✅ **Completed Features**

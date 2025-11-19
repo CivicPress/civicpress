@@ -11,7 +11,7 @@ deprecated: false sunset_date: null additions:
   'null' dependencies:
   - 'observability.md: >=1.0.0'
   - 'api.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civic-press.org> reviewers:
+- Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
