@@ -154,7 +154,7 @@ export class GeographyParser {
     // Generate YAML frontmatter
     const yamlContent = stringify(frontmatter, {
       lineWidth: 0,
-      noRefs: true,
+      aliasDuplicateObjects: false,
       sortKeys: false,
     });
 
