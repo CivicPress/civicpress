@@ -1,6 +1,10 @@
 import { CAC } from 'cac';
 import chalk from 'chalk';
-import { CivicPress } from '@civicpress/core';
+import {
+  CivicPress,
+  BackupService,
+  CentralConfigManager,
+} from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
@@ -674,11 +678,11 @@ export const initCommand = (cli: CAC) => {
                 message: 'Which demo city would you like to load?',
                 choices: [
                   {
-                    name: 'Richmond, Quebec (Bilingual)',
+                    name: 'Richmond, QC, Canada - Francais',
                     value: 'richmond-quebec',
                   },
                   {
-                    name: 'Springfield, Illinois (Comprehensive)',
+                    name: 'Springfield, VA, USA - English',
                     value: 'springfield-usa',
                   },
                   // Future: Add more cities here
@@ -1051,101 +1055,72 @@ async function loadDemoData(
     const projectRoot = path.resolve(path.dirname(__filename), '../../../');
     const demoDataDir = path.join(projectRoot, 'cli', 'src', 'demo-data');
 
-    // Load demo config
-    const configPath = path.join(demoDataDir, 'config', `${demoCity}.yml`);
-    if (!fs.existsSync(configPath)) {
+    // Map demo city name to backup filename
+    const backupFileName = `${demoCity}.tar.gz`;
+    const backupPath = path.join(demoDataDir, backupFileName);
+
+    // Check if backup file exists
+    if (!fs.existsSync(backupPath)) {
       throw new Error(
-        `Demo city '${demoCity}' not found. Available cities: richmond-quebec`
+        `Demo backup file not found: ${backupFileName}. Available backups: ${fs
+          .readdirSync(demoDataDir)
+          .filter((f) => f.endsWith('.tar.gz'))
+          .join(', ')}`
       );
     }
 
-    const configContent = fs.readFileSync(configPath, 'utf8');
-    const demoConfig = yaml.parse(configContent);
+    logger.info(`📦 Found backup file: ${backupFileName}`);
 
-    // Create records directory
+    // Get system data directory (defaults to .system-data in project root)
+    // During init, systemDataDir is at process.cwd() level, same as dataDir's parent
+    const systemDataDir = path.join(process.cwd(), '.system-data');
+
+    // Get database config if available (for storage file restoration)
+    let dbConfig;
+    try {
+      dbConfig = CentralConfigManager.getDatabaseConfig();
+    } catch (error) {
+      // Database config might not be available during init, that's okay
+      logger.info(
+        '⚠️  Database config not available, storage file metadata will not be restored'
+      );
+    }
+
+    // Restore backup using BackupService
+    logger.info(`🔄 Restoring backup from ${backupFileName}...`);
+    const restoreResult = await BackupService.restoreBackup({
+      backupDir: backupPath, // BackupService handles .tar.gz files automatically
+      dataDir: dataDir,
+      systemDataDir: systemDataDir,
+      restoreStorage: true, // Include storage files
+      overwrite: true, // Overwrite existing data
+      logger: logger,
+      databaseConfig: dbConfig,
+    });
+
+    // Log warnings if any
+    if (restoreResult.warnings && restoreResult.warnings.length > 0) {
+      for (const warning of restoreResult.warnings) {
+        logger.warn(`⚠️  ${warning}`);
+      }
+    }
+
+    // Count records loaded
     const recordsDir = path.join(dataDir, 'records');
-    if (!fs.existsSync(recordsDir)) {
-      fs.mkdirSync(recordsDir, { recursive: true });
+    let recordCount = 0;
+    if (fs.existsSync(recordsDir)) {
+      const recordFiles = fs
+        .readdirSync(recordsDir, { recursive: true })
+        .filter((f): f is string => typeof f === 'string' && f.endsWith('.md'));
+      recordCount = recordFiles.length;
     }
 
-    // Copy demo records
-    const recordsSrc = path.join(demoDataDir, 'records');
-    let copiedCount = 0;
-
-    for (const recordFile of demoConfig.demo_data.records) {
-      const srcPath = path.join(recordsSrc, recordFile);
-      const destPath = path.join(recordsDir, recordFile);
-
-      if (fs.existsSync(srcPath)) {
-        fs.copyFileSync(srcPath, destPath);
-        copiedCount++;
-      } else {
-        logger.warn(`⚠️  Demo record not found: ${recordFile}`);
-      }
-    }
-
-    // Copy hooks if they exist
-    if (demoConfig.demo_data.hooks) {
-      const hooksSrc = path.join(demoDataDir, 'hooks');
-      const hooksDest = path.join(dataDir, '.civic', 'hooks');
-      if (!fs.existsSync(hooksDest)) {
-        fs.mkdirSync(hooksDest, { recursive: true });
-      }
-
-      for (const hookFile of demoConfig.demo_data.hooks) {
-        const srcPath = path.join(hooksSrc, hookFile);
-        const destPath = path.join(hooksDest, hookFile);
-
-        if (fs.existsSync(srcPath)) {
-          fs.copyFileSync(srcPath, destPath);
-          logger.info(`📋 Copied hook: ${hookFile}`);
-        }
-      }
-    }
-
-    // Copy templates if they exist
-    if (demoConfig.demo_data.templates) {
-      const templatesSrc = path.join(demoDataDir, 'templates');
-      const templatesDest = path.join(dataDir, '.civic', 'templates');
-      if (!fs.existsSync(templatesDest)) {
-        fs.mkdirSync(templatesDest, { recursive: true });
-      }
-
-      for (const templateFile of demoConfig.demo_data.templates) {
-        const srcPath = path.join(templatesSrc, templateFile);
-        const destPath = path.join(templatesDest, templateFile);
-
-        if (fs.existsSync(srcPath)) {
-          fs.copyFileSync(srcPath, destPath);
-          logger.info(`📄 Copied template: ${templateFile}`);
-        }
-      }
-    }
-
-    // Copy workflows if they exist
-    if (demoConfig.demo_data.workflows) {
-      const workflowsSrc = path.join(demoDataDir, 'workflows');
-      const workflowsDest = path.join(dataDir, '.civic', 'workflows');
-      if (!fs.existsSync(workflowsDest)) {
-        fs.mkdirSync(workflowsDest, { recursive: true });
-      }
-
-      for (const workflowFile of demoConfig.demo_data.workflows) {
-        const srcPath = path.join(workflowsSrc, workflowFile);
-        const destPath = path.join(workflowsDest, workflowFile);
-
-        if (fs.existsSync(srcPath)) {
-          fs.copyFileSync(srcPath, destPath);
-          logger.info(`⚙️  Copied workflow: ${workflowFile}`);
-        }
-      }
-    }
-
-    logger.success(`✅ Loaded ${copiedCount} demo records for ${demoCity}`);
+    logger.success(
+      `✅ Restored demo data for ${demoCity} (${recordCount} records)`
+    );
 
     // Trigger hooks for demo data loading
     try {
-      const { CivicPress } = await import('@civicpress/core');
       const civic = new CivicPress({ dataDir });
       await civic.initialize();
 
@@ -1156,11 +1131,8 @@ async function loadDemoData(
         'demo:data:loaded',
         {
           demoCity,
-          recordCount: copiedCount,
-          records: demoConfig.demo_data.records,
-          hooks: demoConfig.demo_data.hooks || [],
-          templates: demoConfig.demo_data.templates || [],
-          workflows: demoConfig.demo_data.workflows || [],
+          recordCount: recordCount,
+          source: 'backup-restore',
         },
         {
           user: 'system',
@@ -1168,45 +1140,10 @@ async function loadDemoData(
           metadata: {
             demoCity,
             source: 'init-command',
+            backupFile: backupFileName,
           },
         }
       );
-
-      // Trigger individual record created hooks for each loaded record
-      for (const recordFile of demoConfig.demo_data.records) {
-        const recordPath = path.join(recordsDir, recordFile);
-        if (fs.existsSync(recordPath)) {
-          const recordContent = fs.readFileSync(recordPath, 'utf8');
-          const frontmatterMatch = recordContent.match(/^---\n([\s\S]*?)\n---/);
-
-          if (frontmatterMatch) {
-            const frontmatter = yaml.parse(frontmatterMatch[1]);
-            await hookSystem.emit(
-              'record:created',
-              {
-                record: {
-                  title: frontmatter.title,
-                  type: frontmatter.type,
-                  status: frontmatter.status,
-                  path: recordPath,
-                  slug: frontmatter.slug,
-                  authors: frontmatter.authors,
-                  tags: frontmatter.tags,
-                },
-                demoData: true,
-              },
-              {
-                user: 'system',
-                action: 'demo-record-created',
-                metadata: {
-                  demoCity,
-                  recordFile,
-                },
-              }
-            );
-          }
-        }
-      }
 
       logger.info(`🎯 Triggered hooks for demo data loading`);
     } catch (hookError: any) {
