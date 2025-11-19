@@ -1278,12 +1278,6 @@ async function setupCivicrc(
       },
     },
     {
-      type: 'input',
-      name: 'repo_url',
-      message: 'Repository URL (optional):',
-      default: '',
-    },
-    {
       type: 'list',
       name: 'database_type',
       message: 'Select database type:',
@@ -1398,7 +1392,7 @@ async function setupCivicrc(
 
     // Contact and Online Presence
     website: null,
-    repo_url: answers.repo_url || null,
+    repo_url: null,
     email: null,
     phone: null,
 

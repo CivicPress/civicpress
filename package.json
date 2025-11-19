@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@8.15.0",
   "scripts": {
-    "dev": "cd modules/api && pnpm run dev",
+    "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
     "dev:api": "cd modules/api && pnpm run dev",
     "dev:api:watch": "cd modules/api && pnpm run dev:watch",
     "dev:core": "cd core && pnpm run dev",
