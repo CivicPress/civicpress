@@ -509,7 +509,33 @@ export class BackupService {
     if (restoreStorage) {
       const sourceStorageDir = path.join(backupDir, 'storage');
       if (await pathExists(sourceStorageDir)) {
-        storageDir = path.join(systemDataDir, 'storage');
+        // Determine storage path from current storage config
+        // (backup's storage-config.json doesn't include full paths, only folder structure)
+        const storageConfig = await loadStorageConfig(systemDataDir);
+        const activeProvider = storageConfig?.active_provider ?? 'local';
+        let provider = storageConfig?.providers?.[activeProvider];
+
+        // Fallback to legacy backend structure if providers not found
+        if (!provider && storageConfig?.backend) {
+          provider = {
+            type: storageConfig.backend.type,
+            path: storageConfig.backend.path,
+          };
+        }
+
+        if (provider?.type === 'local') {
+          // Use the configured storage path (could be absolute or relative to systemDataDir)
+          const providerPath = provider.path ?? 'storage';
+          storageDir = path.isAbsolute(providerPath)
+            ? providerPath
+            : path.resolve(systemDataDir, providerPath);
+        } else {
+          // Non-local provider or no config - fallback to systemDataDir/storage
+          storageDir = path.join(systemDataDir, 'storage');
+          warnings.push(
+            `Storage provider is not local or config not found. Restoring to default location: ${storageDir}`
+          );
+        }
 
         if (await pathExists(storageDir)) {
           if (!overwrite) {
@@ -528,6 +554,7 @@ export class BackupService {
             recursive: true,
             force: true,
           });
+          logger.info(`Storage files restored to: ${storageDir}`);
         }
       }
     }
@@ -593,10 +620,21 @@ export class BackupService {
           // Load storage config to determine correct provider path
           const storageConfig = await loadStorageConfig(systemDataDir);
           const activeProvider = storageConfig?.active_provider ?? 'local';
-          const provider = storageConfig?.providers?.[activeProvider];
+          let provider = storageConfig?.providers?.[activeProvider];
+
+          // Fallback to legacy backend structure if providers not found
+          if (!provider && storageConfig?.backend) {
+            provider = {
+              type: storageConfig.backend.type,
+              path: storageConfig.backend.path,
+            };
+          }
+
           const isLocalProvider = provider?.type === 'local';
           const newStorageBasePath = isLocalProvider
-            ? path.resolve(systemDataDir, provider?.path ?? 'storage')
+            ? path.isAbsolute(provider?.path ?? '')
+              ? provider.path
+              : path.resolve(systemDataDir, provider?.path ?? 'storage')
             : null;
 
           let restoredCount = 0;
