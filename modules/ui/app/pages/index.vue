@@ -26,7 +26,7 @@ const isAdmin = computed(() => authStore.currentUser?.role === 'admin');
 
 // Default copy
 const defaultAboutIntro =
-  'This is an example CivicPress deployment. It includes sample bylaws, meeting minutes, and geography layers to demonstrate how documents, sessions, and zones appear in an open, transparent civic registry.';
+  'This is an example CivicPress deployment. It includes sample bylaws, meeting minutes, and geography layers to demonstrate how documents, sessions, and zones appear in an open, transparent civic registry.\n\nYou can customize this text by editing the about_intro field in data/.civic/org-config.yml.';
 
 // Normalized organization fields
 const orgName = computed(

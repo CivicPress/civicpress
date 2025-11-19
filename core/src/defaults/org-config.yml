@@ -109,10 +109,10 @@ description:
   required: false
 
 about_intro:
-  value:
-    'This is an example CivicPress deployment. It includes sample bylaws,
-    meeting minutes, and geography layers to demonstrate how documents,
-    sessions, and zones appear in an open, transparent civic registry.'
+  value: |
+    This is an example CivicPress deployment. It includes sample bylaws, meeting minutes, and geography layers to demonstrate how documents, sessions, and zones appear in an open, transparent civic registry.
+
+    You can customize this text by editing the about_intro field in data/.civic/org-config.yml.
   type: 'string:textarea'
   description: 'Homepage introduction copy for the public demo'
   required: false
