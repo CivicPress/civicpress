@@ -1621,7 +1621,7 @@ async function setupStorage(
           },
           icons: {
             path: 'icons',
-            access: 'authenticated',
+            access: 'public',
             allowed_types: ['png', 'svg', 'jpg', 'jpeg', 'gif', 'webp', 'ico'],
             max_size: '2MB',
             description: 'Icons and map-related images for geography records',
