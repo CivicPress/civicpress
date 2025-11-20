@@ -101,7 +101,7 @@ const swaggerSpec = {
     },
   ],
   paths: {
-    '/health': {
+    '/api/v1/health': {
       get: {
         summary: 'Health Check',
         description: 'Check API server status',

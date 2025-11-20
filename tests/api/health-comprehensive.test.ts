@@ -28,7 +28,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should return health status', async () => {
     const response = await request(context.api.getApp())
-      .get('/health')
+      .get('/api/v1/health')
       .expect(200);
 
     expect(response.body.data.status).toBe('healthy');
@@ -39,7 +39,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should return detailed health status', async () => {
     const response = await request(context.api.getApp())
-      .get('/health/detailed')
+      .get('/api/v1/health/detailed')
       .expect(200);
 
     expect(response.body.data.status).toBe('healthy');
@@ -54,7 +54,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should test validation error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'validation' })
       .expect(400);
 
@@ -64,7 +64,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should test not found error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'not_found' })
       .expect(404);
 
@@ -74,7 +74,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should test server error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'server_error' })
       .expect(500);
 
@@ -84,7 +84,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should test generic error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'generic' })
       .expect(500);
 
@@ -95,7 +95,7 @@ describe('Health API (Comprehensive)', () => {
   it('should handle concurrent requests', async () => {
     // Test that the API can handle multiple concurrent requests
     const promises = Array.from({ length: 5 }, () =>
-      request(context.api.getApp()).get('/health')
+      request(context.api.getApp()).get('/api/v1/health')
     );
 
     const responses = await Promise.all(promises);
@@ -108,7 +108,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should return proper content type headers', async () => {
     const response = await request(context.api.getApp())
-      .get('/health')
+      .get('/api/v1/health')
       .expect(200);
 
     expect(response.headers['content-type']).toContain('application/json');
@@ -116,7 +116,7 @@ describe('Health API (Comprehensive)', () => {
 
   it('should handle malformed requests gracefully', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .set('Content-Type', 'application/json')
       .send('invalid json')
       .expect(400);

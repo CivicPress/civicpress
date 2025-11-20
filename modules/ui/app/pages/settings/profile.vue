@@ -28,7 +28,7 @@ const fetchUserInfo = async () => {
 
     // Otherwise try to fetch from API (requires authentication)
     if (authStore.token) {
-      const response = (await $civicApi('/auth/me')) as any;
+      const response = (await $civicApi('/api/v1/auth/me')) as any;
       if (response.success) {
         userInfo.value = response.data.user;
         // Also update the auth store with fresh data

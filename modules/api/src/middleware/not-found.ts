@@ -19,7 +19,7 @@ export function notFoundHandler(req: Request, res: Response): void {
       search: '/api/v1/search',
       config: '/api/v1/config',
       system: '/api/v1/system',
-      health: '/health',
+      health: '/api/v1/health',
     },
   });
 }

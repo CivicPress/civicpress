@@ -20,7 +20,7 @@ describe('API Records Integration', () => {
 
     // Get authentication token for admin
     const adminResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'admin',
         role: 'admin',
@@ -29,7 +29,7 @@ describe('API Records Integration', () => {
 
     // Get authentication token for clerk
     const clerkResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'clerk',
         role: 'clerk',
@@ -38,7 +38,7 @@ describe('API Records Integration', () => {
 
     // Get authentication token for public user
     const publicResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'public',
         role: 'public',

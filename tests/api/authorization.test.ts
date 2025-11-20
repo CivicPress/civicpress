@@ -21,7 +21,7 @@ describe('Authorization System', () => {
 
     // Get authentication tokens for different roles
     const adminResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'admin',
         role: 'admin',
@@ -29,7 +29,7 @@ describe('Authorization System', () => {
     adminToken = adminResponse.body.data.session.token;
 
     const clerkResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'clerk',
         role: 'clerk',
@@ -37,7 +37,7 @@ describe('Authorization System', () => {
     clerkToken = clerkResponse.body.data.session.token;
 
     const publicResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'public',
         role: 'public',

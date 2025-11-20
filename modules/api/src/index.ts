@@ -42,6 +42,7 @@ import infoRouter from './routes/info.js';
 import configRouter from './routes/config.js';
 import systemRouter from './routes/system.js';
 import { createGeographyRouter } from './routes/geography.js';
+import { API_PREFIX, apiPath } from './constants.js';
 
 // Import middleware
 import {
@@ -219,17 +220,17 @@ export class CivicPressAPI {
     const geographyManager = new GeographyManager(this.dataDir);
 
     // Health check (no auth required)
-    this.app.use('/health', healthRouter);
+    this.app.use(apiPath('health'), healthRouter);
 
     // Documentation (no auth required)
-    this.app.use('/docs', docsRouter);
+    this.app.use(apiPath('docs'), docsRouter);
 
     // Info endpoint (no auth required)
-    this.app.use('/info', infoRouter);
+    this.app.use(apiPath('info'), infoRouter);
 
     // Auth routes (no auth required) - these need CivicPress instance
     this.app.use(
-      '/auth',
+      apiPath('auth'),
       (req, res, next) => {
         (req as any).civicPress = this.civicPress;
         next();
@@ -239,14 +240,14 @@ export class CivicPressAPI {
 
     // Public user registration endpoint (no auth required) - must come before general API middleware
     this.app.use(
-      '/api/v1/users/register',
+      apiPath('users/register'),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       registrationRouter
     );
 
     // Public authentication endpoint (no auth required) - must come before general API middleware
     this.app.use(
-      '/api/users/auth',
+      apiPath('users/auth'),
       (req, res, next) => {
         (req as any).civicPress = this.civicPress;
         next();
@@ -255,9 +256,9 @@ export class CivicPressAPI {
     );
 
     // Public routes that should be accessible to guests
-    this.app.use('/api/v1/records', createRecordsRouter(recordsService));
+    this.app.use(apiPath('records'), createRecordsRouter(recordsService));
     this.app.use(
-      '/api/v1/geography',
+      apiPath('geography'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
         (req as any).civicPress = this.civicPress;
@@ -266,7 +267,7 @@ export class CivicPressAPI {
       createGeographyRouter(geographyManager)
     );
     this.app.use(
-      '/api/v1/search',
+      apiPath('search'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
         (req as any).civicPress = this.civicPress;
@@ -274,93 +275,101 @@ export class CivicPressAPI {
       },
       searchRouter
     );
-    this.app.use('/api/v1/status', createStatusRouter());
-    this.app.use('/api/v1/validation', createValidationRouter());
+    this.app.use(apiPath('status'), createStatusRouter());
+    this.app.use(apiPath('validation'), createValidationRouter());
     this.app.use(
-      '/api/v1/config',
+      apiPath('config'),
       (req, _res, next) => {
         (req as any).civicPress = this.civicPress;
         next();
       },
       configRouter
     );
-    this.app.use('/api/v1/system', systemRouter);
+    this.app.use(apiPath('system'), systemRouter);
 
     // Activity log (admin-only; behind auth middleware)
     this.app.use(
-      '/api/v1/audit',
+      apiPath('audit'),
       authMiddleware(this.civicPress),
       createAuditRouter()
     );
 
     // Notifications (admin-only; behind auth middleware)
     this.app.use(
-      '/api/v1/notifications',
+      apiPath('notifications'),
       authMiddleware(this.civicPress),
       notificationsRouter
     );
 
     // Serve brand assets (logos, favicons, etc.)
     this.app.use(
-      '/brand-assets',
+      apiPath('brand-assets'),
       express.static(path.join(this.dataDir, '.civic', 'brand-assets'))
     );
 
     // Protected routes that require authentication
     this.app.use(
-      '/api/v1/export',
+      apiPath('export'),
       authMiddleware(this.civicPress),
       exportRouter
     );
     this.app.use(
-      '/api/v1/import',
+      apiPath('import'),
       authMiddleware(this.civicPress),
       importRouter
     );
-    this.app.use('/api/v1/hooks', authMiddleware(this.civicPress), hooksRouter);
     this.app.use(
-      '/api/v1/templates',
+      apiPath('hooks'),
+      authMiddleware(this.civicPress),
+      hooksRouter
+    );
+    this.app.use(
+      apiPath('templates'),
       authMiddleware(this.civicPress),
       templatesRouter
     );
     this.app.use(
-      '/api/v1/workflows',
+      apiPath('workflows'),
       authMiddleware(this.civicPress),
       workflowsRouter
     );
     this.app.use(
-      '/api/v1/indexing',
+      apiPath('indexing'),
       authMiddleware(this.civicPress),
       createIndexingRouter()
     );
     this.app.use(
-      '/api/v1/history',
+      apiPath('history'),
       authMiddleware(this.civicPress),
       createHistoryRouter()
     );
     this.app.use(
-      '/api/v1/diff',
+      apiPath('diff'),
       authMiddleware(this.civicPress),
       createDiffRouter()
     );
     // UUID-based storage API (for file attachments)
     this.app.use(
-      '/api/v1/storage',
+      apiPath('storage'),
       optionalAuth(this.civicPress),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       uuidStorageRouter
     );
     this.app.use(
-      '/api/v1/users/verify-email-change',
+      apiPath('users/verify-email-change'),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       publicRouter
     ); // Public endpoints (no auth required)
     this.app.use(
-      '/api/v1/users/verify-current-email',
+      apiPath('users/verify-current-email'),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       emailVerificationRouter
     ); // Public endpoints (no auth required)
-    this.app.use('/api/v1/users', authMiddleware(this.civicPress), usersRouter);
+    this.app.use(
+      apiPath('users'),
+      authMiddleware(this.civicPress),
+      usersRouter
+    );
   }
 
   async start(): Promise<void> {

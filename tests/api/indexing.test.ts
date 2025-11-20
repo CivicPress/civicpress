@@ -21,7 +21,7 @@ describe('Indexing API', () => {
 
     // Get authentication token
     const authResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'admin',
         role: 'admin',

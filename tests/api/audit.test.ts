@@ -23,7 +23,7 @@ describe('Audit API', () => {
 
   it('should return 403 for non-admin user', async () => {
     const authRes = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({ username: 'clerk-user', role: 'clerk' });
     const token = authRes.body?.data?.session?.token as string;
 
@@ -36,7 +36,7 @@ describe('Audit API', () => {
   it('should list audit entries for admin and include a config action', async () => {
     // Login as admin
     const adminAuth = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({ username: 'admin-user', role: 'admin' });
     const adminToken = adminAuth.body?.data?.session?.token as string;
 

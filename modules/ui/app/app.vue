@@ -41,7 +41,7 @@ onMounted(() => {
     const api = useNuxtApp().$civicApi;
     if (!api) return;
 
-    api('/info')
+    api('/api/v1/info')
       .then((res: any) => {
         if (!res?.success || !res?.analytics) return;
 
