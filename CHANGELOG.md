@@ -10,6 +10,47 @@ and this project adheres to
 
 ### Added
 
+## [0.1.2] - 2025-11-20
+
+<!-- markdownlint-disable MD024 -->
+
+### Fixed
+
+- **API ES Module Migration**: Fixed critical API startup issues
+  - Migrated API module to ES modules with `type: module` in package.json
+  - Updated all API route imports to include `.js` extensions (required for ES
+    modules)
+  - Replaced CommonJS `require()` calls with ES module `import` statements
+  - Fixed `findProjectRoot` to use ES module syntax instead of `require()`
+  - Resolves "require is not defined" errors that prevented API from starting
+- **Production Start Script**: Added unified production start command
+  - New `pnpm run start` script to start both API (port 3000) and UI (port 3030)
+  - Configured Nuxt preview server to listen on correct port and host
+  - Enables easy production deployment with a single command
+- **Flaky Geography Test**: Fixed intermittent test failure
+  - Added explicit `return` statements in geography preset route handler
+  - Added defensive error handling in `getGeographyPreset()` function
+  - Ensures response is always sent and errors are handled gracefully
+  - Test now passes consistently without "socket hang up" errors
+- **Nuxt Build Error**: Fixed TypeScript compilation error in UI build
+  - Removed invalid `port` property from nitro configuration
+  - Port is now correctly controlled via `PORT` environment variable
+  - UI production builds now complete successfully
+
+### Changed
+
+- **Configuration Resilience**: Improved central config handling
+  - Enhanced `CentralConfigManager` to handle missing `.civicrc` gracefully
+  - Added `.civicrc.example` template for new developers
+  - Better default path resolution for data directory and database
+- **UI Build Configuration**: Updated Nuxt configuration
+  - Fixed nitro devServer configuration
+  - Updated `.gitignore` to exclude compiled `.js` files from app directory
+
+## [0.1.1] - 2025-11-19
+
+### Added
+
 - **Internationalization (i18n)**: Added full i18n support to Nuxt UI module
   - Installed and configured `@nuxtjs/i18n` v10.2.1
   - Added English (en) and French (fr) language support
@@ -259,6 +300,8 @@ and this project adheres to
 
 ## 📝 Version History
 
+- **0.1.2**: Hotfix for API ES module migration, production start script, and
+  build fixes
 - **0.1.1**: Backup compression, demo data improvements, developer experience
   enhancements
 - **1.0.0**: Initial release with core platform architecture
