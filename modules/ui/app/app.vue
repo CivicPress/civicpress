@@ -6,18 +6,33 @@ useHead({
   meta: [
     { charset: 'utf-8' },
     { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-    { name: 'description', content: 'Civic Records Management System' },
+    {
+      name: 'description',
+      content: 'Open-source infrastructure for modern civic life',
+    },
     { property: 'og:title', content: 'CivicPress' },
-    { property: 'og:description', content: 'Civic Records Management System' },
-    { property: 'og:image', content: '/logo-large.svg' },
+    {
+      property: 'og:description',
+      content: 'Open-source infrastructure for modern civic life',
+    },
+    { property: 'og:image', content: '/og_image.png' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: 'https://civicpress.io' },
+    { property: 'og:site_name', content: 'CivicPress' },
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: 'CivicPress' },
-    { name: 'twitter:description', content: 'Civic Records Management System' },
-    { name: 'twitter:image', content: '/logo-large.svg' },
+    {
+      name: 'twitter:description',
+      content: 'Open-source infrastructure for modern civic life',
+    },
+    { name: 'twitter:image', content: '/og_image.png' },
   ],
   link: [
-    { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+    // `sizes="any"` is to fix Chrome bug
+    { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+    { rel: 'icon', href: '/icon.svg', type: 'image/svg+xml' },
+    { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+    { rel: 'manifest', href: '/manifest.webmanifest' },
   ],
   // Ensure head is available globally
   script: [
