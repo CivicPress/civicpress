@@ -441,7 +441,9 @@ const breadcrumbItems = computed(() => [
               </li>
               <li>
                 {{ t('settings.apiTestingTip3') }}:
-                <code class="bg-blue-100 px-1 rounded">GET /auth/me</code>
+                <code class="bg-blue-100 px-1 rounded"
+                  >GET /api/v1/auth/me</code
+                >
               </li>
               <li>{{ t('settings.apiTestingTip4') }}</li>
             </ul>

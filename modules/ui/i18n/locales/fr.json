@@ -949,5 +949,26 @@
     "proposed": "Proposé",
     "reviewed": "Examiné",
     "active": "Actif"
+  },
+  "error": {
+    "notFound": {
+      "title": "Page non trouvée",
+      "message": "La page que vous recherchez n'existe pas ou a été déplacée.",
+      "suggestions": "Voici quelques liens utiles :",
+      "suggestion1": "Vérifiez l'URL pour les erreurs de frappe",
+      "suggestion2": "Retournez à la page d'accueil",
+      "suggestion3": "Parcourez les registres ou les fichiers géographiques"
+    },
+    "serverError": {
+      "title": "Erreur serveur",
+      "message": "Une erreur s'est produite de notre côté. Veuillez réessayer plus tard.",
+      "help": "Si le problème persiste, veuillez contacter le support."
+    },
+    "generic": {
+      "title": "Une erreur s'est produite",
+      "message": "Quelque chose d'inattendu s'est produit. Veuillez réessayer."
+    },
+    "goHome": "Aller à l'accueil",
+    "goBack": "Retour"
   }
 }
