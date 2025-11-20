@@ -75,7 +75,7 @@ export default defineNuxtConfig({
         // The path is passed through by default
       },
     },
-    // Production server port configuration
-    port: process.env.PORT ? parseInt(process.env.PORT) : 3030,
+    // Note: Production preview server port is controlled via PORT env var
+    // (set in package.json start:ui script)
   },
 });
