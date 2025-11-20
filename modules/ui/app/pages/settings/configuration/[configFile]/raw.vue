@@ -81,7 +81,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
-  middleware: ['require-config-manage'],
+  middleware: ['require-auth', 'require-config-manage'],
 });
 
 const route = useRoute();

@@ -4,6 +4,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
 const recordsStore = useRecordsStore();
+const authStore = useAuthStore();
 
 // Route and router for URL state management
 const route = useRoute();
@@ -193,6 +194,9 @@ const breadcrumbItems = computed(() => [
         </template>
         <template #right>
           <HeaderActions
+            v-if="
+              authStore.isLoggedIn && authStore.hasPermission('records:create')
+            "
             :actions="[
               {
                 label: `Create ${recordTypeLabel}`,

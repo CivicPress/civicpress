@@ -4,6 +4,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
 const recordsStore = useRecordsStore();
+const authStore = useAuthStore();
 const { buildQueryFromState, parseQueryToState } = await import(
   '~/composables/useRecordQueryState'
 );
@@ -254,6 +255,10 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
               class="w-44"
             />
             <HeaderActions
+              v-if="
+                authStore.isLoggedIn &&
+                authStore.hasPermission('records:create')
+              "
               :actions="[
                 {
                   label: t('records.createRecord'),

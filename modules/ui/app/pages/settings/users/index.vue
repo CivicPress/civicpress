@@ -68,7 +68,7 @@ const breadcrumbItems = computed(() => [
 ]);
 
 definePageMeta({
-  middleware: ['require-users-manage'],
+  middleware: ['require-auth', 'require-users-manage'],
 });
 
 // On mounted

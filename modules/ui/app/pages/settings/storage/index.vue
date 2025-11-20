@@ -181,6 +181,10 @@ import { useAuthStore } from '@/stores/auth';
 import FileBrowser from '~/components/storage/FileBrowser.vue';
 import FileUpload from '~/components/storage/FileUpload.vue';
 
+definePageMeta({
+  middleware: ['require-auth'],
+});
+
 // Composables
 const toast = useToast();
 const authStore = useAuthStore();
