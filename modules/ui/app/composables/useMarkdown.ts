@@ -1,5 +1,9 @@
 import { marked, type MarkedOptions } from 'marked';
-import { useRuntimeConfig } from '#imports';
+
+// In Nuxt, useRuntimeConfig is globally available at runtime.
+// We declare it here for TypeScript without importing '#imports',
+// so that plain Vitest tests can import this module without Nuxt aliases.
+declare function useRuntimeConfig(): any;
 
 const EMPTY_LINE_MARKER = '[[CIVIC_EMPTY_LINE_MARKER]]';
 
@@ -14,7 +18,21 @@ export const useMarkdown = () => {
 
   marked.use({ renderer });
 
-  const runtimeConfig = useRuntimeConfig();
+  const getApiBaseUrl = (): string => {
+    try {
+      // useRuntimeConfig will be available in a Nuxt runtime environment
+      if (typeof useRuntimeConfig === 'function') {
+        const runtimeConfig = useRuntimeConfig();
+        const url = (runtimeConfig?.public as any)?.civicApiUrl;
+        if (typeof url === 'string' && url.length > 0) {
+          return url;
+        }
+      }
+    } catch {
+      // Ignore errors and fall back to relative URLs
+    }
+    return '';
+  };
 
   /**
    * Normalize internal storage image URLs:
@@ -24,7 +42,7 @@ export const useMarkdown = () => {
    * This allows markdown content to store only the UUID for internal storage images.
    */
   const normalizeInternalImageUrls = (content: string): string => {
-    const apiBaseUrl = (runtimeConfig?.public as any)?.civicApiUrl || '';
+    const apiBaseUrl = getApiBaseUrl();
 
     // Matches markdown image syntax where the URL is a bare UUID:
     // ![alt](123e4567-e89b-12d3-a456-426614174000)
