@@ -224,13 +224,19 @@ export class CentralConfigManager {
 
     // Ensure we have a valid config
     if (!mergedConfig.dataDir) {
-      mergedConfig.dataDir = 'data';
+      // Default to 'data' directory relative to project root
+      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
+      mergedConfig.dataDir = path.resolve(projectRoot, 'data');
+    } else if (!path.isAbsolute(mergedConfig.dataDir)) {
+      // Resolve relative paths to absolute
+      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
+      mergedConfig.dataDir = path.resolve(projectRoot, mergedConfig.dataDir);
     }
     if (!mergedConfig.database) {
       mergedConfig.database = {
         type: 'sqlite',
         sqlite: {
-          file: path.join(mergedConfig.dataDir, 'civic.db'),
+          file: path.join(process.cwd(), '.system-data', 'civic.db'),
         },
       };
     }

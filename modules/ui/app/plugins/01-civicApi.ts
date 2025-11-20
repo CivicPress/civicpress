@@ -5,11 +5,11 @@ export default defineNuxtPlugin((nuxtApp) => {
       // Skip authorization for public endpoints only
       const url = typeof request === 'string' ? request : request.toString();
       const isPublicEndpoint =
-        url.includes('/auth/login') ||
-        url.includes('/auth/password') ||
-        url.includes('/health') ||
-        url.includes('/info') ||
-        url.includes('/docs');
+        url.includes('/api/v1/auth/login') ||
+        url.includes('/api/v1/auth/password') ||
+        url.includes('/api/v1/health') ||
+        url.includes('/api/v1/info') ||
+        url.includes('/api/v1/docs');
 
       if (!isPublicEndpoint) {
         // Get auth store to check if user is logged in

@@ -944,5 +944,26 @@
     "proposed": "Proposed",
     "reviewed": "Reviewed",
     "active": "Active"
+  },
+  "error": {
+    "notFound": {
+      "title": "Page Not Found",
+      "message": "The page you're looking for doesn't exist or has been moved.",
+      "suggestions": "Here are some helpful links:",
+      "suggestion1": "Check the URL for typos",
+      "suggestion2": "Go back to the home page",
+      "suggestion3": "Browse records or geography files"
+    },
+    "serverError": {
+      "title": "Server Error",
+      "message": "Something went wrong on our end. Please try again later.",
+      "help": "If the problem persists, please contact support."
+    },
+    "generic": {
+      "title": "An Error Occurred",
+      "message": "Something unexpected happened. Please try again."
+    },
+    "goHome": "Go to Home",
+    "goBack": "Go Back"
   }
 }

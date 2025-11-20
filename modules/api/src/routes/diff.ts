@@ -5,9 +5,9 @@ import {
   sendSuccess,
   logApiRequest,
   handleApiError,
-} from '../utils/api-logger';
-import { requirePermission } from '../middleware/auth';
-import { AuthenticatedRequest } from '../middleware/auth';
+} from '../utils/api-logger.js';
+import { requirePermission } from '../middleware/auth.js';
+import { AuthenticatedRequest } from '../middleware/auth.js';
 import {
   findRecordFileSync,
   listRecordFilesSync,

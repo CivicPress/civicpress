@@ -65,8 +65,14 @@ export function getGeographyPresets(): Record<string, GeographyPreset> {
  * Get a specific preset by key
  */
 export function getGeographyPreset(key: string): GeographyPreset | null {
-  const presets = getGeographyPresets();
-  return presets[key] || null;
+  try {
+    const presets = getGeographyPresets();
+    return presets[key] || null;
+  } catch (error) {
+    // If getGeographyPresets fails, return null instead of throwing
+    logger.error('Failed to get geography preset:', error);
+    return null;
+  }
 }
 
 /**

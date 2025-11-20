@@ -161,7 +161,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       this.error = null;
       try {
-        const response = await useNuxtApp().$civicApi('/auth/password', {
+        const response = await useNuxtApp().$civicApi('/api/v1/auth/password', {
           method: 'POST',
           body: { username, password },
         });
@@ -184,7 +184,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       this.error = null;
       try {
-        const response = await useNuxtApp().$civicApi('/auth/login', {
+        const response = await useNuxtApp().$civicApi('/api/v1/auth/login', {
           method: 'POST',
           body: { token, provider: 'github' },
         });
@@ -209,7 +209,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         // Call logout API if we have a token
         if (this.token) {
-          await useNuxtApp().$civicApi('/auth/logout', {
+          await useNuxtApp().$civicApi('/api/v1/auth/logout', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${this.token}`,
@@ -298,7 +298,7 @@ export const useAuthStore = defineStore('auth', {
           return !!this.user;
         }
 
-        const response = (await nuxtApp.$civicApi('/auth/me', {
+        const response = (await nuxtApp.$civicApi('/api/v1/auth/me', {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${this.token}`,
@@ -337,7 +337,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       try {
-        const response = (await useNuxtApp().$civicApi('/auth/me', {
+        const response = (await useNuxtApp().$civicApi('/api/v1/auth/me', {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${this.token}`,

@@ -25,7 +25,7 @@ export default defineNuxtConfig({
       civicApiUrl: process.env.API_BASE_URL || 'http://localhost:3000',
       // App configuration
       appName: 'CivicPress',
-      appVersion: '1.0.0',
+      appVersion: '0.1.2',
     },
   },
 
@@ -75,5 +75,7 @@ export default defineNuxtConfig({
         // The path is passed through by default
       },
     },
+    // Note: Production preview server port is controlled via PORT env var
+    // (set in package.json start:ui script)
   },
 });

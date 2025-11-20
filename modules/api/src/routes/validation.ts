@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
-import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
+import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
 import {
   Logger,
   RecordValidator,
@@ -14,7 +14,7 @@ import {
   handleApiError,
   logApiRequest,
   handleValidationError,
-} from '../utils/api-logger';
+} from '../utils/api-logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';

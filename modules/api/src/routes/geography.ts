@@ -216,9 +216,9 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           );
         }
 
-        handleSuccess('get_preset', preset, res);
+        return handleSuccess('get_preset', preset, res);
       } catch (error) {
-        handleError('get_preset', error, res);
+        return handleError('get_preset', error, res);
       }
     }
   );

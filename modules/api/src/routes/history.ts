@@ -3,14 +3,14 @@ import { query, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
   requireRecordPermission,
-} from '../middleware/auth';
+} from '../middleware/auth.js';
 import { Logger } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
   logApiRequest,
   handleValidationError,
-} from '../utils/api-logger';
+} from '../utils/api-logger.js';
 
 const logger = new Logger();
 

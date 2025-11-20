@@ -21,7 +21,7 @@ describe('UUID Storage API', () => {
 
     // Get authentication token for admin
     const adminResponse = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({
         username: 'admin',
         role: 'admin',

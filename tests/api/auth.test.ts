@@ -20,10 +20,10 @@ describe('Authentication API', () => {
     await cleanupAPITestContext(context);
   });
 
-  describe('POST /auth/simulated', () => {
+  describe('POST /api/v1/auth/simulated', () => {
     it('should authenticate with valid simulated credentials', async () => {
       const response = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({
           username: 'testuser',
           role: 'admin',
@@ -37,7 +37,7 @@ describe('Authentication API', () => {
 
     it('should reject login without username', async () => {
       const response = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({});
 
       expect(response.status).toBe(400);
@@ -47,7 +47,7 @@ describe('Authentication API', () => {
 
     it('should handle invalid role', async () => {
       const response = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({
           username: 'testuser',
           role: 'invalid-role',
@@ -59,11 +59,11 @@ describe('Authentication API', () => {
     });
   });
 
-  describe('GET /auth/me', () => {
+  describe('GET /api/v1/auth/me', () => {
     it('should return user info with valid token', async () => {
       // First login to get a token
       const loginResponse = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({
           username: 'testuser',
           role: 'admin',
@@ -72,7 +72,7 @@ describe('Authentication API', () => {
       const token = loginResponse.body.data.session.token;
 
       const response = await request(context.api.getApp())
-        .get('/auth/me')
+        .get('/api/v1/auth/me')
         .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);
@@ -81,7 +81,9 @@ describe('Authentication API', () => {
     });
 
     it('should reject request without authorization header', async () => {
-      const response = await request(context.api.getApp()).get('/auth/me');
+      const response = await request(context.api.getApp()).get(
+        '/api/v1/auth/me'
+      );
 
       expect(response.status).toBe(401);
       expect(response.body.error.message).toBe('Authorization header required');
@@ -90,7 +92,7 @@ describe('Authentication API', () => {
 
     it('should reject request with invalid token', async () => {
       const response = await request(context.api.getApp())
-        .get('/auth/me')
+        .get('/api/v1/auth/me')
         .set('Authorization', 'Bearer invalid-token');
 
       expect(response.status).toBe(401);
@@ -99,11 +101,11 @@ describe('Authentication API', () => {
     });
   });
 
-  describe('POST /auth/logout', () => {
+  describe('POST /api/v1/auth/logout', () => {
     it('should logout successfully', async () => {
       // First login to get a token
       const loginResponse = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({
           username: 'testuser',
           role: 'admin',
@@ -112,7 +114,7 @@ describe('Authentication API', () => {
       const token = loginResponse.body.data.session.token;
 
       const response = await request(context.api.getApp())
-        .post('/auth/logout')
+        .post('/api/v1/auth/logout')
         .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);
@@ -121,7 +123,9 @@ describe('Authentication API', () => {
     });
 
     it('should reject logout without authorization header', async () => {
-      const response = await request(context.api.getApp()).post('/auth/logout');
+      const response = await request(context.api.getApp()).post(
+        '/api/v1/auth/logout'
+      );
 
       expect(response.status).toBe(401);
       expect(response.body.error.message).toBe('Authorization header required');
@@ -133,7 +137,7 @@ describe('Authentication API', () => {
     it('should allow access to records with valid token and permissions', async () => {
       // First login to get a token
       const loginResponse = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({
           username: 'testuser',
           role: 'admin',

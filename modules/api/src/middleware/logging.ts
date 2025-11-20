@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { apiLogger } from '../utils/api-logger';
+import { apiLogger } from '../utils/api-logger.js';
 
 // Middleware to automatically log all API requests and responses
 export function apiLoggingMiddleware(

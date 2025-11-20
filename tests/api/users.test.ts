@@ -119,7 +119,7 @@ describe('API User Management', () => {
     });
   });
 
-  describe('POST /api/users/auth/password - User Authentication', () => {
+  describe('POST /api/v1/users/auth/password - User Authentication', () => {
     it('should authenticate user with valid credentials', async () => {
       // First register a user
       const userData = {
@@ -140,7 +140,7 @@ describe('API User Management', () => {
       };
 
       const response = await request(context.api.getApp())
-        .post('/api/users/auth/password')
+        .post('/api/v1/users/auth/password')
         .send(authData);
 
       expect(response.status).toBe(200);
@@ -170,7 +170,7 @@ describe('API User Management', () => {
       };
 
       const response = await request(context.api.getApp())
-        .post('/api/users/auth/password')
+        .post('/api/v1/users/auth/password')
         .send(authData);
 
       expect(response.status).toBe(401);
@@ -184,7 +184,7 @@ describe('API User Management', () => {
       };
 
       const response = await request(context.api.getApp())
-        .post('/api/users/auth/password')
+        .post('/api/v1/users/auth/password')
         .send(authData);
 
       expect(response.status).toBe(401);
@@ -193,7 +193,7 @@ describe('API User Management', () => {
 
     it('should fail authentication with missing credentials', async () => {
       const response = await request(context.api.getApp())
-        .post('/api/users/auth/password')
+        .post('/api/v1/users/auth/password')
         .send({});
 
       expect(response.status).toBe(400);

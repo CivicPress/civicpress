@@ -6,6 +6,10 @@
 .cache
 dist
 
+# Compiled JavaScript files (TypeScript source files should be used)
+app/**/*.js
+!app/**/*.config.js
+
 # Node dependencies
 node_modules
 

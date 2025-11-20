@@ -210,7 +210,7 @@ modules/ui/
 
 ```bash
 # Check if servers are running
-curl http://localhost:3000/health
+curl http://localhost:3000/api/v1/health
 curl http://localhost:3030
 
 # View logs

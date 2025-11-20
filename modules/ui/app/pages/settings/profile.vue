@@ -28,7 +28,7 @@ const fetchUserInfo = async () => {
 
     // Otherwise try to fetch from API (requires authentication)
     if (authStore.token) {
-      const response = (await $civicApi('/auth/me')) as any;
+      const response = (await $civicApi('/api/v1/auth/me')) as any;
       if (response.success) {
         userInfo.value = response.data.user;
         // Also update the auth store with fresh data
@@ -441,7 +441,9 @@ const breadcrumbItems = computed(() => [
               </li>
               <li>
                 {{ t('settings.apiTestingTip3') }}:
-                <code class="bg-blue-100 px-1 rounded">GET /auth/me</code>
+                <code class="bg-blue-100 px-1 rounded"
+                  >GET /api/v1/auth/me</code
+                >
               </li>
               <li>{{ t('settings.apiTestingTip4') }}</li>
             </ul>

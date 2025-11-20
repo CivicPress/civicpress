@@ -26,7 +26,7 @@ describe('Config RAW endpoints', () => {
   it('should return 403 for non-admin (clerk) user', async () => {
     // Simulated clerk session
     const authRes = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({ username: 'clerk-user', role: 'clerk' });
     const token = authRes.body?.data?.session?.token as string;
 
@@ -38,7 +38,7 @@ describe('Config RAW endpoints', () => {
 
   it('should allow admin to read raw YAML', async () => {
     const authRes = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({ username: 'admin-user', role: 'admin' });
     const token = authRes.body?.data?.session?.token as string;
 
@@ -52,7 +52,7 @@ describe('Config RAW endpoints', () => {
 
   it('should allow admin to write raw YAML and persist', async () => {
     const authRes = await request(context.api.getApp())
-      .post('/auth/simulated')
+      .post('/api/v1/auth/simulated')
       .send({ username: 'admin-user', role: 'admin' });
     const token = authRes.body?.data?.session?.token as string;
 

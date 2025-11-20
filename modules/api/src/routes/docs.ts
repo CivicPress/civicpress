@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
-import { sendSuccess, logApiRequest } from '../utils/api-logger';
+import { sendSuccess, logApiRequest } from '../utils/api-logger.js';
 
 export const docsRouter = Router();
 
@@ -9,7 +9,7 @@ const swaggerSpec = {
   openapi: '3.0.0',
   info: {
     title: 'CivicPress API',
-    version: '1.0.0',
+    version: '0.1.2',
     description: 'REST API for CivicPress governance platform',
     contact: {
       name: 'CivicPress Team',
@@ -101,7 +101,7 @@ const swaggerSpec = {
     },
   ],
   paths: {
-    '/health': {
+    '/api/v1/health': {
       get: {
         summary: 'Health Check',
         description: 'Check API server status',

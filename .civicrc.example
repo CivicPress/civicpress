@@ -1,0 +1,28 @@
+# CivicPress System Configuration
+# Copy this file to .civicrc and customize for your deployment
+# The .civicrc file is machine-specific and should not be committed to Git
+
+version: '1.0.0'
+dataDir: './data'
+modules:
+  - legal-register
+record_types:
+  - bylaw
+  - policy
+  - resolution
+  - ordinance
+  - proclamation
+  - session
+default_role: clerk
+hooks:
+  enabled: true
+workflows:
+  enabled: true
+audit:
+  enabled: true
+database:
+  type: sqlite
+  sqlite:
+    file: './.system-data/civic.db'
+created: '2025-01-01T00:00:00.000Z'
+

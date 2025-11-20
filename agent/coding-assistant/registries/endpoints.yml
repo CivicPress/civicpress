@@ -2,97 +2,97 @@
 # The assistant MUST check here before creating new endpoints.
 
 endpoints:
-  # Auth (mounted at /auth)
+  # Auth (mounted at /api/v1/auth)
   - id: auth:login
     method: POST
-    path: /auth/login
+    path: /api/v1/auth/login
     file: modules/api/src/routes/auth.ts
     desc: Authenticate with OAuth provider token
     status: stable
 
   - id: auth:password
     method: POST
-    path: /auth/password
+    path: /api/v1/auth/password
     file: modules/api/src/routes/auth.ts
     desc: Authenticate with username and password
     status: stable
 
   - id: auth:providers
     method: GET
-    path: /auth/providers
+    path: /api/v1/auth/providers
     file: modules/api/src/routes/auth.ts
     desc: List available OAuth providers
     status: stable
 
   - id: auth:me
     method: GET
-    path: /auth/me
+    path: /api/v1/auth/me
     file: modules/api/src/routes/auth.ts
     desc: Get current authenticated user
     status: stable
 
   - id: auth:logout
     method: POST
-    path: /auth/logout
+    path: /api/v1/auth/logout
     file: modules/api/src/routes/auth.ts
     desc: Logout (stateless)
     status: stable
 
   - id: auth:simulated
     method: POST
-    path: /auth/simulated
+    path: /api/v1/auth/simulated
     file: modules/api/src/routes/auth.ts
     desc: Authenticate with simulated account (disabled in production)
     status: stable
 
-  # Public registration/auth helpers (mounted directly under /api)
+  # Public registration/auth helpers (mounted at /api/v1/users)
   - id: users:register
     method: POST
-    path: /api/users/register
+    path: /api/v1/users/register
     file: modules/api/src/routes/users.ts
     desc: Public user registration
     status: stable
 
   - id: users:password-auth
     method: POST
-    path: /api/users/auth/password
+    path: /api/v1/users/auth/password
     file: modules/api/src/routes/users.ts
     desc: Password authentication (public)
     status: stable
 
-  # Health and docs
+  # Health and docs (mounted at /api/v1)
   - id: health:basic
     method: GET
-    path: /health
+    path: /api/v1/health
     file: modules/api/src/routes/health.ts
     desc: Health check
     status: stable
 
   - id: health:detailed
     method: GET
-    path: /health/detailed
+    path: /api/v1/health/detailed
     file: modules/api/src/routes/health.ts
     desc: Detailed health info
     status: stable
 
   - id: health:test-error
     method: POST
-    path: /health/test-error
+    path: /api/v1/health/test-error
     file: modules/api/src/routes/health.ts
     desc: Emit a test error (diagnostics)
     status: stable
 
   - id: docs:swagger
     method: GET
-    path: /docs/api-docs.json
+    path: /api/v1/docs/api-docs.json
     file: modules/api/src/routes/docs.ts
     desc: OpenAPI schema JSON
     status: stable
 
-  # Info (no auth)
+  # Info (mounted at /api/v1/info)
   - id: info:root
     method: GET
-    path: /info
+    path: /api/v1/info
     file: modules/api/src/routes/info.ts
     desc: System/organization info
     status: stable

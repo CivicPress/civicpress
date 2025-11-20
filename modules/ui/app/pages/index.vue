@@ -74,7 +74,7 @@ const submitHomeSearch = () => {
 // Fetch organization info (public endpoint)
 const fetchOrganizationInfo = async () => {
   try {
-    const response = (await $civicApi('/info')) as any;
+    const response = (await $civicApi('/api/v1/info')) as any;
     if (response.success) {
       organizationInfo.value = response.organization;
     }

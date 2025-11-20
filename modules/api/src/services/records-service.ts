@@ -6,6 +6,8 @@ import {
   RecordManager,
   userCan,
 } from '@civicpress/core';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * RecordsService - API Record Management
@@ -63,11 +65,12 @@ export class RecordsService {
   ) {
     this.civicPress = civicPress;
     // Get dataDir from CivicPress config
-    this.dataDir = (civicPress as any).config?.dataDir || './data';
+    const dataDir = (civicPress as any).config?.dataDir || './data';
+    this.dataDir = dataDir;
 
     // Use provided dependencies or create new ones
     this.workflowManager =
-      workflowManager || new WorkflowConfigManager(this.dataDir!);
+      workflowManager || new WorkflowConfigManager(dataDir);
     this.recordManager = recordManager || civicPress.getRecordManager();
   }
 
@@ -223,12 +226,17 @@ export class RecordsService {
     }
 
     // Read the raw file content from the filesystem
-    const fs = require('fs');
-    const path = require('path');
+    // fs and path are already imported at the top of the file
 
     try {
       // The record.path already includes 'records/', so we need to construct the path correctly
-      const filePath = path.join(this.dataDir!, record.path);
+      if (!this.dataDir) {
+        throw new Error('Data directory not set');
+      }
+      if (!record.path) {
+        throw new Error('Record path not available');
+      }
+      const filePath = path.join(this.dataDir, record.path);
 
       const rawContent = fs.readFileSync(filePath, 'utf8');
 

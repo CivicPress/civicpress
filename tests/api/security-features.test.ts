@@ -48,7 +48,7 @@ describe('API Security Features', () => {
 
       // Get admin token
       const adminResponse = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({ username: 'admin', role: 'admin' });
       adminToken = adminResponse.body.data.session.token;
     });
@@ -59,7 +59,7 @@ describe('API Security Features', () => {
         // Issue: Test expects 400/401 but gets 200 (password change succeeds unexpectedly)
         // First get user token
         const userResponse = await request(context.api.getApp())
-          .post('/auth/simulated')
+          .post('/api/v1/auth/simulated')
           .send({ username: 'passworduser', role: 'public' });
         const userToken = userResponse.body.data.session.token;
         const simulatedUserId = userResponse.body.data.session.user.id;
@@ -113,7 +113,7 @@ describe('API Security Features', () => {
 
       it('should require valid request body', async () => {
         const userResponse = await request(context.api.getApp())
-          .post('/auth/simulated')
+          .post('/api/v1/auth/simulated')
           .send({ username: 'passworduser', role: 'public' });
         const userToken = userResponse.body.data.session.token;
 
@@ -164,7 +164,7 @@ describe('API Security Features', () => {
         // TODO: Fix admin privilege validation - getting 400 instead of 403
         // Issue: Non-admin users should get 403 (Forbidden) not 400 (Bad Request)
         const userResponse = await request(context.api.getApp())
-          .post('/auth/simulated')
+          .post('/api/v1/auth/simulated')
           .send({ username: 'passworduser', role: 'public' });
         const userToken = userResponse.body.data.session.token;
 
@@ -213,13 +213,13 @@ describe('API Security Features', () => {
 
       // Get user token
       const tokenResponse = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({ username: 'emailtestuser', role: 'public' });
       userToken = tokenResponse.body.data.session.token;
 
       // Get admin token
       const adminResponse = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({ username: 'admin', role: 'admin' });
       adminToken = adminResponse.body.data.session.token;
     });
@@ -512,7 +512,7 @@ describe('API Security Features', () => {
 
       // Get admin token
       const adminResponse = await request(context.api.getApp())
-        .post('/auth/simulated')
+        .post('/api/v1/auth/simulated')
         .send({ username: 'admin', role: 'admin' });
       adminToken = adminResponse.body.data.session.token;
     });

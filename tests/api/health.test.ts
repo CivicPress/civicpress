@@ -22,7 +22,7 @@ describe('Health API', () => {
 
   it('should return health status', async () => {
     const response = await request(context.api.getApp())
-      .get('/health')
+      .get('/api/v1/health')
       .expect(200);
 
     expect(response.body.data.status).toBe('healthy');
@@ -33,7 +33,7 @@ describe('Health API', () => {
 
   it('should return detailed health status', async () => {
     const response = await request(context.api.getApp())
-      .get('/health/detailed')
+      .get('/api/v1/health/detailed')
       .expect(200);
 
     expect(response.body.data.status).toBe('healthy');
@@ -48,7 +48,7 @@ describe('Health API', () => {
 
   it('should test validation error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'validation' })
       .expect(400);
 
@@ -58,7 +58,7 @@ describe('Health API', () => {
 
   it('should test not found error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'not_found' })
       .expect(404);
 
@@ -68,7 +68,7 @@ describe('Health API', () => {
 
   it('should test server error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'server_error' })
       .expect(500);
 
@@ -78,7 +78,7 @@ describe('Health API', () => {
 
   it('should test generic error logging', async () => {
     const response = await request(context.api.getApp())
-      .post('/health/test-error')
+      .post('/api/v1/health/test-error')
       .send({ errorType: 'generic' })
       .expect(500);
 

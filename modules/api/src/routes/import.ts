@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
-import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
-import { sendSuccess, logApiRequest } from '../utils/api-logger';
+import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
+import { sendSuccess, logApiRequest } from '../utils/api-logger.js';
 
 export const importRouter = Router();
 

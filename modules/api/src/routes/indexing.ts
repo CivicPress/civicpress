@@ -1,14 +1,14 @@
 import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { join } from 'path';
-import { AuthenticatedRequest, requirePermission } from '../middleware/auth';
+import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
 import { Logger } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
   logApiRequest,
   handleValidationError,
-} from '../utils/api-logger';
+} from '../utils/api-logger.js';
 
 const logger = new Logger();
 

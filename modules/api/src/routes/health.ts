@@ -4,7 +4,7 @@ import {
   sendSuccess,
   handleApiError,
   logApiRequest,
-} from '../utils/api-logger';
+} from '../utils/api-logger.js';
 
 const logger = new Logger();
 
