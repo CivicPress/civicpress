@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import {
   CivicPress,
   Logger,
@@ -191,14 +192,14 @@ export class CivicPressAPI {
 
   private findProjectRoot(): string | null {
     let currentPath = process.cwd();
-    const rootPath = require('path').parse(currentPath).root;
+    const rootPath = path.parse(currentPath).root;
 
     while (currentPath !== rootPath) {
-      const civicrcPath = require('path').join(currentPath, '.civicrc');
-      if (require('fs').existsSync(civicrcPath)) {
+      const civicrcPath = path.join(currentPath, '.civicrc');
+      if (fs.existsSync(civicrcPath)) {
         return currentPath;
       }
-      const parentPath = require('path').dirname(currentPath);
+      const parentPath = path.dirname(currentPath);
       if (parentPath === currentPath) {
         break;
       }
@@ -394,26 +395,29 @@ export class CivicPressAPI {
 }
 
 // Start server if this file is run directly
-if (require.main === module) {
+// ES module equivalent of require.main === module
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+// Check if this file is being run directly (not imported)
+// Compare normalized paths to handle different path formats
+const isMainModule =
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) ===
+    fileURLToPath(
+      process.argv[1].startsWith('file://')
+        ? process.argv[1]
+        : `file://${process.argv[1]}`
+    );
+
+if (isMainModule) {
   // Use CentralConfigManager to get both data directory and database config
-  const { CentralConfigManager } = require('@civicpress/core');
+  // CentralConfigManager is already imported at the top of the file
   const dataDir = CentralConfigManager.getDataDir();
   const port = parseInt(process.env.PORT || '3000');
 
   const api = new CivicPressAPI(port);
 
-  api
-    .initialize(dataDir)
-    .then(() => api.start())
-    .then(() => {
-      logger.info('CivicPress API server started successfully');
-    })
-    .catch((error) => {
-      logger.error('Failed to start CivicPress API server:', error);
-      process.exit(1);
-    });
-
-  // Graceful shutdown
+  // Graceful shutdown handlers
   process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully...');
     await api.shutdown();
@@ -425,5 +429,16 @@ if (require.main === module) {
     await api.shutdown();
     process.exit(0);
   });
+
+  api
+    .initialize(dataDir)
+    .then(() => api.start())
+    .then(() => {
+      logger.info('CivicPress API server started successfully');
+    })
+    .catch((error) => {
+      logger.error('Failed to start CivicPress API server:', error);
+      process.exit(1);
+    });
 }
 // Test comment for watch

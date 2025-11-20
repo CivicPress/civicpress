@@ -75,5 +75,7 @@ export default defineNuxtConfig({
         // The path is passed through by default
       },
     },
+    // Production server port configuration
+    port: process.env.PORT ? parseInt(process.env.PORT) : 3030,
   },
 });

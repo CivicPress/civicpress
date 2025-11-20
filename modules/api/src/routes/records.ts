@@ -4,15 +4,15 @@ import {
   AuthenticatedRequest,
   requireRecordPermission,
   authMiddleware,
-} from '../middleware/auth';
-import { RecordsService } from '../services/records-service';
+} from '../middleware/auth.js';
+import { RecordsService } from '../services/records-service.js';
 import { Logger } from '@civicpress/core';
 import { AuditLogger } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
   logApiRequest,
-} from '../utils/api-logger';
+} from '../utils/api-logger.js';
 
 const logger = new Logger();
 const audit = new AuditLogger();

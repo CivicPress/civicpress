@@ -5,7 +5,7 @@ import {
   logApiRequest,
   handleApiError,
   handleValidationError,
-} from '../utils/api-logger';
+} from '../utils/api-logger.js';
 import { Logger } from '@civicpress/core';
 
 // Declare setTimeout and clearTimeout for TypeScript

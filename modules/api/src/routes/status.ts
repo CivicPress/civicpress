@@ -10,7 +10,7 @@ import {
   handleApiError,
   logApiRequest,
   handleValidationError,
-} from '../utils/api-logger';
+} from '../utils/api-logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

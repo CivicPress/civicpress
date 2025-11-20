@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
-import { sendSuccess, logApiRequest } from '../utils/api-logger';
+import { sendSuccess, logApiRequest } from '../utils/api-logger.js';
 
 export const docsRouter = Router();
 
