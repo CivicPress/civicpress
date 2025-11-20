@@ -2,6 +2,10 @@
 import type { User } from '~/stores/auth';
 import SystemFooter from '~/components/SystemFooter.vue';
 
+definePageMeta({
+  middleware: ['require-auth'],
+});
+
 // Store
 const authStore = useAuthStore();
 

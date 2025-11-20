@@ -7,6 +7,7 @@ definePageMeta({
   title: 'View User',
   requiresAuth: true,
   layout: 'default',
+  middleware: ['require-auth'],
 });
 
 // Route parameters

@@ -112,7 +112,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 
 definePageMeta({
   layout: 'default',
-  middleware: ['require-admin'],
+  middleware: ['require-auth', 'require-admin'],
 });
 
 const { $civicApi } = useNuxtApp();

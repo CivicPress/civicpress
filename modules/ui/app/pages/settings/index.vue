@@ -3,6 +3,10 @@ import type { NavigationMenuItem } from '@nuxt/ui';
 import { ref, onMounted, computed } from 'vue';
 import SystemFooter from '~/components/SystemFooter.vue';
 
+definePageMeta({
+  middleware: ['require-auth'],
+});
+
 const route = useRoute();
 const router = useRouter();
 const { $civicApi } = useNuxtApp();

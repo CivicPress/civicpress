@@ -102,7 +102,7 @@ searchRouter.get(
       }
 
       const recordsService = new (
-        await import('../services/records-service')
+        await import('../services/records-service.js')
       ).RecordsService(civicPress);
       const result = await recordsService.searchRecords(query as string, {
         type: type as string,

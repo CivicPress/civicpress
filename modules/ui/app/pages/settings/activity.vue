@@ -151,7 +151,7 @@ const { t } = useI18n();
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
-  middleware: ['require-config-manage'],
+  middleware: ['require-auth', 'require-config-manage'],
 });
 
 const items = ref<any[]>([]);

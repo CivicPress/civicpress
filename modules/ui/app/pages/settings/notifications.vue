@@ -89,7 +89,7 @@ import { useNuxtApp } from '#imports';
 
 definePageMeta({
   layout: 'default',
-  middleware: ['require-users-manage'],
+  middleware: ['require-auth', 'require-users-manage'],
 });
 
 const { $civicApi } = useNuxtApp();

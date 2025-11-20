@@ -7,7 +7,7 @@ definePageMeta({
   title: 'Edit User',
   requiresAuth: true,
   layout: 'default',
-  middleware: ['require-users-manage'],
+  middleware: ['require-auth', 'require-users-manage'],
 });
 
 const { t } = useI18n();

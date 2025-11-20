@@ -11,7 +11,14 @@
           {{ t('geography.filesDescription') }}
         </template>
         <template #right>
-          <UButton color="primary" @click="navigateToCreate">
+          <UButton
+            v-if="
+              authStore.isLoggedIn &&
+              authStore.hasPermission('geography:create')
+            "
+            color="primary"
+            @click="navigateToCreate"
+          >
             <UIcon name="i-lucide-plus" class="w-4 h-4" />
             {{ t('geography.createGeography') }}
           </UButton>
@@ -246,8 +253,7 @@ const totalPages = ref(1);
 
 // Computed properties
 const canCreateGeography = computed(() => {
-  const userRole = authStore.user?.role;
-  return userRole === 'admin' || userRole === 'clerk';
+  return authStore.isLoggedIn && authStore.hasPermission('geography:create');
 });
 
 const canEditGeography = computed(() => {
