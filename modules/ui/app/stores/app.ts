@@ -17,7 +17,7 @@ export const useAppStore = defineStore('app', {
   state: (): AppState => {
     // Try to restore state from localStorage on initialization
     let initialState: AppState = {
-      sidebarOpen: true,
+      sidebarOpen: false,
       sidebarCollapsed: false,
       theme: 'system',
       notifications: [],
@@ -33,7 +33,7 @@ export const useAppStore = defineStore('app', {
           // Only restore persistent fields (not notifications)
           initialState = {
             ...initialState,
-            sidebarOpen: parsedState.sidebarOpen ?? true,
+            sidebarOpen: parsedState.sidebarOpen ?? false,
             sidebarCollapsed: parsedState.sidebarCollapsed ?? false,
             theme: parsedState.theme ?? 'system',
             notifications: [], // Always start with empty notifications

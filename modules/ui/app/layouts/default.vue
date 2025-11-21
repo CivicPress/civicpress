@@ -43,9 +43,9 @@ const links = computed<NavigationMenuItem[][]>(() => {
 });
 
 onMounted(async () => {
-  // Close sidebar by default on small screens
-  if (process.client && window.innerWidth < 768) {
-    appStore.setSidebarOpen(false);
+  // Open sidebar by default on desktop screens, keep closed on mobile
+  if (process.client && window.innerWidth >= 768) {
+    appStore.setSidebarOpen(true);
   }
 
   const cookie = useCookie('cookie-consent');
