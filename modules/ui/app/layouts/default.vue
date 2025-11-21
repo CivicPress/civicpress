@@ -89,7 +89,7 @@ onMounted(async () => {
       :toggle="{
         color: 'primary',
         variant: 'subtle',
-        class: 'rounded-full',
+        class: 'hidden md:flex rounded-full',
       }"
       :ui="{ footer: 'lg:border-t lg:border-default' }"
     >
