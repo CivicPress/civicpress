@@ -155,6 +155,14 @@ watch(isAuthenticated, (newValue) => {
 
 <template>
   <UDashboardPanel>
+    <template #header>
+      <UDashboardNavbar :ui="{ root: 'border-b-0 shadow-none' }">
+        <template #title>
+          <!-- Intentionally left blank to avoid duplicate title -->
+        </template>
+      </UDashboardNavbar>
+    </template>
+
     <template #body>
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center items-center h-64">

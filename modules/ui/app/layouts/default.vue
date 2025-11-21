@@ -43,6 +43,11 @@ const links = computed<NavigationMenuItem[][]>(() => {
 });
 
 onMounted(async () => {
+  // Close sidebar by default on small screens
+  if (process.client && window.innerWidth < 768) {
+    appStore.setSidebarOpen(false);
+  }
+
   const cookie = useCookie('cookie-consent');
   if (cookie.value === 'accepted') {
     return;
