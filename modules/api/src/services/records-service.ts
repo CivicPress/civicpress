@@ -25,7 +25,9 @@ export class RecordsService {
    * Lower priority number = appears first in list
    */
   private getKindPriority(record: any): number {
-    const kind = record.metadata?.kind;
+    // Check both direct and nested metadata paths
+    // Some records have kind at metadata.kind, others at metadata.metadata.kind
+    const kind = record.metadata?.kind || record.metadata?.metadata?.kind;
     if (kind === 'root') return 3; // Root documents last
     if (kind === 'chapter') return 2; // Chapters in middle
     return 1; // Regular records first

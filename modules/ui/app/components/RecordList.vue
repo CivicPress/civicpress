@@ -85,7 +85,9 @@ const createSummary = (record: CivicRecord): string => {
 // Priority: record (no kind) = 1, chapter = 2, root = 3
 // Lower priority number = appears first in list
 const getKindPriority = (record: any): number => {
-  const kind = record.metadata?.kind;
+  // Check both direct and nested metadata paths
+  // Some records have kind at metadata.kind, others at metadata.metadata.kind
+  const kind = record.metadata?.kind || record.metadata?.metadata?.kind;
   if (kind === 'root') return 3; // Root documents last
   if (kind === 'chapter') return 2; // Chapters in middle
   return 1; // Regular records first
@@ -102,41 +104,35 @@ const processedRecords = computed(() => {
     summary: createSummary(record),
   }));
 
-  // Client-side sort for now
-  let sorted: typeof base;
-  switch (props.sort) {
-    case 'updated_desc':
-      sorted = base.sort(
-        (a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      );
-      break;
-    case 'created_desc':
-      sorted = base.sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      break;
-    case 'title_asc':
-      sorted = base.sort((a, b) => a.title.localeCompare(b.title));
-      break;
-    case 'title_desc':
-      sorted = base.sort((a, b) => b.title.localeCompare(a.title));
-      break;
-    default:
-      sorted = base;
-  }
-
-  // Apply kind-based priority sorting as secondary sort
+  // Sort by kind priority FIRST (primary sort)
   // This ensures: record -> chapter -> root document order
-  return sorted.sort((a, b) => {
+  // Then apply selected sort option as secondary sort within each kind group
+  return base.sort((a, b) => {
+    // Primary sort: kind priority (record=1, chapter=2, root=3)
     const priorityA = getKindPriority(a);
     const priorityB = getKindPriority(b);
     if (priorityA !== priorityB) {
       return priorityA - priorityB;
     }
-    // If same priority, maintain the original sort order
-    return 0;
+
+    // Secondary sort: selected sort option within same kind group
+    switch (props.sort) {
+      case 'updated_desc':
+        return (
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+      case 'created_desc':
+        return (
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      case 'title_asc':
+        return a.title.localeCompare(b.title);
+      case 'title_desc':
+        return b.title.localeCompare(a.title);
+      default:
+        // For 'relevance', maintain API order (already sorted by kind+date)
+        return 0;
+    }
   });
 });
 
