@@ -134,6 +134,11 @@
     "dontHaveAccount": "Vous n'avez pas de compte ?",
     "createOne": "En créer un",
     "forgotPassword": "Mot de passe oublié ?",
+    "resetPasswordComingSoon": "Réinitialiser le mot de passe (bientôt disponible)",
+    "resetPasswordTitle": "Réinitialiser le mot de passe (bientôt disponible)",
+    "resetPasswordDesc": "Nous préparons une récupération sécurisée du mot de passe.",
+    "resetPasswordSupportText": "En attendant, si vous avez besoin d'aide pour accéder à votre compte, veuillez contacter le support à",
+    "backToLogin": "Retour à la connexion",
     "passwordStrength": {
       "veryWeak": "Très faible",
       "weak": "Faible",

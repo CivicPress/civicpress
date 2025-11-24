@@ -134,6 +134,11 @@
     "dontHaveAccount": "Don't have an account?",
     "createOne": "Create one",
     "forgotPassword": "Forgot your password?",
+    "resetPasswordComingSoon": "Reset Password (coming soon)",
+    "resetPasswordTitle": "Reset Password (coming soon)",
+    "resetPasswordDesc": "We're preparing secure password recovery.",
+    "resetPasswordSupportText": "In the meantime, if you need help accessing your account, please contact support at",
+    "backToLogin": "Back to login",
     "passwordStrength": {
       "veryWeak": "Very Weak",
       "weak": "Weak",
