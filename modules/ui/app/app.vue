@@ -5,7 +5,11 @@ useHead({
   title: 'CivicPress',
   meta: [
     { charset: 'utf-8' },
-    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+    {
+      name: 'viewport',
+      content:
+        'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes',
+    },
     {
       name: 'description',
       content: 'Open-source infrastructure for modern civic life',
@@ -42,7 +46,11 @@ useHead({
           title: 'CivicPress',
           meta: [
             { charset: 'utf-8' },
-            { name: 'viewport', content: 'width=device-width, initial-scale=1' }
+            {
+              name: 'viewport',
+              content:
+                'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes',
+            }
           ]
         };
       `,

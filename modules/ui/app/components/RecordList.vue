@@ -20,6 +20,7 @@ interface Props {
     | 'created_desc'
     | 'title_asc'
     | 'title_desc';
+  isSearching?: boolean; // True when user is typing or search is in progress
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -27,6 +28,7 @@ const props = withDefaults(defineProps<Props>(), {
   filters: () => ({}),
   searchQuery: '',
   sort: 'relevance',
+  isSearching: false,
 });
 
 // Emits
@@ -79,6 +81,18 @@ const createSummary = (record: CivicRecord): string => {
     : normalized;
 };
 
+// Helper function to get kind priority for sorting
+// Priority: record (no kind) = 1, chapter = 2, root = 3
+// Lower priority number = appears first in list
+const getKindPriority = (record: any): number => {
+  // Check both direct and nested metadata paths
+  // Some records have kind at metadata.kind, others at metadata.metadata.kind
+  const kind = record.metadata?.kind || record.metadata?.metadata?.kind;
+  if (kind === 'root') return 3; // Root documents last
+  if (kind === 'chapter') return 2; // Chapters in middle
+  return 1; // Regular records first
+};
+
 const processedRecords = computed(() => {
   const base = displayRecords.value.map((record) => ({
     ...record,
@@ -90,30 +104,51 @@ const processedRecords = computed(() => {
     summary: createSummary(record),
   }));
 
-  // Client-side sort for now
-  switch (props.sort) {
-    case 'updated_desc':
-      return base.sort(
-        (a, b) =>
+  // Sort by kind priority FIRST (primary sort)
+  // This ensures: record -> chapter -> root document order
+  // Then apply selected sort option as secondary sort within each kind group
+  return base.sort((a, b) => {
+    // Primary sort: kind priority (record=1, chapter=2, root=3)
+    const priorityA = getKindPriority(a);
+    const priorityB = getKindPriority(b);
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    // Secondary sort: selected sort option within same kind group
+    switch (props.sort) {
+      case 'updated_desc':
+        return (
           new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      );
-    case 'created_desc':
-      return base.sort(
-        (a, b) =>
+        );
+      case 'created_desc':
+        return (
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    case 'title_asc':
-      return base.sort((a, b) => a.title.localeCompare(b.title));
-    case 'title_desc':
-      return base.sort((a, b) => b.title.localeCompare(a.title));
-    default:
-      return base;
-  }
+        );
+      case 'title_asc':
+        return a.title.localeCompare(b.title);
+      case 'title_desc':
+        return b.title.localeCompare(a.title);
+      default:
+        // For 'relevance', maintain API order (already sorted by kind+date)
+        return 0;
+    }
+  });
 });
 
 // Check if we should show loading state
+// Show loading when: user is typing/searching OR store is loading
 const shouldShowLoading = computed(() => {
-  return recordsStore.isLoading;
+  return props.isSearching || recordsStore.isLoading;
+});
+
+// Check if we should hide records and show loading instead
+// Hide records when: user is typing/searching OR store is loading during a search
+const shouldHideRecords = computed(() => {
+  return (
+    props.isSearching ||
+    (recordsStore.isLoading && props.searchQuery?.trim().length >= 3)
+  );
 });
 
 // Check if we should show "Load More" button
@@ -217,10 +252,26 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- Records List - Show immediately, don't wait for loading -->
+    <!-- Records List -->
     <div class="space-y-6">
-      <!-- Show existing records immediately if we have them -->
-      <div v-if="displayRecords.length > 0" class="space-y-6">
+      <!-- Show loading when typing/searching, hide records during search -->
+      <div v-if="shouldHideRecords" class="text-center py-12">
+        <div class="space-y-4">
+          <div class="flex items-center justify-center space-x-2 mb-4">
+            <UIcon
+              name="i-lucide-loader-2"
+              class="w-5 h-5 animate-spin text-gray-500"
+            />
+            <span class="text-sm text-gray-600 dark:text-gray-400">
+              {{ t('records.loadingData') }}
+            </span>
+          </div>
+          <RecordCardSkeleton v-for="i in 3" :key="i" />
+        </div>
+      </div>
+
+      <!-- Show existing records if we have them and not searching -->
+      <div v-else-if="displayRecords.length > 0" class="space-y-6">
         <!-- Pagination for Large Lists -->
         <div v-if="displayRecords.length > 50" class="space-y-6">
           <!-- Paginated Records -->

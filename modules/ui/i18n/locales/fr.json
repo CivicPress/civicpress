@@ -4,6 +4,11 @@
     "gitBacked": "Sauvegardé avec Git",
     "poweredBy": "Propulsé par"
   },
+  "cookies": {
+    "consentTitle": "Nous utilisons des cookies de première partie pour améliorer votre expérience sur notre site web.",
+    "accept": "Accepter",
+    "optOut": "Refuser"
+  },
   "common": {
     "loading": "Chargement...",
     "error": "Erreur",
@@ -129,6 +134,11 @@
     "dontHaveAccount": "Vous n'avez pas de compte ?",
     "createOne": "En créer un",
     "forgotPassword": "Mot de passe oublié ?",
+    "resetPasswordComingSoon": "Réinitialiser le mot de passe (bientôt disponible)",
+    "resetPasswordTitle": "Réinitialiser le mot de passe (bientôt disponible)",
+    "resetPasswordDesc": "Nous préparons une récupération sécurisée du mot de passe.",
+    "resetPasswordSupportText": "En attendant, si vous avez besoin d'aide pour accéder à votre compte, veuillez contacter le support à",
+    "backToLogin": "Retour à la connexion",
     "passwordStrength": {
       "veryWeak": "Très faible",
       "weak": "Faible",
@@ -207,6 +217,7 @@
     },
     "noRecordsMatchFilters": "Aucun registre ne correspond à vos filtres",
     "noRecordsMatchFiltersDesc": "Essayez d'ajuster ou de supprimer vos filtres pour voir tous les registres disponibles.",
+    "loadingData": "Chargement des enregistrements...",
     "pagination": {
       "pageOf": "Page {current} sur {total}"
     },

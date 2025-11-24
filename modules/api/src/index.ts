@@ -58,7 +58,6 @@ import {
   createDatabaseContextMiddleware,
 } from './middleware/logging.js';
 import { authMiddleware, optionalAuth } from './middleware/auth.js';
-import { delayMiddleware } from './middleware/delay.js';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -110,9 +109,6 @@ export class CivicPressAPI {
     this.app.use(performanceMonitoringMiddleware);
     this.app.use(apiLoggingMiddleware);
     this.app.use(authLoggingMiddleware);
-
-    // Add delay middleware for testing loading states (development only)
-    this.app.use(delayMiddleware(2000));
   }
 
   async initialize(dataDir: string): Promise<void> {

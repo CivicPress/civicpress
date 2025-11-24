@@ -18,6 +18,20 @@ import path from 'path';
 export class RecordsService {
   private civicPress: CivicPress;
   private recordManager: RecordManager;
+
+  /**
+   * Helper function to get kind priority for sorting
+   * Priority: record (no kind) = 1, chapter = 2, root = 3
+   * Lower priority number = appears first in list
+   */
+  private getKindPriority(record: any): number {
+    // Check both direct and nested metadata paths
+    // Some records have kind at metadata.kind, others at metadata.metadata.kind
+    const kind = record.metadata?.kind || record.metadata?.metadata?.kind;
+    if (kind === 'root') return 3; // Root documents last
+    if (kind === 'chapter') return 2; // Chapters in middle
+    return 1; // Regular records first
+  }
   private workflowManager: WorkflowConfigManager;
   private dataDir: string | null = null;
 
@@ -560,11 +574,20 @@ export class RecordsService {
       );
     }
 
-    // Sort records by creation date (newest first) for consistent cursor behavior
-    filteredRecords.sort(
-      (a: any, b: any) =>
+    // Sort records by kind priority first (record -> chapter -> root)
+    // Then by creation date (newest first) for consistent cursor behavior
+    filteredRecords.sort((a: any, b: any) => {
+      // First sort by kind priority
+      const priorityA = this.getKindPriority(a);
+      const priorityB = this.getKindPriority(b);
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      // If same priority, sort by creation date (newest first)
+      return (
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+      );
+    });
 
     // Find the starting index based on cursor
     let startIndex = 0;
@@ -641,6 +664,20 @@ export class RecordsService {
       status,
       limit: limit + 1, // Get one extra to determine if there are more results
       offset,
+    });
+
+    // Sort search results by kind priority (record -> chapter -> root)
+    // Then by creation date as secondary sort
+    result.records.sort((a: any, b: any) => {
+      const priorityA = this.getKindPriority(a);
+      const priorityB = this.getKindPriority(b);
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      // If same priority, sort by creation date (newest first)
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     });
 
     // Determine if there are more records

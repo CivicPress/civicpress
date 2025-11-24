@@ -8,40 +8,9 @@ import {
 } from '../utils/api-logger.js';
 import { Logger } from '@civicpress/core';
 
-// Declare setTimeout and clearTimeout for TypeScript
-// declare const setTimeout: any;
-// declare const clearTimeout: any;
-
 const logger = new Logger();
 
 export const searchRouter = Router();
-
-// Development-only delay middleware for testing loading states
-// const addDevDelay = async (req: any, res: any, next: any) => {
-//   // Check if we're in development mode (NODE_ENV not set or equals 'development')
-//   const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
-
-//   console.log(
-//     '🔍 Search delay middleware - NODE_ENV:',
-//     process.env.NODE_ENV,
-//     'isDev:',
-//     isDev
-//   );
-
-//   if (isDev) {
-//     console.log('🔄 Adding 3-second delay for search endpoint:', req.path);
-//     // Simple delay using promise
-//     await new Promise((resolve) => {
-//       const timer = setTimeout(resolve, 3000);
-//       // Clean up timer if request is cancelled
-//       req.on('close', () => clearTimeout(timer));
-//     });
-//   }
-//   next();
-// };
-
-// Apply delay middleware to search routes in development
-// searchRouter.use(addDevDelay);
 
 // GET /api/search - Search records (handles both public and authenticated access)
 searchRouter.get(
