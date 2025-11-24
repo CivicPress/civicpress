@@ -22,6 +22,9 @@ const filters = ref({
 });
 const filtersResetKey = ref(0);
 
+// Track when user is typing/searching (for showing loading state)
+const isSearching = ref(false);
+
 // URL state management functions
 const updateURL = () => {
   const query: any = {};
@@ -48,25 +51,32 @@ const restoreFromURL = () => {
 };
 
 // Debounced API search function
+// Only triggers search if query has at least 3 characters
 const debouncedApiSearch = useDebounceFn(async (query: string) => {
   const statusFilter =
     filters.value.statuses.length > 0
       ? filters.value.statuses.join(',')
       : undefined;
 
-  // Only search if there's a query, otherwise load initial records
-  if (query && query.trim()) {
-    await recordsStore.searchRecords(query, {
+  const trimmedQuery = query?.trim() || '';
+
+  // Only search if query has at least 3 characters, otherwise load initial records
+  if (trimmedQuery.length >= 3) {
+    await recordsStore.searchRecords(trimmedQuery, {
       type: type,
       status: statusFilter,
     });
   } else {
+    // Query is empty or less than 3 chars - load initial records
     await recordsStore.loadInitialRecords({
       type: type,
       status: statusFilter,
     });
     await ensureBylawHierarchyLoaded();
   }
+
+  // Clear searching state after search completes
+  isSearching.value = false;
 }, 300);
 
 // Handle search changes
@@ -74,7 +84,31 @@ const handleSearch = (query: string) => {
   searchQuery.value = query;
   filters.value.search = query;
   updateURL();
-  debouncedApiSearch(query);
+
+  const trimmedQuery = query?.trim() || '';
+
+  // If query is cleared or less than 3 chars, load initial records immediately
+  // Otherwise, trigger debounced search
+  if (trimmedQuery.length === 0) {
+    // Clear search immediately
+    isSearching.value = false;
+    const statusFilter =
+      filters.value.statuses.length > 0
+        ? filters.value.statuses.join(',')
+        : undefined;
+    recordsStore.loadInitialRecords({
+      type: type,
+      status: statusFilter,
+    });
+    ensureBylawHierarchyLoaded();
+  } else if (trimmedQuery.length >= 3) {
+    // Only trigger debounced search if we have at least 3 characters
+    isSearching.value = true; // Set searching state
+    debouncedApiSearch(query);
+  } else {
+    // Query is 1-2 characters - keep records visible, no search happening yet
+    isSearching.value = false;
+  }
 };
 
 // Handle filter changes
@@ -92,9 +126,10 @@ const handleFilterChange = async (newFilters: {
   const statusFilter =
     newFilters.statuses.length > 0 ? newFilters.statuses.join(',') : undefined;
 
-  // Only use searchRecords if there's a search query, otherwise use loadInitialRecords
-  if (searchQuery.value && searchQuery.value.trim()) {
-    await recordsStore.searchRecords(searchQuery.value, {
+  // Only use searchRecords if there's a search query with at least 3 characters
+  const trimmedQuery = searchQuery.value?.trim() || '';
+  if (trimmedQuery.length >= 3) {
+    await recordsStore.searchRecords(trimmedQuery, {
       type: type,
       status: statusFilter,
     });
@@ -229,6 +264,7 @@ const breadcrumbItems = computed(() => [
           :record-type="type"
           :filters="filters"
           :search-query="searchQuery"
+          :is-searching="isSearching"
           @resetFilters="resetFilters"
         />
 

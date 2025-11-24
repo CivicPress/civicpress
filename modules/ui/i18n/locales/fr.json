@@ -4,6 +4,11 @@
     "gitBacked": "Sauvegardé avec Git",
     "poweredBy": "Propulsé par"
   },
+  "cookies": {
+    "consentTitle": "Nous utilisons des cookies de première partie pour améliorer votre expérience sur notre site web.",
+    "accept": "Accepter",
+    "optOut": "Refuser"
+  },
   "common": {
     "loading": "Chargement...",
     "error": "Erreur",
@@ -207,6 +212,7 @@
     },
     "noRecordsMatchFilters": "Aucun registre ne correspond à vos filtres",
     "noRecordsMatchFiltersDesc": "Essayez d'ajuster ou de supprimer vos filtres pour voir tous les registres disponibles.",
+    "loadingData": "Chargement des enregistrements...",
     "pagination": {
       "pageOf": "Page {current} sur {total}"
     },

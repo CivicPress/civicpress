@@ -166,6 +166,13 @@ watch(searchQuery, (newQuery) => {
 
   emit('search', newQuery);
   emitFilterChange();
+
+  // Fetch suggestions while typing (when query has 2+ characters)
+  if (newQuery && newQuery.trim().length >= 2) {
+    fetchSuggestions(newQuery);
+  } else {
+    clearSuggestions();
+  }
 });
 
 watch(

@@ -26,6 +26,9 @@ const sort = ref<
 const page = ref(1);
 const filtersResetKey = ref(0);
 
+// Track when user is typing/searching (for showing loading state)
+const isSearching = ref(false);
+
 // URL state management functions
 const updateURL = () => {
   const query = buildQueryFromState({
@@ -51,6 +54,7 @@ const restoreFromURL = () => {
 };
 
 // Debounced API search function
+// Only triggers search if query has at least 3 characters
 const debouncedApiSearch = useDebounceFn(async (query: string) => {
   const typeFilter =
     filters.value.types.length > 0 ? filters.value.types.join(',') : undefined;
@@ -59,18 +63,24 @@ const debouncedApiSearch = useDebounceFn(async (query: string) => {
       ? filters.value.statuses.join(',')
       : undefined;
 
-  // Only search if there's a query, otherwise load initial records
-  if (query && query.trim()) {
-    await recordsStore.searchRecords(query, {
+  const trimmedQuery = query?.trim() || '';
+
+  // Only search if query has at least 3 characters, otherwise load initial records
+  if (trimmedQuery.length >= 3) {
+    await recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
     });
   } else {
+    // Query is empty or less than 3 chars - load initial records
     await recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
     });
   }
+
+  // Clear searching state after search completes
+  isSearching.value = false;
 }, 300);
 
 // Handle search changes
@@ -78,7 +88,34 @@ const handleSearch = (query: string) => {
   searchQuery.value = query;
   filters.value.search = query;
   updateURL();
-  debouncedApiSearch(query);
+
+  const trimmedQuery = query?.trim() || '';
+
+  // If query is cleared or less than 3 chars, load initial records immediately
+  // Otherwise, trigger debounced search
+  if (trimmedQuery.length === 0) {
+    // Clear search immediately
+    isSearching.value = false;
+    const typeFilter =
+      filters.value.types.length > 0
+        ? filters.value.types.join(',')
+        : undefined;
+    const statusFilter =
+      filters.value.statuses.length > 0
+        ? filters.value.statuses.join(',')
+        : undefined;
+    recordsStore.loadInitialRecords({
+      type: typeFilter,
+      status: statusFilter,
+    });
+  } else if (trimmedQuery.length >= 3) {
+    // Only trigger debounced search if we have at least 3 characters
+    isSearching.value = true; // Set searching state
+    debouncedApiSearch(query);
+  } else {
+    // Query is 1-2 characters - keep records visible, no search happening yet
+    isSearching.value = false;
+  }
 };
 
 // Handle filter changes
@@ -97,9 +134,10 @@ const handleFilterChange = (newFilters: {
   const statusFilter =
     newFilters.statuses.length > 0 ? newFilters.statuses.join(',') : undefined;
 
-  // Only use searchRecords if there's a search query, otherwise use loadInitialRecords
-  if (searchQuery.value && searchQuery.value.trim()) {
-    recordsStore.searchRecords(searchQuery.value, {
+  // Only use searchRecords if there's a search query with at least 3 characters
+  const trimmedQuery = searchQuery.value?.trim() || '';
+  if (trimmedQuery.length >= 3) {
+    recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
     });
@@ -138,8 +176,9 @@ watch(sort, () => {
   page.value = 1;
   updateURL();
   // Re-run search or load with current filters
-  if (searchQuery.value && searchQuery.value.trim()) {
-    recordsStore.searchRecords(searchQuery.value, {
+  const trimmedQuery = searchQuery.value?.trim() || '';
+  if (trimmedQuery.length >= 3) {
+    recordsStore.searchRecords(trimmedQuery, {
       type:
         filters.value.types.length > 0
           ? filters.value.types.join(',')
@@ -172,16 +211,16 @@ const loadRecordsFromState = async () => {
       ? filters.value.statuses.join(',')
       : undefined;
 
-  // Ensure we have a valid, non-empty search query before calling searchRecords
-  const trimmedQuery = searchQuery.value?.trim();
-  if (trimmedQuery && trimmedQuery.length > 0) {
-    // URL has a search query, trigger search
+  // Ensure we have a valid search query with at least 3 characters before calling searchRecords
+  const trimmedQuery = searchQuery.value?.trim() || '';
+  if (trimmedQuery.length >= 3) {
+    // URL has a search query with at least 3 chars, trigger search
     await recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
     });
   } else {
-    // No search query, load initial records
+    // No search query or less than 3 chars, load initial records
     await recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
@@ -291,6 +330,7 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
           :search-query="searchQuery"
           :breadcrumbs-ref="breadcrumbsRef as any"
           :sort="sort"
+          :is-searching="isSearching"
           @resetFilters="resetAllFilters"
         />
 

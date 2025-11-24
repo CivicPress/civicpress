@@ -1,6 +1,40 @@
 @import "tailwindcss";
 @import "@nuxt/ui-pro";
 
+/* Prevent iOS Safari auto-zoom on input focus */
+/* iOS Safari automatically zooms inputs when font-size < 16px */
+/* This prevents that behavior while maintaining accessibility */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Ensure all interactive text inputs have minimum 16px font-size on mobile */
+/* This prevents iOS Safari from auto-zooming when inputs are focused */
+/* Applied only on mobile devices (< 640px) to avoid affecting desktop styling */
+@media (max-width: 639px) {
+  input[type='text'],
+  input[type='search'],
+  input[type='email'],
+  input[type='tel'],
+  input[type='password'],
+  input[type='number'],
+  input[type='url'],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Target Nuxt UI Pro UInput components specifically */
+  /* UInput renders a native input element, so the above should work */
+  /* But we add this for extra specificity if needed */
+  [data-headlessui-state] input,
+  .ui-input input {
+    font-size: 16px;
+  }
+}
+
 /* @theme static {
   --font-sans: 'Public Sans', sans-serif;
   --font-serif: 'Instrument Serif', serif;
