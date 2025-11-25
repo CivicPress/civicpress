@@ -695,6 +695,17 @@ registrationRouter.post('/', async (req, res) => {
 
     const authService = civicPress.getAuthService();
 
+    // Normalize email (lowercase) for consistency
+    const normalizedEmail = userData.email.toLowerCase().trim();
+
+    // Validate email format
+    if (!authService.isValidEmailFormat(normalizedEmail)) {
+      const error = new Error('Invalid email format');
+      (error as any).statusCode = 400;
+      (error as any).code = 'INVALID_EMAIL_FORMAT';
+      return handleApiError('register_user', error, req, res);
+    }
+
     // Check if username already exists
     const existingUser = await authService.getUserByUsername(userData.username);
     if (existingUser) {
@@ -704,19 +715,29 @@ registrationRouter.post('/', async (req, res) => {
       return handleApiError('register_user', error, req, res);
     }
 
+    // Check if email is already in use
+    const emailInUse = await authService.isEmailInUse(normalizedEmail);
+    if (emailInUse) {
+      const error = new Error('Email address is already registered');
+      (error as any).statusCode = 409;
+      (error as any).code = 'EMAIL_EXISTS';
+      return handleApiError('register_user', error, req, res);
+    }
+
     // Hash password
     const bcrypt = await import('bcrypt');
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(userData.password, saltRounds);
 
-    // Create user with default role (usually 'public')
+    // Create user with default role (always 'public' for public registration)
+    // SECURITY: Ignore any role provided in registration - public registration always creates 'public' role users
     // Use username as name if no name is provided
     const userName = userData.name || userData.username;
     const newUser = await authService.createUserWithPassword({
       username: userData.username,
-      email: userData.email,
+      email: normalizedEmail, // Use normalized email
       name: userName,
-      role: userData.role || 'public', // Default to 'public' role
+      role: 'public', // Always 'public' for public registration - ignore userData.role
       passwordHash,
       avatar_url: userData.avatar_url,
     });

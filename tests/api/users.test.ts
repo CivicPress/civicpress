@@ -117,6 +117,141 @@ describe('API User Management', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.message).toBe('Username already exists');
     });
+
+    it('should fail registration with invalid email format', async () => {
+      const invalidEmails = [
+        'notanemail',
+        'missing@domain',
+        '@domain.com',
+        'user@',
+        'user@domain',
+        'user..name@example.com',
+        'user@domain..com',
+      ];
+
+      for (const email of invalidEmails) {
+        const userData = {
+          username: `testuser_${Date.now()}_${Math.random()}`,
+          email: email,
+          password: 'password123',
+          name: 'Test User',
+        };
+
+        const response = await request(context.api.getApp())
+          .post('/api/v1/users/register')
+          .send(userData);
+
+        expect(response.status).toBe(400);
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe('INVALID_EMAIL_FORMAT');
+        expect(response.body.error.message).toBe('Invalid email format');
+      }
+    });
+
+    it('should fail registration with duplicate email', async () => {
+      const userData1 = {
+        username: 'user1',
+        email: 'duplicate@example.com',
+        password: 'password123',
+        name: 'First User',
+      };
+
+      const userData2 = {
+        username: 'user2', // Different username
+        email: 'duplicate@example.com', // Same email
+        password: 'password123',
+        name: 'Second User',
+      };
+
+      // First registration should succeed
+      await request(context.api.getApp())
+        .post('/api/v1/users/register')
+        .send(userData1);
+
+      // Second registration should fail due to duplicate email
+      const response = await request(context.api.getApp())
+        .post('/api/v1/users/register')
+        .send(userData2);
+
+      expect(response.status).toBe(409);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('EMAIL_EXISTS');
+      expect(response.body.error.message).toBe(
+        'Email address is already registered'
+      );
+    });
+
+    it('should normalize email to lowercase', async () => {
+      const userData = {
+        username: 'emailtest',
+        email: 'TestUser@Example.COM', // Mixed case email
+        password: 'password123',
+        name: 'Test User',
+      };
+
+      const response = await request(context.api.getApp())
+        .post('/api/v1/users/register')
+        .send(userData);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      // Email should be normalized to lowercase
+      expect(response.body.data.user.email).toBe('testuser@example.com');
+    });
+
+    it('should ignore role provided during registration and always use public', async () => {
+      const userData = {
+        username: 'roleattempt',
+        email: 'roleattempt@example.com',
+        password: 'password123',
+        name: 'Role Attempt',
+        role: 'admin', // Attempt to set admin role
+      };
+
+      const response = await request(context.api.getApp())
+        .post('/api/v1/users/register')
+        .send(userData);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      // Role should always be 'public' regardless of input
+      expect(response.body.data.user.role).toBe('public');
+      expect(response.body.data.user.role).not.toBe('admin');
+    });
+
+    it('should handle duplicate email with different case', async () => {
+      const userData1 = {
+        username: 'caseuser1',
+        email: 'CaseTest@Example.com',
+        password: 'password123',
+        name: 'First User',
+      };
+
+      const userData2 = {
+        username: 'caseuser2',
+        email: 'casetest@example.com', // Same email, different case
+        password: 'password123',
+        name: 'Second User',
+      };
+
+      // First registration should succeed
+      const response1 = await request(context.api.getApp())
+        .post('/api/v1/users/register')
+        .send(userData1);
+
+      expect(response1.status).toBe(200);
+      // Email should be normalized to lowercase
+      expect(response1.body.data.user.email).toBe('casetest@example.com');
+
+      // Second registration should fail due to duplicate email (case-insensitive)
+      const response2 = await request(context.api.getApp())
+        .post('/api/v1/users/register')
+        .send(userData2);
+
+      expect(response2.status).toBe(409);
+      expect(response2.body.success).toBe(false);
+      expect(response2.body.error.code).toBe('EMAIL_EXISTS');
+    });
   });
 
   describe('POST /api/v1/users/auth/password - User Authentication', () => {

@@ -117,6 +117,26 @@
         "testScript": "",
         "preRequestScript": "",
         "requestVariables": []
+      },
+      {
+        "v": "14",
+        "auth": {
+          "authType": "inherit",
+          "authActive": false
+        },
+        "body": {
+          "body": "{\n  \"username\": \"newuser\",\n  \"email\": \"newuser@example.com\",\n  \"password\": \"SecurePassword123!\",\n  \"name\": \"New User\"\n}",
+          "contentType": "application/json"
+        },
+        "name": "Register new user",
+        "method": "POST",
+        "params": [],
+        "headers": [],
+        "endpoint": "<<baseUrl>>/api/v1/users/register",
+        "responses": {},
+        "testScript": "pw.test(\"Status code is 200\", () => {\n    pw.expect(pw.response.status).toBe(200);\n});\n\npw.test(\"User registered successfully\", () => {\n  pw.expect(pw.response.body.success).toBe(true);\n  pw.expect(pw.response.body.data.user).toBeDefined();\n  pw.expect(pw.response.body.data.user.role).toBe(\"public\");\n  pw.expect(pw.response.body.data.user.email).toBeType(\"string\");\n});\n",
+        "preRequestScript": "",
+        "requestVariables": []
       }
     ],
     "auth": {
