@@ -1,9 +1,9 @@
 name: 'City of Springfield'
 city: 'Springfield'
-state: 'Illinois'
+state: 'Virginia'
 country: 'USA'
-timezone: 'America/Chicago'
-repo_url: 'https://github.com/springfield-il/civic-records'
+timezone: 'America/New_York'
+repo_url: 'https://github.com/springfield-va/civic-records'
 modules: ['legal-register', 'planning', 'finance']
 record_types: ['bylaw', 'policy', 'resolution', 'ordinance', 'proclamation']
 default_role: 'clerk'
@@ -20,7 +20,7 @@ audit:
   log_changes: true
 demo_data:
   name: 'springfield-usa'
-  description: 'Springfield, Illinois - Comprehensive civic records'
+  description: 'Springfield, Virginia - Comprehensive civic records'
   records:
     - 'bylaw-zoning-code.md'
     - 'bylaw-building-codes.md'
