@@ -32,6 +32,7 @@
 - **Nuxt 4**: Modern Vue 3 framework with SSR capabilities
 - **Nuxt UI Pro**: Professional UI component library
 - **Authentication**: JWT token management and user sessions
+- **Account Creation**: User registration page and workflow implemented
 - **Records Interface**: Complete CRUD operations for civic records
 - **Composables**: Reusable Vue composition functions
 - **Configuration Management UI**: Beautiful forms for system configuration

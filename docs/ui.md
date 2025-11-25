@@ -83,6 +83,21 @@ For detailed UI docs and structure, see `modules/ui/README.md`.
   metadata (JSON)
 - Includes a Refresh action and breadcrumb under Settings
 
+## Authentication UI
+
+### Account Creation
+
+- **Registration Page** (`modules/ui/app/pages/auth/register.vue`): User
+  registration form with validation
+- **Account Creation Workflow**: Complete user registration with role assignment
+- **Form Validation**: Inline validation with API error handling
+- **Integration**: Seamless integration with authentication system
+
+### Password Reset
+
+- **Status**: Not yet implemented
+- **Planned**: Password reset page and email-based reset workflow
+
 ## Internationalization (i18n)
 
 CivicPress UI is fully internationalized with support for English and French.

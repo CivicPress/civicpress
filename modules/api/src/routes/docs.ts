@@ -9,7 +9,7 @@ const swaggerSpec = {
   openapi: '3.0.0',
   info: {
     title: 'CivicPress API',
-    version: '0.1.2',
+    version: '0.1.3',
     description: 'REST API for CivicPress governance platform',
     contact: {
       name: 'CivicPress Team',

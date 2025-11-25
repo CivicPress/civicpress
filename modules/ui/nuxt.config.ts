@@ -25,7 +25,7 @@ export default defineNuxtConfig({
       civicApiUrl: process.env.API_BASE_URL || 'http://localhost:3000',
       // App configuration
       appName: 'CivicPress',
-      appVersion: '0.1.2',
+      appVersion: '0.1.3',
     },
   },
 

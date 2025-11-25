@@ -233,7 +233,9 @@ All record types are defined in **core** and provide base functionality:
 7. **`session`** - Meeting sessions and minutes
 
 **All core record types:**
-- Use the standardized markdown format (defined in `docs/record-format-standard.md`)
+
+- Use the standardized markdown format (defined in
+  `docs/record-format-standard.md`)
 - Support base CRUD operations via `RecordManager`
 - Support validation via `RecordValidator`
 - Support indexing via `IndexingService`
@@ -242,15 +244,20 @@ All record types are defined in **core** and provide base functionality:
 ### Module Extensions
 
 **Legal-Register Module:**
-- Extends legal record types (`bylaw`, `ordinance`, `policy`, `proclamation`, `resolution`)
-- Adds specialized features: digital signatures, compliance tracking, legal workflows
+
+- Extends legal record types (`bylaw`, `ordinance`, `policy`, `proclamation`,
+  `resolution`)
+- Adds specialized features: digital signatures, compliance tracking, legal
+  workflows
 - Provides schema extensions for legal-specific fields
 - Module is optional - can be disabled if not needed
 
 **Sessions:**
+
 - Stays in core as a fundamental record type
 - No separate module needed (unless specialized features are required later)
-- If specialized features needed (livestream, transcript processing), can create sessions module or use plugins
+- If specialized features needed (livestream, transcript processing), can create
+  sessions module or use plugins
 
 ## 🧩 **Module Architecture**
 
@@ -292,9 +299,12 @@ All record types are defined in **core** and provide base functionality:
 - **Status**: 📋 Planned (only README exists)
 - **Purpose**: Specialized legal document management
 - **Architecture**:
-  - **Record types** (`bylaw`, `ordinance`, `policy`, `proclamation`, `resolution`) are **core record types** (defined in core)
-  - **Legal-register** is a **separate module** that extends these core types with specialized functionality
-  - Module provides: digital signatures, compliance tracking, legal workflows, legal-specific schema extensions
+  - **Record types** (`bylaw`, `ordinance`, `policy`, `proclamation`,
+    `resolution`) are **core record types** (defined in core)
+  - **Legal-register** is a **separate module** that extends these core types
+    with specialized functionality
+  - Module provides: digital signatures, compliance tracking, legal workflows,
+    legal-specific schema extensions
   - Module is optional and can be disabled if not needed
 - **Features**: Planned for future implementation
   - Digital signature support
@@ -505,7 +515,7 @@ Config Update → Validation → Service Reload → Hook Event → Workflow Trig
 
 ### Phase 3: Advanced Features 🚀 IN PROGRESS
 
-- 🔄 Complete UI module (95% done - only account management missing)
+- 🔄 Complete UI module (98% done - password reset remaining)
 - 📋 Implement plugin system
 - 📋 Complete legal-register module
 - 📋 Add advanced workflows and federation

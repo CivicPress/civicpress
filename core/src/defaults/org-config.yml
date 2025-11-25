@@ -172,7 +172,7 @@ custom:
 
 # Public Demo Metadata
 version:
-  value: '0.1.2'
+  value: '0.1.3'
   type: 'string'
   description: 'Public-facing release version label for this deployment'
   required: false
