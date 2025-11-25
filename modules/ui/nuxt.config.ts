@@ -4,8 +4,9 @@ export default defineNuxtConfig({
   ssr: false,
 
   // Development server configuration
+  // Port can be overridden via PORT or NUXT_PORT environment variable
   devServer: {
-    port: 3030,
+    port: parseInt(process.env.PORT || process.env.NUXT_PORT || '3030'),
   },
 
   // Modules
@@ -46,12 +47,14 @@ export default defineNuxtConfig({
   // },
 
   // i18n configuration
+  // Default locale can be overridden via NUXT_DEFAULT_LOCALE or DEFAULT_LOCALE environment variable
   i18n: {
     locales: [
       { code: 'en', name: 'English', file: 'en.json' },
       { code: 'fr', name: 'Français', file: 'fr.json' },
     ],
-    defaultLocale: 'en',
+    defaultLocale:
+      process.env.NUXT_DEFAULT_LOCALE || process.env.DEFAULT_LOCALE || 'en',
     strategy: 'no_prefix', // No URL prefix since we're only translating home page for now
     detectBrowserLanguage: {
       useCookie: true,
