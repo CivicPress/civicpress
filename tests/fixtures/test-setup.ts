@@ -1639,11 +1639,58 @@ export async function createAPITestContext(): Promise<APITestContext> {
     process.chdir(originalCwd);
   }
 
+  // Create admin user and get token for authenticated API tests
+  let adminToken: string | undefined;
+  try {
+    // Use simulated authentication for admin user via CLI
+    const authResult = execSync(
+      `cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} auth:simulated --username testadmin --role admin --json`,
+      { encoding: 'utf8' }
+    );
+
+    // Extract JSON from the output
+    const fullOutput = authResult.trim();
+    const firstBrace = fullOutput.indexOf('{');
+    if (firstBrace !== -1) {
+      // Find the matching closing brace
+      let braceDepth = 0;
+      let jsonEnd = -1;
+      for (let j = firstBrace; j < fullOutput.length; j++) {
+        if (fullOutput[j] === '{') braceDepth++;
+        if (fullOutput[j] === '}') {
+          braceDepth--;
+          if (braceDepth === 0) {
+            jsonEnd = j + 1;
+            break;
+          }
+        }
+      }
+
+      if (jsonEnd !== -1) {
+        const jsonText = fullOutput.substring(firstBrace, jsonEnd);
+        try {
+          const authJson = JSON.parse(jsonText);
+          if (authJson.success && authJson.session && authJson.session.token) {
+            adminToken = authJson.session.token;
+          }
+        } catch (parseError: any) {
+          // If parsing fails, continue without token
+          console.warn('Warning: Failed to parse auth token from CLI output');
+        }
+      }
+    }
+  } catch (error) {
+    // If admin user creation failed, we'll continue without admin token
+    // Tests that need authentication will need to handle this case
+    console.warn('Warning: Failed to create admin user for API tests:', error);
+  }
+
   return {
     api,
     civic: api.getCivicPress(),
     testDir: config.testDir,
     port, // Include port in context for tests that need it
+    adminToken, // Admin token for authenticated API tests
   };
 }
 

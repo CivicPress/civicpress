@@ -439,12 +439,44 @@ const updateSecondLevelFieldValue = (fullKey: string, value: any) => {
   hasChanges.value = true;
 };
 
+// Validate configuration (optional - validates saved file)
+const validateConfiguration = async (): Promise<boolean> => {
+  try {
+    const response = (await useNuxtApp().$civicApi(
+      `/api/v1/config/${configFile.value}/validate`,
+      {
+        method: 'POST',
+      }
+    )) as any;
+
+    if (response.success && response.data) {
+      const isValid = response.data.valid === true;
+      if (!isValid && response.data.errors && response.data.errors.length > 0) {
+        useToast().add({
+          title: 'Validation warning',
+          description: `Configuration has issues: ${response.data.errors[0]}`,
+          color: 'neutral',
+        });
+      }
+      return isValid;
+    }
+    return true; // If validation endpoint fails, allow save anyway
+  } catch (err) {
+    // Validation endpoint error - don't block save
+    console.warn('Validation check failed:', err);
+    return true;
+  }
+};
+
 // Save configuration
 const saveConfiguration = async () => {
   if (!canManageConfiguration.value) return;
 
   saving.value = true;
   try {
+    // Note: For form-based editor, validation happens on the structured data
+    // The API will transform it to YAML. We validate the saved file after save
+    // to catch any transformation issues.
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/config/${configFile.value}`,
       {
@@ -457,6 +489,9 @@ const saveConfiguration = async () => {
       // Mark as saved
       hasChanges.value = false;
       originalConfig.value = JSON.parse(JSON.stringify(config.value));
+
+      // Validate the saved file to catch any YAML transformation issues
+      await validateConfiguration();
 
       useToast().add({
         title: 'Success',

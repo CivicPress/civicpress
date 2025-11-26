@@ -321,12 +321,35 @@ export class ConfigurationService {
 
   /**
    * Validate configuration structure
+   * @param configType - The configuration type to validate
+   * @param content - Optional YAML content string to validate. If provided, validates this content instead of loading from disk.
    */
   async validateConfiguration(
-    configType: string
+    configType: string,
+    content?: string
   ): Promise<{ valid: boolean; errors: string[] }> {
     try {
-      const config = await this.loadConfiguration(configType);
+      let config: any;
+
+      // If content is provided, parse and validate it directly
+      if (content !== undefined) {
+        try {
+          const parsed = parse(content);
+          config = this.transformToLegacyFormat(parsed);
+        } catch (parseError: any) {
+          // YAML parsing error - this is a syntax error
+          return {
+            valid: false,
+            errors: [
+              `YAML syntax error: ${parseError.message || String(parseError)}`,
+            ],
+          };
+        }
+      } else {
+        // Load from disk (existing behavior)
+        config = await this.loadConfiguration(configType);
+      }
+
       const errors: string[] = [];
 
       // Basic validation - ensure required fields exist

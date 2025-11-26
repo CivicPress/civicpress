@@ -188,11 +188,15 @@ const resetToDefaults = async () => {
 const validate = async () => {
   validating.value = true;
   error.value = null;
+  validation.value = null;
   try {
+    // Send current editor content for validation (validates what user is editing, not saved file)
     const res = (await useNuxtApp().$civicApi(
       `/api/v1/config/${configFile.value}/validate`,
       {
         method: 'POST',
+        body: yaml.value,
+        headers: { 'Content-Type': 'text/yaml' } as any,
       }
     )) as any;
     validation.value = res?.data || null;
@@ -217,11 +221,21 @@ const validate = async () => {
     }
   } catch (e: any) {
     error.value = e.message || 'Failed to validate configuration';
-    useToast().add({
-      title: 'Validation failed',
-      description: error.value || 'Unknown error',
-      color: 'error',
-    });
+    // Extract validation errors from response if available
+    if (e?.data?.data?.errors && Array.isArray(e.data.data.errors)) {
+      validation.value = e.data.data;
+      useToast().add({
+        title: 'Validation failed',
+        description: e.data.data.errors[0] || error.value,
+        color: 'error',
+      });
+    } else {
+      useToast().add({
+        title: 'Validation failed',
+        description: error.value || 'Unknown error',
+        color: 'error',
+      });
+    }
   } finally {
     validating.value = false;
   }
