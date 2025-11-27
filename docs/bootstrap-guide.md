@@ -123,7 +123,7 @@ For the fastest way to see CivicPress in action, you can initialize with
 pre-configured demo data:
 
 ```bash
-# Initialize with Richmond demo data (French/English)
+# Initialize with Richmond, QC demo dataset (French/English)
 ./cli/dist/index.js init --yes --demo-data richmond-quebec
 
 # Or initialize with Springfield demo data (English)

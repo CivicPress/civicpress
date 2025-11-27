@@ -9,6 +9,9 @@ local governance._
 
 # Introduction
 
+CivicPress is an open-source civic records platform that helps municipalities
+manage bylaws, minutes, and public information in open, durable formats.
+
 **CivicPress is an open, transparent, and future‑proof civic platform built for
 municipalities of all sizes.** It turns bylaws, minutes, public meetings,
 geography layers, and civic workflows into structured, searchable, durable
@@ -33,6 +36,17 @@ that are as open as the values they represent.**
 
 ---
 
+# Who is this for?
+
+CivicPress is designed for:
+
+- **Municipal clerks and staff** — daily workflows for managing bylaws, minutes, and civic records
+- **Elected officials and CAOs** — transparent governance tools that build public trust
+- **Civic tech folks and integrators** — open APIs and modular architecture for building connected civic systems
+- **Researchers and journalists** — accessible, searchable public records with full version history
+
+---
+
 # Why CivicPress Exists
 
 Cities rely on digital systems that are often:
@@ -42,44 +56,82 @@ Cities rely on digital systems that are often:
 - hard to maintain
 - incompatible with open data
 - inaccessible to smaller municipalities
-- dependent on PDFs, which are difficult to index, search, or preserve as
-  structured civic records
+
+Many municipal records are currently trapped in PDFs or Word files. These
+formats are difficult to search, hard to index, and not future-proof as primary
+storage. This limits transparency, access to information, and long-term
+archival value.
 
 CivicPress takes the opposite approach:
 
-- **Open formats (Markdown, JSON, GeoJSON)**
-- **Traceable edit history (Git)**
-- **Local-first, resilient design**
-- **Accessible and multilingual**
-- **Ethical & transparent architecture**
+- **Open formats (Markdown, JSON, GeoJSON)** — human-readable, searchable, and
+  future-proof
+- **Traceable edit history (Git)** — every change is auditable and reversible
+- **Local-first, resilient design** — works offline and in small towns
+- **Accessible and multilingual** — built for diverse communities
+- **Ethical & transparent architecture** — no hidden automation or vendor
+  lock-in
 
 Municipal clerks, staff, elected officials, journalists, and citizens can
 finally work with civic information that is **easy to produce, easy to audit,
 easy to share, and built to last.**
 
+For deeper context on the vision and values behind CivicPress:
+
+- **[Manifesto & Values](https://github.com/CivicPress/manifesto/blob/master/manifesto.md)** — core principles and philosophy
+- **[Appendix: Public IT Failures](https://github.com/CivicPress/manifesto/blob/master/appendix-failures.md)** — case studies on why transparent civic systems matter
+
 ---
 
-# Features&#x20;
+# Features
 
-- **Unified Civic Registry** for bylaws, minutes, policies, geography layers,
-  and more
-- **Markdown‑based records** with structured metadata
-- **Full Git versioning** and commit history for every change
-- **Geography Module** with GeoJSON support
-- **Public Sessions Module** for council meetings
-- **Internationalization (i18n)** — full multilingual UI and record metadata
-- **Role‑based permissions** — define who can view, edit, review, approve, or
+CivicPress provides a comprehensive platform for managing civic records and
+public information.
+
+## Records & Content Management
+
+- **Structured records** — bylaws, minutes, policies stored as Markdown with
+  structured metadata
+- **File attachments** — PDFs, images, and other files with metadata and
+  categorization
+- **Full Git versioning** — every change is tracked with commit history,
+  author, and timestamp
+- **Demo datasets** — Springfield, VA and Richmond, QC sample data for
+  exploration and testing
+
+## Search & Discovery
+
+- **Automatic record indexing** — fast full-text search across all records and
+  metadata
+- **Advanced filtering** — search by type, status, date, author, and custom
+  metadata fields
+- **Public API** — RESTful API for programmatic access and integrations
+
+## Geography & Spatial Data
+
+- **Geography layers** — zones, districts, and boundaries using open GeoJSON
+  format
+- **Spatial integration** — link records to geographic areas and visualize
+  coverage
+
+## Governance & Workflows
+
+- **Role-based permissions** — define who can view, edit, review, approve, or
   publish records
-- **Workflow engine (early alpha)** — draft → review → approval processes built
+- **Workflow engine** — configurable draft → review → approval processes built
   into the core
-- **Local‑first, offline‑ready architecture** for resilient municipal
-  deployments
-- **Pluggable storage layer** with configurable folders, providers, and backup
-  targets
-- **Automatic record indexing** for fast search and navigation
-- **CLI tools** for initialization, backup, restore, validation, and maintenance
-- **Nuxt UI Pro interface** optimized for clerks and heavy daily workflows
-- **REST API** for developers and integrations, fully documented and expandable
+- **Public Sessions Module** — manage council meetings and public sessions
+
+## Infrastructure & Operations
+
+- **Local-first architecture** — offline-ready, resilient deployments for
+  small towns and large cities
+- **Backup and restore** — CLI tools for data backup, restore, and migration
+- **Multi-provider storage** — configurable storage backends (local, S3, Azure)
+- **CLI tools** — initialization, validation, maintenance, and administrative
+  operations
+- **Internationalization (i18n)** — full multilingual UI and record metadata
+  support
 
 ---
 
@@ -92,6 +144,9 @@ A live demonstration instance is available here:
 This instance showcases a complete sample dataset — including public records,
 geography layers, meeting minutes, and fully accessible API endpoints — offering
 a hands‑on look at how CivicPress structures and publishes civic information.
+
+**Current status:** v0.1.3 (Alpha). Suitable for demos and pilots with
+support, not yet for unsupervised production use.
 
 ---
 
@@ -119,7 +174,7 @@ node cli/dist/index.js init --yes
 # or
 node cli/dist/index.js init --yes --demo-data springfield-usa
 # or
-node cli/dist/index.js init --yes --demo-data richmond-quebec
+node cli/dist/index.js init --yes --demo-data richmond-quebec  # Richmond, QC demo dataset
 
 # 5. Start the API and UI
 pnpm run start:api
@@ -133,12 +188,33 @@ pnpm run start:ui
 All technical and architectural documentation is located in the [`docs/`](docs/)
 directory:
 
-- **[Bootstrap Guide](docs/bootstrap-guide.md)** — installation & development
-- **[Roadmap](docs/roadmap.md)** — upcoming milestones toward v1.0.0
-- **[Project Status](docs/project-status.md)** — current implementation status
+## For Municipal Staff
+
+- **[Municipal Guide](docs/municipal-guide.md)** — what CivicPress is and how
+  it works for clerks, councils, and municipal staff
+
+## For Developers & IT Teams
+
+- **[Bootstrap Guide](docs/bootstrap-guide.md)** — installation, setup, and
+  development environment
 - **[API Documentation](docs/api.md)** — complete REST API reference
 - **[CLI Usage Guide](docs/cli.md)** — command-line interface documentation
-- **[Architecture](docs/architecture.md)** — modules, storage, workflows, and core design
+- **[Architecture](docs/architecture.md)** — modules, storage, workflows, and
+  core design
+
+## Project Information
+
+- **[Roadmap](docs/roadmap.md)** — technical roadmap and upcoming milestones
+  toward v1.0.0
+- **[Project Status](docs/project-status.md)** — current implementation status
+  and feature completeness
+- **[Governance](docs/governance.md)** — governance model, future OSBL/coop
+  plans, and decision-making processes
+
+## Contributing
+
+- **[Contributing Guide](CONTRIBUTING.md)** — how to get involved as a
+  contributor
 
 ---
 
@@ -171,50 +247,40 @@ CivicPress is built using a modern, open, and well‑supported stack chosen for
 resilience, clarity, and long‑term maintainability — all critical for
 public‑sector software.
 
-- **TypeScript everywhere** — predictable, safe, and widely adopted
+## Core Technologies
+
+- **TypeScript / Node.js** — predictable, safe, and widely adopted
+- **pnpm workspaces / monorepo** — efficient dependency management and modular
+  development
 - **Nuxt 4 + Nuxt UI Pro** — fast, accessible, and easy to extend for
   clerk‑friendly interfaces
-- **Node.js + pnpm** — lightweight, efficient, and ideal for modular back‑end
-  services
-- **SQLite (for now)** — zero‑maintenance, file‑based, perfect for local‑first
-  deployments
-- **Markdown + JSON + YAML + GeoJSON** — open, durable, and future‑proof civic
+- **SQLite** — zero‑maintenance, file‑based database, perfect for local‑first
+  deployments (with future support for PostgreSQL and other databases)
+- **Markdown / YAML / JSON / GeoJSON** — open, durable, and future‑proof civic
   data formats
-- **Git as the versioning engine** — fully auditable change history by design
+- **Git** — versioning engine for fully auditable change history
 - **Nitro (server engine)** — portable, flexible, deployable nearly anywhere
-- **Cloudflare + Nginx** — secure, fast, and robust for public access
+- **Nginx / simple Node processes** — straightforward deployment options
 
-These technologies were selected because they:
+## Design Rationale
 
-- avoid vendor lock‑in
-- are open‑source and widely understood
-- work equally well for small towns and large cities
-- support the local‑first, offline‑capable philosophy of CivicPress
-- ensure data remains transparent, inspectable, and durable for decades
+This stack was chosen because it:
 
-## Why TypeScript/JavaScript?
+- **Broad familiarity** — many web developers can contribute without learning
+  specialized languages or frameworks
+- **Simple local setup** — no heavy enterprise stack required; works on standard
+  development machines
+- **Strong ecosystem** — mature tooling for web UIs, accessibility, and civic
+  portals
+- **Open, versionable formats** — storage in text-based formats (Markdown,
+  YAML, JSON) that are human-readable and Git-friendly
+- **Avoids vendor lock‑in** — all technologies are open-source and widely
+  understood
+- **Works at any scale** — equally suitable for small towns and large cities
+- **Supports local-first philosophy** — offline-capable and resilient
+- **Ensures data longevity** — data remains transparent, inspectable, and
+  durable for decades
 
-CivicPress adopts TypeScript/JavaScript not because it is "better" than other
-ecosystems, but because it aligns with the project's goals of accessibility,
-transparency, and broad participation.
-
-This stack was chosen because:
-
-- **It lowers the barrier to entry** — many contributors, students, and
-  municipal IT staff already know JavaScript or can pick it up quickly.
-- **Setup is straightforward** — a lightweight toolchain reduces operational
-  overhead, which is important for municipalities with limited technical
-  capacity.
-- **The web ecosystem is mature** — modern UI frameworks, accessibility tooling,
-  documentation generators, and API libraries are strongest in the JS/TS world.
-- **TypeScript provides predictability and maintainability** — offering strong
-  typing and safe refactoring in a language many already use.
-- **A large talent pool exists** — making long-term sustainability easier for
-  municipalities and open-source contributors.
-
-This approach supports the project's mission: to build civic technology that is
-easy to understand, easy to extend, and maintainable by both small-town teams
-and larger organizations alike.
 
 ---
 

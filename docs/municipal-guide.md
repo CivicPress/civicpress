@@ -5,7 +5,7 @@ municipal staff._
 
 **Audience:** Municipal clerks, archives staff, DGs, communications officers,
 and IT managers  
-**Version:** v0.1.3
+**Version:** v0.1.3 (Alpha)
 
 ---
 

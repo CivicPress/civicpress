@@ -438,8 +438,8 @@ compatibility:
 authors:
  - 'Sophie Germain <sophie@civicpress.io>'
 reviewers:
- - 'Ada Lovelace <ada@civicpress.org>'
- - 'Irène Joliot-Curie <irene@civicpress.org>'
+ - 'Ada Lovelace <ada@civicpress.io>'
+ - 'Irène Joliot-Curie <irene@civicpress.io>'
 ---
 ```
 

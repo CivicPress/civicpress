@@ -30,8 +30,8 @@ configuration
 ```yaml
 # Organization Configuration
 name: CivicPress
-city: Richmond
-state: Quebec
+city: Springfield
+state: Virginia
 country: Canada
 timezone: America/Montreal
 website: https://civicpress.org

@@ -67,8 +67,8 @@ civic backup --system-data --encrypt --local
 # 1. Fresh CivicPress installation
 civic init --name "New Town" --city "Springfield"
 
-# 2. Clone public data from template city
-git clone https://github.com/richmond/public-civic-data.git data/
+# 2. Clone public data from template city (example)
+git clone https://github.com/springfield/public-civic-data.git data/
 
 # 3. Verify public data integrity
 civic validate --public-data
@@ -84,7 +84,7 @@ civic start
 
 ### **Demo & Template Bundles**
 
-- Create rich demo datasets (e.g. Richmond) by standing up a clean instance,
+- Create rich demo datasets (e.g. Springfield, VA or Richmond, QC) by standing up a clean instance,
   loading records/files like an editor, then running `civic backup create` to
   export `data/` **with git history** plus storage assets and metadata.
 - Host bundles in a dedicated repo so teams can clone the full history or

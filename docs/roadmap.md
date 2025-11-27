@@ -17,7 +17,7 @@ architecture, core concepts, and overall feasibility of the platform.
 
 - Core schema for civic records (bylaws, minutes, geography, metadata)
 - Unified file + attachment system with UUID storage
-- Demo datasets (Springfield, VA and Richmond, QC)
+- Demo datasets (Springfield, VA and Richmond, QC - demo datasets)
 - Markdown-based durable documents with Git-compatible structure
 - Geography and zoning layers (GeoJSON) integrated into records
 
@@ -39,7 +39,7 @@ architecture, core concepts, and overall feasibility of the platform.
 
 ### DevOps & Demo Environment
 
-- Full deployment of **demo.civicpress.io**
+- Full deployment of **https://demo.civicpress.io**
 - EC2-based hosting with Nginx reverse proxy
 - Automated build + prerender pipeline for UI
 - Structured project documentation created

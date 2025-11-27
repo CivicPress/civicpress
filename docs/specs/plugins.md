@@ -243,7 +243,7 @@ metadata:
  maintainers:
  - 'sophie@civicpress.io'
  support:
- email: 'support@civicpress.org'
+ email: 'hello@civicpress.io'
  issues: 'https://github.com/CivicPress/civic-anniversary/issues'
 ```
 

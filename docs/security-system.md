@@ -409,4 +409,4 @@ The security system is designed to be extensible:
 
 For technical support or security questions, please refer to the
 [API documentation](./api.md) or
-[contact the development team](mailto:security@civicpress.org).
+[contact the development team](mailto:hello@civicpress.io).

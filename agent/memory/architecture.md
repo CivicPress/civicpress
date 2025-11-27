@@ -333,7 +333,7 @@ database: { type: sqlite }
 
 ```yaml
 name: Civic Records
-city: Richmond
+city: Springfield
 state: Quebec
 country: Canada
 timezone: America/Montreal

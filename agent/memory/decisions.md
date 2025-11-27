@@ -371,7 +371,7 @@ notifications:
         host: 'smtp.example.com'
         port: 587
         secure: true
-        username: 'notifications@civicpress.org'
+        username: 'hello@civicpress.io'
         password: '***'  # Encrypted
     sms:
       enabled: true
