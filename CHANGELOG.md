@@ -8,14 +8,7 @@ and this project adheres to
 
 ## [Unreleased]
 
-## [0.1.3] - 2025-01-XX
-
-### Added
-
-- **Account Creation**: User registration page and workflow implemented
-  - User registration page (`/auth/register`)
-  - Account creation workflow with validation
-  - Integration with authentication system
+## [0.1.3] - 2025-11-26
 
 ### Changed
 
