@@ -138,7 +138,7 @@ directory:
 - **[Project Status](docs/project-status.md)** — current implementation status
 - **[API Documentation](docs/api.md)** — complete REST API reference
 - **[CLI Usage Guide](docs/cli.md)** — command-line interface documentation
-- **[Architecture](docs/)** — modules, storage, workflows, and core design
+- **[Architecture](docs/architecture.md)** — modules, storage, workflows, and core design
 
 ---
 

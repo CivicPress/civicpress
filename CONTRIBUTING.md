@@ -40,9 +40,9 @@ CivicPress encourages contributions from a wide range of backgrounds. You do not
 
 A few useful resources to consult before contributing:
 
-- Development and installation guide: `docs/bootstrap-guide.md`
-- Roadmap and direction: `docs/roadmap.md`
-- Project status and current implementation: `docs/project-status.md`
+- Development and installation guide: [docs/bootstrap-guide.md](docs/bootstrap-guide.md)
+- Roadmap and direction: [docs/roadmap.md](docs/roadmap.md)
+- Project status and current implementation: [docs/project-status.md](docs/project-status.md)
 - Public interest and participation form: https://tally.so/r/wAYBvN
 
 These documents will give you a clear sense of the goals, priorities, and expectations for CivicPress.
@@ -55,7 +55,7 @@ This section covers the technical workflow for developers.
 
 ## Development Setup
 
-Follow the installation instructions in `docs/bootstrap-guide.md` to set up your environment.
+Follow the installation instructions in [docs/bootstrap-guide.md](docs/bootstrap-guide.md) to set up your environment.
 
 ## Branch Naming
 
@@ -115,7 +115,7 @@ Not all contributions involve writing code. Non-technical contributions are esse
 
 If you encounter bugs or inconsistencies:
 
-- Open an issue on GitHub
+- [Open an issue on GitHub](https://github.com/CivicPress/civicpress/issues)
 - Provide steps to reproduce
 - Include logs or screenshots when applicable
 - Use descriptive titles
@@ -131,7 +131,7 @@ CivicPress is not only a software project; it is a civic initiative. If you wish
 - Express interest in pilot projects
 - Share use cases from your municipality or field
 - Provide feedback on the platform’s direction
-- Contact the project maintainers directly at hello@civicpress.io
+- Contact the project maintainers directly at [hello@civicpress.io](mailto:hello@civicpress.io)
 
 ---
 
