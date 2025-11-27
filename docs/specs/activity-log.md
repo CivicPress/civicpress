@@ -1,4 +1,4 @@
-# 📝 CivicPress Spec: `activity-log.md`
+# CivicPress Spec: `activity-log.md`
 
 ---
 
@@ -8,30 +8,30 @@ deprecated: false sunset_date: null additions:
 - comprehensive activity log documentation
 - event tracking
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'auth.md: >=1.2.0'
-  - 'audit.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'auth.md: >=1.2.0'
+ - 'audit.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Activity Log & Civic Audit Trail
 
-## 🎯 Purpose
+## Purpose
 
 Track all significant user and system actions — providing a **transparent audit
-trail** of edits, approvals, feedback, logins, and system events.  
+trail** of edits, approvals, feedback, logins, and system events. 
 Supports traceability, trust, and debugging across all CivicPress modules.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Log meaningful actions (create, edit, delete, approve, flag)
 - Store user ID, timestamp, action type, record path, and payload summary
@@ -39,87 +39,87 @@ Supports traceability, trust, and debugging across all CivicPress modules.
 - Enable filters by user, type, or module
 - Append-only JSONL log with optional signing
 
-❌ Out of Scope:
+Out of Scope:
 
 - Fine-grained real-time telemetry (see `observability.md`)
 - Tamper-proofing (see `data-integrity.md`)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Action                    | Logged                          |
+| Action | Logged |
 | ------------------------- | ------------------------------- |
-| Approve a bylaw           | `record-approved` with metadata |
-| Submit feedback           | `feedback-submitted` log entry  |
-| Edit a module config      | `module-edited` event           |
-| CLI: `civic log`          | Query activity trail            |
-| API: `/api/logs?user=...` | Filter logs by user or action   |
+| Approve a bylaw | `record-approved` with metadata |
+| Submit feedback | `feedback-submitted` log entry |
+| Edit a module config | `module-edited` event |
+| CLI: `civic log` | Query activity trail |
+| API: `/api/logs?user=...` | Filter logs by user or action |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/logs/activity.jsonl
 core/logger.ts
 ```
 
-## 📝 Example Activity Log Policy Configuration
+## Example Activity Log Policy Configuration
 
 ```yaml
 # .civic/activity-log.yml
 activity_log:
-  enabled: true
-  retention_days: 730
-  redact_sensitive: true
-  sign_entries: true
-  log_level: 'info' # debug, info, warn, error
+ enabled: true
+ retention_days: 730
+ redact_sensitive: true
+ sign_entries: true
+ log_level: 'info' # debug, info, warn, error
 
-  include_actions:
-    - 'record-created'
-    - 'record-edited'
-    - 'record-approved'
-    - 'feedback-submitted'
-    - 'login'
-    - 'role-changed'
-    - 'module-edited'
+ include_actions:
+ - 'record-created'
+ - 'record-edited'
+ - 'record-approved'
+ - 'feedback-submitted'
+ - 'login'
+ - 'role-changed'
+ - 'module-edited'
 
-  exclude_actions:
-    - 'heartbeat'
-    - 'system-ping'
+ exclude_actions:
+ - 'heartbeat'
+ - 'system-ping'
 
-  export:
-    formats:
-      - 'jsonl'
-      - 'csv'
-      - 'pdf'
-    schedule: 'monthly'
+ export:
+ formats:
+ - 'jsonl'
+ - 'csv'
+ - 'pdf'
+ schedule: 'monthly'
 
-  notifications:
-    on_critical_action: true
-    notify_roles:
-      - 'clerk'
-      - 'auditor'
+ notifications:
+ on_critical_action: true
+ notify_roles:
+ - 'clerk'
+ - 'auditor'
 ```
 
 ---
 
-## 📝 Example Log Entry
+## Example Log Entry
 
 ```json
 {
-  "timestamp": "2025-07-04T14:44:00Z",
-  "user": "u-irene-curie",
-  "action": "record-approved",
-  "record": "records/bylaws/curfew.md",
-  "module": "legal-register"
+ "timestamp": "2025-07-04T14:44:00Z",
+ "user": "u-irene-curie",
+ "action": "record-approved",
+ "record": "records/bylaws/curfew.md",
+ "module": "legal-register"
 }
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Logs must be append-only
 - Sensitive actions (deletion, approval) should include actor info
@@ -128,7 +128,7 @@ activity_log:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Simulate common actions (edit, submit, approve)
 - Confirm logs written correctly and sequentially
@@ -137,14 +137,14 @@ activity_log:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Export to CSV or PDF audit report
 - GraphQL interface for dashboards
 - Log tamper detection
 - Signed digest of logs per day/week (e.g. Merkle root)
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`audit.md`](./audit.md) — Audit trail and anomaly detection
 - [`metrics.md`](./metrics.md) — Usage and engagement metrics
@@ -153,6 +153,6 @@ activity_log:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

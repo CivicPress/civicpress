@@ -1,4 +1,4 @@
-# 🔔 CivicPress Spec: `notifications.md`
+# CivicPress Spec: `notifications.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive notification documentation
 - channel security
 - content protection compatibility: min_civicpress: 1.0.0 max_civicpress: 'null'
-  dependencies:
-  - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0' authors:
+ dependencies:
+ - 'auth.md: >=1.2.0'
+ - 'permissions.md: >=1.1.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Notifications System
 
-## 🎯 Purpose
+## Purpose
 
 Enable CivicPress to notify relevant users or external systems when civic events
 occur — such as approvals, feedback received, or new proposals. This supports
@@ -31,35 +31,35 @@ Notifications may be local (in-app), remote (webhook), or outbound (email/SMS).
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Trigger notifications on system events (`hook:`-based)
 - Support multiple channels (email, webhook, CLI, UI)
 - Route messages based on user roles or subscriptions
 - Log all notifications for auditing
 
-❌ Out of Scope:
+Out of Scope:
 
 - Real-time presence or WebSocket chat
 - Delivery retries or guaranteed delivery (handled by future queue system)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Triggered by              | Notifies via                        |
+| Triggered by | Notifies via |
 | ------------------------- | ----------------------------------- |
-| Feedback submitted        | Clerk via email or UI ping          |
-| Bylaw proposed            | Council roles via webhook/email     |
-| Workflow triggered        | System log + optional outbound hook |
-| Record approved           | Authors, related users              |
-| CLI action (e.g. approve) | Optional notifications if enabled   |
+| Feedback submitted | Clerk via email or UI ping |
+| Bylaw proposed | Council roles via webhook/email |
+| Workflow triggered | System log + optional outbound hook |
+| Record approved | Authors, related users |
+| CLI action (e.g. approve) | Optional notifications if enabled |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 core/notify.ts
@@ -69,7 +69,7 @@ core/notify.ts
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Notification Channel Security
 
@@ -117,7 +117,7 @@ core/notify.ts
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Trigger test events and confirm outbound logs
 - Validate webhook delivery and fallback
@@ -126,7 +126,7 @@ core/notify.ts
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Add queue system for retries and scheduling
 - Support digest summary notifications (daily, weekly)
@@ -134,7 +134,7 @@ core/notify.ts
 - Citizen-facing subscription model (per record/tag)
 - i18n templating for multilingual messages
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`hooks.md`](./hooks.md) — Event triggers and notification sources
 - [`scheduler.md`](./scheduler.md) — Scheduled notification delivery
@@ -143,6 +143,6 @@ core/notify.ts
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

@@ -1,4 +1,4 @@
-# 🎨 CivicPress Spec: `ui.md`
+# CivicPress Spec: `ui.md`
 
 ---
 
@@ -8,154 +8,154 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive UI documentation
 - accessibility considerations
 - testing patterns fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'auth.md: >=1.0.0'
+ - 'permissions.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `ui` — CivicPress User Interface Architecture
 
-## 🎯 Purpose
+## Purpose
 
 Define the structure, responsibilities, and separation of concerns between
 CivicPress's public-facing UI and admin/editor tools.
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Define UI structure and separation of concerns
 - Document public and admin UI responsibilities
 - Ensure accessibility and responsive design
 - Provide UI testing and validation guidelines
 
-❌ Out of Scope:
+Out of Scope:
 
 - Implementation-specific UI code
 - Third-party UI libraries
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                      | Description                               |
+| Input | Description |
 | -------------------------- | ----------------------------------------- |
-| CivicPress data            | Records, bylaws, feedback, and civic data |
-| User authentication        | GitHub OAuth and role-based access        |
-| UI components              | Reusable Vue components and layouts       |
-| Design system              | Tailwind CSS and design tokens            |
-| Accessibility requirements | WCAG compliance and responsive design     |
+| CivicPress data | Records, bylaws, feedback, and civic data |
+| User authentication | GitHub OAuth and role-based access |
+| UI components | Reusable Vue components and layouts |
+| Design system | Tailwind CSS and design tokens |
+| Accessibility requirements | WCAG compliance and responsive design |
 
-| Output                | Description                        |
+| Output | Description |
 | --------------------- | ---------------------------------- |
-| Public UI             | Static-exportable civic portal     |
-| Admin interface       | Authenticated management tools     |
-| Responsive layouts    | Mobile and desktop optimized views |
-| Accessible components | WCAG compliant UI elements         |
-| Static exports        | Deployable public-facing sites     |
+| Public UI | Static-exportable civic portal |
+| Admin interface | Authenticated management tools |
+| Responsive layouts | Mobile and desktop optimized views |
+| Accessible components | WCAG compliant UI elements |
+| Static exports | Deployable public-facing sites |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 ui/
-├── public/                # Public-facing UI
-│   ├── components/
-│   │   ├── BylawViewer.vue
-│   │   ├── TimelineNavigator.vue
-│   │   ├── FeedbackExplorer.vue
-│   │   └── SessionViewer.vue
-│   ├── layouts/
-│   │   ├── DefaultLayout.vue
-│   │   └── PublicLayout.vue
-│   ├── pages/
-│   │   ├── index.vue
-│   │   ├── bylaws/
-│   │   ├── timeline/
-│   │   ├── feedback/
-│   │   └── sessions/
-│   └── assets/
-│       ├── styles/
-│       └── images/
-├── admin/                 # Admin interface
-│   ├── components/
-│   │   ├── MarkdownEditor.vue
-│   │   ├── FeedbackInbox.vue
-│   │   ├── SubmissionReview.vue
-│   │   └── RoleSettings.vue
-│   ├── layouts/
-│   │   └── AdminLayout.vue
-│   ├── pages/
-│   │   ├── index.vue
-│   │   ├── editor/
-│   │   ├── feedback/
-│   │   └── settings/
-│   └── composables/
-│       ├── useAuth.ts
-│       └── usePermissions.ts
-├── shared/                # Shared components
-│   ├── components/
-│   │   ├── CivicHeader.vue
-│   │   ├── CivicFooter.vue
-│   │   └── SearchBar.vue
-│   ├── composables/
-│   │   ├── useCivicData.ts
-│   │   └── useNavigation.ts
-│   └── utils/
-│       ├── formatters.ts
-│       └── validators.ts
-└── tests/                 # UI tests
-    ├── public/
-    │   ├── BylawViewer.test.ts
-    │   └── TimelineNavigator.test.ts
-    ├── admin/
-    │   ├── MarkdownEditor.test.ts
-    │   └── FeedbackInbox.test.ts
-    └── e2e/
-        ├── public-journey.test.ts
-        └── admin-workflow.test.ts
+├── public/ # Public-facing UI
+│ ├── components/
+│ │ ├── BylawViewer.vue
+│ │ ├── TimelineNavigator.vue
+│ │ ├── FeedbackExplorer.vue
+│ │ └── SessionViewer.vue
+│ ├── layouts/
+│ │ ├── DefaultLayout.vue
+│ │ └── PublicLayout.vue
+│ ├── pages/
+│ │ ├── index.vue
+│ │ ├── bylaws/
+│ │ ├── timeline/
+│ │ ├── feedback/
+│ │ └── sessions/
+│ └── assets/
+│ ├── styles/
+│ └── images/
+├── admin/ # Admin interface
+│ ├── components/
+│ │ ├── MarkdownEditor.vue
+│ │ ├── FeedbackInbox.vue
+│ │ ├── SubmissionReview.vue
+│ │ └── RoleSettings.vue
+│ ├── layouts/
+│ │ └── AdminLayout.vue
+│ ├── pages/
+│ │ ├── index.vue
+│ │ ├── editor/
+│ │ ├── feedback/
+│ │ └── settings/
+│ └── composables/
+│ ├── useAuth.ts
+│ └── usePermissions.ts
+├── shared/ # Shared components
+│ ├── components/
+│ │ ├── CivicHeader.vue
+│ │ ├── CivicFooter.vue
+│ │ └── SearchBar.vue
+│ ├── composables/
+│ │ ├── useCivicData.ts
+│ │ └── useNavigation.ts
+│ └── utils/
+│ ├── formatters.ts
+│ └── validators.ts
+└── tests/ # UI tests
+ ├── public/
+ │ ├── BylawViewer.test.ts
+ │ └── TimelineNavigator.test.ts
+ ├── admin/
+ │ ├── MarkdownEditor.test.ts
+ │ └── FeedbackInbox.test.ts
+ └── e2e/
+ ├── public-journey.test.ts
+ └── admin-workflow.test.ts
 
 core/
-├── ui.ts                  # UI framework integration
-├── auth-provider.ts       # Authentication provider
-├── permission-checker.ts  # Permission validation
-└── static-exporter.ts     # Static site generation
+├── ui.ts # UI framework integration
+├── auth-provider.ts # Authentication provider
+├── permission-checker.ts # Permission validation
+└── static-exporter.ts # Static site generation
 
 modules/
 ├── ui/
-│   ├── components/
-│   │   ├── UIManager.tsx # UI management
-│   │   ├── ThemeProvider.tsx # Theme management
-│   │   └── LayoutManager.tsx # Layout management
-│   ├── hooks/
-│   │   └── useUI.ts # UI state management
-│   └── utils/
-│       ├── responsive-utils.ts # Responsive design utilities
-│       └── accessibility-utils.ts # Accessibility helpers
+│ ├── components/
+│ │ ├── UIManager.tsx # UI management
+│ │ ├── ThemeProvider.tsx # Theme management
+│ │ └── LayoutManager.tsx # Layout management
+│ ├── hooks/
+│ │ └── useUI.ts # UI state management
+│ └── utils/
+│ ├── responsive-utils.ts # Responsive design utilities
+│ └── accessibility-utils.ts # Accessibility helpers
 └── auth/
-    └── components/
-        └── AuthProvider.tsx # Authentication context
+ └── components/
+ └── AuthProvider.tsx # Authentication context
 
 .civic/
-├── ui.yml                 # UI configuration
-├── themes/                # Theme definitions
-│   ├── default.yml
-│   └── civic.yml
-└── layouts/               # Layout templates
-    ├── public.yml
-    └── admin.yml
+├── ui.yml # UI configuration
+├── themes/ # Theme definitions
+│ ├── default.yml
+│ └── civic.yml
+└── layouts/ # Layout templates
+ ├── public.yml
+ └── admin.yml
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Public UI Security
 
@@ -191,54 +191,54 @@ modules/
 
 ---
 
-## 🧩 Layered UI Architecture
+## Layered UI Architecture
 
 The CivicPress UI is divided into **two layers**:
 
-| Layer     | Audience         | Description                                             |
+| Layer | Audience | Description |
 | --------- | ---------------- | ------------------------------------------------------- |
-| `public/` | Citizens, public | Public-facing civic portal to view and explore records  |
-| `admin/`  | Clerks, council  | Authenticated tools to create, edit, and manage records |
+| `public/` | Citizens, public | Public-facing civic portal to view and explore records |
+| `admin/` | Clerks, council | Authenticated tools to create, edit, and manage records |
 
 ---
 
-## 🖼️ `public/` UI Responsibilities
+## ️ `public/` UI Responsibilities
 
-| Feature               | Description                                       |
+| Feature | Description |
 | --------------------- | ------------------------------------------------- |
-| Town homepage         | `/` with logo, intro, last 3 bylaws, next session |
-| Bylaw viewer          | `/bylaws/[slug]` or `/bylaws/[section]/[slug]`    |
-| Timeline navigator    | `/timeline/`                                      |
-| Feedback explorer     | `/feedback/`, `/feedback/2025-07-01.md`           |
-| Public session viewer | `/sessions/`, linked videos + minutes             |
-| Search + tag filters  | Optional in MVP                                   |
+| Town homepage | `/` with logo, intro, last 3 bylaws, next session |
+| Bylaw viewer | `/bylaws/[slug]` or `/bylaws/[section]/[slug]` |
+| Timeline navigator | `/timeline/` |
+| Feedback explorer | `/feedback/`, `/feedback/2025-07-01.md` |
+| Public session viewer | `/sessions/`, linked videos + minutes |
+| Search + tag filters | Optional in MVP |
 
-✅ Fully static-exportable (Nuxt `nuxi generate`)  
-✅ No login required  
-✅ 100% safe and public  
-✅ Designed to be fast, legible, accessible
+Fully static-exportable (Nuxt `nuxi generate`) 
+No login required 
+100% safe and public 
+Designed to be fast, legible, accessible
 
 ---
 
-## 🔐 `admin/` UI Responsibilities
+## `admin/` UI Responsibilities
 
-| Feature                | Description                              |
+| Feature | Description |
 | ---------------------- | ---------------------------------------- |
-| GitHub login (MVP)     | Read role from `.civic/roles.yml`        |
-| Inline Markdown editor | Edit or propose edits to records         |
-| Feedback inbox         | View/respond/approve comments            |
-| Submission review      | Accept or reject proposed edits          |
-| Index trigger          | Re-run civic index manually              |
+| GitHub login (MVP) | Read role from `.civic/roles.yml` |
+| Inline Markdown editor | Edit or propose edits to records |
+| Feedback inbox | View/respond/approve comments |
+| Submission review | Accept or reject proposed edits |
+| Index trigger | Re-run civic index manually |
 | Role settings (future) | View civic permissions and workflow logs |
-| Draft workspace        | Unpublished civic work area              |
+| Draft workspace | Unpublished civic work area |
 
-⚠️ Protected by GitHub or Civic ID (later)  
-⚠️ Respects roles defined in `permissions.md`  
-⚠️ May run only in dev mode or gated route
+️ Protected by GitHub or Civic ID (later) 
+️ Respects roles defined in `permissions.md` 
+️ May run only in dev mode or gated route
 
 ---
 
-## 🧱 Frameworks
+## Frameworks
 
 - **Nuxt 4** (recommended): handles SSR, SSG, file-based routing
 - **Tailwind CSS**: styling baseline
@@ -248,7 +248,7 @@ The CivicPress UI is divided into **two layers**:
 
 ---
 
-## 🔐 Auth Flow (MVP)
+## Auth Flow (MVP)
 
 ```yaml
 - User visits /admin
@@ -265,16 +265,16 @@ Later, support for:
 
 ---
 
-## 🛠️ CLI Support
+## ️ CLI Support
 
 ```bash
-civic dev        # Launches public + admin UI
-civic serve      # Public-only viewer
+civic dev # Launches public + admin UI
+civic serve # Public-only viewer
 ```
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test public UI renders without authentication
 - Verify admin routes require proper role access
@@ -284,7 +284,7 @@ civic serve      # Public-only viewer
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Advanced search functionality with fuzzy matching
 - Real-time collaboration features for admin editing
@@ -295,7 +295,7 @@ civic serve      # Public-only viewer
 - Offline support for public content viewing
 - Advanced accessibility features and tools
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`auth.md`](./auth.md) — Authentication and authorization
 - [`permissions.md`](./permissions.md) — Role-based access control
@@ -305,7 +305,7 @@ civic serve      # Public-only viewer
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03
 - Updated: Renamed `frontend/` → `public/`

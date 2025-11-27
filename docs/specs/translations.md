@@ -1,4 +1,4 @@
-# 🌐 CivicPress Spec: `translations.md`
+# CivicPress Spec: `translations.md`
 
 ---
 
@@ -8,19 +8,19 @@ deprecated: false sunset_date: null additions:
 - comprehensive translation documentation
 - internationalization
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'ui.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'ui.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Translations & Multilingual Support
 
-## 🎯 Purpose
+## Purpose
 
 Enable CivicPress to support **multilingual civic records, user interfaces, and
 workflows** — so that towns can operate inclusively in regions with multiple
@@ -30,9 +30,9 @@ CivicPress should be multilingual at its core — not as an afterthought.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Support translated civic records (`record.fr.md`, `record.en.md`)
 - Tag and link translation equivalents in frontmatter
@@ -40,25 +40,25 @@ CivicPress should be multilingual at its core — not as an afterthought.
 - Allow language toggle in public interface
 - i18n fallback for system-generated strings (CLI, API)
 
-❌ Out of Scope:
+Out of Scope:
 
 - Real-time machine translation
 - Pluralization/grammar for every language (initially)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                      | Result                               |
+| Input | Result |
 | -------------------------- | ------------------------------------ |
-| `minutes-2024-01-01.fr.md` | Public UI shows French version       |
-| `minutes-2024-01-01.en.md` | Public UI shows English version      |
-| `language:` in frontmatter | UI toggle inferred                   |
-| `i18n/labels.fr.yml`       | Used for translated buttons/messages |
+| `minutes-2024-01-01.fr.md` | Public UI shows French version |
+| `minutes-2024-01-01.en.md` | Public UI shows English version |
+| `language:` in frontmatter | UI toggle inferred |
+| `i18n/labels.fr.yml` | Used for translated buttons/messages |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 records/
@@ -70,123 +70,123 @@ i18n/
 .civic/i18n.yml
 ```
 
-## 📝 Example Internationalization Configuration
+## Example Internationalization Configuration
 
 ```yaml
 # .civic/i18n.yml
 default_locale: 'en'
 fallback_locale: 'en'
 available_locales:
-  - 'en'
-  - 'fr'
-  - 'es'
+ - 'en'
+ - 'fr'
+ - 'es'
 
 locales:
-  en:
-    name: 'English'
-    native_name: 'English'
-    direction: 'ltr'
-    date_format: 'MM/DD/YYYY'
-    time_format: '12h'
-    currency: 'USD'
-    number_format:
-      decimal: '.'
-      thousands: ','
-      precision: 2
+ en:
+ name: 'English'
+ native_name: 'English'
+ direction: 'ltr'
+ date_format: 'MM/DD/YYYY'
+ time_format: '12h'
+ currency: 'USD'
+ number_format:
+ decimal: '.'
+ thousands: ','
+ precision: 2
 
-  fr:
-    name: 'French'
-    native_name: 'Français'
-    direction: 'ltr'
-    date_format: 'DD/MM/YYYY'
-    time_format: '24h'
-    currency: 'CAD'
-    number_format:
-      decimal: ','
-      thousands: ' '
-      precision: 2
+ fr:
+ name: 'French'
+ native_name: 'Français'
+ direction: 'ltr'
+ date_format: 'DD/MM/YYYY'
+ time_format: '24h'
+ currency: 'CAD'
+ number_format:
+ decimal: ','
+ thousands: ' '
+ precision: 2
 
-  es:
-    name: 'Spanish'
-    native_name: 'Español'
-    direction: 'ltr'
-    date_format: 'DD/MM/YYYY'
-    time_format: '24h'
-    currency: 'USD'
-    number_format:
-      decimal: ','
-      thousands: '.'
-      precision: 2
+ es:
+ name: 'Spanish'
+ native_name: 'Español'
+ direction: 'ltr'
+ date_format: 'DD/MM/YYYY'
+ time_format: '24h'
+ currency: 'USD'
+ number_format:
+ decimal: ','
+ thousands: '.'
+ precision: 2
 
 translation_files:
-  - 'common.yml'
-  - 'navigation.yml'
-  - 'forms.yml'
-  - 'errors.yml'
-  - 'notifications.yml'
-  - 'legal.yml'
+ - 'common.yml'
+ - 'navigation.yml'
+ - 'forms.yml'
+ - 'errors.yml'
+ - 'notifications.yml'
+ - 'legal.yml'
 
 namespaces:
-  common:
-    description: 'Common UI elements and actions'
-    files:
-      - 'i18n/en/common.yml'
-      - 'i18n/fr/common.yml'
-      - 'i18n/es/common.yml'
+ common:
+ description: 'Common UI elements and actions'
+ files:
+ - 'i18n/en/common.yml'
+ - 'i18n/fr/common.yml'
+ - 'i18n/es/common.yml'
 
-  navigation:
-    description: 'Navigation and menu items'
-    files:
-      - 'i18n/en/navigation.yml'
-      - 'i18n/fr/navigation.yml'
-      - 'i18n/es/navigation.yml'
+ navigation:
+ description: 'Navigation and menu items'
+ files:
+ - 'i18n/en/navigation.yml'
+ - 'i18n/fr/navigation.yml'
+ - 'i18n/es/navigation.yml'
 
-  legal:
-    description: 'Legal terms and civic documents'
-    files:
-      - 'i18n/en/legal.yml'
-      - 'i18n/fr/legal.yml'
-      - 'i18n/es/legal.yml'
+ legal:
+ description: 'Legal terms and civic documents'
+ files:
+ - 'i18n/en/legal.yml'
+ - 'i18n/fr/legal.yml'
+ - 'i18n/es/legal.yml'
 
 auto_translation:
-  enabled: false # For MVP, manual translations only
-  provider: 'google' # Future: google, deepl, azure
-  api_key: '${TRANSLATION_API_KEY}'
+ enabled: false # For MVP, manual translations only
+ provider: 'google' # Future: google, deepl, azure
+ api_key: '${TRANSLATION_API_KEY}'
 
 pluralization:
-  rules:
-    en:
-      one: '1'
-      other: 'other'
-    fr:
-      one: '1'
-      other: 'other'
-    es:
-      one: '1'
-      other: 'other'
+ rules:
+ en:
+ one: '1'
+ other: 'other'
+ fr:
+ one: '1'
+ other: 'other'
+ es:
+ one: '1'
+ other: 'other'
 
 interpolation:
-  variables:
-    - 'town_name'
-    - 'current_year'
-    - 'user_name'
-    - 'record_title'
+ variables:
+ - 'town_name'
+ - 'current_year'
+ - 'user_name'
+ - 'record_title'
 
-  examples:
-    welcome_message: 'Welcome to {{town_name}}'
-    copyright: '© {{current_year}} {{town_name}}'
-    user_greeting: 'Hello, {{user_name}}'
+ examples:
+ welcome_message: 'Welcome to {{town_name}}'
+ copyright: '© {{current_year}} {{town_name}}'
+ user_greeting: 'Hello, {{user_name}}'
 
 quality:
-  review_required: true
-  reviewer_role: 'translator'
-  auto_detect_missing: true
-  fallback_strategy: 'key_or_default'
+ review_required: true
+ reviewer_role: 'translator'
+ auto_detect_missing: true
+ fallback_strategy: 'key_or_default'
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Translation Integrity & Accuracy
 
@@ -238,36 +238,36 @@ quality:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Toggle language in UI and verify translations load
 - Confirm fallback to default language if missing
 - Validate `i18n/` JSON parsing in frontend
 - Ensure civic records link to each other via frontmatter
 
-## ✅ Implementation Status (December 2025)
+## Implementation Status (December 2025)
 
 ### Completed Implementation
 
-- ✅ **UI Internationalization**: Complete translation system implemented using
-  `@nuxtjs/i18n` and `vue-i18n`
-- ✅ **Translation Files**: JSON-based translation files (`en.json`, `fr.json`)
-  in `modules/ui/i18n/locales/`
-- ✅ **Full Coverage**: All UI components, pages, forms, modals, and messages
-  translated
-- ✅ **Pluralization**: ICU MessageFormat support for proper plural forms
-- ✅ **Dynamic Content**: `useConfigTranslations` composable for translating
-  configuration-driven values
-- ✅ **Consistent Patterns**: Translation keys follow organized structure by
-  feature area
+- **UI Internationalization**: Complete translation system implemented using
+ `@nuxtjs/i18n` and `vue-i18n`
+- **Translation Files**: JSON-based translation files (`en.json`, `fr.json`)
+ in `modules/ui/i18n/locales/`
+- **Full Coverage**: All UI components, pages, forms, modals, and messages
+ translated
+- **Pluralization**: ICU MessageFormat support for proper plural forms
+- **Dynamic Content**: `useConfigTranslations` composable for translating
+ configuration-driven values
+- **Consistent Patterns**: Translation keys follow organized structure by
+ feature area
 
 ### Translation Coverage
 
-- ✅ **Pages**: Records, Geography, Settings (all sub-pages), Authentication
-- ✅ **Components**: Forms, Selectors, Browsers, Modals, Alerts, Toasts
-- ✅ **Navigation**: Sidebar, breadcrumbs, buttons, labels
-- ✅ **Messages**: Error messages, validation feedback, success notifications
-- ✅ **Footer**: System footer component
+- **Pages**: Records, Geography, Settings (all sub-pages), Authentication
+- **Components**: Forms, Selectors, Browsers, Modals, Alerts, Toasts
+- **Navigation**: Sidebar, breadcrumbs, buttons, labels
+- **Messages**: Error messages, validation feedback, success notifications
+- **Footer**: System footer component
 
 ### Current Languages
 
@@ -278,8 +278,8 @@ quality:
 
 ```
 modules/ui/i18n/locales/
-├── en.json  # English translations
-└── fr.json  # French translations
+├── en.json # English translations
+└── fr.json # French translations
 ```
 
 ### Key Features Implemented
@@ -292,7 +292,7 @@ modules/ui/i18n/locales/
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - CLI translation sync (`civic translate sync`)
 - Translation completeness checks
@@ -301,6 +301,6 @@ modules/ui/i18n/locales/
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

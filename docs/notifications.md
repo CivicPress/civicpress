@@ -22,6 +22,10 @@ sending and template-based notifications for authentication workflows.
 Notification configuration is stored in `.system-data/notifications.yml`
 (sensitive data, not in Git).
 
+### Environment Variables (Preferred)
+
+For a complete example of all available environment variables, see [`notifications-credentials.example`](./notifications-credentials.example). Copy the relevant variables to your `.env.local` file.
+
 ### Configuration Structure
 
 ```yaml
@@ -30,7 +34,7 @@ channels:
     enabled: true
     provider: 'smtp'  # or 'sendgrid', 'ses', 'nodemailer'
 
-    # SMTP Configuration
+# SMTP Configuration
     smtp:
       host: 'mail.example.com'
       port: 587
@@ -42,13 +46,13 @@ channels:
       tls:
         rejectUnauthorized: false  # For SSL certificate issues
 
-    # SendGrid Configuration
+# SendGrid Configuration
     sendgrid:
       apiKey: 'SG.your-api-key'
       from: 'noreply@example.com'
       sandboxMode: true  # For testing without domain verification
 
-    # AWS SES Configuration
+# AWS SES Configuration
     ses:
       accessKeyId: 'your-access-key'
       secretAccessKey: 'your-secret-key'

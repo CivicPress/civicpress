@@ -1,6 +1,6 @@
-# 🔒 CivicPress Backup Strategy
+# CivicPress Backup Strategy
 
-## 🎯 Architecture Overview
+## Architecture Overview
 
 CivicPress uses a **separated backup strategy** to ensure security and
 transparency:
@@ -11,7 +11,7 @@ transparency:
   with backups; remote cloud objects (S3/Azure) stay in place and rely on cloud
   durability/backups.
 
-## 📁 Directory Structure
+## Directory Structure
 
 ```
 civicpress/
@@ -30,7 +30,7 @@ civicpress/
         └── policy/           # Public policies
 ```
 
-## 🔄 Backup Workflows
+## Backup Workflows
 
 ### **Public Data Backup (Git Repository + Local Storage Assets)**
 
@@ -39,11 +39,11 @@ civicpress/
 civic backup --public-only --commit --push
 
 # This backs up:
-# ✅ data/records/ (all civic records)
-# ✅ data/.civic/ (public configuration)
-# ✅ data/templates/ (public templates)
-# ✅ storage/ manifests + exported local assets (optional flag)
-# ❌ .system-data/ (never included)
+# data/records/ (all civic records)
+# data/.civic/ (public configuration)
+# data/templates/ (public templates)
+# storage/ manifests + exported local assets (optional flag)
+# .system-data/ (never included)
 ```
 
 ### **Private Data Backup (IT Managed)**
@@ -53,13 +53,13 @@ civic backup --public-only --commit --push
 civic backup --system-data --encrypt --local
 
 # This backs up:
-# ✅ .system-data/civic.db (encrypted)
-# ✅ .system-data/logs/ (encrypted)
-# ✅ .system-data/backups/ (encrypted)
-# ❌ data/ (handled separately)
+# .system-data/civic.db (encrypted)
+# .system-data/logs/ (encrypted)
+# .system-data/backups/ (encrypted)
+# data/ (handled separately)
 ```
 
-## 🚀 Fresh Install Process
+## Fresh Install Process
 
 ### **Complete Setup Workflow**
 
@@ -77,9 +77,9 @@ civic validate --public-data
 civic start
 
 # Result:
-# ✅ Complete public data from template city
-# ✅ Fresh local database for operations
-# ✅ No sensitive data exposure
+# Complete public data from template city
+# Fresh local database for operations
+# No sensitive data exposure
 ```
 
 ### **Demo & Template Bundles**
@@ -100,7 +100,7 @@ civic start
 - **Rapid Deployment**: Quick setup for new municipalities
 - **Consistency**: Standardized civic record formats
 
-## 🔐 Security Considerations
+## Security Considerations
 
 ### **Public Data (data/)**
 
@@ -116,7 +116,7 @@ civic start
 - 🔒 **Audit Logging**: Complete access tracking
 - 🔒 **Compliance**: Meets data protection requirements
 
-## 📋 Implementation Commands
+## Implementation Commands
 
 ### **Backup Commands**
 
@@ -157,30 +157,30 @@ civic validate --system-data
 civic validate --full
 ```
 
-## 🎯 Benefits of This Approach
+## Benefits of This Approach
 
-### **✅ Security**
+### ** Security**
 
 - **Clear Separation**: Public vs private data clearly defined
 - **No Cross-Contamination**: Sensitive data never in public repos
 - **Access Control**: IT professionals manage private data
 - **Encryption**: Private data always encrypted
 
-### **✅ Transparency**
+### ** Transparency**
 
 - **Public Access**: All civic records publicly available
 - **Git History**: Complete audit trail of changes
 - **Compliance**: Meets public records requirements
 - **Collaboration**: Multiple stakeholders can contribute
 
-### **✅ Scalability**
+### ** Scalability**
 
 - **Template Cities**: Reuse proven configurations
 - **Rapid Deployment**: Quick setup for new municipalities
 - **Standardization**: Consistent civic processes
 - **Best Practices**: Shared knowledge and experience
 
-### **✅ Disaster Recovery**
+### ** Disaster Recovery**
 
 - **Git Backup**: Public data in version control
 - **Encrypted Backup**: Private data securely backed up
@@ -188,7 +188,7 @@ civic validate --full
   demo bundle installs use the same tooling)
 - **Integrity Checks**: Validation of restored data
 
-## 🔗 Related Documentation
+## Related Documentation
 
 - [Database Security](./specs/database.md)
 - [Backup Specifications](./specs/backup.md)

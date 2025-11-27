@@ -1,4 +1,4 @@
-# 📦 CivicPress Spec: `archive-policy.md`
+# CivicPress Spec: `archive-policy.md`
 
 ---
 
@@ -8,77 +8,77 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive archive policy documentation
 - data retention
 - authenticity preservation fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'public-data-structure.md: >=1.0.0'
-  - 'storage.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'public-data-structure.md: >=1.0.0'
+ - 'storage.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `archive-policy` — Civic Record Retention, Expiry, and Transparency
 
-## 🎯 Purpose
+## Purpose
 
 Establish principles and default rules for archiving civic records in
 CivicPress, ensuring transparency, compliance, and historical continuity.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Define how long records are retained
 - Specify what gets archived vs deleted
 - Outline folder structure and archival metadata
 - Guide visibility, purging, and version pinning
 
-❌ Out of scope:
+Out of scope:
 
 - Encrypted or private data retention (see `auth.md`)
 - Personal information policies (see `privacy-policy.md`)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input              | Description                                        |
+| Input | Description |
 | ------------------ | -------------------------------------------------- |
-| Civic records      | Records to be archived (bylaws, resolutions, etc.) |
-| Retention policies | Rules determining when records expire              |
-| Archive metadata   | Information about the archival process             |
-| Audit logs         | Records of archive operations                      |
+| Civic records | Records to be archived (bylaws, resolutions, etc.) |
+| Retention policies | Rules determining when records expire |
+| Archive metadata | Information about the archival process |
+| Audit logs | Records of archive operations |
 
-| Output           | Description                          |
+| Output | Description |
 | ---------------- | ------------------------------------ |
-| Archived records | Records moved to archive structure   |
-| Archive metadata | Documentation of archival process    |
-| Audit trail      | Logs of archive operations           |
-| Archive index    | Searchable index of archived content |
+| Archived records | Records moved to archive structure |
+| Archive metadata | Documentation of archival process |
+| Audit trail | Logs of archive operations |
+| Archive index | Searchable index of archived content |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/
 ├── records/
-│   ├── bylaws/
-│   ├── resolutions/
-│   └── feedback/
+│ ├── bylaws/
+│ ├── resolutions/
+│ └── feedback/
 ├── archive/
-│   ├── bylaws/
-│   │   └── repealed/
-│   ├── resolutions/
-│   │   └── expired/
-│   └── feedback/
-│       └── expired/
+│ ├── bylaws/
+│ │ └── repealed/
+│ ├── resolutions/
+│ │ └── expired/
+│ └── feedback/
+│ └── expired/
 └── audit/
-    └── archive-logs/
+ └── archive-logs/
 ```
 
 Archive operations are handled by:
@@ -89,20 +89,20 @@ Archive operations are handled by:
 
 ---
 
-## 🗂️ Archive Structure (Default)
+## ️ Archive Structure (Default)
 
 ```
 records/
 ├── bylaws/
-│   └── section-02/
-│       └── bylaw-curfew.md
+│ └── section-02/
+│ └── bylaw-curfew.md
 ├── archive/
-│   ├── bylaws/
-│   │   └── repealed/
-│   │       └── bylaw-lawn-watering-1998.md
-│   └── resolutions/
-│       └── expired/
-│           └── resolution-summer-parking.md
+│ ├── bylaws/
+│ │ └── repealed/
+│ │ └── bylaw-lawn-watering-1998.md
+│ └── resolutions/
+│ └── expired/
+│ └── resolution-summer-parking.md
 ```
 
 Records are never deleted — they're **moved to `/archive/`** and tagged
@@ -110,19 +110,19 @@ accordingly.
 
 ---
 
-## 🧠 Retention Rules (Defaults)
+## Retention Rules (Defaults)
 
-| Type             | Retention Duration | Archive Action                            |
+| Type | Retention Duration | Archive Action |
 | ---------------- | ------------------ | ----------------------------------------- |
-| Bylaws           | ∞ (indefinite)     | Repealed → `/archive/bylaws/repealed/`    |
-| Resolutions      | 10 years           | Expired → `/archive/resolutions/expired/` |
-| Feedback         | 5 years            | Expired or compressed                     |
-| Sessions (video) | 3–7 years          | Move or link offline                      |
-| Drafts           | 1 year             | Purged unless adopted                     |
+| Bylaws | ∞ (indefinite) | Repealed → `/archive/bylaws/repealed/` |
+| Resolutions | 10 years | Expired → `/archive/resolutions/expired/` |
+| Feedback | 5 years | Expired or compressed |
+| Sessions (video) | 3–7 years | Move or link offline |
+| Drafts | 1 year | Purged unless adopted |
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Archive Integrity & Authenticity
 
@@ -174,21 +174,21 @@ accordingly.
 
 ---
 
-## 🧩 Hooks
+## Hooks
 
 - `onRecordArchive` → triggers log entry, index update, optional notification
 - `onRetentionCheck` → periodic script validates records nearing expiry
 
 ---
 
-## 📊 Audit Log
+## Audit Log
 
 CivicPress may implement:
 
 ```
 .audit/
 ├── 2025-07-03/
-│   └── archive-log.md
+│ └── archive-log.md
 ```
 
 This includes:
@@ -199,7 +199,7 @@ This includes:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test archive workflow with sample records
 - Verify retention rules are enforced correctly
@@ -209,10 +209,10 @@ This includes:
 
 ---
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`public-data-structure.md`](./public-data-structure.md) — Data organization
-  and structure
+ and structure
 - [`storage.md`](./storage.md) — Storage systems and data persistence
 - [`audit.md`](./audit.md) — Audit logging and transparency
 - [`security.md`](./security.md) — Security considerations and compliance
@@ -220,7 +220,7 @@ This includes:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Federation-level archive policies
 - Cryptographic signing of archive actions
@@ -229,7 +229,7 @@ This includes:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03
 - Last updated: 2025-07-15

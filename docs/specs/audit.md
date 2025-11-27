@@ -1,4 +1,4 @@
-# 📋 CivicPress Spec: `audit.md`
+# CivicPress Spec: `audit.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive audit documentation
 - audit trails
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0' authors:
+ 'null' dependencies:
+ - 'auth.md: >=1.2.0'
+ - 'permissions.md: >=1.1.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Audit Mechanism
 
-## 🎯 Purpose
+## Purpose
 
 Enable verifiable inspection of CivicPress records, actions, and logs — to
 support legal compliance, third-party oversight, transparency, and historical
@@ -31,9 +31,9 @@ This builds upon the `activity-log.md` and `data-integrity.md` specs.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Define audit modes (manual, scheduled, external)
 - Provide tooling for reviewing logs, changes, signatures
@@ -41,88 +41,88 @@ This builds upon the `activity-log.md` and `data-integrity.md` specs.
 - Enable export of audit reports (PDF, JSON, Markdown)
 - Distinguish between civic policy audit vs system health
 
-❌ Out of Scope:
+Out of Scope:
 
 - Legal interpretation of audit results
 - Continuous monitoring (see `observability.md`)
 
 ---
 
-## 🔗 Audit Targets
+## Audit Targets
 
-| Target            | Audit Includes                                   |
+| Target | Audit Includes |
 | ----------------- | ------------------------------------------------ |
-| Records           | Status, version, lifecycle, manifest, signatures |
-| Activity log      | Gaps, anomalies, unknown actors                  |
-| Workflows         | Signed? Approved? Malicious triggers?            |
-| Permissions/Roles | Unauthorized privilege changes                   |
-| File system state | Orphaned files, deleted/renamed without record   |
+| Records | Status, version, lifecycle, manifest, signatures |
+| Activity log | Gaps, anomalies, unknown actors |
+| Workflows | Signed? Approved? Malicious triggers? |
+| Permissions/Roles | Unauthorized privilege changes |
+| File system state | Orphaned files, deleted/renamed without record |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 core/audit.ts
 .civic/audit/
-  ├── last-run.json
-  ├── reports/2025-07-04-summary.md
-  └── anomalies.jsonl
+ ├── last-run.json
+ ├── reports/2025-07-04-summary.md
+ └── anomalies.jsonl
 ```
 
-## 📝 Example Audit Policy Configuration
+## Example Audit Policy Configuration
 
 ```yaml
 # .civic/audit/policy.yml
 audit:
-  schedule: 'weekly' # daily, weekly, monthly
-  run_on_push: false
-  notify_roles:
-    - 'clerk'
-    - 'auditor'
+ schedule: 'weekly' # daily, weekly, monthly
+ run_on_push: false
+ notify_roles:
+ - 'clerk'
+ - 'auditor'
 
-  targets:
-    records: true
-    activity_log: true
-    workflows: true
-    permissions: true
-    file_system: true
+ targets:
+ records: true
+ activity_log: true
+ workflows: true
+ permissions: true
+ file_system: true
 
-  report:
-    formats:
-      - 'pdf'
-      - 'markdown'
-      - 'json'
-    include_anomalies: true
-    redact_sensitive: true
-    summary_only: false
+ report:
+ formats:
+ - 'pdf'
+ - 'markdown'
+ - 'json'
+ include_anomalies: true
+ redact_sensitive: true
+ summary_only: false
 
-  retention:
-    keep_reports_days: 365
-    keep_anomalies_days: 730
+ retention:
+ keep_reports_days: 365
+ keep_anomalies_days: 730
 
-  external_auditors:
-    enabled: false
-    allowed_domains:
-      - 'town.ca'
-      - 'auditor.example'
+ external_auditors:
+ enabled: false
+ allowed_domains:
+ - 'town.ca'
+ - 'auditor.example'
 ```
 
 ---
 
-## 🚨 Example Anomaly Entry
+## Example Anomaly Entry
 
 ```json
 {
-  "type": "signature-missing",
-  "record": "records/bylaws/curfew.md",
-  "detected_at": "2025-07-04T17:00:00Z"
+ "type": "signature-missing",
+ "record": "records/bylaws/curfew.md",
+ "detected_at": "2025-07-04T17:00:00Z"
 }
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Audit outputs must be immutable (Git-committed or signed)
 - Some reports may contain sensitive metadata (e.g., internal roles)
@@ -130,7 +130,7 @@ audit:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Simulate missing or invalid manifests
 - Introduce permission mismatch or fake users
@@ -139,14 +139,14 @@ audit:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Web UI audit viewer
 - Schedule audits (see `scheduler.md`)
 - Notarize or timestamp audit result hashes
 - Plugin interface for external auditors
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`activity-log.md`](./activity-log.md) — User/system action logging
 - [`data-integrity.md`](./data-integrity.md) — Hashing and tamper detection
@@ -156,6 +156,6 @@ audit:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

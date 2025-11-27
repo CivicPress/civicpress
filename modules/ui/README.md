@@ -35,7 +35,7 @@ interacting with the CivicPress API.
 
 ## Current Status
 
-### ✅ Working
+### Working
 
 - Nuxt 4 development server running on port 3030
 - Nuxt UI Pro components available
@@ -54,13 +54,13 @@ interacting with the CivicPress API.
 - Configuration management UI
 - Development tools enabled
 
-### 🔄 In Progress
+### In Progress
 
 - Advanced workflow features
 - Real-time notifications
 - Plugin registry interface
 
-### 📋 Planned
+### Planned
 
 - Advanced analytics dashboard
 - Custom report generation

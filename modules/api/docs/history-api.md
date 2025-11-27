@@ -18,14 +18,14 @@ Get Git commit history for all records or filtered by specific criteria.
 
 #### Query Parameters
 
-| Parameter | Type     | Required | Description                                             |
-| --------- | -------- | -------- | ------------------------------------------------------- |
-| `record`  | string   | No       | Filter by specific record (e.g., "policy/data-privacy") |
-| `limit`   | integer  | No       | Number of commits to return (1-100, default: 10)        |
-| `offset`  | integer  | No       | Number of commits to skip (default: 0)                  |
-| `author`  | string   | No       | Filter by author name or email                          |
-| `since`   | ISO 8601 | No       | Filter commits since this date                          |
-| `until`   | ISO 8601 | No       | Filter commits until this date                          |
+| Parameter | Type     | Required | Default | Min | Max | Description                                             |
+| --------- | -------- | -------- | ------- | --- | --- | ------------------------------------------------------- |
+| `record`  | string   | No       | -       | -   | -   | Filter by specific record (e.g., "policy/data-privacy") |
+| `limit`   | integer  | No       | 10      | 1   | 100 | Number of commits to return                             |
+| `offset`  | integer  | No       | 0       | 0   | -   | Number of commits to skip                               |
+| `author`  | string   | No       | -       | -   | -   | Filter by author name or email                          |
+| `since`   | ISO 8601 | No       | -       | -   | -   | Filter commits since this date                          |
+| `until`   | ISO 8601 | No       | -       | -   | -   | Filter commits until this date                          |
 
 #### Example Requests
 
@@ -100,13 +100,13 @@ Get Git commit history for a specific record.
 
 #### Query Parameters
 
-| Parameter | Type     | Required | Description                                      |
-| --------- | -------- | -------- | ------------------------------------------------ |
-| `limit`   | integer  | No       | Number of commits to return (1-100, default: 10) |
-| `offset`  | integer  | No       | Number of commits to skip (default: 0)           |
-| `author`  | string   | No       | Filter by author name or email                   |
-| `since`   | ISO 8601 | No       | Filter commits since this date                   |
-| `until`   | ISO 8601 | No       | Filter commits until this date                   |
+| Parameter | Type     | Required | Default | Min | Max | Description                    |
+| --------- | -------- | -------- | ------- | --- | --- | ------------------------------ |
+| `limit`   | integer  | No       | 10      | 1   | 100 | Number of commits to return    |
+| `offset`  | integer  | No       | 0       | 0   | -   | Number of commits to skip      |
+| `author`  | string   | No       | -       | -   | -   | Filter by author name or email |
+| `since`   | ISO 8601 | No       | -       | -   | -   | Filter commits since this date |
+| `until`   | ISO 8601 | No       | -       | -   | -   | Filter commits until this date |
 
 #### Example Requests
 
@@ -154,9 +154,95 @@ curl -H "Authorization: Bearer <token>" \
 }
 ```
 
+## Parameter Details
+
+### Record Parameter
+
+The `record` parameter can be specified in two ways:
+
+1. **Query parameter** (GET /api/history): `?record=policy/data-privacy`
+2. **Path parameter** (GET /api/history/:record): `/api/history/policy/data-privacy`
+
+**Format**: `{type}/{id}` where:
+- `type`: Record type (bylaw, policy, resolution, etc.)
+- `id`: Record identifier (filename without extension)
+
+**Examples**:
+- `policy/data-privacy`
+- `bylaw/zoning-amendment`
+- `resolution/budget-2024`
+
+### Limit Parameter
+
+Controls the number of commits returned:
+- **Range**: 1-100
+- **Default**: 10
+- **Validation**: Must be integer between 1 and 100
+
+### Offset Parameter
+
+Controls pagination by skipping commits:
+- **Range**: 0 or greater
+- **Default**: 0
+- **Validation**: Must be non-negative integer
+
+### Author Parameter
+
+Filters commits by author name or email:
+- **Type**: String
+- **Case**: Case-insensitive partial match
+- **Search**: Matches author name or email
+
+### Since/Until Parameters
+
+Filter commits by date range:
+- **Format**: ISO 8601 datetime string (e.g., `2024-01-01T00:00:00Z`)
+- **Behavior**: `since` includes commits on or after the date, `until` includes commits on or before the date
+
+## Response Data Structure
+
+### History Entry
+
+Each commit in the history array contains:
+
+| Field       | Type   | Description                         |
+| ----------- | ------ | ----------------------------------- |
+| `hash`      | string | Full Git commit hash                |
+| `shortHash` | string | Shortened hash (first 8 characters) |
+| `message`   | string | Git commit message                  |
+| `author`    | string | Author name                         |
+| `email`     | string | Author email address                |
+| `date`      | string | Original commit date                |
+| `timestamp` | string | ISO 8601 formatted timestamp        |
+| `record`    | string | Associated record (or "all")        |
+
+### Summary Object
+
+Contains metadata about the response:
+
+| Field             | Type   | Description                              |
+| ----------------- | ------ | ---------------------------------------- |
+| `totalCommits`    | number | Total number of commits matching filters |
+| `returnedCommits` | number | Number of commits in current response    |
+| `limit`           | number | Requested limit parameter                |
+| `offset`          | number | Requested offset parameter               |
+| `record`          | string | Record filter applied                    |
+| `filters`         | object | Applied filter parameters                |
+
+## HTTP Status Codes
+
+| Code | Description                           |
+| ---- | ------------------------------------- |
+| 200  | Success                               |
+| 400  | Validation error (invalid parameters) |
+| 401  | Authentication required               |
+| 403  | Permission denied                     |
+| 404  | Record not found (for /api/history/:record) |
+| 500  | Server error                          |
+
 ## Error Responses
 
-### Validation Error
+### Validation Error (400)
 
 ```json
 {
@@ -176,7 +262,19 @@ curl -H "Authorization: Bearer <token>" \
 }
 ```
 
-### Permission Error
+### Authentication Error (401)
+
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Authentication required",
+    "code": "AUTH_REQUIRED"
+  }
+}
+```
+
+### Permission Error (403)
 
 ```json
 {
@@ -189,7 +287,19 @@ curl -H "Authorization: Bearer <token>" \
 }
 ```
 
-### Git Engine Error
+### Not Found Error (404)
+
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Route GET /api/history/invalid-path not found",
+    "code": "NOT_FOUND"
+  }
+}
+```
+
+### Git Engine Error (500)
 
 ```json
 {

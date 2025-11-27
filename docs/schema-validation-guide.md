@@ -1,28 +1,28 @@
-# 🔍 Schema Validation Guide
+# Schema Validation Guide
 
 **Version**: 1.0.0  
 **Status**: Official Documentation  
 **Last Updated**: January 2025
 
-## 🎯 Overview
+## Overview
 
 CivicPress uses **JSON Schema** (draft-07) to validate record frontmatter,
 ensuring data integrity and consistency across all record types. This guide
 explains how schema validation works, how to use it, and how to extend it.
 
-## 📋 Table of Contents
+## Table of Contents
 
-1. [How It Works](#-how-it-works)
-2. [Validation Layers](#-validation-layers)
-3. [Using Validation](#️-using-validation)
-4. [Schema Composition](#-schema-composition)
-5. [Extending Schemas](#-extending-schemas)
-6. [Error Messages](#-error-messages)
-7. [Troubleshooting](#-troubleshooting)
+1. [How It Works](#how-it-works)
+2. [Validation Layers](#validation-layers)
+3. [Using Validation](#using-validation)
+4. [Schema Composition](#schema-composition)
+5. [Extending Schemas](#extending-schemas)
+6. [Error Messages](#error-messages)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
-## 🔧 How It Works
+## How It Works
 
 ### Architecture
 
@@ -58,7 +58,7 @@ Validation Result (errors, warnings, info)
 
 ---
 
-## 📊 Validation Layers
+## Validation Layers
 
 ### Layer 1: Schema Validation (JSON Schema)
 
@@ -94,7 +94,7 @@ Validation Result (errors, warnings, info)
 
 ---
 
-## 🛠️ Using Validation
+## Using Validation
 
 ### CLI Validation
 
@@ -166,7 +166,7 @@ Records are automatically validated:
 
 ---
 
-## 🧩 Schema Composition
+## Schema Composition
 
 Schemas are composed dynamically at runtime:
 
@@ -248,7 +248,7 @@ Schemas are merged in this order (using JSON Schema `allOf`):
 
 ---
 
-## 🔌 Extending Schemas
+## Extending Schemas
 
 ### Adding a Type-Specific Schema
 
@@ -317,7 +317,7 @@ RecordSchemaBuilder.unregisterPluginSchema('my-plugin');
 
 ---
 
-## ❌ Error Messages
+## Error Messages
 
 Schema validation provides clear, actionable error messages:
 
@@ -349,26 +349,26 @@ Schema validation provides clear, actionable error messages:
 
 ```
 Field "author": Missing required field: author
-💡 Add the "author" field to the frontmatter
+Tip: Add the "author" field to the frontmatter
 ```
 
 **Invalid Format**:
 
 ```
 Field "created": Field "created" must be a valid date-time
-💡 Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ (e.g., "2025-01-15T10:30:00Z")
+Tip: Use ISO 8601 format: YYYY-MM-DDTHH:mm:ssZ (e.g., "2025-01-15T10:30:00Z")
 ```
 
 **Invalid Enum**:
 
 ```
 Field "status": Field "status" must be one of: draft, pending_review, approved, published
-💡 Choose one of the allowed values: draft, pending_review, approved, published
+Tip: Choose one of the allowed values: draft, pending_review, approved, published
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Schema Not Loading
 
@@ -441,7 +441,7 @@ frontmatter object rather than re-serializing the parsed record.
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Record Format Standard](./record-format-standard.md) - Complete field
   definitions
@@ -451,7 +451,7 @@ frontmatter object rather than re-serializing the parsed record.
 
 ---
 
-## 🎓 Examples
+## Examples
 
 ### Validating a Record (Node.js)
 

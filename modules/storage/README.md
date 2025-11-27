@@ -1,10 +1,10 @@
-# 🗄️ CivicPress Storage Module
+# CivicPress Storage Module
 
 A comprehensive UUID-based file and media storage solution for CivicPress,
 supporting multiple storage backends with database tracking, configurable
 folders, access control, and file validation.
 
-## 🎯 **Purpose**
+## Purpose
 
 The Storage Module provides secure, UUID-tracked file storage for:
 
@@ -14,7 +14,7 @@ The Storage Module provides secure, UUID-tracked file storage for:
 - **Public assets** (logos, images)
 - **Private documents** (permits, applications)
 
-## 🏗️ **Architecture**
+## Architecture
 
 ### **Core Components**
 
@@ -27,13 +27,13 @@ The Storage Module provides secure, UUID-tracked file storage for:
 
 ### **Storage Backends**
 
-- ✅ **Local Storage**: File system-based storage (implemented)
-- ✅ **S3 Compatible**: AWS S3 and S3-compatible storage (implemented)
-- ✅ **Azure Blob**: Microsoft Azure Blob storage (implemented)
-- 🔲 **Google Cloud Storage**: GCS support (planned)
-- 🔲 **IPFS**: Distributed storage (planned)
+- **Local Storage**: File system-based storage (implemented)
+- **S3 Compatible**: AWS S3 and S3-compatible storage (implemented)
+- **Azure Blob**: Microsoft Azure Blob storage (implemented)
+- **Google Cloud Storage**: GCS support (planned)
+- **IPFS**: Distributed storage (planned)
 
-## 📂 **Configuration**
+## Configuration
 
 ### **Storage Configuration File**
 
@@ -86,7 +86,7 @@ metadata:
 - **`authenticated`**: Requires valid user session
 - **`private`**: Restricted to specific user roles/permissions
 
-## 🔧 **Usage**
+## Usage
 
 ### **Basic Setup**
 
@@ -154,7 +154,7 @@ await configManager.updateFolder('sessions', {
 await configManager.resetToDefaults();
 ```
 
-## 🔐 **Security Features**
+## Security Features
 
 ### **File Validation**
 
@@ -176,7 +176,7 @@ await configManager.resetToDefaults();
 - **Backup integration**: Automatic inclusion in system backups
 - **Retention policies**: Configurable file lifecycle management
 
-## 📱 **API Integration**
+## API Integration
 
 ### **REST Endpoints** (Planned)
 
@@ -199,7 +199,7 @@ civic storage:config                     # Show configuration
 civic storage:config:set <key> <value>   # Update configuration
 ```
 
-## 🧪 **Testing**
+## Testing
 
 Run the test suite:
 
@@ -214,15 +214,15 @@ pnpm run test
 pnpm run test:ui
 ```
 
-### **Test Coverage**
+### Test Coverage
 
-- ✅ Configuration management
-- ✅ File operations
-- ✅ Access control
-- ✅ Error handling
-- ✅ Validation logic
+- Configuration management
+- File operations
+- Access control
+- Error handling
+- Validation logic
 
-## 🚀 **Development**
+## Development
 
 ### **Build**
 
@@ -242,7 +242,7 @@ pnpm run dev
 pnpm run clean && pnpm run build
 ```
 
-## 🔗 **Integration Points**
+## Integration Points
 
 ### **Core Platform**
 
@@ -264,30 +264,30 @@ pnpm run clean && pnpm run build
 - **Legal Register**: Document attachments
 - **Feedback System**: File uploads from citizens
 
-## 📋 **Roadmap**
+## Roadmap
 
-### **Phase 1: Core Storage** ✅
+### Phase 1: Core Storage (Complete)
 
 - [x] Local file system storage
 - [x] Configurable folder structure
 - [x] File validation and security
 - [x] Basic CRUD operations
 
-### **Phase 2: Advanced Features** 🔄
+### Phase 2: Advanced Features (In Progress)
 
 - [ ] Cloud storage backends (S3, MinIO)
 - [ ] File compression and optimization
 - [ ] Thumbnail generation
 - [ ] Advanced search and indexing
 
-### **Phase 3: Enterprise Features** 📋
+### Phase 3: Enterprise Features (Planned)
 
 - [ ] File encryption at rest
 - [ ] Advanced retention policies
 - [ ] CDN integration
 - [ ] Multi-region replication
 
-## 🤝 **Contributing**
+## Contributing
 
 1. **Fork the repository**
 2. **Create a feature branch**
@@ -296,11 +296,11 @@ pnpm run clean && pnpm run build
 5. **Ensure all tests pass**
 6. **Submit a pull request**
 
-## 📄 **License**
+## License
 
 MIT License - see [LICENSE](../../LICENSE) for details.
 
 ---
 
-**Storage Module Status**: ✅ **Core Implementation Complete** **Next Phase**:
-API endpoints and UI integration
+**Storage Module Status**: Core Implementation Complete. Next Phase: API
+endpoints and UI integration

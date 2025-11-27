@@ -1,9 +1,9 @@
-# 🕐 CivicPress Indexing Schedules
+# CivicPress Indexing Schedules
 
 This guide covers different indexing strategies based on your use case, data
 volume, and performance requirements.
 
-## 📊 **Indexing Strategy Matrix**
+## **Indexing Strategy Matrix**
 
 | Use Case        | Data Volume        | Update Frequency | Recommended Strategy |
 | --------------- | ------------------ | ---------------- | -------------------- |
@@ -12,7 +12,7 @@ volume, and performance requirements.
 | **Medium City** | 1000-10000 records | Hourly           | Scheduled cron       |
 | **Large City**  | > 10000 records    | Real-time        | Event-driven         |
 
-## 🎯 **Strategy 1: Manual Indexing**
+## **Strategy 1: Manual Indexing**
 
 **Best for:** Development, testing, small datasets
 
@@ -37,7 +37,7 @@ civic index --validate         # Validate existing indexes
 - ❌ Can become outdated
 - ❌ Not suitable for production
 
-## 🔗 **Strategy 2: Git Hook Indexing**
+## **Strategy 2: Git Hook Indexing**
 
 **Best for:** Small to medium towns, team collaboration
 
@@ -78,7 +78,7 @@ include_module_indexes: true
 - ❌ Can slow down commit process
 - ❌ Requires Git workflow
 
-## ⏰ **Strategy 3: Scheduled Indexing**
+## Strategy 3: Scheduled Indexing**
 
 **Best for:** Medium to large cities, production systems
 
@@ -142,7 +142,7 @@ WantedBy=timers.target
 - ❌ Fixed schedule
 - ❌ May run unnecessarily
 
-## 🚀 **Strategy 4: Event-Driven Indexing**
+## **Strategy 4: Event-Driven Indexing**
 
 **Best for:** Large cities, real-time requirements
 
@@ -158,18 +158,27 @@ chokidar "data/records/**/*.md" -c "civic index --silent"
 
 ### API-Triggered Indexing
 
+The CivicPress API includes indexing endpoints that can be used for event-driven
+indexing:
+
 ```typescript
-// Add to your API routes
-app.post('/api/v1/index/rebuild', async (req, res) => {
-  try {
-    const indexingService = new IndexingService(civicPress);
-    await indexingService.generateIndexes({ rebuild: true });
-    res.json({ success: true, message: 'Indexes rebuilt' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Use the existing API endpoint
+// POST /api/v1/indexing/generate
+const response = await fetch('/api/v1/indexing/generate', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    rebuild: true,
+    syncDatabase: true
+  })
 });
 ```
+
+See [Indexing System](indexing-system.md#api-endpoints) for complete API
+documentation.
 
 **Pros:**
 
@@ -184,7 +193,7 @@ app.post('/api/v1/index/rebuild', async (req, res) => {
 - ❌ Requires monitoring
 - ❌ Potential performance impact
 
-## 📈 **Performance Monitoring**
+## **Performance Monitoring**
 
 ### Index Generation Metrics
 
@@ -215,7 +224,7 @@ performance:
   memory_limit_mb: 512
 ```
 
-## 🔧 **Implementation Examples**
+## **Implementation Examples**
 
 ### Small Town Setup (Git Hooks)
 
@@ -293,9 +302,11 @@ export class SmartIndexingService extends IndexingService {
 
     try {
       await this.generateIndexes({ rebuild: false });
-      console.log(`Indexed ${this.indexingQueue.length} changes`);
+      // Use centralized output system instead of console.log
+      // logger.info(`Indexed ${this.indexingQueue.length} changes`);
     } catch (error) {
-      console.error('Indexing failed:', error);
+      // Use centralized output system instead of console.error
+      // logger.error('Indexing failed:', error);
     } finally {
       this.isIndexing = false;
       this.indexingQueue = [];
@@ -308,7 +319,7 @@ export class SmartIndexingService extends IndexingService {
 }
 ```
 
-## 🎯 **Recommendations by Use Case**
+## **Recommendations by Use Case**
 
 ### **Development Environment**
 
@@ -339,7 +350,7 @@ git hooks/post-commit  # Auto-index on commit
 0 2 * * * civic index --rebuild --silent  # Daily rebuild
 ```
 
-## 📊 **Monitoring and Alerts**
+## **Monitoring and Alerts**
 
 ```bash
 # Health check script

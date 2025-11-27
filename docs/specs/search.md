@@ -1,4 +1,4 @@
-# 🔎 CivicPress Spec: `search.md`
+# CivicPress Spec: `search.md`
 
 ---
 
@@ -8,19 +8,19 @@ deprecated: false sunset_date: null additions:
 - comprehensive search documentation
 - algorithms
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'indexing.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'indexing.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Record Search Engine
 
-## 🎯 Purpose
+## Purpose
 
 Provide powerful, accessible search functionality across all civic records —
 enabling users to find bylaws, feedback, meetings, votes, or modules by keyword,
@@ -31,9 +31,9 @@ gracefully scale from small towns to large cities.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Index all `.md` records and structured metadata
 - Support API queries and CLI searches
@@ -41,7 +41,7 @@ gracefully scale from small towns to large cities.
 - Rank results by relevance
 - Return contextual excerpt (snippet) for display
 
-❌ Out of Scope:
+Out of Scope:
 
 - Full database indexing (handled later via DB)
 - Cross-town search (can be federated later)
@@ -49,18 +49,18 @@ gracefully scale from small towns to large cities.
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input Example                  | Result                                |
+| Input Example | Result |
 | ------------------------------ | ------------------------------------- |
-| `civic search curfew`          | Returns all records mentioning curfew |
-| `/v1/search?q=mayor+signature` | Ranked civic records with matches     |
-| `civic search --tag=budget`    | Results filtered by tag               |
-| UI search box                  | Renders paginated result view         |
+| `civic search curfew` | Returns all records mentioning curfew |
+| `/v1/search?q=mayor+signature` | Ranked civic records with matches |
+| `civic search --tag=budget` | Results filtered by tag |
+| UI search box | Renders paginated result view |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 core/search.ts
@@ -69,17 +69,17 @@ core/search.ts
 
 ---
 
-## 📝 Index Format
+## Index Format
 
 ```json
 [
-  {
-    "path": "records/bylaws/curfew.md",
-    "title": "Bylaw 2025-14: Curfew",
-    "tags": ["safety", "bylaw"],
-    "status": "adopted",
-    "excerpt": "No citizen shall be outdoors past 10pm..."
-  }
+ {
+ "path": "records/bylaws/curfew.md",
+ "title": "Bylaw 2025-14: Curfew",
+ "tags": ["safety", "bylaw"],
+ "status": "adopted",
+ "excerpt": "No citizen shall be outdoors past 10pm..."
+ }
 ]
 ```
 
@@ -87,7 +87,7 @@ Index is built from frontmatter + extracted content, refreshed on change.
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Only public records are indexed for public UI
 - Private records may have separate access-controlled search
@@ -96,7 +96,7 @@ Index is built from frontmatter + extracted content, refreshed on change.
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Index valid and invalid Markdown files
 - Test various search inputs for expected results
@@ -105,7 +105,7 @@ Index is built from frontmatter + extracted content, refreshed on change.
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Search weight tuning (title > content > tags)
 - Advanced filters (module, vote outcome, signer)
@@ -113,7 +113,7 @@ Index is built from frontmatter + extracted content, refreshed on change.
 - Federated search across instances
 - ElasticSearch or full DB integration
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`indexing.md`](./indexing.md) — File indexing and metadata extraction
 - [`manifest.md`](./manifest.md) — Record metadata and frontmatter
@@ -122,6 +122,6 @@ Index is built from frontmatter + extracted content, refreshed on change.
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

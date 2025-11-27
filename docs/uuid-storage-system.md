@@ -120,17 +120,22 @@ Authorization: Bearer {token}
 
 ### Environment Variables (Preferred)
 
+For a complete example of all available environment variables, see [`storage-credentials.example`](../storage-credentials.example). Copy the relevant variables to your `.env.local` file.
+
+**Quick Reference:**
+
 ```bash
 # S3 Configuration
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_DEFAULT_REGION=us-west-2
-AWS_S3_BUCKET=your-bucket-name
+S3_ACCESS_KEY_ID=your_access_key
+S3_SECRET_ACCESS_KEY=your_secret_key
+S3_REGION=us-west-2
+S3_BUCKET=your-bucket-name
 
 # Azure Configuration
 AZURE_STORAGE_CONNECTION_STRING=your_connection_string
 AZURE_STORAGE_ACCOUNT_NAME=your_account
 AZURE_STORAGE_ACCOUNT_KEY=your_key
+AZURE_CONTAINER_NAME=civicpress
 ```
 
 ### Configuration File (Fallback)

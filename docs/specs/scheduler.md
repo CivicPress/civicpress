@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive scheduler documentation
 - execution security
 - automation patterns compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'workflows.md: >=1.3.0'
-  - 'hooks.md: >=1.2.0' authors:
+ 'null' dependencies:
+ - 'workflows.md: >=1.3.0'
+ - 'hooks.md: >=1.2.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Scheduler & Timed Actions
 
-## 🎯 Purpose
+## Purpose
 
 Allow towns to schedule civic actions — like publishing a record, triggering a
 workflow, or posting a notification — to occur **at a future time or on a
@@ -32,33 +32,33 @@ rollouts.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Schedule execution of workflows or CLI commands
 - Use cron-style or ISO timestamps
 - Store timers as civic-readable config files
 - Allow dry-run previews of scheduled actions
 
-❌ Out of Scope:
+Out of Scope:
 
 - Distributed job queues (initially)
 - Millisecond-level precision
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                       | Output                          |
+| Input | Output |
 | --------------------------- | ------------------------------- |
-| `.civic/schedule.yml`       | Defines scheduled civic actions |
-| `civic schedule run`        | CLI executor for due tasks      |
-| UI action (e.g. delay post) | Adds entry to schedule file     |
+| `.civic/schedule.yml` | Defines scheduled civic actions |
+| `civic schedule run` | CLI executor for due tasks |
+| UI action (e.g. delay post) | Adds entry to schedule file |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/schedule.yml
@@ -69,22 +69,22 @@ Example `schedule.yml`:
 
 ```yaml
 - id: announce-archive-policy
-  run_at: 2025-07-08T08:00:00Z
-  command: civic notify --group=council --message="Reminder: Archive policy in effect today"
+ run_at: 2025-07-08T08:00:00Z
+ command: civic notify --group=council --message="Reminder: Archive policy in effect today"
 
 - id: publish-curfew-bylaw
-  run_at: 2025-07-10T00:00:00Z
-  command: civic publish records/bylaws/curfew.md
+ run_at: 2025-07-10T00:00:00Z
+ command: civic publish records/bylaws/curfew.md
 ```
 
 ---
 
-## 📘 Civic Example: Scheduled Law Activation
+## Civic Example: Scheduled Law Activation
 
 A town council adopts a fireworks ban bylaw that takes effect at the end of the
 year.
 
-### 📝 Record
+### Record
 
 ```yaml
 title: 'Bylaw 2025-18: Fireworks Ban'
@@ -92,16 +92,16 @@ status: adopted
 effective_at: 2025-12-31T00:00:00Z
 ```
 
-### 📅 Schedule
+### Schedule
 
 ```yaml
 - id: publish-fireworks-ban
-  run_at: 2025-12-31T00:00:00Z
-  command: civic publish records/bylaws/2025-18-fireworks-ban.md
+ run_at: 2025-12-31T00:00:00Z
+ command: civic publish records/bylaws/2025-18-fireworks-ban.md
 
 - id: fireworks-ban-reminder
-  run_at: 2025-12-30T12:00:00Z
-  command: civic notify --group=public --message="🚫 Reminder: Fireworks ban takes effect tomorrow."
+ run_at: 2025-12-30T12:00:00Z
+ command: civic notify --group=public --message="🚫 Reminder: Fireworks ban takes effect tomorrow."
 ```
 
 This ensures the record goes live precisely when intended — and citizens are
@@ -109,7 +109,7 @@ reminded in advance. All actions are logged for full traceability.
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Job Execution Security
 
@@ -161,7 +161,7 @@ reminded in advance. All actions are logged for full traceability.
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Create sample jobs and confirm execution
 - Simulate missed jobs (e.g. clock lag)
@@ -170,7 +170,7 @@ reminded in advance. All actions are logged for full traceability.
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Crontab syntax for recurring jobs
 - Webhook or system job integration
@@ -178,7 +178,7 @@ reminded in advance. All actions are logged for full traceability.
 - Long-term audit view of job history
 - Module-level schedules
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`workflows.md`](./workflows.md) — Scheduled workflow execution
 - [`notifications.md`](./notifications.md) — Scheduled notification delivery
@@ -187,6 +187,6 @@ reminded in advance. All actions are logged for full traceability.
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

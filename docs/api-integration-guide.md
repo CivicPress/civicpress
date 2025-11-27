@@ -3,7 +3,7 @@
 This guide covers how to integrate with the CivicPress API for building
 applications that interact with civic governance data.
 
-## 🎯 Overview
+## Overview
 
 The CivicPress API provides RESTful access to:
 
@@ -13,7 +13,7 @@ The CivicPress API provides RESTful access to:
 - **Template System**: Use predefined templates for record creation
 - **Export/Import**: Bulk data operations
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. API Server Setup
 
@@ -42,7 +42,7 @@ curl http://localhost:3000/health
 curl http://localhost:3000/api/v1/records
 ```
 
-## 📋 Core Concepts
+## Core Concepts
 
 ### Record Types
 
@@ -65,71 +65,71 @@ curl http://localhost:3000/api/v1/records
 - `council` - Elected officials
 - `public` - General public (read-only)
 
-## 🔧 API Integration Examples
+## API Integration Examples
 
 ### JavaScript/Node.js
 
 ```javascript
 class CivicPressAPI {
-  constructor(baseUrl = 'http://localhost:3000', apiKey) {
-    this.baseUrl = baseUrl;
-    this.headers = {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey
-    };
-  }
+ constructor(baseUrl = 'http://localhost:3000', apiKey) {
+ this.baseUrl = baseUrl;
+ this.headers = {
+ 'Content-Type': 'application/json',
+ 'X-API-Key': apiKey
+ };
+ }
 
-  // List records with filtering
-  async listRecords(options = {}) {
-    const params = new URLSearchParams();
-    if (options.type) params.append('type', options.type);
-    if (options.status) params.append('status', options.status);
-    if (options.limit) params.append('limit', options.limit);
-    if (options.offset) params.append('offset', options.offset);
+ // List records with filtering
+ async listRecords(options = {}) {
+ const params = new URLSearchParams();
+ if (options.type) params.append('type', options.type);
+ if (options.status) params.append('status', options.status);
+ if (options.limit) params.append('limit', options.limit);
+ if (options.offset) params.append('offset', options.offset);
 
-    const response = await fetch(`${this.baseUrl}/api/v1/records?${params}`, {
-      headers: this.headers
-    });
-    return response.json();
-  }
+ const response = await fetch(`${this.baseUrl}/api/v1/records?${params}`, {
+ headers: this.headers
+ });
+ return response.json();
+ }
 
-  // Get specific record
-  async getRecord(id, type) {
-    const params = type ? `?type=${type}` : '';
-    const response = await fetch(`${this.baseUrl}/api/v1/records/${id}${params}`, {
-      headers: this.headers
-    });
-    return response.json();
-  }
+ // Get specific record
+ async getRecord(id, type) {
+ const params = type ? `?type=${type}` : '';
+ const response = await fetch(`${this.baseUrl}/api/v1/records/${id}${params}`, {
+ headers: this.headers
+ });
+ return response.json();
+ }
 
-  // Create new record
-  async createRecord(recordData) {
-    const response = await fetch(`${this.baseUrl}/api/v1/records`, {
-      method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify(recordData)
-    });
-    return response.json();
-  }
+ // Create new record
+ async createRecord(recordData) {
+ const response = await fetch(`${this.baseUrl}/api/v1/records`, {
+ method: 'POST',
+ headers: this.headers,
+ body: JSON.stringify(recordData)
+ });
+ return response.json();
+ }
 
-  // Update record
-  async updateRecord(id, updates) {
-    const response = await fetch(`${this.baseUrl}/api/v1/records/${id}`, {
-      method: 'PUT',
-      headers: this.headers,
-      body: JSON.stringify(updates)
-    });
-    return response.json();
-  }
+ // Update record
+ async updateRecord(id, updates) {
+ const response = await fetch(`${this.baseUrl}/api/v1/records/${id}`, {
+ method: 'PUT',
+ headers: this.headers,
+ body: JSON.stringify(updates)
+ });
+ return response.json();
+ }
 
-  // Delete record
-  async deleteRecord(id) {
-    const response = await fetch(`${this.baseUrl}/api/v1/records/${id}`, {
-      method: 'DELETE',
-      headers: this.headers
-    });
-    return response.json();
-  }
+ // Delete record
+ async deleteRecord(id) {
+ const response = await fetch(`${this.baseUrl}/api/v1/records/${id}`, {
+ method: 'DELETE',
+ headers: this.headers
+ });
+ return response.json();
+ }
 }
 
 // Usage example
@@ -140,10 +140,10 @@ const bylaws = await api.listRecords({ type: 'bylaw', status: 'active' });
 
 // Create new bylaw
 const newBylaw = await api.createRecord({
-  title: 'Parking Regulations',
-  type: 'bylaw',
-  content: '# Parking Regulations\n\nNo parking on Main Street...',
-  role: 'clerk'
+ title: 'Parking Regulations',
+ type: 'bylaw',
+ content: '# Parking Regulations\n\nNo parking on Main Street...',
+ role: 'clerk'
 });
 ```
 
@@ -154,78 +154,78 @@ import requests
 from typing import Optional, Dict, Any
 
 class CivicPressAPI:
-    def __init__(self, base_url: str = "http://localhost:3000", api_key: str = None):
-        self.base_url = base_url
-        self.headers = {
-            'Content-Type': 'application/json',
-            'X-API-Key': api_key
-        } if api_key else {'Content-Type': 'application/json'}
+ def __init__(self, base_url: str = "http://localhost:3000", api_key: str = None):
+ self.base_url = base_url
+ self.headers = {
+ 'Content-Type': 'application/json',
+ 'X-API-Key': api_key
+ } if api_key else {'Content-Type': 'application/json'}
 
-    def list_records(self, record_type: Optional[str] = None,
-                    status: Optional[str] = None,
-                    limit: Optional[int] = None,
-                    offset: Optional[int] = None) -> Dict[str, Any]:
-        """List records with optional filtering."""
-        params = {}
-        if record_type:
-            params['type'] = record_type
-        if status:
-            params['status'] = status
-        if limit:
-            params['limit'] = limit
-        if offset:
-            params['offset'] = offset
+ def list_records(self, record_type: Optional[str] = None,
+ status: Optional[str] = None,
+ limit: Optional[int] = None,
+ offset: Optional[int] = None) -> Dict[str, Any]:
+ """List records with optional filtering."""
+ params = {}
+ if record_type:
+ params['type'] = record_type
+ if status:
+ params['status'] = status
+ if limit:
+ params['limit'] = limit
+ if offset:
+ params['offset'] = offset
 
-        response = requests.get(f"{self.base_url}/api/v1/records",
-                              headers=self.headers, params=params)
-        response.raise_for_status()
-        return response.json()
+ response = requests.get(f"{self.base_url}/api/v1/records",
+ headers=self.headers, params=params)
+ response.raise_for_status()
+ return response.json()
 
-    def get_record(self, record_id: str, record_type: Optional[str] = None) -> Dict[str, Any]:
-        """Get a specific record by ID."""
-        params = {'type': record_type} if record_type else {}
-        response = requests.get(f"{self.base_url}/api/v1/records/{record_id}",
-                              headers=self.headers, params=params)
-        response.raise_for_status()
-        return response.json()
+ def get_record(self, record_id: str, record_type: Optional[str] = None) -> Dict[str, Any]:
+ """Get a specific record by ID."""
+ params = {'type': record_type} if record_type else {}
+ response = requests.get(f"{self.base_url}/api/v1/records/{record_id}",
+ headers=self.headers, params=params)
+ response.raise_for_status()
+ return response.json()
 
-    def create_record(self, title: str, record_type: str,
-                     content: Optional[str] = None,
-                     template: Optional[str] = None,
-                     role: Optional[str] = None,
-                     metadata: Optional[Dict] = None) -> Dict[str, Any]:
-        """Create a new record."""
-        data = {
-            'title': title,
-            'type': record_type
-        }
-        if content:
-            data['content'] = content
-        if template:
-            data['template'] = template
-        if role:
-            data['role'] = role
-        if metadata:
-            data['metadata'] = metadata
+ def create_record(self, title: str, record_type: str,
+ content: Optional[str] = None,
+ template: Optional[str] = None,
+ role: Optional[str] = None,
+ metadata: Optional[Dict] = None) -> Dict[str, Any]:
+ """Create a new record."""
+ data = {
+ 'title': title,
+ 'type': record_type
+ }
+ if content:
+ data['content'] = content
+ if template:
+ data['template'] = template
+ if role:
+ data['role'] = role
+ if metadata:
+ data['metadata'] = metadata
 
-        response = requests.post(f"{self.base_url}/api/v1/records",
-                               headers=self.headers, json=data)
-        response.raise_for_status()
-        return response.json()
+ response = requests.post(f"{self.base_url}/api/v1/records",
+ headers=self.headers, json=data)
+ response.raise_for_status()
+ return response.json()
 
-    def update_record(self, record_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
-        """Update an existing record."""
-        response = requests.put(f"{self.base_url}/api/v1/records/{record_id}",
-                              headers=self.headers, json=updates)
-        response.raise_for_status()
-        return response.json()
+ def update_record(self, record_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+ """Update an existing record."""
+ response = requests.put(f"{self.base_url}/api/v1/records/{record_id}",
+ headers=self.headers, json=updates)
+ response.raise_for_status()
+ return response.json()
 
-    def delete_record(self, record_id: str) -> Dict[str, Any]:
-        """Delete a record."""
-        response = requests.delete(f"{self.base_url}/api/v1/records/{record_id}",
-                                 headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+ def delete_record(self, record_id: str) -> Dict[str, Any]:
+ """Delete a record."""
+ response = requests.delete(f"{self.base_url}/api/v1/records/{record_id}",
+ headers=self.headers)
+ response.raise_for_status()
+ return response.json()
 
 # Usage example
 api = CivicPressAPI("http://localhost:3000", "clerk")
@@ -235,10 +235,10 @@ bylaws = api.list_records(record_type="bylaw", status="active")
 
 # Create new policy
 new_policy = api.create_record(
-    title="Remote Work Policy",
-    record_type="policy",
-    content="# Remote Work Policy\n\nEmployees may work remotely...",
-    role="clerk"
+ title="Remote Work Policy",
+ record_type="policy",
+ content="# Remote Work Policy\n\nEmployees may work remotely...",
+ role="clerk"
 )
 ```
 
@@ -261,24 +261,24 @@ curl -s -H "X-API-Key: $API_KEY" "$API_BASE/records?type=bylaw" | jq '.'
 # Create new record
 echo "=== Creating new record ==="
 curl -s -X POST "$API_BASE/records" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: $API_KEY" \
-  -d '{
-    "title": "Test Bylaw",
-    "type": "bylaw",
-    "content": "# Test Bylaw\n\nThis is a test bylaw.",
-    "role": "clerk"
-  }' | jq '.'
+ -H "Content-Type: application/json" \
+ -H "X-API-Key: $API_KEY" \
+ -d '{
+ "title": "Test Bylaw",
+ "type": "bylaw",
+ "content": "# Test Bylaw\n\nThis is a test bylaw.",
+ "role": "clerk"
+ }' | jq '.'
 
 # Update record status
 echo "=== Updating record status ==="
 curl -s -X PUT "$API_BASE/records/test-bylaw" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: council" \
-  -d '{"status": "proposed"}' | jq '.'
+ -H "Content-Type: application/json" \
+ -H "X-API-Key: council" \
+ -d '{"status": "proposed"}' | jq '.'
 ```
 
-## 🔐 Authentication & Authorization
+## Authentication & Authorization
 
 ### API Key Authentication
 
@@ -290,31 +290,31 @@ curl -H "X-API-Key: clerk" http://localhost:3000/api/v1/records
 
 ### Role-based Permissions
 
-| Operation          | clerk   | council | public |
+| Operation | clerk | council | public |
 | ------------------ | ------- | ------- | ------ |
-| Read records       | ✅      | ✅      | ✅     |
-| Create records     | ✅      | ✅      | ❌     |
-| Update records     | ✅      | ✅      | ❌     |
-| Delete records     | ❌      | ✅      | ❌     |
-| Status transitions | Limited | Full    | ❌     |
+| Read records | | | |
+| Create records | | | |
+| Update records | | | |
+| Delete records | | | |
+| Status transitions | Limited | Full | |
 
 ### Status Transition Rules
 
 ```javascript
 // Valid transitions by role
 const transitions = {
-  clerk: {
-    'draft': ['proposed']
-  },
-  council: {
-    'proposed': ['reviewed'],
-    'reviewed': ['approved', 'archived'],
-    'approved': ['archived']
-  }
+ clerk: {
+ 'draft': ['proposed']
+ },
+ council: {
+ 'proposed': ['reviewed'],
+ 'reviewed': ['approved', 'archived'],
+ 'approved': ['archived']
+ }
 };
 ```
 
-## 📊 Error Handling
+## Error Handling
 
 ### HTTP Status Codes
 
@@ -331,11 +331,11 @@ const transitions = {
 
 ```json
 {
-  "error": {
-    "message": "Invalid record type",
-    "details": "Type 'invalid' is not allowed. Valid types: bylaw, policy, proposal, resolution",
-    "code": "VALIDATION_ERROR"
-  }
+ "error": {
+ "message": "Invalid record type",
+ "details": "Type 'invalid' is not allowed. Valid types: bylaw, policy, proposal, resolution",
+ "code": "VALIDATION_ERROR"
+ }
 }
 ```
 
@@ -344,68 +344,68 @@ const transitions = {
 ```javascript
 // Handle rate limiting
 try {
-  const response = await api.listRecords();
+ const response = await api.listRecords();
 } catch (error) {
-  if (error.status === 429) {
-    // Wait and retry
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return await api.listRecords();
-  }
+ if (error.status === 429) {
+ // Wait and retry
+ await new Promise(resolve => setTimeout(resolve, 1000));
+ return await api.listRecords();
+ }
 }
 
 // Handle permission errors
 try {
-  await api.deleteRecord('record-id');
+ await api.deleteRecord('record-id');
 } catch (error) {
-  if (error.status === 403) {
-    console.log('Insufficient permissions to delete this record');
-  }
+ if (error.status === 403) {
+ console.log('Insufficient permissions to delete this record');
+ }
 }
 
 // Handle validation errors
 try {
-  await api.createRecord({
-    title: 'Test',
-    type: 'invalid-type' // This will fail
-  });
+ await api.createRecord({
+ title: 'Test',
+ type: 'invalid-type' // This will fail
+ });
 } catch (error) {
-  if (error.status === 400) {
-    console.log('Validation error:', error.details);
-  }
+ if (error.status === 400) {
+ console.log('Validation error:', error.details);
+ }
 }
 ```
 
-## 🔄 Workflow Integration
+## Workflow Integration
 
 ### Status Management
 
 ```javascript
 // Move record through workflow
 async function processRecord(recordId, targetStatus) {
-  const record = await api.getRecord(recordId);
+ const record = await api.getRecord(recordId);
 
-  // Validate transition
-  const validTransitions = {
-    'draft': ['proposed'],
-    'proposed': ['reviewed', 'archived'],
-    'reviewed': ['approved', 'archived'],
-    'approved': ['archived']
-  };
+ // Validate transition
+ const validTransitions = {
+ 'draft': ['proposed'],
+ 'proposed': ['reviewed', 'archived'],
+ 'reviewed': ['approved', 'archived'],
+ 'approved': ['archived']
+ };
 
-  const currentStatus = record.status;
-  const allowedTransitions = validTransitions[currentStatus] || [];
+ const currentStatus = record.status;
+ const allowedTransitions = validTransitions[currentStatus] || [];
 
-  if (!allowedTransitions.includes(targetStatus)) {
-    throw new Error(`Invalid transition from ${currentStatus} to ${targetStatus}`);
-  }
+ if (!allowedTransitions.includes(targetStatus)) {
+ throw new Error(`Invalid transition from ${currentStatus} to ${targetStatus}`);
+ }
 
-  return await api.updateRecord(recordId, { status: targetStatus });
+ return await api.updateRecord(recordId, { status: targetStatus });
 }
 
 // Example workflow
-await processRecord('new-bylaw', 'proposed');  // clerk submits
-await processRecord('new-bylaw', 'reviewed');  // council reviews
-await processRecord('new-bylaw', 'approved');  // council approves
+await processRecord('new-bylaw', 'proposed'); // clerk submits
+await processRecord('new-bylaw', 'reviewed'); // council reviews
+await processRecord('new-bylaw', 'approved'); // council approves
 ```
 
 ### Batch Operations
@@ -413,58 +413,58 @@ await processRecord('new-bylaw', 'approved');  // council approves
 ```javascript
 // Update multiple records
 async function updateMultipleRecords(updates) {
-  const results = [];
+ const results = [];
 
-  for (const update of updates) {
-    try {
-      const result = await api.updateRecord(update.id, update.changes);
-      results.push({ id: update.id, success: true, data: result });
-    } catch (error) {
-      results.push({ id: update.id, success: false, error: error.message });
-    }
-  }
+ for (const update of updates) {
+ try {
+ const result = await api.updateRecord(update.id, update.changes);
+ results.push({ id: update.id, success: true, data: result });
+ } catch (error) {
+ results.push({ id: update.id, success: false, error: error.message });
+ }
+ }
 
-  return results;
+ return results;
 }
 
 // Example batch update
 const updates = [
-  { id: 'bylaw-1', changes: { status: 'proposed' } },
-  { id: 'bylaw-2', changes: { status: 'approved' } },
-  { id: 'policy-1', changes: { content: 'Updated content' } }
+ { id: 'bylaw-1', changes: { status: 'proposed' } },
+ { id: 'bylaw-2', changes: { status: 'approved' } },
+ { id: 'policy-1', changes: { content: 'Updated content' } }
 ];
 
 const results = await updateMultipleRecords(updates);
 ```
 
-## 📈 Performance & Best Practices
+## Performance & Best Practices
 
 ### Pagination
 
 ```javascript
 // Handle large datasets with pagination
 async function getAllRecords(options = {}) {
-  const allRecords = [];
-  let offset = 0;
-  const limit = options.limit || 100;
+ const allRecords = [];
+ let offset = 0;
+ const limit = options.limit || 100;
 
-  while (true) {
-    const response = await api.listRecords({
-      ...options,
-      limit,
-      offset
-    });
+ while (true) {
+ const response = await api.listRecords({
+ ...options,
+ limit,
+ offset
+ });
 
-    allRecords.push(...response.records);
+ allRecords.push(...response.records);
 
-    if (response.records.length < limit) {
-      break; // No more records
-    }
+ if (response.records.length < limit) {
+ break; // No more records
+ }
 
-    offset += limit;
-  }
+ offset += limit;
+ }
 
-  return allRecords;
+ return allRecords;
 }
 ```
 
@@ -473,28 +473,28 @@ async function getAllRecords(options = {}) {
 ```javascript
 // Simple caching for frequently accessed data
 class CachedCivicPressAPI extends CivicPressAPI {
-  constructor(baseUrl, apiKey, cacheTimeout = 5 * 60 * 1000) {
-    super(baseUrl, apiKey);
-    this.cache = new Map();
-    this.cacheTimeout = cacheTimeout;
-  }
+ constructor(baseUrl, apiKey, cacheTimeout = 5 * 60 * 1000) {
+ super(baseUrl, apiKey);
+ this.cache = new Map();
+ this.cacheTimeout = cacheTimeout;
+ }
 
-  async getRecord(id, type) {
-    const cacheKey = `record:${id}:${type || 'any'}`;
-    const cached = this.cache.get(cacheKey);
+ async getRecord(id, type) {
+ const cacheKey = `record:${id}:${type || 'any'}`;
+ const cached = this.cache.get(cacheKey);
 
-    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      return cached.data;
-    }
+ if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+ return cached.data;
+ }
 
-    const data = await super.getRecord(id, type);
-    this.cache.set(cacheKey, {
-      data,
-      timestamp: Date.now()
-    });
+ const data = await super.getRecord(id, type);
+ this.cache.set(cacheKey, {
+ data,
+ timestamp: Date.now()
+ });
 
-    return data;
-  }
+ return data;
+ }
 }
 ```
 
@@ -503,61 +503,61 @@ class CachedCivicPressAPI extends CivicPressAPI {
 ```javascript
 // Retry failed requests
 async function withRetry(fn, maxRetries = 3, delay = 1000) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (attempt === maxRetries) {
-        throw error;
-      }
+ for (let attempt = 1; attempt <= maxRetries; attempt++) {
+ try {
+ return await fn();
+ } catch (error) {
+ if (attempt === maxRetries) {
+ throw error;
+ }
 
-      if (error.status === 429) {
-        // Rate limited - wait longer
-        await new Promise(resolve => setTimeout(resolve, delay * attempt));
-      } else if (error.status >= 500) {
-        // Server error - retry
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        // Client error - don't retry
-        throw error;
-      }
-    }
-  }
+ if (error.status === 429) {
+ // Rate limited - wait longer
+ await new Promise(resolve => setTimeout(resolve, delay * attempt));
+ } else if (error.status >= 500) {
+ // Server error - retry
+ await new Promise(resolve => setTimeout(resolve, delay));
+ } else {
+ // Client error - don't retry
+ throw error;
+ }
+ }
+ }
 }
 
 // Usage
 const records = await withRetry(() => api.listRecords());
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Unit Tests
 
 ```javascript
 // Example test using Jest
 describe('CivicPress API', () => {
-  let api;
+ let api;
 
-  beforeEach(() => {
-    api = new CivicPressAPI('http://localhost:3000', 'test-key');
-  });
+ beforeEach(() => {
+ api = new CivicPressAPI('http://localhost:3000', 'test-key');
+ });
 
-  test('should list records', async () => {
-    const records = await api.listRecords();
-    expect(records).toHaveProperty('records');
-    expect(Array.isArray(records.records)).toBe(true);
-  });
+ test('should list records', async () => {
+ const records = await api.listRecords();
+ expect(records).toHaveProperty('records');
+ expect(Array.isArray(records.records)).toBe(true);
+ });
 
-  test('should create record', async () => {
-    const newRecord = await api.createRecord({
-      title: 'Test Record',
-      type: 'bylaw',
-      content: '# Test\n\nContent'
-    });
+ test('should create record', async () => {
+ const newRecord = await api.createRecord({
+ title: 'Test Record',
+ type: 'bylaw',
+ content: '# Test\n\nContent'
+ });
 
-    expect(newRecord).toHaveProperty('id');
-    expect(newRecord.title).toBe('Test Record');
-  });
+ expect(newRecord).toHaveProperty('id');
+ expect(newRecord.title).toBe('Test Record');
+ });
 });
 ```
 
@@ -566,29 +566,29 @@ describe('CivicPress API', () => {
 ```javascript
 // Test complete workflow
 test('should handle complete record lifecycle', async () => {
-  // Create record
-  const record = await api.createRecord({
-    title: 'Test Bylaw',
-    type: 'bylaw',
-    content: '# Test\n\nContent'
-  });
+ // Create record
+ const record = await api.createRecord({
+ title: 'Test Bylaw',
+ type: 'bylaw',
+ content: '# Test\n\nContent'
+ });
 
-  expect(record.status).toBe('draft');
+ expect(record.status).toBe('draft');
 
-  // Update status
-  const updated = await api.updateRecord(record.id, { status: 'proposed' });
-  expect(updated.status).toBe('proposed');
+ // Update status
+ const updated = await api.updateRecord(record.id, { status: 'proposed' });
+ expect(updated.status).toBe('proposed');
 
-  // Verify in list
-  const records = await api.listRecords({ status: 'proposed' });
-  expect(records.records.some(r => r.id === record.id)).toBe(true);
+ // Verify in list
+ const records = await api.listRecords({ status: 'proposed' });
+ expect(records.records.some(r => r.id === record.id)).toBe(true);
 
-  // Clean up
-  await api.deleteRecord(record.id);
+ // Clean up
+ await api.deleteRecord(record.id);
 });
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -600,7 +600,7 @@ API_HOST=localhost
 API_CORS_ORIGIN=*
 
 # Rate Limiting
-API_RATE_LIMIT_WINDOW_MS=900000  # 15 minutes
+API_RATE_LIMIT_WINDOW_MS=900000 # 15 minutes
 API_RATE_LIMIT_MAX=100
 
 # Authentication
@@ -632,24 +632,24 @@ CMD ["node", "dist/index.js"]
 # docker-compose.yml
 version: '3.8'
 services:
-  civicpress-api:
-    build: ./modules/api
-    ports:
-      - "3000:3000"
-    environment:
-      - CIVIC_DATA_DIR=/data
-    volumes:
-      - ./data:/data
+ civicpress-api:
+ build: ./modules/api
+ ports:
+ - "3000:3000"
+ environment:
+ - CIVIC_DATA_DIR=/data
+ volumes:
+ - ./data:/data
 ```
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [API Reference Documentation](api.md)
 - [CivicPress Core Documentation](../core/README.md)
 - [CLI Documentation](../cli/README.md)
 - [Workflow Configuration Guide](workflows.md)
 
-## 🤝 Support
+## Support
 
 For questions or issues:
 

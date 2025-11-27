@@ -1,4 +1,4 @@
-# 🌐 CivicPress Spec: `serve.md`
+# CivicPress Spec: `serve.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive serve documentation
 - hosting patterns
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'deployment.md: >=1.0.0'
-  - 'static-export.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'deployment.md: >=1.0.0'
+ - 'static-export.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `serve` — CivicPress Static & Live Preview Server
 
-## 🎯 Purpose
+## Purpose
 
 Enable towns, clerks, and citizens to preview civic records locally or on hosted
 platforms without requiring a full frontend app.
@@ -31,9 +31,9 @@ using static HTML or local Nuxt rendering.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Render Markdown records as HTML
 - Read from local Git repo (`records/`)
@@ -41,77 +41,77 @@ using static HTML or local Nuxt rendering.
 - Allow filtered browsing (`/bylaws`, `/timeline`, etc.)
 - Serve `.civic/index.yml` for navigation
 
-❌ Not responsible for:
+Not responsible for:
 
 - Admin UI
 - Approvals, publishing, or writing actions
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input               | Description                              |
+| Input | Description |
 | ------------------- | ---------------------------------------- |
-| Civic records       | Markdown files from `records/` directory |
-| Git repository      | Local Git repo with civic history        |
-| Configuration files | `.civic/index.yml` and theme settings    |
-| HTTP requests       | Browser requests for civic content       |
-| Authentication data | Optional user authentication info        |
+| Civic records | Markdown files from `records/` directory |
+| Git repository | Local Git repo with civic history |
+| Configuration files | `.civic/index.yml` and theme settings |
+| HTTP requests | Browser requests for civic content |
+| Authentication data | Optional user authentication info |
 
-| Output          | Description                              |
+| Output | Description |
 | --------------- | ---------------------------------------- |
-| Rendered HTML   | Civic records rendered as web pages      |
-| API responses   | JSON data for civic records and metadata |
-| Static assets   | CSS, JavaScript, and theme files         |
-| Navigation data | Index and search results                 |
-| Audit logs      | Server access and request logs           |
+| Rendered HTML | Civic records rendered as web pages |
+| API responses | JSON data for civic records and metadata |
+| Static assets | CSS, JavaScript, and theme files |
+| Navigation data | Index and search results |
+| Audit logs | Server access and request logs |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 serve/
-├── server.ts              # Main server entry point
+├── server.ts # Main server entry point
 ├── routes/
-│   ├── index.ts           # Main route handlers
-│   ├── records.ts         # Record serving routes
-│   ├── api.ts            # API endpoint routes
-│   └── assets.ts         # Static asset routes
+│ ├── index.ts # Main route handlers
+│ ├── records.ts # Record serving routes
+│ ├── api.ts # API endpoint routes
+│ └── assets.ts # Static asset routes
 ├── lib/
-│   ├── render.ts          # Markdown rendering utilities
-│   ├── git.ts            # Git integration utilities
-│   ├── auth.ts           # Authentication utilities
-│   └── cache.ts          # Caching utilities
+│ ├── render.ts # Markdown rendering utilities
+│ ├── git.ts # Git integration utilities
+│ ├── auth.ts # Authentication utilities
+│ └── cache.ts # Caching utilities
 ├── views/
-│   ├── layout.html        # Base HTML template
-│   ├── record.html        # Record display template
-│   ├── index.html         # Index page template
-│   └── error.html         # Error page template
+│ ├── layout.html # Base HTML template
+│ ├── record.html # Record display template
+│ ├── index.html # Index page template
+│ └── error.html # Error page template
 ├── themes/
-│   ├── default.css        # Default theme styles
-│   ├── classic.css        # Classic theme styles
-│   └── modern.css         # Modern theme styles
+│ ├── default.css # Default theme styles
+│ ├── classic.css # Classic theme styles
+│ └── modern.css # Modern theme styles
 ├── middleware/
-│   ├── auth.ts           # Authentication middleware
-│   ├── cors.ts           # CORS configuration
-│   └── logging.ts        # Request logging middleware
+│ ├── auth.ts # Authentication middleware
+│ ├── cors.ts # CORS configuration
+│ └── logging.ts # Request logging middleware
 └── config/
-    ├── serve.yml          # Server configuration
-    └── themes.yml         # Theme configuration
+ ├── serve.yml # Server configuration
+ └── themes.yml # Theme configuration
 
 tests/
 ├── serve/
-│   ├── server.test.ts
-│   ├── rendering.test.ts
-│   └── routing.test.ts
+│ ├── server.test.ts
+│ ├── rendering.test.ts
+│ └── routing.test.ts
 └── integration/
-    └── serve-integration.test.ts
+ └── serve-integration.test.ts
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Server Security
 
@@ -163,7 +163,7 @@ tests/
 
 ---
 
-## 🏗️ Architecture
+## ️ Architecture
 
 - Lightweight Express or Hono server
 - Uses `markdown-it`, `highlight.js`, `gray-matter`, and civic theming
@@ -172,34 +172,34 @@ tests/
 
 ---
 
-## 📂 Folder Example
+## Folder Example
 
 ```
 serve/
-├── server.ts         # Entry file
+├── server.ts # Entry file
 ├── routes/
-│   └── *.ts          # Markdown and asset routes
+│ └── *.ts # Markdown and asset routes
 ├── lib/
-│   └── render.ts     # Markdown to HTML
+│ └── render.ts # Markdown to HTML
 ├── views/
-│   └── layout.html   # Templated renderer
+│ └── layout.html # Templated renderer
 └── themes/
-    └── default.css
+ └── default.css
 ```
 
 ---
 
-## 🚦 Preview Modes
+## Preview Modes
 
-| Mode    | Description                                |
+| Mode | Description |
 | ------- | ------------------------------------------ |
-| Static  | Previews Markdown only, fast load          |
-| Dynamic | Enables search, tags, Git log view         |
-| API     | Acts as API fallback if `api/` not running |
+| Static | Previews Markdown only, fast load |
+| Dynamic | Enables search, tags, Git log view |
+| API | Acts as API fallback if `api/` not running |
 
 ---
 
-## 🛠️ Usage
+## ️ Usage
 
 ```bash
 civic serve
@@ -214,7 +214,7 @@ Options:
 
 ---
 
-## 🔐 Permissions & Security
+## Permissions & Security
 
 - Read-only mode
 - Optional `.htpasswd` or GitHub auth
@@ -222,7 +222,7 @@ Options:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test Markdown rendering with various content types
 - Verify theme switching works correctly
@@ -232,7 +232,7 @@ Options:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Export static build (`civic export`)
 - Mobile-friendly theme
@@ -241,7 +241,7 @@ Options:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03
 

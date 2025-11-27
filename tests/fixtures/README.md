@@ -8,7 +8,7 @@ directory, database, and configuration.
 
 ## What Each Test Context Does
 
-### 🔧 **Test Directory Creation**
+### Test Directory Creation
 
 ```typescript
 // Creates a unique temporary directory like:
@@ -31,7 +31,7 @@ const config = createTestDirectory('api-test');
         └── resolution-budget-2025.md
 ```
 
-### 🗄️ **Database Setup**
+### Database Setup
 
 **API Tests:**
 
@@ -45,7 +45,7 @@ const config = createTestDirectory('api-test');
 - Database file: `{testDir}/test.db`
 - Automatically cleaned up after test
 
-### 🌐 **API Server Setup**
+### API Server Setup
 
 **Port Usage:**
 
@@ -60,7 +60,7 @@ const api = new CivicPressAPI(3002);  // Port 3002
 await api.initialize(config.testDir);
 ```
 
-### 👥 **User Management**
+### User Management
 
 **Test Users Created:**
 
@@ -74,16 +74,16 @@ await api.initialize(config.testDir);
 - Tokens are generated instantly for testing
 - No real user creation in database
 
-### 📁 **File Isolation**
+### File Isolation
 
 **Complete Separation:**
 
-- ✅ **Temporary directories** in `/tmp/`
-- ✅ **No access to project files**
-- ✅ **No interference between tests**
-- ✅ **Automatic cleanup** after each test
-- ✅ **Unique timestamps** prevent conflicts
-- ✅ **Isolated storage directories** - each test gets its own storage folder
+- Temporary directories in `/tmp/`
+- No access to project files
+- No interference between tests
+- Automatic cleanup after each test
+- Unique timestamps prevent conflicts
+- Isolated storage directories - each test gets its own storage folder
   with absolute paths
 
 **Storage Isolation:**
@@ -115,7 +115,7 @@ interfering with each other or the working directory.
 
 ## Test Context Types
 
-### 1. **API Test Context** (`createAPITestContext()`)
+### 1. API Test Context (`createAPITestContext()`)
 
 **What it does:**
 
@@ -133,7 +133,7 @@ const context = await createAPITestContext();
 // context.testDir - Path to test directory
 ```
 
-### 2. **CLI Test Context** (`createCLITestContext()`)
+### 2. CLI Test Context (`createCLITestContext()`)
 
 **What it does:**
 
@@ -149,7 +149,7 @@ const context = createCLITestContext();
 // context.cliPath - Path to CLI executable
 ```
 
-### 3. **Core Test Context** (`createCoreTestContext()`)
+### 3. Core Test Context (`createCoreTestContext()`)
 
 **What it does:**
 
@@ -216,18 +216,18 @@ roles:
 
 **What's Mocked:**
 
-- ✅ All `@civicpress/core` exports
-- ✅ Database operations (for API tests)
-- ✅ Authentication (tokens, users)
-- ✅ File system operations
-- ✅ Git operations
+- All `@civicpress/core` exports
+- Database operations (for API tests)
+- Authentication (tokens, users)
+- File system operations
+- Git operations
 
 **What's Real:**
 
-- ✅ Express.js server (for API tests)
-- ✅ HTTP requests/responses
-- ✅ File system (for CLI tests)
-- ✅ Database (for core tests)
+- Express.js server (for API tests)
+- HTTP requests/responses
+- File system (for CLI tests)
+- Database (for core tests)
 
 ## Cleanup Process
 

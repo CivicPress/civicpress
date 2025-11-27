@@ -1,11 +1,11 @@
-# 🔍 CivicPress Indexing System
+# CivicPress Indexing System
 
 The CivicPress indexing system provides powerful search and discovery
 capabilities for civic records. It automatically scans markdown files, extracts
 metadata from YAML frontmatter, and creates searchable indexes that enable fast
 record discovery and filtering.
 
-## 🎯 Features
+## Features
 
 ### Core Functionality
 
@@ -49,7 +49,7 @@ civic index --stats
 civic index --json
 ```
 
-## 📁 File Structure
+## File Structure
 
 ```
 records/
@@ -60,7 +60,7 @@ records/
     └── index.yml               # Module-specific index
 ```
 
-## 📝 Record Format
+## Record Format
 
 Each civic record should include YAML frontmatter with metadata:
 
@@ -98,7 +98,7 @@ slug: 'noise-restrictions'
 - `slug`: URL-friendly identifier
 - `source`: Source file reference
 
-## 🌐 API Endpoints
+## API Endpoints
 
 ### Indexing Endpoints
 
@@ -204,7 +204,7 @@ Validate all indexes for integrity and consistency.
 }
 ```
 
-## 🔧 API Usage
+## API Usage
 
 ### IndexingService
 
@@ -264,7 +264,7 @@ interface CivicIndexEntry {
 }
 ```
 
-## 🧪 Testing
+## Testing
 
 The indexing system includes comprehensive tests:
 
@@ -284,7 +284,7 @@ Tests cover:
 - ✅ Index statistics and health checks
 - ✅ Validation of index integrity
 
-## 🚀 Performance
+## Performance
 
 - **Fast Scanning**: Efficient directory traversal and file processing
 - **Memory Efficient**: Processes files one at a time
@@ -292,7 +292,7 @@ Tests cover:
 - **Caching**: Intelligent caching of parsed metadata
 - **Parallel Processing**: Multi-threaded processing for large datasets
 
-## 🔍 Search Capabilities
+## Search Capabilities
 
 ### Text Search
 
@@ -344,7 +344,7 @@ const { index } = await response.json();
 console.log(`Found ${index.entries.length} records`);
 ```
 
-## 📊 Monitoring & Health
+## Monitoring & Health
 
 ### Index Statistics
 
@@ -353,7 +353,7 @@ console.log(`Found ${index.entries.length} records`);
 civic index --stats
 
 # Output:
-# 📊 Indexing Statistics
+# Indexing Statistics
 # Total Records: 15
 # Modules: legal-register, feedback
 # Types: bylaw, policy, resolution
@@ -369,7 +369,7 @@ civic index --stats
 civic index --validate
 
 # Output:
-# ✅ Index Validation Results
+# Index Validation Results
 # Valid: true
 # Total Indexes: 3
 # Total Records: 15
@@ -402,7 +402,7 @@ curl -H "Authorization: Bearer <token>" \
 }
 ```
 
-## 🔄 Automation
+## Automation
 
 ### Git Hooks
 
@@ -443,7 +443,7 @@ jobs:
       - run: civic index --rebuild
 ```
 
-## 🔐 Security Considerations
+## Security Considerations
 
 ### Index Integrity
 
@@ -459,37 +459,37 @@ jobs:
 - **Validation**: Index validation requires appropriate permissions
 - **Secure Storage**: Index files are stored securely
 
-## 🔄 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
 1. **Missing Required Fields**:
 
    ```bash
-   # Check for missing fields
+# Check for missing fields
    civic index --validate
 
-   # Fix missing fields in frontmatter
-   # Add title, type, status to YAML frontmatter
+# Fix missing fields in frontmatter
+# Add title, type, status to YAML frontmatter
    ```
 
 2. **Orphaned Files**:
 
    ```bash
-   # Find orphaned files
+# Find orphaned files
    civic index --validate
 
-   # Remove orphaned index entries
-   # Or restore missing files
+# Remove orphaned index entries
+# Or restore missing files
    ```
 
 3. **Index Corruption**:
 
    ```bash
-   # Rebuild all indexes
+# Rebuild all indexes
    civic index --rebuild
 
-   # Validate after rebuild
+# Validate after rebuild
    civic index --validate
    ```
 
@@ -503,8 +503,10 @@ export CIVIC_DEBUG=indexing
 civic index --rebuild --verbose
 ```
 
-## 📚 Related Documentation
+## Related Documentation
 
+- [Indexing Schedules](indexing-schedules.md) - Strategies for scheduling indexing operations
 - [Authentication System](auth-system.md)
 - [API Documentation](api.md)
 - [CLI Commands](cli.md)
+- [Indexing Spec](specs/indexing.md) - Technical specification

@@ -1,4 +1,4 @@
-# 🔐 CivicPress Spec: `auth.md`
+# CivicPress Spec: `auth.md`
 
 ---
 
@@ -14,22 +14,22 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - testing section enhancement
 - code examples
 - validation patterns migration_guide: null compatibility: min_civicpress: 1.0.0
-  max_civicpress: null dependencies:
-  - 'permissions.md: >=1.0.0'
-  - 'roles.yml.md: >=1.0.0'
-  - 'signatures.md: >=1.0.0'
-  - 'git-policy.md: >=1.0.0' authors:
+ max_civicpress: null dependencies:
+ - 'permissions.md: >=1.0.0'
+ - 'roles.yml.md: >=1.0.0'
+ - 'signatures.md: >=1.0.0'
+ - 'git-policy.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Authentication & Identity System
 
-## 🎯 Purpose
+## Purpose
 
 Define how users are authenticated in CivicPress and how their identity is
 trusted across roles, contributions, and civic records.
@@ -39,9 +39,9 @@ early versions, GitHub is used as the primary identity provider.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Authenticate users through GitHub or future providers
 - Attach author metadata to civic records
@@ -49,7 +49,7 @@ early versions, GitHub is used as the primary identity provider.
 - Verify commit authorship
 - Optionally store or cache verified sessions
 
-❌ Out of Scope:
+Out of Scope:
 
 - Password management
 - Federated identity across municipalities
@@ -57,23 +57,23 @@ early versions, GitHub is used as the primary identity provider.
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input               | Description                       |
+| Input | Description |
 | ------------------- | --------------------------------- |
-| GitHub login token  | Used to identify a contributor    |
-| Git commit author   | Parsed from commit metadata       |
+| GitHub login token | Used to identify a contributor |
+| Git commit author | Parsed from commit metadata |
 | GitHub API response | Used to validate user/org context |
 
-| Output                | Description                        |
+| Output | Description |
 | --------------------- | ---------------------------------- |
-| Session object        | With role, permissions, metadata   |
+| Session object | With role, permissions, metadata |
 | `author:` field in MD | Written as trusted identity marker |
-| Git commit signature  | Used to confirm authorship         |
+| Git commit signature | Used to confirm authorship |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 core/auth.ts
@@ -82,7 +82,7 @@ core/auth.ts
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Commit author must match GitHub identity (verified via token or signature)
 - Local/offline users fallback to signed commit validation
@@ -91,7 +91,7 @@ core/auth.ts
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 ### Authentication Testing
 
@@ -100,137 +100,137 @@ core/auth.ts
 ```typescript
 // tests/unit/auth/authentication.test.ts
 describe('Authentication System', () => {
-  let authService: AuthenticationService;
-  let mockAPI: MockCivicPressAPI;
+ let authService: AuthenticationService;
+ let mockAPI: MockCivicPressAPI;
 
-  beforeEach(() => {
-    mockAPI = new MockCivicPressAPI();
-    authService = new AuthenticationService(mockAPI);
-  });
+ beforeEach(() => {
+ mockAPI = new MockCivicPressAPI();
+ authService = new AuthenticationService(mockAPI);
+ });
 
-  describe('GitHub OAuth Authentication', () => {
-    it('should authenticate valid GitHub user', async () => {
-      // Arrange
-      const githubToken = 'valid-github-token';
-      const mockUser = {
-        id: '123',
-        username: 'test-user',
-        role: 'contributor',
-      };
-      mockAPI.github.validateToken.mockResolvedValue(mockUser);
+ describe('GitHub OAuth Authentication', () => {
+ it('should authenticate valid GitHub user', async () => {
+ // Arrange
+ const githubToken = 'valid-github-token';
+ const mockUser = {
+ id: '123',
+ username: 'test-user',
+ role: 'contributor',
+ };
+ mockAPI.github.validateToken.mockResolvedValue(mockUser);
 
-      // Act
-      const result = await authService.authenticateWithGitHub(githubToken);
+ // Act
+ const result = await authService.authenticateWithGitHub(githubToken);
 
-      // Assert
-      expect(result.authenticated).toBe(true);
-      expect(result.user).toEqual(mockUser);
-      expect(result.session).toBeDefined();
-    });
+ // Assert
+ expect(result.authenticated).toBe(true);
+ expect(result.user).toEqual(mockUser);
+ expect(result.session).toBeDefined();
+ });
 
-    it('should reject invalid GitHub token', async () => {
-      // Arrange
-      const invalidToken = 'invalid-token';
-      mockAPI.github.validateToken.mockRejectedValue(
-        new Error('Invalid token')
-      );
+ it('should reject invalid GitHub token', async () => {
+ // Arrange
+ const invalidToken = 'invalid-token';
+ mockAPI.github.validateToken.mockRejectedValue(
+ new Error('Invalid token')
+ );
 
-      // Act & Assert
-      await expect(
-        authService.authenticateWithGitHub(invalidToken)
-      ).rejects.toThrow('Invalid token');
-    });
+ // Act & Assert
+ await expect(
+ authService.authenticateWithGitHub(invalidToken)
+ ).rejects.toThrow('Invalid token');
+ });
 
-    it('should handle GitHub API rate limiting', async () => {
-      // Arrange
-      const token = 'valid-token';
-      mockAPI.github.validateToken.mockRejectedValue(
-        new Error('Rate limit exceeded')
-      );
+ it('should handle GitHub API rate limiting', async () => {
+ // Arrange
+ const token = 'valid-token';
+ mockAPI.github.validateToken.mockRejectedValue(
+ new Error('Rate limit exceeded')
+ );
 
-      // Act & Assert
-      await expect(authService.authenticateWithGitHub(token)).rejects.toThrow(
-        'Rate limit exceeded'
-      );
-    });
-  });
+ // Act & Assert
+ await expect(authService.authenticateWithGitHub(token)).rejects.toThrow(
+ 'Rate limit exceeded'
+ );
+ });
+ });
 
-  describe('Session Management', () => {
-    it('should create secure session', async () => {
-      // Arrange
-      const user = { id: '123', username: 'test-user', role: 'contributor' };
+ describe('Session Management', () => {
+ it('should create secure session', async () => {
+ // Arrange
+ const user = { id: '123', username: 'test-user', role: 'contributor' };
 
-      // Act
-      const session = await authService.createSession(user);
+ // Act
+ const session = await authService.createSession(user);
 
-      // Assert
-      expect(session.id).toBeDefined();
-      expect(session.userId).toBe(user.id);
-      expect(session.created).toBeInstanceOf(Date);
-      expect(session.expires).toBeInstanceOf(Date);
-    });
+ // Assert
+ expect(session.id).toBeDefined();
+ expect(session.userId).toBe(user.id);
+ expect(session.created).toBeInstanceOf(Date);
+ expect(session.expires).toBeInstanceOf(Date);
+ });
 
-    it('should validate session token', async () => {
-      // Arrange
-      const user = { id: '123', username: 'test-user', role: 'contributor' };
-      const session = await authService.createSession(user);
+ it('should validate session token', async () => {
+ // Arrange
+ const user = { id: '123', username: 'test-user', role: 'contributor' };
+ const session = await authService.createSession(user);
 
-      // Act
-      const isValid = await authService.validateSession(session.token);
+ // Act
+ const isValid = await authService.validateSession(session.token);
 
-      // Assert
-      expect(isValid).toBe(true);
-    });
+ // Assert
+ expect(isValid).toBe(true);
+ });
 
-    it('should reject expired session', async () => {
-      // Arrange
-      const user = { id: '123', username: 'test-user', role: 'contributor' };
-      const session = await authService.createSession(user);
+ it('should reject expired session', async () => {
+ // Arrange
+ const user = { id: '123', username: 'test-user', role: 'contributor' };
+ const session = await authService.createSession(user);
 
-      // Simulate expired session
-      session.expires = new Date(Date.now() - 1000);
+ // Simulate expired session
+ session.expires = new Date(Date.now() - 1000);
 
-      // Act
-      const isValid = await authService.validateSession(session.token);
+ // Act
+ const isValid = await authService.validateSession(session.token);
 
-      // Assert
-      expect(isValid).toBe(false);
-    });
-  });
+ // Assert
+ expect(isValid).toBe(false);
+ });
+ });
 
-  describe('Role-Based Access Control', () => {
-    it('should assign correct role from GitHub', async () => {
-      // Arrange
-      const githubUser = {
-        id: '123',
-        username: 'test-user',
-        organizations: ['civicpress'],
-      };
-      mockAPI.github.getUser.mockResolvedValue(githubUser);
-      mockAPI.config.get.mockResolvedValue({ civicpress: 'admin' });
+ describe('Role-Based Access Control', () => {
+ it('should assign correct role from GitHub', async () => {
+ // Arrange
+ const githubUser = {
+ id: '123',
+ username: 'test-user',
+ organizations: ['civicpress'],
+ };
+ mockAPI.github.getUser.mockResolvedValue(githubUser);
+ mockAPI.config.get.mockResolvedValue({ civicpress: 'admin' });
 
-      // Act
-      const user = await authService.mapGitHubUserToRole(githubUser);
+ // Act
+ const user = await authService.mapGitHubUserToRole(githubUser);
 
-      // Assert
-      expect(user.role).toBe('admin');
-    });
+ // Assert
+ expect(user.role).toBe('admin');
+ });
 
-    it('should default to contributor role for unknown users', async () => {
-      // Arrange
-      const githubUser = {
-        id: '123',
-        username: 'test-user',
-        organizations: [],
-      };
+ it('should default to contributor role for unknown users', async () => {
+ // Arrange
+ const githubUser = {
+ id: '123',
+ username: 'test-user',
+ organizations: [],
+ };
 
-      // Act
-      const user = await authService.mapGitHubUserToRole(githubUser);
+ // Act
+ const user = await authService.mapGitHubUserToRole(githubUser);
 
-      // Assert
-      expect(user.role).toBe('contributor');
-    });
-  });
+ // Assert
+ expect(user.role).toBe('contributor');
+ });
+ });
 });
 ```
 
@@ -239,74 +239,74 @@ describe('Authentication System', () => {
 ```typescript
 // tests/integration/auth/authentication-integration.test.ts
 describe('Authentication Integration', () => {
-  let testUtils: CivicPressTestUtils;
-  let api: CivicPressAPI;
+ let testUtils: CivicPressTestUtils;
+ let api: CivicPressAPI;
 
-  beforeEach(async () => {
-    testUtils = new CivicPressTestUtils();
-    api = await testUtils.initializeTestAPI();
-  });
+ beforeEach(async () => {
+ testUtils = new CivicPressTestUtils();
+ api = await testUtils.initializeTestAPI();
+ });
 
-  afterEach(async () => {
-    await testUtils.cleanup();
-  });
+ afterEach(async () => {
+ await testUtils.cleanup();
+ });
 
-  describe('End-to-End Authentication Flow', () => {
-    it('should complete full authentication workflow', async () => {
-      // Arrange
-      const githubToken = 'test-github-token';
-      const expectedUser = {
-        id: '123',
-        username: 'test-user',
-        role: 'contributor',
-        email: 'test@example.com',
-      };
+ describe('End-to-End Authentication Flow', () => {
+ it('should complete full authentication workflow', async () => {
+ // Arrange
+ const githubToken = 'test-github-token';
+ const expectedUser = {
+ id: '123',
+ username: 'test-user',
+ role: 'contributor',
+ email: 'test@example.com',
+ };
 
-      // Act
-      const authResult = await api.auth.authenticate(githubToken);
-      const session = await api.auth.createSession(authResult.user);
-      const validatedUser = await api.auth.validateSession(session.token);
+ // Act
+ const authResult = await api.auth.authenticate(githubToken);
+ const session = await api.auth.createSession(authResult.user);
+ const validatedUser = await api.auth.validateSession(session.token);
 
-      // Assert
-      expect(authResult.authenticated).toBe(true);
-      expect(authResult.user).toEqual(expectedUser);
-      expect(session).toBeDefined();
-      expect(validatedUser).toEqual(expectedUser);
-    });
+ // Assert
+ expect(authResult.authenticated).toBe(true);
+ expect(authResult.user).toEqual(expectedUser);
+ expect(session).toBeDefined();
+ expect(validatedUser).toEqual(expectedUser);
+ });
 
-    it('should handle authentication failure gracefully', async () => {
-      // Arrange
-      const invalidToken = 'invalid-token';
+ it('should handle authentication failure gracefully', async () => {
+ // Arrange
+ const invalidToken = 'invalid-token';
 
-      // Act & Assert
-      await expect(api.auth.authenticate(invalidToken)).rejects.toThrow(
-        'Authentication failed'
-      );
-    });
-  });
+ // Act & Assert
+ await expect(api.auth.authenticate(invalidToken)).rejects.toThrow(
+ 'Authentication failed'
+ );
+ });
+ });
 
-  describe('Multi-User Authentication', () => {
-    it('should handle concurrent user authentication', async () => {
-      // Arrange
-      const users = [
-        { token: 'token1', expectedRole: 'contributor' },
-        { token: 'token2', expectedRole: 'clerk' },
-        { token: 'token3', expectedRole: 'mayor' },
-      ];
+ describe('Multi-User Authentication', () => {
+ it('should handle concurrent user authentication', async () => {
+ // Arrange
+ const users = [
+ { token: 'token1', expectedRole: 'contributor' },
+ { token: 'token2', expectedRole: 'clerk' },
+ { token: 'token3', expectedRole: 'mayor' },
+ ];
 
-      // Act
-      const results = await Promise.all(
-        users.map((user) => api.auth.authenticate(user.token))
-      );
+ // Act
+ const results = await Promise.all(
+ users.map((user) => api.auth.authenticate(user.token))
+ );
 
-      // Assert
-      expect(results).toHaveLength(3);
-      results.forEach((result, index) => {
-        expect(result.authenticated).toBe(true);
-        expect(result.user.role).toBe(users[index].expectedRole);
-      });
-    });
-  });
+ // Assert
+ expect(results).toHaveLength(3);
+ results.forEach((result, index) => {
+ expect(result.authenticated).toBe(true);
+ expect(result.user.role).toBe(users[index].expectedRole);
+ });
+ });
+ });
 });
 ```
 
@@ -317,103 +317,103 @@ describe('Authentication Integration', () => {
 ```typescript
 // tests/security/auth/authentication-security.test.ts
 describe('Authentication Security', () => {
-  let securityTestSuite: SecurityTestSuite;
+ let securityTestSuite: SecurityTestSuite;
 
-  beforeEach(() => {
-    securityTestSuite = new SecurityTestSuite();
-  });
+ beforeEach(() => {
+ securityTestSuite = new SecurityTestSuite();
+ });
 
-  describe('Authentication Bypass Testing', () => {
-    it('should prevent session hijacking', async () => {
-      // Arrange
-      const validSession = await createValidSession();
-      const hijackedToken = modifyToken(validSession.token);
+ describe('Authentication Bypass Testing', () => {
+ it('should prevent session hijacking', async () => {
+ // Arrange
+ const validSession = await createValidSession();
+ const hijackedToken = modifyToken(validSession.token);
 
-      // Act
-      const result =
-        await securityTestSuite.testSessionHijacking(hijackedToken);
+ // Act
+ const result =
+ await securityTestSuite.testSessionHijacking(hijackedToken);
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.vulnerabilities).toHaveLength(0);
-    });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.vulnerabilities).toHaveLength(0);
+ });
 
-    it('should prevent brute force attacks', async () => {
-      // Arrange
-      const testCases = [
-        { username: 'admin', password: 'password' },
-        { username: 'admin', password: 'admin' },
-        { username: 'admin', password: '123456' },
-      ];
+ it('should prevent brute force attacks', async () => {
+ // Arrange
+ const testCases = [
+ { username: 'admin', password: 'password' },
+ { username: 'admin', password: 'admin' },
+ { username: 'admin', password: '123456' },
+ ];
 
-      // Act
-      const result =
-        await securityTestSuite.testBruteForceProtection(testCases);
+ // Act
+ const result =
+ await securityTestSuite.testBruteForceProtection(testCases);
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.blockedAttempts).toBeGreaterThan(0);
-    });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.blockedAttempts).toBeGreaterThan(0);
+ });
 
-    it('should validate token integrity', async () => {
-      // Arrange
-      const validToken = createValidToken();
-      const tamperedToken = tamperWithToken(validToken);
+ it('should validate token integrity', async () => {
+ // Arrange
+ const validToken = createValidToken();
+ const tamperedToken = tamperWithToken(validToken);
 
-      // Act
-      const result = await securityTestSuite.testTokenIntegrity(tamperedToken);
+ // Act
+ const result = await securityTestSuite.testTokenIntegrity(tamperedToken);
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.detectedTampering).toBe(true);
-    });
-  });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.detectedTampering).toBe(true);
+ });
+ });
 
-  describe('Input Validation Testing', () => {
-    it('should prevent SQL injection in authentication', async () => {
-      // Arrange
-      const maliciousInputs = [
-        "'; DROP TABLE users; --",
-        "' OR '1'='1",
-        "'; INSERT INTO users VALUES ('hacker', 'admin'); --",
-      ];
+ describe('Input Validation Testing', () => {
+ it('should prevent SQL injection in authentication', async () => {
+ // Arrange
+ const maliciousInputs = [
+ "'; DROP TABLE users; --",
+ "' OR '1'='1",
+ "'; INSERT INTO users VALUES ('hacker', 'admin'); --",
+ ];
 
-      // Act
-      const results = await Promise.all(
-        maliciousInputs.map((input) =>
-          securityTestSuite.testSQLInjection(input)
-        )
-      );
+ // Act
+ const results = await Promise.all(
+ maliciousInputs.map((input) =>
+ securityTestSuite.testSQLInjection(input)
+ )
+ );
 
-      // Assert
-      results.forEach((result) => {
-        expect(result.passed).toBe(true);
-        expect(result.vulnerabilities).toHaveLength(0);
-      });
-    });
+ // Assert
+ results.forEach((result) => {
+ expect(result.passed).toBe(true);
+ expect(result.vulnerabilities).toHaveLength(0);
+ });
+ });
 
-    it('should prevent XSS in authentication forms', async () => {
-      // Arrange
-      const maliciousInputs = [
-        "<script>alert('xss')</script>",
-        "javascript:alert('xss')",
-        "<img src=x onerror=alert('xss')>",
-      ];
+ it('should prevent XSS in authentication forms', async () => {
+ // Arrange
+ const maliciousInputs = [
+ "<script>alert('xss')</script>",
+ "javascript:alert('xss')",
+ "<img src=x onerror=alert('xss')>",
+ ];
 
-      // Act
-      const results = await Promise.all(
-        maliciousInputs.map((input) =>
-          securityTestSuite.testXSSProtection(input)
-        )
-      );
+ // Act
+ const results = await Promise.all(
+ maliciousInputs.map((input) =>
+ securityTestSuite.testXSSProtection(input)
+ )
+ );
 
-      // Assert
-      results.forEach((result) => {
-        expect(result.passed).toBe(true);
-        expect(result.sanitized).toBe(true);
-      });
-    });
-  });
+ // Assert
+ results.forEach((result) => {
+ expect(result.passed).toBe(true);
+ expect(result.sanitized).toBe(true);
+ });
+ });
+ });
 });
 ```
 
@@ -424,76 +424,76 @@ describe('Authentication Security', () => {
 ```typescript
 // tests/performance/auth/authentication-performance.test.ts
 describe('Authentication Performance', () => {
-  let performanceTestSuite: PerformanceTestSuite;
+ let performanceTestSuite: PerformanceTestSuite;
 
-  beforeEach(() => {
-    performanceTestSuite = new PerformanceTestSuite();
-  });
+ beforeEach(() => {
+ performanceTestSuite = new PerformanceTestSuite();
+ });
 
-  describe('Authentication Response Time', () => {
-    it('should authenticate users within acceptable time', async () => {
-      // Arrange
-      const concurrentUsers = 100;
-      const testDuration = 30000; // 30 seconds
+ describe('Authentication Response Time', () => {
+ it('should authenticate users within acceptable time', async () => {
+ // Arrange
+ const concurrentUsers = 100;
+ const testDuration = 30000; // 30 seconds
 
-      // Act
-      const result = await performanceTestSuite.testAuthenticationLoad(
-        concurrentUsers,
-        testDuration
-      );
+ // Act
+ const result = await performanceTestSuite.testAuthenticationLoad(
+ concurrentUsers,
+ testDuration
+ );
 
-      // Assert
-      expect(result.averageResponseTime).toBeLessThan(1000); // < 1 second
-      expect(result.p95ResponseTime).toBeLessThan(2000); // < 2 seconds
-      expect(result.successRate).toBeGreaterThan(0.95); // > 95% success
-    });
+ // Assert
+ expect(result.averageResponseTime).toBeLessThan(1000); // < 1 second
+ expect(result.p95ResponseTime).toBeLessThan(2000); // < 2 seconds
+ expect(result.successRate).toBeGreaterThan(0.95); // > 95% success
+ });
 
-    it('should handle authentication spikes', async () => {
-      // Arrange
-      const baseLoad = 50;
-      const spikeLoad = 200;
-      const spikeDuration = 10000; // 10 seconds
+ it('should handle authentication spikes', async () => {
+ // Arrange
+ const baseLoad = 50;
+ const spikeLoad = 200;
+ const spikeDuration = 10000; // 10 seconds
 
-      // Act
-      const result = await performanceTestSuite.testAuthenticationSpike(
-        baseLoad,
-        spikeLoad,
-        spikeDuration
-      );
+ // Act
+ const result = await performanceTestSuite.testAuthenticationSpike(
+ baseLoad,
+ spikeLoad,
+ spikeDuration
+ );
 
-      // Assert
-      expect(result.baseline.successRate).toBeGreaterThan(0.95);
-      expect(result.spike.successRate).toBeGreaterThan(0.9);
-      expect(result.recovery.successRate).toBeGreaterThan(0.95);
-    });
-  });
+ // Assert
+ expect(result.baseline.successRate).toBeGreaterThan(0.95);
+ expect(result.spike.successRate).toBeGreaterThan(0.9);
+ expect(result.recovery.successRate).toBeGreaterThan(0.95);
+ });
+ });
 
-  describe('Session Management Performance', () => {
-    it('should handle concurrent session creation', async () => {
-      // Arrange
-      const concurrentSessions = 1000;
+ describe('Session Management Performance', () => {
+ it('should handle concurrent session creation', async () => {
+ // Arrange
+ const concurrentSessions = 1000;
 
-      // Act
-      const result =
-        await performanceTestSuite.testSessionCreation(concurrentSessions);
+ // Act
+ const result =
+ await performanceTestSuite.testSessionCreation(concurrentSessions);
 
-      // Assert
-      expect(result.averageCreationTime).toBeLessThan(500); // < 500ms
-      expect(result.successRate).toBeGreaterThan(0.99); // > 99% success
-    });
+ // Assert
+ expect(result.averageCreationTime).toBeLessThan(500); // < 500ms
+ expect(result.successRate).toBeGreaterThan(0.99); // > 99% success
+ });
 
-    it('should validate sessions efficiently', async () => {
-      // Arrange
-      const sessions = await createTestSessions(1000);
+ it('should validate sessions efficiently', async () => {
+ // Arrange
+ const sessions = await createTestSessions(1000);
 
-      // Act
-      const result = await performanceTestSuite.testSessionValidation(sessions);
+ // Act
+ const result = await performanceTestSuite.testSessionValidation(sessions);
 
-      // Assert
-      expect(result.averageValidationTime).toBeLessThan(100); // < 100ms
-      expect(result.successRate).toBeGreaterThan(0.99); // > 99% success
-    });
-  });
+ // Assert
+ expect(result.averageValidationTime).toBeLessThan(100); // < 100ms
+ expect(result.successRate).toBeGreaterThan(0.99); // > 99% success
+ });
+ });
 });
 ```
 
@@ -504,72 +504,72 @@ describe('Authentication Performance', () => {
 ```typescript
 // tests/accessibility/auth/authentication-accessibility.test.ts
 describe('Authentication Accessibility', () => {
-  let accessibilityTestSuite: AccessibilityTestSuite;
-  let page: any; // Playwright page
+ let accessibilityTestSuite: AccessibilityTestSuite;
+ let page: any; // Playwright page
 
-  beforeEach(async () => {
-    accessibilityTestSuite = new AccessibilityTestSuite(page);
-  });
+ beforeEach(async () => {
+ accessibilityTestSuite = new AccessibilityTestSuite(page);
+ });
 
-  describe('Login Form Accessibility', () => {
-    it('should meet WCAG 2.1 AA standards', async () => {
-      // Arrange
-      await page.goto('/login');
+ describe('Login Form Accessibility', () => {
+ it('should meet WCAG 2.1 AA standards', async () => {
+ // Arrange
+ await page.goto('/login');
 
-      // Act
-      const result = await accessibilityTestSuite.testWCAGCompliance();
+ // Act
+ const result = await accessibilityTestSuite.testWCAGCompliance();
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.score).toBeGreaterThan(95); // > 95% compliance
-    });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.score).toBeGreaterThan(95); // > 95% compliance
+ });
 
-    it('should support screen readers', async () => {
-      // Arrange
-      await page.goto('/login');
+ it('should support screen readers', async () => {
+ // Arrange
+ await page.goto('/login');
 
-      // Act
-      const result =
-        await accessibilityTestSuite.testScreenReaderCompatibility();
+ // Act
+ const result =
+ await accessibilityTestSuite.testScreenReaderCompatibility();
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.ariaLabels).toBeDefined();
-      expect(result.focusManagement).toBe(true);
-    });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.ariaLabels).toBeDefined();
+ expect(result.focusManagement).toBe(true);
+ });
 
-    it('should support keyboard navigation', async () => {
-      // Arrange
-      await page.goto('/login');
+ it('should support keyboard navigation', async () => {
+ // Arrange
+ await page.goto('/login');
 
-      // Act
-      const result = await accessibilityTestSuite.testKeyboardNavigation();
+ // Act
+ const result = await accessibilityTestSuite.testKeyboardNavigation();
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.tabOrder).toBeDefined();
-      expect(result.shortcuts).toBeDefined();
-    });
-  });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.tabOrder).toBeDefined();
+ expect(result.shortcuts).toBeDefined();
+ });
+ });
 
-  describe('Error Message Accessibility', () => {
-    it('should provide accessible error messages', async () => {
-      // Arrange
-      await page.goto('/login');
+ describe('Error Message Accessibility', () => {
+ it('should provide accessible error messages', async () => {
+ // Arrange
+ await page.goto('/login');
 
-      // Act
-      await page.fill('input[name="username"]', 'invalid');
-      await page.fill('input[name="password"]', 'invalid');
-      await page.click('button[type="submit"]');
+ // Act
+ await page.fill('input[name="username"]', 'invalid');
+ await page.fill('input[name="password"]', 'invalid');
+ await page.click('button[type="submit"]');
 
-      // Assert
-      const errorMessage = await page.locator('.error-message').textContent();
-      expect(errorMessage).toBeDefined();
-      expect(await page.locator('.error-message').getAttribute('role')).toBe(
-        'alert'
-      );
-    });
-  });
+ // Assert
+ const errorMessage = await page.locator('.error-message').textContent();
+ expect(errorMessage).toBeDefined();
+ expect(await page.locator('.error-message').getAttribute('role')).toBe(
+ 'alert'
+ );
+ });
+ });
 });
 ```
 
@@ -580,72 +580,72 @@ describe('Authentication Accessibility', () => {
 ```typescript
 // tests/compliance/auth/authentication-compliance.test.ts
 describe('Authentication Compliance', () => {
-  let complianceTestSuite: ComplianceTestSuite;
+ let complianceTestSuite: ComplianceTestSuite;
 
-  beforeEach(() => {
-    complianceTestSuite = new ComplianceTestSuite();
-  });
+ beforeEach(() => {
+ complianceTestSuite = new ComplianceTestSuite();
+ });
 
-  describe('Audit Trail Compliance', () => {
-    it('should log all authentication attempts', async () => {
-      // Arrange
-      const testCases = [
-        { username: 'valid-user', success: true },
-        { username: 'invalid-user', success: false },
-        { username: 'locked-user', success: false },
-      ];
+ describe('Audit Trail Compliance', () => {
+ it('should log all authentication attempts', async () => {
+ // Arrange
+ const testCases = [
+ { username: 'valid-user', success: true },
+ { username: 'invalid-user', success: false },
+ { username: 'locked-user', success: false },
+ ];
 
-      // Act
-      const auditLogs = await Promise.all(
-        testCases.map((testCase) =>
-          complianceTestSuite.testAuthenticationLogging(testCase)
-        )
-      );
+ // Act
+ const auditLogs = await Promise.all(
+ testCases.map((testCase) =>
+ complianceTestSuite.testAuthenticationLogging(testCase)
+ )
+ );
 
-      // Assert
-      auditLogs.forEach((log) => {
-        expect(log.timestamp).toBeDefined();
-        expect(log.user).toBeDefined();
-        expect(log.action).toBe('authentication_attempt');
-        expect(log.success).toBeDefined();
-        expect(log.ipAddress).toBeDefined();
-      });
-    });
+ // Assert
+ auditLogs.forEach((log) => {
+ expect(log.timestamp).toBeDefined();
+ expect(log.user).toBeDefined();
+ expect(log.action).toBe('authentication_attempt');
+ expect(log.success).toBeDefined();
+ expect(log.ipAddress).toBeDefined();
+ });
+ });
 
-    it('should maintain audit log integrity', async () => {
-      // Arrange
-      const auditLogs = await createTestAuditLogs(100);
+ it('should maintain audit log integrity', async () => {
+ // Arrange
+ const auditLogs = await createTestAuditLogs(100);
 
-      // Act
-      const result = await complianceTestSuite.testAuditLogIntegrity(auditLogs);
+ // Act
+ const result = await complianceTestSuite.testAuditLogIntegrity(auditLogs);
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.tamperDetected).toBe(false);
-      expect(result.hashValid).toBe(true);
-    });
-  });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.tamperDetected).toBe(false);
+ expect(result.hashValid).toBe(true);
+ });
+ });
 
-  describe('Data Retention Compliance', () => {
-    it('should comply with data retention policies', async () => {
-      // Arrange
-      const retentionPolicy = {
-        sessionData: '30 days',
-        auditLogs: '7 years',
-        failedAttempts: '90 days',
-      };
+ describe('Data Retention Compliance', () => {
+ it('should comply with data retention policies', async () => {
+ // Arrange
+ const retentionPolicy = {
+ sessionData: '30 days',
+ auditLogs: '7 years',
+ failedAttempts: '90 days',
+ };
 
-      // Act
-      const result =
-        await complianceTestSuite.testDataRetention(retentionPolicy);
+ // Act
+ const result =
+ await complianceTestSuite.testDataRetention(retentionPolicy);
 
-      // Assert
-      expect(result.passed).toBe(true);
-      expect(result.sessionDataRetention).toBe(true);
-      expect(result.auditLogRetention).toBe(true);
-      expect(result.failedAttemptsRetention).toBe(true);
-    });
-  });
+ // Assert
+ expect(result.passed).toBe(true);
+ expect(result.sessionDataRetention).toBe(true);
+ expect(result.auditLogRetention).toBe(true);
+ expect(result.failedAttemptsRetention).toBe(true);
+ });
+ });
 });
 ```
 
@@ -656,70 +656,70 @@ describe('Authentication Compliance', () => {
 ```typescript
 // tests/cli/auth/authentication-cli.test.ts
 describe('Authentication CLI', () => {
-  let cliTestSuite: CLITestSuite;
+ let cliTestSuite: CLITestSuite;
 
-  beforeEach(() => {
-    cliTestSuite = new CLITestSuite();
-  });
+ beforeEach(() => {
+ cliTestSuite = new CLITestSuite();
+ });
 
-  describe('Login Command', () => {
-    it('should authenticate via CLI', async () => {
-      // Arrange
-      const credentials = { username: 'test-user', password: 'test-pass' };
+ describe('Login Command', () => {
+ it('should authenticate via CLI', async () => {
+ // Arrange
+ const credentials = { username: 'test-user', password: 'test-pass' };
 
-      // Act
-      const result = await cliTestSuite.testLoginCommand(credentials);
+ // Act
+ const result = await cliTestSuite.testLoginCommand(credentials);
 
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.sessionToken).toBeDefined();
-      expect(result.userRole).toBe('contributor');
-    });
+ // Assert
+ expect(result.success).toBe(true);
+ expect(result.sessionToken).toBeDefined();
+ expect(result.userRole).toBe('contributor');
+ });
 
-    it('should handle invalid credentials gracefully', async () => {
-      // Arrange
-      const invalidCredentials = { username: 'invalid', password: 'invalid' };
+ it('should handle invalid credentials gracefully', async () => {
+ // Arrange
+ const invalidCredentials = { username: 'invalid', password: 'invalid' };
 
-      // Act
-      const result = await cliTestSuite.testLoginCommand(invalidCredentials);
+ // Act
+ const result = await cliTestSuite.testLoginCommand(invalidCredentials);
 
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.error).toContain('Invalid credentials');
-    });
-  });
+ // Assert
+ expect(result.success).toBe(false);
+ expect(result.error).toBeDefined();
+ expect(result.error).toContain('Invalid credentials');
+ });
+ });
 
-  describe('Logout Command', () => {
-    it('should logout successfully', async () => {
-      // Arrange
-      const session = await cliTestSuite.createTestSession();
+ describe('Logout Command', () => {
+ it('should logout successfully', async () => {
+ // Arrange
+ const session = await cliTestSuite.createTestSession();
 
-      // Act
-      const result = await cliTestSuite.testLogoutCommand(session.token);
+ // Act
+ const result = await cliTestSuite.testLogoutCommand(session.token);
 
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.sessionInvalidated).toBe(true);
-    });
-  });
+ // Assert
+ expect(result.success).toBe(true);
+ expect(result.sessionInvalidated).toBe(true);
+ });
+ });
 });
 ```
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Support **dedicated CivicPress user system** (with local accounts,
-  passwordless login, session tokens)
+ passwordless login, session tokens)
 - Add **federated identity** across towns via civic keyrings or public profiles
 - Enable **anonymous draft mode** using commit-reveal or zero-knowledge proof
-  patterns
+ patterns
 - Support **multi-provider login** (e.g., GitHub, GitLab, municipal SSO, etc.)
 - Integrate **optional email verification or civic ID verification** for
-  clerk-grade access
+ clerk-grade access
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`permissions.md`](./permissions.md) — Role-based access control
 - [`roles.yml.md`](./roles.yml.md) — Default civic roles and responsibilities
@@ -728,7 +728,7 @@ describe('Authentication CLI', () => {
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04
 - Updated: 2025-07-04

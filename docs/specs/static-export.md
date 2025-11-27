@@ -1,4 +1,4 @@
-# 📄 CivicPress Spec: `static-export.md`
+# CivicPress Spec: `static-export.md`
 
 ---
 
@@ -8,30 +8,30 @@ deprecated: false sunset_date: null additions:
 - comprehensive static export documentation
 - asset validation
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'ui.md: >=1.0.0'
-  - 'public-data-structure.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'ui.md: >=1.0.0'
+ - 'public-data-structure.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Static Export & Offline Access
 
-## 🎯 Purpose
+## Purpose
 
 Allow towns to export their entire CivicPress deployment as **static HTML +
-assets**, for offline browsing, archival, and ultra-low-cost hosting.  
+assets**, for offline browsing, archival, and ultra-low-cost hosting. 
 Ideal for disconnected communities, government USB archives, or GitHub Pages.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Pre-render all civic records and modules as HTML
 - Export theme, branding, search index, assets
@@ -39,38 +39,38 @@ Ideal for disconnected communities, government USB archives, or GitHub Pages.
 - Support full offline browsing (no API calls)
 - Provide download CLI/API command
 
-❌ Out of Scope:
+Out of Scope:
 
 - Live editing or feedback submission
 - Dynamic workflows or CLI integrations
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Action                | Result                                 |
+| Action | Result |
 | --------------------- | -------------------------------------- |
 | `civic export static` | Generates `/dist/static-export` folder |
-| `GET /export.zip`     | Offers prebuilt static export download |
-| GitHub Pages          | Can serve `/static-export` folder      |
+| `GET /export.zip` | Offers prebuilt static export download |
+| GitHub Pages | Can serve `/static-export` folder |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 dist/static-export/
-  ├── index.html
-  ├── records/bylaws/...
-  ├── assets/css/
-  ├── assets/js/
-  ├── civic-index.json
-  └── civic-manifest.json
+ ├── index.html
+ ├── records/bylaws/...
+ ├── assets/css/
+ ├── assets/js/
+ ├── civic-index.json
+ └── civic-manifest.json
 ```
 
 ---
 
-## 💡 Export Features
+## Export Features
 
 - Markdown fully rendered
 - Civic index + metadata embedded
@@ -80,7 +80,7 @@ dist/static-export/
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Exported data must not leak drafts or unpublished items
 - All links must resolve offline
@@ -88,7 +88,7 @@ dist/static-export/
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Open index.html locally in browser
 - Browse records, test search, print, theme
@@ -97,7 +97,7 @@ dist/static-export/
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - USB export mode (`--usb`) with README + launcher
 - Weekly auto-exports (see `scheduler.md`)
@@ -106,6 +106,6 @@ dist/static-export/
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

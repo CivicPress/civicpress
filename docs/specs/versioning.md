@@ -1,4 +1,4 @@
-# 🔢 CivicPress Spec: `versioning.md`
+# CivicPress Spec: `versioning.md`
 
 ---
 
@@ -8,29 +8,29 @@ deprecated: false sunset_date: null additions:
 - comprehensive versioning documentation
 - version management
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'git-policy.md: >=1.1.0' authors:
+ 'null' dependencies:
+ - 'git-policy.md: >=1.1.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Record Versioning
 
-## 🎯 Purpose
+## Purpose
 
-Define how civic records in CivicPress are versioned over time using Git.  
+Define how civic records in CivicPress are versioned over time using Git. 
 Every edit, proposal, or adoption is traceable via commits, branches, and pull
 requests — ensuring full public accountability and transparency.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Track every change to civic records via Git
 - Provide readable diffs and timeline views
@@ -38,30 +38,30 @@ requests — ensuring full public accountability and transparency.
 - Support rollback and recovery of past versions
 - Encourage PR-based editing and review process
 
-❌ Out of Scope:
+Out of Scope:
 
 - API route versioning (handled in `api.md`)
 - Real-time collaborative editing (handled in future spec)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input         | Description                          |
+| Input | Description |
 | ------------- | ------------------------------------ |
-| Git commits   | Every file change is a new version   |
-| Git branches  | Used for proposals, drafts, patches  |
+| Git commits | Every file change is a new version |
+| Git branches | Used for proposals, drafts, patches |
 | Pull requests | Used for civic discussion and review |
 
-| Output           | Description                 |
+| Output | Description |
 | ---------------- | --------------------------- |
 | Git history view | Civic timeline for any file |
-| Commit metadata  | Author, timestamp, role     |
-| PR logs          | Public discussion history   |
+| Commit metadata | Author, timestamp, role |
+| PR logs | Public discussion history |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .git/
@@ -71,7 +71,7 @@ records/
 
 ---
 
-## 📉 Record Lifecycle Notes
+## Record Lifecycle Notes
 
 CivicPress avoids hard-deletion of civic records.
 
@@ -90,7 +90,7 @@ preserves full traceability.
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - All commits must be signed or attributable
 - History must not be force-pushed or rewritten without audit
@@ -99,7 +99,7 @@ preserves full traceability.
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Validate Git repo integrity regularly
 - Ensure proper PR and branch naming conventions
@@ -108,7 +108,7 @@ preserves full traceability.
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Add `/history/` viewer per record in public UI
 - Auto-tag major civic milestones (`v1-adopted`, `v2-amended`)
@@ -117,6 +117,6 @@ preserves full traceability.
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

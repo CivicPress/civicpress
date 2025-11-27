@@ -1,9 +1,9 @@
-# 📊 Validation System
+# Validation System
 
 CivicPress includes a comprehensive validation system that ensures data quality,
 compliance, and consistency across all civic records.
 
-## 📋 Overview
+## Overview
 
 The validation system provides multiple layers of validation:
 
@@ -13,7 +13,7 @@ The validation system provides multiple layers of validation:
 - **Content Validation** - Section requirements, placeholder detection
 - **Template Validation** - Template structure and inheritance validation
 
-## ✅ Validation Types
+## Validation Types
 
 ### Basic Validation
 
@@ -151,7 +151,7 @@ validation:
 | `semantic_version` | Semantic versioning        | `1.2.3`                | SemVer 2.0           |
 | `required_if`      | Conditional required field | `status == 'approved'` | Condition expression |
 
-## 🎯 Validation Commands
+## Validation Commands
 
 ### Validate Single Record
 
@@ -195,8 +195,8 @@ civic validate --all --strict
 📄 bylaw/public-meeting-procedures.md
   ❌ Invalid
     ❌ bylaw_number: Required field 'bylaw_number' is missing or empty
-    ⚠️  contact_email: Invalid email format
-    ⚠️  content: Found 2 placeholder(s) in content
+    ⚠  contact_email: Invalid email format
+    ⚠  content: Found 2 placeholder(s) in content
 
 📊 Final Summary:
   Total errors: 1
@@ -245,7 +245,7 @@ civic validate --all --strict
 }
 ```
 
-## 🔧 Validation Configuration
+## Validation Configuration
 
 ### Template-Level Validation
 
@@ -291,7 +291,7 @@ validation:
     - "temp/*"
 ```
 
-## 📊 Validation Examples
+## Validation Examples
 
 ### Bylaw Validation
 
@@ -350,8 +350,8 @@ contact_email: "invalid-email"
 **Validation Results:**
 
 - ❌ Invalid email format
-- ⚠️ Missing compliance section
-- ⚠️ Content too short for policy
+- ⚠ Missing compliance section
+- ⚠ Content too short for policy
 
 ### Resolution Validation
 
@@ -381,7 +381,7 @@ budget_justification: "Annual operating budget"
 - ✅ All required sections present
 - ✅ Approval workflow complete
 
-## 🛠️ Custom Validation Development
+## Custom Validation Development
 
 ### Creating Custom Validators
 
@@ -427,7 +427,7 @@ private validateAdvancedRule(
 }
 ```
 
-## 📚 Best Practices
+## Best Practices
 
 ### Validation Design
 
@@ -451,7 +451,7 @@ private validateAdvancedRule(
 3. **Severity Levels** - Distinguish between errors and warnings
 4. **Context Information** - Include relevant field and value information
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Template System Guide](templates.md)
 - [CLI Usage Guide](cli.md)

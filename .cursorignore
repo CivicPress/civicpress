@@ -46,6 +46,8 @@ tests/
 !tests/**/*.ts
 !tests/**/*.js
 !tests/**/*.json
+!tests/README.md
+!tests/fixtures/README.md
 
 # ─────────────────────────────────────────────
 # Environment, OS, editor files

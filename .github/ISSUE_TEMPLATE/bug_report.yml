@@ -1,4 +1,4 @@
-name: 🐛 Bug Report
+name: Bug Report
 description: Report a bug or issue in CivicPress
 labels: [bug, needs-triage]
 assignees: []
@@ -19,7 +19,7 @@ body:
   - type: input
     id: summary
     attributes:
-      label: 🎯 Bug Summary
+      label: Bug Summary
       description: A clear, concise description of the bug
       placeholder:
         'e.g., Legal register validation fails for certain record types'
@@ -29,7 +29,7 @@ body:
   - type: textarea
     id: description
     attributes:
-      label: 📝 Detailed Description
+      label: Detailed Description
       description: What happened? What should have happened?
       placeholder: |
         **What happened:**
@@ -44,7 +44,7 @@ body:
   - type: textarea
     id: steps
     attributes:
-      label: 🔄 Steps to Reproduce
+      label: Steps to Reproduce
       description: How can we reproduce this issue?
       placeholder: |
         1. Navigate to the legal register module
@@ -59,7 +59,7 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: ✅ Expected Behavior
+      label: Expected Behavior
       description: What did you expect to happen?
       placeholder: |
         The validation should:
@@ -73,7 +73,7 @@ body:
   - type: textarea
     id: actual
     attributes:
-      label: ❌ Actual Behavior
+      label: Actual Behavior
       description: What actually happened?
       placeholder: |
         Instead, the system:
@@ -87,54 +87,54 @@ body:
   - type: dropdown
     id: severity
     attributes:
-      label: 🚨 Severity
+      label: Severity
       description: How critical is this issue?
       options:
-        - '🔴 Critical - System crash or data loss'
-        - '🟡 High - Major functionality broken'
-        - '🟢 Medium - Minor functionality issue'
-        - '🔵 Low - Cosmetic or minor inconvenience'
+        - 'Critical - System crash or data loss'
+        - 'High - Major functionality broken'
+        - 'Medium - Minor functionality issue'
+        - 'Low - Cosmetic or minor inconvenience'
     validations:
       required: true
 
   - type: input
     id: version
     attributes:
-      label: 📦 Version
+      label: Version
       description: What version of CivicPress are you using?
       placeholder: '1.0.0 (or commit hash)'
 
   - type: dropdown
     id: environment
     attributes:
-      label: 💻 Environment
+      label: Environment
       description: What's your setup?
       options:
-        - '🖥️ Desktop - Windows'
-        - '🖥️ Desktop - macOS'
-        - '🖥️ Desktop - Linux'
-        - '📱 Mobile - iOS'
-        - '📱 Mobile - Android'
-        - '🌐 Web Browser'
-        - '🐳 Docker'
-        - '☁️ Cloud Deployment'
+        - 'Desktop - Windows'
+        - 'Desktop - macOS'
+        - 'Desktop - Linux'
+        - 'Mobile - iOS'
+        - 'Mobile - Android'
+        - 'Web Browser'
+        - 'Docker'
+        - 'Cloud Deployment'
 
   - type: textarea
     id: system
     attributes:
-      label: 🔧 System Information
+      label: System Information
       description: OS, browser, Node.js version, etc.
       placeholder: |
         **Operating System:** macOS 14.0
         **Node.js Version:** 20.11.1
         **Browser:** Chrome 120.0
         **CivicPress Version:** 1.0.0
-        **pnpm Version:** 10.12.4
+        **pnpm Version:** 8.15.0
 
   - type: textarea
     id: logs
     attributes:
-      label: 📋 Error Logs
+      label: Error Logs
       description: Any error messages, console logs, or stack traces
       placeholder: |
         ```
@@ -146,7 +146,7 @@ body:
   - type: textarea
     id: screenshots
     attributes:
-      label: 📸 Screenshots/Videos
+      label: Screenshots/Videos
       description: Visual evidence of the bug (if applicable)
       placeholder: |
         - Screenshot of the error message
@@ -156,7 +156,7 @@ body:
   - type: textarea
     id: civic-impact
     attributes:
-      label: 🏛️ Civic Impact
+      label: Civic Impact
       description: How does this bug affect civic operations or public trust?
       placeholder: |
         - Does this affect public record transparency?
@@ -167,7 +167,7 @@ body:
   - type: textarea
     id: additional
     attributes:
-      label: 📋 Additional Context
+      label: Additional Context
       description: Any other relevant information
       placeholder: |
         - When did this start happening?
@@ -179,7 +179,7 @@ body:
   - type: checkboxes
     id: checklist
     attributes:
-      label: ✅ Bug Report Checklist
+      label: Bug Report Checklist
       description: Please confirm you've completed these steps
       options:
         - label: I've searched existing issues to avoid duplicates
@@ -194,7 +194,7 @@ body:
       value: |
         ---
 
-        **Thank you for helping make CivicPress more reliable and trustworthy!** 🛠️🏛️
+        **Thank you for helping make CivicPress more reliable and trustworthy!**
 
         Our team will investigate this issue and respond within 1-2 weeks.
         For critical issues affecting public trust or civic operations, please tag maintainers immediately.

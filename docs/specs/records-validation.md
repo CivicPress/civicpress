@@ -1,4 +1,4 @@
-# ✅ CivicPress Spec: `records-validation.md`
+# CivicPress Spec: `records-validation.md`
 
 ---
 
@@ -8,19 +8,19 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive validation documentation
 - integrity patterns
 - security considerations fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'public-data-structure.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'public-data-structure.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `records-validation` — Civic Record Validation Rules (`civic lint`)
 
-## 🎯 Purpose
+## Purpose
 
 Define the validation rules and CLI tools used to ensure all civic records are
 structurally valid, properly formatted, and compliant with CivicPress standards
@@ -28,9 +28,9 @@ before they can be published or approved.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Validate frontmatter structure and required fields
 - Check file naming conventions and directory paths
@@ -38,80 +38,80 @@ before they can be published or approved.
 - Detect missing metadata or unapproved records
 - Help catch errors early in the civic process
 
-❌ Out of scope:
+Out of scope:
 
 - Content moderation or sentiment checking
 - Full spellchecking or grammar enforcement
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                 | Description                                |
+| Input | Description |
 | --------------------- | ------------------------------------------ |
-| Civic records         | Markdown files to be validated             |
-| Validation rules      | Configuration from `.civic/validation.yml` |
-| Role definitions      | User roles from `.civic/roles.yml`         |
-| File system structure | Directory organization and naming          |
-| Validation schemas    | Frontmatter and metadata schemas           |
+| Civic records | Markdown files to be validated |
+| Validation rules | Configuration from `.civic/validation.yml` |
+| Role definitions | User roles from `.civic/roles.yml` |
+| File system structure | Directory organization and naming |
+| Validation schemas | Frontmatter and metadata schemas |
 
-| Output             | Description                           |
+| Output | Description |
 | ------------------ | ------------------------------------- |
-| Validation results | Pass/fail status for each record      |
-| Error reports      | Detailed error messages and locations |
-| Validation logs    | Audit trail of validation operations  |
-| Compliance reports | Summary of validation compliance      |
-| Fix suggestions    | Automated suggestions for fixes       |
+| Validation results | Pass/fail status for each record |
+| Error reports | Detailed error messages and locations |
+| Validation logs | Audit trail of validation operations |
+| Compliance reports | Summary of validation compliance |
+| Fix suggestions | Automated suggestions for fixes |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 core/
-├── validation.ts          # Main validation logic
-├── record-validator.ts    # Record-specific validation
+├── validation.ts # Main validation logic
+├── record-validator.ts # Record-specific validation
 ├── frontmatter-validator.ts # Frontmatter validation
-└── schema-validator.ts    # Schema validation utilities
+└── schema-validator.ts # Schema validation utilities
 
 modules/
 ├── validation/
-│   ├── components/
-│   │   ├── ValidationReport.tsx # Validation report display
-│   │   ├── ValidationErrors.tsx # Error display component
-│   │   └── ValidationSettings.tsx # Validation configuration UI
-│   ├── hooks/
-│   │   └── useValidation.ts     # Validation data hook
-│   └── utils/
-│       ├── validation-rules.ts  # Validation rule definitions
-│       └── error-formatter.ts   # Error message formatting
+│ ├── components/
+│ │ ├── ValidationReport.tsx # Validation report display
+│ │ ├── ValidationErrors.tsx # Error display component
+│ │ └── ValidationSettings.tsx # Validation configuration UI
+│ ├── hooks/
+│ │ └── useValidation.ts # Validation data hook
+│ └── utils/
+│ ├── validation-rules.ts # Validation rule definitions
+│ └── error-formatter.ts # Error message formatting
 └── ui/
-    └── components/
-        └── ValidationProvider.tsx # Validation context provider
+ └── components/
+ └── ValidationProvider.tsx # Validation context provider
 
 .civic/
-├── validation.yml         # Validation configuration
-├── validation-schemas/    # Custom validation schemas
-│   ├── bylaw-schema.yml
-│   ├── motion-schema.yml
-│   └── resolution-schema.yml
-└── validation-rules/      # Custom validation rules
-    ├── naming-rules.yml
-    ├── frontmatter-rules.yml
-    └── content-rules.yml
+├── validation.yml # Validation configuration
+├── validation-schemas/ # Custom validation schemas
+│ ├── bylaw-schema.yml
+│ ├── motion-schema.yml
+│ └── resolution-schema.yml
+└── validation-rules/ # Custom validation rules
+ ├── naming-rules.yml
+ ├── frontmatter-rules.yml
+ └── content-rules.yml
 
 tests/
 ├── validation/
-│   ├── record-validation.test.ts
-│   ├── frontmatter-validation.test.ts
-│   └── schema-validation.test.ts
+│ ├── record-validation.test.ts
+│ ├── frontmatter-validation.test.ts
+│ └── schema-validation.test.ts
 └── integration/
-    └── validation-integration.test.ts
+ └── validation-integration.test.ts
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Validation Security
 
@@ -163,30 +163,30 @@ tests/
 
 ---
 
-## 🧪 What Gets Validated
+## What Gets Validated
 
-### 🔖 Frontmatter Checks
+### Frontmatter Checks
 
 - Required fields: `title`, `status`, `module`
 - Optional fields: `tags`, `authors`, `source`, `approved_by`
 - Valid `status` values: `draft`, `proposed`, `approved`, `adopted`, `archived`
 - Valid `module` name must match declared modules in `manifest.yml`
 
-### 📁 File Checks
+### File Checks
 
 - File must reside in correct folder (`timeline/YYYY-MM-DD/`, `bylaws/`, etc.)
 - File must have `.md` extension
 - No duplicate slugs (based on filename or `slug:` field)
 - Must not be empty
 
-### 👥 Authorship & Roles
+### Authorship & Roles
 
 - All `authors:` entries must match `.civic/roles.yml`
 - If `approved_by:` is present, each name must map to a `council-member`,
-  `mayor`, or `admin`
+ `mayor`, or `admin`
 - If publishing, ensure minimum quorum (from `git-policy.md`)
 
-### 🧠 Metadata Checks
+### Metadata Checks
 
 - Dates (`issued:`, `created:`, etc.) must be valid ISO dates
 - `tags:` must be array of lowercase strings
@@ -194,7 +194,7 @@ tests/
 
 ---
 
-## 🔧 Usage
+## Usage
 
 Run manually:
 
@@ -210,7 +210,7 @@ civic lint records/timeline/2025-07-03/bylaw-quiet-hours.md
 
 ---
 
-## 🧰 CLI Integrations
+## CLI Integrations
 
 - `civic propose` auto-validates file before opening PR
 - `civic approve` checks role match and record readiness
@@ -218,17 +218,17 @@ civic lint records/timeline/2025-07-03/bylaw-quiet-hours.md
 
 ---
 
-## 🔍 Output Format
+## Output Format
 
 Errors are shown with file, line, and reason:
 
 ```
-✖ records/timeline/2025-07-03/bylaw-quiet-hours.md
-  - Missing required field: title
-  - Author "Emmy Noether" not found in roles.yml
+records/timeline/2025-07-03/bylaw-quiet-hours.md
+ - Missing required field: title
+ - Author "Emmy Noether" not found in roles.yml
 ```
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test validation with valid and invalid records
 - Verify all required fields are checked
@@ -238,19 +238,19 @@ Errors are shown with file, line, and reason:
 
 ---
 
-## 🐞 Known Issues
+## Known Issues
 
 - **CLI re-serialization bug**: `civic validate <record>` currently rebuilds the
-  markdown via `RecordParser.serializeToMarkdown()` before running schema
-  checks. When validating files outside `data/records/`, this conversion turns
-  ISO 8601 strings into `Date` objects, so Ajv reports type errors for `date`,
-  `created`, `updated`, and `source.imported_at`. Copy the file into
-  `data/records/` or call `RecordSchemaValidator.validate()` directly until the
-  CLI helper is patched.
+ markdown via `RecordParser.serializeToMarkdown()` before running schema
+ checks. When validating files outside `data/records/`, this conversion turns
+ ISO 8601 strings into `Date` objects, so Ajv reports type errors for `date`,
+ `created`, `updated`, and `source.imported_at`. Copy the file into
+ `data/records/` or call `RecordSchemaValidator.validate()` directly until the
+ CLI helper is patched.
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Support `.civic/validation.yml` to customize required fields
 - Add spellchecking for `title`, `summary`, `content`
@@ -259,6 +259,6 @@ Errors are shown with file, line, and reason:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03

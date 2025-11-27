@@ -1,19 +1,19 @@
-# 🔗 CivicPress Linked Records System
+# CivicPress Linked Records System
 
 **Version**: 1.0.0  
-**Status**: ✅ Production Ready  
+**Status**: Production Ready  
 **Last Updated**: September 2025
 
-## 📋 Overview
+## Overview
 
 The CivicPress Linked Records System allows users to create relationships
 between civic records, enabling powerful document linking and reference
 management. This system supports various relationship types and provides an
 intuitive interface for managing record connections.
 
-## 🎯 Key Features
+## Key Features
 
-### ✅ **Complete Implementation**
+### Complete Implementation
 
 - **Record Integration**: Link any record to any other record type
 - **Relationship Categorization**: Organize links by relationship type (related,
@@ -25,7 +25,7 @@ intuitive interface for managing record connections.
   frontmatter
 - **TypeScript Support**: Full type safety for linked record data structures
 
-### 🔧 **Technical Architecture**
+### Technical Architecture
 
 - **Database Schema**: New `linked_records` JSON column with automatic migration
 - **API Endpoints**: REST endpoints with validation for linked record operations
@@ -33,7 +33,7 @@ intuitive interface for managing record connections.
 - **Configuration**: link-categories.yml for customizable relationship types
 - **Authentication**: Secure record access with JWT token validation
 
-## 🏗️ Architecture
+## Architecture
 
 ### Database Schema
 
@@ -160,7 +160,7 @@ categories:
     value: 'other'
 ```
 
-## 🎨 UI Components
+## UI Components
 
 ### RecordLinkSelector
 
@@ -201,7 +201,7 @@ A component for displaying and managing linked records:
 - Remove links functionality
 - Responsive design
 
-## 🔧 Implementation Details
+## Implementation Details
 
 ### TypeScript Interfaces
 
@@ -275,7 +275,7 @@ linkedRecords: [{"id":"record-1757087424779","type":"bylaw","description":"Relat
 ---
 ```
 
-## 🚀 Usage Examples
+## Usage Examples
 
 ### Adding Linked Records via API
 
@@ -320,7 +320,7 @@ curl -X PUT 'http://localhost:3000/api/v1/records/record-456' \
   }'
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Test Coverage
 
@@ -337,21 +337,21 @@ curl -X PUT 'http://localhost:3000/api/v1/records/record-456' \
 4. **Category Loading**: Verify dynamic category loading from API
 5. **Data Persistence**: Confirm links are saved to database and markdown
 
-## 🔒 Security Considerations
+## Security Considerations
 
 - **Authentication**: All linked record operations require valid JWT tokens
 - **Authorization**: Users can only link records they have access to
 - **Validation**: Input validation prevents malicious data injection
 - **Audit Trail**: All linked record changes are logged for compliance
 
-## 📈 Performance
+## Performance
 
 - **Database**: JSON column provides fast querying and updates
 - **API**: Efficient serialization/deserialization of linked records
 - **UI**: Lazy loading and pagination for large record lists
 - **Caching**: Category data cached for improved performance
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
 ### Planned Features
 

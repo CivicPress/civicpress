@@ -55,8 +55,23 @@ Always respond in this order:
 
 ## Common Project Guardrails
 
+- **⚠️ CRITICAL**: Never use `console.log()`, `console.error()`,
+  `console.warn()`, or direct console output. Always use centralized output
+  functions:
+  - CLI: `cliSuccess()`, `cliError()`, `cliInfo()`, `cliWarn()`, `cliDebug()`
+    from `cli/src/utils/cli-output.ts`
+  - Core: `coreSuccess()`, `coreError()`, `coreInfo()`, `coreWarn()`,
+    `coreDebug()` from `core/src/utils/core-output.ts`
+  - API: `sendSuccess()`, `handleApiError()`, `handleValidationError()`,
+    `logApiRequest()` from `modules/api/src/utils/api-logger.ts`
+- Never manually handle JSON output (`if (options.json) { ... }`); centralized
+  functions handle `--json` automatically.
+- Never manually handle silent mode; centralized functions respect `--silent`
+  automatically.
+- Always include operation context in output calls.
+- See `docs/centralized-output-patterns.md` for complete patterns.
 - Do not patch `dist/` outputs post‑build; fix source instead.
-- API/UI use hot reload; don’t instruct manual restarts during dev.
+- API/UI use hot reload; don't instruct manual restarts during dev.
 - CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and
   `--silent` (tests rely on this).
 - Tests: use shared setup/fixtures; never touch the real

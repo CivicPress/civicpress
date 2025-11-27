@@ -2,7 +2,7 @@
 
 The web interface for CivicPress, built with Nuxt 4 and Nuxt UI.
 
-## 🏗️ Architecture
+## Architecture
 
 ### Technology Stack
 
@@ -31,7 +31,7 @@ modules/ui/
 - **Theme Engine:** Configurable theming system
 - **Replaceable Components:** Modular component architecture
 
-## 🚀 Development
+## Development
 
 ### Setup
 
@@ -53,7 +53,7 @@ npm run dev
 - **User/Password:** Simulated authentication
 - **JWT Tokens:** Both methods return valid tokens
 
-## 🎯 Features
+## Features
 
 ### User Journey
 
@@ -73,7 +73,7 @@ Home → Login → Sign Up → Record List → Single Record → Search → User
 - **No mock data** or development mode
 - **Direct API calls** to CivicPress backend
 
-## 🔧 Plugin System
+## Plugin System
 
 ### Hook Points
 
@@ -89,7 +89,7 @@ Home → Login → Sign Up → Record List → Single Record → Search → User
 - **Authentication:** Pluggable auth providers
 - **API Clients:** Extensible API integration
 
-## 📝 Development Status
+## Development Status
 
 - [ ] Module initialization
 - [ ] Authentication system

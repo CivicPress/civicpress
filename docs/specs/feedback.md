@@ -1,4 +1,4 @@
-# 💬 CivicPress Spec: `feedback.md`
+# CivicPress Spec: `feedback.md`
 
 ---
 
@@ -8,37 +8,37 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive feedback documentation
 - feedback workflows
 - security considerations fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'ui.md: >=1.0.0'
-  - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'ui.md: >=1.0.0'
+ - 'auth.md: >=1.0.0'
+ - 'permissions.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `feedback` — CivicPress Feedback Module (Civic Input, Comments, and Concerns)
 
-## 🎯 Purpose
+## Purpose
 
 Enable citizens and contributors to submit feedback, concerns, suggestions, or
 reactions on civic matters — in a Git-native, traceable, and auditable way.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Accept and store feedback as Markdown records
 - Enable review, triage, tagging, and linking to other records
 - Provide workflow triggers for new or reviewed feedback
 - Facilitate resolution status and transparency
 
-❌ Out of scope:
+Out of scope:
 
 - Authentication or identity verification (see `auth.md`)
 - Real-time chat or discussion threads
@@ -46,77 +46,77 @@ reactions on civic matters — in a Git-native, traceable, and auditable way.
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input               | Description                                          |
+| Input | Description |
 | ------------------- | ---------------------------------------------------- |
-| User feedback       | Text submissions from citizens and contributors      |
-| Feedback metadata   | Title, tags, related records, submitter info         |
-| Review actions      | Status changes, comments, and resolutions            |
-| Authentication data | User identity and role permissions                   |
-| Related records     | Links to bylaws, resolutions, or other civic records |
+| User feedback | Text submissions from citizens and contributors |
+| Feedback metadata | Title, tags, related records, submitter info |
+| Review actions | Status changes, comments, and resolutions |
+| Authentication data | User identity and role permissions |
+| Related records | Links to bylaws, resolutions, or other civic records |
 
-| Output                | Description                                 |
+| Output | Description |
 | --------------------- | ------------------------------------------- |
-| Feedback records      | Markdown files in `records/feedback/`       |
-| Feedback index        | Searchable index of all feedback items      |
+| Feedback records | Markdown files in `records/feedback/` |
+| Feedback index | Searchable index of all feedback items |
 | Notification triggers | Workflow events for new or updated feedback |
-| Audit logs            | History of feedback submissions and reviews |
-| Status updates        | Feedback lifecycle state changes            |
+| Audit logs | History of feedback submissions and reviews |
+| Status updates | Feedback lifecycle state changes |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 records/
 └── feedback/
-    ├── 2025-07-03/
-    │   ├── noise-complaint.md
-    │   └── bike-lane-suggestion.md
-    ├── 2025-07-04/
-    │   └── park-maintenance.md
-    └── index.yml
+ ├── 2025-07-03/
+ │ ├── noise-complaint.md
+ │ └── bike-lane-suggestion.md
+ ├── 2025-07-04/
+ │ └── park-maintenance.md
+ └── index.yml
 
 .civic/
-├── feedback.yml           # Feedback configuration
+├── feedback.yml # Feedback configuration
 └── feedback-templates/
-    ├── complaint.md
-    ├── suggestion.md
-    └── question.md
+ ├── complaint.md
+ ├── suggestion.md
+ └── question.md
 
 core/
-├── feedback.ts            # Feedback processing logic
+├── feedback.ts # Feedback processing logic
 ├── feedback-validation.ts # Feedback validation rules
-└── feedback-workflow.ts   # Feedback workflow automation
+└── feedback-workflow.ts # Feedback workflow automation
 
 modules/
 ├── feedback/
-│   ├── components/
-│   │   ├── FeedbackForm.tsx
-│   │   ├── FeedbackList.tsx
-│   │   └── FeedbackDetail.tsx
-│   ├── hooks/
-│   │   └── useFeedback.ts
-│   └── utils/
-│       ├── feedback-parser.ts
-│       └── feedback-indexer.ts
+│ ├── components/
+│ │ ├── FeedbackForm.tsx
+│ │ ├── FeedbackList.tsx
+│ │ └── FeedbackDetail.tsx
+│ ├── hooks/
+│ │ └── useFeedback.ts
+│ └── utils/
+│ ├── feedback-parser.ts
+│ └── feedback-indexer.ts
 └── ui/
-    └── components/
-        └── FeedbackProvider.tsx
+ └── components/
+ └── FeedbackProvider.tsx
 
 tests/
 ├── feedback/
-│   ├── feedback-submission.test.ts
-│   ├── feedback-review.test.ts
-│   └── feedback-workflow.test.ts
+│ ├── feedback-submission.test.ts
+│ ├── feedback-review.test.ts
+│ └── feedback-workflow.test.ts
 └── integration/
-    └── feedback-integration.test.ts
+ └── feedback-integration.test.ts
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Feedback Submission Security
 
@@ -160,20 +160,20 @@ tests/
 
 ---
 
-## 📁 File Structure
+## File Structure
 
 ```
 records/
 └── feedback/
-    ├── 2025-07-03/
-    │   └── noise-complaint.md
-    ├── 2025-07-04/
-    │   └── bike-lane-suggestion.md
+ ├── 2025-07-03/
+ │ └── noise-complaint.md
+ ├── 2025-07-04/
+ │ └── bike-lane-suggestion.md
 ```
 
 ---
 
-## 🧠 Record Format
+## Record Format
 
 Each feedback file is a standalone civic record.
 
@@ -184,7 +184,7 @@ status: 'submitted'
 submitted_by: 'anonymous'
 tags: ['noise', 'events']
 related_to:
-  - 'bylaw-quiet-hours.md'
+ - 'bylaw-quiet-hours.md'
 created: '2025-07-03'
 module: 'feedback'
 ---
@@ -193,19 +193,19 @@ Park events are playing music past 11pm. Please enforce a curfew.
 
 ---
 
-## 🔁 Feedback Lifecycle
+## Feedback Lifecycle
 
-| Status      | Description                               |
+| Status | Description |
 | ----------- | ----------------------------------------- |
-| `submitted` | Submitted by citizen or contributor       |
-| `in-review` | Triage started by clerk                   |
-| `addressed` | Included in motion, record, or fix        |
-| `rejected`  | Considered invalid, abusive, or off-topic |
-| `archived`  | Stored but no action taken                |
+| `submitted` | Submitted by citizen or contributor |
+| `in-review` | Triage started by clerk |
+| `addressed` | Included in motion, record, or fix |
+| `rejected` | Considered invalid, abusive, or off-topic |
+| `archived` | Stored but no action taken |
 
 ---
 
-## 🛠️ CLI Commands
+## ️ CLI Commands
 
 ```bash
 civic feedback submit --title "..." --body "..." --tags noise,safety
@@ -215,7 +215,7 @@ civic feedback resolve noise-complaint.md --status addressed
 
 ---
 
-## 🔔 Hook Triggers
+## Hook Triggers
 
 - `onFeedbackSubmit` → notify team, tag dashboard
 - `onFeedbackReview` → notify related record authors
@@ -223,7 +223,7 @@ civic feedback resolve noise-complaint.md --status addressed
 
 ---
 
-## 🔐 Trust & Moderation
+## Trust & Moderation
 
 - All feedback is Git-tracked
 - Status determines visibility (public by default, filterable by role)
@@ -232,21 +232,21 @@ civic feedback resolve noise-complaint.md --status addressed
 
 ---
 
-## 📊 Index Example
+## Index Example
 
 `records/feedback/index.yml`:
 
 ```yaml
 - file: '2025-07-03/noise-complaint.md'
-  status: submitted
-  tags: ['noise']
-  related_to: ['bylaw-quiet-hours.md']
-  submitted_by: 'anonymous'
+ status: submitted
+ tags: ['noise']
+ related_to: ['bylaw-quiet-hours.md']
+ submitted_by: 'anonymous'
 ```
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test feedback submission flow
 - Verify status transitions work correctly
@@ -256,7 +256,7 @@ civic feedback resolve noise-complaint.md --status addressed
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Sentiment scoring
 - Upvotes / signal amplification
@@ -266,6 +266,6 @@ civic feedback resolve noise-complaint.md --status addressed
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03

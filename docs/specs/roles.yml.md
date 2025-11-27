@@ -1,4 +1,4 @@
-# 🧑‍💼 CivicPress Spec: `roles.yml.md`
+# ‍ CivicPress Spec: `roles.yml.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive roles documentation
 - YAML schema
 - security considerations fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'permissions.md: >=1.0.0'
-  - 'auth.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'permissions.md: >=1.0.0'
+ - 'auth.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `.civic/roles.yml` — CivicPress Role Assignments
 
-## 🎯 Purpose
+## Purpose
 
 Define the format, structure, and usage of `.civic/roles.yml`, which maps Git
 users to civic roles and metadata. This file powers permissions across CLI,
@@ -29,83 +29,83 @@ workflows, approvals, and visual editors.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Map Git usernames to defined roles
 - Enable CLI and editors to validate permissions
 - Expose human-readable civic role info
 - Optionally include metadata (title, email, etc.)
 
-❌ Out of scope:
+Out of scope:
 
 - Authentication or login management (see future `auth.md`)
 - Dynamic role assignment or delegation (future extension)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                    | Description                         |
+| Input | Description |
 | ------------------------ | ----------------------------------- |
-| Git usernames            | Commit authors and user identifiers |
-| Role definitions         | Role types from `permissions.md`    |
-| User metadata            | Names, emails, departments, titles  |
-| Role assignments         | User-to-role mappings and changes   |
-| Role validation requests | Permission checks and role lookups  |
+| Git usernames | Commit authors and user identifiers |
+| Role definitions | Role types from `permissions.md` |
+| User metadata | Names, emails, departments, titles |
+| Role assignments | User-to-role mappings and changes |
+| Role validation requests | Permission checks and role lookups |
 
-| Output                  | Description                           |
+| Output | Description |
 | ----------------------- | ------------------------------------- |
-| Role mappings           | Validated user-to-role assignments    |
-| Permission decisions    | Allow/deny responses based on roles   |
-| Role validation results | Role verification and status checks   |
-| User metadata           | Display names and contact information |
-| Audit logs              | Role assignment and change history    |
+| Role mappings | Validated user-to-role assignments |
+| Permission decisions | Allow/deny responses based on roles |
+| Role validation results | Role verification and status checks |
+| User metadata | Display names and contact information |
+| Audit logs | Role assignment and change history |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/
-├── roles.yml              # User role assignments
-├── role-metadata.yml      # Extended user metadata
-└── role-history.yml       # Role change history
+├── roles.yml # User role assignments
+├── role-metadata.yml # Extended user metadata
+└── role-history.yml # Role change history
 
 core/
-├── roles.ts               # Role management logic
-├── role-validator.ts      # Role validation utilities
-├── role-resolver.ts       # Role lookup and resolution
-└── role-audit.ts          # Role audit logging
+├── roles.ts # Role management logic
+├── role-validator.ts # Role validation utilities
+├── role-resolver.ts # Role lookup and resolution
+└── role-audit.ts # Role audit logging
 
 modules/
 ├── roles/
-│   ├── components/
-│   │   ├── RoleManager.tsx # Role management UI
-│   │   ├── RoleViewer.tsx # Role display component
-│   │   └── RoleAssigner.tsx # Role assignment interface
-│   ├── hooks/
-│   │   └── useRoles.ts     # Role data hook
-│   └── utils/
-│       ├── role-parser.ts  # Role file parsing
-│       └── role-validator.ts # Role validation utilities
+│ ├── components/
+│ │ ├── RoleManager.tsx # Role management UI
+│ │ ├── RoleViewer.tsx # Role display component
+│ │ └── RoleAssigner.tsx # Role assignment interface
+│ ├── hooks/
+│ │ └── useRoles.ts # Role data hook
+│ └── utils/
+│ ├── role-parser.ts # Role file parsing
+│ └── role-validator.ts # Role validation utilities
 └── ui/
-    └── components/
-        └── RoleProvider.tsx # Role context provider
+ └── components/
+ └── RoleProvider.tsx # Role context provider
 
 tests/
 ├── roles/
-│   ├── role-validation.test.ts
-│   ├── role-assignment.test.ts
-│   └── role-resolution.test.ts
+│ ├── role-validation.test.ts
+│ ├── role-assignment.test.ts
+│ └── role-resolution.test.ts
 └── integration/
-    └── roles-integration.test.ts
+ └── roles-integration.test.ts
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Role Assignment Security
 
@@ -157,31 +157,31 @@ tests/
 
 ---
 
-## 📄 Example `.civic/roles.yml`
+## Example `.civic/roles.yml`
 
 ```yaml
 users:
-  clerk-richmond:
-    role: clerk
-    name: 'Ada Lovelace'
-    email: 'ada@richmond.ca'
+ clerk-richmond:
+ role: clerk
+ name: 'Ada Lovelace'
+ email: 'ada@richmond.ca'
 
-  council-marie:
-    role: council-member
-    name: 'Marie Curie'
+ council-marie:
+ role: council-member
+ name: 'Marie Curie'
 
-  mayor-luc:
-    role: mayor
-    name: 'Luc Lapointe'
+ mayor-luc:
+ role: mayor
+ name: 'Luc Lapointe'
 
-  auditor-hugo:
-    role: auditor
-    name: 'Hugo Gagarine'
+ auditor-hugo:
+ role: auditor
+ name: 'Hugo Gagarine'
 ```
 
 ---
 
-## 📚 Usage
+## Usage
 
 - Validates commit authors (`git log`) in `civic lint`
 - Powers dropdowns in visual editors (assign author/approver)
@@ -190,16 +190,16 @@ users:
 
 ---
 
-## 🧠 Schema
+## Schema
 
 ```yaml
 users:
-  <git-username>:
-    role: <role>
-    name: <display name>
-    email: <optional>
-    department: <optional>
-    title: <optional>
+ <git-username>:
+ role: <role>
+ name: <display name>
+ email: <optional>
+ department: <optional>
+ title: <optional>
 ```
 
 - `role`: must match defined civic role in `permissions.md`
@@ -208,14 +208,14 @@ users:
 
 ---
 
-## 🧪 Validation
+## Validation
 
 - Check for duplicate roles
 - Validate usernames are lowercase, no spaces
 - Ensure all `authors:` in civic records match a known user
 - Use `civic lint:roles` for checks
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test role validation with valid and invalid users
 - Verify duplicate role detection works correctly
@@ -225,7 +225,7 @@ users:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Group membership or committees (e.g., finance-committee)
 - Delegation tokens (temporary approval rights)
@@ -233,6 +233,6 @@ users:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03

@@ -1,4 +1,4 @@
-# 🗳️ CivicPress Spec: `votes.md`
+# ️ CivicPress Spec: `votes.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive voting documentation
 - vote integrity
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0' authors:
+ 'null' dependencies:
+ - 'auth.md: >=1.2.0'
+ - 'permissions.md: >=1.1.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Record Voting System
 
-## 🎯 Purpose
+## Purpose
 
 Allow councils, boards, and authorized users to **vote on civic records** such
 as bylaws, proposals, or appointments — capturing democratic decision-making in
@@ -32,9 +32,9 @@ as a historical record of deliberation.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Enable structured voting on records
 - Track individual votes with metadata (who, how, when)
@@ -42,7 +42,7 @@ as a historical record of deliberation.
 - Update record `status:` if vote passes
 - Display vote results in UI and API
 
-❌ Out of Scope:
+Out of Scope:
 
 - Secret or anonymous voting
 - Token-based or financial voting
@@ -50,37 +50,37 @@ as a historical record of deliberation.
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Action                        | Result                           |
+| Action | Result |
 | ----------------------------- | -------------------------------- |
-| `civic vote --yes bylaw.md`   | Records user's vote as "yes"     |
-| GitHub PR comment: `vote: no` | Interpreted as structured vote   |
-| Vote log file update          | Triggers possible status change  |
-| `civic tally`                 | Displays or updates vote outcome |
+| `civic vote --yes bylaw.md` | Records user's vote as "yes" |
+| GitHub PR comment: `vote: no` | Interpreted as structured vote |
+| Vote log file update | Triggers possible status change |
+| `civic tally` | Displays or updates vote outcome |
 
 ---
 
-## 📝 Vote Log Format
+## Vote Log Format
 
 Stored in: `.civic/votes/bylaw-2025-18.json`
 
 ```json
 {
-  "record": "records/bylaws/2025-18-fireworks-ban.md",
-  "outcome": "adopted",
-  "threshold": "majority",
-  "votes": [
-    { "name": "Ada Lovelace", "vote": "yes", "date": "2025-07-03" },
-    { "name": "Irène Joliot-Curie", "vote": "yes" },
-    { "name": "Alan Turing", "vote": "no" }
-  ]
+ "record": "records/bylaws/2025-18-fireworks-ban.md",
+ "outcome": "adopted",
+ "threshold": "majority",
+ "votes": [
+ { "name": "Ada Lovelace", "vote": "yes", "date": "2025-07-03" },
+ { "name": "Irène Joliot-Curie", "vote": "yes" },
+ { "name": "Alan Turing", "vote": "no" }
+ ]
 }
 ```
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/votes/
@@ -89,7 +89,7 @@ records/bylaws/*.md
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Only authorized roles may cast votes
 - Vote logs are immutable once finalized
@@ -98,7 +98,7 @@ records/bylaws/*.md
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Simulate vote casting and outcome tally
 - Check that invalid voters are rejected
@@ -107,7 +107,7 @@ records/bylaws/*.md
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Abstain and conflict-of-interest options
 - Custom vote thresholds (⅔, unanimous, quorum logic)
@@ -115,17 +115,17 @@ records/bylaws/*.md
 - Vote delegation and proxy features
 - Verifiable civic vote receipts
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`signatures.md`](./signatures.md) — Vote authentication and digital
-  signatures
+ signatures
 - [`permissions.md`](./permissions.md) — Vote authorization and role
-  requirements
+ requirements
 - [`workflows.md`](./workflows.md) — Automated vote processing and status
-  updates
+ updates
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

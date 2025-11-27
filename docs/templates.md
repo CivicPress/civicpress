@@ -1,9 +1,9 @@
-# 🎨 Advanced Template System
+# Advanced Template System
 
 CivicPress features a sophisticated template system that supports inheritance,
 validation, and dynamic content generation.
 
-## 📋 Overview
+## Overview
 
 Templates in CivicPress are Markdown files with YAML frontmatter that define:
 
@@ -12,7 +12,7 @@ Templates in CivicPress are Markdown files with YAML frontmatter that define:
 - **Inheritance** - Template extension and customization
 - **Variables** - Dynamic content substitution
 
-## 🏗️ Template Structure
+## Template Structure
 
 ### Basic Template
 
@@ -91,7 +91,7 @@ validation:
 {{enforcement}}
 ```
 
-## 🔄 Template Inheritance
+## Template Inheritance
 
 Templates can inherit from parent templates, allowing for:
 
@@ -152,7 +152,7 @@ validation:
 3. **Content Override** - Child content replaces parent content
 4. **Validation Inheritance** - All validation rules are inherited
 
-## ✅ Advanced Validation
+## Advanced Validation
 
 ### Validation Types
 
@@ -245,7 +245,7 @@ validation:
 | `semantic_version` | Semantic versioning        | `1.2.3`                |
 | `required_if`      | Conditional required field | `status == 'approved'` |
 
-## 🎯 Template Commands
+## Template Commands
 
 ### List Templates
 
@@ -287,7 +287,7 @@ civic template --validate bylaw/advanced
 civic template --validate bylaw/advanced --json
 ```
 
-## 📝 Template Variables
+## Template Variables
 
 ### Basic Variables
 
@@ -330,7 +330,7 @@ updated: "Last update timestamp"
 {{provisions}}
 ```
 
-## 🎨 Template Examples
+## Template Examples
 
 ### Policy Template
 
@@ -394,7 +394,7 @@ validation:
 {{implementation}}
 ```
 
-## 🔧 Template Development
+## Template Development
 
 ### Best Practices
 
@@ -436,7 +436,7 @@ civic template --show bylaw/advanced
 civic create bylaw "Test Bylaw" --template advanced
 ```
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Validation System Guide](validation.md)
 - [CLI Usage Guide](cli.md)

@@ -15,6 +15,9 @@ The assistant must **always** follow these instructions when generating code.
 - ALWAYS return complete code + Vitest tests + a doc stub.
 - Follow conventions from `conventions.md` (Nuxt 4 + TS, Prettier, ESLint,
   WCAG/i18n).
+- **⚠️ CRITICAL**: Never use `console.log()`, `console.error()`, or direct
+  console output. Always use centralized output functions (cliSuccess,
+  coreError, sendSuccess, etc.). See `docs/centralized-output-patterns.md`.
 - Pages MUST include proper accessibility landmarks.
 - No hard-coded UI strings; all text must be i18n-ready one the feature is
   implemented.
@@ -49,6 +52,9 @@ Always respond in the following order:
 
 - ✅ Files follow naming + folder rules from `conventions.md`.
 - ✅ Code is lint/format compliant by construction.
+- ✅ **No console.log/error/warn** - all output uses centralized functions.
+- ✅ **No manual JSON handling** - centralized functions handle `--json`
+  automatically.
 - ✅ Tests compile and cover at least one happy + one edge case.
 - ✅ No duplicate IDs/names against registries.
 - ✅ Doc stub is clear and civic-friendly.

@@ -1,4 +1,4 @@
-# 🛡️ CivicPress Spec: `moderation.md`
+# ️ CivicPress Spec: `moderation.md`
 
 ---
 
@@ -8,32 +8,32 @@ deprecated: false sunset_date: null additions:
 - comprehensive moderation documentation
 - content integrity
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'auth.md: >=1.2.0'
-  - 'permissions.md: >=1.1.0'
-  - 'users.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'auth.md: >=1.2.0'
+ - 'permissions.md: >=1.1.0'
+ - 'users.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Moderation System
 
-## 🎯 Purpose
+## Purpose
 
 Enable CivicPress instances to review, flag, and moderate user-submitted content
-such as public feedback, proposals, and comments.  
+such as public feedback, proposals, and comments. 
 Protects civic workflows from spam, abuse, or bad actors — while preserving
 transparency and accountability.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Allow content to be flagged (spam, off-topic, offensive, etc.)
 - Log moderation actions (who, what, when, why)
@@ -41,51 +41,51 @@ transparency and accountability.
 - Enforce soft actions (hide, redact, anonymize)
 - Notify moderators or maintainers when action is required
 
-❌ Out of Scope:
+Out of Scope:
 
 - Fully automated moderation (e.g. AI content filters)
 - Real-time chat moderation (no live forums in MVP)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                            | Result                            |
+| Input | Result |
 | -------------------------------- | --------------------------------- |
-| `/api/feedback/:id/flag`         | Flags item as problematic         |
-| CLI: `civic review flagged`      | Shows queue of flagged content    |
+| `/api/feedback/:id/flag` | Flags item as problematic |
+| CLI: `civic review flagged` | Shows queue of flagged content |
 | GitHub comment: `flag:offensive` | Interpreted as moderation trigger |
-| Maintainer removes/edits record  | Logged as moderation action       |
+| Maintainer removes/edits record | Logged as moderation action |
 
 ---
 
-## 📝 Example Moderation Log
+## Example Moderation Log
 
 Stored in: `.civic/moderation.log.jsonl`
 
 ```json
 {
-  "timestamp": "2025-07-04T14:23:00Z",
-  "action": "flagged",
-  "record": "records/feedback/noise-curfew-ada.md",
-  "flag": "off-topic",
-  "by": "u-anon-4391"
+ "timestamp": "2025-07-04T14:23:00Z",
+ "action": "flagged",
+ "record": "records/feedback/noise-curfew-ada.md",
+ "flag": "off-topic",
+ "by": "u-anon-4391"
 }
 ```
 
 ```json
 {
-  "timestamp": "2025-07-04T14:30:00Z",
-  "action": "redacted",
-  "record": "records/feedback/noise-curfew-ada.md",
-  "by": "u-irene-curie",
-  "reason": "Personal attack removed"
+ "timestamp": "2025-07-04T14:30:00Z",
+ "action": "redacted",
+ "record": "records/feedback/noise-curfew-ada.md",
+ "by": "u-irene-curie",
+ "reason": "Personal attack removed"
 }
 ```
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/moderation.log.jsonl
@@ -93,50 +93,50 @@ records/feedback/
 core/moderation.ts
 ```
 
-## 📝 Example Moderation Policy Configuration
+## Example Moderation Policy Configuration
 
 ```yaml
 # .civic/moderation.yml
 moderators:
-  - id: 'u-irene-curie'
-    name: 'Irène Joliot-Curie'
-    email: 'irene@richmond.ca'
-    roles: ['mayor', 'moderator']
-  - id: 'u-ada-lovelace'
-    name: 'Ada Lovelace'
-    email: 'ada@richmond.ca'
-    roles: ['clerk', 'moderator']
+ - id: 'u-irene-curie'
+ name: 'Irène Joliot-Curie'
+ email: 'irene@richmond.ca'
+ roles: ['mayor', 'moderator']
+ - id: 'u-ada-lovelace'
+ name: 'Ada Lovelace'
+ email: 'ada@richmond.ca'
+ roles: ['clerk', 'moderator']
 
 flag_types:
-  - spam
-  - off-topic
-  - offensive
-  - duplicate
-  - resolved
+ - spam
+ - off-topic
+ - offensive
+ - duplicate
+ - resolved
 
 thresholds:
-  auto_hide: 3 # Hide content after 3 flags
-  auto_review: 2 # Send to moderator after 2 flags
+ auto_hide: 3 # Hide content after 3 flags
+ auto_review: 2 # Send to moderator after 2 flags
 
 rate_limits:
-  flag_per_user_per_day: 10
-  review_per_moderator_per_day: 50
+ flag_per_user_per_day: 10
+ review_per_moderator_per_day: 50
 
 notifications:
-  on_flagged: true
-  on_resolved: true
-  notify_roles:
-    - 'moderator'
-    - 'clerk'
+ on_flagged: true
+ on_resolved: true
+ notify_roles:
+ - 'moderator'
+ - 'clerk'
 
 logging:
-  redact_personal_info: true
-  log_retention_days: 365
+ redact_personal_info: true
+ log_retention_days: 365
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Moderator Authentication & Authorization
 
@@ -182,7 +182,7 @@ logging:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Simulate spam or flagged content in feedback
 - Review and resolve via CLI or API
@@ -191,14 +191,14 @@ logging:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Reputation-based trust system for users
 - Machine learning content filters (optional plugin)
 - Community flag review queue
 - Moderator dashboards and notification digests
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`feedback.md`](./feedback.md) — User feedback and comment moderation
 - [`permissions.md`](./permissions.md) — Moderator roles and permissions
@@ -207,6 +207,6 @@ logging:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

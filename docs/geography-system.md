@@ -1,7 +1,7 @@
 # Geography Data Management System
 
-**Last Updated**: January 2025  
-**Status**: ✅ **Fully Implemented and Tested**
+**Last Updated**: January 2025 
+**Status**: **Fully Implemented and Tested**
 
 ## Overview
 
@@ -13,27 +13,27 @@ citizens, with interactive mapping capabilities and public transparency.
 
 ## Key Features
 
-### 🌍 **Centralized Geography Management**
+### **Centralized Geography Management**
 
 - **File Storage**: Geography files stored in `data/geography/` with organized
-  category structure
+ category structure
 - **Public Access**: Geography files accessible at `/geography/` for citizen
-  transparency
+ transparency
 - **Git Versioning**: Built-in version control through data/ folder for complete
-  audit trail
+ audit trail
 - **Role-Based Access**: Public view, admin edit, specialized permissions
 
-### 📝 **Text Box Input System**
+### **Text Box Input System**
 
 - **Content Pasting**: Paste GeoJSON/KML content directly into text area
 - **API Validation**: Real-time validation of content (JSON structure, geometry
-  validity)
+ validity)
 - **Metadata Extraction**: Automatic extraction of bounds, SRID, feature count
 - **File Generation**: Standardized filename generation based on name + category
 - **Live Preview**: Real-time map preview with Leaflet showing parsed data
 - **Error Feedback**: Real-time validation with detailed error messages
 
-### 🗺️ **Interactive Mapping**
+### **Interactive Mapping**
 
 - **Leaflet Integration**: Interactive maps throughout the system
 - **Feature Highlighting**: Visual display of geographic features
@@ -41,12 +41,12 @@ citizens, with interactive mapping capabilities and public transparency.
 - **Data Summary**: Feature count, bounds, SRID information panels
 - **Real-time Updates**: Map updates as content changes
 
-### 🔗 **Record Integration**
+### **Record Integration**
 
 - **Geography Linking**: Link geography files to civic records (similar to file
-  attachments)
+ attachments)
 - **Legacy Support**: Maintains backward compatibility with existing geography
-  fields
+ fields
 - **Dual System**: Both legacy coordinate fields and new geography file linking
 - **Seamless Migration**: Gradual transition from old to new system
 
@@ -56,30 +56,30 @@ citizens, with interactive mapping capabilities and public transparency.
 
 ```
 data/
-├── geography/                 # Geography files (git versioned)
-│   ├── geojson/              # GeoJSON files (.md with embedded GeoJSON)
-│   │   ├── zones/            # Zoning data
-│   │   ├── boundaries/       # Municipal boundaries
-│   │   ├── districts/        # Administrative districts
-│   │   └── facilities/       # Public facilities
-│   ├── kml/                  # KML files (.md with embedded KML)
-│   │   ├── municipal-boundaries/
-│   │   └── service-areas/
-│   ├── gpx/                  # GPX files (.md with embedded GPX)
-│   │   └── routes/
-│   └── shp/                  # Shapefile data (.shp, .dbf, .shx)
-│       └── cadastral/
-├── records/                  # Existing civic records
-└── .civic/                   # Platform configuration
+├── geography/ # Geography files (git versioned)
+│ ├── geojson/ # GeoJSON files (.md with embedded GeoJSON)
+│ │ ├── zones/ # Zoning data
+│ │ ├── boundaries/ # Municipal boundaries
+│ │ ├── districts/ # Administrative districts
+│ │ └── facilities/ # Public facilities
+│ ├── kml/ # KML files (.md with embedded KML)
+│ │ ├── municipal-boundaries/
+│ │ └── service-areas/
+│ ├── gpx/ # GPX files (.md with embedded GPX)
+│ │ └── routes/
+│ └── shp/ # Shapefile data (.shp, .dbf, .shx)
+│ └── cadastral/
+├── records/ # Existing civic records
+└── .civic/ # Platform configuration
 ```
 
 **File Format**: Geography files are stored in a hybrid markdown format (`.md`)
 with:
 
 - **YAML Frontmatter**: Contains metadata (id, name, type, category,
-  description, SRID, bounds, timestamps)
+ description, SRID, bounds, timestamps)
 - **Code Block**: Contains the raw GeoJSON/KML/GPX content in a fenced code
-  block
+ block
 
 This format ensures:
 
@@ -92,59 +92,59 @@ This format ensures:
 
 ```typescript
 // Geography CRUD operations
-GET    /api/v1/geography              // List geography files
-POST   /api/v1/geography              // Create geography file
-GET    /api/v1/geography/:id          // Get geography file
-PUT    /api/v1/geography/:id          // Update geography file
-DELETE /api/v1/geography/:id          // Delete geography file
+GET /api/v1/geography // List geography files
+POST /api/v1/geography // Create geography file
+GET /api/v1/geography/:id // Get geography file
+PUT /api/v1/geography/:id // Update geography file
+DELETE /api/v1/geography/:id // Delete geography file
 
 // Geography validation
-POST   /api/v1/geography/validate     // Validate geography content
+POST /api/v1/geography/validate // Validate geography content
 
 // Geography raw content
-GET    /api/v1/geography/:id/raw      // Get raw GeoJSON/KML content (for external tools)
+GET /api/v1/geography/:id/raw // Get raw GeoJSON/KML content (for external tools)
 
 // Geography search
-GET    /api/v1/geography/search       // Search geography files
+GET /api/v1/geography/search // Search geography files
 ```
 
 ### Data Types
 
 ```typescript
 interface GeographyFile {
-  id: string;                    // Unique identifier
-  name: string;                 // Human-readable name
-  type: 'geojson' | 'kml' | 'gpx' | 'shapefile';
-  category: 'zone' | 'boundary' | 'district' | 'facility' | 'route';
-  description: string;
-  srid: number;                 // Spatial reference system
-  bounds: BoundingBox;         // Geographic extent
-  metadata: {
-    source: string;             // Data source
-    created: string;            // Creation date
-    updated: string;            // Last modified
-    version: string;            // Data version
-    accuracy: string;           // Data accuracy level
-  };
-  file_path: string;           // Path to actual file
-  preview_image?: string;       // Thumbnail for admin interface
-  content?: string;            // Raw file content for display
-  created_at: string;
-  updated_at: string;
+ id: string; // Unique identifier
+ name: string; // Human-readable name
+ type: 'geojson' | 'kml' | 'gpx' | 'shapefile';
+ category: 'zone' | 'boundary' | 'district' | 'facility' | 'route';
+ description: string;
+ srid: number; // Spatial reference system
+ bounds: BoundingBox; // Geographic extent
+ metadata: {
+ source: string; // Data source
+ created: string; // Creation date
+ updated: string; // Last modified
+ version: string; // Data version
+ accuracy: string; // Data accuracy level
+ };
+ file_path: string; // Path to actual file
+ preview_image?: string; // Thumbnail for admin interface
+ content?: string; // Raw file content for display
+ created_at: string;
+ updated_at: string;
 }
 
 interface LinkedGeography {
-  geographyId: string;
-  role: string;
-  description?: string;
+ geographyId: string;
+ role: string;
+ description?: string;
 }
 
 interface RecordGeography {
-  srid: number;
-  zone_ref?: string;
-  bbox?: BoundingBox;
-  center?: CenterCoordinates;
-  linkedGeography?: LinkedGeography[];
+ srid: number;
+ zone_ref?: string;
+ bbox?: BoundingBox;
+ center?: CenterCoordinates;
+ linkedGeography?: LinkedGeography[];
 }
 ```
 
@@ -203,21 +203,21 @@ interface RecordGeography {
 
 ```
 1. User pastes GeoJSON/KML content
-   ↓
+ ↓
 2. Debounced parsing (500ms delay)
-   ↓
+ ↓
 3. JSON/KML validation and parsing
-   ↓
+ ↓
 4. Geometry validation (check for valid geometries)
-   ↓
+ ↓
 5. Map update with new data
-   ↓
+ ↓
 6. Summary update with statistics
-   ↓
+ ↓
 7. Error display if validation fails
-   ↓
+ ↓
 8. Save to data/geography/ with metadata
-   ↓
+ ↓
 9. Create database record with relationships
 ```
 
@@ -225,15 +225,15 @@ interface RecordGeography {
 
 ```typescript
 interface GeographyValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-  metadata?: {
-    featureCount: number;
-    bounds: BoundingBox;
-    srid: number;
-    geometryTypes: string[];
-  };
+ valid: boolean;
+ errors: string[];
+ warnings: string[];
+ metadata?: {
+ featureCount: number;
+ bounds: BoundingBox;
+ srid: number;
+ geometryTypes: string[];
+ };
 }
 ```
 
@@ -244,31 +244,31 @@ interface GeographyValidationResult {
 ```typescript
 // Frontend form submission
 const geographyData = {
-  name: "Residential Zones",
-  type: "geojson",
-  category: "zone",
-  description: "Residential zoning boundaries for the city",
-  content: `{
-    "type": "FeatureCollection",
-    "features": [
-      {
-        "type": "Feature",
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [[[-73.6, 45.4], [-73.5, 45.4], [-73.5, 45.5], [-73.6, 45.5], [-73.6, 45.4]]]
-        },
-        "properties": { "name": "R1 Zone" }
-      }
-    ]
-  }`,
-  srid: 4326
+ name: "Residential Zones",
+ type: "geojson",
+ category: "zone",
+ description: "Residential zoning boundaries for the city",
+ content: `{
+ "type": "FeatureCollection",
+ "features": [
+ {
+ "type": "Feature",
+ "geometry": {
+ "type": "Polygon",
+ "coordinates": [[[-73.6, 45.4], [-73.5, 45.4], [-73.5, 45.5], [-73.6, 45.5], [-73.6, 45.4]]]
+ },
+ "properties": { "name": "R1 Zone" }
+ }
+ ]
+ }`,
+ srid: 4326
 };
 
 // POST /api/v1/geography
 const response = await fetch('/api/v1/geography', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(geographyData)
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(geographyData)
 });
 ```
 
@@ -277,22 +277,22 @@ const response = await fetch('/api/v1/geography', {
 ```typescript
 // Record with linked geography
 const recordData = {
-  title: "Noise Control — Residential Zones",
-  type: "bylaw",
-  content: "Content here...",
-  geography: {
-    srid: 4326,
-    zone_ref: "mtl:zone:res-R1",
-    bbox: [-73.65, 45.45, -73.52, 45.55],
-    center: { lon: -73.58, lat: 45.50 },
-    linkedGeography: [
-      {
-        geographyId: "geo-001",
-        role: "zone-boundary",
-        description: "Residential zone boundaries"
-      }
-    ]
-  }
+ title: "Noise Control — Residential Zones",
+ type: "bylaw",
+ content: "Content here...",
+ geography: {
+ srid: 4326,
+ zone_ref: "mtl:zone:res-R1",
+ bbox: [-73.65, 45.45, -73.52, 45.55],
+ center: { lon: -73.58, lat: 45.50 },
+ linkedGeography: [
+ {
+ geographyId: "geo-001",
+ role: "zone-boundary",
+ description: "Residential zone boundaries"
+ }
+ ]
+ }
 };
 ```
 
@@ -300,25 +300,25 @@ const recordData = {
 
 ```vue
 <template>
-  <div class="space-y-6">
-    <!-- Legacy Geography Fields -->
-    <div class="space-y-4">
-      <h3 class="text-lg font-medium">Manual Geography Data</h3>
-      <UFormField label="Zone Reference">
-        <UInput v-model="form.geography.zone_ref" placeholder="e.g., mtl:zone:res-R1" />
-      </UFormField>
-      <!-- ... other legacy fields ... -->
-    </div>
+ <div class="space-y-6">
+ <!-- Legacy Geography Fields -->
+ <div class="space-y-4">
+ <h3 class="text-lg font-medium">Manual Geography Data</h3>
+ <UFormField label="Zone Reference">
+ <UInput v-model="form.geography.zone_ref" placeholder="e.g., mtl:zone:res-R1" />
+ </UFormField>
+ <!-- ... other legacy fields ... -->
+ </div>
 
-    <!-- New Geography File Linking -->
-    <div class="space-y-4">
-      <h3 class="text-lg font-medium">Linked Geography Files</h3>
-      <GeographyBrowser
-        v-model="form.geography.linkedGeography"
-        :categories="['zone', 'boundary', 'district']"
-      />
-    </div>
-  </div>
+ <!-- New Geography File Linking -->
+ <div class="space-y-4">
+ <h3 class="text-lg font-medium">Linked Geography Files</h3>
+ <GeographyBrowser
+ v-model="form.geography.linkedGeography"
+ :categories="['zone', 'boundary', 'district']"
+ />
+ </div>
+ </div>
 </template>
 ```
 
@@ -412,7 +412,7 @@ geography fields:
 
 - **Legacy Fields**: SRID, zone_ref, bbox, center, attachments continue to work
 - **Dual Support**: Records can use both legacy fields and new geography file
-  linking
+ linking
 - **Gradual Migration**: Organizations can migrate at their own pace
 - **Data Preservation**: No existing geography data is lost
 

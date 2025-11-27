@@ -1,4 +1,4 @@
-# Legal-Register Module
+# CivicPress Legal-Register Module
 
 The Legal-Register module extends CivicPress core record types with legal-specific validation and features.
 

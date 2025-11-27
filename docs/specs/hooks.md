@@ -8,29 +8,29 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - detailed YAML examples
 - comprehensive hook configurations
 - security considerations fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'workflows.md: >=1.0.0'
-  - 'plugins.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'workflows.md: >=1.0.0'
+ - 'plugins.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `hooks` — CivicPress Hooks System
 
-## 🎯 Purpose
+## Purpose
 
 To allow CivicPress Core and modules to emit named events ("hooks") that trigger
 user-defined workflows or internal actions.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Provide a central `emitHook()` function
 - Support core events (e.g., `onRecordPublish`, `onFeedbackSubmit`)
@@ -38,22 +38,22 @@ user-defined workflows or internal actions.
 - Pass structured context to any hooked workflows
 - Log and audit hook calls
 
-❌ Out of scope:
+Out of scope:
 
 - Direct access to private module internals
 - Long-running external integrations (handled by workflows)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-Triggered by: CivicPress Core or modules  
-Input: `eventName`, `payload`, `context`  
+Triggered by: CivicPress Core or modules 
+Input: `eventName`, `payload`, `context` 
 Output: Executes all matching workflows (if any)
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 core/hooks.ts
@@ -63,57 +63,57 @@ core/workflow-engine.ts
 
 ---
 
-## 🧠 Hook Configuration Examples
+## Hook Configuration Examples
 
-### 📄 Example Hook Configuration (`.civic/hooks.yml`)
+### Example Hook Configuration (`.civic/hooks.yml`)
 
 ```yaml
 # Global hook configuration
 hooks:
-  # Core civic events
-  onRecordPublish:
-    enabled: true
-    workflows:
-      - 'notify-council'
-      - 'update-index'
-    audit: true
+# Core civic events
+ onRecordPublish:
+ enabled: true
+ workflows:
+ - 'notify-council'
+ - 'update-index'
+ audit: true
 
-  onFeedbackSubmit:
-    enabled: true
-    workflows:
-      - 'triage-feedback'
-    audit: true
+ onFeedbackSubmit:
+ enabled: true
+ workflows:
+ - 'triage-feedback'
+ audit: true
 
-  onBylawApproved:
-    enabled: true
-    workflows:
-      - 'notify-public'
-      - 'update-legal-register'
-    audit: true
+ onBylawApproved:
+ enabled: true
+ workflows:
+ - 'notify-public'
+ - 'update-legal-register'
+ audit: true
 
-  # Module-specific events
-  onSessionScheduled:
-    enabled: true
-    workflows:
-      - 'notify-attendees'
-    audit: false
+# Module-specific events
+ onSessionScheduled:
+ enabled: true
+ workflows:
+ - 'notify-attendees'
+ audit: false
 
-  onBudgetSubmitted:
-    enabled: true
-    workflows:
-      - 'notify-finance-committee'
-      - 'schedule-review'
-    audit: true
+ onBudgetSubmitted:
+ enabled: true
+ workflows:
+ - 'notify-finance-committee'
+ - 'schedule-review'
+ audit: true
 
 # Hook execution settings
 settings:
-  maxConcurrent: 5
-  timeout: 30000 # 30 seconds
-  retryAttempts: 3
-  defaultMode: 'async' # sync, async, or dry-run
+ maxConcurrent: 5
+ timeout: 30000 # 30 seconds
+ retryAttempts: 3
+ defaultMode: 'async' # sync, async, or dry-run
 ```
 
-### 📄 Example Hook Context Payload
+### Example Hook Context Payload
 
 ```yaml
 # Example payload for onRecordPublish hook
@@ -121,39 +121,39 @@ event: 'onRecordPublish'
 timestamp: '2025-07-03T14:30:00Z'
 user: 'clerk-richmond'
 record:
-  path: 'records/bylaws/section-02/bylaw-noise-restrictions.md'
-  title: 'Noise Restrictions'
-  status: 'published'
-  module: 'legal-register'
-  authors:
-    - 'Ada Lovelace'
-  approved_by:
-    - 'Marie Curie'
-    - 'Luc Lapointe'
+ path: 'records/bylaws/section-02/bylaw-noise-restrictions.md'
+ title: 'Noise Restrictions'
+ status: 'published'
+ module: 'legal-register'
+ authors:
+ - 'Ada Lovelace'
+ approved_by:
+ - 'Marie Curie'
+ - 'Luc Lapointe'
 context:
-  town: 'richmond-qc'
-  environment: 'production'
-  git_commit: 'abc123def456'
-  git_branch: 'main'
+ town: 'richmond-qc'
+ environment: 'production'
+ git_commit: 'abc123def456'
+ git_branch: 'main'
 ```
 
-### 📄 Example Workflow Hook Registration
+### Example Workflow Hook Registration
 
 ```yaml
 # .civic/workflows/notify-council.js
 module.exports = {
-  name: "notify-council",
-  description: "Notify council members of new published records",
-  hooks: ["onRecordPublish"],
-  async execute({ record, context }) {
-    // Implementation here
-  }
+ name: "notify-council",
+ description: "Notify council members of new published records",
+ hooks: ["onRecordPublish"],
+ async execute({ record, context }) {
+ // Implementation here
+ }
 };
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Only allowed events can be triggered
 - Workflows triggered are signed, sandboxed, and defined in `.civic/workflows/`
@@ -161,7 +161,7 @@ module.exports = {
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Emit known hooks and assert expected workflows fire
 - Log output can be validated
@@ -169,7 +169,7 @@ module.exports = {
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Wildcard or namespaced hook support (e.g. `onRecord:*`)
 - Hook replay or re-run mechanism
@@ -180,7 +180,7 @@ module.exports = {
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-02
 - Last updated: 2025-07-02

@@ -16,7 +16,7 @@ The CLI module is the primary interface for CivicPress operations, offering:
 
 ## Features
 
-### ✅ Core Functionality
+### Core Functionality
 
 - **20+ Commands**: Comprehensive command set for all operations
 - **JSON Output**: Machine-readable output for automation
@@ -24,7 +24,7 @@ The CLI module is the primary interface for CivicPress operations, offering:
 - **Role-Based Access**: Granular permissions for different civic roles
 - **Git Integration**: Automatic version control and audit trails
 
-### ✅ Record Management
+### Record Management
 
 - **Create Records**: `civic create bylaw "Noise Ordinance"`
 - **List Records**: `civic list --type bylaw --status approved`
@@ -32,14 +32,14 @@ The CLI module is the primary interface for CivicPress operations, offering:
 - **Edit Records**: `civic edit bylaw/noise-ordinance --status proposed`
 - **Search Records**: `civic search "budget" --type resolution`
 
-### ✅ Authentication & Users
+### Authentication & Users
 
 - **Simulated Auth**: `civic auth:simulated --username admin --role admin`
 - **GitHub OAuth**: `civic auth:login --token <github_token>`
 - **Password Auth**: `civic auth:password --username <user> --password <pass>`
 - **User Management**: `civic users list`, `civic users create`
 
-### ✅ System Administration
+### System Administration
 
 - **Status Management**: `civic status bylaw/noise-ordinance approved`
 - **Configuration**: `civic debug config`, `civic debug permissions`

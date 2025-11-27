@@ -1,4 +1,4 @@
-# 🎨 CivicPress Spec: `themes.md`
+# CivicPress Spec: `themes.md`
 
 ---
 
@@ -8,19 +8,19 @@ deprecated: false sunset_date: null additions:
 - comprehensive theme documentation
 - customization patterns
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'ui.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'ui.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Theming & Municipal Branding
 
-## 🎯 Purpose
+## Purpose
 
 Enable towns using CivicPress to customize the **visual appearance** of their
 public UI — including logos, colors, fonts, and layout presets — to reflect
@@ -28,9 +28,9 @@ their civic identity without modifying core code.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Allow custom logo, colors, and fonts
 - Support multiple themes per town (e.g. light/dark, bilingual)
@@ -38,165 +38,165 @@ their civic identity without modifying core code.
 - Expose theme data to frontend at build/runtime
 - Offer default CivicPress theme fallback
 
-❌ Out of Scope:
+Out of Scope:
 
 - Full white-labeling of core logic
 - JavaScript runtime theming (handled by framework)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                       | Result                              |
+| Input | Result |
 | --------------------------- | ----------------------------------- |
-| `.civic/theme.yml`          | Loads logo, brand colors, town name |
-| `public/theme/logo.svg`     | Overrides default CivicPress logo   |
-| Frontend calls `useTheme()` | UI reflects town's visual identity  |
+| `.civic/theme.yml` | Loads logo, brand colors, town name |
+| `public/theme/logo.svg` | Overrides default CivicPress logo |
+| Frontend calls `useTheme()` | UI reflects town's visual identity |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/theme.yml
 public/theme/
-  └── logo.svg
-  └── favicon.png
-  └── hero.jpg
+ └── logo.svg
+ └── favicon.png
+ └── hero.jpg
 ```
 
-## 📝 Example Theme Configuration
+## Example Theme Configuration
 
 ```yaml
 # .civic/theme.yml
 town:
-  name: 'Richmond'
-  province: 'Quebec'
-  country: 'Canada'
-  website: 'https://richmond.ca'
-  contact:
-    email: 'info@richmond.ca'
-    phone: '+1-450-000-0000'
-    address: '123 Main Street, Richmond, QC'
+ name: 'Richmond'
+ province: 'Quebec'
+ country: 'Canada'
+ website: 'https://richmond.ca'
+ contact:
+ email: 'info@richmond.ca'
+ phone: '+1-450-000-0000'
+ address: '123 Main Street, Richmond, QC'
 
 branding:
-  logo:
-    primary: '/theme/logo.svg'
-    favicon: '/theme/favicon.ico'
-    hero_image: '/theme/hero.jpg'
-    alt_text: 'Richmond Municipality Logo'
+ logo:
+ primary: '/theme/logo.svg'
+ favicon: '/theme/favicon.ico'
+ hero_image: '/theme/hero.jpg'
+ alt_text: 'Richmond Municipality Logo'
 
-  colors:
-    primary: '#1a4d80' # Municipal blue
-    secondary: '#e67e22' # Orange accent
-    success: '#27ae60' # Green
-    warning: '#f39c12' # Orange
-    error: '#e74c3c' # Red
-    info: '#3498db' # Blue
+ colors:
+ primary: '#1a4d80' # Municipal blue
+ secondary: '#e67e22' # Orange accent
+ success: '#27ae60' # Green
+ warning: '#f39c12' # Orange
+ error: '#e74c3c' # Red
+ info: '#3498db' # Blue
 
-    background:
-      primary: '#ffffff'
-      secondary: '#f8f9fa'
-      tertiary: '#e9ecef'
+ background:
+ primary: '#ffffff'
+ secondary: '#f8f9fa'
+ tertiary: '#e9ecef'
 
-    text:
-      primary: '#212529'
-      secondary: '#6c757d'
-      muted: '#adb5bd'
-      inverse: '#ffffff'
+ text:
+ primary: '#212529'
+ secondary: '#6c757d'
+ muted: '#adb5bd'
+ inverse: '#ffffff'
 
-  typography:
-    font_family: 'Inter, system-ui, sans-serif'
-    font_size_base: '16px'
-    line_height_base: '1.5'
-    headings:
-      h1: '2.5rem'
-      h2: '2rem'
-      h3: '1.75rem'
-      h4: '1.5rem'
-      h5: '1.25rem'
-      h6: '1rem'
+ typography:
+ font_family: 'Inter, system-ui, sans-serif'
+ font_size_base: '16px'
+ line_height_base: '1.5'
+ headings:
+ h1: '2.5rem'
+ h2: '2rem'
+ h3: '1.75rem'
+ h4: '1.5rem'
+ h5: '1.25rem'
+ h6: '1rem'
 
-  spacing:
-    unit: '8px'
-    container_max_width: '1200px'
-    gutter: '24px'
+ spacing:
+ unit: '8px'
+ container_max_width: '1200px'
+ gutter: '24px'
 
-  components:
-    buttons:
-      border_radius: '6px'
-      padding: '12px 24px'
-      font_weight: '500'
+ components:
+ buttons:
+ border_radius: '6px'
+ padding: '12px 24px'
+ font_weight: '500'
 
-    cards:
-      border_radius: '8px'
-      shadow: '0 2px 4px rgba(0,0,0,0.1)'
-      padding: '24px'
+ cards:
+ border_radius: '8px'
+ shadow: '0 2px 4px rgba(0,0,0,0.1)'
+ padding: '24px'
 
-    forms:
-      border_radius: '4px'
-      border_color: '#ced4da'
-      focus_color: '#1a4d80'
+ forms:
+ border_radius: '4px'
+ border_color: '#ced4da'
+ focus_color: '#1a4d80'
 
 themes:
-  default: 'light'
-  available:
-    - 'light'
-    - 'dark'
-    - 'high_contrast'
+ default: 'light'
+ available:
+ - 'light'
+ - 'dark'
+ - 'high_contrast'
 
-  light:
-    name: 'Richmond Light'
-    description: 'Default light theme'
-    colors:
-      background: '#ffffff'
-      text: '#212529'
+ light:
+ name: 'Richmond Light'
+ description: 'Default light theme'
+ colors:
+ background: '#ffffff'
+ text: '#212529'
 
-  dark:
-    name: 'Richmond Dark'
-    description: 'Dark theme for accessibility'
-    colors:
-      background: '#1a1a1a'
-      text: '#ffffff'
+ dark:
+ name: 'Richmond Dark'
+ description: 'Dark theme for accessibility'
+ colors:
+ background: '#1a1a1a'
+ text: '#ffffff'
 
-  high_contrast:
-    name: 'High Contrast'
-    description: 'High contrast for accessibility'
-    colors:
-      background: '#ffffff'
-      text: '#000000'
-    accessibility:
-      contrast_ratio: 7.0
+ high_contrast:
+ name: 'High Contrast'
+ description: 'High contrast for accessibility'
+ colors:
+ background: '#ffffff'
+ text: '#000000'
+ accessibility:
+ contrast_ratio: 7.0
 
 accessibility:
-  contrast_ratio: 4.5
-  focus_visible: true
-  reduced_motion: true
-  keyboard_navigation: true
+ contrast_ratio: 4.5
+ focus_visible: true
+ reduced_motion: true
+ keyboard_navigation: true
 
 responsive:
-  breakpoints:
-    sm: '576px'
-    md: '768px'
-    lg: '992px'
-    xl: '1200px'
-    xxl: '1400px'
+ breakpoints:
+ sm: '576px'
+ md: '768px'
+ lg: '992px'
+ xl: '1200px'
+ xxl: '1400px'
 
 customization:
-  allow_user_override: true
-  allow_custom_css: false # Security consideration
-  footer:
-    text: '© 2025 Richmond Municipality'
-    links:
-      - text: 'Privacy Policy'
-        url: '/privacy'
-      - text: 'Terms of Service'
-        url: '/terms'
+ allow_user_override: true
+ allow_custom_css: false # Security consideration
+ footer:
+ text: '© 2025 Richmond Municipality'
+ links:
+ - text: 'Privacy Policy'
+ url: '/privacy'
+ - text: 'Terms of Service'
+ url: '/terms'
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Asset Security & Validation
 
@@ -248,7 +248,7 @@ customization:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Load theme config and confirm branding applies
 - Test dark/light mode switches (if available)
@@ -257,7 +257,7 @@ customization:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Visual theming wizard in UI
 - Upload branding kit via admin panel
@@ -266,6 +266,6 @@ customization:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

@@ -1,25 +1,28 @@
-# 🤝 Contributing to CivicPress
+# Contributing to CivicPress
 
 Thank you for your interest in contributing to CivicPress! This guide will help
 you get started.
 
-## 🌟 Our Mission
+## Our Mission
 
 CivicPress exists to bring transparency, participation, and trust back to local
 governance. We're building open, modular, Git-native civic software that is
 accessible, auditable, and human-centered.
 
-## 📋 Before You Start
+## Before You Start
 
+- Development and installation guide: `docs/bootstrap-guide.md`
+- Roadmap and direction: `docs/roadmap.md`
+- Project status and current implementation: `docs/project-status.md`
 - Familiarize yourself with our
   [manifesto](https://github.com/CivicPress/manifesto/blob/master/manifesto.md)
 - Check existing issues and discussions before creating new ones
 
-## 🚀 Development Setup
+## Development Setup
 
 ### Prerequisites
 
-- Node.js 20.11.1+ (see `.nvmrc`)
+- Node.js 20.11.1+ 
 - pnpm package manager
 - Git
 
@@ -46,7 +49,7 @@ pnpm run format:check
 **Note**: The `chmod +x` step is required on Unix-like systems (macOS, Linux) to
 make the CLI executable. Without it, you'll get a "permission denied" error.
 
-## 📝 Development Workflow
+## Development Workflow
 
 ### 1. Create a Feature Branch
 
@@ -91,8 +94,8 @@ pnpm run format
 # Check formatting
 pnpm run format:check
 
-# Run tests (when available)
-pnpm test
+# Run tests
+pnpm run test:run
 ```
 
 ### 5. Specification Management
@@ -140,7 +143,7 @@ pnpm run build
 - Reference any related issues
 - Ensure all CI checks pass
 
-## 🎯 Development Standards
+## Development Standards
 
 ### Code Quality
 
@@ -163,7 +166,7 @@ pnpm run build
 - Consider diverse audiences
 - Keep documentation up-to-date
 
-## 🐛 Reporting Issues
+## Reporting Issues
 
 When reporting issues, please include:
 
@@ -173,7 +176,7 @@ When reporting issues, please include:
 - Environment details (OS, Node version, etc.)
 - Screenshots if applicable
 
-## 💡 Feature Requests
+## Feature Requests
 
 We welcome feature requests! When suggesting new features:
 
@@ -182,7 +185,7 @@ We welcome feature requests! When suggesting new features:
 - Think about long-term maintainability
 - Align with our core principles
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 civicpress/
@@ -194,14 +197,14 @@ civicpress/
 └── tests/           # Test files
 ```
 
-## 🤔 Questions?
+## Questions?
 
 - Check existing issues and discussions
 - Join our community discussions
 - Reach out to maintainers at <hello@civicpress.io>
 - Get involved through our [community form](https://tally.so/r/wAYBvN)
 
-## 🙏 Thank You
+## Thank You
 
 Every contribution, no matter how small, helps build better civic technology.
 Thank you for being part of this mission!

@@ -1,4 +1,4 @@
-# 🔄 CivicPress Spec: `workflows.md`
+# CivicPress Spec: `workflows.md`
 
 ---
 
@@ -8,21 +8,21 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive security considerations
 - detailed workflow examples
 - enhanced testing patterns fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'auth.md: >=1.0.0'
-  - 'permissions.md: >=1.0.0'
-  - 'hooks.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'auth.md: >=1.0.0'
+ - 'permissions.md: >=1.0.0'
+ - 'hooks.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `workflows` — CivicPress Workflows Engine
 
-## 🎯 Purpose
+## Purpose
 
 To allow towns to define local civic logic (notifications, tagging, approvals)
 using event-based JavaScript files stored in `.civic/workflows/`.
@@ -32,9 +32,9 @@ core logic.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Load `.js` files from the workflows folder
 - Execute on matching hook events
@@ -42,7 +42,7 @@ core logic.
 - Enforce policy (signatures, dry-run, role checks)
 - Log executions for audit trail
 
-❌ Out of scope:
+Out of scope:
 
 - Unrestricted file system or network access
 - Background job scheduling (separate system)
@@ -50,74 +50,74 @@ core logic.
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-Triggered by: Hook events from core or modules  
-Input: Civic object payload and context  
+Triggered by: Hook events from core or modules 
+Input: Civic object payload and context 
 Output: Actions taken, logs recorded
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/
-├── workflows/              # Workflow files
-│   ├── onRecordSubmit.js
-│   ├── onFeedback.js
-│   ├── onApproval.js
-│   ├── onBylawPublish.js
-│   └── onUserRegistration.js
-├── workflow.policy.yml     # Workflow security policy
-├── workflow.config.yml     # Workflow configuration
-├── hooks.log.jsonl        # Workflow execution logs
-└── workflow-cache/         # Workflow execution cache
-    ├── compiled/
-    └── metadata/
+├── workflows/ # Workflow files
+│ ├── onRecordSubmit.js
+│ ├── onFeedback.js
+│ ├── onApproval.js
+│ ├── onBylawPublish.js
+│ └── onUserRegistration.js
+├── workflow.policy.yml # Workflow security policy
+├── workflow.config.yml # Workflow configuration
+├── hooks.log.jsonl # Workflow execution logs
+└── workflow-cache/ # Workflow execution cache
+ ├── compiled/
+ └── metadata/
 
 core/
-├── workflow-engine.ts      # Main workflow execution engine
-├── workflow-sandbox.ts     # Secure sandbox environment
-├── workflow-policy.ts      # Policy enforcement logic
-├── workflow-logger.ts      # Workflow logging system
-└── workflow-cache.ts       # Workflow caching system
+├── workflow-engine.ts # Main workflow execution engine
+├── workflow-sandbox.ts # Secure sandbox environment
+├── workflow-policy.ts # Policy enforcement logic
+├── workflow-logger.ts # Workflow logging system
+└── workflow-cache.ts # Workflow caching system
 
 modules/
 ├── workflows/
-│   ├── components/
-│   │   ├── WorkflowEditor.tsx # Workflow editing UI
-│   │   ├── PolicyManager.tsx # Policy management UI
-│   │   └── ExecutionMonitor.tsx # Execution monitoring
-│   ├── hooks/
-│   │   └── useWorkflows.ts # Workflow data hook
-│   └── utils/
-│       ├── workflow-parser.ts # Workflow parsing utilities
-│       └── policy-validator.ts # Policy validation
+│ ├── components/
+│ │ ├── WorkflowEditor.tsx # Workflow editing UI
+│ │ ├── PolicyManager.tsx # Policy management UI
+│ │ └── ExecutionMonitor.tsx # Execution monitoring
+│ ├── hooks/
+│ │ └── useWorkflows.ts # Workflow data hook
+│ └── utils/
+│ ├── workflow-parser.ts # Workflow parsing utilities
+│ └── policy-validator.ts # Policy validation
 └── ui/
-    └── components/
-        └── WorkflowProvider.tsx # Workflow context provider
+ └── components/
+ └── WorkflowProvider.tsx # Workflow context provider
 
 tests/
 ├── workflows/
-│   ├── workflow-execution.test.ts
-│   ├── policy-enforcement.test.ts
-│   ├── sandbox-security.test.ts
-│   └── workflow-validation.test.ts
+│ ├── workflow-execution.test.ts
+│ ├── policy-enforcement.test.ts
+│ ├── sandbox-security.test.ts
+│ └── workflow-validation.test.ts
 ├── integration/
-│   ├── workflow-hooks.test.ts
-│   └── workflow-api.test.ts
+│ ├── workflow-hooks.test.ts
+│ └── workflow-api.test.ts
 └── e2e/
-    └── workflow-journey.test.ts
+ └── workflow-journey.test.ts
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Workflow Security
 
 - All workflow files must be cryptographically signed or approved based on
-  `workflow.policy.yml`
+ `workflow.policy.yml`
 - Workflows must run in a secure sandbox environment (e.g., `vm2`)
 - File system and network access must be explicitly permitted in policy
 - Only authorized roles defined in policy can execute workflows
@@ -157,7 +157,7 @@ tests/
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Support `--dry-run` mode
 - Simulate events via CLI (`civic run-workflow`)
@@ -166,7 +166,7 @@ tests/
 
 ---
 
-## 🧰 Invocation Methods
+## Invocation Methods
 
 - CLI: `civic run-workflow onRecordSubmit record.yaml`
 - API: `POST /v1/hook/onRecordSubmit`
@@ -174,33 +174,33 @@ tests/
 
 ---
 
-## 🧠 Example Workflow: onRecordSubmit.js
+## Example Workflow: onRecordSubmit.js
 
 ```js
 module.exports = async ({ record, context }) => {
-  if (record.path.includes('bylaws/')) {
-    await civic.appendTag(record, 'awaiting-legal');
-  }
+ if (record.path.includes('bylaws/')) {
+ await civic.appendTag(record, 'awaiting-legal');
+ }
 };
 ```
 
 ---
 
-## 📜 Example Policy File: workflow.policy.yml
+## Example Policy File: workflow.policy.yml
 
 ```yaml
 trustedAuthors:
-  - clerk-richmond
-  - civic-devs
+ - clerk-richmond
+ - civic-devs
 permissions:
-  allowNetwork: false
-  allowFilesystem: false
+ allowNetwork: false
+ allowFilesystem: false
 defaultMode: dry-run
 ```
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Visual editor in admin UI
 - Scheduled (cron-like) triggers
@@ -210,7 +210,7 @@ defaultMode: dry-run
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-02
 - Merged revision: 2025-07-03

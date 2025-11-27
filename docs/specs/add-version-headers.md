@@ -1,4 +1,4 @@
-# 📋 CivicPress Spec: `add-version-headers.md`
+# CivicPress Spec: `add-version-headers.md`
 
 ---
 
@@ -8,34 +8,34 @@ deprecated: false sunset_date: null additions:
 - comprehensive version header documentation
 - maintenance guidelines
 - validation standards compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'spec-versioning.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'spec-versioning.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Version Header Maintenance & Standards
 
-## 🎯 Purpose
+## Purpose
 
 Define standards and guidelines for maintaining version headers across all
 CivicPress specifications, ensuring consistency and proper version tracking
 throughout the specification ecosystem.
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Define YAML frontmatter standards for all specs
 - Provide guidelines for version updates and changes
 - Establish validation and maintenance procedures
 - Document dependency management practices
 
-❌ Out of Scope:
+Out of Scope:
 
 - Automated version management (handled by spec-versioning.md)
 - Content review of individual specs
@@ -43,9 +43,9 @@ throughout the specification ecosystem.
 
 ---
 
-## 📊 Current Status
+## Current Status
 
-### ✅ All Specs Have Version Headers (60/60)
+### All Specs Have Version Headers (60/60)
 
 All CivicPress specifications now use standardized YAML frontmatter with:
 
@@ -55,19 +55,19 @@ All CivicPress specifications now use standardized YAML frontmatter with:
 - **Dependency tracking** (compatibility and requirements)
 - **Author attribution** (unified identity system)
 
-### 📈 Version Distribution
+### Version Distribution
 
-| Version | Count | Status                                |
+| Version | Count | Status |
 | ------- | ----- | ------------------------------------- |
-| 1.5.0   | 1     | plugins.md                            |
-| 1.3.0   | 1     | workflows.md                          |
-| 1.2.0   | 3     | auth.md, hooks.md, spec-versioning.md |
-| 1.1.0   | 2     | permissions.md, git-policy.md         |
-| 1.0.0   | 53    | All other specs                       |
+| 1.5.0 | 1 | plugins.md |
+| 1.3.0 | 1 | workflows.md |
+| 1.2.0 | 3 | auth.md, hooks.md, spec-versioning.md |
+| 1.1.0 | 2 | permissions.md, git-policy.md |
+| 1.0.0 | 53 | All other specs |
 
 ---
 
-## 🔧 YAML Frontmatter Standards
+## YAML Frontmatter Standards
 
 ### Required Fields
 
@@ -84,10 +84,10 @@ additions:
 fixes:
 - list of corrections or improvements
 compatibility:
-  min_civicpress: 1.0.0
-  max_civicpress: 'null'
-  dependencies:
-  - 'dependency.md: >=1.0.0'
+ min_civicpress: 1.0.0
+ max_civicpress: 'null'
+ dependencies:
+ - 'dependency.md: >=1.0.0'
 authors:
 - Sophie Germain <sophie@civicpress.io>
 reviewers:
@@ -112,16 +112,16 @@ reviewers:
 
 ---
 
-## 🔍 Validation & Maintenance
+## Validation & Maintenance
 
 ### Automated Validation
 
 The `.civic/tools/validate-specs.js` script checks:
 
-- ✅ YAML frontmatter presence and format
-- ✅ Required fields (version, status, authors, etc.)
-- ✅ Section structure and formatting
-- ✅ Cross-reference consistency
+- YAML frontmatter presence and format
+- Required fields (version, status, authors, etc.)
+- Section structure and formatting
+- Cross-reference consistency
 
 ### Manual Review Checklist
 
@@ -147,7 +147,7 @@ When updating specs, verify:
 
 ---
 
-## 🔗 Integration with Other Specs
+## Integration with Other Specs
 
 ### Related Specifications
 
@@ -163,7 +163,7 @@ When updating specs, verify:
 
 ---
 
-## 🚀 Benefits of Standardization
+## Benefits of Standardization
 
 ### Consistency
 
@@ -185,7 +185,7 @@ When updating specs, verify:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-15
 - Last updated: 2025-07-15

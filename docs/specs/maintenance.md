@@ -1,4 +1,4 @@
-# 🔧 CivicPress Spec: `maintenance.md`
+# CivicPress Spec: `maintenance.md`
 
 ---
 
@@ -8,19 +8,19 @@ deprecated: false sunset_date: null additions:
 - comprehensive maintenance documentation
 - operational patterns
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'deployment.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'deployment.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Maintenance & Downtime Handling
 
-## 🎯 Purpose
+## Purpose
 
 Define how CivicPress handles planned maintenance, scheduled downtime, or
 degraded service modes — with clear communication and graceful fallback for
@@ -28,9 +28,9 @@ users.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Allow toggling of maintenance mode via CLI or config
 - Display maintenance banner or message in UI
@@ -38,25 +38,25 @@ users.
 - Schedule upcoming maintenance windows
 - Log maintenance start/stop in audit trail
 
-❌ Out of Scope:
+Out of Scope:
 
 - Full observability or uptime monitoring (see `observability.md`)
 - Disaster scenarios (see `disaster-recovery.md`)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Trigger                     | Result                                   |
+| Trigger | Result |
 | --------------------------- | ---------------------------------------- |
-| CLI: `civic maintenance on` | Sets platform into maintenance mode      |
-| `.civic/maintenance.yml`    | Message, window, expected duration       |
-| API detects downtime        | Returns HTTP 503 with Retry-After header |
-| UI detects mode             | Shows banner and disables civic actions  |
+| CLI: `civic maintenance on` | Sets platform into maintenance mode |
+| `.civic/maintenance.yml` | Message, window, expected duration |
+| API detects downtime | Returns HTTP 503 with Retry-After header |
+| UI detects mode | Shows banner and disables civic actions |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/maintenance.yml
@@ -66,7 +66,7 @@ core/maintenance.ts
 
 ---
 
-## 📄 Example `maintenance.yml`
+## Example `maintenance.yml`
 
 ```yaml
 enabled: true
@@ -78,7 +78,7 @@ contact: 'admin@richmond.qc'
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Only authorized users should toggle mode
 - Maintenance message must not leak sensitive info
@@ -86,7 +86,7 @@ contact: 'admin@richmond.qc'
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Trigger manually via CLI or file
 - Validate UI messaging and disabled actions
@@ -95,7 +95,7 @@ contact: 'admin@richmond.qc'
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Auto-notify users via email or dashboard
 - Show previous downtime history
@@ -104,6 +104,6 @@ contact: 'admin@richmond.qc'
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

@@ -1,4 +1,4 @@
-# 📊 CivicPress Spec: `observability.md`
+# CivicPress Spec: `observability.md`
 
 ---
 
@@ -8,127 +8,127 @@ deprecated: false sunset_date: null additions:
 - comprehensive observability documentation
 - monitoring patterns
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'api.md: >=1.0.0'
-  - 'deployment.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'api.md: >=1.0.0'
+ - 'deployment.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Observability & Audit Trail
 
-## 🎯 Purpose
+## Purpose
 
 Ensure that all critical actions in CivicPress — from feedback to approvals to
-workflow execution — are **visible, traceable, and auditable**.  
+workflow execution — are **visible, traceable, and auditable**. 
 This supports civic trust, debugging, transparency, and operational health.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Log all significant events (CLI, API, UI)
 - Track workflow execution and errors
 - Enable audit logs of civic record changes
 - Collect basic metrics for performance monitoring
 
-❌ Out of Scope:
+Out of Scope:
 
 - Full-stack tracing (handled by external APM tools)
 - Usage analytics of end users (unless anonymized)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Triggered by           | Logged to                      |
+| Triggered by | Logged to |
 | ---------------------- | ------------------------------ |
-| CLI or API command     | `.civic/logs/action.log.jsonl` |
-| Workflow run           | `.civic/hooks.log.jsonl`       |
-| Error/exception        | `.civic/logs/error.log.jsonl`  |
-| Audit action (approve) | `.civic/audit.log.jsonl`       |
+| CLI or API command | `.civic/logs/action.log.jsonl` |
+| Workflow run | `.civic/hooks.log.jsonl` |
+| Error/exception | `.civic/logs/error.log.jsonl` |
+| Audit action (approve) | `.civic/audit.log.jsonl` |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/logs/
-  └── action.log.jsonl
-  └── error.log.jsonl
+ └── action.log.jsonl
+ └── error.log.jsonl
 .civic/hooks.log.jsonl
 .civic/audit.log.jsonl
 .civic/observability.yml
 ```
 
-## 📝 Example Observability Configuration
+## Example Observability Configuration
 
 ```yaml
 # .civic/observability.yml
 logging:
-  level: 'info' # debug, info, warn, error
-  format: 'jsonl'
-  rotation:
-    max_size: '10MB'
-    max_files: 5
-    compress: true
+ level: 'info' # debug, info, warn, error
+ format: 'jsonl'
+ rotation:
+ max_size: '10MB'
+ max_files: 5
+ compress: true
 
-  files:
-    action: '.civic/logs/action.log.jsonl'
-    error: '.civic/logs/error.log.jsonl'
-    audit: '.civic/logs/audit.log.jsonl'
-    hooks: '.civic/hooks.log.jsonl'
+ files:
+ action: '.civic/logs/action.log.jsonl'
+ error: '.civic/logs/error.log.jsonl'
+ audit: '.civic/logs/audit.log.jsonl'
+ hooks: '.civic/hooks.log.jsonl'
 
 monitoring:
-  metrics:
-    enabled: true
-    port: 9090
-    path: '/metrics'
+ metrics:
+ enabled: true
+ port: 9090
+ path: '/metrics'
 
-  health_checks:
-    enabled: true
-    interval: '30s'
-    endpoints:
-      - '/health'
-      - '/ready'
-      - '/live'
+ health_checks:
+ enabled: true
+ interval: '30s'
+ endpoints:
+ - '/health'
+ - '/ready'
+ - '/live'
 
 audit:
-  enabled: true
-  redact_sensitive: true
-  public_logs: ['audit', 'hooks']
-  private_logs: ['action', 'error']
+ enabled: true
+ redact_sensitive: true
+ public_logs: ['audit', 'hooks']
+ private_logs: ['action', 'error']
 
-  events:
-    - 'user.login'
-    - 'record.create'
-    - 'record.update'
-    - 'record.delete'
-    - 'vote.cast'
-    - 'signature.add'
-    - 'workflow.execute'
-    - 'backup.create'
+ events:
+ - 'user.login'
+ - 'record.create'
+ - 'record.update'
+ - 'record.delete'
+ - 'vote.cast'
+ - 'signature.add'
+ - 'workflow.execute'
+ - 'backup.create'
 
 alerts:
-  webhooks:
-    - url: 'https://hooks.slack.com/...'
-      events: ['error', 'backup.failed']
+ webhooks:
+ - url: 'https://hooks.slack.com/...'
+ events: ['error', 'backup.failed']
 
-  email:
-    enabled: false
-    smtp_host: 'smtp.town.ca'
-    recipients: ['admin@town.ca']
+ email:
+ enabled: false
+ smtp_host: 'smtp.town.ca'
+ recipients: ['admin@town.ca']
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Logs should redact sensitive info before commit
 - Some logs (audit, workflow) may be public, others private
@@ -137,7 +137,7 @@ alerts:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Trigger known CLI/API actions and confirm logs
 - Validate log rotation or cleanup behavior
@@ -146,7 +146,7 @@ alerts:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - CivicPress dashboard with status/metrics (live observability)
 - Pluggable external sinks (e.g., Loki, Logstash, Sentry)
@@ -155,6 +155,6 @@ alerts:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

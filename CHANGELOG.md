@@ -1,4 +1,4 @@
-# 📋 Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -312,7 +312,7 @@ and this project adheres to
 
 ---
 
-## 📝 Version History
+## Version History
 
 - **0.1.2**: Hotfix for API ES module migration, production start script, and
   build fixes
@@ -321,7 +321,7 @@ and this project adheres to
 - **1.0.0**: Initial release with core platform architecture
 - **Unreleased**: Development and feature additions
 
-## 🔗 Links
+## Links
 
 - [Contributing Guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)

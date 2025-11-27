@@ -1,4 +1,4 @@
-# 🚀 CivicPress Bootstrap Guide
+# CivicPress Bootstrap Guide
 
 > **Complete step-by-step guide to get started with CivicPress**
 
@@ -6,7 +6,7 @@ This guide walks you through the entire CivicPress workflow, from initial setup
 to advanced operations. Each section includes copy-paste commands and
 explanations.
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before starting, ensure you have:
 
@@ -14,7 +14,7 @@ Before starting, ensure you have:
 - Git installed
 - A terminal/command prompt ready
 
-## 🏗️ 1. Project Setup
+## 1. Project Setup
 
 ### Clone and Install
 
@@ -45,7 +45,7 @@ make the CLI executable. Without it, you'll get a "permission denied" error.
 
 You should see the CivicPress CLI help output with all available commands.
 
-## 🗄️ Database Configuration
+## Database Configuration
 
 CivicPress uses a central configuration file, `.civicrc`, at the project root to
 define where your data lives and how the database is set up.
@@ -103,7 +103,7 @@ For more details, see [database.md](specs/database.md) and the
 
 ---
 
-## 🎯 2. Initialize Your CivicPress Repository
+## 2. Initialize Your CivicPress Repository
 
 ### Basic Initialization
 
@@ -146,7 +146,7 @@ You should see:
 - `.civic/` directory with configuration files
 - `data/` directory for your records
 
-## 📝 3. Create Your First Records
+## 3. Create Your First Records
 
 ### Create a Basic Bylaw
 
@@ -184,7 +184,7 @@ This will create a new bylaw record with a default template.
 ./cli/dist/index.js list --status draft
 ```
 
-## 👀 4. View and Edit Records
+## 4. View and Edit Records
 
 ### View a Record
 
@@ -203,7 +203,7 @@ This will create a new bylaw record with a default template.
 ./cli/dist/index.js edit "public-meeting-procedures"
 ```
 
-## 🔍 5. Search and Explore
+## 5. Search and Explore
 
 ### Search Records
 
@@ -238,7 +238,7 @@ This will create a new bylaw record with a default template.
 ./cli/dist/index.js diff "public-meeting-procedures" --from HEAD~1 --to HEAD
 ```
 
-## 🎨 6. Template System
+## 6. Template System
 
 ### List Available Templates
 
@@ -270,7 +270,7 @@ This will create a new bylaw record with a default template.
 ./cli/dist/index.js create policy "Comprehensive IT Policy" --template detailed-policy
 ```
 
-## ✅ 7. Validation
+## 7. Validation
 
 ### Validate Records
 
@@ -292,7 +292,7 @@ This will create a new bylaw record with a default template.
 ./cli/dist/index.js template --validate bylaw/default
 ```
 
-## 🔄 8. Status Management
+## 8. Status Management
 
 ### Change Record Status
 
@@ -314,7 +314,7 @@ This will create a new bylaw record with a default template.
 ./cli/dist/index.js status "public-meeting-procedures"
 ```
 
-## 📤 9. Export and Import
+## 9. Export and Import
 
 ### Export Records
 
@@ -351,7 +351,7 @@ This will create a new bylaw record with a default template.
 ./cli/dist/index.js import path/to/records/ --dry-run
 ```
 
-## 🪝 10. Hooks and Workflows
+## 10. Hooks and Workflows
 
 ### Manage Hooks
 
@@ -406,7 +406,7 @@ roles:
     can_view: [bylaw, policy, resolution]
 ```
 
-## 🔧 11. Advanced Operations
+## 11. Advanced Operations
 
 ### Commit Records
 
@@ -444,7 +444,7 @@ roles:
 ./cli/dist/index.js list --quiet
 ```
 
-## 🧪 12. Testing and Validation
+## 12. Testing and Validation
 
 ### Run Tests
 
@@ -469,7 +469,7 @@ pnpm run test tests/cli/create.test.ts
 ./cli/dist/index.js template --validate-all
 ```
 
-## 📊 13. Monitoring and Maintenance
+## 13. Monitoring and Maintenance
 
 ### Check System Health
 
@@ -494,7 +494,7 @@ pnpm run test tests/cli/create.test.ts
 ./cli/dist/index.js import backup/ --overwrite
 ```
 
-## 🎯 14. Common Workflows
+## 14. Common Workflows
 
 ### Complete Record Lifecycle
 
@@ -551,7 +551,7 @@ mkdir imports/
 ./cli/dist/index.js validate --all
 ```
 
-## 🆘 15. Troubleshooting
+## 15. Troubleshooting
 
 ### Common Issues
 
@@ -607,7 +607,7 @@ git commit -m "Initial commit"
 ./cli/dist/index.js template --help
 ```
 
-## 🎉 Congratulations
+## Congratulations
 
 You've successfully set up and used CivicPress! You now have:
 

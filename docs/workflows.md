@@ -19,22 +19,22 @@ Here's a simple configuration that works for most cities:
 
 ```yaml
 statuses:
-  - draft
-  - approved
-  - archived
+ - draft
+ - approved
+ - archived
 
 transitions:
-  draft: [approved]
-  approved: [archived]
-  archived: []
+ draft: [approved]
+ approved: [archived]
+ archived: []
 
 roles:
-  clerk:
-    can_transition:
-      draft: [approved]
-      any: [archived]
-  public:
-    can_view: [bylaw, policy, resolution]
+ clerk:
+ can_transition:
+ draft: [approved]
+ any: [archived]
+ public:
+ can_view: [bylaw, policy, resolution]
 ```
 
 This creates a simple workflow:
@@ -52,30 +52,30 @@ For cities that need more control:
 
 ```yaml
 statuses:
-  - draft
-  - proposed
-  - reviewed
-  - approved
-  - archived
+ - draft
+ - proposed
+ - reviewed
+ - approved
+ - archived
 
 transitions:
-  draft: [proposed]
-  proposed: [reviewed, archived]
-  reviewed: [approved, archived]
-  approved: [archived]
-  archived: []
+ draft: [proposed]
+ proposed: [reviewed, archived]
+ reviewed: [approved, archived]
+ approved: [archived]
+ archived: []
 
 roles:
-  clerk:
-    can_transition:
-      draft: [proposed]
-      proposed: [reviewed]
-  council:
-    can_transition:
-      reviewed: [approved]
-      any: [archived]
-  public:
-    can_view: [bylaw, policy, resolution]
+ clerk:
+ can_transition:
+ draft: [proposed]
+ proposed: [reviewed]
+ council:
+ can_transition:
+ reviewed: [approved]
+ any: [archived]
+ public:
+ can_view: [bylaw, policy, resolution]
 ```
 
 ### Department-Specific Workflows
@@ -84,32 +84,32 @@ Different rules for different record types:
 
 ```yaml
 recordTypes:
-  bylaw:
-    statuses: [draft, proposed, reviewed, approved, archived]
-    transitions:
-      draft: [proposed]
-      proposed: [reviewed, archived]
-      reviewed: [approved, archived]
-      approved: [archived]
-      archived: []
-  policy:
-    statuses: [draft, approved, archived]
-    transitions:
-      draft: [approved]
-      approved: [archived]
-      archived: []
+ bylaw:
+ statuses: [draft, proposed, reviewed, approved, archived]
+ transitions:
+ draft: [proposed]
+ proposed: [reviewed, archived]
+ reviewed: [approved, archived]
+ approved: [archived]
+ archived: []
+ policy:
+ statuses: [draft, approved, archived]
+ transitions:
+ draft: [approved]
+ approved: [archived]
+ archived: []
 
 roles:
-  legal_dept:
-    can_transition:
-      draft: [proposed]
-      proposed: [reviewed]
-  council:
-    can_transition:
-      reviewed: [approved]
-      any: [archived]
-  public:
-    can_view: [bylaw, policy, resolution]
+ legal_dept:
+ can_transition:
+ draft: [proposed]
+ proposed: [reviewed]
+ council:
+ can_transition:
+ reviewed: [approved]
+ any: [archived]
+ public:
+ can_view: [bylaw, policy, resolution]
 ```
 
 ## Configuration Options
@@ -120,11 +120,11 @@ Define the possible states for records:
 
 ```yaml
 statuses:
-  - draft
-  - proposed
-  - reviewed
-  - approved
-  - archived
+ - draft
+ - proposed
+ - reviewed
+ - approved
+ - archived
 ```
 
 ### Transitions
@@ -133,11 +133,11 @@ Define which status changes are allowed:
 
 ```yaml
 transitions:
-  draft: [proposed]           # draft can become proposed
-  proposed: [reviewed, archived]  # proposed can become reviewed or archived
-  reviewed: [approved, archived]  # reviewed can become approved or archived
-  approved: [archived]        # approved can become archived
-  archived: []                # archived is final state
+ draft: [proposed] # draft can become proposed
+ proposed: [reviewed, archived] # proposed can become reviewed or archived
+ reviewed: [approved, archived] # reviewed can become approved or archived
+ approved: [archived] # approved can become archived
+ archived: [] # archived is final state
 ```
 
 ### Roles
@@ -146,20 +146,20 @@ Define who can do what:
 
 ```yaml
 roles:
-  clerk:
-    can_transition:
-      draft: [proposed]       # clerk can move draft → proposed
-      proposed: [reviewed]    # clerk can move proposed → reviewed
-    can_create: [bylaw, policy, resolution]  # clerk can create these types
-    can_edit: [bylaw, policy, resolution]    # clerk can edit these types
-  council:
-    can_transition:
-      reviewed: [approved]    # council can move reviewed → approved
-      any: [archived]         # council can archive from any status
-    can_create: [bylaw, policy, resolution]
-    can_edit: [bylaw, policy, resolution]
-  public:
-    can_view: [bylaw, policy, resolution]    # public can only view
+ clerk:
+ can_transition:
+ draft: [proposed] # clerk can move draft → proposed
+ proposed: [reviewed] # clerk can move proposed → reviewed
+ can_create: [bylaw, policy, resolution] # clerk can create these types
+ can_edit: [bylaw, policy, resolution] # clerk can edit these types
+ council:
+ can_transition:
+ reviewed: [approved] # council can move reviewed → approved
+ any: [archived] # council can archive from any status
+ can_create: [bylaw, policy, resolution]
+ can_edit: [bylaw, policy, resolution]
+ public:
+ can_view: [bylaw, policy, resolution] # public can only view
 ```
 
 ## Role Permissions
@@ -203,11 +203,11 @@ When viewing a record in the web UI, users see a **Status Transitions** section
 that:
 
 - **Shows Only Valid Transitions**: Displays only status changes allowed for the
-  current user's role and record status
+ current user's role and record status
 - **Prevents Invalid Changes**: Users cannot attempt transitions that violate
-  workflow rules
+ workflow rules
 - **Provides Clear Feedback**: Shows helpful error messages when transitions
-  fail
+ fail
 
 ### Example UI Flow
 
@@ -222,10 +222,10 @@ that:
 The UI provides clear, helpful error messages:
 
 - **Invalid Transitions**: "Transition from 'draft' to 'approved' is not
-  allowed. Allowed transitions: proposed, archived."
+ allowed. Allowed transitions: proposed, archived."
 - **Typo Suggestions**: "Did you mean 'reviewed'?" when users type "review"
 - **Final Status**: "Allowed transitions: none (final status)" for archived
-  records
+ records
 
 ## Validation
 
@@ -240,13 +240,13 @@ CivicPress validates all actions against the workflow configuration:
 If validation fails, you'll see clear, helpful error messages:
 
 - **Workflow Violations**: "Transition from 'draft' to 'approved' is not
-  allowed. Allowed transitions: proposed, archived."
+ allowed. Allowed transitions: proposed, archived."
 - **Typo Detection**: "Did you mean 'reviewed'?" when users type "review"
-  instead of "reviewed"
+ instead of "reviewed"
 - **Status Context**: "Allowed transitions: none (final status)" for archived
-  records
+ records
 - **Role Restrictions**: "Role 'clerk' cannot transition from 'reviewed' to
-  'approved'"
+ 'approved'"
 
 These messages help users understand what went wrong and how to fix it.
 
@@ -262,7 +262,7 @@ If no `workflows.yml` file exists, CivicPress uses these defaults:
 
 1. **Start Simple**: Use the basic configuration for most cities
 2. **Document Your Process**: Make sure your workflow matches your actual
-   approval process
+ approval process
 3. **Test Changes**: Always test workflow changes before deploying
 4. **Role Clarity**: Define clear roles that match your organization structure
 5. **Audit Trail**: All status changes are logged with role information

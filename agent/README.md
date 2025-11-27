@@ -1,11 +1,11 @@
-# 🤖 CivicPress Agent Memory System
+# CivicPress Agent Memory System
 
 This folder serves as a **common base memory** for any AI agent (Cursor,
 Copilot, etc.) working on the CivicPress project. It provides persistent
 context, shared understanding, and structured memory that survives across
 different AI sessions and tools.
 
-## 🧠 **Purpose: Common AI Memory**
+## Purpose: Common AI Memory
 
 This system ensures that any AI agent working on CivicPress has access to:
 
@@ -15,7 +15,7 @@ This system ensures that any AI agent working on CivicPress has access to:
 - **Structured Memory**: Organized information that persists across sessions
 - **Development Continuity**: Seamless handoffs between different AI tools
 
-## 📁 **Memory Structure**
+## Memory Structure
 
 ```
 agent/
@@ -40,7 +40,7 @@ agent/
     └── handover-protocol.md # How to handoff between agents
 ```
 
-## 🎯 **How to Use This Memory System**
+## How to Use This Memory System
 
 ### For AI Agents (Cursor, Copilot, etc.)
 
@@ -59,7 +59,7 @@ agent/
 3. **Share**: Ensure all AI tools have access to this memory
 4. **Review**: Periodically review and clean up outdated information
 
-## 🔄 **Memory Update Protocol**
+## Memory Update Protocol
 
 When working with AI agents:
 
@@ -68,55 +68,55 @@ When working with AI agents:
 3. **After Completion**: Document outcomes and lessons learned
 4. **On Handoff**: Use the handover protocol to transfer context
 
-## 📋 Current State
+## Current State
 
 CivicPress is currently in the **implementation phase** with comprehensive
 features:
 
-- ✅ **50+ Specifications**: Complete design system covering all aspects
-- ✅ **Core Implementation**: Complete CivicPress core with database, auth, git
+- **50+ Specifications**: Complete design system covering all aspects
+- **Core Implementation**: Complete CivicPress core with database, auth, git
   integration
-- ✅ **CLI Commands**: 15+ commands with full role-based authorization
-- ✅ **Role-Based Authorization**: Complete permission system with role
+- **CLI Commands**: 15+ commands with full role-based authorization
+- **Role-Based Authorization**: Complete permission system with role
   hierarchy
-- ✅ **API Endpoints**: 20+ REST endpoints with authentication
-- ✅ **Testing**: 272 tests passing with 95.6% coverage
-- ✅ **Documentation**: Updated CLI documentation with authorization info
+- **API Endpoints**: 20+ REST endpoints with authentication
+- **Testing**: 272 tests passing with 95.6% coverage
+- **Documentation**: Updated CLI documentation with authorization info
 
-## 🎯 Development Priorities
+## Development Priorities
 
-### Phase 1: ✅ Core Foundation (COMPLETED)
+### Phase 1: Core Foundation (COMPLETED)
 
-- ✅ Implement civic-core.ts loader
-- ✅ Build hook system (emitHook)
-- ✅ Create workflow engine
-- ✅ Add Git integration with role-aware commits
-- ✅ Implement role-based authorization system
+- Implement civic-core.ts loader
+- Build hook system (emitHook)
+- Create workflow engine
+- Add Git integration with role-aware commits
+- Implement role-based authorization system
 
-### Phase 2: ✅ Development Experience (COMPLETED)
+### Phase 2: Development Experience (COMPLETED)
 
-- ✅ Implement specification validation tools
-- ✅ Build testing framework
-- ✅ Create development documentation
-- ✅ Add example implementations
-- ✅ Complete CLI with authorization
+- Implement specification validation tools
+- Build testing framework
+- Create development documentation
+- Add example implementations
+- Complete CLI with authorization
 
 ### Phase 3: Civic Modules (IN PROGRESS)
 
-- 🔄 Complete legal-register module
-- 🔄 Add record validation and lifecycle management
-- 🔄 Implement legal document workflows
-- 🔄 Add approval and publishing processes
-- 🔄 Extend authorization to API endpoints
+- Complete legal-register module
+- Add record validation and lifecycle management
+- Implement legal document workflows
+- Add approval and publishing processes
+- Extend authorization to API endpoints
 
-## 📁 File Contents
+## File Contents
 
 - **`manifesto-slim.md`**: Core principles and ethos for AI guidance
 - **`goals.md`**: Current development goals and progress tracking
 - **`context.md`**: Technical context and implementation priorities
 - **`README.md`**: This file - overview and purpose
 
-## ✅ Why It Exists
+## Why It Exists
 
 AI coding partners are more useful when they can reference consistent, evolving
 context. This folder acts as the shared brain between you and your AI
@@ -129,8 +129,7 @@ Feel free to ignore it if working solo — or expand it if using AI tools.
 
 ---
 
-**🌐 [civicpress.io](https://civicpress.io)** | **📧
-[hello@civicpress.io](mailto:hello@civicpress.io)**
+**[civicpress.io](https://civicpress.io)** | **[hello@civicpress.io](mailto:hello@civicpress.io)**
 
 **NOTE:** This memory system is inspired by the
 [Agentic Project Management (APM)](https://github.com/sdi2200262/agentic-project-management)

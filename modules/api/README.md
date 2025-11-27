@@ -97,7 +97,7 @@ graph TD
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -133,7 +133,7 @@ pnpm start
 - `PORT` - API server port (defaults to 3000)
 - `HOST` - API server host (defaults to localhost)
 
-## 📚 API Reference
+## API Reference
 
 ### Base URL
 
@@ -393,7 +393,7 @@ curl -X DELETE http://localhost:3000/api/v1/records/api-test-record \
 }
 ```
 
-## 🔐 Authentication & Authorization
+## Authentication & Authorization
 
 ### Current Implementation
 
@@ -403,11 +403,11 @@ curl -X DELETE http://localhost:3000/api/v1/records/api-test-record \
 
 ### Roles & Permissions
 
-| Role      | Create                       | Read   | Update | Archive | Status Transitions  |
-| --------- | ---------------------------- | ------ | ------ | ------- | ------------------- |
-| `clerk`   | ✅ bylaw, policy, resolution | ✅ all | ✅ all | ❌      | draft → proposed    |
-| `council` | ✅ bylaw, policy, resolution | ✅ all | ✅ all | ✅      | proposed → approved |
-| `public`  | ❌                           | ✅ all | ❌     | ❌      | ❌                  |
+| Role      | Create                    | Read | Update | Archive | Status Transitions  |
+| --------- | ------------------------- | ---- | ------ | ------- | ------------------- |
+| `clerk`   | bylaw, policy, resolution | all  | all    | none    | draft → proposed    |
+| `council` | bylaw, policy, resolution | all  | all    | all     | proposed → approved |
+| `public`  | none                      | all  | none   | none    | none                |
 
 ### Status Workflow
 
@@ -415,7 +415,7 @@ curl -X DELETE http://localhost:3000/api/v1/records/api-test-record \
 draft → proposed → reviewed → approved → archived
 ```
 
-## 🛠️ Development
+## Development
 
 ### Project Structure
 
@@ -462,7 +462,7 @@ pnpm test:watch
 pnpm test:coverage
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Server Options
 
@@ -489,7 +489,7 @@ interface ApiServerOptions {
 - Credentials supported
 - Default: allow all origins
 
-## 🚀 Deployment
+## Deployment
 
 ### Production Build
 
@@ -526,7 +526,7 @@ HOST=0.0.0.0
 NODE_ENV=production
 ```
 
-## 📊 Monitoring
+## Monitoring
 
 ### Health Check
 
@@ -547,7 +547,7 @@ NODE_ENV=production
 - Record operation counts
 - User activity metrics
 
-## 🔗 Integration Examples
+## Integration Examples
 
 ### JavaScript/Node.js
 
@@ -615,7 +615,7 @@ curl -X PUT http://localhost:3000/api/v1/records/test \
   -d '{"status": "proposed"}'
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -654,19 +654,19 @@ DEBUG=civicpress:* pnpm run dev
 - Review hook system logs
 - Monitor rate limiting headers
 
-## 📝 Changelog
+## Changelog
 
 ### v1.0.0 (2025-07-09)
 
-- ✅ Initial API implementation
-- ✅ Records CRUD operations
-- ✅ CivicPress core integration
-- ✅ Role-based permissions
-- ✅ Workflow validation
-- ✅ Health check endpoint
-- ✅ Rate limiting and security
+- Initial API implementation
+- Records CRUD operations
+- CivicPress core integration
+- Role-based permissions
+- Workflow validation
+- Health check endpoint
+- Rate limiting and security
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create feature branch
@@ -674,6 +674,6 @@ DEBUG=civicpress:* pnpm run dev
 4. Ensure all tests pass
 5. Submit pull request
 
-## 📄 License
+## License
 
 MIT License - see LICENSE file for details.

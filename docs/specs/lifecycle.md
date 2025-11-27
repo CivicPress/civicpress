@@ -1,4 +1,4 @@
-# 🔄 CivicPress Spec: `lifecycle.md`
+# CivicPress Spec: `lifecycle.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive lifecycle documentation
 - state management
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'workflows.md: >=1.3.0'
-  - 'status-tags.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'workflows.md: >=1.3.0'
+ - 'status-tags.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Record Lifecycle
 
-## 🎯 Purpose
+## Purpose
 
 Define how civic records (e.g. bylaws, minutes, proposals) transition through
 various lifecycle stages — from draft to adoption, amendment, retirement, and
@@ -31,56 +31,56 @@ This ensures long-term clarity and consistency across all records.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Define valid lifecycle states (`draft`, `proposed`, `adopted`, `amended`,
-  `archived`, `repealed`)
+ `archived`, `repealed`)
 - Allow records to update `status:` and track transitions
 - Ensure consistent UI, API, and CLI behavior per stage
 - Link related versions (e.g. `amends: bylaw-2018-12`)
 - Handle content withdrawal or deprecation
 
-❌ Out of Scope:
+Out of Scope:
 
 - File deletion (files are always retained via Git)
 - Legal enforcement or interpretation
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input              | Description                                     |
+| Input | Description |
 | ------------------ | ----------------------------------------------- |
-| Civic records      | Markdown files with status metadata             |
-| Status transitions | State change requests and approvals             |
+| Civic records | Markdown files with status metadata |
+| Status transitions | State change requests and approvals |
 | Lifecycle policies | Configuration rules from `.civic/lifecycle.yml` |
-| User permissions   | Role-based transition authorization             |
-| Related records    | Links to previous versions or amendments        |
+| User permissions | Role-based transition authorization |
+| Related records | Links to previous versions or amendments |
 
-| Output              | Description                               |
+| Output | Description |
 | ------------------- | ----------------------------------------- |
-| Updated records     | Records with new status and metadata      |
-| Transition logs     | Audit trail of lifecycle changes          |
-| Workflow triggers   | Automated processes for state changes     |
-| Archive entries     | Records moved to archive structure        |
+| Updated records | Records with new status and metadata |
+| Transition logs | Audit trail of lifecycle changes |
+| Workflow triggers | Automated processes for state changes |
+| Archive entries | Records moved to archive structure |
 | Notification events | Alerts for status changes and transitions |
 
 ---
 
-## 🔗 Lifecycle States & Flow
+## Lifecycle States & Flow
 
 ```text
 [DRAFT] → [PROPOSED] → [ADOPTED]
-                       ↘
-                        [REJECTED]
+ ↘
+ [REJECTED]
 [ADOPTED] → [AMENDED] → [REPEALED] or [ARCHIVED]
 ```
 
 ---
 
-## 📘 Example Frontmatter
+## Example Frontmatter
 
 ```yaml
 title: 'Bylaw 2025-18: Noise Restriction'
@@ -91,7 +91,7 @@ replaced_by: '2028-02-quiet-hours'
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 records/bylaws/2025-18-noise.md
@@ -99,83 +99,83 @@ records/archive/
 .civic/lifecycle.log.jsonl
 ```
 
-## 📝 Example Lifecycle Policy Configuration
+## Example Lifecycle Policy Configuration
 
 ```yaml
 # .civic/lifecycle.yml
 lifecycle:
-  states:
-    draft:
-      label: 'Draft'
-      color: '#6c757d'
-      editable: true
-      deletable: true
-    proposed:
-      label: 'Proposed'
-      color: '#007bff'
-      editable: false
-      deletable: false
-    adopted:
-      label: 'Adopted'
-      color: '#28a745'
-      editable: false
-      deletable: false
-    amended:
-      label: 'Amended'
-      color: '#ffc107'
-      editable: false
-      deletable: false
-    repealed:
-      label: 'Repealed'
-      color: '#dc3545'
-      editable: false
-      deletable: false
-    archived:
-      label: 'Archived'
-      color: '#6c757d'
-      editable: false
-      deletable: false
-    rejected:
-      label: 'Rejected'
-      color: '#e74c3c'
-      editable: false
-      deletable: false
+ states:
+ draft:
+ label: 'Draft'
+ color: '#6c757d'
+ editable: true
+ deletable: true
+ proposed:
+ label: 'Proposed'
+ color: '#007bff'
+ editable: false
+ deletable: false
+ adopted:
+ label: 'Adopted'
+ color: '#28a745'
+ editable: false
+ deletable: false
+ amended:
+ label: 'Amended'
+ color: '#ffc107'
+ editable: false
+ deletable: false
+ repealed:
+ label: 'Repealed'
+ color: '#dc3545'
+ editable: false
+ deletable: false
+ archived:
+ label: 'Archived'
+ color: '#6c757d'
+ editable: false
+ deletable: false
+ rejected:
+ label: 'Rejected'
+ color: '#e74c3c'
+ editable: false
+ deletable: false
 
-  transitions:
-    draft:
-      to: ['proposed', 'archived']
-      requires_approval: false
-    proposed:
-      to: ['adopted', 'rejected', 'archived']
-      requires_approval: true
-      approval_roles: ['clerk', 'mayor']
-    adopted:
-      to: ['amended', 'repealed', 'archived']
-      requires_approval: true
-      approval_roles: ['clerk', 'mayor']
-    amended:
-      to: ['repealed', 'archived']
-      requires_approval: true
-      approval_roles: ['clerk', 'mayor']
-    repealed:
-      to: ['archived']
-      requires_approval: false
-    archived:
-      to: []
-      requires_approval: false
-    rejected:
-      to: ['archived']
-      requires_approval: false
+ transitions:
+ draft:
+ to: ['proposed', 'archived']
+ requires_approval: false
+ proposed:
+ to: ['adopted', 'rejected', 'archived']
+ requires_approval: true
+ approval_roles: ['clerk', 'mayor']
+ adopted:
+ to: ['amended', 'repealed', 'archived']
+ requires_approval: true
+ approval_roles: ['clerk', 'mayor']
+ amended:
+ to: ['repealed', 'archived']
+ requires_approval: true
+ approval_roles: ['clerk', 'mayor']
+ repealed:
+ to: ['archived']
+ requires_approval: false
+ archived:
+ to: []
+ requires_approval: false
+ rejected:
+ to: ['archived']
+ requires_approval: false
 
-  logging:
-    enabled: true
-    log_file: '.civic/lifecycle.log.jsonl'
-    retention_days: 730
+ logging:
+ enabled: true
+ log_file: '.civic/lifecycle.log.jsonl'
+ retention_days: 730
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Only authorized users can change lifecycle status
 - Transitions should trigger hooks or workflow validation
@@ -183,7 +183,7 @@ lifecycle:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Validate status tags for invalid states
 - Check state transitions via CLI/API
@@ -192,14 +192,14 @@ lifecycle:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Lifecycle visualization UI (graph of changes)
 - Cross-record diff for amendments
 - Draft collaboration mode
 - Policy rules per module type (e.g. permits vs minutes)
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`status-tags.md`](./status-tags.md) — Status definitions and transitions
 - [`workflows.md`](./workflows.md) — Automated lifecycle transitions
@@ -209,6 +209,6 @@ lifecycle:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

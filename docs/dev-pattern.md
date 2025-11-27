@@ -1,4 +1,4 @@
-# 🧱 CivicPress Development Pattern: CLI → Core → API
+# CivicPress Development Pattern: CLI → Core → API
 
 CivicPress follows a **CLI-first architecture** to ensure that each new feature
 is:
@@ -9,9 +9,9 @@ is:
 
 ---
 
-## 📐 Development Flow
+## Development Flow
 
-### 1. 🛠️ CLI Layer
+### 1. CLI Layer
 
 Every new feature begins as a `civic` CLI command.
 
@@ -19,7 +19,7 @@ Every new feature begins as a `civic` CLI command.
 - This enforces clarity, minimalism, and usability by humans
 - Commands are fast, offline-friendly, and scriptable
 
-### 2. ⚙️ Core Logic Layer
+### 2. Core Logic Layer
 
 The CLI wraps logic in `core/`:
 
@@ -28,7 +28,7 @@ The CLI wraps logic in `core/`:
 - No I/O or UI dependencies
 - Testable via Vitest and callable by API/CLI
 
-### 3. 🌐 API Layer
+### 3. API Layer
 
 The REST API wraps the same core logic:
 
@@ -38,7 +38,7 @@ The REST API wraps the same core logic:
 
 ---
 
-## ✅ Benefits
+## Benefits
 
 - **Consistency**: Everything runs the same logic across CLI, API, UI
 - **Traceability**: CLI use can be logged or version-controlled
@@ -47,12 +47,12 @@ The REST API wraps the same core logic:
 
 ---
 
-## 🔁 Visual Overview
+## Visual Overview
 
 ```mermaid
 graph TD
-  CLI["🛠️ CLI Command (e.g. civic approve)"]
-  Core["⚙️ Core Logic (e.g. approveRecord())"]
+  CLI["🛠 CLI Command (e.g. civic approve)"]
+  Core["⚙ Core Logic (e.g. approveRecord())"]
   API["🌐 API Route (/api/approve)"]
 
   CLI --> Core
@@ -61,7 +61,7 @@ graph TD
 
 ---
 
-## 🚀 Development Commands
+## Development Commands
 
 ### API Development
 
@@ -92,7 +92,7 @@ default, automatically restarting when files change.
 
 ---
 
-## 🤖 Agent Note
+## Agent Note
 
 All AI or agent-based development for CivicPress **must follow this flow**:
 
@@ -102,7 +102,7 @@ All AI or agent-based development for CivicPress **must follow this flow**:
 
 ---
 
-## 🛡️ Error Handling Pattern
+## Error Handling Pattern
 
 ### Centralized Error Management
 

@@ -1,51 +1,111 @@
 # CivicPress TODO List
 
-## 🎯 **Current Priority: API Enhancement Phase (v1.3.0)**
+## Current Priority: API Enhancement Phase (v1.3.0)
 
-### **✅ Recent Achievements**
+### Recent Achievements
 
-- **✅ All Tests Passing**: 599 tests passing, 22 skipped - system is stable and
-  healthy
-- **✅ CLI User Management**: Fixed JSON parsing issues in simulated
+- **All Tests Passing**: 600+ tests passing - system is stable and healthy
+- **CLI User Management**: Fixed JSON parsing issues in simulated
   authentication
-- **✅ Authentication System**: Both simulated and password auth working
+- **Authentication System**: Both simulated and password auth working
   perfectly
-- **✅ Test Suite Stabilization**: Comprehensive test coverage across all
+- **Test Suite Stabilization**: Comprehensive test coverage across all
   modules
-- **✅ Recovered Specifications**: Restored comprehensive platform
+- **Recovered Specifications**: Restored comprehensive platform
   specifications (50+ specs)
+- **Diff API**: Complete diff API implementation with documentation
+- **Backup System**: Full backup and restore functionality implemented
+- **Frontend Migration**: Successfully migrated to Nuxt 4
 
-### **Immediate Tasks (Next 1-2 weeks)**
+### Immediate Tasks (Next 1-2 weeks)
 
-#### **🐛 UI Pagination Bug Fix**
+#### Centralized Output Patterns Migration
 
-- [ ] **Fix client-side pagination in UI**
+- [ ] **Migrate CLI commands to use centralized output functions**
+  - **Current Status**: Only `list.ts` command follows the pattern (~5%
+    compliance)
+  - **Violations**: 528+ instances of `console.log()`, 350+ instances of manual
+    JSON handling
+  - **Priority**: High - affects code consistency and maintainability
+  - **Files to migrate**:
+    - `cli/src/commands/users.ts` (100+ violations)
+    - `cli/src/commands/storage.ts` (50+ violations)
+    - `cli/src/commands/view.ts`, `validate.ts`, `create.ts`, `edit.ts`,
+      `config.ts`
+    - `cli/src/commands/export.ts`, `geography.ts`, `hook.ts`, `import.ts`,
+      `notify.ts`
+    - `cli/src/commands/status.ts`, `records.ts`, and others
+  - **Action**: Replace all `console.log()`/`console.error()` with
+    `cliSuccess()`, `cliError()`, etc.
+  - **Action**: Remove all manual JSON handling (`if (options.json) { ... }`)
+  - **Reference**: See `docs/centralized-output-patterns.md` for patterns
+  - **Good Example**: `cli/src/commands/list.ts` demonstrates correct usage
+
+- [ ] **Migrate Core library to use centralized output functions**
+  - **Current Status**: Only `hooks/hook-system.ts` follows the pattern (~10%
+    compliance)
+  - **Violations**: 68+ instances of `console.log/warn/error` in core modules
+  - **Priority**: Medium - affects logging consistency
+  - **Files to migrate**:
+    - `core/src/database/database-adapter.ts` (multiple console.log)
+    - `core/src/indexing/indexing-service.ts` (console.warn/error)
+    - `core/src/notifications/notification-service.ts` (console.log)
+    - `core/src/auth/auth-service.ts` (debug console.log)
+    - `core/src/config/configuration-service.ts` (console.warn)
+    - And 10+ more files
+  - **Action**: Replace with `coreSuccess()`, `coreError()`, `coreInfo()`, etc.
+  - **Note**: `core/src/utils/logger.ts` using console internally is acceptable
+  - **Reference**: See `docs/centralized-output-patterns.md` for patterns
+
+- [ ] **Clean up API module debug console.log statements**
+  - **Current Status**: ~90% compliant, but has some debug console.log
+  - **Violations**: Debug console.log in `routes/geography.ts`,
+    `routes/users.ts`, `routes/auth.ts`
+  - **Priority**: Low - mostly debug code
+  - **Action**: Replace debug console.log with proper logging or remove
+
+- [ ] **Fix documentation file name mismatch**
+  - **Issue**: Docs reference `api-response.ts` but actual file is
+    `api-logger.ts`
+  - **Action**: Update `docs/centralized-output-patterns.md` to reference
+    correct file (still has 2 references to `api-response.ts`)
+
+#### UI Pagination Bug Fix
+
+- [ ] **Verify and fix client-side pagination in UI**
       (`modules/ui/app/pages/records/index.vue`)
   - **Issue**: Pagination and "records per page" not working correctly
   - **Problem**: Mixing client-side and server-side pagination logic
   - **Impact**: Users can't navigate pages or change page size properly
   - **Priority**: High - affects core UI functionality
   - **Status**: Server-side pagination works, client-side needs fixing
+  - **Note**: Code shows pagination implementation exists, needs verification
 
-#### **Diff API Implementation**
+#### Diff API Implementation
 
-- [ ] **Design Diff API endpoints**
-  - `GET /api/diff/:recordId` - Compare record versions
-  - `GET /api/diff/:recordId/:commit1/:commit2` - Compare specific commits
-  - `POST /api/diff/bulk` - Bulk diff operations
-- [ ] **Implement diff logic**
-  - Git-based diff generation
-  - Frontmatter and content diffing
-  - Metadata change tracking
-  - Conflict detection and resolution
-- [ ] **Create diff documentation**
-  - API endpoint documentation
-  - Diff format specification
-  - Integration examples
+- [x] **Design Diff API endpoints** - Complete
+  - `GET /api/diff/:recordId` - Compare record versions (Implemented)
+  - `GET /api/diff/:recordId/history` - Get commit history (Implemented)
+  - `GET /api/diff/:recordId/commits` - Get commits that modified record (Implemented)
+  - `GET /api/diff/:recordId/versions` - Get all versions (Implemented)
+  - `GET /api/diff/commits/:commit1/:commit2` - Compare all records between commits (Implemented)
+- [x] **Implement diff logic** - Complete
+  - Git-based diff generation (Implemented)
+  - Frontmatter and content diffing (Implemented)
+  - Metadata change tracking (Implemented)
+  - Multiple diff formats (unified, side-by-side, json) (Implemented)
+- [x] **Create diff documentation** - Complete
+  - API endpoint documentation exists (`modules/api/docs/diff-api.md`)
+  - Diff format specification documented
+  - Integration examples provided
 
-#### **Analytics API Implementation**
+#### Analytics API Implementation
 
-- [ ] **Design Analytics API endpoints**
+- [x] **Analytics Configuration** - Complete
+  - Analytics config system implemented (`/api/info` endpoint provides analytics config)
+  - Head/body injection support for analytics scripts
+  - Configuration management via UI
+- [ ] **Design Analytics API endpoints** - Planned
   - `GET /api/analytics/usage` - Usage statistics
   - `GET /api/analytics/records` - Record analytics
   - `GET /api/analytics/users` - User activity
@@ -60,11 +120,11 @@
   - Metrics explanation
   - Dashboard integration guide
 
-#### **Bulk Operations API**
+#### Bulk Operations API
 
 - [ ] **Design bulk operations endpoints**
   - `POST /api/records/bulk` - Bulk record operations
-  - `POST /api/validation/bulk` - Bulk validation (✅ Done)
+  - `POST /api/validation/bulk` - Bulk validation (Done)
   - `POST /api/export/bulk` - Bulk export
   - `POST /api/import/bulk` - Bulk import
 - [ ] **Implement bulk operation logic**
@@ -77,7 +137,7 @@
   - Performance considerations
   - Error handling guide
 
-#### **Advanced Search API**
+#### Advanced Search API
 
 - [ ] **Enhance search functionality**
   - Full-text search implementation
@@ -93,9 +153,64 @@
   - Filter options guide
   - Performance optimization tips
 
-### **Short Term Tasks (v1.4.0 - Next 1-2 months)**
+#### Templates API Implementation
 
-#### **Plugin System Foundation**
+- [ ] **Implement Templates API endpoints**
+  - **Current Status**: API endpoints exist but are stubbed (return empty arrays/mock data)
+  - **Files**: `modules/api/src/routes/templates.ts` (all endpoints return placeholders)
+  - **UI Integration**: `modules/ui/app/composables/useTemplates.ts` has TODOs to use API
+  - **Priority**: Medium - affects template functionality
+  - **Action**: Implement actual template loading from `data/.civic/templates/` directory
+  - **Action**: Update UI to fetch templates from API instead of hardcoded defaults
+  - **Reference**: `core/src/utils/template-engine.ts` has file system loading logic
+
+#### Configuration Export/Import
+
+- [ ] **Implement configuration export API endpoint**
+  - **Current Status**: Not implemented - UI shows "coming soon" message
+  - **File**: `modules/ui/app/pages/settings/configuration/index.vue` (line 321)
+  - **Priority**: Low - nice to have feature
+  - **Action**: Create `POST /api/v1/config/export` endpoint to export all configs as ZIP
+  - **Action**: Implement UI download functionality
+
+- [ ] **Implement configuration import UI**
+  - **Current Status**: Not implemented - UI shows "coming soon" message
+  - **File**: `modules/ui/app/pages/settings/configuration/index.vue` (line 340)
+  - **Priority**: Low - nice to have feature
+  - **Action**: Create file upload UI for configuration import
+  - **Action**: Validate and apply imported configurations
+
+#### Core Library Enhancements
+
+- [ ] **Implement document number generator database query**
+  - **Current Status**: Returns placeholder (always 1)
+  - **File**: `core/src/utils/document-number-generator.ts` (line 183)
+  - **Priority**: Medium - affects document numbering accuracy
+  - **Action**: Query database to find highest sequence number for record type/year
+  - **Action**: Ensure proper sequence number generation
+
+- [ ] **Implement workflow engine integration in hooks**
+  - **Current Status**: Hook system logs workflow execution but doesn't integrate with workflow engine
+  - **File**: `core/src/hooks/hook-system.ts` (line 410)
+  - **Priority**: Medium - affects workflow functionality
+  - **Action**: Integrate hook system with workflow engine for actual workflow execution
+
+- [ ] **Implement geography database persistence**
+  - **Current Status**: Geography saves to files only, not database
+  - **Files**: `core/src/geography/geography-manager.ts` (lines 112, 285)
+  - **Priority**: Low - file-based storage works, database would enable better querying
+  - **Action**: Add database persistence for geography files alongside file storage
+  - **Action**: Update geography manager to save/update in database
+
+- [ ] **Use auth store for current user in templates**
+  - **Current Status**: RecordForm uses translation key instead of actual user
+  - **File**: `modules/ui/app/components/RecordForm.vue` (line 450)
+  - **Priority**: Low - minor enhancement (auth store has `currentUser` available)
+  - **Action**: Replace `t('records.currentUser')` with `useAuth().user.value?.name` or similar
+
+### Short Term Tasks (v1.4.0 - Next 1-2 months)
+
+#### Plugin System Foundation
 
 - [ ] **Design plugin architecture** (based on `docs/specs/plugins.md`)
   - Plugin registration and management
@@ -108,7 +223,7 @@
   - Plugin development tools
   - Plugin documentation
 
-#### **Workflow Engine Enhancement**
+#### Workflow Engine Enhancement
 
 - [ ] **Design advanced workflow system** (based on `docs/specs/workflows.md`)
   - Configurable approval processes
@@ -121,7 +236,7 @@
   - `PUT /api/workflows/:id` - Update workflow
   - `DELETE /api/workflows/:id` - Delete workflow
 
-#### **Audit Trail System**
+#### Audit Trail System
 
 - [ ] **Design audit trail system** (based on `docs/specs/audit.md`)
   - Comprehensive change tracking
@@ -134,9 +249,9 @@
   - `GET /api/audit/user/:userId` - Get user audit trail
   - `POST /api/audit/export` - Export audit trail
 
-### **Medium Term Tasks (v1.5.0 - Next 3-6 months)**
+### Medium Term Tasks (v1.5.0 - Next 3-6 months)
 
-#### **Civic Modules Implementation**
+#### Civic Modules Implementation
 
 - [ ] **Legal Register Module** (based on `docs/specs/legal-register.md`)
   - Bylaw management and versioning
@@ -156,7 +271,7 @@
   - Feedback moderation and review
   - Citizen engagement analytics
 
-#### **Advanced Security Features**
+#### Advanced Security Features
 
 - [ ] **Cryptographic Signatures** (based on `docs/specs/signatures.md`)
   - Digital signature implementation
@@ -170,7 +285,7 @@
   - Security audit logging
   - Compliance monitoring
 
-#### **Federation System**
+#### Federation System
 
 - [ ] **Design federation architecture** (based on `docs/specs/manifest.md`)
   - Multi-node synchronization
@@ -178,9 +293,9 @@
   - Federation security
   - Node management
 
-### **Long Term Tasks (v1.6.0 - Next 6-12 months)**
+### Long Term Tasks (v1.6.0 - Next 6-12 months)
 
-#### **Multi-tenant Support**
+#### Multi-tenant Support
 
 - [ ] **Design multi-tenant architecture**
   - Tenant isolation and security
@@ -188,15 +303,19 @@
   - Tenant-specific configurations
   - Resource management
 
-#### **Advanced UI/UX**
+#### Advanced UI/UX
 
-- [ ] **Frontend Migration** (Nuxt PWA)
-  - Migrate from Astro to Nuxt
+- [x] **Frontend Migration** - Complete
+  - Migrated from Astro to Nuxt 4 (Completed)
+  - Nuxt UI Pro integration (Completed)
+  - Admin interface (Completed)
+  - Modern user experience (Completed)
+- [ ] **PWA Features** - Planned
   - Implement PWA features
-  - Add admin interface
-  - Enhance user experience
+  - Offline support
+  - Service worker integration
 
-#### **Enterprise Features**
+#### Enterprise Features
 
 - [ ] **Advanced Monitoring** (based on `docs/specs/observability.md`)
   - System health monitoring
@@ -204,20 +323,22 @@
   - Alert systems
   - Capacity planning
 
-- [ ] **Backup and Recovery** (based on `docs/specs/backup.md`)
-  - Automated backup systems
-  - Disaster recovery procedures
-  - Data retention policies
-  - Recovery testing
+- [x] **Backup and Recovery** - Core Implementation Complete
+  - Backup system implemented (`core/src/backup/backup-service.ts`)
+  - CLI backup commands (`civic backup create/restore`)
+  - Tarball compression support
+  - Storage file restoration
+  - Demo data loading via backups
+  - **Remaining**: Automated scheduled backups, advanced retention policies, recovery testing
 
-### **Documentation and Standards**
+### Documentation and Standards
 
 - [ ] **Update all documentation** to reflect recovered specifications
 - [ ] **Create implementation guides** for each major feature
 - [ ] **Develop testing standards** based on `docs/specs/testing-framework.md`
 - [ ] **Establish deployment procedures** based on `docs/specs/deployment.md`
 
-### **Quality Assurance**
+### Quality Assurance
 
 - [ ] **Maintain test coverage** at 90%+ for all new features
 - [ ] **Implement security testing** based on `docs/specs/security.md`
@@ -226,12 +347,12 @@
 
 ---
 
-## 📊 **Platform Vision Summary**
+## Platform Vision Summary
 
 Based on the recovered specifications, CivicPress is designed as a **complete
 civic technology platform** with:
 
-### **Core Principles**
+### Core Principles
 
 - **Transparency by default** — Government should work in daylight
 - **Trust through traceability** — Every record, every change, every action is
@@ -242,16 +363,19 @@ civic technology platform** with:
 - **Markdown as civic format** — Legible, versionable, future-proof civic
   records
 
-### **Current Status**
+### Current Status
 
-- ✅ **Foundation Complete**: Core CLI, API, and database functionality
-- ✅ **Testing Stable**: 391 tests passing with comprehensive coverage
-- ✅ **Documentation Restored**: 50+ specifications providing clear roadmap
-- 🚀 **Ready for Enhancement**: Solid foundation for advanced features
+- **Foundation Complete**: Core CLI, API, and database functionality
+- **Testing Stable**: 600+ tests passing with comprehensive coverage
+- **Documentation Restored**: 50+ specifications providing clear roadmap
+- **Diff API Complete**: Full diff functionality with documentation
+- **Backup System Complete**: Core backup and restore functionality
+- **Frontend Complete**: Nuxt 4 migration and modern UI
+- **Ready for Enhancement**: Solid foundation for advanced features
 
-### **Next Phase Focus**
+### Next Phase Focus
 
-- **API Enhancement**: Diff, Analytics, Bulk Operations, Advanced Search
+- **API Enhancement**: Analytics, Bulk Operations, Advanced Search
 - **Plugin System**: Extensible architecture for civic modules
 - **Workflow Engine**: Advanced approval processes and status management
 - **Security Framework**: Cryptographic verification and audit trails

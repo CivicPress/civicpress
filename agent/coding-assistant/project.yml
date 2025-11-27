@@ -10,6 +10,7 @@ non_negotiables:
   - Respect CivicPress coding conventions (see conventions.md).
   - Reuse existing CLI commands, endpoints, and components — do not reinvent.
   - Never bypass templates or registries; generate through them.
+  - Never use console.log/error/warn directly; always use centralized output functions (cliSuccess, coreError, sendSuccess, etc.).
 
 defaults:
   language: TypeScript

@@ -1,4 +1,4 @@
-# 📅 CivicPress Spec: `timeline.md`
+# CivicPress Spec: `timeline.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive timeline documentation
 - chronological tracking
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'public-data-structure.md: >=1.0.0'
-  - 'workflows.md: >=1.3.0' authors:
+ 'null' dependencies:
+ - 'public-data-structure.md: >=1.0.0'
+ - 'workflows.md: >=1.3.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Civic Activity Timeline
 
-## 🎯 Purpose
+## Purpose
 
 Provide a chronological view of civic events, decisions, feedback, and changes —
 to give users and contributors a clear picture of how governance unfolds over
@@ -33,9 +33,9 @@ modules.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Store daily entries of civic activity
 - Accept any record type: proposals, drafts, discussions, etc.
@@ -43,41 +43,41 @@ modules.
 - Offer hooks for UI (calendar view, list, heatmap)
 - Allow modules to reference timeline entries
 
-❌ Out of Scope:
+Out of Scope:
 
 - Serving as final record of law (those move to `bylaws/`, etc.)
 - Full text search (handled by index)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                        | Result                             |
+| Input | Result |
 | ---------------------------- | ---------------------------------- |
-| `timeline/2025-07-04/foo.md` | Appears in timeline view           |
-| Record with `date:` tag      | Sorted and grouped chronologically |
-| Hooked module entry          | Displays link in timeline format   |
+| `timeline/2025-07-04/foo.md` | Appears in timeline view |
+| Record with `date:` tag | Sorted and grouped chronologically |
+| Hooked module entry | Displays link in timeline format |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 records/timeline/
-  └── 2025-07-04/
-        └── curfew-debate.md
-        └── notes-ada.md
+ └── 2025-07-04/
+ └── curfew-debate.md
+ └── notes-ada.md
 ```
 
 ---
 
-## 📝 Example Frontmatter
+## Example Frontmatter
 
 ```yaml
 title: 'Curfew Debate Summary'
 authors:
-  - name: 'Ada Lovelace'
-    role: 'Clerk'
+ - name: 'Ada Lovelace'
+ role: 'Clerk'
 tags: [bylaw, discussion]
 date: 2025-07-04
 status: draft
@@ -85,7 +85,7 @@ status: draft
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Timeline entries may include sensitive drafts
 - Records must follow same permission rules as others
@@ -93,7 +93,7 @@ status: draft
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Render timeline chronologically with frontmatter parsing
 - Validate date formatting and directory sorting
@@ -102,7 +102,7 @@ status: draft
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - UI calendar and list view modes
 - Timeline filters by tag/author/module
@@ -111,6 +111,6 @@ status: draft
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

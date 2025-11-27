@@ -1,4 +1,4 @@
-# 📊 CivicPress Spec: `public-data-structure.md`
+# CivicPress Spec: `public-data-structure.md`
 
 ---
 
@@ -8,19 +8,19 @@ deprecated: false sunset_date: null additions:
 - comprehensive data structure documentation
 - organization patterns
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'manifest.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'manifest.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `public-data-structure` — CivicPress Public Data Structure
 
-## 🎯 Purpose
+## Purpose
 
 Define how civic records (e.g., bylaws, minutes, motions) are stored in
 CivicPress using a hybrid structure that supports both chronological
@@ -28,109 +28,109 @@ traceability and thematic organization.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Define how to chronologically track civic records (`timeline/`)
 - Define how to structure finalized civic documents (`bylaws/`, `minutes/`)
 - Provide clear naming conventions and frontmatter schemas
 
-❌ Out of scope:
+Out of scope:
 
 - Database schemas
 - UI rendering formats (handled by each module)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input                 | Description                          |
+| Input | Description |
 | --------------------- | ------------------------------------ |
-| Civic records         | Markdown files with YAML frontmatter |
-| Record metadata       | Title, status, authors, dates, tags  |
-| File system structure | Directory organization and naming    |
-| Git commits           | Version history and change tracking  |
-| Record relationships  | Links between related records        |
+| Civic records | Markdown files with YAML frontmatter |
+| Record metadata | Title, status, authors, dates, tags |
+| File system structure | Directory organization and naming |
+| Git commits | Version history and change tracking |
+| Record relationships | Links between related records |
 
-| Output             | Description                          |
+| Output | Description |
 | ------------------ | ------------------------------------ |
 | Structured records | Organized civic documents in folders |
-| Timeline entries   | Chronological civic activity records |
-| Record indexes     | Searchable indexes of civic records  |
-| Archive entries    | Finalized records moved to archive   |
-| Relationship maps  | Links and references between records |
+| Timeline entries | Chronological civic activity records |
+| Record indexes | Searchable indexes of civic records |
+| Archive entries | Finalized records moved to archive |
+| Relationship maps | Links and references between records |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 records/
-├── timeline/              # Chronological civic activity
-│   ├── 2025-07-03/
-│   │   ├── bylaw-curfew.md
-│   │   └── motion-budget.md
-│   └── 2025-07-12/
-│       └── bylaw-curfew.md
-├── bylaws/               # Finalized bylaws by section
-│   ├── section-01/
-│   │   └── bylaw-curfew.md
-│   └── section-02/
-│       └── bylaw-noise-restrictions.md
-├── minutes/              # Meeting minutes
-│   ├── regular/
-│   │   └── meeting-2025-07-03.md
-│   └── emergency/
-│       └── meeting-2025-07-15.md
-├── resolutions/          # Council resolutions
-│   └── 2025-06-10/
-│       └── resolution-road-repair.md
-└── feedback/            # Public feedback
-    └── 2025-07-03/
-        └── noise-complaint.md
+├── timeline/ # Chronological civic activity
+│ ├── 2025-07-03/
+│ │ ├── bylaw-curfew.md
+│ │ └── motion-budget.md
+│ └── 2025-07-12/
+│ └── bylaw-curfew.md
+├── bylaws/ # Finalized bylaws by section
+│ ├── section-01/
+│ │ └── bylaw-curfew.md
+│ └── section-02/
+│ └── bylaw-noise-restrictions.md
+├── minutes/ # Meeting minutes
+│ ├── regular/
+│ │ └── meeting-2025-07-03.md
+│ └── emergency/
+│ └── meeting-2025-07-15.md
+├── resolutions/ # Council resolutions
+│ └── 2025-06-10/
+│ └── resolution-road-repair.md
+└── feedback/ # Public feedback
+ └── 2025-07-03/
+ └── noise-complaint.md
 
 .civic/
-├── data-structure.yml    # Data structure configuration
+├── data-structure.yml # Data structure configuration
 ├── naming-conventions.yml # File naming rules
-└── frontmatter-schemas/  # Frontmatter templates
-    ├── bylaw.yml
-    ├── motion.yml
-    └── resolution.yml
+└── frontmatter-schemas/ # Frontmatter templates
+ ├── bylaw.yml
+ ├── motion.yml
+ └── resolution.yml
 
 core/
-├── data-structure.ts     # Data structure logic
-├── record-organizer.ts   # Record organization utilities
-├── timeline-manager.ts   # Timeline management
-└── archive-manager.ts    # Archive management
+├── data-structure.ts # Data structure logic
+├── record-organizer.ts # Record organization utilities
+├── timeline-manager.ts # Timeline management
+└── archive-manager.ts # Archive management
 
 modules/
 ├── data-structure/
-│   ├── components/
-│   │   ├── RecordViewer.tsx # Record display component
-│   │   ├── TimelineViewer.tsx # Timeline display
-│   │   └── ArchiveViewer.tsx # Archive display
-│   ├── hooks/
-│   │   └── useDataStructure.ts # Data structure hook
-│   └── utils/
-│       ├── record-parser.ts # Record parsing utilities
-│       └── structure-validator.ts # Structure validation
+│ ├── components/
+│ │ ├── RecordViewer.tsx # Record display component
+│ │ ├── TimelineViewer.tsx # Timeline display
+│ │ └── ArchiveViewer.tsx # Archive display
+│ ├── hooks/
+│ │ └── useDataStructure.ts # Data structure hook
+│ └── utils/
+│ ├── record-parser.ts # Record parsing utilities
+│ └── structure-validator.ts # Structure validation
 └── ui/
-    └── components/
-        └── DataStructureProvider.tsx # Data structure context
+ └── components/
+ └── DataStructureProvider.tsx # Data structure context
 
 tests/
 ├── data-structure/
-│   ├── record-organization.test.ts
-│   ├── timeline-management.test.ts
-│   └── archive-management.test.ts
+│ ├── record-organization.test.ts
+│ ├── timeline-management.test.ts
+│ └── archive-management.test.ts
 └── integration/
-    └── data-structure-integration.test.ts
+ └── data-structure-integration.test.ts
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Data Integrity & Authenticity
 
@@ -182,39 +182,39 @@ tests/
 
 ---
 
-## 📂 Hybrid Folder Structure
+## Hybrid Folder Structure
 
 CivicPress separates civic record **evolution** from **organization**:
 
-### 📘 `timeline/` — The Civic Ledger
+### `timeline/` — The Civic Ledger
 
 ```
 records/
 ├── timeline/
-│   ├── 2025-07-03/
-│   │   ├── bylaw-curfew.md
-│   │   └── motion-budget.md
-│   ├── 2025-07-12/
-│   │   └── bylaw-curfew.md
-│   └── 2025-07-23/
-│       └── bylaw-curfew.md
+│ ├── 2025-07-03/
+│ │ ├── bylaw-curfew.md
+│ │ └── motion-budget.md
+│ ├── 2025-07-12/
+│ │ └── bylaw-curfew.md
+│ └── 2025-07-23/
+│ └── bylaw-curfew.md
 ```
 
 - Chronological folder = civic activity day
 - Files reflect civic evolution (e.g., drafts, amendments, approvals)
 - Every change is tracked in Git commits
 
-### 📚 `bylaws/`, `minutes/` — Thematic Archive
+### `bylaws/`, `minutes/` — Thematic Archive
 
 ```
 records/
 ├── bylaws/
-│   ├── section-01/
-│   │   └── bylaw-curfew.md
+│ ├── section-01/
+│ │ └── bylaw-curfew.md
 ├── minutes/
-│   ├── regular/
-│   │   └── meeting-2025-07-03.md
-│   └── emergency/
+│ ├── regular/
+│ │ └── meeting-2025-07-03.md
+│ └── emergency/
 ```
 
 - Once adopted, finalized records are moved (or referenced) here
@@ -223,7 +223,7 @@ records/
 
 ---
 
-## 🔁 Record Synchronization Policy
+## Record Synchronization Policy
 
 If a record exists in the structured folders (e.g.,
 `bylaws/section-02/bylaw-curfew.md`) and future edits occur in the `timeline/`,
@@ -231,9 +231,9 @@ the structured file **must eventually reflect those changes**.
 
 Valid approaches:
 
-- ✅ Update the structured file in-place (with Git commit + changelog)
-- ✅ Replace with a new version (archive the old version clearly)
-- ✅ Use `source:` or `latest:` in frontmatter to link to the timeline
+- Update the structured file in-place (with Git commit + changelog)
+- Replace with a new version (archive the old version clearly)
+- Use `source:` or `latest:` in frontmatter to link to the timeline
 
 This ensures:
 
@@ -245,7 +245,7 @@ All modules that publish civic records **must respect this lifecycle**.
 
 ---
 
-## 🧠 YAML Frontmatter Structure
+## YAML Frontmatter Structure
 
 ```yaml
 ---
@@ -253,8 +253,8 @@ title: 'Bylaw on Park Regulation'
 type: bylaw
 status: draft
 authors:
-  - name: 'Ada Lovelace'
-    role: 'clerk'
+ - name: 'Ada Lovelace'
+ role: 'clerk'
 created: '2025-07-03'
 updated: '2025-07-12'
 tags: ['parks', 'safety']
@@ -265,17 +265,17 @@ source: 'timeline/2025-07-03/bylaw-park.md'
 ---
 ```
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
-- ✅ Create draft in `timeline/YYYY-MM-DD/` → visible in dev UI
-- ✅ Commit edited record → tracked in Git with correct author
-- ✅ Move record to `bylaws/` → `source:` link remains intact
-- ✅ Render diff between timeline and structured file
-- ✅ Run `civic lint:records` to validate naming, structure, frontmatter
+- Create draft in `timeline/YYYY-MM-DD/` → visible in dev UI
+- Commit edited record → tracked in Git with correct author
+- Move record to `bylaws/` → `source:` link remains intact
+- Render diff between timeline and structured file
+- Run `civic lint:records` to validate naming, structure, frontmatter
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - `civic index` command to regenerate a public search index
 - `civic trace` tool to follow a record's full evolution across timeline
@@ -284,7 +284,7 @@ source: 'timeline/2025-07-03/bylaw-park.md'
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03
 - Updated: 2025-07-03

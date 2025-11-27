@@ -1,16 +1,54 @@
 # Centralized Output Patterns
 
+> **⚠ Important**: Never use `console.log()`, `console.error()`, or direct
+> console output in CivicPress code. Always use the centralized output functions
+> described in this guide.
+
 This document describes the centralized output and logging patterns implemented
-across the CivicPress ecosystem, providing consistency and maintainability
+across the CivicPress ecosystem. These patterns ensure consistency,
+maintainability, and proper handling of output modes (JSON, silent, verbose)
 across API, CLI, and Core modules.
+
+## Why Use Centralized Output?
+
+**❌ Don't do this:**
+
+```typescript
+console.log('✅ Success!');
+console.error('❌ Error:', error);
+if (options.json) {
+  console.log(JSON.stringify(data));
+}
+```
+
+**✅ Do this instead:**
+
+```typescript
+cliSuccess(data, 'Success!', { operation: 'my-command' });
+cliError('Error occurred', 'ERROR_CODE', { error }, 'my-command');
+// JSON mode is handled automatically
+```
+
+### Benefits
+
+- **Automatic JSON mode**: Output automatically switches to JSON when `--json`
+  flag is used
+- **Silent mode support**: Respects `--silent` flag automatically
+- **Consistent formatting**: Uniform output format across all commands
+- **Rich context**: Operation timing, metadata, and debugging information
+- **Type safety**: TypeScript interfaces ensure correct usage
+- **Better testing**: Structured output is easier to test
 
 ## Overview
 
 The CivicPress project implements three centralized output systems:
 
-1. **API Response System** (`modules/api/src/utils/api-response.ts`)
-2. **CLI Output System** (`cli/src/utils/cli-output.ts`)
-3. **Core Output System** (`core/src/utils/core-output.ts`)
+1. **API Response System** (`modules/api/src/utils/api-logger.ts`) - For REST
+   API endpoints
+2. **CLI Output System** (`cli/src/utils/cli-output.ts`) - For command-line
+   interface
+3. **Core Output System** (`core/src/utils/core-output.ts`) - For core library
+   operations
 
 Each system provides structured, consistent output handling with support for:
 
@@ -67,11 +105,32 @@ graph TB
 
 ## CLI Output System
 
+**Location**: `cli/src/utils/cli-output.ts`
+
+### Quick Start
+
+```typescript
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliDebug,
+  cliTable,
+  cliStartOperation,
+} from '../utils/cli-output.js';
+
+// Initialize with global options (do this at the start of your command)
+import { initializeCliOutput, getGlobalOptionsFromArgs } from '../utils/global-options.js';
+const globalOptions = getGlobalOptionsFromArgs();
+initializeCliOutput(globalOptions);
+```
+
 ### Features
 
 - **Structured Output**: Consistent success/error response formats
-- **JSON Mode**: Machine-readable output with `--json` flag
-- **Silent Mode**: Suppress output with `--silent` flag
+- **JSON Mode**: Machine-readable output with `--json` flag (automatic)
+- **Silent Mode**: Suppress output with `--silent` flag (automatic)
 - **Verbose Mode**: Enhanced debugging with `--verbose` flag
 - **Table Output**: Formatted table display for structured data
 - **Operation Timing**: Automatic timing of CLI operations
@@ -131,8 +190,8 @@ endOperation();
 
 ```
 ✅ Successfully listed 5 records
-ℹ️  Loading records...
-⚠️  Warning: Some files could not be processed
+ℹ  Loading records...
+⚠  Warning: Some files could not be processed
 🔍 Debug: Processing file example.md
 🔄 Starting: list records
 ```
@@ -156,6 +215,21 @@ endOperation();
 ```
 
 ## Core Output System
+
+**Location**: `core/src/utils/core-output.ts`
+
+### Quick Start
+
+```typescript
+import {
+  coreSuccess,
+  coreError,
+  coreInfo,
+  coreWarn,
+  coreDebug,
+  coreStartOperation,
+} from '../utils/core-output.js';
+```
 
 ### Features
 
@@ -224,6 +298,147 @@ coreOutput.setLevel(LogLevel.DEBUG);
 if (coreOutput.isSilent()) {
   // Handle silent mode
 }
+```
+
+## API Response System
+
+**Location**: `modules/api/src/utils/api-response.ts`
+
+### Quick Start
+
+```typescript
+import {
+  sendSuccess,
+  handleApiError,
+  handleValidationError,
+  logApiRequest,
+} from '../utils/api-response.js';
+```
+
+### Success Responses
+
+```typescript
+// Simple success
+sendSuccess(res, data);
+
+// With message
+sendSuccess(res, data, 'Records retrieved successfully');
+
+// With metadata
+sendSuccess(res, data, 'Operation completed', {
+  totalRecords: 5,
+  processingTime: 1250
+});
+```
+
+### Error Handling
+
+```typescript
+// API errors
+handleApiError(res, error, 'Failed to process request');
+
+// Validation errors
+handleValidationError(res, validationErrors, 'Invalid input data');
+
+// Custom error codes
+handleApiError(res, error, 'Database connection failed', 503);
+```
+
+### Request Logging
+
+```typescript
+// Log API request
+logApiRequest(req, 'GET /api/records', { userId: req.user?.id });
+```
+
+## Common Patterns & Quick Reference
+
+### Command Structure Pattern
+
+```typescript
+export const myCommand = (cli: CAC) => {
+  cli
+    .command('my-command', 'Description')
+    .option('--option <value>', 'Option description')
+    .action(async (args: string, options: any) => {
+      // 1. Initialize output system
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      // 2. Start operation timing
+      const endOperation = cliStartOperation('my-command');
+
+      try {
+        // 3. Perform operation
+        const result = await doSomething();
+
+        // 4. Report success
+        cliSuccess(result, 'Operation completed', {
+          operation: 'my-command',
+          totalItems: result.length
+        });
+      } catch (error) {
+        // 5. Handle errors
+        cliError('Operation failed', 'OPERATION_FAILED', { error }, 'my-command');
+        process.exit(1);
+      } finally {
+        // 6. End operation timing
+        endOperation();
+      }
+    });
+};
+```
+
+### Error Handling Pattern
+
+```typescript
+try {
+  // ... operation
+  cliSuccess(data, 'Success');
+} catch (error) {
+  cliError(
+    'Operation failed',
+    'OPERATION_FAILED',
+    {
+      error: error instanceof Error ? error.message : String(error),
+      context: 'additional context'
+    },
+    'operation-name'
+  );
+  process.exit(1);
+}
+```
+
+### Progress Reporting Pattern
+
+```typescript
+cliInfo('Starting operation...', 'operation-name');
+
+for (let i = 0; i < items.length; i++) {
+  cliProgress(`Processing item ${i + 1} of ${items.length}`, 'operation-name');
+  // ... process item
+}
+
+cliSuccess(result, 'Operation completed');
+```
+
+### Global Options Reference
+
+| Flag         | Description           | Output                           |
+| ------------ | --------------------- | -------------------------------- |
+| `--json`     | Machine-readable JSON | Structured JSON with metadata    |
+| `--silent`   | Suppress all output   | No output (logs still generated) |
+| `--quiet`    | Errors only           | Error messages only              |
+| `--verbose`  | Enhanced debugging    | Debug messages + normal output   |
+| `--no-color` | Disable colors        | Plain text output                |
+
+**Example:**
+
+```bash
+civic list --json          # JSON output
+civic list --silent        # No output
+civic list --verbose       # Debug output
+civic list --quiet         # Errors only
 ```
 
 ## Migration Guide
@@ -414,6 +629,59 @@ coreError('Test error', 'TEST_ERROR');
 3. **Tracing**: Distributed tracing with OpenTelemetry
 4. **Analytics**: Usage analytics and performance insights
 
+## Migration Checklist
+
+When updating existing code to use centralized output:
+
+- [ ] Replace all `console.log()` with appropriate output function
+      (`cliSuccess`, `cliInfo`, etc.)
+- [ ] Replace all `console.error()` with `cliError()` or `coreError()`
+- [ ] Remove manual JSON handling (`if (options.json) { ... }`)
+- [ ] Add operation context to all output calls
+- [ ] Use descriptive error codes (not generic "ERROR")
+- [ ] Add operation timing where appropriate
+- [ ] Test both human-readable and JSON output modes
+- [ ] Test silent mode behavior
+- [ ] Update tests to verify output format
+
+## Common Mistakes to Avoid
+
+### Don't
+
+```typescript
+// Direct console usage
+console.log('Success!');
+console.error('Error:', error);
+
+// Manual JSON handling
+if (options.json) {
+  console.log(JSON.stringify(data));
+} else {
+  console.log('Success!');
+}
+
+// Missing context
+cliSuccess(data, 'Done');
+```
+
+### Do
+
+```typescript
+// Use centralized functions
+cliSuccess(data, 'Success!', { operation: 'my-command' });
+cliError('Error occurred', 'ERROR_CODE', { error }, 'my-command');
+
+// Let system handle JSON mode automatically
+cliSuccess(data, 'Success!', { operation: 'my-command' });
+
+// Include rich context
+cliSuccess(data, 'Done', {
+  operation: 'my-command',
+  totalItems: data.length,
+  processingTime: duration
+});
+```
+
 ## Conclusion
 
 The centralized output patterns provide:
@@ -423,6 +691,9 @@ The centralized output patterns provide:
 - **Type Safety**: TypeScript interfaces for all output formats
 - **Observability**: Rich context for debugging and monitoring
 - **Flexibility**: Support for multiple output modes and formats
+
+**Remember**: Always use the centralized output functions. Never use
+`console.log()` or `console.error()` directly in CivicPress code.
 
 This system ensures that CivicPress provides a professional, consistent user
 experience across all interfaces while maintaining the flexibility needed for

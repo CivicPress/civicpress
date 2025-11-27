@@ -1,8 +1,8 @@
-# 🧪 CivicPress Tests
+# CivicPress Tests
 
 This folder contains test scaffolding and coverage for CivicPress.
 
-## 🧱 Structure
+## Structure
 
 ```
 tests/
@@ -17,7 +17,7 @@ tests/
 └── utils/            # Shared test utilities
 ```
 
-## 🧪 Test Goals
+## Test Goals
 
 - Validate critical civic logic (approvals, merging, feedback)
 - Ensure core CLI commands function as expected
@@ -25,7 +25,7 @@ tests/
 - Test API endpoints for geography and storage systems
 - Verify data validation and error handling
 
-## 🚀 Running Tests
+## Running Tests
 
 Tests are run using Vitest. Use the following commands:
 
@@ -40,7 +40,7 @@ pnpm run test:watch
 pnpm run test:run tests/api/geography.test.ts
 ```
 
-## 📋 Test Coverage
+## Test Coverage
 
 ### API Tests
 

@@ -1,4 +1,4 @@
-# 👁️ CivicPress Spec: `review-policy.md`
+# ️ CivicPress Spec: `review-policy.md`
 
 ---
 
@@ -8,31 +8,31 @@ deprecated: false sunset_date: null additions:
 - comprehensive review policy documentation
 - review workflows
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'permissions.md: >=1.1.0'
-  - 'workflows.md: >=1.3.0' authors:
+ 'null' dependencies:
+ - 'permissions.md: >=1.1.0'
+ - 'workflows.md: >=1.3.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `review-policy` — Record Review & Approval Policy
 
-## 🎯 Purpose
+## Purpose
 
 Define how civic records move through **review and approval workflows** before
-being published, adopted, or archived.  
+being published, adopted, or archived. 
 This includes contributor roles, PR-style approvals, and customizable review
 gates for transparency and accountability.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Specify how many approvals are required for record adoption
 - Define who can approve records (roles, committees)
@@ -40,25 +40,25 @@ gates for transparency and accountability.
 - Allow review policies to vary by record type (e.g. bylaw vs. minutes)
 - Track review status in metadata and audit logs
 
-❌ Out of Scope:
+Out of Scope:
 
 - Voting results (covered by `votes.md`)
 - Moderation or spam protection
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Action                             | Result                               |
+| Action | Result |
 | ---------------------------------- | ------------------------------------ |
-| User proposes new record           | Status = `proposed`                  |
-| Required approvals are met         | Status = `adopted`, `approved`, etc. |
+| User proposes new record | Status = `proposed` |
+| Required approvals are met | Status = `adopted`, `approved`, etc. |
 | `review-policy.yml` says 2 signers | Blocks until 2 valid approvals given |
-| Record history shows reviewers     | Audit and trust preserved            |
+| Record history shows reviewers | Audit and trust preserved |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/review-policy.yml
@@ -67,26 +67,26 @@ records/**/*.md
 
 ---
 
-## 📝 Example `review-policy.yml`
+## Example `review-policy.yml`
 
 ```yaml
 defaults:
-  required_approvals: 2
-  eligible_roles: [clerk, mayor, councilor]
+ required_approvals: 2
+ eligible_roles: [clerk, mayor, councilor]
 
 rules:
-  bylaws/:
-    required_approvals: 3
-    eligible_roles: [clerk, councilor]
+ bylaws/:
+ required_approvals: 3
+ eligible_roles: [clerk, councilor]
 
-  minutes/:
-    required_approvals: 1
-    eligible_roles: [clerk]
+ minutes/:
+ required_approvals: 1
+ eligible_roles: [clerk]
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Approvers must be authenticated and authorized
 - Review actions must be auditable
@@ -95,7 +95,7 @@ rules:
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Simulate approval flow for new record
 - Attempt early merge without quorum — block it
@@ -104,7 +104,7 @@ rules:
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - UI approval queue (inbox of pending items)
 - Role-weighted or committee-based approvals
@@ -113,6 +113,6 @@ rules:
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

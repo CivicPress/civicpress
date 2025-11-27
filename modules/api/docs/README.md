@@ -78,11 +78,18 @@ router.get('/records', async (req, res) => {
 
 ## Documentation
 
-- [Centralized Response System](./centralized-response-system.md) - Complete
-  guide to the response system
-- [Quick Reference](./quick-reference.md) - Developer quick reference
-- [Error Handling](./error-handling.md) - Error handling patterns
+- [Quick Reference](./quick-reference.md) - Developer quick reference for API
+  response patterns
 - [History API](./history-api.md) - Git commit history endpoints
+- [Error Logging](./error-logging.md) - API error logging system
+- [Status API](./status-api.md) - System status and monitoring endpoints
+- [Validation API](./validation-api.md) - Record validation endpoints
+- [Diff API](./diff-api.md) - Record comparison and diff endpoints
+
+> **Note**: For comprehensive output patterns documentation covering API, CLI,
+> and Core modules, see
+> [Centralized Output Patterns](../../docs/centralized-output-patterns.md) in
+> the main documentation.
 
 ## Available Endpoints
 

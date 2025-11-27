@@ -13,10 +13,10 @@ correctly across the API, UI, and CLI interfaces.
 1. **Start the development environment:**
 
    ```bash
-   # Terminal 1: Start API server
+# Terminal 1: Start API server
    cd modules/api && pnpm run dev
 
-   # Terminal 2: Start UI server
+# Terminal 2: Start UI server
    cd modules/ui && pnpm run dev
    ```
 

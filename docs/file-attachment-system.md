@@ -1,31 +1,31 @@
-# 📎 CivicPress File Attachment System
+# CivicPress File Attachment System
 
-**Version**: 1.0.0  
-**Status**: ✅ Production Ready  
+**Version**: 1.0.0 
+**Status**: Production Ready 
 **Last Updated**: September 2025
 
-## 📋 Overview
+## Overview
 
 The CivicPress File Attachment System allows users to link existing files from
 the storage system to any record type. This creates a powerful association
 between civic documents and their supporting materials while maintaining
 security and organization.
 
-## 🎯 Key Features
+## Key Features
 
-### ✅ **Complete Implementation**
+### **Complete Implementation**
 
 - **Record Integration**: Link files to any record type (bylaws, policies,
-  resolutions, etc.)
+ resolutions, etc.)
 - **File Selection**: Intuitive UI for browsing and selecting existing files
 - **Categorization**: Organize attachments by type (Reference, Financial, Legal,
-  etc.)
+ etc.)
 - **Secure Access**: Authenticated downloads with proper error handling
 - **Database Persistence**: Files stored in both database and markdown
-  frontmatter
+ frontmatter
 - **Configuration**: Customizable attachment types via YAML configuration
 
-### 🔧 **Technical Architecture**
+### **Technical Architecture**
 
 - **Database Schema**: New `attached_files` JSON column with automatic migration
 - **API Endpoints**: REST endpoints with validation for file operations
@@ -33,7 +33,7 @@ security and organization.
 - **TypeScript**: Full type safety for attachment data structures
 - **Authentication**: Secure file access with JWT token validation
 
-## 🏗️ Architecture
+## Architecture
 
 ### Database Schema
 
@@ -46,17 +46,17 @@ The `attached_files` column stores JSON data with the following structure:
 
 ```json
 [
-  {
-    "id": "d4a71bf5-db44-4a50-9adf-de226e2c000e",
-    "path": "public/agenda-2025-09-02.d4a71bf5-db44-4a50-9adf-de226e2c000e.txt",
-    "original_name": "agenda-2025-09-02.txt",
-    "description": "Meeting agenda for September 2nd",
-    "category": {
-      "label": "Reference",
-      "value": "reference",
-      "description": "Reference documents and materials"
-    }
-  }
+ {
+ "id": "d4a71bf5-db44-4a50-9adf-de226e2c000e",
+ "path": "public/agenda-2025-09-02.d4a71bf5-db44-4a50-9adf-de226e2c000e.txt",
+ "original_name": "agenda-2025-09-02.txt",
+ "description": "Meeting agenda for September 2nd",
+ "category": {
+ "label": "Reference",
+ "value": "reference",
+ "description": "Reference documents and materials"
+ }
+ }
 ]
 ```
 
@@ -70,17 +70,17 @@ Content-Type: application/json
 Authorization: Bearer <token>
 
 {
-  "title": "Sample Bylaw",
-  "content": "...",
-  "attachedFiles": [
-    {
-      "id": "file-uuid",
-      "path": "storage/path",
-      "original_name": "document.pdf",
-      "description": "Supporting document",
-      "category": "reference"
-    }
-  ]
+ "title": "Sample Bylaw",
+ "content": "...",
+ "attachedFiles": [
+ {
+ "id": "file-uuid",
+ "path": "storage/path",
+ "original_name": "document.pdf",
+ "description": "Supporting document",
+ "category": "reference"
+ }
+ ]
 }
 ```
 
@@ -92,14 +92,14 @@ Authorization: Bearer <token>
 
 Response:
 {
-  "success": true,
-  "data": {
-    "record": {
-      "id": "record-id",
-      "title": "Sample Bylaw",
-      "attachedFiles": [...]
-    }
-  }
+ "success": true,
+ "data": {
+ "record": {
+ "id": "record-id",
+ "title": "Sample Bylaw",
+ "attachedFiles": [...]
+ }
+ }
 }
 ```
 
@@ -112,7 +112,7 @@ Authorization: Bearer <token>
 Response: Binary file data with proper headers
 ```
 
-## 🎨 UI Components
+## UI Components
 
 ### FileBrowserPopover
 
@@ -133,9 +133,9 @@ files from the storage system.
 
 ```vue
 <FileBrowserPopover
-  v-model:open="showFileBrowser"
-  @file-selected="handleFileSelection"
-  :attachment-types="attachmentTypes"
+ v-model:open="showFileBrowser"
+ @file-selected="handleFileSelection"
+ :attachment-types="attachmentTypes"
 />
 ```
 
@@ -148,7 +148,7 @@ Integrated into record view pages to display linked files with:
 - Download buttons with authentication
 - Edit/remove functionality
 
-## ⚙️ Configuration
+## Configuration
 
 ### Attachment Types
 
@@ -156,47 +156,47 @@ File: `core/src/defaults/attachment-types.yml`
 
 ```yaml
 _metadata:
-  name: 'File Attachment Types'
-  description: 'Configure types and categories for file attachments'
-  version: '1.0.0'
-  editable: true
+ name: 'File Attachment Types'
+ description: 'Configure types and categories for file attachments'
+ version: '1.0.0'
+ editable: true
 
 types:
-  reference:
-    label:
-      value: 'Reference'
-      type: 'string'
-      description: 'Display label for reference documents'
-      required: true
-    description:
-      value: 'Reference documents and materials'
-      type: 'textarea'
-      description: 'Description of this attachment type'
-      required: true
+ reference:
+ label:
+ value: 'Reference'
+ type: 'string'
+ description: 'Display label for reference documents'
+ required: true
+ description:
+ value: 'Reference documents and materials'
+ type: 'textarea'
+ description: 'Description of this attachment type'
+ required: true
 
-  financial:
-    label:
-      value: 'Financial'
-      type: 'string'
-      description: 'Display label for financial documents'
-      required: true
-    description:
-      value: 'Budget reports, financial statements, invoices'
-      type: 'textarea'
-      description: 'Description of this attachment type'
-      required: true
+ financial:
+ label:
+ value: 'Financial'
+ type: 'string'
+ description: 'Display label for financial documents'
+ required: true
+ description:
+ value: 'Budget reports, financial statements, invoices'
+ type: 'textarea'
+ description: 'Description of this attachment type'
+ required: true
 
-  legal:
-    label:
-      value: 'Legal'
-      type: 'string'
-      description: 'Display label for legal documents'
-      required: true
-    description:
-      value: 'Legal opinions, contracts, agreements'
-      type: 'textarea'
-      description: 'Description of this attachment type'
-      required: true
+ legal:
+ label:
+ value: 'Legal'
+ type: 'string'
+ description: 'Display label for legal documents'
+ required: true
+ description:
+ value: 'Legal opinions, contracts, agreements'
+ type: 'textarea'
+ description: 'Description of this attachment type'
+ required: true
 ```
 
 ### Configuration API
@@ -208,7 +208,7 @@ GET /api/v1/config/attachment-types
 Authorization: Bearer <token>
 ```
 
-## 🔐 Security
+## Security
 
 ### Authentication
 
@@ -232,7 +232,7 @@ All file operations require authentication:
 - Client-side error handling with user feedback
 - Server-side logging for security events
 
-## 💻 Development
+## Development
 
 ### Core Services
 
@@ -245,11 +245,11 @@ Handles serialization and deserialization of attachment data:
 ```typescript
 // Serialize attachments for database storage
 const attachedFilesJson = record.attachedFiles ?
-  JSON.stringify(record.attachedFiles) : null;
+ JSON.stringify(record.attachedFiles) : null;
 
 // Deserialize attachments from database
 record.attachedFiles = row.attached_files ?
-  JSON.parse(row.attached_files) : [];
+ JSON.parse(row.attached_files) : [];
 ```
 
 #### Configuration Service
@@ -260,7 +260,7 @@ Manages attachment type configuration:
 
 ```typescript
 export function getAttachmentTypes(): AttachmentTypes {
-  return loadConfiguration('attachment-types');
+ return loadConfiguration('attachment-types');
 }
 ```
 
@@ -277,8 +277,8 @@ body('attachedFiles').optional().isArray(),
 // Route handler processes attachedFiles
 const { attachedFiles, ...otherData } = req.body;
 await recordsService.updateRecord(id, {
-  ...otherData,
-  attachedFiles
+ ...otherData,
+ attachedFiles
 });
 ```
 
@@ -290,13 +290,13 @@ Provides attachment type data to Vue components:
 
 ```typescript
 export const useAttachmentTypes = () => {
-  const { $civicApi } = useNuxtApp();
+ const { $civicApi } = useNuxtApp();
 
-  return $civicApi('/api/v1/config/attachment-types');
+ return $civicApi('/api/v1/config/attachment-types');
 };
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Test Coverage
 
@@ -320,7 +320,7 @@ export const useAttachmentTypes = () => {
 5. **Secure Download**: Test authenticated file downloads
 6. **Error Handling**: Test various error scenarios
 
-## 📈 Usage Examples
+## Usage Examples
 
 ### Basic Attachment Workflow
 
@@ -337,22 +337,22 @@ export const useAttachmentTypes = () => {
 ```javascript
 // Update record with attachments
 const response = await fetch('/api/v1/records/123', {
-  method: 'PUT',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  },
-  body: JSON.stringify({
-    title: 'Updated Record',
-    attachedFiles: [
-      {
-        id: 'file-uuid',
-        original_name: 'document.pdf',
-        description: 'Important document',
-        category: 'legal'
-      }
-    ]
-  })
+ method: 'PUT',
+ headers: {
+ 'Content-Type': 'application/json',
+ 'Authorization': `Bearer ${token}`
+ },
+ body: JSON.stringify({
+ title: 'Updated Record',
+ attachedFiles: [
+ {
+ id: 'file-uuid',
+ original_name: 'document.pdf',
+ description: 'Important document',
+ category: 'legal'
+ }
+ ]
+ })
 });
 ```
 
@@ -364,15 +364,15 @@ const types = await $civicApi('/api/v1/config/attachment-types');
 
 // Use in UI
 const categoryOptions = Object.entries(types.data.types).map(
-  ([key, config]) => ({
-    value: key,
-    label: config.label.value,
-    description: config.description.value
-  })
+ ([key, config]) => ({
+ value: key,
+ label: config.label.value,
+ description: config.description.value
+ })
 );
 ```
 
-## 🚀 Future Enhancements
+## Future Enhancements
 
 ### Planned Features
 
@@ -390,7 +390,7 @@ const categoryOptions = Object.entries(types.data.types).map(
 - **Indexing**: Full-text search of attachment content
 - **Webhooks**: Notify external systems of attachment changes
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [UUID Storage System](uuid-storage-system.md)
 - [Configuration Architecture](configuration-architecture.md)
@@ -398,7 +398,7 @@ const categoryOptions = Object.entries(types.data.types).map(
 - [Storage Specification](specs/storage.md)
 - [Database Schema](specs/database.md)
 
-## 🤝 Contributing
+## Contributing
 
 ### Adding New Features
 

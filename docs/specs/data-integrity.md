@@ -1,4 +1,4 @@
-# 🛡️ CivicPress Spec: `data-integrity.md`
+# ️ CivicPress Spec: `data-integrity.md`
 
 ---
 
@@ -8,20 +8,20 @@ deprecated: false sunset_date: null additions:
 - comprehensive data integrity documentation
 - validation patterns
 - security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-  - 'public-data-structure.md: >=1.0.0'
-  - 'records-validation.md: >=1.0.0' authors:
+ 'null' dependencies:
+ - 'public-data-structure.md: >=1.0.0'
+ - 'records-validation.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 Data Integrity & Record Validation
 
-## 🎯 Purpose
+## Purpose
 
 Ensure that civic records and metadata remain **untampered**, **authentic**, and
 **verifiable** — especially in long-term archival and public trust scenarios.
@@ -31,9 +31,9 @@ consistency.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Generate and store record-level cryptographic hashes
 - Enable CLI or API integrity verification
@@ -41,24 +41,24 @@ consistency.
 - Track expected file size, format, and schema
 - Log validation results in audit trail
 
-❌ Out of Scope:
+Out of Scope:
 
 - Full blockchain or decentralized storage (future)
 - Cryptographic signatures (see `signatures.md`)
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Action                             | Output                            |
+| Action | Output |
 | ---------------------------------- | --------------------------------- |
-| `civic hash records/bylaw.md`      | SHA-256 hash written to log       |
-| `civic verify`                     | Lists modified or missing records |
-| API endpoint: `/integrity/:record` | Returns fingerprint & status      |
+| `civic hash records/bylaw.md` | SHA-256 hash written to log |
+| `civic verify` | Lists modified or missing records |
+| API endpoint: `/integrity/:record` | Returns fingerprint & status |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 .civic/integrity.json
@@ -68,21 +68,21 @@ core/integrity.ts
 
 ---
 
-## 📝 Example Fingerprint
+## Example Fingerprint
 
 ```json
 {
-  "path": "records/bylaws/curfew.md",
-  "sha256": "c4ab7f3d99f1e83a8d9f84e2f7bb9...",
-  "size": 4121,
-  "format": "markdown",
-  "verified_at": "2025-07-04T14:21:00Z"
+ "path": "records/bylaws/curfew.md",
+ "sha256": "c4ab7f3d99f1e83a8d9f84e2f7bb9...",
+ "size": 4121,
+ "format": "markdown",
+ "verified_at": "2025-07-04T14:21:00Z"
 }
 ```
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 - Any file change must update or invalidate its hash
 - Git commit logs can be cross-validated with hashes
@@ -90,7 +90,7 @@ core/integrity.ts
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test verification after file edits
 - Simulate tampered or corrupted records
@@ -99,14 +99,14 @@ core/integrity.ts
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Signed Merkle trees for entire civic folder
 - Time-stamped notarization (e.g. OpenTimestamps)
 - Blockchain anchoring plugin (opt-in)
 - Immutable file snapshots for historic records
 
-## 🔗 Related Specs
+## Related Specs
 
 - [`backup.md`](./backup.md) — Backup integrity verification
 - [`signatures.md`](./signatures.md) — Cryptographic signature validation
@@ -115,6 +115,6 @@ core/integrity.ts
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-04

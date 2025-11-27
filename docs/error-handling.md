@@ -1,9 +1,9 @@
-# 🛡️ Error Handling Guide
+# Error Handling Guide
 
 CivicPress implements a comprehensive error handling system that provides
 consistent user experience and maintainable code.
 
-## 🎯 Overview
+## Overview
 
 The error handling system consists of:
 
@@ -13,7 +13,7 @@ The error handling system consists of:
 - **Toast Notifications**: Automatic user feedback for all errors
 - **Store Integration**: Consistent error handling across all stores
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Basic Usage
 
@@ -51,7 +51,7 @@ const message = handleValidationError(error, {
 })
 ```
 
-## 🔧 Error Handler Types
+## Error Handler Types
 
 ### `handleApiError()`
 
@@ -83,7 +83,7 @@ const message = handleValidationError(error, {
 - **Features**: Automatically determines error type and routes appropriately
 - **Use Case**: General error handling when type is unknown
 
-## ⚙️ Configuration Options
+## Configuration Options
 
 All error handlers accept an `ErrorOptions` object:
 
@@ -96,7 +96,7 @@ interface ErrorOptions {
 }
 ```
 
-## 🌐 API Interceptor
+## API Interceptor
 
 The `civicApi` plugin automatically handles common HTTP errors:
 
@@ -135,7 +135,7 @@ async onResponseError({ response, error }) {
 }
 ```
 
-## 🏪 Store Integration
+## Store Integration
 
 ### Records Store
 
@@ -177,7 +177,7 @@ try {
 }
 ```
 
-## 🎨 Toast Notifications
+## Toast Notifications
 
 All errors automatically show toast notifications with appropriate styling:
 
@@ -198,7 +198,7 @@ $toast.add({
 })
 ```
 
-## 🔍 Debugging
+## Debugging
 
 ### Console Logging
 
@@ -225,7 +225,7 @@ The error object contains:
 }
 ```
 
-## 📋 Best Practices
+## Best Practices
 
 ### 1. Use Centralized Error Handling
 
@@ -285,7 +285,7 @@ if (error.status === 422) {
 return handleError(error) // Automatically determines type
 ```
 
-## 🚀 Migration Guide
+## Migration Guide
 
 ### From Manual Error Handling
 
@@ -318,7 +318,7 @@ try {
 }
 ```
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Development Pattern](./dev-pattern.md) - Overall development approach
 - [API Integration Guide](./api-integration-guide.md) - API usage patterns

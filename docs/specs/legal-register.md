@@ -1,4 +1,4 @@
-# ⚖️ CivicPress Spec: `legal-register.md`
+# ️ CivicPress Spec: `legal-register.md`
 
 ---
 
@@ -8,153 +8,153 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive legal register documentation
 - document integrity
 - security considerations fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-  - 'public-data-structure.md: >=1.0.0'
-  - 'records-validation.md: >=1.0.0' authors:
+ min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ - 'public-data-structure.md: >=1.0.0'
+ - 'records-validation.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
 
 ---
 
-## 📛 Name
+## Name
 
 `legal-register` — CivicPress Legal Register Module (Bylaws, Motions, and Legal
 Records)
 
-## 🎯 Purpose
+## Purpose
 
 Manage and organize official civic legal records such as bylaws, motions,
 ordinances, and resolutions in a structured, Markdown-native format.
 
 ---
 
-## 🧩 Scope & Responsibilities
+## Scope & Responsibilities
 
-✅ Responsibilities:
+Responsibilities:
 
 - Accept Markdown records for bylaws, motions, and resolutions
 - Enable indexing, status tracking, versioning, and approval flow
 - Define file structure, naming, and YAML frontmatter fields
 - Attach to feedback, sessions, and history timeline
 
-❌ Out of scope:
+Out of scope:
 
 - PDF management or media hosting
 - Legal advice or interpretation
 
 ---
 
-## 🔗 Inputs & Outputs
+## Inputs & Outputs
 
-| Input              | Description                                        |
+| Input | Description |
 | ------------------ | -------------------------------------------------- |
-| Legal documents    | Markdown files for bylaws, motions, resolutions    |
-| Document metadata  | Title, number, status, authors, approval info      |
-| Approval workflows | Multi-role approval processes and signatures       |
-| Legal templates    | Pre-defined templates for different document types |
-| Version history    | Document versioning and change tracking            |
+| Legal documents | Markdown files for bylaws, motions, resolutions |
+| Document metadata | Title, number, status, authors, approval info |
+| Approval workflows | Multi-role approval processes and signatures |
+| Legal templates | Pre-defined templates for different document types |
+| Version history | Document versioning and change tracking |
 
-| Output              | Description                              |
+| Output | Description |
 | ------------------- | ---------------------------------------- |
-| Legal records       | Structured legal documents in `records/` |
-| Legal indexes       | Searchable indexes of legal documents    |
-| Approval logs       | Audit trails of document approvals       |
-| Version snapshots   | Immutable versions of legal documents    |
-| Publication notices | Notifications of legal document changes  |
+| Legal records | Structured legal documents in `records/` |
+| Legal indexes | Searchable indexes of legal documents |
+| Approval logs | Audit trails of document approvals |
+| Version snapshots | Immutable versions of legal documents |
+| Publication notices | Notifications of legal document changes |
 
 ---
 
-## 📂 File/Folder Location
+## File/Folder Location
 
 ```
 records/
 ├── bylaws/
-│   ├── section-01/
-│   │   ├── bylaw-tree-cutting.md
-│   │   └── index.yml
-│   ├── section-02/
-│   │   ├── bylaw-noise-restrictions.md
-│   │   └── index.yml
-│   └── repealed/
-│       └── bylaw-old-curfew-1998.md
+│ ├── section-01/
+│ │ ├── bylaw-tree-cutting.md
+│ │ └── index.yml
+│ ├── section-02/
+│ │ ├── bylaw-noise-restrictions.md
+│ │ └── index.yml
+│ └── repealed/
+│ └── bylaw-old-curfew-1998.md
 ├── motions/
-│   ├── 2025-07-01/
-│   │   ├── motion-curfew-extension.md
-│   │   └── index.yml
-│   └── pending/
-│       └── motion-budget-increase.md
+│ ├── 2025-07-01/
+│ │ ├── motion-curfew-extension.md
+│ │ └── index.yml
+│ └── pending/
+│ └── motion-budget-increase.md
 └── resolutions/
-    ├── 2025-06-10/
-    │   ├── resolution-road-repair.md
-    │   └── index.yml
-    └── adopted/
-        └── resolution-emergency-funding.md
+ ├── 2025-06-10/
+ │ ├── resolution-road-repair.md
+ │ └── index.yml
+ └── adopted/
+ └── resolution-emergency-funding.md
 
 .civic/
-├── legal-register.yml     # Legal register configuration
+├── legal-register.yml # Legal register configuration
 ├── legal-templates/
-│   ├── bylaw-template.md
-│   ├── motion-template.md
-│   └── resolution-template.md
+│ ├── bylaw-template.md
+│ ├── motion-template.md
+│ └── resolution-template.md
 └── legal-schemas/
-    ├── bylaw-schema.yml
-    ├── motion-schema.yml
-    └── resolution-schema.yml
+ ├── bylaw-schema.yml
+ ├── motion-schema.yml
+ └── resolution-schema.yml
 
 core/
-├── legal-register.ts      # Legal register logic
-├── legal-validation.ts    # Legal document validation
-├── legal-workflow.ts      # Legal approval workflows
-└── legal-indexing.ts      # Legal document indexing
+├── legal-register.ts # Legal register logic
+├── legal-validation.ts # Legal document validation
+├── legal-workflow.ts # Legal approval workflows
+└── legal-indexing.ts # Legal document indexing
 
 modules/
 ├── legal-register/
-│   ├── components/
-│   │   ├── LegalDocumentViewer.tsx
-│   │   ├── LegalDocumentEditor.tsx
-│   │   └── LegalApprovalWorkflow.tsx
-│   ├── hooks/
-│   │   └── useLegalRegister.ts
-│   └── utils/
-│       ├── legal-parser.ts
-│       ├── legal-validator.ts
-│       └── legal-indexer.ts
+│ ├── components/
+│ │ ├── LegalDocumentViewer.tsx
+│ │ ├── LegalDocumentEditor.tsx
+│ │ └── LegalApprovalWorkflow.tsx
+│ ├── hooks/
+│ │ └── useLegalRegister.ts
+│ └── utils/
+│ ├── legal-parser.ts
+│ ├── legal-validator.ts
+│ └── legal-indexer.ts
 └── ui/
-    └── components/
-        └── LegalProvider.tsx
+ └── components/
+ └── LegalProvider.tsx
 
 tests/
 ├── legal-register/
-│   ├── legal-creation.test.ts
-│   ├── legal-approval.test.ts
-│   └── legal-indexing.test.ts
+│ ├── legal-creation.test.ts
+│ ├── legal-approval.test.ts
+│ └── legal-indexing.test.ts
 └── integration/
-    └── legal-register-integration.test.ts
+ └── legal-register-integration.test.ts
 ```
 
 ---
 
-## 📁 File Structure
+## File Structure
 
 ```
 records/
 ├── bylaws/
-│   ├── section-01/
-│   │   └── bylaw-tree-cutting.md
-│   ├── section-02/
-│   │   └── bylaw-noise-restrictions.md
+│ ├── section-01/
+│ │ └── bylaw-tree-cutting.md
+│ ├── section-02/
+│ │ └── bylaw-noise-restrictions.md
 ├── motions/
-│   └── 2025-07-01/
-│       └── motion-curfew-extension.md
+│ └── 2025-07-01/
+│ └── motion-curfew-extension.md
 └── resolutions/
-    └── 2025-06-10/
-        └── resolution-road-repair.md
+ └── 2025-06-10/
+ └── resolution-road-repair.md
 ```
 
 ---
 
-## 🧠 Record Format
+## Record Format
 
 Example for a bylaw:
 
@@ -169,31 +169,31 @@ created: '2025-06-12'
 adopted: '2025-07-01'
 module: 'legal-register'
 authors:
-  - name: 'Irène Joliot-Curie'
-    role: 'clerk'
+ - name: 'Irène Joliot-Curie'
+ role: 'clerk'
 approved_by:
-  - 'Ada Lovelace'
+ - 'Ada Lovelace'
 related_to:
-  - records/feedback/2025-06-20/noise-complaint.md
-  - records/public-sessions/2025-06-28/index.md
+ - records/feedback/2025-06-20/noise-complaint.md
+ - records/public-sessions/2025-06-28/index.md
 ---
 To ensure a peaceful night environment...
 ```
 
 ---
 
-## 🔁 Lifecycle States
+## Lifecycle States
 
-| Status     | Description          |
+| Status | Description |
 | ---------- | -------------------- |
-| `draft`    | Initial proposal     |
+| `draft` | Initial proposal |
 | `proposed` | Under council review |
-| `adopted`  | Approved and binding |
+| `adopted` | Approved and binding |
 | `archived` | Repealed or replaced |
 
 ---
 
-## 🛠️ CLI Commands
+## ️ CLI Commands
 
 ```bash
 civic propose bylaw --title "..." --section 02
@@ -203,7 +203,7 @@ civic archive bylaw-noise-restrictions.md
 
 ---
 
-## 🔗 Hooks & Workflows
+## Hooks & Workflows
 
 - `onBylawProposed` → notify roles or open review thread
 - `onBylawAdopted` → trigger indexing or update dashboard
@@ -211,7 +211,7 @@ civic archive bylaw-noise-restrictions.md
 
 ---
 
-## 🔐 Security & Trust Considerations
+## Security & Trust Considerations
 
 ### Legal Document Integrity
 
@@ -263,20 +263,20 @@ civic archive bylaw-noise-restrictions.md
 
 ---
 
-## 📊 Indexing Example
+## Indexing Example
 
 ```yaml
 - file: bylaws/section-02/bylaw-noise-restrictions.md
-  title: 'Noise Restrictions'
-  number: 'BL-2025-003'
-  status: 'adopted'
-  section: '02'
-  adopted: '2025-07-01'
+ title: 'Noise Restrictions'
+ number: 'BL-2025-003'
+ status: 'adopted'
+ section: '02'
+ adopted: '2025-07-01'
 ```
 
 ---
 
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - Test bylaw creation and approval workflow
 - Verify status transitions work correctly
@@ -286,7 +286,7 @@ civic archive bylaw-noise-restrictions.md
 
 ---
 
-## 🛠️ Future Enhancements
+## ️ Future Enhancements
 
 - Tracking repealed/replaced laws
 - Cross-town bylaw comparison tools
@@ -295,6 +295,6 @@ civic archive bylaw-noise-restrictions.md
 
 ---
 
-## 📅 History
+## History
 
 - Drafted: 2025-07-03

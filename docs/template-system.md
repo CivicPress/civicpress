@@ -1,7 +1,7 @@
 # Template Loading System
 
-**Last Updated**: January 2025  
-**Status**: ✅ **Fully Implemented and Tested**
+**Last Updated**: January 2025 
+**Status**: **Fully Implemented and Tested**
 
 ## Overview
 
@@ -11,28 +11,28 @@ and confirmation workflows to prevent accidental content loss.
 
 ## Features
 
-### 📝 **Template Management**
+### **Template Management**
 
 - **Type-Based Templates**: Templates organized by record type (bylaw, policy,
-  resolution, etc.)
+ resolution, etc.)
 - **Template Selection**: Dropdown interface showing available templates
 - **Template Metadata**: Name, description, and type information
 - **Always Visible**: Template section visible from the start, even before
-  record type selection
+ record type selection
 
-### 🔄 **Content Loading**
+### **Content Loading**
 
 - **Confirmation Modal**: Detailed template information and content replacement
-  warning
+ warning
 - **Variable Substitution**: Dynamic content with current form data
 - **Content Replacement**: Complete replacement of existing content with
-  template
+ template
 - **User Control**: Clear confirmation required before any content changes
 
-### 🎯 **User Experience**
+### **User Experience**
 
 - **Progressive Disclosure**: Template options appear after record type
-  selection
+ selection
 - **Clear Guidance**: Helpful messages when no templates are available
 - **Visual Feedback**: Toast notifications for successful template loading
 - **Error Prevention**: Confirmation prevents accidental content loss
@@ -46,40 +46,40 @@ The template system is integrated into the record creation and editing forms:
 ```vue
 <!-- Template Loading Section -->
 <div class="my-4">
-  <h3 class="text-lg font-medium text-gray-900 dark:text-white">Templates</h3>
+ <h3 class="text-lg font-medium text-gray-900 dark:text-white">Templates</h3>
 
-  <!-- Template Options (when type is selected) -->
-  <div v-if="form.type" class="space-y-2">
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-      Available Templates
-    </label>
-    <div class="flex items-center gap-2">
-      <UButton
-        color="primary"
-        variant="outline"
-        size="sm"
-        @click="openTemplateModal"
-        :disabled="saving || !selectedTemplate || !templateOptionsComputed.length"
-      >
-        Load Template
-      </UButton>
-      <USelectMenu
-        v-model="selectedTemplate"
-        :items="templateOptionsComputed"
-        placeholder="Select a template"
-        :disabled="saving"
-        class="flex-1"
-      />
-    </div>
-    <p class="text-sm text-gray-600">
-      Choose a template and click "Load Template" to populate the content field.
-    </p>
-  </div>
+ <!-- Template Options (when type is selected) -->
+ <div v-if="form.type" class="space-y-2">
+ <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+ Available Templates
+ </label>
+ <div class="flex items-center gap-2">
+ <UButton
+ color="primary"
+ variant="outline"
+ size="sm"
+ @click="openTemplateModal"
+ :disabled="saving || !selectedTemplate || !templateOptionsComputed.length"
+ >
+ Load Template
+ </UButton>
+ <USelectMenu
+ v-model="selectedTemplate"
+ :items="templateOptionsComputed"
+ placeholder="Select a template"
+ :disabled="saving"
+ class="flex-1"
+ />
+ </div>
+ <p class="text-sm text-gray-600">
+ Choose a template and click "Load Template" to populate the content field.
+ </p>
+ </div>
 
-  <!-- Guidance Message (when no type selected) -->
-  <div v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
-    Select a record type above to see available templates.
-  </div>
+ <!-- Guidance Message (when no type selected) -->
+ <div v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
+ Select a record type above to see available templates.
+ </div>
 </div>
 ```
 
@@ -90,55 +90,55 @@ A comprehensive confirmation modal ensures users understand the implications:
 ```vue
 <!-- Template Confirmation Modal -->
 <UModal
-  v-model="showTemplateModal"
-  v-if="selectedTemplate"
-  title="Load Template"
-  description="Are you sure you want to load this template? This will replace your current content."
+ v-model="showTemplateModal"
+ v-if="selectedTemplate"
+ title="Load Template"
+ description="Are you sure you want to load this template? This will replace your current content."
 >
-  <template #body>
-    <div class="space-y-4">
-      <!-- Template Details -->
-      <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div class="flex items-start space-x-3">
-          <UIcon name="i-lucide-info" class="w-5 h-5 text-blue-600 mt-0.5" />
-          <div class="text-sm text-blue-700 dark:text-blue-300">
-            <p class="font-medium">Template Details:</p>
-            <ul class="mt-1 space-y-1">
-              <li>• <strong>Name:</strong> {{ selectedTemplate?.label }}</li>
-              <li>• <strong>Type:</strong> {{ form.type }}</li>
-              <li v-if="selectedTemplate?.description">• <strong>Description:</strong> {{ selectedTemplate.description }}</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+ <template #body>
+ <div class="space-y-4">
+ <!-- Template Details -->
+ <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+ <div class="flex items-start space-x-3">
+ <UIcon name="i-lucide-info" class="w-5 h-5 text-blue-600 mt-0.5" />
+ <div class="text-sm text-blue-700 dark:text-blue-300">
+ <p class="font-medium">Template Details:</p>
+ <ul class="mt-1 space-y-1">
+ <li>• <strong>Name:</strong> {{ selectedTemplate?.label }}</li>
+ <li>• <strong>Type:</strong> {{ form.type }}</li>
+ <li v-if="selectedTemplate?.description">• <strong>Description:</strong> {{ selectedTemplate.description }}</li>
+ </ul>
+ </div>
+ </div>
+ </div>
 
-      <!-- Warning -->
-      <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-        <div class="flex items-start space-x-3">
-          <UIcon name="i-lucide-alert-triangle" class="w-5 h-5 text-yellow-600 mt-0.5" />
-          <div class="text-sm text-yellow-700 dark:text-yellow-300">
-            <p class="font-medium">Warning:</p>
-            <ul class="mt-1 space-y-1">
-              <li>• Current content will be completely replaced</li>
-              <li>• Template variables will be filled with current form data</li>
-              <li>• This action cannot be undone</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  </template>
+ <!-- Warning -->
+ <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+ <div class="flex items-start space-x-3">
+ <UIcon name="i-lucide-alert-triangle" class="w-5 h-5 text-yellow-600 mt-0.5" />
+ <div class="text-sm text-yellow-700 dark:text-yellow-300">
+ <p class="font-medium">Warning:</p>
+ <ul class="mt-1 space-y-1">
+ <li>• Current content will be completely replaced</li>
+ <li>• Template variables will be filled with current form data</li>
+ <li>• This action cannot be undone</li>
+ </ul>
+ </div>
+ </div>
+ </div>
+ </div>
+ </template>
 
-  <template #footer="{ close }">
-    <div class="flex justify-end space-x-3">
-      <UButton color="neutral" variant="outline" @click="close">
-        Cancel
-      </UButton>
-      <UButton color="primary" :loading="saving" @click="loadTemplate">
-        Load Template
-      </UButton>
-    </div>
-  </template>
+ <template #footer="{ close }">
+ <div class="flex justify-end space-x-3">
+ <UButton color="neutral" variant="outline" @click="close">
+ Cancel
+ </UButton>
+ <UButton color="primary" :loading="saving" @click="loadTemplate">
+ Load Template
+ </UButton>
+ </div>
+ </template>
 </UModal>
 ```
 
@@ -149,38 +149,38 @@ A comprehensive confirmation modal ensures users understand the implications:
 ```typescript
 // Open template confirmation modal
 const openTemplateModal = () => {
-  if (selectedTemplate.value) {
-    showTemplateModal.value = true;
-  }
+ if (selectedTemplate.value) {
+ showTemplateModal.value = true;
+ }
 };
 
 // Load and apply selected template
 const loadTemplate = () => {
-  if (selectedTemplate.value) {
-    const template = getTemplateById(selectedTemplate.value.value);
-    if (template) {
-      // Prepare variables for template substitution
-      const variables = {
-        title: form.title || '[Record Title]',
-        user: 'Current User', // TODO: Get from auth store
-        timestamp: new Date().toISOString(),
-      };
+ if (selectedTemplate.value) {
+ const template = getTemplateById(selectedTemplate.value.value);
+ if (template) {
+ // Prepare variables for template substitution
+ const variables = {
+ title: form.title || '[Record Title]',
+ user: 'Current User', // TODO: Get from auth store
+ timestamp: new Date().toISOString(),
+ };
 
-      // Process template with variables
-      const processedContent = processTemplate(template, variables);
+ // Process template with variables
+ const processedContent = processTemplate(template, variables);
 
-      // Update form content
-      form.content = processedContent;
+ // Update form content
+ form.content = processedContent;
 
-      // Close modal and show success notification
-      showTemplateModal.value = false;
-      toast.add({
-        title: 'Template Loaded',
-        description: `Template "${template.name}" has been loaded successfully.`,
-        color: 'primary',
-      });
-    }
-  }
+ // Close modal and show success notification
+ showTemplateModal.value = false;
+ toast.add({
+ title: 'Template Loaded',
+ description: `Template "${template.name}" has been loaded successfully.`,
+ color: 'primary',
+ });
+ }
+ }
 };
 ```
 
@@ -188,23 +188,23 @@ const loadTemplate = () => {
 
 ```typescript
 interface Template {
-  id: string;
-  name: string;
-  description?: string;
-  type: string;
-  content: string;
-  variables: string[];
+ id: string;
+ name: string;
+ description?: string;
+ type: string;
+ content: string;
+ variables: string[];
 }
 
 // Template options for dropdown
 const templateOptionsComputed = computed(() => {
-  if (!form.type) return [];
+ if (!form.type) return [];
 
-  return getTemplatesByType(form.type).map(template => ({
-    label: template.name,
-    value: template.id,
-    description: template.description
-  }));
+ return getTemplatesByType(form.type).map(template => ({
+ label: template.name,
+ value: template.id,
+ description: template.description
+ }));
 });
 ```
 
@@ -240,15 +240,15 @@ const templateContent = `
 
 // Variable substitution
 const processTemplate = (template: Template, variables: Record<string, string>) => {
-  let content = template.content;
+ let content = template.content;
 
-  // Replace variables with actual values
-  Object.entries(variables).forEach(([key, value]) => {
-    const regex = new RegExp(`{{${key}}}`, 'g');
-    content = content.replace(regex, value);
-  });
+ // Replace variables with actual values
+ Object.entries(variables).forEach(([key, value]) => {
+ const regex = new RegExp(`{{${key}}}`, 'g');
+ content = content.replace(regex, value);
+ });
 
-  return content;
+ return content;
 };
 ```
 
@@ -321,24 +321,24 @@ Templates are managed through the existing template system:
 ```typescript
 // Template loading functionality
 it('should load template and replace content', async () => {
-  // Select template
-  await selectTemplate('bylaw-template');
+ // Select template
+ await selectTemplate('bylaw-template');
 
-  // Open modal
-  await click(loadTemplateButton);
+ // Open modal
+ await click(loadTemplateButton);
 
-  // Confirm template loading
-  await click(confirmButton);
+ // Confirm template loading
+ await click(confirmButton);
 
-  // Verify content replacement
-  expect(form.content).toContain('Template content');
-  expect(showTemplateModal.value).toBe(false);
+ // Verify content replacement
+ expect(form.content).toContain('Template content');
+ expect(showTemplateModal.value).toBe(false);
 });
 
 // Template visibility
 it('should show template section even without type selected', () => {
-  expect(templateSection).toBeVisible();
-  expect(templateGuidance).toHaveText('Select a record type above');
+ expect(templateSection).toBeVisible();
+ expect(templateGuidance).toHaveText('Select a record type above');
 });
 ```
 

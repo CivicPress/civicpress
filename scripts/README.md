@@ -6,11 +6,6 @@ the project root (the CivicPress repository) with Node.
 
 ## Available Scripts
 
-- `backfill-session-attachments.mjs`  
-  Scan session markdown records for embedded storage file URLs, look up the
-  referenced files, and populate each record’s `attached_files` frontmatter
-  array. Inline markdown links are left intact.
-
 - `normalize-notifications.mjs`  
   Merge `.system-data/notifications.yml` with the default schema so every entry
   has the expected metadata, backing up the current file before rewriting it.
@@ -45,7 +40,7 @@ the project root (the CivicPress repository) with Node.
 
 ```bash
 # Run a helper script
-node scripts/backfill-session-attachments.mjs
+node scripts/normalize-notifications.mjs
 ```
 
 When a script reads or writes `.system-data/` make sure the API and other

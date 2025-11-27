@@ -121,7 +121,7 @@ User resets configuration
 - ✅ **Safe to commit**: No sensitive information
 - ✅ **Collaborative**: Team members can modify
 - ✅ **Version controlled**: Changes are tracked
-- ⚠️ **Public exposure**: Visible in repository
+- ⚠ **Public exposure**: Visible in repository
 
 ### Private Data (`.system-data/`)
 
@@ -174,8 +174,8 @@ If you have configuration files in the wrong location:
 3. **Update .gitignore**:
 
    ```gitignore
-   # Remove data/.civic/ from .gitignore if present
-   # Ensure .system-data/ is in .gitignore
+# Remove data/.civic/ from .gitignore if present
+# Ensure .system-data/ is in .gitignore
    .system-data/
    ```
 
