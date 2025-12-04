@@ -1,6 +1,15 @@
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  getGlobalOptionsFromArgs,
+  initializeCliOutput,
+} from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export default function setupAuthCommand(cli: CAC) {
   cli
@@ -12,11 +21,20 @@ export default function setupAuthCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('auth:login');
+
       try {
         if (!options.token) {
-          if (!options.silent) {
-            console.error('Error: --token is required');
-          }
+          cliError(
+            '--token is required',
+            'VALIDATION_ERROR',
+            undefined,
+            'auth:login'
+          );
           process.exit(1);
         }
 
@@ -30,8 +48,8 @@ export default function setupAuthCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -41,14 +59,15 @@ export default function setupAuthCommand(cli: CAC) {
         // Check if provider is supported
         const availableProviders = authService.getAvailableOAuthProviders();
         if (!availableProviders.includes(options.provider)) {
-          if (!options.silent) {
-            console.error(
-              `Error: Provider '${options.provider}' is not supported`
-            );
-            console.error(
-              `Available providers: ${availableProviders.join(', ')}`
-            );
-          }
+          cliError(
+            `Provider '${options.provider}' is not supported`,
+            'INVALID_PROVIDER',
+            {
+              providedProvider: options.provider,
+              availableProviders,
+            },
+            'auth:login'
+          );
           process.exit(1);
         }
 
@@ -58,40 +77,37 @@ export default function setupAuthCommand(cli: CAC) {
           options.token
         );
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                session: {
-                  token: session.token,
-                  user: session.user,
-                  expiresAt: session.expiresAt,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log('✅ Authentication successful!');
-          console.log(
-            `👤 User: ${session.user.username} (${session.user.name})`
-          );
-          console.log(`🔑 Role: ${session.user.role}`);
-          console.log(`⏰ Expires: ${session.expiresAt.toISOString()}`);
-          console.log(`🎫 Session token: ${session.token.substring(0, 20)}...`);
-        }
+        cliSuccess(
+          {
+            session: {
+              token: session.token,
+              user: session.user,
+              expiresAt: session.expiresAt,
+            },
+          },
+          `Authentication successful: ${session.user.username}`,
+          {
+            operation: 'auth:login',
+            provider: options.provider,
+            username: session.user.username,
+            role: session.user.role,
+          }
+        );
 
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Authentication failed:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Authentication failed',
+          'AUTH_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            provider: options.provider,
+          },
+          'auth:login'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -102,45 +118,45 @@ export default function setupAuthCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
-      const shouldOutputJson = options.json;
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('auth:me');
+
       try {
         // Use global AuthUtils for authentication
         const { user, civic } = await AuthUtils.requireAuthWithCivic(
           options.token,
-          shouldOutputJson
+          globalOptions.json
         );
-        // Output user info if authenticated
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                user,
-                authenticated: !!user,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          if (user) {
-            console.log('✅ You are authenticated!');
-            console.log(`👤 Username: ${user.username}`);
-            console.log(`📝 Name: ${user.name || 'Not provided'}`);
-            console.log(`📧 Email: ${user.email || 'Not provided'}`);
-            console.log(`🔑 Role: ${user.role}`);
+
+        cliSuccess(
+          {
+            user,
+            authenticated: !!user,
+          },
+          `Authenticated as ${user.username}`,
+          {
+            operation: 'auth:me',
+            username: user.username,
+            role: user.role,
           }
-        }
+        );
+
         await civic.shutdown();
       } catch (error) {
-        // AuthUtils already outputs the error and exits, so this is just a fallback
-        if (!options.silent) {
-          console.error(
-            '❌ Failed to get user info:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Failed to get user info',
+          'GET_USER_INFO_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'auth:me'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -149,6 +165,12 @@ export default function setupAuthCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('auth:providers');
+
       try {
         // Get configuration from central config
         const { CentralConfigManager } = await import('@civicpress/core');
@@ -160,8 +182,8 @@ export default function setupAuthCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -169,33 +191,28 @@ export default function setupAuthCommand(cli: CAC) {
         const authService = civic.getAuthService();
         const providers = authService.getAvailableOAuthProviders();
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                providers,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log('🔐 Available OAuth providers:');
-          providers.forEach((provider) => {
-            console.log(`  • ${provider}`);
-          });
-        }
+        cliSuccess(
+          { providers },
+          `Available OAuth providers: ${providers.join(', ')}`,
+          {
+            operation: 'auth:providers',
+            providerCount: providers.length,
+          }
+        );
 
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Failed to get providers:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Failed to get providers',
+          'GET_PROVIDERS_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'auth:providers'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -208,11 +225,20 @@ export default function setupAuthCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('auth:validate');
+
       try {
         if (!options.token) {
-          if (!options.silent) {
-            console.error('Error: --token is required');
-          }
+          cliError(
+            '--token is required',
+            'VALIDATION_ERROR',
+            undefined,
+            'auth:validate'
+          );
           process.exit(1);
         }
 
@@ -225,6 +251,10 @@ export default function setupAuthCommand(cli: CAC) {
         const civic = new CivicPress({
           dataDir,
           database: dbConfig,
+          logger: {
+            json: globalOptions.json,
+            silent: globalOptions.silent,
+          },
         });
         await civic.initialize();
 
@@ -233,14 +263,15 @@ export default function setupAuthCommand(cli: CAC) {
         // Check if provider is supported
         const availableProviders = authService.getAvailableOAuthProviders();
         if (!availableProviders.includes(options.provider)) {
-          if (!options.silent) {
-            console.error(
-              `Error: Provider '${options.provider}' is not supported`
-            );
-            console.error(
-              `Available providers: ${availableProviders.join(', ')}`
-            );
-          }
+          cliError(
+            `Provider '${options.provider}' is not supported`,
+            'INVALID_PROVIDER',
+            {
+              providedProvider: options.provider,
+              availableProviders,
+            },
+            'auth:validate'
+          );
           process.exit(1);
         }
 
@@ -251,34 +282,26 @@ export default function setupAuthCommand(cli: CAC) {
           options.token
         );
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                user,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log('✅ Token is valid!');
-          console.log(`👤 User: ${user.username} (${user.name})`);
-          console.log(`📧 Email: ${user.email || 'Not provided'}`);
-          console.log(`🆔 Provider ID: ${user.providerUserId}`);
-          console.log(`🔗 Provider: ${user.provider}`);
-        }
+        cliSuccess({ user }, `Token is valid for user ${user.username}`, {
+          operation: 'auth:validate',
+          provider: options.provider,
+          username: user.username,
+        });
 
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Token validation failed:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Token validation failed',
+          'TOKEN_VALIDATION_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            provider: options.provider,
+          },
+          'auth:validate'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -294,27 +317,31 @@ export default function setupAuthCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('auth:simulated');
+
       // Check production environment first, before any initialization
       if (process.env.NODE_ENV === 'production') {
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              { error: 'Simulated accounts are disabled in production' },
-              null,
-              2
-            )
-          );
-        } else {
-          console.error('Error: Simulated accounts are disabled in production');
-        }
+        cliError(
+          'Simulated accounts are disabled in production',
+          'PRODUCTION_DISABLED',
+          undefined,
+          'auth:simulated'
+        );
         process.exit(1);
       }
 
       try {
         if (!options.username) {
-          if (!options.silent) {
-            console.error('Error: --username is required');
-          }
+          cliError(
+            '--username is required',
+            'VALIDATION_ERROR',
+            undefined,
+            'auth:simulated'
+          );
           process.exit(1);
         }
 
@@ -327,6 +354,10 @@ export default function setupAuthCommand(cli: CAC) {
         const civic = new CivicPress({
           dataDir,
           database: dbConfig,
+          logger: {
+            json: globalOptions.json,
+            silent: globalOptions.silent,
+          },
         });
         await civic.initialize();
 
@@ -335,10 +366,15 @@ export default function setupAuthCommand(cli: CAC) {
         // Validate role
         if (!(await authService.isValidRole(options.role))) {
           const availableRoles = await authService.getAvailableRoles();
-          if (!options.silent) {
-            console.error(`Error: Invalid role '${options.role}'`);
-            console.error(`Available roles: ${availableRoles.join(', ')}`);
-          }
+          cliError(
+            `Invalid role '${options.role}'`,
+            'INVALID_ROLE',
+            {
+              providedRole: options.role,
+              availableRoles,
+            },
+            'auth:simulated'
+          );
           process.exit(1);
         }
 
@@ -348,46 +384,35 @@ export default function setupAuthCommand(cli: CAC) {
           options.role
         );
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                message: 'Successfully authenticated with simulated account',
-                session: {
-                  token: session.token,
-                  user: session.user,
-                  expiresAt: session.expiresAt,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          console.log('✅ Successfully authenticated with simulated account!');
-          console.log(
-            `👤 User: ${session.user.username} (${session.user.role})`
-          );
-          console.log(`⏰ Session expires: ${session.expiresAt.toISOString()}`);
-          console.log(`🎫 Session token: ${session.token.substring(0, 20)}...`);
-          console.log(
-            '💡 You can now use CivicPress commands without specifying --role'
-          );
-        }
+        cliSuccess(
+          {
+            session: {
+              token: session.token,
+              user: session.user,
+              expiresAt: session.expiresAt,
+            },
+          },
+          `Successfully authenticated with simulated account: ${session.user.username}`,
+          {
+            operation: 'auth:simulated',
+            username: session.user.username,
+            role: session.user.role,
+          }
+        );
 
         await civic.shutdown();
       } catch (error) {
-        const errorMsg =
-          error instanceof Error
-            ? error.message
-            : 'Simulated authentication failed';
-        if (options.json) {
-          console.log(JSON.stringify({ error: errorMsg }, null, 2));
-        } else {
-          console.error(`❌ ${errorMsg}`);
-        }
+        cliError(
+          'Simulated authentication failed',
+          'SIMULATED_AUTH_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'auth:simulated'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -398,6 +423,12 @@ export default function setupAuthCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('auth:password');
+
       try {
         let username = options.username;
         let password = options.password;
@@ -446,8 +477,8 @@ export default function setupAuthCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -460,40 +491,35 @@ export default function setupAuthCommand(cli: CAC) {
           password
         );
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                session: {
-                  token: session.token,
-                  user: session.user,
-                  expiresAt: session.expiresAt,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log('✅ Password authentication successful!');
-          console.log(
-            `👤 User: ${session.user.username} (${session.user.name})`
-          );
-          console.log(`🔑 Role: ${session.user.role}`);
-          console.log(`⏰ Expires: ${session.expiresAt.toISOString()}`);
-          console.log(`🎫 Session token: ${session.token.substring(0, 20)}...`);
-        }
+        cliSuccess(
+          {
+            session: {
+              token: session.token,
+              user: session.user,
+              expiresAt: session.expiresAt,
+            },
+          },
+          `Password authentication successful: ${session.user.username}`,
+          {
+            operation: 'auth:password',
+            username: session.user.username,
+            role: session.user.role,
+          }
+        );
 
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Password authentication failed:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Password authentication failed',
+          'PASSWORD_AUTH_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'auth:password'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }

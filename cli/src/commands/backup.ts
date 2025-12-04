@@ -13,7 +13,15 @@ import {
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 const require = createRequire(import.meta.url);
 const { version: civicpressVersion } = require('../../../package.json');
@@ -60,7 +68,10 @@ export function registerBackupCommand(cli: CAC): void {
     .action(async (action: string, source: string | undefined, opts: any) => {
       const options = opts as BackupCommandOptions;
       const globalOpts = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOpts);
+
       const logger = initializeLogger();
+      const endOperation = cliStartOperation('backup');
 
       try {
         switch (action) {
@@ -81,21 +92,17 @@ export function registerBackupCommand(cli: CAC): void {
             );
         }
       } catch (error) {
-        if (globalOpts.json || options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Backup command failed:', error);
-        }
+        cliError(
+          'Backup command failed',
+          'BACKUP_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'backup'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
@@ -191,27 +198,28 @@ function outputCreateResult(
     warnings: result.warnings,
   };
 
-  if (jsonOutput) {
-    console.log(JSON.stringify(payload, null, 2));
-    return;
-  }
+  cliSuccess(payload, 'Backup created successfully', {
+    operation: 'backup',
+  });
 
-  logger.info('✅ Backup created successfully');
-  logger.info(`📂 Directory: ${result.backupDir}`);
+  cliInfo(`📂 Directory: ${result.backupDir}`, 'backup');
   if (result.gitBundlePath) {
-    logger.info(`🔐 Git bundle: ${result.gitBundlePath}`);
+    cliInfo(`🔐 Git bundle: ${result.gitBundlePath}`, 'backup');
   }
   if (result.storageFilesExported) {
-    logger.info(`📋 Storage files table exported (storage-files.json)`);
+    cliInfo(`📋 Storage files table exported (storage-files.json)`, 'backup');
   }
   if (result.storageConfigExported) {
-    logger.info(`⚙️  Storage configuration exported (storage-config.json)`);
+    cliInfo(
+      `⚙️  Storage configuration exported (storage-config.json)`,
+      'backup'
+    );
   }
   if (tarballPath) {
-    logger.info(`🗜️  Tarball: ${tarballPath}`);
+    cliInfo(`🗜️  Tarball: ${tarballPath}`, 'backup');
   }
   if (result.warnings.length > 0) {
-    result.warnings.forEach((warning) => logger.warn(`⚠️  ${warning}`));
+    result.warnings.forEach((warning) => cliWarn(`⚠️  ${warning}`, 'backup'));
   }
 }
 
@@ -228,17 +236,15 @@ function outputRestoreResult(
     warnings: result.warnings,
   };
 
-  if (jsonOutput) {
-    console.log(JSON.stringify(payload, null, 2));
-    return;
-  }
+  cliSuccess(payload, 'Backup restored successfully', {
+    operation: 'backup',
+  });
 
-  logger.info('✅ Backup restored successfully');
-  logger.info(`📂 Data directory: ${result.dataDir}`);
+  cliInfo(`📂 Data directory: ${result.dataDir}`, 'backup');
   if (result.storageDir) {
-    logger.info(`📦 Storage directory: ${result.storageDir}`);
+    cliInfo(`📦 Storage directory: ${result.storageDir}`, 'backup');
   }
   if (result.warnings.length > 0) {
-    result.warnings.forEach((warning) => logger.warn(`⚠️  ${warning}`));
+    result.warnings.forEach((warning) => cliWarn(`⚠️  ${warning}`, 'backup'));
   }
 }

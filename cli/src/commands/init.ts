@@ -12,7 +12,14 @@ import * as yaml from 'yaml';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 import { fileURLToPath } from 'url';
 
 export const initCommand = (cli: CAC) => {
@@ -31,9 +38,12 @@ export const initCommand = (cli: CAC) => {
     )
     .action(async (options: any) => {
       const skipPrompts = options.yes || options.noPrompt;
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
       const logger = initializeLogger();
+      const endOperation = cliStartOperation('init');
 
       // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
@@ -171,9 +181,14 @@ export const initCommand = (cli: CAC) => {
             await loadDemoData(dataDir, demoCity, logger);
           }
 
-          if (!shouldOutputJson) {
-            console.log('✅ CivicPress project initialized with defaults.');
-          }
+          cliSuccess(
+            {
+              initialized: true,
+              message: 'CivicPress project initialized with defaults.',
+            },
+            'CivicPress project initialized with defaults.',
+            { operation: 'init' }
+          );
           return;
         }
 
@@ -758,30 +773,32 @@ Date: ${new Date().toISOString()}`;
           }
         }
 
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                message: 'CivicPress repository initialized successfully',
-                data: {
-                  dataDir: fullDataDir,
-                  systemDataDir: systemDataDir,
-                  gitInitialized: initGit || gitExists,
-                  configPath: path.join(systemDataDir, 'config.yml'),
-                },
-                nextSteps: [
-                  `cd ${dataDir}`,
-                  'civic create <type> <title> - Create a new civic record',
-                  'civic commit -m "message" -r <role> - Commit changes',
-                  'civic history - View record history',
-                ],
-              },
-              null,
-              2
-            )
-          );
-        } else {
+        const successData = {
+          success: true,
+          message: 'CivicPress repository initialized successfully',
+          data: {
+            dataDir: fullDataDir,
+            systemDataDir: systemDataDir,
+            gitInitialized: initGit || gitExists,
+            configPath: path.join(systemDataDir, 'config.yml'),
+          },
+          nextSteps: [
+            `cd ${dataDir}`,
+            'civic create <type> <title> - Create a new civic record',
+            'civic commit -m "message" -r <role> - Commit changes',
+            'civic history - View record history',
+          ],
+        };
+
+        cliSuccess(
+          successData,
+          'CivicPress repository initialized successfully!',
+          {
+            operation: 'init',
+          }
+        );
+
+        if (!shouldOutputJson) {
           logger.success('✅ CivicPress repository initialized successfully!');
           logger.info('📖 Next steps:');
           logger.info(`   cd ${dataDir}`);
@@ -800,19 +817,17 @@ Date: ${new Date().toISOString()}`;
         // Explicitly flush stdout before exit (for test environments)
         process.stdout.write('', () => process.exit(0));
       } catch (err: any) {
-        if (shouldOutputJson) {
-          console.error(
-            JSON.stringify(
-              {
-                success: false,
-                error: err?.message || err,
-                stack: err?.stack || undefined,
-              },
-              null,
-              2
-            )
-          );
-        } else {
+        cliError(
+          'Failed to initialize repository',
+          'INIT_FAILED',
+          {
+            error: err?.message || err,
+            stack: err?.stack || undefined,
+          },
+          'init'
+        );
+
+        if (!shouldOutputJson) {
           logger.error('❌ Failed to initialize repository:');
           logger.error(err?.message || err);
           if (err?.stack) {
@@ -820,6 +835,8 @@ Date: ${new Date().toISOString()}`;
           }
         }
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

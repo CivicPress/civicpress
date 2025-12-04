@@ -3,7 +3,15 @@ import { CivicPress } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 
 export const autoIndexCommand = (cli: CAC) => {
@@ -17,11 +25,17 @@ export const autoIndexCommand = (cli: CAC) => {
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     .action(async (options: any) => {
-      try {
-        const globalOpts = getGlobalOptionsFromArgs();
-        const logger = initializeLogger();
-        const shouldOutputJson = globalOpts.json;
+      // Initialize CLI output with global options
+      const globalOpts = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOpts);
 
+      const logger = initializeLogger();
+      const endOperation = cliStartOperation('auto-index');
+
+      // Check if we should output JSON
+      const shouldOutputJson = globalOpts.json;
+
+      try {
         // Validate authentication and get civic instance
         const { civic } = await AuthUtils.requireAuthWithCivic(
           options.token,
@@ -52,17 +66,26 @@ export const autoIndexCommand = (cli: CAC) => {
         } else if (options.list) {
           await listRecords(civicPress, options, globalOpts, logger);
         } else {
-          logger.info('Auto-indexing workflow test command');
-          logger.info('Use --demo to run a complete demonstration');
-          logger.info('Use --create <title> to create a test record');
-          logger.info('Use --update <id> to update a record');
-          logger.info('Use --list to list all records');
+          cliInfo('Auto-indexing workflow test command', 'auto-index');
+          cliInfo('Use --demo to run a complete demonstration', 'auto-index');
+          cliInfo('Use --create <title> to create a test record', 'auto-index');
+          cliInfo('Use --update <id> to update a record', 'auto-index');
+          cliInfo('Use --list to list all records', 'auto-index');
         }
 
         await civicPress.shutdown();
       } catch (error) {
-        console.error('Auto-index command failed:', error);
+        cliError(
+          'Auto-index command failed',
+          'AUTO_INDEX_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'auto-index'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };
@@ -108,49 +131,45 @@ async function runAutoIndexingDemo(
   const indexingService = civicPress.getIndexingService();
   const index = await indexingService.generateIndexes();
 
+  const demoResult = {
+    demo: {
+      originalRecord: record,
+      updatedRecord: {
+        id: 'demo-record',
+        title: 'Updated Demo Bylaw for Auto-Indexing',
+      },
+      indexResults: {
+        totalRecords: index.metadata.totalRecords,
+        modules: index.metadata.modules,
+        types: index.metadata.types,
+        statuses: index.metadata.statuses,
+      },
+    },
+  };
+
+  cliSuccess(demoResult, 'Auto-indexing demo completed', {
+    operation: 'auto-index',
+  });
+
   if (!globalOpts.silent) {
-    if (globalOpts.json) {
-      console.log(
-        JSON.stringify(
-          {
-            demo: {
-              originalRecord: record,
-              updatedRecord: {
-                id: 'demo-record',
-                title: 'Updated Demo Bylaw for Auto-Indexing',
-              },
-              indexResults: {
-                totalRecords: index.metadata.totalRecords,
-                modules: index.metadata.modules,
-                types: index.metadata.types,
-                statuses: index.metadata.statuses,
-              },
-            },
-          },
-          null,
-          2
-        )
+    logger.info('📊 Indexing Results:');
+    logger.info(`  Total records: ${index.metadata.totalRecords}`);
+    logger.info(`  Modules: ${index.metadata.modules.join(', ')}`);
+    logger.info(`  Types: ${index.metadata.types.join(', ')}`);
+    logger.info(`  Statuses: ${index.metadata.statuses.join(', ')}`);
+
+    // Check if our updated record is in the index
+    const demoRecordInIndex = index.entries.find(
+      (entry: any) => entry.title === 'Updated Demo Bylaw for Auto-Indexing'
+    );
+
+    if (demoRecordInIndex) {
+      logger.info(
+        '✅ Demo record found in index with correct status: ' +
+          demoRecordInIndex.status
       );
     } else {
-      logger.info('📊 Indexing Results:');
-      logger.info(`  Total records: ${index.metadata.totalRecords}`);
-      logger.info(`  Modules: ${index.metadata.modules.join(', ')}`);
-      logger.info(`  Types: ${index.metadata.types.join(', ')}`);
-      logger.info(`  Statuses: ${index.metadata.statuses.join(', ')}`);
-
-      // Check if our updated record is in the index
-      const demoRecordInIndex = index.entries.find(
-        (entry: any) => entry.title === 'Updated Demo Bylaw for Auto-Indexing'
-      );
-
-      if (demoRecordInIndex) {
-        logger.info(
-          '✅ Demo record found in index with correct status: ' +
-            demoRecordInIndex.status
-        );
-      } else {
-        logger.warn('⚠️  Demo record not found in index');
-      }
+      logger.warn('⚠️  Demo record not found in index');
     }
   }
 
@@ -210,14 +229,14 @@ async function listRecords(
 ) {
   const result = await civicPress.getRecordManager().listRecords();
 
+  cliSuccess(result, 'Records listed', {
+    operation: 'auto-index',
+  });
+
   if (!globalOpts.silent) {
-    if (globalOpts.json) {
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      logger.info(`📋 Found ${result.total} records:`);
-      for (const record of result.records) {
-        logger.info(`  - ${record.title} (${record.type}, ${record.status})`);
-      }
+    logger.info(`📋 Found ${result.total} records:`);
+    for (const record of result.records) {
+      logger.info(`  - ${record.title} (${record.type}, ${record.status})`);
     }
   }
 }

@@ -7,7 +7,15 @@ import * as readline from 'readline';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 import {
   getAvailableRecords,
   resolveRecordReference,
@@ -89,15 +97,20 @@ export function registerDiffCommand(cli: CAC) {
       'Interactive mode - show commit history and select version'
     )
     .action(async (record: string, options: DiffOptions) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('diff');
 
       try {
         const config = await loadConfig();
         if (!config) {
-          logger.error(
-            '❌ No CivicPress configuration found. Run "civic init" first.'
+          cliError(
+            'No CivicPress configuration found. Run "civic init" first.',
+            'NOT_INITIALIZED',
+            undefined,
+            'diff'
           );
           process.exit(1);
         }
@@ -113,9 +126,6 @@ export function registerDiffCommand(cli: CAC) {
           metadata: options.metadata || false,
           interactive: options.interactive || false,
         };
-
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
 
         // Handle content-only and metadata-only flags
         if (options.content) {
@@ -141,11 +151,20 @@ export function registerDiffCommand(cli: CAC) {
             throw new Error('dataDir is not configured');
           }
           const results = await compareRecords(config.dataDir, diffOptions);
-          displayDiffResults(results, diffOptions, shouldOutputJson);
+          displayDiffResults(results, diffOptions);
         }
       } catch (error) {
-        logger.error('❌ Diff failed:', error);
+        cliError(
+          'Diff failed',
+          'DIFF_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'diff'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
@@ -260,7 +279,10 @@ async function getFileCommitHistory(
 
     return commits;
   } catch (error) {
-    console.warn('Error getting file commit history:', error);
+    cliWarn(
+      `Error getting file commit history: ${error instanceof Error ? error.message : String(error)}`,
+      'diff'
+    );
     return [];
   }
 }
@@ -310,11 +332,11 @@ async function promptForCommitSelection(
 
         const selection = parseInt(answer);
         if (isNaN(selection) || selection < 1 || selection > maxCommits) {
-          console.log(
-            chalk.red(
-              '❌ Invalid selection. Please enter a number between 1 and',
-              maxCommits
-            )
+          cliError(
+            `Invalid selection. Please enter a number between 1 and ${maxCommits}`,
+            'INVALID_SELECTION',
+            { maxCommits },
+            'diff'
           );
           resolve(null);
           return;
@@ -375,7 +397,14 @@ async function compareRecords(
 
     return results;
   } catch (error) {
-    console.error('Error comparing records:', error);
+    cliError(
+      'Error comparing records',
+      'COMPARE_ERROR',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'diff'
+    );
     return [];
   }
 }
@@ -387,7 +416,6 @@ async function compareSingleRecord(
   commit2: string,
   options: DiffOptions
 ): Promise<DiffResult | null> {
-  const logger = initializeLogger();
   try {
     // Get file content at both commits
     const content1 = await getFileContent(git, recordPath, commit1);
@@ -475,7 +503,10 @@ async function compareSingleRecord(
         changes.length > 0 ? formatMetadataDiff(changes) : undefined,
     };
   } catch (error) {
-    logger.warn(`Error comparing ${recordPath}:`, error);
+    cliWarn(
+      `Error comparing ${recordPath}: ${error instanceof Error ? error.message : String(error)}`,
+      'diff'
+    );
     return null;
   }
 }
@@ -499,12 +530,14 @@ async function getChangedFiles(
   commit1: string,
   commit2: string
 ): Promise<string[]> {
-  const logger = initializeLogger();
   try {
     const diff = await git.diff([`${commit1}..${commit2}`, '--name-only']);
     return diff.split('\n').filter((file) => file.trim());
   } catch (error) {
-    logger.warn('Error getting changed files:', error);
+    cliWarn(
+      `Error getting changed files: ${error instanceof Error ? error.message : String(error)}`,
+      'diff'
+    );
     return [];
   }
 }
@@ -551,98 +584,83 @@ function formatMetadataDiff(changes: DiffResult['changes']): string {
   return lines.join('\n');
 }
 
-function displayDiffResults(
-  results: DiffResult[],
-  options: DiffOptions,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
-  if (shouldOutputJson) {
-    console.log(
-      JSON.stringify(
-        {
-          results,
-          summary: {
-            totalRecords: results.length,
-            options: {
-              commit1: options.commit1 || 'HEAD~1',
-              commit2: options.commit2 || 'HEAD',
-              record: options.record,
-              showMetadata: options.showMetadata,
-              showContent: options.showContent,
-            },
-          },
-        },
-        null,
-        2
-      )
-    );
-    return;
-  }
-
+function displayDiffResults(results: DiffResult[], options: DiffOptions) {
   if (results.length === 0) {
-    logger.info('🔍 No differences found.');
+    cliInfo('No differences found.', 'diff');
     return;
   }
 
-  logger.info(`🔍 Found ${results.length} record(s) with changes:\n`);
+  const summary = {
+    results,
+    summary: {
+      totalRecords: results.length,
+      options: {
+        commit1: options.commit1 || 'HEAD~1',
+        commit2: options.commit2 || 'HEAD',
+        record: options.record,
+        showMetadata: options.showMetadata,
+        showContent: options.showContent,
+      },
+    },
+  };
 
-  for (const result of results) {
-    logger.info(`📄 ${result.record}`);
-    logger.info(`   Type: ${result.type}`);
+  cliSuccess(summary, 'diff');
 
-    if (result.changes.length > 0) {
-      logger.info('\n   📋 Metadata Changes:');
-      for (const change of result.changes) {
-        switch (change.type) {
-          case 'added':
-            logger.info(`     + ${change.field}: ${change.newValue}`);
-            break;
-          case 'removed':
-            logger.error(`     - ${change.field}: ${change.oldValue}`);
-            break;
-          case 'modified':
-            logger.error(`     - ${change.field}: ${change.oldValue}`);
-            logger.info(`     + ${change.field}: ${change.newValue}`);
-            break;
-        }
-      }
-    }
+  if (results.length > 0) {
+    cliInfo(`Found ${results.length} record(s) with changes:\n`, 'diff');
 
-    if (result.contentDiff) {
-      logger.info('\n   📝 Content Changes:');
+    for (const result of results) {
+      cliInfo(`📄 ${result.record}`, 'diff');
+      cliInfo(`   Type: ${result.type}`, 'diff');
 
-      if (options.format === 'json') {
-        logger.info(
-          JSON.stringify(
-            {
-              record: result.record,
-              type: result.type,
-              changes: result.changes,
-              contentDiff: result.contentDiff,
-            },
-            null,
-            2
-          )
-        );
-      } else {
-        // Display unified diff with colors
-        const lines = result.contentDiff.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('+') && !line.startsWith('+++')) {
-            logger.info(`     ${line}`);
-          } else if (line.startsWith('-') && !line.startsWith('---')) {
-            logger.error(`     ${line}`);
-          } else if (line.startsWith('@')) {
-            logger.info(`     ${line}`);
-          } else {
-            logger.info(`     ${line}`);
+      if (result.changes.length > 0) {
+        cliInfo('\n   📋 Metadata Changes:', 'diff');
+        for (const change of result.changes) {
+          switch (change.type) {
+            case 'added':
+              cliInfo(`     + ${change.field}: ${change.newValue}`, 'diff');
+              break;
+            case 'removed':
+              cliWarn(`     - ${change.field}: ${change.oldValue}`, 'diff');
+              break;
+            case 'modified':
+              cliWarn(`     - ${change.field}: ${change.oldValue}`, 'diff');
+              cliInfo(`     + ${change.field}: ${change.newValue}`, 'diff');
+              break;
           }
         }
       }
-    }
 
-    logger.info('\n' + '─'.repeat(60) + '\n');
+      if (result.contentDiff) {
+        cliInfo('\n   📝 Content Changes:', 'diff');
+
+        if (options.format === 'json') {
+          const contentSummary = {
+            record: result.record,
+            type: result.type,
+            changes: result.changes,
+            contentDiff: result.contentDiff,
+          };
+          cliInfo(JSON.stringify(contentSummary, null, 2), 'diff');
+        } else {
+          // Display unified diff with colors
+          const lines = result.contentDiff.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+              cliInfo(`     ${line}`, 'diff');
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+              cliWarn(`     ${line}`, 'diff');
+            } else if (line.startsWith('@')) {
+              cliInfo(`     ${line}`, 'diff');
+            } else {
+              cliInfo(`     ${line}`, 'diff');
+            }
+          }
+        }
+      }
+
+      cliInfo('\n' + '─'.repeat(60) + '\n', 'diff');
+    }
   }
 }
 

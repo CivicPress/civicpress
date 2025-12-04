@@ -7,7 +7,15 @@ import {
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 // Deep-normalize metadata-shaped values { value, type, ... } -> value
 function normalizeMetadata<T = any>(input: any): T {
@@ -95,16 +103,7 @@ class EmailChannel {
 
   private async sendViaSMTP(request: any) {
     try {
-      console.log('🔧 Starting SMTP send...');
       const nodemailer = await import('nodemailer');
-
-      console.log('🔧 SMTP Configuration:');
-      console.log(`  Host: ${this.config.credentials.host}`);
-      console.log(`  Port: ${this.config.credentials.port}`);
-      console.log(`  Secure: ${this.config.credentials.secure}`);
-      console.log(`  User: ${this.config.credentials.auth?.user}`);
-      console.log(`  From: ${this.config.credentials.from}`);
-      console.log(`  To: ${request.to}`);
 
       const transporter = nodemailer.default.createTransport({
         host: this.config.credentials.host,
@@ -112,14 +111,12 @@ class EmailChannel {
         secure: this.config.credentials.secure,
         auth: this.config.credentials.auth,
         tls: this.config.credentials.tls || { rejectUnauthorized: false },
-        debug: true,
-        logger: true,
+        debug: false,
+        logger: false,
       });
 
       // Test connection first
-      console.log('🔧 Testing SMTP connection...');
       await transporter.verify();
-      console.log('✅ SMTP connection verified successfully');
 
       const mailOptions = {
         from: this.config.credentials.from,
@@ -129,24 +126,17 @@ class EmailChannel {
         html: request.content?.html,
       };
 
-      console.log('🔧 Sending email...');
       const info = await transporter.sendMail(mailOptions);
-      console.log('✅ Email sent successfully');
-      console.log(`  Message ID: ${info.messageId}`);
-      console.log(`  Response: ${JSON.stringify(info, null, 2)}`);
 
       return {
         success: true,
         messageId: info.messageId || `smtp_${Date.now()}`,
       };
     } catch (error: any) {
-      console.error('❌ SMTP Error:');
-      console.error(`  Error: ${error.message}`);
-      console.error(`  Code: ${error.code}`);
-      console.error(`  Command: ${error.command}`);
-      console.error(`  Response: ${error.response}`);
-      console.error(`  ResponseCode: ${error.responseCode}`);
-      throw error;
+      // Error will be handled by the caller
+      throw new Error(
+        `SMTP Error: ${error.message}${error.code ? ` (${error.code})` : ''}`
+      );
     }
   }
 
@@ -154,13 +144,10 @@ class EmailChannel {
     try {
       const config = this.config.credentials;
       if (!config.apiKey) {
-        console.warn('⚠️ SendGrid API key not configured');
         return false;
       }
-      console.log('✅ SendGrid connection test passed');
       return true;
     } catch (error) {
-      console.error('❌ SendGrid connection test failed:', error);
       return false;
     }
   }
@@ -169,12 +156,10 @@ class EmailChannel {
     try {
       const config = this.config.credentials;
       if (!config.apiKey && this.config.provider === 'sendgrid') {
-        console.error('❌ SendGrid API key is required');
         return false;
       }
       return true;
     } catch (error) {
-      console.error('❌ Configuration validation failed:', error);
       return false;
     }
   }
@@ -220,8 +205,11 @@ export default function notifyCommand(cli: CAC) {
     .option('--silent', 'Suppress output')
     .option('--verbose', 'Enable verbose debugging output')
     .action(async (options) => {
-      // Initialize logger
-      const logger = initializeLogger();
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('notify:test');
 
       try {
         const {
@@ -236,10 +224,6 @@ export default function notifyCommand(cli: CAC) {
           verbose,
         } = options;
 
-        if (!silent) {
-          logger.info('📧 Testing notification system...');
-        }
-
         // Initialize configuration
         const config = new NotificationConfig();
 
@@ -253,9 +237,6 @@ export default function notifyCommand(cli: CAC) {
         }
 
         // Create and register email channel
-        console.log('🔧 Creating email channel with provider:', provider);
-        console.log('🔧 Email config:', JSON.stringify(emailConfig, null, 2));
-
         const rawCreds =
           (emailConfig as any)[provider as any] ||
           (emailConfig as any).sendgrid;
@@ -265,12 +246,6 @@ export default function notifyCommand(cli: CAC) {
           credentials: rawCreds,
           settings: {},
         });
-
-        console.log('🔧 Email channel provider:', emailChannel.config.provider);
-        console.log(
-          '🔧 Email channel credentials:',
-          JSON.stringify(emailChannel.config.credentials, null, 2)
-        );
 
         notificationService.registerChannel('email', emailChannel as any);
 
@@ -319,19 +294,30 @@ export default function notifyCommand(cli: CAC) {
             data: templateData,
           });
 
-          if (json) {
-            console.log(JSON.stringify(result, null, 2));
-          } else if (!silent) {
-            if (result.success) {
-              logger.success('✅ Email sent successfully!');
-              logger.info(`📧 Notification ID: ${result.notificationId}`);
-              logger.info(
-                `📧 Sent channels: ${result.sentChannels.join(', ')}`
-              );
-            } else {
-              logger.error('❌ Email failed to send');
-              logger.error(`📧 Errors: ${result.errors?.join(', ')}`);
-            }
+          if (result.success) {
+            cliSuccess(
+              {
+                notificationId: result.notificationId,
+                sentChannels: result.sentChannels,
+              },
+              `Email sent successfully using template ${templateName}`,
+              {
+                operation: 'notify:test',
+                template: templateName,
+                notificationId: result.notificationId,
+              }
+            );
+          } else {
+            cliError(
+              `Email failed to send: ${result.errors?.join(', ')}`,
+              'SEND_FAILED',
+              {
+                errors: result.errors,
+                template: templateName,
+              },
+              'notify:test'
+            );
+            process.exit(1);
           }
 
           return result;
@@ -359,17 +345,32 @@ export default function notifyCommand(cli: CAC) {
           data: {},
         });
 
-        if (json) {
-          console.log(JSON.stringify(result, null, 2));
-        } else if (!silent) {
-          if (result.success) {
-            logger.success('✅ Email sent successfully!');
-            logger.info(`📧 Notification ID: ${result.notificationId}`);
-            logger.info(`📧 Sent channels: ${result.sentChannels.join(', ')}`);
-          } else {
-            logger.error('❌ Email failed to send');
-            logger.error(`📧 Errors: ${result.errors?.join(', ')}`);
-          }
+        if (result.success) {
+          cliSuccess(
+            {
+              notificationId: result.notificationId,
+              sentChannels: result.sentChannels,
+              to,
+              subject,
+            },
+            `Email sent successfully to ${to}`,
+            {
+              operation: 'notify:test',
+              to,
+              notificationId: result.notificationId,
+            }
+          );
+        } else {
+          cliError(
+            `Email failed to send: ${result.errors?.join(', ')}`,
+            'SEND_FAILED',
+            {
+              errors: result.errors,
+              to,
+            },
+            'notify:test'
+          );
+          process.exit(1);
         }
 
         return result;
@@ -377,22 +378,15 @@ export default function notifyCommand(cli: CAC) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: errorMessage,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.error(`❌ Error: ${errorMessage}`);
-        }
-
+        cliError(
+          'Notification test failed',
+          'NOTIFY_TEST_FAILED',
+          { error: errorMessage },
+          'notify:test'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -401,62 +395,49 @@ export default function notifyCommand(cli: CAC) {
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
-      try {
-        const { json, silent } = options;
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
 
+      const endOperation = cliStartOperation('notify:config');
+
+      try {
         const config = new NotificationConfig();
         const emailConfig = config.getChannelConfig('email');
 
-        if (json) {
-          console.log(
-            JSON.stringify(
-              {
-                email: {
-                  enabled: emailConfig?.enabled,
-                  provider: emailConfig?.provider,
-                  sendgrid: emailConfig?.sendgrid
-                    ? {
-                        apiKey: emailConfig.sendgrid.apiKey ? '***' : undefined,
-                        from: emailConfig.sendgrid.from,
-                      }
-                    : undefined,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else if (!silent) {
-          console.log('📧 Notification Configuration:');
-          console.log(`  Email enabled: ${emailConfig?.enabled}`);
-          console.log(`  Provider: ${emailConfig?.provider}`);
-          if (emailConfig?.sendgrid) {
-            console.log(`  SendGrid from: ${emailConfig.sendgrid.from}`);
-            console.log(
-              `  SendGrid API key: ${emailConfig.sendgrid.apiKey ? 'Configured' : 'Not configured'}`
-            );
-          }
-        }
+        const emailData = {
+          enabled: emailConfig?.enabled,
+          provider: emailConfig?.provider,
+          sendgrid: emailConfig?.sendgrid
+            ? {
+                apiKey: emailConfig.sendgrid.apiKey ? '***' : undefined,
+                from: emailConfig.sendgrid.from,
+              }
+            : undefined,
+        };
+
+        const message = emailConfig?.enabled
+          ? `Email notifications enabled (${emailConfig?.provider || 'default'} provider)`
+          : 'Email notifications disabled';
+
+        cliSuccess({ email: emailData }, message, {
+          operation: 'notify:config',
+          emailEnabled: emailConfig?.enabled,
+          provider: emailConfig?.provider,
+        });
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: errorMessage,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.error(`❌ Error: ${errorMessage}`);
-        }
-
+        cliError(
+          'Failed to get notification configuration',
+          'GET_CONFIG_FAILED',
+          { error: errorMessage },
+          'notify:config'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -475,15 +456,14 @@ export default function notifyCommand(cli: CAC) {
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
-      // Initialize logger
-      const logger = initializeLogger();
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('notify:queue');
 
       try {
-        const { status, limit, json, silent } = options;
-
-        if (!silent) {
-          logger.info('📧 Checking notification queue...');
-        }
+        const { status, limit } = options;
 
         // Initialize configuration
         const config = new NotificationConfig();
@@ -511,83 +491,49 @@ export default function notifyCommand(cli: CAC) {
           });
         }
 
-        if (json) {
-          console.log(
-            JSON.stringify(
-              {
-                statistics: stats,
-                queue: filteredHistory,
-                filters: {
-                  status,
-                  limit: parseInt(limit),
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else if (!silent) {
-          logger.info('📊 Notification Queue Statistics:');
-          logger.info(`  Total sent: ${stats.totalSent}`);
-          logger.info(`  Total failed: ${stats.totalFailed}`);
-          logger.info(
-            `  Success rate: ${stats.totalSent > 0 ? ((stats.totalSent / (stats.totalSent + stats.totalFailed)) * 100).toFixed(1) : 0}%`
-          );
+        const successRate =
+          stats.totalSent > 0
+            ? (
+                (stats.totalSent / (stats.totalSent + stats.totalFailed)) *
+                100
+              ).toFixed(1)
+            : '0';
 
-          if (Object.keys(stats.channels).length > 0) {
-            logger.info('\n📧 Channel Statistics:');
-            Object.entries(stats.channels).forEach(
-              ([channel, data]: [string, any]) => {
-                logger.info(
-                  `  ${channel}: ${data.sent} sent, ${data.failed} failed`
-                );
-              }
-            );
+        const message =
+          filteredHistory.length === 0
+            ? `No notifications found (status: ${status})`
+            : `Found ${filteredHistory.length} notification${filteredHistory.length === 1 ? '' : 's'} (${stats.totalSent} sent, ${stats.totalFailed} failed, ${successRate}% success rate)`;
+
+        cliSuccess(
+          {
+            statistics: stats,
+            queue: filteredHistory,
+            filters: {
+              status,
+              limit: parseInt(limit),
+            },
+          },
+          message,
+          {
+            operation: 'notify:queue',
+            totalSent: stats.totalSent,
+            totalFailed: stats.totalFailed,
+            queueLength: filteredHistory.length,
           }
-
-          if (filteredHistory.length > 0) {
-            logger.info(
-              `\n📋 Recent Notifications (${filteredHistory.length} entries):`
-            );
-            filteredHistory.forEach((entry, index) => {
-              const timestamp = new Date(entry.timestamp).toLocaleString();
-              const status = entry.details?.success ? '✅' : '❌';
-              const channels = entry.details?.channels?.join(', ') || 'none';
-              const notificationId = entry.id || 'unknown';
-              logger.info(
-                `  ${index + 1}. ${status} ${notificationId} (${channels}) - ${timestamp}`
-              );
-
-              if (entry.details?.errors && entry.details.errors.length > 0) {
-                logger.warn(`     Errors: ${entry.details.errors.join(', ')}`);
-              }
-            });
-          } else {
-            logger.info(
-              '\n📋 No notifications found with the specified filters.'
-            );
-          }
-        }
+        );
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: errorMessage,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.error(`❌ Error: ${errorMessage}`);
-        }
-
+        cliError(
+          'Failed to get notification queue',
+          'GET_QUEUE_FAILED',
+          { error: errorMessage },
+          'notify:queue'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -605,15 +551,14 @@ export default function notifyCommand(cli: CAC) {
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
-      // Initialize logger
-      const logger = initializeLogger();
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('notify:retry');
 
       try {
-        const { id, all, limit, json, silent } = options;
-
-        if (!silent) {
-          logger.info('🔄 Retrying failed notifications...');
-        }
+        const { id, all, limit } = options;
 
         // Initialize configuration
         const config = new NotificationConfig();
@@ -623,28 +568,7 @@ export default function notifyCommand(cli: CAC) {
 
         if (id) {
           // Retry specific notification
-          if (!silent) {
-            logger.info(`🔄 Retrying notification: ${id}`);
-          }
-
-          // This would require implementing retry logic in the notification service
-          // For now, we'll just show a message
-          if (!silent) {
-            logger.warn('⚠️ Retry functionality not yet implemented');
-          }
-
-          if (json) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  message: 'Retry functionality not yet implemented',
-                },
-                null,
-                2
-              )
-            );
-          }
+          cliWarn('Retry functionality not yet implemented', 'notify:retry');
         } else if (all) {
           // Retry all failed notifications
           const history = await notificationService.getHistory(parseInt(limit));
@@ -652,51 +576,32 @@ export default function notifyCommand(cli: CAC) {
             (entry) => !entry.details?.success
           );
 
-          if (!silent) {
-            logger.info(
-              `Found ${failedNotifications.length} failed notifications to retry`
-            );
-          }
-
-          if (json) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: true,
-                  found: failedNotifications.length,
-                  message: 'Retry functionality not yet implemented',
-                },
-                null,
-                2
-              )
-            );
-          }
+          cliWarn(
+            `Found ${failedNotifications.length} failed notification${failedNotifications.length === 1 ? '' : 's'} to retry, but retry functionality is not yet implemented`,
+            'notify:retry'
+          );
         } else {
-          if (!silent) {
-            logger.error('❌ Please specify --id or --all');
-          }
+          cliError(
+            'Please specify --id or --all',
+            'VALIDATION_ERROR',
+            undefined,
+            'notify:retry'
+          );
           process.exit(1);
         }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: errorMessage,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.error(`❌ Error: ${errorMessage}`);
-        }
-
+        cliError(
+          'Failed to retry notifications',
+          'RETRY_FAILED',
+          { error: errorMessage },
+          'notify:retry'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }

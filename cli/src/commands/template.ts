@@ -7,8 +7,16 @@ import * as fs from 'fs';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 interface LegacyTemplate {
   name: string;
@@ -45,110 +53,87 @@ export function registerTemplateCommand(cli: CAC) {
     .option('--partial <name>', 'Show partial details')
     .option('--create-partial <name>', 'Create a new partial')
     .action(async (options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
-      const shouldOutputJson = globalOptions.json;
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('template');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
-        shouldOutputJson
+        globalOptions.json
       );
       const dataDir = civic.getDataDir();
 
       // Check template management permissions
       const canManageTemplates = await userCan(user, 'templates:manage');
       if (!canManageTemplates) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to manage templates',
-                requiredPermission: 'templates:manage',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to manage templates');
-          logger.info(`Role '${user.role}' cannot manage templates`);
-        }
+        cliError(
+          'Insufficient permissions to manage templates',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'templates:manage',
+            userRole: user.role,
+          },
+          'template'
+        );
         process.exit(1);
       }
 
       try {
         if (options.init) {
-          await initializeDefaultTemplates(dataDir, shouldOutputJson);
+          await initializeDefaultTemplates(dataDir);
         } else if (options.list) {
-          await listTemplates(dataDir, shouldOutputJson);
+          await listTemplates(dataDir, globalOptions.json);
         } else if (options.show) {
-          await showTemplate(dataDir, options.show, shouldOutputJson);
+          await showTemplate(dataDir, options.show);
         } else if (options.create) {
-          await createTemplate(
-            dataDir,
-            options.create,
-            options.type,
-            shouldOutputJson
-          );
+          await createTemplate(dataDir, options.create, options.type);
         } else if (options.validate) {
-          await validateTemplate(dataDir, options.validate, shouldOutputJson);
+          await validateTemplate(dataDir, options.validate);
         } else if (options.preview) {
-          await previewTemplate(dataDir, options.preview, shouldOutputJson);
+          await previewTemplate(dataDir, options.preview);
         } else if (options.partials) {
-          await listPartials(dataDir, shouldOutputJson);
+          await listPartials(dataDir);
         } else if (options.partial) {
-          await showPartial(dataDir, options.partial, shouldOutputJson);
+          await showPartial(dataDir, options.partial);
         } else if (options.createPartial) {
-          await createPartial(dataDir, options.createPartial, shouldOutputJson);
+          await createPartial(dataDir, options.createPartial);
         } else {
-          logger.info('📋 Template Management Commands:');
-          logger.info(
-            '  civic template --list                    # List all templates'
-          );
-          logger.info(
-            '  civic template --show <template>         # Show template details'
-          );
-          logger.info(
-            '  civic template --create <name> --type <type>  # Create new template'
-          );
-          logger.info(
-            '  civic template --validate <template>     # Validate template'
-          );
-          logger.info(
-            '  civic template --preview <template>      # Preview template with sample data'
-          );
-          logger.info(
-            '  civic template --init                    # Initialize default templates'
-          );
-          logger.info('');
-          logger.info('📋 Partial Management Commands:');
-          logger.info(
-            '  civic template --partials               # List available partials'
-          );
-          logger.info(
-            '  civic template --partial <name>         # Show partial details'
-          );
-          logger.info(
-            '  civic template --create-partial <name>  # Create new partial'
+          cliInfo(
+            'Template Management Commands:\n' +
+              '  civic template --list                    # List all templates\n' +
+              '  civic template --show <template>         # Show template details\n' +
+              '  civic template --create <name> --type <type>  # Create new template\n' +
+              '  civic template --validate <template>     # Validate template\n' +
+              '  civic template --preview <template>      # Preview template with sample data\n' +
+              '  civic template --init                    # Initialize default templates\n' +
+              '\n' +
+              'Partial Management Commands:\n' +
+              '  civic template --partials               # List available partials\n' +
+              '  civic template --partial <name>         # Show partial details\n' +
+              '  civic template --create-partial <name>  # Create new partial',
+            'template'
           );
         }
       } catch (error) {
-        logger.error('❌ Template command failed:', error);
+        cliError(
+          'Template command failed',
+          'TEMPLATE_COMMAND_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'template'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
 
-async function initializeDefaultTemplates(
-  dataDir: string,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function initializeDefaultTemplates(dataDir: string) {
   const templatesDir = join(dataDir, '.civic', 'templates');
 
   try {
@@ -164,42 +149,28 @@ async function initializeDefaultTemplates(
       const templateContent = yaml.stringify(template);
       await writeFile(templatePath, templateContent);
       createdTemplates.push(template.name);
-      if (!shouldOutputJson) {
-        logger.info(`✅ Created template: ${template.name}`);
-      }
     }
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'Default templates initialized successfully',
-            templates: createdTemplates,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info('\n🎉 Default templates initialized successfully!');
-    }
+    cliSuccess(
+      {
+        templates: createdTemplates,
+      },
+      `Default templates initialized successfully (${createdTemplates.length} template${createdTemplates.length === 1 ? '' : 's'})`,
+      {
+        operation: 'template:init',
+        templateCount: createdTemplates.length,
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: false,
-            error: 'Error initializing templates',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error initializing templates:', error);
-    }
+    cliError(
+      'Error initializing templates',
+      'INIT_TEMPLATES_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'template:init'
+    );
+    throw error;
   }
 }
 
@@ -466,8 +437,8 @@ function getDefaultTemplates(): LegacyTemplate[] {
 }
 
 async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
-  const logger = initializeLogger();
   const templateEngine = new TemplateEngine(dataDir);
+  const logger = initializeLogger();
 
   try {
     const recordTypes = ['bylaw', 'policy', 'proposal', 'resolution'];
@@ -483,32 +454,14 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
             templateName
           );
           if (template) {
-            if (shouldOutputJson) {
-              allTemplates.push({
-                name: templateName,
-                type: type,
-                extends: (template as any).extends,
-                hasParent: !!(template as any).parentTemplate,
-                sections: template.sections?.length || 0,
-                requiredFields:
-                  template.validation?.required_fields?.length || 0,
-              });
-            } else {
-              logger.info(`  ${type}/${templateName}`);
-              if ((template as any).extends) {
-                logger.info(`    Extends: ${(template as any).extends}`);
-              }
-              if ((template as any).parentTemplate) {
-                logger.info(
-                  `    Inherits from: ${(template as any).parentTemplate.name}`
-                );
-              }
-              logger.info(`    Sections: ${template.sections?.length || 0}`);
-              logger.info(
-                `    Required fields: ${template.validation?.required_fields?.length || 0}`
-              );
-              logger.info('');
-            }
+            allTemplates.push({
+              name: templateName,
+              type: type,
+              extends: (template as any).extends,
+              hasParent: !!(template as any).parentTemplate,
+              sections: template.sections?.length || 0,
+              requiredFields: template.validation?.required_fields?.length || 0,
+            });
           }
         } catch {
           // Skip templates that can't be loaded
@@ -518,18 +471,19 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
     }
 
     if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            templates: allTemplates,
-            summary: {
-              totalTemplates: allTemplates.length,
-              types: recordTypes,
-            },
+      cliSuccess(
+        {
+          templates: allTemplates,
+          summary: {
+            totalTemplates: allTemplates.length,
+            types: recordTypes,
           },
-          null,
-          2
-        )
+        },
+        `Found ${allTemplates.length} template${allTemplates.length === 1 ? '' : 's'}`,
+        {
+          operation: 'template:list',
+          templateCount: allTemplates.length,
+        }
       );
     } else if (allTemplates.length === 0) {
       logger.warn(
@@ -538,28 +492,22 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
     }
   } catch (error) {
     if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error listing templates',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
+      cliError(
+        'Error listing templates',
+        'LIST_TEMPLATES_FAILED',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'template:list'
       );
+      throw error;
     } else {
       logger.error('❌ Error listing templates:', error);
     }
   }
 }
 
-async function showTemplate(
-  dataDir: string,
-  templateName: string,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function showTemplate(dataDir: string, templateName: string) {
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
@@ -579,99 +527,53 @@ async function showTemplate(
     const template = await templateEngine.loadTemplate(type, name);
 
     if (!template) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Template not found: ${templateName}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Template not found: ${templateName}`);
-        return;
-      }
+      cliError(
+        `Template not found: ${templateName}`,
+        'TEMPLATE_NOT_FOUND',
+        { templateName },
+        'template:show'
+      );
+      return;
     }
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            template: {
-              name: template.name,
-              type: template.type,
-              extends: (template as any).extends,
-              hasParent: !!(template as any).parentTemplate,
-              sections: template.sections,
-              validation: template.validation,
-              content: template.content,
-            },
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info(`📋 Template: ${template.name}`);
-      logger.info(`Type: ${template.type}`);
-      if ((template as any).extends) {
-        logger.info(`Extends: ${(template as any).extends}`);
+    cliSuccess(
+      {
+        template: {
+          name: template.name,
+          type: template.type,
+          extends: (template as any).extends,
+          hasParent: !!(template as any).parentTemplate,
+          sections: template.sections,
+          validation: template.validation,
+          content: template.content,
+        },
+      },
+      `Template: ${template.name} (${template.type})`,
+      {
+        operation: 'template:show',
+        templateName: template.name,
+        templateType: template.type,
       }
-      if ((template as any).parentTemplate) {
-        logger.info(`Inherits from: ${(template as any).parentTemplate.name}`);
-      }
-
-      logger.info('\n📝 Content Template:');
-      logger.info(template.content);
-
-      logger.info('\n✅ Validation Rules:');
-      logger.info(
-        `Required fields: ${template.validation.required_fields?.join(', ') || 'none'}`
-      );
-      logger.info(
-        `Status values: ${template.validation.status_values?.join(', ') || 'none'}`
-      );
-      logger.info(
-        `Business rules: ${template.validation.business_rules?.length || 0}`
-      );
-      logger.info(
-        `Advanced rules: ${(template.validation as any).advanced_rules?.length || 0}`
-      );
-      logger.info(
-        `Field relationships: ${(template.validation as any).field_relationships?.length || 0}`
-      );
-      logger.info(
-        `Custom validators: ${(template.validation as any).custom_validators?.length || 0}`
-      );
-    }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error showing template',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error showing template:', error);
-    }
+    cliError(
+      'Error showing template',
+      'SHOW_TEMPLATE_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        templateName,
+      },
+      'template:show'
+    );
+    throw error;
   }
 }
 
 async function createTemplate(
   dataDir: string,
   templateName: string,
-  recordType?: string,
-  shouldOutputJson?: boolean
+  recordType?: string
 ) {
-  const logger = new Logger();
   const templatesDir = join(dataDir, '.civic', 'templates');
   const templatePath = join(templatesDir, `${templateName}.yml`);
 
@@ -680,21 +582,13 @@ async function createTemplate(
     await mkdir(templatesDir, { recursive: true });
 
     if (fs.existsSync(templatePath)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Template already exists: ${templateName}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Template already exists: ${templateName}`);
-        return;
-      }
+      cliError(
+        `Template already exists: ${templateName}`,
+        'TEMPLATE_EXISTS',
+        { templateName, path: templatePath },
+        'template:create'
+      );
+      return;
     }
 
     const template: LegacyTemplate = {
@@ -730,50 +624,36 @@ async function createTemplate(
     const templateContent = yaml.stringify(template);
     await writeFile(templatePath, templateContent);
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: `Created template: ${templateName}`,
-            template: {
-              name: templateName,
-              type: recordType || 'custom',
-              path: templatePath,
-            },
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info(`✅ Created template: ${templateName}`);
-      logger.info(`   Edit ${templatePath} to customize the template`);
-    }
+    cliSuccess(
+      {
+        template: {
+          name: templateName,
+          type: recordType || 'custom',
+          path: templatePath,
+        },
+      },
+      `Created template: ${templateName}`,
+      {
+        operation: 'template:create',
+        templateName,
+        templateType: recordType || 'custom',
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error creating template',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error creating template:', error);
-    }
+    cliError(
+      'Error creating template',
+      'CREATE_TEMPLATE_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        templateName,
+      },
+      'template:create'
+    );
+    throw error;
   }
 }
 
-async function validateTemplate(
-  dataDir: string,
-  templateName: string,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function validateTemplate(dataDir: string, templateName: string) {
   const templatePath = join(
     dataDir,
     '.civic',
@@ -783,29 +663,17 @@ async function validateTemplate(
 
   try {
     if (!fs.existsSync(templatePath)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Template not found: ${templateName}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Template not found: ${templateName}`);
-        return;
-      }
+      cliError(
+        `Template not found: ${templateName}`,
+        'TEMPLATE_NOT_FOUND',
+        { templateName },
+        'template:validate'
+      );
+      return;
     }
 
     const templateContent = await readFile(templatePath, 'utf-8');
     const template = yaml.parse(templateContent) as LegacyTemplate;
-
-    if (!shouldOutputJson) {
-      logger.info(`🔍 Validating template: ${template.name}`);
-    }
 
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -843,62 +711,57 @@ async function validateTemplate(
       }
     }
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            template: templateName,
-            isValid: errors.length === 0,
-            errors,
-            warnings,
-            summary: {
-              totalErrors: errors.length,
-              totalWarnings: warnings.length,
-            },
-          },
-          null,
-          2
-        )
+    if (errors.length === 0 && warnings.length === 0) {
+      cliSuccess(
+        {
+          template: templateName,
+          isValid: true,
+          errors,
+          warnings,
+        },
+        `Template '${templateName}' is valid`,
+        {
+          operation: 'template:validate',
+          templateName,
+        }
+      );
+    } else if (errors.length === 0) {
+      cliWarn(
+        `Template '${templateName}' is valid but has ${warnings.length} warning${warnings.length === 1 ? '' : 's'}`,
+        'template:validate'
       );
     } else {
-      // Report results
-      if (errors.length === 0 && warnings.length === 0) {
-        logger.info('✅ Template is valid!');
-      } else {
-        if (errors.length > 0) {
-          logger.error('❌ Validation errors:');
-          errors.forEach((error) => logger.error(`  - ${error}`));
-        }
-        if (warnings.length > 0) {
-          logger.warn('⚠️  Validation warnings:');
-          warnings.forEach((warning) => logger.warn(`  - ${warning}`));
-        }
-      }
+      cliError(
+        `Template '${templateName}' has ${errors.length} error${errors.length === 1 ? '' : 's'}${warnings.length > 0 ? ` and ${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : ''}`,
+        'VALIDATION_FAILED',
+        {
+          template: templateName,
+          isValid: false,
+          errors,
+          warnings,
+          summary: {
+            totalErrors: errors.length,
+            totalWarnings: warnings.length,
+          },
+        },
+        'template:validate'
+      );
     }
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error validating template',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error validating template:', error);
-    }
+    cliError(
+      'Error validating template',
+      'VALIDATE_TEMPLATE_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        templateName,
+      },
+      'template:validate'
+    );
+    throw error;
   }
 }
 
-async function previewTemplate(
-  dataDir: string,
-  templateName: string,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function previewTemplate(dataDir: string, templateName: string) {
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
@@ -918,25 +781,13 @@ async function previewTemplate(
     const template = await templateEngine.loadTemplate(type, name);
 
     if (!template) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Template not found: ${templateName}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Template not found: ${templateName}`);
-        return;
-      }
-    }
-
-    if (!shouldOutputJson) {
-      logger.info(`🔍 Previewing template: ${template.name}`);
+      cliError(
+        `Template not found: ${templateName}`,
+        'TEMPLATE_NOT_FOUND',
+        { templateName },
+        'template:preview'
+      );
+      return;
     }
 
     const sampleVariables: Record<string, any> = {
@@ -959,36 +810,28 @@ async function previewTemplate(
       sampleVariables
     );
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            template: templateName,
-            renderedContent,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info(`📄 Preview of ${template.name}:`);
-      logger.info(renderedContent);
-    }
+    cliSuccess(
+      {
+        template: templateName,
+        renderedContent,
+      },
+      `Preview of template: ${template.name}`,
+      {
+        operation: 'template:preview',
+        templateName: template.name,
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error previewing template',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error previewing template:', error);
-    }
+    cliError(
+      'Error previewing template',
+      'PREVIEW_TEMPLATE_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        templateName,
+      },
+      'template:preview'
+    );
+    throw error;
   }
 }
 
@@ -1006,130 +849,85 @@ export {
   createPartial,
 };
 
-async function listPartials(dataDir: string, shouldOutputJson?: boolean) {
-  const logger = initializeLogger();
+async function listPartials(dataDir: string) {
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
     const partials = templateEngine.listPartials();
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            partials,
-            count: partials.length,
-          },
-          null,
-          2
-        )
+    if (partials.length === 0) {
+      cliInfo(
+        'No partials found. Create your first partial with: civic template --create-partial <name>',
+        'template:list-partials'
       );
     } else {
-      if (partials.length === 0) {
-        logger.info('📋 No partials found.');
-        logger.info(
-          '💡 Create your first partial with: civic template --create-partial <name>'
-        );
-      } else {
-        logger.info(`📋 Available partials (${partials.length}):`);
-        partials.forEach((partial: string) => {
-          logger.info(`  - ${partial}`);
-        });
-      }
+      cliSuccess(
+        {
+          partials,
+          count: partials.length,
+        },
+        `Found ${partials.length} partial${partials.length === 1 ? '' : 's'}`,
+        {
+          operation: 'template:list-partials',
+          partialCount: partials.length,
+        }
+      );
     }
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error listing partials',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error listing partials:', error);
-    }
+    cliError(
+      'Error listing partials',
+      'LIST_PARTIALS_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'template:list-partials'
+    );
+    throw error;
   }
 }
 
-async function showPartial(
-  dataDir: string,
-  partialName: string,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function showPartial(dataDir: string, partialName: string) {
   const templateEngine = new TemplateEngine(dataDir);
 
   try {
     const partial = templateEngine.getPartialDetails(partialName);
 
     if (!partial) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Partial not found: ${partialName}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Partial not found: ${partialName}`);
-        return;
-      }
+      cliError(
+        `Partial not found: ${partialName}`,
+        'PARTIAL_NOT_FOUND',
+        { partialName },
+        'template:show-partial'
+      );
+      return;
     }
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            partial: partialName,
-            details: partial,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info(`📋 Partial: ${partial.name}`);
-      if (partial.description) {
-        logger.info(`📝 Description: ${partial.description}`);
+    cliSuccess(
+      {
+        partial: partialName,
+        details: partial,
+      },
+      `Partial: ${partial.name}`,
+      {
+        operation: 'template:show-partial',
+        partialName: partial.name,
       }
-      if (partial.parameters && partial.parameters.length > 0) {
-        logger.info(`🔧 Parameters: ${partial.parameters.join(', ')}`);
-      }
-      logger.info(`📄 Content:`);
-      logger.info(partial.content);
-    }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error showing partial',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error showing partial:', error);
-    }
+    cliError(
+      'Error showing partial',
+      'SHOW_PARTIAL_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        partialName,
+      },
+      'template:show-partial'
+    );
+    throw error;
   }
 }
 
-async function createPartial(
-  dataDir: string,
-  partialName: string,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function createPartial(dataDir: string, partialName: string) {
   try {
     const partialsDir = join(dataDir, '.civic', 'partials');
     await mkdir(partialsDir, { recursive: true });
@@ -1137,21 +935,13 @@ async function createPartial(
     const partialPath = join(partialsDir, `${partialName}.md`);
 
     if (fs.existsSync(partialPath)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Partial already exists: ${partialName}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Partial already exists: ${partialName}`);
-        return;
-      }
+      cliError(
+        `Partial already exists: ${partialName}`,
+        'PARTIAL_EXISTS',
+        { partialName, path: partialPath },
+        'template:create-partial'
+      );
+      return;
     }
 
     // Create a default partial template
@@ -1185,39 +975,27 @@ Use this partial in templates with:
 
     await writeFile(partialPath, defaultPartial);
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: `Partial created: ${partialName}`,
-            path: partialPath,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info(`✅ Created partial: ${partialName}`);
-      logger.info(`📁 Location: ${partialPath}`);
-      logger.info(
-        '💡 Edit the partial to customize its content and parameters.'
-      );
-    }
+    cliSuccess(
+      {
+        partialName,
+        path: partialPath,
+      },
+      `Partial created: ${partialName}`,
+      {
+        operation: 'template:create-partial',
+        partialName,
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error creating partial',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error creating partial:', error);
-    }
+    cliError(
+      'Error creating partial',
+      'CREATE_PARTIAL_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        partialName,
+      },
+      'template:create-partial'
+    );
+    throw error;
   }
 }

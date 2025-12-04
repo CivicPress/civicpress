@@ -5,6 +5,7 @@ import {
   WorkflowConfigManager,
   RecordManager,
   userCan,
+  coreError,
 } from '@civicpress/core';
 import fs from 'fs';
 import path from 'path';
@@ -266,7 +267,15 @@ export class RecordsService {
         author: record.author,
       };
     } catch (error) {
-      console.error(`Failed to read raw file for record ${id}:`, error);
+      coreError(
+        `Failed to read raw file for record ${id}`,
+        'RECORD_FILE_READ_ERROR',
+        {
+          recordId: id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'records:getRaw' }
+      );
       // Fall back to database content if file read fails
       return {
         id: record.id,

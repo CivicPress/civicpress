@@ -7,12 +7,20 @@ import { userCan } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import {
   getAvailableRecords,
   resolveRecordReference,
 } from '../utils/record-locator.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export const viewCommand = (cli: CAC) => {
   cli
@@ -20,39 +28,32 @@ export const viewCommand = (cli: CAC) => {
     .option('--token <token>', 'Session token for authentication')
     .option('-r, --raw', 'Show raw markdown content')
     .action(async (recordName: string, options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
       const logger = initializeLogger();
-      const shouldOutputJson = globalOptions.json;
+      const endOperation = cliStartOperation('view');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
-        shouldOutputJson
+        globalOptions.json
       );
       const dataDir = civic.getDataDir();
 
       // Check view permissions
       const canView = await userCan(user, 'records:view');
       if (!canView) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to view records',
-                requiredPermission: 'records:view',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to view records');
-          logger.info(`Role '${user.role}' cannot view records`);
-        }
+        cliError(
+          'Insufficient permissions to view records',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'records:view',
+            userRole: user.role,
+          },
+          'view'
+        );
         process.exit(1);
       }
 
@@ -68,17 +69,8 @@ export const viewCommand = (cli: CAC) => {
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify({ error: 'No records directory found' }, null, 2)
-            );
-            return;
-          } else {
-            logger.warn(
-              '📁 No records directory found. Create some records first!'
-            );
-            return;
-          }
+          cliWarn('No records directory found', 'view');
+          return;
         }
 
         const resolvedRecord = resolveRecordReference(dataDir, recordName);
@@ -86,33 +78,16 @@ export const viewCommand = (cli: CAC) => {
         if (!resolvedRecord) {
           const availableRecords = getAvailableRecords(dataDir);
 
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  error: `Record "${recordName}" not found`,
-                  availableRecords,
-                },
-                null,
-                2
-              )
-            );
-            return;
-          } else {
-            logger.error(`❌ Record "${recordName}" not found.`);
-            logger.info('Available records:');
-
-            // List available records
-            for (const [type, files] of Object.entries(availableRecords)) {
-              if (files.length > 0) {
-                logger.info(`  ${type}:`);
-                for (const file of files) {
-                  logger.debug(`    ${file}`);
-                }
-              }
-            }
-            return;
-          }
+          cliError(
+            `Record "${recordName}" not found`,
+            'RECORD_NOT_FOUND',
+            {
+              recordName,
+              availableRecords,
+            },
+            'view'
+          );
+          return;
         }
 
         const recordPath = resolvedRecord.absolutePath;
@@ -156,10 +131,11 @@ export const viewCommand = (cli: CAC) => {
           rawContent: content,
         };
 
-        if (shouldOutputJson) {
-          console.log(JSON.stringify({ record }, null, 2));
-          return;
-        }
+        cliSuccess({ record }, `Record: ${record.title}`, {
+          operation: 'view',
+          recordType: record.type,
+          recordTitle: record.title,
+        });
 
         // Display record information
         logger.info('\n' + '='.repeat(60));

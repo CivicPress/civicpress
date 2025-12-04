@@ -6,6 +6,7 @@ import { NotificationQueue } from './notification-queue.js';
 import { NotificationSecurity } from './notification-security.js';
 import { NotificationRateLimiter } from './notification-rate-limiter.js';
 import { NotificationLogger } from './notification-logger.js';
+import { coreDebug, coreError } from '../utils/core-output.js';
 
 export interface NotificationRequest {
   userId?: string;
@@ -73,11 +74,21 @@ export class NotificationService {
     const notificationId = this.generateNotificationId();
 
     try {
-      console.log(`  - Notification ID: ${notificationId}`);
-      console.log(`  - Template: ${request.template}`);
-      console.log(`  - Channels: ${request.channels.join(', ')}`);
-      console.log(`  - Email: ${request.email}`);
-      console.log(`  - Data:`, request.data);
+      coreDebug(`Notification ID: ${notificationId}`, {
+        operation: 'notification:send',
+      });
+      coreDebug(`Template: ${request.template}`, {
+        operation: 'notification:send',
+      });
+      coreDebug(`Channels: ${request.channels.join(', ')}`, {
+        operation: 'notification:send',
+      });
+      coreDebug(`Email: ${request.email}`, {
+        operation: 'notification:send',
+      });
+      coreDebug('Notification data', request.data, {
+        operation: 'notification:send',
+      });
 
       // Security checks
       await this.security.validateRequest(request);
@@ -142,11 +153,21 @@ export class NotificationService {
         errors: errors.length > 0 ? errors : undefined,
       };
 
-      console.log(`✅ [DEBUG] Notification response:`, response);
+      coreDebug('Notification response', response, {
+        operation: 'notification:send',
+      });
       this.logger.info(`Notification sent: ${notificationId}`, response);
       return response;
     } catch (error) {
-      console.log(`❌ [DEBUG] Notification failed:`, error);
+      coreError(
+        `Notification failed: ${notificationId}`,
+        'NOTIFICATION_FAILED',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          notificationId,
+        },
+        { operation: 'notification:send' }
+      );
       this.logger.error(
         `Notification failed: ${notificationId}`,
         error as Error
@@ -184,7 +205,10 @@ export class NotificationService {
       priority: request.priority || 'normal',
     });
 
-    console.log(`✅ [DEBUG] Channel ${channelName} sent successfully`);
+    coreDebug(`Channel ${channelName} sent successfully`, {
+      operation: 'notification:send',
+      channel: channelName,
+    });
   }
 
   /**

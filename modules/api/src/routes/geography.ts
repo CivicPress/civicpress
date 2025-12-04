@@ -14,6 +14,13 @@ import {
   applyGeographyPreset,
 } from '@civicpress/core';
 import { AuthenticatedRequest } from '../middleware/auth.js';
+import {
+  handleApiError,
+  logApiError,
+  logApiSuccess,
+  sendSuccess,
+  handleValidationError as apiHandleValidationError,
+} from '../utils/api-logger.js';
 
 export function createGeographyRouter(geographyManager: GeographyManager) {
   const router = Router();
@@ -35,15 +42,13 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   const handleError = (
     operation: string,
     error: any,
+    req: Request,
     res: Response,
     statusCode: number = 500
   ) => {
-    console.error(`Geography API ${operation} error:`, error);
-    res.status(statusCode).json({
-      success: false,
-      error: error.message || 'An error occurred',
-      message: `${operation} failed`,
-    });
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    (errorObj as any).statusCode = statusCode;
+    handleApiError(operation, errorObj, req, res, `${operation} failed`);
   };
 
   const handleValidationError = (
@@ -86,7 +91,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         handleSuccess('list_geography', result, res);
       } catch (error) {
-        handleError('list_geography', error, res);
+        handleError('list_geography', error, req, res);
       }
     }
   );
@@ -114,6 +119,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         return handleError(
           'create_geography',
           new Error('Authentication required'),
+          req,
           res,
           401
         );
@@ -127,8 +133,6 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
       try {
         const { name, type, category, description, content, srid, metadata } =
           req.body;
-
-        console.log('API: Creating geography file:', { name, type, category });
 
         const geographyFile = await geographyManager.createGeographyFile(
           {
@@ -145,11 +149,13 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           req.user
         );
 
-        console.log('API: Geography file created:', geographyFile.id);
+        logApiSuccess('create_geography', req as any, {
+          geographyFileId: geographyFile.id,
+        });
 
         handleSuccess('create_geography', geographyFile, res, 201);
       } catch (error) {
-        handleError('create_geography', error, res);
+        handleError('create_geography', error, req, res);
       }
     }
   );
@@ -177,7 +183,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         handleSuccess('validate_geography', validation, res);
       } catch (error) {
-        handleError('validate_geography', error, res);
+        handleError('validate_geography', error, req, res);
       }
     }
   );
@@ -189,7 +195,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
       const presets = listGeographyPresets();
       handleSuccess('list_presets', presets, res);
     } catch (error) {
-      handleError('list_presets', error, res);
+      handleError('list_presets', error, req, res);
     }
   });
 
@@ -211,6 +217,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           return handleError(
             'get_preset',
             new Error('Preset not found'),
+            req,
             res,
             404
           );
@@ -218,7 +225,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         return handleSuccess('get_preset', preset, res);
       } catch (error) {
-        return handleError('get_preset', error, res);
+        return handleError('get_preset', error, req, res);
       }
     }
   );
@@ -247,7 +254,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         handleSuccess('apply_preset', result, res);
       } catch (error) {
-        handleError('apply_preset', error, res);
+        handleError('apply_preset', error, req, res);
       }
     }
   );
@@ -265,18 +272,13 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
       try {
         const { id } = req.params;
 
-        // Log the ID being searched for debugging
-        console.log(
-          `[Geography API] Searching for geography file with ID: ${id}`
-        );
-
         const geographyFile = await geographyManager.getGeographyFile(id);
 
         if (!geographyFile) {
-          console.log(`[Geography API] Geography file not found for ID: ${id}`);
           return handleError(
             'get_geography',
             new Error(`Geography file not found: ${id}`),
+            req,
             res,
             404
           );
@@ -284,8 +286,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         handleSuccess('get_geography', geographyFile, res);
       } catch (error) {
-        console.error(`[Geography API] Error getting geography file:`, error);
-        handleError('get_geography', error, res);
+        handleError('get_geography', error, req, res);
       }
     }
   );
@@ -308,6 +309,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           return handleError(
             'get_geography_raw',
             new Error('Geography file not found'),
+            req,
             res,
             404
           );
@@ -323,7 +325,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         res.setHeader('Content-Type', contentType);
         res.send(rawContent);
       } catch (error) {
-        handleError('get_geography_raw', error, res);
+        handleError('get_geography_raw', error, req, res);
       }
     }
   );
@@ -345,6 +347,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         return handleError(
           'update_geography',
           new Error('Authentication required'),
+          req,
           res,
           401
         );
@@ -375,7 +378,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         handleSuccess('update_geography', geographyFile, res);
       } catch (error) {
-        handleError('update_geography', error, res);
+        handleError('update_geography', error, req, res);
       }
     }
   );
@@ -390,6 +393,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         return handleError(
           'delete_geography',
           new Error('Authentication required'),
+          req,
           res,
           401
         );
@@ -411,9 +415,9 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           error?.code === 'NOT_FOUND' ||
           error?.name === 'GeographyNotFoundError'
         ) {
-          return handleError('delete_geography', error, res, 404);
+          return handleError('delete_geography', error, req, res, 404);
         }
-        handleError('delete_geography', error, res);
+        handleError('delete_geography', error, req, res);
       }
     }
   );
@@ -451,7 +455,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         handleSuccess('get_linked_records', linkedRecords, res);
       } catch (error) {
-        handleError('get_linked_records', error, res);
+        handleError('get_linked_records', error, req, res);
       }
     }
   );

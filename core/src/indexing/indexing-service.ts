@@ -10,6 +10,7 @@ import * as yaml from 'js-yaml';
 import { CivicPress } from '../civic-core.js';
 import { Logger } from '../utils/logger.js';
 import { RecordParser } from '../records/record-parser.js';
+import { coreWarn, coreError } from '../utils/core-output.js';
 
 export interface CivicIndexEntry {
   file: string;
@@ -193,7 +194,11 @@ export class IndexingService {
 
       return entry;
     } catch (error) {
-      console.warn(`Failed to extract metadata from ${filePath}:`, error);
+      coreWarn(`Failed to extract metadata from ${filePath}`, {
+        operation: 'indexing:extract-metadata',
+        filePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -306,7 +311,11 @@ export class IndexingService {
       const content = readFileSync(indexPath, 'utf-8');
       return yaml.load(content) as CivicIndex;
     } catch (error) {
-      console.warn(`Failed to load index from ${indexPath}:`, error);
+      coreWarn(`Failed to load index from ${indexPath}`, {
+        operation: 'indexing:load-index',
+        indexPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -417,7 +426,15 @@ export class IndexingService {
       } catch (error) {
         conflictCount++;
         logger.warn(`❌ Failed to sync ${entry.title}: ${error}`);
-        console.error(`Detailed error for ${entry.title}:`, error);
+        coreError(
+          `Detailed error for ${entry.title}`,
+          'SYNC_ERROR',
+          {
+            entry: entry.title,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          { operation: 'indexing:sync' }
+        );
       }
     }
 
@@ -545,7 +562,10 @@ export class IndexingService {
 
       case 'manual':
         // For manual resolution, we'll skip for now and log
-        console.warn(`⚠️  Manual resolution needed for: ${entry.title}`);
+        coreWarn(`Manual resolution needed for: ${entry.title}`, {
+          operation: 'indexing:conflict-resolution',
+          entry: entry.title,
+        });
         return false;
 
       default:

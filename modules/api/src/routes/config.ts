@@ -49,6 +49,80 @@ router.get('/link-categories', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/config/:type/validate
+ * Validate a configuration file (public - validation should be accessible without auth)
+ *
+ * Request body (optional):
+ * - content: string - YAML content to validate. If provided, validates this content instead of the saved file.
+ */
+router.post(
+  '/:type/validate',
+  express.text({ type: '*/*', limit: '5mb' }),
+  async (req, res) => {
+    try {
+      const { type } = req.params;
+      // Check if content was sent as text/string (raw YAML)
+      // If req.body is a non-empty string, use it; otherwise validate saved file
+      let content: string | undefined;
+      if (typeof req.body === 'string' && req.body.trim().length > 0) {
+        content = req.body;
+      } else if (
+        req.body &&
+        typeof req.body === 'object' &&
+        (req.body as any).content
+      ) {
+        // Fallback: check if content was sent in JSON format
+        content = (req.body as any).content;
+      }
+      // If content is undefined, validateConfiguration will load from disk
+
+      const validation = await configurationService.validateConfiguration(
+        type,
+        content
+      );
+
+      res.json({
+        success: true,
+        data: validation,
+      });
+
+      // Optional audit logging (don't require auth for validation)
+      const actor = (req as any).user || {};
+      if (actor.id) {
+        await audit.log({
+          source: 'api',
+          actor: { id: actor.id, username: actor.username, role: actor.role },
+          action: 'config:validate',
+          target: { type: 'config', id: type },
+          outcome: validation?.valid ? 'success' : 'failure',
+          message: validation?.valid
+            ? undefined
+            : (validation?.errors?.[0] as any),
+          metadata: validation,
+        });
+      }
+    } catch (error) {
+      const { type } = req.params || ({} as any);
+      const actor = (req as any).user || {};
+      if (actor.id) {
+        await audit.log({
+          source: 'api',
+          actor: { id: actor.id, username: actor.username, role: actor.role },
+          action: 'config:validate',
+          target: { type: 'config', id: type },
+          outcome: 'failure',
+          message: String(error),
+        });
+      }
+      res.status(500).json({
+        success: false,
+        error: `Failed to validate configuration: ${error}`,
+      });
+    }
+  }
+);
+
 // Secured configuration routes: require authenticated admin permission
 router.use((req, res, next) => {
   const civicPress = (req as any).civicPress;
@@ -313,75 +387,6 @@ router.post('/:type/reset', async (req, res) => {
     });
   }
 });
-
-/**
- * POST /api/config/:type/validate
- * Validate a configuration file
- *
- * Request body (optional):
- * - content: string - YAML content to validate. If provided, validates this content instead of the saved file.
- */
-router.post(
-  '/:type/validate',
-  express.text({ type: '*/*', limit: '5mb' }),
-  async (req, res) => {
-    try {
-      const { type } = req.params;
-      // Check if content was sent as text/string (raw YAML)
-      // If req.body is a non-empty string, use it; otherwise validate saved file
-      let content: string | undefined;
-      if (typeof req.body === 'string' && req.body.trim().length > 0) {
-        content = req.body;
-      } else if (
-        req.body &&
-        typeof req.body === 'object' &&
-        (req.body as any).content
-      ) {
-        // Fallback: check if content was sent in JSON format
-        content = (req.body as any).content;
-      }
-      // If content is undefined, validateConfiguration will load from disk
-
-      const validation = await configurationService.validateConfiguration(
-        type,
-        content
-      );
-
-      res.json({
-        success: true,
-        data: validation,
-      });
-
-      const actor = (req as any).user || {};
-      await audit.log({
-        source: 'api',
-        actor: { id: actor.id, username: actor.username, role: actor.role },
-        action: 'config:validate',
-        target: { type: 'config', id: type },
-        outcome: validation?.valid ? 'success' : 'failure',
-        message: validation?.valid
-          ? undefined
-          : (validation?.errors?.[0] as any),
-        metadata: validation,
-      });
-    } catch (error) {
-      const { type } = req.params || ({} as any);
-      const actor = (req as any).user || {};
-      await audit.log({
-        source: 'api',
-        actor: { id: actor.id, username: actor.username, role: actor.role },
-        action: 'config:validate',
-        target: { type: 'config', id: type },
-        outcome: 'failure',
-        message: String(error),
-      });
-      res.status(500).json({
-        success: false,
-        error: `Failed to validate configuration: ${error}`,
-      });
-    }
-  }
-);
 
 /**
  * GET /api/config/validate/all

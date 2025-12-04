@@ -198,8 +198,8 @@ describe('CLI Sync Commands', () => {
       const jsonMatch = result.match(/\{[\s\S]*\}/);
       expect(jsonMatch).toBeTruthy();
       const jsonResult = JSON.parse(jsonMatch![0]);
-      expect(jsonResult.metadata).toBeDefined();
-      expect(jsonResult.metadata.totalRecords).toBe(3);
+      expect(jsonResult.data.metadata).toBeDefined();
+      expect(jsonResult.data.metadata.totalRecords).toBe(3);
     });
 
     it('should support --silent output', () => {
@@ -307,8 +307,8 @@ describe('CLI Sync Commands', () => {
       const jsonMatch = result.match(/\{[\s\S]*\}/);
       expect(jsonMatch).toBeTruthy();
       const jsonResult = JSON.parse(jsonMatch![0]);
-      expect(jsonResult.metadata).toBeDefined();
-      expect(jsonResult.metadata.totalRecords).toBe(3);
+      expect(jsonResult.data.metadata).toBeDefined();
+      expect(jsonResult.data.metadata.totalRecords).toBe(3);
     });
 
     it('should support --silent output with sync', () => {

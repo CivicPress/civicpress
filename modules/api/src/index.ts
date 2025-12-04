@@ -182,7 +182,6 @@ export class CivicPressAPI {
       logger.info('CivicPress API initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize CivicPress API:', error);
-      console.error('Full error details:', error);
       throw error;
     }
   }

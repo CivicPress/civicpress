@@ -1,3 +1,5 @@
+import { coreError } from '../utils/core-output.js';
+
 export interface QueuedNotification {
   id: string;
   request: any;
@@ -58,9 +60,14 @@ export class NotificationQueue {
             await this.handleRetry(notification);
           }
         } catch (error) {
-          console.error(
-            `Failed to process queued notification ${notification.id}:`,
-            error
+          coreError(
+            `Failed to process queued notification ${notification.id}`,
+            'QUEUE_PROCESS_ERROR',
+            {
+              notificationId: notification.id,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            { operation: 'notification:queue' }
           );
           await this.handleRetry(notification);
         }
@@ -79,8 +86,14 @@ export class NotificationQueue {
     if (notification.attempts >= notification.maxAttempts) {
       // Remove from queue after max attempts
       this.removeFromQueue(notification.id);
-      console.error(
-        `Notification ${notification.id} failed after ${notification.attempts} attempts`
+      coreError(
+        `Notification ${notification.id} failed after ${notification.attempts} attempts`,
+        'QUEUE_MAX_ATTEMPTS',
+        {
+          notificationId: notification.id,
+          attempts: notification.attempts,
+        },
+        { operation: 'notification:queue' }
       );
       return;
     }

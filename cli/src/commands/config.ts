@@ -11,8 +11,15 @@ import { createRequire } from 'module';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 function createConfigService(): ConfigurationService {
   const central = CentralConfigManager.getConfig();
@@ -47,32 +54,29 @@ export function registerConfigCommands(cli: CAC) {
       'Show configuration status (user/default/missing)'
     )
     .action(async () => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:status');
+
       try {
         const service = createConfigService();
         const status = await service.getConfigurationStatus();
-        if (json) {
-          console.log(JSON.stringify({ success: true, data: status }, null, 2));
-        } else {
-          logger.info('📊 Configuration status:');
-          for (const [type, state] of Object.entries(status)) {
-            logger.info(`  • ${type}: ${state}`);
-          }
-        }
+
+        cliSuccess({ status }, `Configuration status retrieved`, {
+          operation: 'config:status',
+          configCount: Object.keys(status).length,
+        });
       } catch (err: any) {
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Failed to get configuration status:', err);
-        }
+        cliError(
+          'Failed to get configuration status',
+          'GET_CONFIG_STATUS_FAILED',
+          { error: err?.message || String(err) },
+          'config:status'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -80,33 +84,33 @@ export function registerConfigCommands(cli: CAC) {
   cli
     .command('config:list', 'List available configuration files')
     .action(async () => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:list');
+
       try {
         const service = createConfigService();
         const list = await service.getConfigurationList();
-        if (json) {
-          console.log(JSON.stringify({ success: true, data: list }, null, 2));
-        } else {
-          logger.info('📄 Available configurations:');
-          for (const item of list) {
-            logger.info(`  • ${item.file} (${item.status})`);
-            logger.debug(`    ${item.name} — ${item.description}`);
+
+        cliSuccess(
+          { list },
+          `Found ${list.length} available configuration${list.length === 1 ? '' : 's'}`,
+          {
+            operation: 'config:list',
+            configCount: list.length,
           }
-        }
+        );
       } catch (err: any) {
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Failed to list configurations:', err);
-        }
+        cliError(
+          'Failed to list configurations',
+          'LIST_CONFIGS_FAILED',
+          { error: err?.message || String(err) },
+          'config:list'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -115,48 +119,41 @@ export function registerConfigCommands(cli: CAC) {
     .command('config:get <type>', 'Get a configuration file')
     .option('--raw', 'Output raw YAML (no transforms)')
     .action(async (type: string, options: any) => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:get');
+
       try {
         const service = createConfigService();
         if (options.raw) {
           const yamlTxt = await (service as any).loadRawConfigurationYAML(type);
-          if (json) {
-            console.log(
-              JSON.stringify(
-                { success: true, data: { type, yaml: yamlTxt } },
-                null,
-                2
-              )
-            );
-          } else {
-            // Print raw YAML directly
-            process.stdout.write(yamlTxt);
-          }
+          cliSuccess({ type, yaml: yamlTxt }, `Raw configuration for ${type}`, {
+            operation: 'config:get',
+            configType: type,
+            format: 'raw',
+          });
         } else {
           const config = await service.loadConfiguration(type);
-          if (json) {
-            console.log(
-              JSON.stringify({ success: true, data: config }, null, 2)
-            );
-          } else {
-            logger.info(`📄 ${type} (normalized):`);
-            logger.info(JSON.stringify(config, null, 2));
-          }
+          cliSuccess({ config }, `Configuration for ${type} (normalized)`, {
+            operation: 'config:get',
+            configType: type,
+            format: 'normalized',
+          });
         }
       } catch (err: any) {
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error(`❌ Failed to get configuration '${type}':`, err);
-        }
+        cliError(
+          `Failed to get configuration '${type}'`,
+          'GET_CONFIG_FAILED',
+          {
+            error: err?.message || String(err),
+            configType: type,
+          },
+          'config:get'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -167,36 +164,52 @@ export function registerConfigCommands(cli: CAC) {
     .option('--file <path>', 'Path to YAML file to save')
     .option('--token <token>', 'Session token for authentication (for audit)')
     .action(async (type: string, options: any) => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:put');
+
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       let actor: any | undefined;
       if (options?.token) {
         try {
-          actor = await AuthUtils.requireAuth(options.token, json);
+          actor = await AuthUtils.requireAuth(
+            options.token,
+            globalOptions.json
+          );
         } catch {}
       }
       try {
         const service = createConfigService();
 
         if (!options.file) {
-          throw new Error('Missing --file <path> argument');
+          cliError(
+            'Missing --file <path> argument',
+            'VALIDATION_ERROR',
+            undefined,
+            'config:put'
+          );
+          process.exit(1);
         }
         const filePath = path.resolve(options.file);
         if (!fs.existsSync(filePath)) {
-          throw new Error(`File not found: ${filePath}`);
+          cliError(
+            `File not found: ${filePath}`,
+            'FILE_NOT_FOUND',
+            undefined,
+            'config:put'
+          );
+          process.exit(1);
         }
         const yamlTxt = await fsp.readFile(filePath, 'utf8');
         await (service as any).saveRawConfigurationYAML(type, yamlTxt);
 
-        if (json) {
-          console.log(
-            JSON.stringify({ success: true, data: { type } }, null, 2)
-          );
-        } else {
-          logger.success(`✅ Saved configuration '${type}'`);
-        }
+        cliSuccess({ type }, `Saved configuration '${type}'`, {
+          operation: 'config:put',
+          configType: type,
+        });
+
         await audit.log({
           source: 'cli',
           actor: actor
@@ -217,18 +230,18 @@ export function registerConfigCommands(cli: CAC) {
           outcome: 'failure',
           message: err?.message || String(err),
         });
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error(`❌ Failed to save configuration '${type}':`, err);
-        }
+        cliError(
+          `Failed to save configuration '${type}'`,
+          'SAVE_CONFIG_FAILED',
+          {
+            error: err?.message || String(err),
+            configType: type,
+          },
+          'config:put'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -238,14 +251,20 @@ export function registerConfigCommands(cli: CAC) {
     .option('--all', 'Validate all configurations')
     .option('--token <token>', 'Session token for authentication (for audit)')
     .action(async (type: string | undefined, options: any) => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:validate');
+
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       let actor: any | undefined;
       if (options?.token) {
         try {
-          actor = await AuthUtils.requireAuth(options.token, json);
+          actor = await AuthUtils.requireAuth(
+            options.token,
+            globalOptions.json
+          );
         } catch {}
       }
       try {
@@ -263,21 +282,21 @@ export function registerConfigCommands(cli: CAC) {
           for (const t of types) {
             results.push(await validateOne(t));
           }
-          if (json) {
-            console.log(
-              JSON.stringify({ success: true, data: results }, null, 2)
-            );
-          } else {
-            logger.info('🔍 Configuration validation results:');
-            for (const r of results) {
-              if (r.valid) {
-                logger.info(`  ✅ ${r.type}: valid`);
-              } else {
-                logger.error(`  ❌ ${r.type}: invalid`);
-                for (const e of r.errors) logger.error(`     - ${e}`);
-              }
-            }
-          }
+
+          const validCount = results.filter((r) => r.valid).length;
+          const invalidCount = results.length - validCount;
+          const message =
+            invalidCount === 0
+              ? `All ${results.length} configuration${results.length === 1 ? '' : 's'} are valid`
+              : `${validCount} valid, ${invalidCount} invalid configuration${results.length === 1 ? '' : 's'}`;
+
+          cliSuccess({ results }, message, {
+            operation: 'config:validate',
+            totalCount: results.length,
+            validCount,
+            invalidCount,
+          });
+
           await audit.log({
             source: 'cli',
             actor: actor
@@ -290,16 +309,24 @@ export function registerConfigCommands(cli: CAC) {
           });
         } else if (type) {
           const r = await validateOne(type);
-          if (json) {
-            console.log(JSON.stringify({ success: true, data: r }, null, 2));
+
+          if (r.valid) {
+            cliSuccess({ result: r }, `Configuration '${type}' is valid`, {
+              operation: 'config:validate',
+              configType: type,
+            });
           } else {
-            if (r.valid) {
-              logger.success(`✅ ${type} is valid`);
-            } else {
-              logger.error(`❌ ${type} is invalid`);
-              for (const e of r.errors) logger.error(`   - ${e}`);
-            }
+            cliError(
+              `Configuration '${type}' is invalid: ${r.errors.join(', ')}`,
+              'VALIDATION_FAILED',
+              {
+                errors: r.errors,
+                configType: type,
+              },
+              'config:validate'
+            );
           }
+
           await audit.log({
             source: 'cli',
             actor: actor
@@ -309,18 +336,17 @@ export function registerConfigCommands(cli: CAC) {
             target: { type: 'config', name: type },
             outcome: r.valid ? 'success' : 'failure',
           });
-        } else {
-          if (json) {
-            console.log(
-              JSON.stringify(
-                { success: false, error: 'Specify a type or use --all' },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.info('Usage: civic config:validate <type> | --all');
+
+          if (!r.valid) {
+            process.exit(1);
           }
+        } else {
+          cliError(
+            'Specify a type or use --all',
+            'VALIDATION_ERROR',
+            undefined,
+            'config:validate'
+          );
           process.exit(1);
         }
       } catch (err: any) {
@@ -334,18 +360,18 @@ export function registerConfigCommands(cli: CAC) {
           outcome: 'failure',
           message: err?.message || String(err),
         });
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Validation failed:', err);
-        }
+        cliError(
+          'Configuration validation failed',
+          'VALIDATION_ERROR',
+          {
+            error: err?.message || String(err),
+            configType: type || 'all',
+          },
+          'config:validate'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -354,26 +380,31 @@ export function registerConfigCommands(cli: CAC) {
     .command('config:reset <type>', 'Reset a configuration to defaults')
     .option('--token <token>', 'Session token for authentication (for audit)')
     .action(async (type: string, options: any) => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:reset');
+
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       let actor: any | undefined;
       if (options?.token) {
         try {
-          actor = await AuthUtils.requireAuth(options.token, json);
+          actor = await AuthUtils.requireAuth(
+            options.token,
+            globalOptions.json
+          );
         } catch {}
       }
       try {
         const service = createConfigService();
         await service.resetToDefaults(type);
-        if (json) {
-          console.log(
-            JSON.stringify({ success: true, data: { type } }, null, 2)
-          );
-        } else {
-          logger.success(`✅ Reset '${type}' to defaults`);
-        }
+
+        cliSuccess({ type }, `Reset '${type}' to defaults`, {
+          operation: 'config:reset',
+          configType: type,
+        });
+
         await audit.log({
           source: 'cli',
           actor: actor
@@ -394,18 +425,18 @@ export function registerConfigCommands(cli: CAC) {
           outcome: 'failure',
           message: err?.message || String(err),
         });
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error(`❌ Failed to reset '${type}':`, err);
-        }
+        cliError(
+          `Failed to reset '${type}'`,
+          'RESET_CONFIG_FAILED',
+          {
+            error: err?.message || String(err),
+            configType: type,
+          },
+          'config:reset'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -417,14 +448,20 @@ export function registerConfigCommands(cli: CAC) {
     })
     .option('--token <token>', 'Session token for authentication (for audit)')
     .action(async (options: any) => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:export');
+
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       let actor: any | undefined;
       if (options?.token) {
         try {
-          actor = await AuthUtils.requireAuth(options.token, json);
+          actor = await AuthUtils.requireAuth(
+            options.token,
+            globalOptions.json
+          );
         } catch {}
       }
       try {
@@ -455,20 +492,19 @@ export function registerConfigCommands(cli: CAC) {
           }
         }
 
-        if (json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                data: { dir: destRoot, files: list.map((i: any) => i.file) },
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.success(`✅ Exported configurations to ${destRoot}`);
-        }
+        cliSuccess(
+          {
+            dir: destRoot,
+            files: list.map((i: any) => i.file),
+          },
+          `Exported ${list.length} configuration${list.length === 1 ? '' : 's'} to ${destRoot}`,
+          {
+            operation: 'config:export',
+            destination: destRoot,
+            fileCount: list.length,
+          }
+        );
+
         await audit.log({
           source: 'cli',
           actor: actor
@@ -490,18 +526,17 @@ export function registerConfigCommands(cli: CAC) {
           outcome: 'failure',
           message: err?.message || String(err),
         });
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Export failed:', err);
-        }
+        cliError(
+          'Configuration export failed',
+          'EXPORT_CONFIG_FAILED',
+          {
+            error: err?.message || String(err),
+          },
+          'config:export'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -513,14 +548,20 @@ export function registerConfigCommands(cli: CAC) {
     })
     .option('--token <token>', 'Session token for authentication (for audit)')
     .action(async (options: any) => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:import');
+
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       let actor: any | undefined;
       if (options?.token) {
         try {
-          actor = await AuthUtils.requireAuth(options.token, json);
+          actor = await AuthUtils.requireAuth(
+            options.token,
+            globalOptions.json
+          );
         } catch {}
       }
       try {
@@ -549,13 +590,15 @@ export function registerConfigCommands(cli: CAC) {
           }
         }
 
-        if (json) {
-          console.log(
-            JSON.stringify({ success: true, data: { imported } }, null, 2)
-          );
-        } else {
-          logger.success(`✅ Imported configurations: ${imported.join(', ')}`);
-        }
+        cliSuccess(
+          { imported },
+          `Imported ${imported.length} configuration${imported.length === 1 ? '' : 's'}: ${imported.join(', ')}`,
+          {
+            operation: 'config:import',
+            importedCount: imported.length,
+          }
+        );
+
         await audit.log({
           source: 'cli',
           actor: actor
@@ -577,18 +620,17 @@ export function registerConfigCommands(cli: CAC) {
           outcome: 'failure',
           message: err?.message || String(err),
         });
-        if (json) {
-          console.log(
-            JSON.stringify(
-              { success: false, error: err?.message || String(err) },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Import failed:', err);
-        }
+        cliError(
+          'Configuration import failed',
+          'IMPORT_CONFIG_FAILED',
+          {
+            error: err?.message || String(err),
+          },
+          'config:import'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -600,8 +642,11 @@ export function registerConfigCommands(cli: CAC) {
     )
     .option('--all', 'Initialize all configurations')
     .action(async (type: string | undefined, options: any) => {
-      const logger = initializeLogger();
-      const { json } = getGlobalOptionsFromArgs();
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('config:init');
+
       try {
         let service;
         try {
@@ -638,7 +683,6 @@ export function registerConfigCommands(cli: CAC) {
             await service.resetToDefaults(t);
             return { type: t, created: true };
           } catch (innerError: any) {
-            // Wrap inner error with more context
             const innerMsg =
               innerError?.message ||
               innerError?.toString() ||
@@ -652,17 +696,12 @@ export function registerConfigCommands(cli: CAC) {
 
         const types = options.all ? Object.keys(status) : type ? [type] : [];
         if (types.length === 0) {
-          if (json) {
-            console.log(
-              JSON.stringify(
-                { success: false, error: 'Specify a type or use --all' },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.info('Usage: civic config:init <type> | --all');
-          }
+          cliError(
+            'Specify a type or use --all',
+            'VALIDATION_ERROR',
+            undefined,
+            'config:init'
+          );
           process.exit(1);
         }
 
@@ -671,7 +710,6 @@ export function registerConfigCommands(cli: CAC) {
           try {
             results.push(await initOne(t));
           } catch (initError: any) {
-            // Enhanced error extraction to handle empty messages
             let initErrMsg = 'Unknown error';
             if (initError?.message && initError.message.trim()) {
               initErrMsg = initError.message;
@@ -689,20 +727,6 @@ export function registerConfigCommands(cli: CAC) {
               initErrMsg = `Error code: ${initError.code}`;
             } else if (initError?.name) {
               initErrMsg = `Error: ${initError.name}`;
-            } else {
-              // Last resort: try to stringify the entire error object
-              try {
-                const errorStr = JSON.stringify(
-                  initError,
-                  Object.getOwnPropertyNames(initError)
-                );
-                if (errorStr && errorStr !== '{}') {
-                  initErrMsg = `Error details: ${errorStr}`;
-                }
-              } catch {
-                // If stringification fails, use a generic message with the type
-                initErrMsg = `Error of type ${typeof initError} occurred`;
-              }
             }
             throw new Error(
               `Failed to initialize configuration ${t}: ${initErrMsg}`
@@ -710,19 +734,20 @@ export function registerConfigCommands(cli: CAC) {
           }
         }
 
-        if (json) {
-          console.log(
-            JSON.stringify({ success: true, data: results }, null, 2)
-          );
-        } else {
-          for (const r of results) {
-            if (r.created)
-              logger.success(`✅ Initialized '${r.type}' from defaults`);
-            else logger.info(`ℹ️  Skipped '${r.type}' (already exists)`);
-          }
-        }
+        const createdCount = results.filter((r) => r.created).length;
+        const skippedCount = results.length - createdCount;
+        const message =
+          createdCount > 0
+            ? `Initialized ${createdCount} configuration${createdCount === 1 ? '' : 's'}${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}`
+            : `All ${results.length} configuration${results.length === 1 ? '' : 's'} already exist`;
+
+        cliSuccess({ results }, message, {
+          operation: 'config:init',
+          totalCount: results.length,
+          createdCount,
+          skippedCount,
+        });
       } catch (err: any) {
-        // Extract error message from various error formats
         let errorMessage = 'Unknown error';
         if (err?.message && err.message.trim()) {
           errorMessage = err.message;
@@ -738,13 +763,11 @@ export function registerConfigCommands(cli: CAC) {
           errorMessage = err.stack.split('\n')[0];
         }
 
-        // If still empty, try to get more context
         if (
           errorMessage === 'Unknown error' ||
           !errorMessage.trim() ||
           errorMessage === 'Error'
         ) {
-          // Build a descriptive error message from available properties
           const parts: string[] = [];
           if (err?.name) parts.push(`Error type: ${err.name}`);
           if (err?.code) parts.push(`Code: ${err.code}`);
@@ -754,58 +777,24 @@ export function registerConfigCommands(cli: CAC) {
 
           if (parts.length > 0) {
             errorMessage = parts.join(', ');
-          } else if (err?.stack) {
-            // Use first non-empty line from stack
-            const stackLines = err.stack
-              .split('\n')
-              .filter((line: string) => line.trim());
-            if (stackLines.length > 1) {
-              errorMessage = stackLines[1].trim();
-            } else if (stackLines.length > 0) {
-              errorMessage = stackLines[0].trim();
-            }
-          }
-
-          // Final fallback
-          if (
-            !errorMessage ||
-            errorMessage === 'Unknown error' ||
-            errorMessage === 'Error'
-          ) {
+          } else {
             errorMessage =
               'Error occurred during initialization (no error details available)';
           }
         }
 
-        if (json) {
-          console.log(
-            JSON.stringify({ success: false, error: errorMessage }, null, 2)
-          );
-        } else {
-          // Always output error message, even if logger might suppress it
-          // Use console.error directly to ensure it's always visible
-          if (errorMessage && errorMessage.trim()) {
-            console.error('❌ Initialization failed:', errorMessage);
-            logger.error('❌ Initialization failed:', errorMessage);
-          } else {
-            // Fallback: output directly to stderr if message is empty
-            console.error(
-              '❌ Initialization failed: Error occurred (no error message available)'
-            );
-            // Also log the raw error object for debugging
-            if (err) {
-              console.error(
-                'Raw error object:',
-                JSON.stringify(err, Object.getOwnPropertyNames(err), 2)
-              );
-            }
-          }
-          if (err?.stack && !json) {
-            console.error('Stack trace:', err.stack);
-            logger.debug('Stack trace:', err.stack);
-          }
-        }
+        cliError(
+          'Configuration initialization failed',
+          'INIT_CONFIG_FAILED',
+          {
+            error: errorMessage,
+            stack: err?.stack,
+          },
+          'config:init'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }

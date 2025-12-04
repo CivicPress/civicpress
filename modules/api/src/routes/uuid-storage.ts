@@ -12,7 +12,7 @@ import {
   handleStorageError,
   handleStorageValidationError,
 } from '../handlers/storage-handlers.js';
-import { logApiRequest } from '../utils/api-logger.js';
+import { logApiRequest, logApiError } from '../utils/api-logger.js';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { Response } from 'express';
@@ -175,9 +175,7 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
       await storageService.initialize();
     } catch (error: any) {
       // Log the actual error for debugging
-      console.error('Storage initialization error:', {
-        message: error.message,
-        stack: error.stack,
+      logApiError('storage_initialization', error, req as any, {
         systemDataDir,
         configPath: configManager
           ? (configManager as any).configPath

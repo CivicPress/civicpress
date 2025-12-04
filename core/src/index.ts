@@ -127,6 +127,17 @@ export { WorkflowConfigManager } from './config/workflow-config.js';
 export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
+export {
+  coreSuccess,
+  coreError,
+  coreInfo,
+  coreWarn,
+  coreDebug,
+  coreProgress,
+  coreRaw,
+  coreErrorRaw,
+  coreStartOperation,
+} from './utils/core-output.js';
 export { AuditLogger } from './audit/audit-logger.js';
 export { DocumentNumberGenerator } from './utils/document-number-generator.js';
 export { ComplianceFieldHelpers } from './utils/compliance-helpers.js';

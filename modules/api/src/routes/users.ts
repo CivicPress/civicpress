@@ -4,6 +4,7 @@ import {
   logApiRequest,
   sendSuccess,
   handleApiError,
+  logApiError,
 } from '../utils/api-logger.js';
 import { AuditLogger } from '@civicpress/core';
 
@@ -140,7 +141,6 @@ router.post('/', async (req, res) => {
   logApiRequest(req, { operation: 'create_user' });
 
   try {
-    console.log('🔧 [DEBUG] Starting user creation endpoint');
     const userData: CreateUserRequest = req.body;
 
     // Validate required fields
@@ -761,7 +761,6 @@ registrationRouter.post('/', async (req, res) => {
       { operation: 'register_user' }
     );
   } catch (error) {
-    console.error(error instanceof Error ? error.stack : 'No stack');
     handleApiError('register_user', error, req, res, 'Failed to register user');
   }
 });

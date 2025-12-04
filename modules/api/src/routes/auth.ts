@@ -263,7 +263,6 @@ router.post('/simulated', async (req, res) => {
 
     // Validate role
     const isValidRole = await authService.isValidRole(role);
-    console.log(`[API] Role validation for '${role}': ${isValidRole}`);
     if (!isValidRole) {
       const error = new Error(`Invalid role: ${role}`);
       (error as any).statusCode = 400;

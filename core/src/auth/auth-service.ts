@@ -8,6 +8,7 @@ import {
   EmailChangeRequest,
   EmailValidationResult,
 } from './email-validation-service.js';
+import { coreDebug } from '../utils/core-output.js';
 
 const logger = new Logger();
 
@@ -395,32 +396,59 @@ export class AuthService {
     auth_provider?: string;
     email_verified?: boolean;
   }): Promise<AuthUser> {
-    console.log(
-      '🔧 [DEBUG] AuthService.createUserWithPassword called with:',
-      JSON.stringify(userData, null, 2)
-    );
+    coreDebug('AuthService.createUserWithPassword called', userData, {
+      operation: 'auth:createUserWithPassword',
+    });
 
     // Set default role if not provided
     const role = userData.role || (await this.getDefaultRole());
-    console.log('🔧 [DEBUG] Using role:', role);
+    coreDebug(
+      'Using role',
+      { role },
+      { operation: 'auth:createUserWithPassword' }
+    );
 
-    console.log('🔧 [DEBUG] Calling this.db.createUserWithPassword');
+    coreDebug('Calling this.db.createUserWithPassword', undefined, {
+      operation: 'auth:createUserWithPassword',
+    });
     const userId = await this.db.createUserWithPassword({
       ...userData,
       role,
     });
-    console.log('🔧 [DEBUG] Got userId:', userId);
+    coreDebug(
+      'Got userId',
+      { userId },
+      { operation: 'auth:createUserWithPassword' }
+    );
 
-    console.log('🔧 [DEBUG] Calling this.db.getUserById with userId:', userId);
+    coreDebug(
+      'Calling this.db.getUserById',
+      { userId },
+      {
+        operation: 'auth:createUserWithPassword',
+      }
+    );
     const user = await this.db.getUserById(userId);
-    console.log('🔧 [DEBUG] Got user:', !!user, user ? user.username : 'null');
+    coreDebug(
+      'Got user',
+      { userId, userExists: !!user, username: user ? user.username : null },
+      { operation: 'auth:createUserWithPassword' }
+    );
 
     if (!user) {
-      console.log('🔧 [DEBUG] User is null, throwing error');
+      coreDebug('User is null, throwing error', undefined, {
+        operation: 'auth:createUserWithPassword',
+      });
       throw new Error('Failed to create user');
     }
 
-    console.log('🔧 [DEBUG] Returning user:', user.username);
+    coreDebug(
+      'Returning user',
+      { username: user.username },
+      {
+        operation: 'auth:createUserWithPassword',
+      }
+    );
     return {
       id: user.id,
       username: user.username,

@@ -6,9 +6,17 @@ import { HookSystem } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import { userCan } from '@civicpress/core';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export function registerHookCommand(cli: CAC) {
   cli
@@ -23,39 +31,31 @@ export function registerHookCommand(cli: CAC) {
     .option('--logs', 'Show hook execution logs')
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (action: string, options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
-      const shouldOutputJson = globalOptions.json;
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('hook');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
-        shouldOutputJson
+        globalOptions.json
       );
       const dataDir = civic.getDataDir();
 
       // Check hook management permissions
       const canManageHooks = await userCan(user, 'hooks:manage');
       if (!canManageHooks) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to manage hooks',
-                requiredPermission: 'hooks:manage',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to manage hooks');
-          logger.info(`Role '${user.role}' cannot manage hooks`);
-        }
+        cliError(
+          'Insufficient permissions to manage hooks',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'hooks:manage',
+            userRole: user.role,
+          },
+          'hook'
+        );
         process.exit(1);
       }
 
@@ -64,199 +64,83 @@ export function registerHookCommand(cli: CAC) {
         await hookSystem.initialize();
 
         if (options.list || action === 'list') {
-          await listHooks(hookSystem, options, shouldOutputJson);
+          await listHooks(hookSystem);
         } else if (options.config || action === 'config') {
-          await showConfig(hookSystem, options, shouldOutputJson);
+          await showConfig(hookSystem);
         } else if (options.test || action === 'test') {
-          await testHook(
-            hookSystem,
-            options.test || action,
-            options,
-            shouldOutputJson
-          );
+          await testHook(hookSystem, options.test || action);
         } else if (options.enable || action === 'enable') {
-          await enableHook(
-            hookSystem,
-            options.enable || action,
-            options,
-            shouldOutputJson
-          );
+          await enableHook(hookSystem, options.enable || action);
         } else if (options.disable || action === 'disable') {
-          await disableHook(
-            hookSystem,
-            options.disable || action,
-            options,
-            shouldOutputJson
-          );
+          await disableHook(hookSystem, options.disable || action);
         } else if (options.workflows || action === 'workflows') {
-          await listWorkflows(hookSystem, options, shouldOutputJson);
+          await listWorkflows(hookSystem);
         } else if (options.logs || action === 'logs') {
-          await showLogs(dataDir, options, shouldOutputJson);
+          await showLogs(dataDir, options);
         } else {
           showHelp();
         }
       } catch (error) {
-        logger.error('❌ Hook management failed:', error);
+        cliError(
+          'Hook management failed',
+          'HOOK_MANAGEMENT_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'hook'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
 
-async function listHooks(
-  hookSystem: HookSystem,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function listHooks(hookSystem: HookSystem) {
   const config = hookSystem.getConfiguration();
   const registeredHooks = hookSystem.getRegisteredHooks();
 
-  if (shouldOutputJson) {
-    console.log(
-      JSON.stringify(
-        {
-          registered: registeredHooks,
-          configured: config?.hooks || {},
-          summary: {
-            totalRegistered: registeredHooks.length,
-            totalConfigured: Object.keys(config?.hooks || {}).length,
-          },
-        },
-        null,
-        2
-      )
-    );
-    return;
-  }
-
-  logger.info('🪝 CivicPress Hooks');
-  logger.info('─'.repeat(50));
-
-  // Show registered hooks
-  logger.info('\n📋 Registered Hooks:');
-  for (const hook of registeredHooks) {
-    const hookConfig = config?.hooks[hook];
-    // Handle both old and new metadata formats
-    const enabled =
-      typeof hookConfig?.enabled === 'boolean'
-        ? hookConfig.enabled
-        : (hookConfig?.enabled?.value ?? false);
-    const workflowsArray = Array.isArray(hookConfig?.workflows)
-      ? hookConfig.workflows
-      : (hookConfig?.workflows?.value ?? []);
-
-    const status = enabled ? '✅ Enabled' : '❌ Disabled';
-    const workflows = workflowsArray.length
-      ? `(${workflowsArray.join(', ')})`
-      : '(no workflows)';
-
-    logger.info(`  ${hook} ${status} ${workflows}`);
-
-    if (hookConfig?.description) {
-      logger.info(`    ${hookConfig.description}`);
+  cliSuccess(
+    {
+      registered: registeredHooks,
+      configured: config?.hooks || {},
+      summary: {
+        totalRegistered: registeredHooks.length,
+        totalConfigured: Object.keys(config?.hooks || {}).length,
+      },
+    },
+    `Found ${registeredHooks.length} registered hook${registeredHooks.length === 1 ? '' : 's'}`,
+    {
+      operation: 'hook:list',
+      totalRegistered: registeredHooks.length,
+      totalConfigured: Object.keys(config?.hooks || {}).length,
     }
-  }
-
-  // Show configured hooks not yet registered
-  if (config?.hooks) {
-    const configuredHooks = Object.keys(config.hooks);
-    const unregisteredHooks = configuredHooks.filter(
-      (h) => !registeredHooks.includes(h)
-    );
-
-    if (unregisteredHooks.length > 0) {
-      logger.info('\n⚙️  Configured (Not Registered):');
-      for (const hook of unregisteredHooks) {
-        const hookConfig = config.hooks[hook];
-        const status = hookConfig.enabled ? '✅ Enabled' : '❌ Disabled';
-        logger.info(`  ${hook} ${status}`);
-      }
-    }
-  }
+  );
 }
 
-async function showConfig(
-  hookSystem: HookSystem,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function showConfig(hookSystem: HookSystem) {
   const config = hookSystem.getConfiguration();
 
-  if (shouldOutputJson) {
-    console.log(JSON.stringify(config, null, 2));
-    return;
-  }
-
-  logger.info('⚙️  Hook Configuration');
-  logger.info('─'.repeat(50));
-
   if (!config) {
-    logger.warn('⚠️  No hook configuration found');
+    cliWarn('No hook configuration found', 'hook:config');
     return;
   }
 
-  // Show settings
-  logger.info('\n🔧 Settings:');
-  logger.info(`  Max Concurrent: ${config.settings.maxConcurrent}`);
-  logger.info(`  Timeout: ${config.settings.timeout}ms`);
-  logger.info(`  Retry Attempts: ${config.settings.retryAttempts}`);
-  logger.info(`  Default Mode: ${config.settings.defaultMode}`);
-
-  // Show hooks
-  logger.info('\n🪝 Hooks:');
-  for (const [hookName, hookConfig] of Object.entries(config.hooks)) {
-    // Handle both old and new metadata formats
-    const enabled =
-      typeof hookConfig.enabled === 'boolean'
-        ? hookConfig.enabled
-        : (hookConfig.enabled?.value ?? false);
-    const workflowsArray = Array.isArray(hookConfig.workflows)
-      ? hookConfig.workflows
-      : (hookConfig.workflows?.value ?? []);
-    const audit =
-      typeof hookConfig.audit === 'boolean'
-        ? hookConfig.audit
-        : (hookConfig.audit?.value ?? false);
-
-    const status = enabled ? '✅' : '❌';
-    logger.info(`  ${status} ${hookName}`);
-    logger.info(`    Workflows: ${workflowsArray.join(', ') || 'none'}`);
-    logger.info(`    Audit: ${audit ? 'yes' : 'no'}`);
-    if (hookConfig.description) {
-      logger.info(`    Description: ${hookConfig.description}`);
-    }
-    logger.info('');
-  }
+  cliSuccess({ config }, 'Hook configuration retrieved', {
+    operation: 'hook:config',
+    hooksCount: Object.keys(config.hooks || {}).length,
+  });
 }
 
-async function testHook(
-  hookSystem: HookSystem,
-  hookName: string,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function testHook(hookSystem: HookSystem, hookName: string) {
   if (!hookName) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Hook name required for testing',
-          },
-          null,
-          2
-        )
-      );
-      return;
-    } else {
-      logger.error('❌ Hook name required for testing');
-      return;
-    }
-  }
-
-  if (!shouldOutputJson) {
-    logger.info(`🧪 Testing hook: ${hookName}`);
+    cliError(
+      'Hook name required for testing',
+      'VALIDATION_ERROR',
+      undefined,
+      'hook:test'
+    );
+    return;
   }
 
   const testData = {
@@ -278,70 +162,41 @@ async function testHook(
 
   try {
     await hookSystem.emit(hookName, testData, testContext);
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'Hook test completed successfully',
-            hook: hookName,
-            testData,
-            testContext,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info('✅ Hook test completed successfully');
-    }
+    cliSuccess(
+      {
+        hook: hookName,
+        testData,
+        testContext,
+      },
+      `Hook '${hookName}' test completed successfully`,
+      {
+        operation: 'hook:test',
+        hookName,
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: false,
-            error: 'Hook test failed',
-            details: error instanceof Error ? error.message : String(error),
-            hook: hookName,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Hook test failed:', error);
-    }
+    cliError(
+      'Hook test failed',
+      'HOOK_TEST_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        hook: hookName,
+      },
+      'hook:test'
+    );
+    throw error;
   }
 }
 
-async function enableHook(
-  hookSystem: HookSystem,
-  hookName: string,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function enableHook(hookSystem: HookSystem, hookName: string) {
   if (!hookName) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Hook name required for enabling',
-          },
-          null,
-          2
-        )
-      );
-      return;
-    } else {
-      logger.error('❌ Hook name required for enabling');
-      return;
-    }
-  }
-
-  if (!shouldOutputJson) {
-    logger.info(`✅ Enabling hook: ${hookName}`);
+    cliError(
+      'Hook name required for enabling',
+      'VALIDATION_ERROR',
+      undefined,
+      'hook:enable'
+    );
+    return;
   }
 
   const config = hookSystem.getConfiguration();
@@ -349,21 +204,10 @@ async function enableHook(
     config.hooks[hookName].enabled = true;
     await hookSystem.updateConfiguration(config);
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: `Hook '${hookName}' enabled`,
-            hook: hookName,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info(`✅ Hook '${hookName}' enabled`);
-    }
+    cliSuccess({ hook: hookName }, `Hook '${hookName}' enabled`, {
+      operation: 'hook:enable',
+      hookName,
+    });
 
     // Auto-commit the configuration change
     try {
@@ -375,59 +219,30 @@ async function enableHook(
         const commitHash = await git.commit(`feat(hooks): enable ${hookName}`, [
           '.civic/hooks.yml',
         ]);
-        if (!shouldOutputJson) {
-          logger.info(`💾 Configuration committed: ${commitHash}`);
-        }
+        cliInfo(`Configuration committed: ${commitHash}`, 'hook:enable');
       }
     } catch {
-      if (!shouldOutputJson) {
-        logger.warn('⚠️  Failed to auto-commit configuration change');
-      }
+      cliWarn('Failed to auto-commit configuration change', 'hook:enable');
     }
   } else {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: `Hook '${hookName}' not found in configuration`,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error(`❌ Hook '${hookName}' not found in configuration`);
-    }
+    cliError(
+      `Hook '${hookName}' not found in configuration`,
+      'HOOK_NOT_FOUND',
+      { hookName },
+      'hook:enable'
+    );
   }
 }
 
-async function disableHook(
-  hookSystem: HookSystem,
-  hookName: string,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function disableHook(hookSystem: HookSystem, hookName: string) {
   if (!hookName) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Hook name required for disabling',
-          },
-          null,
-          2
-        )
-      );
-      return;
-    } else {
-      logger.error('❌ Hook name required for disabling');
-      return;
-    }
-  }
-
-  if (!shouldOutputJson) {
-    logger.info(`❌ Disabling hook: ${hookName}`);
+    cliError(
+      'Hook name required for disabling',
+      'VALIDATION_ERROR',
+      undefined,
+      'hook:disable'
+    );
+    return;
   }
 
   const config = hookSystem.getConfiguration();
@@ -435,21 +250,10 @@ async function disableHook(
     config.hooks[hookName].enabled = false;
     await hookSystem.updateConfiguration(config);
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: `Hook '${hookName}' disabled`,
-            hook: hookName,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.info(`✅ Hook '${hookName}' disabled`);
-    }
+    cliSuccess({ hook: hookName }, `Hook '${hookName}' disabled`, {
+      operation: 'hook:disable',
+      hookName,
+    });
 
     // Auto-commit the configuration change
     try {
@@ -462,38 +266,22 @@ async function disableHook(
           `feat(hooks): disable ${hookName}`,
           ['.civic/hooks.yml']
         );
-        if (!shouldOutputJson) {
-          logger.info(`💾 Configuration committed: ${commitHash}`);
-        }
+        cliInfo(`Configuration committed: ${commitHash}`, 'hook:disable');
       }
     } catch {
-      if (!shouldOutputJson) {
-        logger.warn('⚠️  Failed to auto-commit configuration change');
-      }
+      cliWarn('Failed to auto-commit configuration change', 'hook:disable');
     }
   } else {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: `Hook '${hookName}' not found in configuration`,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error(`❌ Hook '${hookName}' not found in configuration`);
-    }
+    cliError(
+      `Hook '${hookName}' not found in configuration`,
+      'HOOK_NOT_FOUND',
+      { hookName },
+      'hook:disable'
+    );
   }
 }
 
-async function listWorkflows(
-  hookSystem: HookSystem,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function listWorkflows(hookSystem: HookSystem) {
   const config = hookSystem.getConfiguration();
   const workflows = new Set<string>();
 
@@ -508,64 +296,32 @@ async function listWorkflows(
     }
   }
 
-  if (shouldOutputJson) {
-    console.log(
-      JSON.stringify(
-        {
-          workflows: Array.from(workflows).sort(),
-          summary: {
-            totalWorkflows: workflows.size,
-          },
-        },
-        null,
-        2
-      )
-    );
-    return;
-  }
-
-  logger.info('⚙️  Available Workflows');
-  logger.info('─'.repeat(50));
-
   if (workflows.size === 0) {
-    logger.warn('⚠️  No workflows configured');
+    cliWarn('No workflows configured', 'hook:workflows');
     return;
   }
 
-  for (const workflow of Array.from(workflows).sort()) {
-    logger.info(`  📋 ${workflow}`);
-  }
-
-  logger.info(
-    '\n💡 Workflows are executed automatically when their associated hooks are triggered.'
+  cliSuccess(
+    {
+      workflows: Array.from(workflows).sort(),
+      summary: {
+        totalWorkflows: workflows.size,
+      },
+    },
+    `Found ${workflows.size} workflow${workflows.size === 1 ? '' : 's'}`,
+    {
+      operation: 'hook:workflows',
+      totalWorkflows: workflows.size,
+    }
   );
-  logger.info('   To add custom workflows, create files in .civic/workflows/');
 }
 
-async function showLogs(
-  dataDir: string,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function showLogs(dataDir: string, options: any) {
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 
   if (!existsSync(logPath)) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'No hook logs found',
-          },
-          null,
-          2
-        )
-      );
-      return;
-    } else {
-      logger.warn('⚠️  No hook logs found');
-      return;
-    }
+    cliWarn('No hook logs found', 'hook:logs');
+    return;
   }
 
   try {
@@ -575,65 +331,60 @@ async function showLogs(
       .split('\n')
       .filter((line) => line.trim());
 
-    if (options.format === 'json') {
-      logger.info(
-        JSON.stringify(
-          lines.map((line) => JSON.parse(line)),
-          null,
-          2
-        )
-      );
-      return;
-    }
-
-    logger.info('📋 Hook Execution Logs');
-    logger.info('─'.repeat(50));
-
     if (lines.length === 0) {
-      logger.warn('⚠️  No log entries found');
+      cliWarn('No log entries found', 'hook:logs');
       return;
     }
 
-    // Show last 10 entries
-    const recentLines = lines.slice(-10);
-    for (const line of recentLines) {
-      try {
-        const entry = JSON.parse(line);
-        const timestamp = new Date(entry.timestamp).toLocaleString();
-        const type =
-          entry.type === 'emit'
-            ? '🪝'
-            : entry.type === 'workflow'
-              ? '⚙️'
-              : '❌';
-
-        logger.info(`${type} ${timestamp} ${entry.name}`);
-        if (entry.type === 'error') {
-          logger.error(`    ${entry.data.error}`);
+    const logEntries = lines
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
         }
-      } catch {
-        logger.warn(`  Invalid log entry: ${line}`);
-      }
-    }
+      })
+      .filter((entry) => entry !== null);
 
-    if (lines.length > 10) {
-      logger.info(`\n... and ${lines.length - 10} more entries`);
-    }
+    const recentEntries = logEntries.slice(-10);
+
+    cliSuccess(
+      {
+        entries: recentEntries,
+        totalEntries: logEntries.length,
+        showing: recentEntries.length,
+      },
+      `Showing ${recentEntries.length} of ${logEntries.length} log entr${logEntries.length === 1 ? 'y' : 'ies'}`,
+      {
+        operation: 'hook:logs',
+        totalEntries: logEntries.length,
+        showing: recentEntries.length,
+      }
+    );
   } catch (error) {
-    logger.error('❌ Failed to read logs:', error);
+    cliError(
+      'Failed to read logs',
+      'READ_LOGS_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'hook:logs'
+    );
+    throw error;
   }
 }
 
 function showHelp() {
-  const logger = initializeLogger();
-  logger.info('🪝 CivicPress Hook Management');
-  logger.info('─'.repeat(50));
-  logger.info('  civic hook list                    # List all hooks');
-  logger.info('  civic hook config                  # Show configuration');
-  logger.info('  civic hook test <hook>             # Test a hook');
-  logger.info('  civic hook enable <hook>           # Enable a hook');
-  logger.info('  civic hook disable <hook>          # Disable a hook');
-  logger.info('  civic hook workflows               # List workflows');
-  logger.info('  civic hook logs                    # Show execution logs');
-  logger.info('  civic hook --format json           # JSON output');
+  cliInfo(
+    'CivicPress Hook Management\n' +
+      '  civic hook list                    # List all hooks\n' +
+      '  civic hook config                  # Show configuration\n' +
+      '  civic hook test <hook>             # Test a hook\n' +
+      '  civic hook enable <hook>           # Enable a hook\n' +
+      '  civic hook disable <hook>          # Disable a hook\n' +
+      '  civic hook workflows               # List workflows\n' +
+      '  civic hook logs                    # Show execution logs\n' +
+      '  civic hook --format json           # JSON output',
+    'hook'
+  );
 }

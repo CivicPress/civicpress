@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { coreError } from '../utils/core-output.js';
 
 export interface AuditEntry {
   id: string;
@@ -80,7 +81,14 @@ export class NotificationAudit {
       // Rotate log if too large
       await this.rotateLogIfNeeded();
     } catch (error) {
-      console.error('Failed to write audit entry:', error);
+      coreError(
+        'Failed to write audit entry',
+        'AUDIT_WRITE_ERROR',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'notification:audit' }
+      );
     }
   }
 
@@ -107,7 +115,14 @@ export class NotificationAudit {
         fs.writeFileSync(this.auditLogPath, keptLines.join('\n') + '\n');
       }
     } catch (error) {
-      console.error('Failed to rotate audit log:', error);
+      coreError(
+        'Failed to rotate audit log',
+        'AUDIT_ROTATE_ERROR',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'notification:audit' }
+      );
     }
   }
 
@@ -188,7 +203,14 @@ export class NotificationAudit {
         };
       });
     } catch (error) {
-      console.error('Failed to read audit entries:', error);
+      coreError(
+        'Failed to read audit entries',
+        'AUDIT_READ_ERROR',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'notification:audit' }
+      );
       return [];
     }
   }
@@ -209,7 +231,14 @@ export class NotificationAudit {
         fs.unlinkSync(this.auditLogPath);
       }
     } catch (error) {
-      console.error('Failed to clear audit log:', error);
+      coreError(
+        'Failed to clear audit log',
+        'AUDIT_CLEAR_ERROR',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'notification:audit' }
+      );
     }
   }
 }

@@ -1,6 +1,7 @@
 import sqlite3 from 'sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
+import { coreError, coreInfo, coreDebug } from '../utils/core-output.js';
 
 export interface DatabaseAdapter {
   connect(): Promise<void>;
@@ -217,8 +218,15 @@ export class SQLiteAdapter implements DatabaseAdapter {
       try {
         await this.execute(table);
       } catch (error) {
-        console.error('Error creating table:', error);
-        console.error('Table SQL:', table);
+        coreError(
+          'Error creating table',
+          'TABLE_CREATION_ERROR',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            table: table.substring(0, 100), // Truncate for readability
+          },
+          { operation: 'database:initialize' }
+        );
         throw error;
       }
     }
@@ -228,7 +236,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       await this.execute('ALTER TABLE records ADD COLUMN geography TEXT');
     } catch (error) {
       // Column already exists, ignore error
-      console.log('Geography column already exists or migration not needed');
+      coreDebug('Geography column already exists or migration not needed', {
+        operation: 'database:initialize',
+      });
     }
 
     // Add attached_files column to existing records table if it doesn't exist
@@ -236,8 +246,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       await this.execute('ALTER TABLE records ADD COLUMN attached_files TEXT');
     } catch (error) {
       // Column already exists, ignore error
-      console.log(
-        'Attached files column already exists or migration not needed'
+      coreDebug(
+        'Attached files column already exists or migration not needed',
+        { operation: 'database:initialize' }
       );
     }
 
@@ -246,8 +257,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       await this.execute('ALTER TABLE records ADD COLUMN linked_records TEXT');
     } catch (error) {
       // Column already exists, ignore error
-      console.log(
-        'Linked records column already exists or migration not needed'
+      coreDebug(
+        'Linked records column already exists or migration not needed',
+        { operation: 'database:initialize' }
       );
     }
 
@@ -258,8 +270,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       );
     } catch (error) {
       // Column already exists, ignore error
-      console.log(
-        'Linked geography files column already exists or migration not needed'
+      coreDebug(
+        'Linked geography files column already exists or migration not needed',
+        { operation: 'database:initialize' }
       );
     }
 
@@ -295,13 +308,15 @@ export class SQLiteAdapter implements DatabaseAdapter {
     for (const migration of userSecurityMigrations) {
       try {
         await this.execute(migration.sql);
-        console.log(
-          `✓ Added ${migration.column} column for ${migration.description}`
+        coreInfo(
+          `✓ Added ${migration.column} column for ${migration.description}`,
+          { operation: 'database:initialize' }
         );
       } catch (error) {
         // Column already exists, ignore error
-        console.log(
-          `${migration.column} column already exists or migration not needed`
+        coreDebug(
+          `${migration.column} column already exists or migration not needed`,
+          { operation: 'database:initialize' }
         );
       }
     }
@@ -313,9 +328,13 @@ export class SQLiteAdapter implements DatabaseAdapter {
         SET auth_provider = 'password', email_verified = TRUE 
         WHERE password_hash IS NOT NULL AND auth_provider IS NULL
       `);
-      console.log('✓ Updated existing password users with auth_provider');
+      coreInfo('✓ Updated existing password users with auth_provider', {
+        operation: 'database:initialize',
+      });
     } catch (error) {
-      console.log('Auth provider update not needed or already completed');
+      coreDebug('Auth provider update not needed or already completed', {
+        operation: 'database:initialize',
+      });
     }
   }
 }

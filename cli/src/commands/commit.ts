@@ -3,12 +3,20 @@ import { AuthUtils } from '../utils/auth-utils.js';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { userCan } from '@civicpress/core';
 import {
   getAvailableRecords,
   resolveRecordReference,
 } from '../utils/record-locator.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export const commitCommand = (cli: CAC) => {
   cli
@@ -18,15 +26,16 @@ export const commitCommand = (cli: CAC) => {
     .option('-r, --role <role>', 'Role for commit (clerk, council, etc.)')
     .option('-a, --all', 'Commit all changes (not just specific files)')
     .action(async (recordName: string, options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
-      const shouldOutputJson = globalOptions.json;
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('commit');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
-        shouldOutputJson
+        globalOptions.json
       );
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
@@ -35,49 +44,27 @@ export const commitCommand = (cli: CAC) => {
       // Check commit permissions
       const canCommit = await userCan(user, 'records:edit');
       if (!canCommit) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to commit records',
-                requiredPermission: 'records:edit',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to commit records');
-          logger.info(`Role '${user.role}' cannot commit records`);
-        }
+        cliError(
+          'Insufficient permissions to commit records',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'records:edit',
+            userRole: user.role,
+          },
+          'commit'
+        );
         process.exit(1);
       }
 
       try {
-        if (!shouldOutputJson) {
-          logger.info('💾 Committing civic records...');
-        }
-
         // Validate required options
         if (!options.message) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Commit message is required',
-                  details: 'Use -m or --message',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.error('❌ Commit message is required. Use -m or --message');
-          }
+          cliError(
+            'Commit message is required. Use -m or --message',
+            'VALIDATION_ERROR',
+            undefined,
+            'commit'
+          );
           process.exit(1);
         }
 
@@ -87,9 +74,6 @@ export const commitCommand = (cli: CAC) => {
         // Set role if provided
         if (options.role) {
           git.setRole(options.role);
-          if (!shouldOutputJson) {
-            logger.info(`👤 Using role: ${options.role}`);
-          }
         }
 
         // Determine which files to commit
@@ -110,32 +94,15 @@ export const commitCommand = (cli: CAC) => {
           if (!resolved) {
             const availableRecords = getAvailableRecords(dataDir);
 
-            if (shouldOutputJson) {
-              console.log(
-                JSON.stringify(
-                  {
-                    success: false,
-                    error: 'Record not found',
-                    details: `Record "${recordName}" not found`,
-                    availableRecords,
-                  },
-                  null,
-                  2
-                )
-              );
-            } else {
-              logger.error(`❌ Record "${recordName}" not found.`);
-              logger.info('Available records:');
-
-              for (const [type, files] of Object.entries(availableRecords)) {
-                if (files.length > 0) {
-                  logger.info(`  ${type}:`);
-                  for (const file of files) {
-                    logger.debug(`    ${file}`);
-                  }
-                }
-              }
-            }
+            cliError(
+              `Record "${recordName}" not found`,
+              'RECORD_NOT_FOUND',
+              {
+                recordName,
+                availableRecords,
+              },
+              'commit'
+            );
             process.exit(1);
           }
 
@@ -152,49 +119,33 @@ export const commitCommand = (cli: CAC) => {
           if (allChangedFiles.includes(relativeRecordPath)) {
             filesToCommit = [relativeRecordPath];
           } else {
-            if (shouldOutputJson) {
-              console.log(
-                JSON.stringify(
-                  {
-                    success: false,
-                    error: 'No changes to commit',
-                    details: `No changes found for record "${recordName}"`,
-                  },
-                  null,
-                  2
-                )
-              );
-            } else {
-              logger.warn(`No changes found for record "${recordName}"`);
-            }
+            cliWarn(`No changes found for record "${recordName}"`, 'commit');
             process.exit(1);
           }
         }
 
         if (filesToCommit.length === 0) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'No files to commit',
-                  details: 'No changes found to commit',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.warn('No files to commit.');
-          }
+          cliWarn('No files to commit', 'commit');
           process.exit(1);
         }
 
         // Commit the files
-        await git.commit(options.message, filesToCommit);
-        if (!shouldOutputJson) {
-          logger.success('✅ Committed successfully!');
-        }
+        const commitHash = await git.commit(options.message, filesToCommit);
+
+        cliSuccess(
+          {
+            commitHash,
+            files: filesToCommit,
+            message: options.message,
+            role: options.role,
+          },
+          `Committed ${filesToCommit.length} file${filesToCommit.length === 1 ? '' : 's'}`,
+          {
+            operation: 'commit',
+            fileCount: filesToCommit.length,
+            role: options.role,
+          }
+        );
         await audit.log({
           source: 'cli',
           actor: { username: user.username, role: user.role },
@@ -212,22 +163,18 @@ export const commitCommand = (cli: CAC) => {
           outcome: 'failure',
           message: error instanceof Error ? error.message : String(error),
         });
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Failed to commit records',
-                details: error instanceof Error ? error.message : String(error),
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Failed to commit records:', error);
-        }
+        cliError(
+          'Failed to commit records',
+          'COMMIT_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            recordName,
+          },
+          'commit'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

@@ -1,5 +1,6 @@
 import { simpleGit, SimpleGit } from 'simple-git';
 import { cwd } from 'process';
+import { coreDebug } from '../utils/core-output.js';
 
 /**
  * GitEngine - Git Integration with Role-Aware Commits
@@ -65,7 +66,13 @@ export class GitEngine {
   async commit(message: string, files?: string[]): Promise<string> {
     // Skip Git commits if DISABLE_GIT_COMMITS is set (for development)
     if (process.env.DISABLE_GIT_COMMITS === 'true') {
-      console.log(`[DEV] Skipping Git commit: ${message}`);
+      coreDebug(
+        `[DEV] Skipping Git commit: ${message}`,
+        {
+          message,
+        },
+        { operation: 'git:commit' }
+      );
       return 'dev-skip-commit';
     }
 

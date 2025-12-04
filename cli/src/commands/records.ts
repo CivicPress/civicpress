@@ -14,7 +14,15 @@ import {
 import {
   getGlobalOptionsFromArgs,
   initializeLogger,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 interface MigrationResult {
   id: string;
@@ -40,9 +48,11 @@ export function registerRecordsCommand(cli: CAC) {
     .option('--json', 'Output results as JSON')
     .option('--silent', 'Suppress non-error output')
     .action(async (options: any) => {
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
-      const quietOutput = globalOptions.silent || globalOptions.json;
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('records:migrate-folders');
 
       try {
         const dataDir =
@@ -210,14 +220,14 @@ export function registerRecordsCommand(cli: CAC) {
               }
             }
 
-            if (!quietOutput) {
-              logger.info(
-                `${loggerPrefix} Moved ${relativePath} → ${targetRelativePath}`
-              );
-            }
-          } else if (!quietOutput) {
-            logger.info(
-              `${loggerPrefix} Would move ${relativePath} → ${targetRelativePath}`
+            cliInfo(
+              `${loggerPrefix} Moved ${relativePath} → ${targetRelativePath}`,
+              'records:migrate-folders'
+            );
+          } else {
+            cliInfo(
+              `${loggerPrefix} Would move ${relativePath} → ${targetRelativePath}`,
+              'records:migrate-folders'
             );
           }
         }
@@ -231,53 +241,42 @@ export function registerRecordsCommand(cli: CAC) {
         ).length;
         const skippedCount = migrations.length - migratedCount;
 
-        if (globalOptions.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                dryRun,
-                dataDir,
-                includeArchive,
-                migrated: migratedCount,
-                skipped: skippedCount,
-                migrations,
-              },
-              null,
-              2
-            )
+        const summary = {
+          success: true,
+          dryRun,
+          dataDir,
+          includeArchive,
+          migrated: migratedCount,
+          skipped: skippedCount,
+          migrations,
+        };
+
+        const message = dryRun
+          ? `Dry-run complete: ${migratedCount} migrated, ${skippedCount} skipped`
+          : `Migration complete: ${migratedCount} migrated, ${skippedCount} skipped`;
+
+        cliSuccess(summary, message, {
+          operation: 'records:migrate-folders',
+        });
+
+        if (includeArchive) {
+          cliInfo(
+            'Archive records were included in this run.',
+            'records:migrate-folders'
           );
-        } else if (!quietOutput) {
-          const summaryPrefix = dryRun
-            ? '✅ Dry-run complete:'
-            : '✅ Migration complete:';
-          logger.success(
-            `${summaryPrefix} ${migratedCount} migrated, ${skippedCount} skipped`
-          );
-          if (includeArchive) {
-            logger.info('Archive records were included in this run.');
-          }
         }
       } catch (error) {
-        if (globalOptions.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error(
-            `❌ Failed to migrate record folders: ${
-              error instanceof Error ? error.message : String(error)
-            }`
-          );
-        }
+        cliError(
+          'Failed to migrate record folders',
+          'MIGRATION_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'records:migrate-folders'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }

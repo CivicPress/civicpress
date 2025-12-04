@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { coreError } from '../utils/core-output.js';
 
 export type ActivityOutcome = 'success' | 'failure';
 export type ActivitySource = 'api' | 'cli' | 'ui' | 'core';
@@ -75,7 +76,14 @@ export class AuditLogger {
       await this.rotateIfNeeded();
     } catch (err) {
       // Best-effort audit; never throw
-      console.error('[AuditLogger] Failed to write entry:', err);
+      coreError(
+        '[AuditLogger] Failed to write entry',
+        'AUDIT_WRITE_FAILED',
+        {
+          error: err instanceof Error ? err.message : String(err),
+        },
+        { operation: 'audit:log' }
+      );
     }
   }
 
@@ -92,7 +100,14 @@ export class AuditLogger {
         fs.writeFileSync(this.logPath, kept.join('\n') + '\n');
       }
     } catch (err) {
-      console.error('[AuditLogger] Rotate failed:', err);
+      coreError(
+        '[AuditLogger] Rotate failed',
+        'AUDIT_ROTATE_FAILED',
+        {
+          error: err instanceof Error ? err.message : String(err),
+        },
+        { operation: 'audit:rotate' }
+      );
     }
   }
 
@@ -103,7 +118,14 @@ export class AuditLogger {
       const lines = content.split('\n').filter((l) => l.trim());
       return lines.map((l) => JSON.parse(l));
     } catch (err) {
-      console.error('[AuditLogger] Read failed:', err);
+      coreError(
+        '[AuditLogger] Read failed',
+        'AUDIT_READ_FAILED',
+        {
+          error: err instanceof Error ? err.message : String(err),
+        },
+        { operation: 'audit:read' }
+      );
       return [];
     }
   }

@@ -1,4 +1,14 @@
 import { CAC } from 'cac';
+import {
+  getGlobalOptionsFromArgs,
+  initializeCliOutput,
+} from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export const infoCommand = (cli: CAC) => {
   cli
@@ -9,7 +19,12 @@ export const infoCommand = (cli: CAC) => {
       'Session token for authentication (required for system config)'
     )
     .action(async (options) => {
-      const shouldOutputJson = options.json;
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('info');
+
       const token = options.token;
       let isAdmin = false;
       let userInfo: any = null;
@@ -22,15 +37,17 @@ export const infoCommand = (cli: CAC) => {
         if (token) {
           // Validate token and check admin without exiting
           const { CivicPress } = await import('@civicpress/core');
-          const { CentralConfigManager } = await import('@civicpress/core');
           try {
-            const dataDir = CentralConfigManager.getDataDir();
-            const dbConfig = CentralConfigManager.getDatabaseConfig();
+            dataDir = CentralConfigManager.getDataDir();
+            dbConfig = CentralConfigManager.getDatabaseConfig();
 
             const civic = new CivicPress({
               dataDir,
               database: dbConfig,
-              logger: { json: shouldOutputJson },
+              logger: {
+                json: globalOptions.json,
+                silent: globalOptions.silent,
+              },
             });
             await civic.initialize();
 
@@ -57,92 +74,45 @@ export const infoCommand = (cli: CAC) => {
           dataDir = CentralConfigManager.getDataDir();
           dbConfig = CentralConfigManager.getDatabaseConfig();
         }
-        if (shouldOutputJson) {
-          const output: any = {
-            success: true,
-            organization: orgConfig,
+
+        const output: any = {
+          organization: orgConfig,
+        };
+        if (isAdmin) {
+          output.system = {
+            ...systemConfig,
+            dataDir,
+            database: dbConfig,
           };
-          if (isAdmin) {
-            output.system = {
-              ...systemConfig,
-              dataDir,
-              database: dbConfig,
-            };
-            output.user = userInfo;
-          } else if (token) {
-            output.note = 'System config is only visible to admin users.';
-            if (userInfo) output.user = userInfo;
-          }
-          console.log(JSON.stringify(output, null, 2));
-        } else {
-          console.log('🏢 Organization Information:');
-          console.log(`   Name: ${orgConfig.name || 'Not set'}`);
-          console.log(`   City: ${orgConfig.city || 'Not set'}`);
-          console.log(`   State: ${orgConfig.state || 'Not set'}`);
-          console.log(`   Country: ${orgConfig.country || 'Not set'}`);
-          console.log(`   Timezone: ${orgConfig.timezone || 'Not set'}`);
-          if (orgConfig.website)
-            console.log(`   Website: ${orgConfig.website}`);
-          if (orgConfig.repo_url)
-            console.log(`   Repository: ${orgConfig.repo_url}`);
-          if (orgConfig.email) console.log(`   Email: ${orgConfig.email}`);
-          if (orgConfig.phone) console.log(`   Phone: ${orgConfig.phone}`);
-          if (orgConfig.logo) console.log(`   Logo: ${orgConfig.logo}`);
-          if (orgConfig.tagline)
-            console.log(`   Tagline: ${orgConfig.tagline}`);
-          if (orgConfig.mission)
-            console.log(`   Mission: ${orgConfig.mission}`);
-          if (orgConfig.description)
-            console.log(`   Description: ${orgConfig.description}`);
-          if (orgConfig.social) {
-            console.log('   Social:');
-            Object.entries(orgConfig.social).forEach(([key, value]) => {
-              if (value) console.log(`     ${key}: ${value}`);
-            });
-          }
-          if (orgConfig.custom) {
-            console.log('   Custom:');
-            Object.entries(orgConfig.custom).forEach(([key, value]) => {
-              if (value) console.log(`     ${key}: ${value}`);
-            });
-          }
-          if (isAdmin) {
-            console.log('');
-            console.log('⚙️ System Configuration:');
-            console.log(`   Data Directory: ${dataDir}`);
-            console.log(
-              `   Database Type: ${dbConfig?.type || 'Not configured'}`
-            );
-            if (dbConfig?.sqlite?.file)
-              console.log(`   SQLite File: ${dbConfig.sqlite.file}`);
-            if (dbConfig?.postgres?.url)
-              console.log(`   PostgreSQL URL: ${dbConfig.postgres.url}`);
-          } else if (token) {
-            if (userInfo && userInfo.role !== 'admin') {
-              console.log('\n🔒 System config is only visible to admin users.');
-            } else if (!userInfo) {
-              console.log(
-                '\n🔒 Invalid or expired token. System config hidden.'
-              );
-            }
-          }
+          output.user = userInfo;
+        } else if (token) {
+          output.note = 'System config is only visible to admin users.';
+          if (userInfo) output.user = userInfo;
         }
+
+        const message = isAdmin
+          ? `Organization and system information (authenticated as ${userInfo?.username || 'admin'})`
+          : token
+            ? `Organization information (system config requires admin access)`
+            : 'Organization information';
+
+        cliSuccess(output, message, {
+          operation: 'info',
+          isAdmin,
+          hasToken: !!token,
+        });
       } catch (error) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          console.error('❌ Failed to load info:', error);
-        }
+        cliError(
+          'Failed to load info',
+          'LOAD_INFO_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'info'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };
