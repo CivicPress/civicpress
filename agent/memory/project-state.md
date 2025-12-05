@@ -42,6 +42,13 @@
   content replacement
 - **Record Geography Display**: Dedicated geography information sections in
   record views
+- **Record Editor**: Professional markdown editor with simplified button system
+  - Single "Save changes" split-button with contextual dropdown menu
+  - Status dropdown in Details sidebar
+  - Raw YAML preview accordion
+  - Word wrap enabled, no horizontal scrollbar
+  - Full-width layout without footer
+  - Complete internationalization (English/French)
 
 #### **Developer Experience**
 

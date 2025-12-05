@@ -47,6 +47,27 @@
 - **Debounced Search**: 300ms delay to prevent excessive API calls
 - **Lazy Loading**: Load more records on demand with cursor-based pagination
 
+### Record Editor UI Patterns 📝
+
+- **Simplified Button System**: Single split-button with contextual dropdown
+  reduces cognitive load
+- **State-Aware Actions**: Menu items filtered based on current record status
+  and allowed transitions
+- **Confirmation Modals**: Important actions (publish, unpublish, archive,
+  delete) require confirmation
+- **Flat Document Design**: Removed card wrappers for clean, document-focused
+  interface
+- **Word Wrap**: CodeMirror `EditorView.lineWrapping` prevents horizontal
+  scrollbars
+- **Reactive Counts**: Accordion item counts update automatically when items are
+  added/removed
+- **Component Lifecycle**: Use `getCurrentInstance()` check before calling
+  lifecycle hooks in composables
+- **Dropdown Menu Structure**: UDropdownMenu expects array-of-arrays format for
+  sections
+- **Status Management**: Status dropdown uses same pattern as type dropdown for
+  consistency
+
 ### UX/UI Consistency Standards 🎨
 
 - **UDashboardPanel Pattern**: Consistent header and body structure across pages

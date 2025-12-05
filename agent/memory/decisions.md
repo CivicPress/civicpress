@@ -183,6 +183,47 @@ Since we're in development with no production data:
 - Implement new geography linking system
 - Add Leaflet map widgets throughout system
 
+## Record Editor Button System Simplification (January 2025)
+
+### **✅ DECIDED: Single Split-Button with Contextual Menu**
+
+**Decision**: Replace the two-button system (Save Draft + Publish split-button)
+with a single "Save changes" split-button that shows contextual actions in a
+dropdown menu.
+
+#### **Rationale**
+
+1. **Reduces Cognitive Load**: Users see one primary action instead of two
+   competing buttons
+2. **Eliminates Redundancy**: Autosave already handles draft saving, manual
+   "Save Draft" was redundant
+3. **State-Aware Actions**: Menu shows only relevant actions based on current
+   record status
+4. **Future-Proof**: Easy to add new workflow actions without cluttering the UI
+5. **Familiar Pattern**: Similar to Google Docs, Notion, and other modern
+   editors
+
+#### **Button System Implementation**
+
+- **Primary Button**: Always labeled "Save changes" (simplified, no contextual
+  labels)
+- **Status Display**: Separate status badge/chip shows current status (Draft,
+  Published, etc.)
+- **Dropdown Actions**:
+  - Always: "Save changes" (same as main button click)
+  - Contextual: Publish now, Unpublish to draft, Archive record
+  - Status transitions: Individual items for each allowed transition
+- **Confirmation Modals**: Required for publish, unpublish, archive, and delete
+  actions
+- **More Menu**: Separate menu for tools (history, duplicate, export, delete)
+
+#### **Button System Benefits**
+
+- Cleaner header with less visual clutter
+- Clearer action hierarchy (primary action vs. secondary options)
+- Better discoverability of workflow actions
+- Easier to extend with new actions in the future
+
 ---
 
 ## Roles API Endpoint Implementation (Legacy)

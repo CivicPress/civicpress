@@ -448,6 +448,230 @@ export class DatabaseService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  // Draft management
+  async createDraft(draftData: {
+    id: string;
+    title: string;
+    type: string;
+    status?: string;
+    markdown_body?: string | null;
+    metadata?: string | null;
+    geography?: string | null;
+    attached_files?: string | null;
+    linked_records?: string | null;
+    linked_geography_files?: string | null;
+    author: string;
+    created_by: string;
+  }): Promise<void> {
+    await this.adapter.execute(
+      'INSERT INTO record_drafts (id, title, type, status, markdown_body, metadata, geography, attached_files, linked_records, linked_geography_files, author, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        draftData.id,
+        draftData.title,
+        draftData.type,
+        draftData.status || 'draft',
+        draftData.markdown_body || null,
+        draftData.metadata || null,
+        draftData.geography || null,
+        draftData.attached_files || null,
+        draftData.linked_records || null,
+        draftData.linked_geography_files || null,
+        draftData.author,
+        draftData.created_by,
+      ]
+    );
+  }
+
+  async getDraft(id: string): Promise<any | null> {
+    const rows = await this.adapter.query(
+      'SELECT * FROM record_drafts WHERE id = ?',
+      [id]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  async listDrafts(
+    options: {
+      type?: string;
+      created_by?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<{ drafts: any[]; total: number }> {
+    const clauses: string[] = [];
+    const params: any[] = [];
+
+    if (options.type) {
+      clauses.push('type = ?');
+      params.push(options.type);
+    }
+
+    if (options.created_by) {
+      clauses.push('created_by = ?');
+      params.push(options.created_by);
+    }
+
+    const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    // Get total count
+    const countRows = await this.adapter.query(
+      `SELECT COUNT(*) as total FROM record_drafts ${whereClause}`,
+      params
+    );
+    const total = countRows[0]?.total || 0;
+
+    // Get drafts with pagination
+    let query = `SELECT * FROM record_drafts ${whereClause} ORDER BY last_draft_saved_at DESC`;
+    if (options.limit) {
+      query += ` LIMIT ${options.limit}`;
+      if (options.offset) {
+        query += ` OFFSET ${options.offset}`;
+      }
+    }
+
+    const rows = await this.adapter.query(query, params);
+
+    return {
+      drafts: rows,
+      total,
+    };
+  }
+
+  async updateDraft(
+    id: string,
+    updates: {
+      title?: string;
+      type?: string;
+      status?: string;
+      markdown_body?: string;
+      metadata?: string;
+      geography?: string;
+      attached_files?: string;
+      linked_records?: string;
+      linked_geography_files?: string;
+    }
+  ): Promise<void> {
+    const fields = [];
+    const values = [];
+
+    if (updates.title !== undefined) {
+      fields.push('title = ?');
+      values.push(updates.title);
+    }
+    if (updates.type !== undefined) {
+      fields.push('type = ?');
+      values.push(updates.type);
+    }
+    if (updates.status !== undefined) {
+      fields.push('status = ?');
+      values.push(updates.status);
+    }
+    if (updates.markdown_body !== undefined) {
+      fields.push('markdown_body = ?');
+      values.push(updates.markdown_body);
+    }
+    if (updates.metadata !== undefined) {
+      fields.push('metadata = ?');
+      values.push(updates.metadata);
+    }
+    if (updates.geography !== undefined) {
+      fields.push('geography = ?');
+      values.push(updates.geography);
+    }
+    if (updates.attached_files !== undefined) {
+      fields.push('attached_files = ?');
+      values.push(updates.attached_files);
+    }
+    if (updates.linked_records !== undefined) {
+      fields.push('linked_records = ?');
+      values.push(updates.linked_records);
+    }
+    if (updates.linked_geography_files !== undefined) {
+      fields.push('linked_geography_files = ?');
+      values.push(updates.linked_geography_files);
+    }
+
+    if (fields.length === 0) {
+      return; // No updates to perform
+    }
+
+    // Always update last_draft_saved_at and updated_at
+    fields.push('last_draft_saved_at = CURRENT_TIMESTAMP');
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+
+    values.push(id);
+
+    await this.adapter.execute(
+      `UPDATE record_drafts SET ${fields.join(', ')} WHERE id = ?`,
+      values
+    );
+  }
+
+  async deleteDraft(id: string): Promise<void> {
+    await this.adapter.execute('DELETE FROM record_drafts WHERE id = ?', [id]);
+  }
+
+  // Lock management
+  async acquireLock(
+    recordId: string,
+    lockedBy: string,
+    expiresAt: Date
+  ): Promise<boolean> {
+    // First, clean up expired locks for this record
+    await this.adapter.execute(
+      'DELETE FROM record_locks WHERE record_id = ? AND expires_at < CURRENT_TIMESTAMP',
+      [recordId]
+    );
+
+    // Check if record is already locked
+    const existingLock = await this.getLock(recordId);
+    if (existingLock && existingLock.expires_at > new Date().toISOString()) {
+      // Lock exists and is not expired
+      return false;
+    }
+
+    // Acquire lock (INSERT OR REPLACE to handle existing expired locks)
+    await this.adapter.execute(
+      'INSERT OR REPLACE INTO record_locks (record_id, locked_by, expires_at) VALUES (?, ?, ?)',
+      [recordId, lockedBy, expiresAt.toISOString()]
+    );
+
+    return true;
+  }
+
+  async releaseLock(recordId: string, lockedBy: string): Promise<boolean> {
+    const result = await this.adapter.execute(
+      'DELETE FROM record_locks WHERE record_id = ? AND locked_by = ?',
+      [recordId, lockedBy]
+    );
+    return (result as any).changes > 0;
+  }
+
+  async getLock(recordId: string): Promise<any | null> {
+    // Clean up expired locks first
+    await this.adapter.execute(
+      'DELETE FROM record_locks WHERE expires_at < CURRENT_TIMESTAMP'
+    );
+
+    const rows = await this.adapter.query(
+      'SELECT * FROM record_locks WHERE record_id = ?',
+      [recordId]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  async refreshLock(
+    recordId: string,
+    lockedBy: string,
+    expiresAt: Date
+  ): Promise<boolean> {
+    const result = await this.adapter.execute(
+      'UPDATE record_locks SET expires_at = ? WHERE record_id = ? AND locked_by = ?',
+      [expiresAt.toISOString(), recordId, lockedBy]
+    );
+    return (result as any).changes > 0;
+  }
+
   async updateRecord(
     id: string,
     updates: {

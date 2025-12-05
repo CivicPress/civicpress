@@ -4,8 +4,12 @@ import {
   UpdateRecordRequest,
   WorkflowConfigManager,
   RecordManager,
+  RecordParser,
+  RecordData,
   userCan,
   coreError,
+  DatabaseService,
+  Logger,
 } from '@civicpress/core';
 import fs from 'fs';
 import path from 'path';
@@ -19,6 +23,7 @@ import path from 'path';
 export class RecordsService {
   private civicPress: CivicPress;
   private recordManager: RecordManager;
+  private logger: Logger;
 
   /**
    * Helper function to get kind priority for sorting
@@ -73,10 +78,13 @@ export class RecordsService {
     return { whereClause, params };
   }
 
+  private db: DatabaseService;
+
   constructor(
     civicPress: CivicPress,
     recordManager?: RecordManager,
-    workflowManager?: WorkflowConfigManager
+    workflowManager?: WorkflowConfigManager,
+    db?: DatabaseService
   ) {
     this.civicPress = civicPress;
     // Get dataDir from CivicPress config
@@ -87,6 +95,8 @@ export class RecordsService {
     this.workflowManager =
       workflowManager || new WorkflowConfigManager(dataDir);
     this.recordManager = recordManager || civicPress.getRecordManager();
+    this.db = db || civicPress.getDatabaseService();
+    this.logger = new Logger();
   }
 
   /**
@@ -758,5 +768,545 @@ export class RecordsService {
       types,
       statuses,
     };
+  }
+
+  /**
+   * Create a new draft (saves to record_drafts table only, no file)
+   */
+  async createDraft(
+    data: {
+      title: string;
+      type: string;
+      status?: string;
+      markdownBody?: string;
+      metadata?: Record<string, any>;
+      geography?: any;
+      attachedFiles?: Array<{
+        id: string;
+        path: string;
+        original_name: string;
+        description?: string;
+        category?:
+          | string
+          | {
+              label: string;
+              value: string;
+              description: string;
+            };
+      }>;
+      linkedRecords?: Array<{
+        id: string;
+        type: string;
+        description: string;
+        path?: string;
+        category?: string;
+      }>;
+      linkedGeographyFiles?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+      }>;
+    },
+    user: any
+  ): Promise<any> {
+    // Validate permissions
+    const hasPermission = await userCan(user, 'records:create', {
+      recordType: data.type,
+      action: 'create',
+    });
+
+    if (!hasPermission) {
+      throw new Error(
+        `Permission denied: Cannot create records of type '${data.type}'`
+      );
+    }
+
+    // Generate record ID
+    const recordId = `record-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+
+    // Extract username safely
+    let username = 'unknown';
+    if (typeof user.username === 'string') {
+      username = user.username;
+    } else if (user.name && typeof user.name === 'string') {
+      username = user.name;
+    } else if (user.id) {
+      username = user.id.toString();
+    }
+
+    // Extract user ID safely
+    let userId = username;
+    if (user.id) {
+      userId = user.id.toString();
+    } else if (typeof user.username === 'string') {
+      userId = user.username;
+    }
+
+    // Save to draft table
+    try {
+      await this.db.createDraft({
+        id: recordId,
+        title: data.title,
+        type: data.type,
+        status: data.status || 'draft',
+        markdown_body: data.markdownBody || null,
+        metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+        geography: data.geography ? JSON.stringify(data.geography) : null,
+        attached_files:
+          data.attachedFiles && data.attachedFiles.length > 0
+            ? JSON.stringify(data.attachedFiles)
+            : null,
+        linked_records:
+          data.linkedRecords && data.linkedRecords.length > 0
+            ? JSON.stringify(data.linkedRecords)
+            : null,
+        linked_geography_files:
+          data.linkedGeographyFiles && data.linkedGeographyFiles.length > 0
+            ? JSON.stringify(data.linkedGeographyFiles)
+            : null,
+        author: username,
+        created_by: userId,
+      });
+    } catch (error: any) {
+      // Log the error for debugging
+      this.logger.error('Failed to create draft', {
+        error: error.message,
+        stack: error.stack,
+        recordId,
+        title: data.title,
+        type: data.type,
+        username,
+        userId,
+        markdownBodyLength: data.markdownBody?.length || 0,
+      });
+      throw error;
+    }
+
+    // Get the created draft
+    const draft = await this.db.getDraft(recordId);
+
+    return {
+      id: draft.id,
+      title: draft.title,
+      type: draft.type,
+      status: draft.status,
+      markdownBody: draft.markdown_body,
+      metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
+      geography: draft.geography ? JSON.parse(draft.geography) : undefined,
+      attachedFiles: draft.attached_files
+        ? JSON.parse(draft.attached_files)
+        : [],
+      linkedRecords: draft.linked_records
+        ? JSON.parse(draft.linked_records)
+        : [],
+      linkedGeographyFiles: draft.linked_geography_files
+        ? JSON.parse(draft.linked_geography_files)
+        : [],
+      author: draft.author,
+      created_by: draft.created_by,
+      created_at: draft.created_at,
+      updated_at: draft.updated_at,
+      last_draft_saved_at: draft.last_draft_saved_at,
+    };
+  }
+
+  /**
+   * Update a draft
+   */
+  async updateDraft(
+    id: string,
+    data: {
+      title?: string;
+      type?: string;
+      status?: string;
+      markdownBody?: string;
+      metadata?: Record<string, any>;
+      geography?: any;
+      attachedFiles?: Array<{
+        id: string;
+        path: string;
+        original_name: string;
+        description?: string;
+        category?:
+          | string
+          | {
+              label: string;
+              value: string;
+              description: string;
+            };
+      }>;
+      linkedRecords?: Array<{
+        id: string;
+        type: string;
+        description: string;
+        path?: string;
+        category?: string;
+      }>;
+      linkedGeographyFiles?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+      }>;
+    },
+    user: any
+  ): Promise<any> {
+    // Check if draft exists
+    const draft = await this.db.getDraft(id);
+    if (!draft) {
+      throw new Error(`Draft not found: ${id}`);
+    }
+
+    // Use new type if provided, otherwise use existing type for permission check
+    const recordType = data.type || draft.type;
+
+    // Validate permissions - check both old and new type if type is being changed
+    const hasPermission = await userCan(user, 'records:edit', {
+      recordType: recordType,
+      action: 'edit',
+    });
+
+    if (!hasPermission) {
+      throw new Error(
+        `Permission denied: Cannot edit records of type '${recordType}'`
+      );
+    }
+
+    // If type is being changed, also check permission for the new type
+    if (data.type && data.type !== draft.type) {
+      const hasNewTypePermission = await userCan(user, 'records:edit', {
+        recordType: data.type,
+        action: 'edit',
+      });
+
+      if (!hasNewTypePermission) {
+        throw new Error(
+          `Permission denied: Cannot change record type to '${data.type}'`
+        );
+      }
+    }
+
+    // Update draft
+    await this.db.updateDraft(id, {
+      title: data.title,
+      type: data.type,
+      status: data.status,
+      markdown_body: data.markdownBody,
+      metadata: data.metadata ? JSON.stringify(data.metadata) : undefined,
+      geography: data.geography ? JSON.stringify(data.geography) : undefined,
+      attached_files: data.attachedFiles
+        ? JSON.stringify(data.attachedFiles)
+        : undefined,
+      linked_records: data.linkedRecords
+        ? JSON.stringify(data.linkedRecords)
+        : undefined,
+      linked_geography_files: data.linkedGeographyFiles
+        ? JSON.stringify(data.linkedGeographyFiles)
+        : undefined,
+    });
+
+    // Get updated draft
+    const updatedDraft = await this.db.getDraft(id);
+
+    return {
+      id: updatedDraft.id,
+      title: updatedDraft.title,
+      type: updatedDraft.type,
+      status: updatedDraft.status,
+      markdownBody: updatedDraft.markdown_body,
+      metadata: updatedDraft.metadata ? JSON.parse(updatedDraft.metadata) : {},
+      geography: updatedDraft.geography
+        ? JSON.parse(updatedDraft.geography)
+        : undefined,
+      attachedFiles: updatedDraft.attached_files
+        ? JSON.parse(updatedDraft.attached_files)
+        : [],
+      linkedRecords: updatedDraft.linked_records
+        ? JSON.parse(updatedDraft.linked_records)
+        : [],
+      linkedGeographyFiles: updatedDraft.linked_geography_files
+        ? JSON.parse(updatedDraft.linked_geography_files)
+        : [],
+      author: updatedDraft.author,
+      created_by: updatedDraft.created_by,
+      created_at: updatedDraft.created_at,
+      updated_at: updatedDraft.updated_at,
+      last_draft_saved_at: updatedDraft.last_draft_saved_at,
+    };
+  }
+
+  /**
+   * List drafts from the record_drafts table
+   */
+  async listDrafts(
+    options: {
+      type?: string;
+      created_by?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<{ records: any[]; total: number }> {
+    const result = await this.db.listDrafts(options);
+
+    // Transform drafts to match record format
+    const records = result.drafts.map((draft) => ({
+      id: draft.id,
+      title: draft.title,
+      type: draft.type,
+      status: draft.status,
+      markdownBody: draft.markdown_body,
+      content: draft.markdown_body, // Alias for compatibility
+      metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
+      geography: draft.geography ? JSON.parse(draft.geography) : undefined,
+      attachedFiles: draft.attached_files
+        ? JSON.parse(draft.attached_files)
+        : [],
+      linkedRecords: draft.linked_records
+        ? JSON.parse(draft.linked_records)
+        : [],
+      linkedGeographyFiles: draft.linked_geography_files
+        ? JSON.parse(draft.linked_geography_files)
+        : [],
+      author: draft.author,
+      created_by: draft.created_by,
+      created_at: draft.created_at,
+      updated_at: draft.updated_at,
+      last_draft_saved_at: draft.last_draft_saved_at,
+      isDraft: true,
+    }));
+
+    return {
+      records,
+      total: result.total,
+    };
+  }
+
+  /**
+   * Delete a draft
+   */
+  async deleteDraft(id: string): Promise<void> {
+    await this.db.deleteDraft(id);
+  }
+
+  /**
+   * Get frontmatter YAML for a record or draft
+   * Uses RecordParser to ensure proper format matching the schema
+   */
+  async getFrontmatterYaml(id: string, user: any): Promise<string | null> {
+    // Get the record or draft
+    const recordData = await this.getDraftOrRecord(id, user);
+    if (!recordData) {
+      return null;
+    }
+
+    // Convert to RecordData format
+    const record: RecordData = {
+      id: recordData.id,
+      title: recordData.title,
+      type: recordData.type,
+      status: recordData.status,
+      content: recordData.markdownBody || recordData.content || '',
+      metadata: recordData.metadata || {},
+      geography: recordData.geography,
+      attachedFiles: recordData.attachedFiles || [],
+      linkedRecords: recordData.linkedRecords || [],
+      linkedGeographyFiles: recordData.linkedGeographyFiles || [],
+      author: recordData.author || recordData.created_by || 'unknown',
+      authors: recordData.authors,
+      created_at: recordData.created_at || new Date().toISOString(),
+      updated_at:
+        recordData.updated_at ||
+        recordData.last_draft_saved_at ||
+        new Date().toISOString(),
+      source: recordData.source,
+      commit_ref: recordData.commit_ref,
+      commit_signature: recordData.commit_signature,
+    };
+
+    // Use RecordParser to generate the properly formatted markdown
+    const fullMarkdown = RecordParser.serializeToMarkdown(record);
+
+    // Extract just the frontmatter YAML (between the --- delimiters)
+    const frontmatterMatch = fullMarkdown.match(/^---\n([\s\S]*?)\n---/);
+    if (frontmatterMatch && frontmatterMatch[1]) {
+      return frontmatterMatch[1].trim();
+    }
+
+    // Fallback: if extraction fails, build frontmatter and format manually
+    const frontmatter = RecordParser.buildFrontmatter(record);
+    // Use js-yaml library (available in API module) to format (though we lose the ordering from generateOrderedYaml)
+    const yaml = await import('js-yaml');
+    return yaml.dump(frontmatter, { indent: 2, lineWidth: 0 });
+  }
+
+  /**
+   * Get a draft or published record
+   * Checks drafts first (if user can edit), then published records
+   */
+  async getDraftOrRecord(id: string, user: any): Promise<any | null> {
+    // Check if user can edit (if so, check drafts first)
+    const canEdit = await userCan(user, 'records:edit', {
+      action: 'edit',
+    });
+
+    if (canEdit) {
+      // Check drafts first
+      const draft = await this.db.getDraft(id);
+      if (draft) {
+        return {
+          id: draft.id,
+          title: draft.title,
+          type: draft.type,
+          status: draft.status,
+          markdownBody: draft.markdown_body,
+          metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
+          geography: draft.geography ? JSON.parse(draft.geography) : undefined,
+          attachedFiles: draft.attached_files
+            ? JSON.parse(draft.attached_files)
+            : [],
+          linkedRecords: draft.linked_records
+            ? JSON.parse(draft.linked_records)
+            : [],
+          linkedGeographyFiles: draft.linked_geography_files
+            ? JSON.parse(draft.linked_geography_files)
+            : [],
+          author: draft.author,
+          created_by: draft.created_by,
+          created_at: draft.created_at,
+          updated_at: draft.updated_at,
+          last_draft_saved_at: draft.last_draft_saved_at,
+          isDraft: true,
+        };
+      }
+    }
+
+    // Fall back to published record
+    const record = await this.getRecord(id);
+    if (record) {
+      return {
+        ...record,
+        isDraft: false,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Publish a draft (creates record file and moves to records table)
+   */
+  async publishDraft(
+    id: string,
+    user: any,
+    targetStatus?: string
+  ): Promise<any> {
+    // Get draft
+    const draft = await this.db.getDraft(id);
+    if (!draft) {
+      throw new Error(`Draft not found: ${id}`);
+    }
+
+    // Validate permissions (publishing requires edit permission)
+    const hasPermission = await userCan(user, 'records:edit', {
+      recordType: draft.type,
+      action: 'edit',
+    });
+
+    if (!hasPermission) {
+      throw new Error(
+        `Permission denied: Cannot publish records of type '${draft.type}'`
+      );
+    }
+
+    // Use target status or draft's current status
+    const finalStatus = targetStatus || draft.status;
+
+    // Create record request
+    const request: CreateRecordRequest = {
+      title: draft.title,
+      type: draft.type,
+      content: draft.markdown_body,
+      metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
+      geography: draft.geography ? JSON.parse(draft.geography) : undefined,
+      attachedFiles: draft.attached_files
+        ? JSON.parse(draft.attached_files)
+        : undefined,
+      linkedRecords: draft.linked_records
+        ? JSON.parse(draft.linked_records)
+        : undefined,
+      linkedGeographyFiles: draft.linked_geography_files
+        ? JSON.parse(draft.linked_geography_files)
+        : undefined,
+      status: finalStatus,
+      createdAt: draft.created_at,
+      updatedAt: draft.updated_at,
+    };
+
+    // Create record using RecordManager (this will create file and save to records table)
+    const record = await this.recordManager.createRecordWithId(
+      id,
+      request,
+      user
+    );
+
+    // Delete draft
+    await this.db.deleteDraft(id);
+
+    return {
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status,
+      content: record.content,
+      metadata: record.metadata || {},
+      authors: record.authors,
+      source: record.source,
+      geography: record.geography,
+      attachedFiles: record.attachedFiles || [],
+      linkedRecords: record.linkedRecords || [],
+      linkedGeographyFiles: record.linkedGeographyFiles || [],
+      path: record.path,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      author: record.author,
+      commit_ref: record.commit_ref,
+      commit_signature: record.commit_signature,
+    };
+  }
+
+  /**
+   * Lock management
+   */
+  async acquireLock(
+    recordId: string,
+    user: any,
+    lockDurationMinutes = 30
+  ): Promise<boolean> {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + lockDurationMinutes);
+    const lockedBy = user.id?.toString() || user.username;
+
+    return await this.db.acquireLock(recordId, lockedBy, expiresAt);
+  }
+
+  async releaseLock(recordId: string, user: any): Promise<boolean> {
+    const lockedBy = user.id?.toString() || user.username;
+    return await this.db.releaseLock(recordId, lockedBy);
+  }
+
+  async getLock(recordId: string): Promise<any | null> {
+    return await this.db.getLock(recordId);
+  }
+
+  async refreshLock(
+    recordId: string,
+    user: any,
+    lockDurationMinutes = 30
+  ): Promise<boolean> {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + lockDurationMinutes);
+    const lockedBy = user.id?.toString() || user.username;
+
+    return await this.db.refreshLock(recordId, lockedBy, expiresAt);
   }
 }

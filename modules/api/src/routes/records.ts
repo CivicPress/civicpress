@@ -4,6 +4,7 @@ import {
   AuthenticatedRequest,
   requireRecordPermission,
   authMiddleware,
+  optionalAuth,
 } from '../middleware/auth.js';
 import { RecordsService } from '../services/records-service.js';
 import { Logger } from '@civicpress/core';
@@ -136,10 +137,133 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   });
 
+  // GET /api/records/drafts - Get user's draft records (authenticated only)
+  // NOTE: This must come BEFORE /:id route to avoid matching "drafts" as an ID
+  router.get(
+    '/drafts',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('view'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'list_drafts' });
+
+      try {
+        const { type, limit, offset } = req.query;
+
+        logger.info('Listing user drafts', {
+          type,
+          limit,
+          offset,
+          requestId: (req as any).requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
+        });
+
+        // List drafts from record_drafts table, optionally filtered by user
+        const userId = req.user?.id?.toString() || req.user?.username;
+        const result = await recordsService.listDrafts({
+          type: type as string,
+          created_by: userId, // Filter by current user
+          limit: limit ? parseInt(limit as string) : undefined,
+          offset: offset ? parseInt(offset as string) : undefined,
+        });
+
+        logger.info('User drafts listed successfully', {
+          totalRecords: result.records?.length || 0,
+          requestId: (req as any).requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
+        });
+
+        sendSuccess(result, req, res, { operation: 'list_drafts' });
+      } catch (error) {
+        handleApiError('list_drafts', error, req, res, 'Failed to list drafts');
+      }
+    }
+  );
+
+  // GET /api/records/:id/frontmatter - Get frontmatter YAML for a record (handles both public and authenticated access)
+  // NOTE: This must come BEFORE /:id route to avoid matching "frontmatter" as an ID
+  router.get(
+    '/:id/frontmatter',
+    param('id').isString().notEmpty(),
+    optionalAuth(recordsService.getCivicPress()),
+    async (req: any, res: Response) => {
+      const isAuthenticated = (req as any).user !== undefined;
+      const operation = isAuthenticated
+        ? 'get_frontmatter_authenticated'
+        : 'get_frontmatter_public';
+
+      logApiRequest(req, { operation });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'get_frontmatter',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+
+        logger.info(
+          `Getting frontmatter YAML for record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
+        const yaml = await recordsService.getFrontmatterYaml(
+          id,
+          (req as any).user
+        );
+
+        if (!yaml) {
+          const error = new Error('Record not found');
+          (error as any).statusCode = 404;
+          (error as any).code = 'RECORD_NOT_FOUND';
+          throw error;
+        }
+
+        logger.info(
+          `Frontmatter YAML for record ${id} retrieved successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            recordId: id,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
+        // Return as plain text YAML (not JSON)
+        res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
+        res.status(200).send(yaml);
+      } catch (error) {
+        handleApiError(
+          operation,
+          error,
+          req,
+          res,
+          'Failed to get frontmatter YAML'
+        );
+      }
+    }
+  );
+
   // GET /api/records/:id - Get a specific record (handles both public and authenticated access)
+  // Uses optional auth middleware - if user is authenticated, they can see drafts
   router.get(
     '/:id',
     param('id').isString().notEmpty(),
+    // Optional auth - attach user if token is present, but don't require it
+    optionalAuth(recordsService.getCivicPress()),
     async (req: any, res: Response) => {
       const isAuthenticated = (req as any).user !== undefined;
       const operation = isAuthenticated
@@ -172,7 +296,9 @@ export function createRecordsRouter(recordsService: RecordsService) {
           }
         );
 
-        const record = await recordsService.getRecord(id);
+        // Check drafts first (if user can edit), then published records
+        const user = (req as any).user;
+        const record = await recordsService.getDraftOrRecord(id, user || {});
 
         if (!record) {
           const error = new Error('Record not found');
@@ -266,47 +392,6 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   );
 
-  // GET /api/records/drafts - Get user's draft records (authenticated only)
-  router.get(
-    '/drafts',
-    requireRecordPermission('view'),
-    async (req: AuthenticatedRequest, res: Response) => {
-      logApiRequest(req, { operation: 'list_drafts' });
-
-      try {
-        const { type, limit, offset } = req.query;
-
-        logger.info('Listing user drafts', {
-          type,
-          limit,
-          offset,
-          requestId: (req as any).requestId,
-          userId: req.user?.id,
-          userRole: req.user?.role,
-        });
-
-        // For now, return all records with status 'draft'
-        // In the future, this could be filtered by user ownership
-        const result = await recordsService.listRecords({
-          type: type as string,
-          status: 'draft',
-          limit: limit ? parseInt(limit as string) : undefined,
-        });
-
-        logger.info('User drafts listed successfully', {
-          totalRecords: result.records?.length || 0,
-          requestId: (req as any).requestId,
-          userId: req.user?.id,
-          userRole: req.user?.role,
-        });
-
-        sendSuccess(result, req, res, { operation: 'list_drafts' });
-      } catch (error) {
-        handleApiError('list_drafts', error, req, res, 'Failed to list drafts');
-      }
-    }
-  );
-
   // POST /api/records - Create a new record (authenticated only)
   router.post(
     '/',
@@ -390,18 +475,18 @@ export function createRecordsRouter(recordsService: RecordsService) {
           name: user.name,
         };
 
-        const record = await recordsService.createRecord(
+        // Create draft instead of published record (no file created until publish)
+        const record = await recordsService.createDraft(
           {
             title,
             type,
-            content,
+            status: req.body.status || 'draft',
+            markdownBody: content, // Map 'content' to 'markdownBody' for drafts
             metadata,
             geography,
             attachedFiles,
             linkedRecords,
             linkedGeographyFiles,
-            authors,
-            source,
           },
           cleanUser
         );
@@ -767,6 +852,414 @@ export function createRecordsRouter(recordsService: RecordsService) {
           req,
           res,
           'Failed to list allowed transitions'
+        );
+      }
+    }
+  );
+
+  // DELETE /api/v1/records/:id/draft - Delete draft (authenticated only)
+  router.delete(
+    '/:id/draft',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'delete_draft' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'delete_draft',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        // Check if draft exists and belongs to user
+        const draft = await recordsService.getDraftOrRecord(id, user);
+        if (!draft || !draft.isDraft) {
+          const error = new Error('Draft not found');
+          (error as any).statusCode = 404;
+          (error as any).code = 'DRAFT_NOT_FOUND';
+          throw error;
+        }
+
+        // Verify ownership (optional - can be removed if admins should delete any draft)
+        if (
+          draft.created_by !== user.id?.toString() &&
+          draft.created_by !== user.username
+        ) {
+          const error = new Error(
+            'Permission denied: You can only delete your own drafts'
+          );
+          (error as any).statusCode = 403;
+          throw error;
+        }
+
+        // Delete draft
+        await recordsService.deleteDraft(id);
+
+        sendSuccess({ message: 'Draft deleted successfully', id }, req, res, {
+          operation: 'delete_draft',
+        });
+        await audit.log({
+          source: 'api',
+          actor: {
+            id: user.id,
+            username: (user as any).username,
+            role: user.role,
+          },
+          action: 'records:delete_draft',
+          target: { type: 'draft', id },
+          outcome: 'success',
+        });
+      } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:delete_draft',
+          target: { type: 'draft', id },
+          outcome: 'failure',
+          message: String(error),
+        });
+        handleApiError(
+          'delete_draft',
+          error,
+          req,
+          res,
+          'Failed to delete draft'
+        );
+      }
+    }
+  );
+
+  // PUT /api/v1/records/:id/draft - Save draft (authenticated only)
+  router.put(
+    '/:id/draft',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    body('title').optional().isString(),
+    body('markdownBody').optional().isString(),
+    body('status').optional().isString(),
+    body('metadata').optional().isObject(),
+    body('geography').optional().isObject(),
+    body('attachedFiles').optional().isArray(),
+    body('linkedRecords').optional().isArray(),
+    body('linkedGeographyFiles').optional().isArray(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'save_draft' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'save_draft',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const updates = req.body;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        // Check if draft exists, update it; otherwise create it
+        const existingDraft = await recordsService.getDraftOrRecord(id, user);
+        let draft;
+
+        if (existingDraft?.isDraft) {
+          // Update existing draft
+          draft = await recordsService.updateDraft(id, updates, user);
+        } else {
+          // Create new draft (if record exists, we'll create a draft from it)
+          // For now, we'll require the full data for creation
+          if (!updates.title || !updates.type) {
+            const error = new Error(
+              'Title and type are required for new drafts'
+            );
+            (error as any).statusCode = 400;
+            throw error;
+          }
+          draft = await recordsService.createDraft(
+            {
+              title: updates.title,
+              type: updates.type,
+              status: updates.status,
+              markdownBody: updates.markdownBody,
+              metadata: updates.metadata,
+              geography: updates.geography,
+              attachedFiles: updates.attachedFiles,
+              linkedRecords: updates.linkedRecords,
+              linkedGeographyFiles: updates.linkedGeographyFiles,
+            },
+            user
+          );
+        }
+
+        sendSuccess(draft, req, res, { operation: 'save_draft' });
+        await audit.log({
+          source: 'api',
+          actor: {
+            id: user.id,
+            username: (user as any).username,
+            role: user.role,
+          },
+          action: 'records:save_draft',
+          target: { type: 'record', id },
+          outcome: 'success',
+        });
+      } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:save_draft',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
+        handleApiError('save_draft', error, req, res, 'Failed to save draft');
+      }
+    }
+  );
+
+  // POST /api/v1/records/:id/publish - Publish draft (authenticated only)
+  router.post(
+    '/:id/publish',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    body('status').optional().isString(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'publish_record' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'publish_record',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        const record = await recordsService.publishDraft(id, user, status);
+
+        sendSuccess(record, req, res, {
+          operation: 'publish_record',
+          statusCode: 201,
+        });
+        await audit.log({
+          source: 'api',
+          actor: {
+            id: user.id,
+            username: (user as any).username,
+            role: user.role,
+          },
+          action: 'records:publish',
+          target: { type: 'record', id },
+          outcome: 'success',
+        });
+      } catch (error) {
+        const user = (req as any).user || {};
+        const id = (req as any).params?.id;
+        await audit.log({
+          source: 'api',
+          actor: { id: user.id, username: user.username, role: user.role },
+          action: 'records:publish',
+          target: { type: 'record', id },
+          outcome: 'failure',
+          message: String(error),
+        });
+        handleApiError(
+          'publish_record',
+          error,
+          req,
+          res,
+          'Failed to publish record'
+        );
+      }
+    }
+  );
+
+  // POST /api/v1/records/:id/lock - Acquire lock (authenticated only)
+  router.post(
+    '/:id/lock',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'acquire_lock' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'acquire_lock',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        const acquired = await recordsService.acquireLock(id, user);
+
+        if (!acquired) {
+          const lock = await recordsService.getLock(id);
+          const error = new Error(
+            `Record is locked by ${lock?.locked_by || 'another user'}`
+          );
+          (error as any).statusCode = 409;
+          (error as any).code = 'RECORD_LOCKED';
+          (error as any).lockedBy = lock?.locked_by;
+          (error as any).expiresAt = lock?.expires_at;
+          throw error;
+        }
+
+        sendSuccess({ locked: true, recordId: id }, req, res, {
+          operation: 'acquire_lock',
+        });
+      } catch (error) {
+        handleApiError(
+          'acquire_lock',
+          error,
+          req,
+          res,
+          'Failed to acquire lock'
+        );
+      }
+    }
+  );
+
+  // DELETE /api/v1/records/:id/lock - Release lock (authenticated only)
+  router.delete(
+    '/:id/lock',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'release_lock' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'release_lock',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        const released = await recordsService.releaseLock(id, user);
+
+        sendSuccess({ locked: !released, recordId: id }, req, res, {
+          operation: 'release_lock',
+        });
+      } catch (error) {
+        handleApiError(
+          'release_lock',
+          error,
+          req,
+          res,
+          'Failed to release lock'
+        );
+      }
+    }
+  );
+
+  // GET /api/v1/records/:id/lock - Get lock status (authenticated only)
+  router.get(
+    '/:id/lock',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'get_lock' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'get_lock',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const lock = await recordsService.getLock(id);
+
+        sendSuccess(
+          {
+            locked: !!lock,
+            lockedBy: lock?.locked_by || null,
+            lockedAt: lock?.locked_at || null,
+            expiresAt: lock?.expires_at || null,
+          },
+          req,
+          res,
+          { operation: 'get_lock' }
+        );
+      } catch (error) {
+        handleApiError(
+          'get_lock',
+          error,
+          req,
+          res,
+          'Failed to get lock status'
         );
       }
     }

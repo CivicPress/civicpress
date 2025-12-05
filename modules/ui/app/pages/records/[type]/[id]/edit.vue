@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
 import RecordForm from '~/components/RecordForm.vue';
-import SystemFooter from '~/components/SystemFooter.vue';
 import FormSkeleton from '~/components/FormSkeleton.vue';
 
 const { t } = useI18n();
@@ -45,11 +44,12 @@ const fetchRecord = async () => {
       const apiRecord = response.data;
 
       // Transform API response to match CivicRecord interface
+      // Note: Drafts return markdownBody, published records return content
       record.value = {
         id: apiRecord.id,
         title: apiRecord.title,
-        type: apiRecord.type,
-        content: apiRecord.content || '',
+        type: apiRecord.type, // This should be the updated type from draft if it exists
+        content: apiRecord.markdownBody || apiRecord.content || '',
         status: apiRecord.status,
         path: apiRecord.path,
         author: apiRecord.author,
@@ -76,42 +76,29 @@ const fetchRecord = async () => {
   }
 };
 
-// Handle form submission
+// Handle form submission (new RecordForm handles this internally via draft/publish)
 const handleSubmit = async (recordData: any) => {
-  saving.value = true;
-  error.value = '';
+  // The new RecordForm handles draft updates and publishing internally
+  // This is kept for backward compatibility but may not be called
+  console.log('Form submitted:', recordData);
+};
 
-  try {
-    // Update record via API
-    const response = (await useNuxtApp().$civicApi(`/api/v1/records/${id}`, {
-      method: 'PUT',
-      body: recordData,
-    })) as any;
-
-    if (response && response.success) {
-      toast.add({
-        title: t('records.recordUpdated'),
-        description: t('records.successfullyUpdated', {
-          title: recordData.title,
-        }),
-        color: 'primary',
-      });
-
-      // Navigate back to the record
-      navigateTo(`/records/${type}/${id}`);
-    } else {
-      throw new Error(t('records.failedToUpdateRecord'));
-    }
-  } catch (err: any) {
-    const errorMessage = err.message || t('records.failedToUpdateRecord');
-    error.value = errorMessage;
-    toast.add({
-      title: t('common.error'),
-      description: errorMessage,
-      color: 'error',
-    });
-  } finally {
-    saving.value = false;
+// Handle record saved - update local record state to reflect changes (e.g., type changes)
+const handleRecordSaved = (recordData: any) => {
+  if (record.value) {
+    // Update the record with the latest data from the server
+    record.value = {
+      ...record.value,
+      type: recordData.type,
+      title: recordData.title,
+      status: recordData.status,
+      content:
+        recordData.markdownBody || recordData.content || record.value.content,
+      updated_at:
+        recordData.updated_at ||
+        recordData.last_draft_saved_at ||
+        record.value.updated_at,
+    };
   }
 };
 
@@ -170,6 +157,9 @@ onMounted(() => {
   fetchRecord();
 });
 
+// Use the record's type if available, otherwise fall back to route param
+const currentType = computed(() => record.value?.type || type);
+
 const breadcrumbItems = computed(() => [
   {
     label: t('common.home'),
@@ -180,12 +170,12 @@ const breadcrumbItems = computed(() => [
     to: '/records',
   },
   {
-    label: getTypeLabel(type),
-    to: `/records/${type}`,
+    label: getTypeLabel(currentType.value),
+    to: `/records/${currentType.value}`,
   },
   {
     label: record.value?.id || id || t('records.viewRecord'),
-    to: `/records/${type}/${id}`,
+    to: `/records/${currentType.value}/${id}`,
   },
   {
     label: t('common.edit'),
@@ -213,8 +203,10 @@ const breadcrumbItems = computed(() => [
     </template>
 
     <template #body>
-      <div class="space-y-6">
-        <UBreadcrumb :items="breadcrumbItems" />
+      <div class="flex flex-col h-full">
+        <div class="flex-shrink-0 mb-6">
+          <UBreadcrumb :items="breadcrumbItems" />
+        </div>
 
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-12">
@@ -229,141 +221,19 @@ const breadcrumbItems = computed(() => [
           :title="t('records.accessDenied')"
           :description="t('records.noPermissionToEdit')"
           icon="i-lucide-alert-circle"
+          class="mb-6"
         />
 
         <!-- Record Form -->
-        <div v-else-if="record" class="space-y-6">
-          <!-- Record Information Card -->
-          <UCard v-if="recordFormRef">
-            <div class="space-y-4">
-              <!-- Title -->
-              <UFormField
-                :label="t('common.title')"
-                required
-                :error="
-                  recordFormRef.hasSubmitted && recordFormRef.formErrors.title
-                    ? recordFormRef.formErrors.title
-                    : undefined
-                "
-              >
-                <UInput
-                  v-model="recordFormRef.form.title"
-                  :placeholder="t('records.enterTitle')"
-                  :disabled="saving"
-                  class="w-full"
-                />
-              </UFormField>
-
-              <!-- Type and Status -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <UFormField
-                  :label="t('common.type')"
-                  required
-                  :error="
-                    recordFormRef.hasSubmitted && recordFormRef.formErrors.type
-                      ? recordFormRef.formErrors.type
-                      : undefined
-                  "
-                >
-                  <USelectMenu
-                    v-model="recordFormRef.selectedRecordType"
-                    :items="recordFormRef.recordTypeOptionsComputed"
-                    :placeholder="t('records.selectType')"
-                    :disabled="saving"
-                    class="w-full"
-                  />
-                </UFormField>
-
-                <UFormField
-                  :label="t('common.status')"
-                  required
-                  :error="
-                    recordFormRef.hasSubmitted &&
-                    recordFormRef.formErrors.status
-                      ? recordFormRef.formErrors.status
-                      : undefined
-                  "
-                >
-                  <USelectMenu
-                    v-model="recordFormRef.selectedRecordStatus"
-                    :items="recordFormRef.recordStatusOptionsComputed"
-                    :placeholder="t('records.selectStatus')"
-                    :disabled="saving"
-                    class="w-full"
-                  />
-                </UFormField>
-              </div>
-
-              <!-- Description -->
-              <UFormField
-                :label="t('common.description')"
-                :error="
-                  recordFormRef.hasSubmitted &&
-                  recordFormRef.formErrors.description
-                    ? recordFormRef.formErrors.description
-                    : undefined
-                "
-              >
-                <UTextarea
-                  v-model="recordFormRef.form.description"
-                  :placeholder="t('records.enterRecordDescription')"
-                  :disabled="saving"
-                  :rows="3"
-                  class="w-full"
-                />
-              </UFormField>
-
-              <!-- Tags -->
-              <UFormField
-                :label="t('common.tags')"
-                :error="
-                  recordFormRef.hasSubmitted && recordFormRef.formErrors.tags
-                    ? recordFormRef.formErrors.tags
-                    : undefined
-                "
-              >
-                <UInput
-                  v-model="recordFormRef.newTag"
-                  :placeholder="t('records.addTagPlaceholder')"
-                  :disabled="saving"
-                  @keyup.enter="recordFormRef.handleTagEnter"
-                  class="w-full"
-                />
-                <div
-                  v-if="recordFormRef.form.tags.length > 0"
-                  class="flex flex-wrap gap-2 mt-2"
-                >
-                  <UBadge
-                    v-for="tag in recordFormRef.form.tags"
-                    :key="tag"
-                    color="primary"
-                    variant="soft"
-                    size="sm"
-                  >
-                    {{ tag }}
-                    <UButton
-                      icon="i-lucide-x"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      @click="recordFormRef.removeTag(tag)"
-                    />
-                  </UBadge>
-                </div>
-              </UFormField>
-            </div>
-          </UCard>
-
+        <div v-else-if="record" class="flex-1 min-h-0 -mx-6 -mb-6">
           <RecordForm
-            ref="recordFormRef"
             :record="record"
             :is-editing="true"
             :saving="saving"
             :error="error"
             :can-delete="canDeleteRecords"
-            :hide-basic-fields="true"
-            @submit="handleSubmit"
             @delete="handleDelete"
+            @saved="handleRecordSaved"
           />
         </div>
 
@@ -387,9 +257,6 @@ const breadcrumbItems = computed(() => [
             icon="i-lucide-alert-circle"
           />
         </div>
-
-        <!-- Footer -->
-        <SystemFooter v-if="record || error" />
       </div>
     </template>
   </UDashboardPanel>

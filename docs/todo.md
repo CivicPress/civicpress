@@ -13,6 +13,13 @@
 - **Diff API**: Complete diff API implementation with documentation
 - **Backup System**: Full backup and restore functionality implemented
 - **Frontend Migration**: Successfully migrated to Nuxt 4
+- **Record Editor Refinement**: Complete UI overhaul with simplified button
+  system
+  - Single "Save changes" split-button with contextual dropdown
+  - Status dropdown in Details sidebar
+  - Raw YAML preview accordion
+  - Word wrap enabled, flat document design
+  - Complete internationalization (English/French)
 
 ### Immediate Tasks (Next 1-2 weeks)
 

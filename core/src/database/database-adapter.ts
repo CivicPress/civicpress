@@ -212,6 +212,34 @@ export class SQLiteAdapter implements DatabaseAdapter {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
       )`,
+
+      // Record drafts table (temporary until v3 collaboration)
+      `CREATE TABLE IF NOT EXISTS record_drafts (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        status TEXT DEFAULT 'draft',
+        markdown_body TEXT,
+        metadata TEXT,
+        geography TEXT,
+        attached_files TEXT,
+        linked_records TEXT,
+        linked_geography_files TEXT,
+        author TEXT,
+        created_by TEXT,
+        last_draft_saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      // Record locks table (temporary until v3 collaboration)
+      `CREATE TABLE IF NOT EXISTS record_locks (
+        record_id TEXT PRIMARY KEY,
+        locked_by TEXT NOT NULL,
+        locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME,
+        FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+      )`,
     ];
 
     for (const table of tables) {
