@@ -1,0 +1,38 @@
+hooks:
+  record:created:
+    enabled: true
+    workflows:
+      - validate-record
+      - notify-council
+    audit: true
+    description: Triggered when a new record is created
+  record:updated:
+    enabled: true
+    workflows:
+      - validate-record
+      - update-index
+    audit: true
+    description: Triggered when a record is updated
+  record:committed:
+    enabled: true
+    workflows:
+      - validate-record
+    audit: true
+    description: Triggered when a record is committed to Git
+  status:changed:
+    enabled: true
+    workflows:
+      - notify-stakeholders
+    audit: true
+    description: Triggered when a record status changes
+  validation:failed:
+    enabled: true
+    workflows:
+      - notify-author
+    audit: true
+    description: Triggered when record validation fails
+settings:
+  maxConcurrent: 5
+  timeout: 30000
+  retryAttempts: 3
+  defaultMode: async
