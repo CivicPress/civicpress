@@ -13,10 +13,7 @@ const props = withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-  <div
-    v-if="show"
-    class="preview-panel h-full overflow-y-auto bg-white dark:bg-gray-900"
-  >
+  <div v-if="show" class="preview-panel h-full overflow-y-auto">
     <div class="max-w-4xl mx-auto px-6 py-8">
       <RecordPreview :content="content" :wrap="true" />
     </div>

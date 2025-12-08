@@ -168,7 +168,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
         });
 
         logger.info('User drafts listed successfully', {
-          totalRecords: result.records?.length || 0,
+          totalRecords: result.drafts?.length || 0,
           requestId: (req as any).requestId,
           userId: req.user?.id,
           userRole: req.user?.role,
@@ -400,6 +400,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
     body('title').isString().notEmpty(),
     body('type').isString().notEmpty(),
     body('content').optional().isString(),
+    body('status').optional().isString(), // Legal status (stored in YAML + DB)
+    body('workflowState').optional().isString(), // Internal editorial status (DB-only, never in YAML)
     body('role').optional().isString(),
     body('metadata').optional().isObject(),
     body('geography').optional().isObject(),
@@ -480,7 +482,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
           {
             title,
             type,
-            status: req.body.status || 'draft',
+            status: req.body.status || 'draft', // Legal status (stored in YAML + DB)
+            workflowState: req.body.workflowState || 'draft', // Internal editorial status (DB-only, never in YAML)
             markdownBody: content, // Map 'content' to 'markdownBody' for drafts
             metadata,
             geography,
@@ -532,6 +535,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
   );
 
   // PUT /api/records/:id - Update a record (authenticated only)
+  // TODO: Remove this endpoint once all work is complete. All updates should go through /:id/draft
+  // and only be written to .md files on publish. This direct update endpoint writes to .md immediately.
   router.put(
     '/:id',
     authMiddleware(recordsService.getCivicPress()),
@@ -539,7 +544,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
     param('id').isString().notEmpty(),
     body('title').optional().isString(),
     body('content').optional().isString(),
-    body('status').optional().isString(),
+    body('status').optional().isString(), // Legal status (stored in YAML + DB)
+    body('workflowState').optional().isString(), // Internal editorial status (DB-only, never in YAML)
     body('metadata').optional().isObject(),
     body('geography').optional().isObject(),
     body('attachedFiles').optional().isArray(),
@@ -954,7 +960,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
     param('id').isString().notEmpty(),
     body('title').optional().isString(),
     body('markdownBody').optional().isString(),
-    body('status').optional().isString(),
+    body('status').optional().isString(), // Legal status (stored in YAML + DB)
+    body('workflowState').optional().isString(), // Internal editorial status (DB-only, never in YAML)
     body('metadata').optional().isObject(),
     body('geography').optional().isObject(),
     body('attachedFiles').optional().isArray(),
@@ -1006,6 +1013,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
               title: updates.title,
               type: updates.type,
               status: updates.status,
+              workflowState: updates.workflowState, // Internal editorial status (DB-only, never in YAML)
               markdownBody: updates.markdownBody,
               metadata: updates.metadata,
               geography: updates.geography,
@@ -1013,7 +1021,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
               linkedRecords: updates.linkedRecords,
               linkedGeographyFiles: updates.linkedGeographyFiles,
             },
-            user
+            user,
+            id // Use the ID from URL
           );
         }
 

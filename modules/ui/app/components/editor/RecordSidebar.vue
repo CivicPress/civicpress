@@ -17,7 +17,8 @@ interface Props {
   recordId?: string;
   recordType?: string;
   title?: string;
-  status?: string;
+  status?: string; // Legal status (stored in YAML + DB)
+  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   author?: string;
   created_at?: string;
   updated_at?: string;
@@ -59,7 +60,8 @@ const emit = defineEmits<{
   'update:linkedRecords': [records: typeof props.linkedRecords];
   'update:linkedGeographyFiles': [files: typeof props.linkedGeographyFiles];
   'update:recordType': [type: string];
-  'update:status': [status: string];
+  'update:status': [status: string]; // Legal status (stored in YAML + DB)
+  'update:workflowState': [workflowState: string]; // Internal editorial status (DB-only, never in YAML)
   'update:tags': [tags: string[]];
   close: [];
 }>();
@@ -113,13 +115,44 @@ const selectedStatus = computed({
   },
 });
 
+// Workflow state options (hardcoded for now - can be refactored later)
+const workflowStateOptions = computed(() => [
+  { value: 'draft', label: t('records.workflowState.draft') },
+  { value: 'under_review', label: t('records.workflowState.underReview') },
+  {
+    value: 'ready_for_publication',
+    label: t('records.workflowState.readyForPublication'),
+  },
+  { value: 'internal_only', label: t('records.workflowState.internalOnly') },
+]);
+
+// Selected workflow state as object (for USelectMenu)
+const selectedWorkflowState = computed({
+  get: () => {
+    if (!props.workflowState) return undefined;
+    return workflowStateOptions.value.find(
+      (opt: any) => opt.value === props.workflowState
+    );
+  },
+  set: (value: any) => {
+    if (value) {
+      emit(
+        'update:workflowState',
+        typeof value === 'string' ? value : value.value
+      );
+    } else {
+      emit('update:workflowState', '');
+    }
+  },
+});
+
 // Fetch types and statuses on mount
 onMounted(async () => {
   await fetchRecordTypes();
   await fetchRecordStatuses();
 });
 
-const openSections = ref<string[]>(['details']);
+const openSections = ref<string[]>(['details', 'attachments']);
 
 // Date formatting
 const formatDateTime = (dateString: string) => {
@@ -261,27 +294,22 @@ const accordionItems = computed(() => [
     count: props.attachedFiles.length,
   },
   {
-    label:
-      props.linkedRecords.length <= 1
-        ? t('records.linkedRecords.titleSingular')
-        : t('records.linkedRecords.title'),
+    label: t('records.editor.relations'),
     value: 'relations',
     icon: 'i-lucide-link',
-    count: props.linkedRecords.length,
-  },
-  {
-    label:
-      props.linkedGeographyFiles.length <= 1
-        ? t('records.linkedGeographySingular')
-        : t('records.linkedGeography'),
-    value: 'geography',
-    icon: 'i-lucide-map',
-    count: props.linkedGeographyFiles.length,
+    count:
+      props.linkedRecords.length + props.linkedGeographyFiles.length ||
+      undefined,
   },
   {
     label: t('records.editor.activity'),
     value: 'activity',
     icon: 'i-lucide-history',
+  },
+  {
+    label: t('records.editor.technicalDetails'),
+    value: 'technical',
+    icon: 'i-lucide-settings',
   },
   {
     label: t('records.editor.rawYaml'),
@@ -321,18 +349,20 @@ const accordionItems = computed(() => [
         :ui="{
           item: '',
           trigger:
-            'pl-4 pr-4 py-1.5 w-full flex items-center bg-gray-50 dark:bg-gray-800/30 transition-colors',
+            'pl-4 pr-4 py-2 w-full flex items-center bg-gray-50 dark:bg-gray-800/30 transition-colors',
           leadingIcon:
-            'w-3.5 h-3.5 text-gray-500 dark:text-gray-400 ml-0 mr-1 flex-shrink-0',
+            'w-3.5 h-3.5 text-gray-500 dark:text-gray-400 ml-0 mr-2 flex-shrink-0',
           trailingIcon:
             'w-4 h-4 text-gray-400 dark:text-gray-500 ml-auto mr-0 flex-shrink-0',
-          label: 'font-medium text-sm text-gray-900 dark:text-gray-100',
+          label:
+            'font-medium text-xs uppercase tracking-wider text-gray-700 dark:text-gray-300',
         }"
       >
         <template #default="{ item }">
-          <span class="font-medium text-sm text-gray-900 dark:text-gray-100">{{
-            item.label
-          }}</span>
+          <span
+            class="font-medium text-xs uppercase tracking-wider text-gray-700 dark:text-gray-300"
+            >{{ item.label }}</span
+          >
           <UBadge
             v-if="item.count !== undefined && item.count > 0"
             color="primary"
@@ -345,12 +375,12 @@ const accordionItems = computed(() => [
         </template>
 
         <template #content="{ item }">
-          <div class="pl-4 pr-4 pb-4 pt-2">
+          <div class="pl-4 pr-4 pb-4 pt-3">
             <!-- Details Section -->
             <div v-if="item.value === 'details'" class="space-y-4">
               <div>
                 <label
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block"
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
                 >
                   {{ t('common.type') }}
                   <span class="text-red-500">*</span>
@@ -362,38 +392,50 @@ const accordionItems = computed(() => [
                   :disabled="disabled"
                   :placeholder="t('records.selectType')"
                   class="w-full"
+                  size="sm"
                 />
               </div>
               <div>
                 <label
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block"
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
                 >
                   {{ t('common.status') }}
                 </label>
-                <!-- Editable status selector -->
+                <!-- Editable status selector - Legal status (stored in YAML + DB) -->
                 <USelectMenu
                   v-model="selectedStatus"
                   :items="statusOptions"
                   :disabled="disabled"
                   :placeholder="t('records.selectStatus')"
                   class="w-full"
+                  size="sm"
                 />
-              </div>
-              <div>
-                <label
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block"
-                >
-                  {{ t('records.raw.recordId') }}
-                </label>
-                <p
-                  class="text-sm font-mono text-gray-600 dark:text-gray-400 break-all"
-                >
-                  {{ recordId || t('common.noData') }}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {{ t('records.statusHelper') }}
                 </p>
               </div>
               <div>
                 <label
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block"
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
+                >
+                  {{ t('records.workflowState.label') }}
+                </label>
+                <!-- Editable workflow state selector - Internal editorial status (DB-only, never in YAML) -->
+                <USelectMenu
+                  v-model="selectedWorkflowState"
+                  :items="workflowStateOptions"
+                  :disabled="disabled"
+                  :placeholder="t('records.workflowState.select')"
+                  class="w-full"
+                  size="sm"
+                />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {{ t('records.workflowStateHelper') }}
+                </p>
+              </div>
+              <div>
+                <label
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
                 >
                   {{ t('common.tags') }}
                 </label>
@@ -406,35 +448,6 @@ const accordionItems = computed(() => [
                   class="w-full"
                 />
               </div>
-              <div v-if="created_at">
-                <label
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block"
-                >
-                  {{ t('records.metadataFields.created_at') }}
-                </label>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ formatDateTime(created_at) }}
-                </p>
-              </div>
-              <div v-if="updated_at">
-                <label
-                  class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block"
-                >
-                  {{ t('records.metadataFields.updated_at') }}
-                </label>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ formatDateTime(updated_at) }}
-                </p>
-              </div>
-              <!-- Metadata section hidden for regular users -->
-              <!-- <div v-if="Object.keys(metadata).length > 0">
-                <label class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">
-                  {{ t('records.additionalInformation') }}
-                </label>
-                <div class="mt-1 bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                  <pre class="text-xs text-gray-700 dark:text-gray-300 overflow-auto">{{ JSON.stringify(metadata, null, 2) }}</pre>
-                </div>
-              </div> -->
             </div>
 
             <!-- Attachments Section -->
@@ -446,54 +459,78 @@ const accordionItems = computed(() => [
             />
 
             <!-- Relations Section -->
-            <EditorRelations
-              v-else-if="item.value === 'relations'"
-              :linked-records="linkedRecords"
-              :record-id="recordId"
-              :disabled="disabled"
-              @update:linked-records="emit('update:linkedRecords', $event)"
-            />
-
-            <!-- Geography Section -->
-            <div v-else-if="item.value === 'geography'" class="space-y-4">
-              <div class="flex items-center justify-end">
-                <UPopover v-model:open="showGeographySelector">
-                  <UButton
-                    icon="i-lucide-plus"
-                    color="primary"
-                    variant="outline"
-                    size="xs"
-                    :disabled="disabled"
-                  >
-                    {{ t('records.geography.linkGeography') }}
-                  </UButton>
-
-                  <template #content>
-                    <GeographySelector
-                      v-model:selected-ids="selectedGeographyIds"
-                      :multiple="true"
-                      @selection-change="handleGeographySelection"
-                    />
-                  </template>
-                </UPopover>
+            <div v-else-if="item.value === 'relations'" class="space-y-4">
+              <!-- Linked Records -->
+              <div>
+                <label
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block"
+                >
+                  {{
+                    props.linkedRecords.length <= 1
+                      ? t('records.linkedRecords.titleSingular')
+                      : t('records.linkedRecords.title')
+                  }}
+                </label>
+                <EditorRelations
+                  :linked-records="linkedRecords"
+                  :record-id="recordId"
+                  :disabled="disabled"
+                  @update:linked-records="emit('update:linkedRecords', $event)"
+                />
               </div>
 
-              <GeographyLinkForm
-                v-if="linkedGeographyFiles.length > 0"
-                :model-value="linkedGeographyFiles"
-                :disabled="disabled"
-                @update:model-value="
-                  emit('update:linkedGeographyFiles', $event)
-                "
-              />
+              <!-- Linked Geography -->
+              <div>
+                <label
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block"
+                >
+                  {{
+                    props.linkedGeographyFiles.length <= 1
+                      ? t('records.linkedGeographySingular')
+                      : t('records.linkedGeography')
+                  }}
+                </label>
+                <div class="space-y-2">
+                  <div class="flex items-center justify-end">
+                    <UPopover v-model:open="showGeographySelector">
+                      <UButton
+                        icon="i-lucide-plus"
+                        color="primary"
+                        variant="outline"
+                        size="xs"
+                        :disabled="disabled"
+                      >
+                        {{ t('records.geography.linkGeography') }}
+                      </UButton>
 
-              <div
-                v-else
-                class="text-center py-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
-              >
-                <p class="text-xs text-gray-500">
-                  {{ t('records.geography.noLinkedGeographyFiles') }}
-                </p>
+                      <template #content>
+                        <GeographySelector
+                          v-model:selected-ids="selectedGeographyIds"
+                          :multiple="true"
+                          @selection-change="handleGeographySelection"
+                        />
+                      </template>
+                    </UPopover>
+                  </div>
+
+                  <GeographyLinkForm
+                    v-if="linkedGeographyFiles.length > 0"
+                    :model-value="linkedGeographyFiles"
+                    :disabled="disabled"
+                    @update:model-value="
+                      emit('update:linkedGeographyFiles', $event)
+                    "
+                  />
+
+                  <div
+                    v-else
+                    class="text-center py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
+                  >
+                    <p class="text-xs text-gray-500">
+                      {{ t('records.geography.noLinkedGeographyFiles') }}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -502,6 +539,42 @@ const accordionItems = computed(() => [
               v-else-if="item.value === 'activity'"
               :record-id="recordId"
             />
+
+            <!-- Technical Details Section -->
+            <div v-else-if="item.value === 'technical'" class="space-y-4">
+              <div>
+                <label
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
+                >
+                  {{ t('records.raw.recordId') }}
+                </label>
+                <p
+                  class="text-xs font-mono text-gray-500 dark:text-gray-400 break-all bg-gray-50 dark:bg-gray-800 px-2 py-1.5 rounded"
+                >
+                  {{ recordId || t('common.noData') }}
+                </p>
+              </div>
+              <div v-if="created_at">
+                <label
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
+                >
+                  {{ t('records.metadataFields.created_at') }}
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ formatDateTime(created_at) }}
+                </p>
+              </div>
+              <div v-if="updated_at">
+                <label
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
+                >
+                  {{ t('records.metadataFields.updated_at') }}
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ formatDateTime(updated_at) }}
+                </p>
+              </div>
+            </div>
 
             <!-- Raw YAML Section -->
             <div v-else-if="item.value === 'raw-yaml'" class="space-y-2">
@@ -524,14 +597,13 @@ const accordionItems = computed(() => [
                     'text-red-600 dark:text-red-400': yamlError,
                   }"
                 >
-                        {{
+                  {{
                     rawYaml ||
                     (props.recordId
                       ? t('common.noData')
                       : t('records.editor.saveToSeeYaml'))
                   }}
-                      </pre
-                >
+                </pre>
               </div>
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('records.editor.rawYamlDescription') }}

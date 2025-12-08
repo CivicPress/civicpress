@@ -55,7 +55,8 @@ export interface CreateRecordRequest {
   type: string;
   content?: string;
   metadata?: Record<string, any>;
-  status?: string;
+  status?: string; // Legal status (stored in YAML + DB)
+  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   createdAt?: string;
   updatedAt?: string;
   relativePath?: string;
@@ -101,7 +102,8 @@ export interface CreateRecordRequest {
 export interface UpdateRecordRequest {
   title?: string;
   content?: string;
-  status?: string;
+  status?: string; // Legal status (stored in YAML + DB)
+  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   relativePath?: string;
   metadata?: Record<string, any>;
   geography?: Geography;

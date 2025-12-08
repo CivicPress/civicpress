@@ -76,16 +76,22 @@ const dropdownItems = computed(() => {
   const sections: any[][] = [];
   const firstSection: any[] = [];
 
-  // Always show "Save changes" as first item
-  firstSection.push({
-    label: t('records.editor.saveChanges'),
-    icon: 'i-lucide-save',
-    onClick: () => {
-      emit('save-changes');
-    },
-  });
+  // Show "Save and Publish" option in dropdown
+  // Publishing should always be available if user is editing (not dependent on workflow transitions)
+  if (props.isEditing && !isArchived.value) {
+    firstSection.push({
+      label: t('records.editor.saveAndPublish'),
+      icon: 'i-lucide-send',
+      onClick: () => {
+        selectedPublishStatus.value = props.status;
+        showPublishModal.value = true;
+      },
+    });
+  }
 
-  sections.push(firstSection);
+  if (firstSection.length > 0) {
+    sections.push(firstSection);
+  }
 
   // Status transitions section
   const transitionsSection: any[] = [];
@@ -102,23 +108,8 @@ const dropdownItems = computed(() => {
         },
       });
     }
-  } else if (!isArchived.value) {
-    // For draft/non-archived records: Publish option
-    if (
-      props.allowedTransitions.some((s) =>
-        ['published', 'active', 'approved'].includes(s.toLowerCase())
-      )
-    ) {
-      transitionsSection.push({
-        label: t('records.editor.publishNow'),
-        icon: 'i-lucide-send',
-        onClick: () => {
-          selectedPublishStatus.value = props.status;
-          showPublishModal.value = true;
-        },
-      });
-    }
   }
+  // Note: Publish option is now in firstSection, not here
 
   // Archive option (if not already archived and allowed)
   if (!isArchived.value && props.allowedTransitions.includes('archived')) {
@@ -273,9 +264,9 @@ const formatTime = (date: Date) => {
 
 <template>
   <div
-    class="editor-header bg-white dark:bg-gray-900 px-6 border-b border-gray-200 dark:border-gray-800 w-full"
+    class="editor-header bg-white dark:bg-gray-900 px-8 border-b border-gray-200 dark:border-gray-800 w-full"
   >
-    <div class="flex items-center gap-6 h-16 w-full">
+    <div class="flex items-center gap-6 w-full py-4">
       <!-- Left: Title Input (Full width) -->
       <div class="flex-1 min-w-0">
         <UInput
@@ -283,8 +274,7 @@ const formatTime = (date: Date) => {
           @update:model-value="emit('update:title', $event)"
           :disabled="disabled"
           :placeholder="t('records.recordTitle')"
-          size="lg"
-          class="w-full text-xl font-semibold"
+          class="w-full text-2xl font-medium !border-0 border-b border-gray-300 dark:border-gray-700 !rounded-none !px-0 py-3 focus:ring-0 focus:border-primary-500 dark:focus:border-primary-400 !bg-transparent placeholder-gray-400 dark:placeholder-gray-500 !shadow-none"
           :aria-label="t('records.recordTitle')"
         />
       </div>
@@ -311,17 +301,7 @@ const formatTime = (date: Date) => {
           }}</span>
         </div>
 
-        <!-- Status Badge -->
-        <UBadge
-          :color="(statusConfig.color as any) || 'neutral'"
-          variant="soft"
-          size="sm"
-          class="flex-shrink-0"
-        >
-          {{ statusConfig.label || status }}
-        </UBadge>
-
-        <!-- Save Changes Split Button -->
+        <!-- Save Split Button -->
         <div class="flex items-center gap-0">
           <UButton
             color="primary"
@@ -330,7 +310,7 @@ const formatTime = (date: Date) => {
             @click="emit('save-changes')"
             class="rounded-r-none"
           >
-            {{ t('records.editor.saveChanges') }}
+            {{ t('common.save') }}
           </UButton>
 
           <UDropdownMenu

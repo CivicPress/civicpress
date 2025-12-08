@@ -27,7 +27,8 @@ export interface RecordData {
   id: string;
   title: string;
   type: string;
-  status: string;
+  status: string; // Legal status (stored in YAML + DB)
+  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   content?: string;
   metadata?: Record<string, any>;
   geography?: Geography;
@@ -191,7 +192,8 @@ export class RecordManager {
       id: recordId,
       title: request.title,
       type: request.type,
-      status,
+      status, // Legal status (stored in YAML + DB)
+      workflowState, // Internal editorial status (DB-only, never in YAML)
       content: request.content,
       geography: request.geography,
       attachedFiles: request.attachedFiles,
@@ -223,6 +225,7 @@ export class RecordManager {
       title: record.title,
       type: record.type,
       status: record.status,
+      workflow_state: record.workflowState,
       content: record.content,
       metadata: JSON.stringify(record.metadata),
       geography: record.geography
@@ -284,6 +287,7 @@ export class RecordManager {
         ? new Date(request.updatedAt).toISOString()
         : createdAt;
     const status = request.status || 'draft';
+    const workflowState = request.workflowState || 'draft'; // Internal editorial status (DB-only)
     const recordPath = request.relativePath
       ? request.relativePath.replace(/\\/g, '/')
       : buildRecordRelativePath(request.type, recordId, createdAt);
@@ -315,7 +319,8 @@ export class RecordManager {
       id: recordId,
       title: request.title,
       type: request.type,
-      status,
+      status, // Legal status (stored in YAML + DB)
+      workflowState, // Internal editorial status (DB-only, never in YAML)
       content: request.content,
       geography: request.geography,
       attachedFiles: request.attachedFiles,
@@ -345,6 +350,7 @@ export class RecordManager {
       title: record.title,
       type: record.type,
       status: record.status,
+      workflow_state: record.workflowState,
       content: record.content,
       metadata: JSON.stringify(record.metadata),
       geography: record.geography
@@ -414,6 +420,8 @@ export class RecordManager {
           ...parsedRecord,
           // Keep database fields for internal tracking
           path: dbRecord.path,
+          // workflowState is DB-only (never in YAML), so always get it from database
+          workflowState: dbRecord.workflow_state || 'draft', // Internal editorial status (DB-only, never in YAML)
           // Ensure timestamps are set (use parsed if available, otherwise database)
           created_at:
             parsedRecord.created_at ||
@@ -440,7 +448,8 @@ export class RecordManager {
       id: dbRecord.id,
       title: dbRecord.title,
       type: dbRecord.type,
-      status: dbRecord.status || 'draft',
+      status: dbRecord.status || 'draft', // Legal status (stored in YAML + DB)
+      workflowState: dbRecord.workflow_state || 'draft', // Internal editorial status (DB-only, never in YAML)
       content: dbRecord.content || '',
       path: dbRecord.path,
       author: dbRecord.author || 'unknown',
@@ -555,7 +564,9 @@ export class RecordManager {
     // Update basic fields
     if (request.title !== undefined) updatedRecord.title = request.title;
     if (request.content !== undefined) updatedRecord.content = request.content;
-    if (request.status !== undefined) updatedRecord.status = request.status;
+    if (request.status !== undefined) updatedRecord.status = request.status; // Legal status (stored in YAML + DB)
+    if (request.workflowState !== undefined)
+      updatedRecord.workflowState = request.workflowState; // Internal editorial status (DB-only, never in YAML)
     if (request.geography !== undefined)
       updatedRecord.geography = request.geography;
     if (request.attachedFiles !== undefined)
@@ -604,6 +615,8 @@ export class RecordManager {
     if (request.title !== undefined) dbUpdates.title = request.title;
     if (request.content !== undefined) dbUpdates.content = request.content;
     if (request.status !== undefined) dbUpdates.status = request.status;
+    if (request.workflowState !== undefined)
+      dbUpdates.workflow_state = request.workflowState;
     if (request.geography !== undefined)
       dbUpdates.geography = JSON.stringify(request.geography);
     if (request.attachedFiles !== undefined)

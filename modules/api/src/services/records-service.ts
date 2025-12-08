@@ -114,6 +114,8 @@ export class RecordsService {
       title: string;
       type: string;
       content?: string;
+      status?: string; // Legal status (stored in YAML + DB)
+      workflowState?: string; // Internal editorial status (DB-only, never in YAML)
       metadata?: Record<string, any>;
       geography?: any;
       attachedFiles?: Array<{
@@ -176,6 +178,8 @@ export class RecordsService {
       title: data.title,
       type: data.type,
       content: data.content,
+      status: data.status,
+      workflowState: data.workflowState,
       metadata: data.metadata,
       geography: data.geography,
       attachedFiles: data.attachedFiles,
@@ -223,7 +227,8 @@ export class RecordsService {
       id: record.id,
       title: record.title,
       type: record.type,
-      status: record.status,
+      status: record.status, // Legal status (stored in YAML + DB)
+      workflowState: record.workflowState, // Internal editorial status (DB-only)
       content: record.content,
       metadata: record.metadata || {},
       authors: record.authors,
@@ -309,7 +314,8 @@ export class RecordsService {
     data: {
       title?: string;
       content?: string;
-      status?: string;
+      status?: string; // Legal status (stored in YAML + DB)
+      workflowState?: string; // Internal editorial status (DB-only, never in YAML)
       metadata?: Record<string, any>;
       geography?: any;
       attachedFiles?: Array<{
@@ -378,6 +384,7 @@ export class RecordsService {
       title: data.title,
       content: data.content,
       status: data.status,
+      workflowState: data.workflowState,
       metadata: data.metadata,
       geography: data.geography,
       attachedFiles: data.attachedFiles,
@@ -402,7 +409,8 @@ export class RecordsService {
       id: updatedRecord.id,
       title: updatedRecord.title,
       type: updatedRecord.type,
-      status: updatedRecord.status,
+      status: updatedRecord.status, // Legal status (stored in YAML + DB)
+      workflowState: updatedRecord.workflowState, // Internal editorial status (DB-only)
       content: updatedRecord.content,
       metadata: updatedRecord.metadata || {},
       authors: updatedRecord.authors,
@@ -632,7 +640,8 @@ export class RecordsService {
       id: record.id,
       title: record.title,
       type: record.type,
-      status: record.status,
+      status: record.status, // Legal status (stored in YAML + DB)
+      workflowState: record.workflowState, // Internal editorial status (DB-only)
       content: record.content,
       metadata: record.metadata || {},
       path: record.path,
@@ -777,7 +786,8 @@ export class RecordsService {
     data: {
       title: string;
       type: string;
-      status?: string;
+      status?: string; // Legal status (stored in YAML + DB)
+      workflowState?: string; // Internal editorial status (DB-only, never in YAML)
       markdownBody?: string;
       metadata?: Record<string, any>;
       geography?: any;
@@ -807,7 +817,8 @@ export class RecordsService {
         description?: string;
       }>;
     },
-    user: any
+    user: any,
+    recordId?: string // Optional ID - if not provided, will be generated
   ): Promise<any> {
     // Validate permissions
     const hasPermission = await userCan(user, 'records:create', {
@@ -821,8 +832,8 @@ export class RecordsService {
       );
     }
 
-    // Generate record ID
-    const recordId = `record-${Date.now()}`;
+    // Use provided ID or generate one
+    const finalRecordId = recordId || `record-${Date.now()}`;
     const createdAt = new Date().toISOString();
 
     // Extract username safely
@@ -846,10 +857,17 @@ export class RecordsService {
     // Save to draft table
     try {
       await this.db.createDraft({
-        id: recordId,
+        id: finalRecordId,
         title: data.title,
         type: data.type,
         status: data.status || 'draft',
+        // Always use the provided workflowState, default to 'draft' only if not provided
+        workflow_state:
+          data.workflowState !== undefined &&
+          data.workflowState !== null &&
+          data.workflowState !== ''
+            ? data.workflowState
+            : 'draft',
         markdown_body: data.markdownBody || null,
         metadata: data.metadata ? JSON.stringify(data.metadata) : null,
         geography: data.geography ? JSON.stringify(data.geography) : null,
@@ -884,13 +902,44 @@ export class RecordsService {
     }
 
     // Get the created draft
-    const draft = await this.db.getDraft(recordId);
+    const draft = await this.db.getDraft(finalRecordId);
+
+    // workflowState: Prioritize the value we sent if it's non-default, otherwise use DB value
+    // This ensures that when we create a draft with a specific workflowState, it's honored
+    // even if the DB has a default 'draft' value (which can happen if column was added with DEFAULT)
+    const dbWorkflowState =
+      draft.workflow_state !== undefined
+        ? draft.workflow_state
+        : (draft as any).workflowState;
+
+    // Priority: 1) Value we sent (if non-default), 2) DB value, 3) 'draft' default
+    const finalWorkflowState =
+      data.workflowState !== undefined &&
+      data.workflowState !== null &&
+      data.workflowState !== '' &&
+      data.workflowState !== 'draft'
+        ? data.workflowState // If we sent a non-default value, use it (this handles cases where DB has default)
+        : dbWorkflowState !== undefined &&
+            dbWorkflowState !== null &&
+            dbWorkflowState !== ''
+          ? dbWorkflowState // Otherwise use DB value
+          : 'draft'; // Final fallback to default
+
+    // Log for debugging
+    this.logger.debug('Determining workflowState for createDraft response', {
+      id: draft.id,
+      dbWorkflowState,
+      requestedWorkflowState: data.workflowState,
+      finalWorkflowState,
+      hasWorkflowStateInDraft: 'workflow_state' in draft,
+    });
 
     return {
       id: draft.id,
       title: draft.title,
       type: draft.type,
-      status: draft.status,
+      status: draft.status, // Legal status (stored in YAML + DB)
+      workflowState: finalWorkflowState, // Internal editorial status (DB-only)
       markdownBody: draft.markdown_body,
       metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
       geography: draft.geography ? JSON.parse(draft.geography) : undefined,
@@ -919,7 +968,8 @@ export class RecordsService {
     data: {
       title?: string;
       type?: string;
-      status?: string;
+      status?: string; // Legal status (stored in YAML + DB)
+      workflowState?: string; // Internal editorial status (DB-only, never in YAML)
       markdownBody?: string;
       metadata?: Record<string, any>;
       geography?: any;
@@ -986,8 +1036,25 @@ export class RecordsService {
       }
     }
 
+    // Get existing draft to preserve workflowState if not being updated
+    const existingDraft = await this.db.getDraft(id);
+    // Get workflow_state from existing draft - handle both snake_case (DB) and camelCase (API)
+    const existingWorkflowState =
+      existingDraft?.workflow_state || existingDraft?.workflowState;
+
+    // Log for debugging
+    this.logger.info('Reading existing draft for workflowState preservation', {
+      id,
+      existingWorkflowState,
+      hasWorkflowState: 'workflow_state' in (existingDraft || {}),
+      existingDraftKeys: existingDraft ? Object.keys(existingDraft) : [],
+      draftWorkflowState: existingDraft?.workflow_state,
+      draftWorkflowStateType: typeof existingDraft?.workflow_state,
+    });
+
     // Update draft
-    await this.db.updateDraft(id, {
+    // Only include workflow_state if it's explicitly provided (not undefined)
+    const draftUpdates: any = {
       title: data.title,
       type: data.type,
       status: data.status,
@@ -1003,16 +1070,130 @@ export class RecordsService {
       linked_geography_files: data.linkedGeographyFiles
         ? JSON.stringify(data.linkedGeographyFiles)
         : undefined,
-    });
+    };
+
+    // Only update workflow_state if it's explicitly provided (not undefined/null/empty)
+    // Otherwise preserve the existing value
+    if (
+      data.workflowState !== undefined &&
+      data.workflowState !== null &&
+      data.workflowState !== ''
+    ) {
+      draftUpdates.workflow_state = data.workflowState;
+      this.logger.info('Including workflow_state in draft update', {
+        id,
+        workflowState: data.workflowState,
+        draftUpdatesKeys: Object.keys(draftUpdates),
+      });
+    } else if (
+      existingWorkflowState !== undefined &&
+      existingWorkflowState !== null &&
+      existingWorkflowState !== ''
+    ) {
+      // Preserve existing workflowState if not being updated
+      draftUpdates.workflow_state = existingWorkflowState;
+      this.logger.info('Preserving existing workflow_state in draft update', {
+        id,
+        workflowState: existingWorkflowState,
+      });
+    }
+
+    await this.db.updateDraft(id, draftUpdates);
 
     // Get updated draft
     const updatedDraft = await this.db.getDraft(id);
+
+    // Debug: Log workflow_state value to verify it's being saved
+    if (updatedDraft) {
+      this.logger.info('Draft workflow_state after update', {
+        id,
+        workflow_state: updatedDraft.workflow_state,
+        workflow_state_type: typeof updatedDraft.workflow_state,
+        has_workflow_state: 'workflow_state' in updatedDraft,
+        allKeys: Object.keys(updatedDraft),
+      });
+    }
+
+    // Determine workflowState value with priority:
+    // 1. Explicitly provided value (highest priority)
+    // 2. Preserved value from existing draft
+    // 3. Value from updated draft (DB)
+    // 4. Default 'draft' (lowest priority)
+    let workflowStateValue = 'draft'; // Default
+
+    // Priority 1: If workflowState was explicitly provided in the update, use it
+    if (
+      data.workflowState !== undefined &&
+      data.workflowState !== null &&
+      data.workflowState !== ''
+    ) {
+      workflowStateValue = data.workflowState;
+      this.logger.debug('Using explicit workflowState from update', {
+        id,
+        workflowStateValue,
+      });
+    }
+    // Priority 2: Use the value we read from existing draft (preserved during update)
+    else if (
+      existingWorkflowState !== undefined &&
+      existingWorkflowState !== null &&
+      existingWorkflowState !== ''
+    ) {
+      workflowStateValue = existingWorkflowState;
+      this.logger.debug('Using preserved workflowState from existing draft', {
+        id,
+        workflowStateValue,
+      });
+    }
+    // Priority 3: Fallback to DB value if available
+    else if (
+      updatedDraft &&
+      'workflow_state' in updatedDraft &&
+      updatedDraft.workflow_state !== null &&
+      updatedDraft.workflow_state !== undefined &&
+      updatedDraft.workflow_state !== ''
+    ) {
+      workflowStateValue = updatedDraft.workflow_state;
+      this.logger.debug('Using workflowState from updated draft (DB)', {
+        id,
+        workflowStateValue,
+      });
+    }
+    // Priority 4: Use default and log warning
+    else {
+      if (!updatedDraft || !('workflow_state' in updatedDraft)) {
+        this.logger.warn(
+          'workflow_state column does not exist in database - migration may not have run',
+          {
+            id,
+            availableColumns: updatedDraft ? Object.keys(updatedDraft) : [],
+            existingWorkflowState,
+            hasExistingValue:
+              existingWorkflowState !== undefined &&
+              existingWorkflowState !== null,
+          }
+        );
+      } else {
+        this.logger.debug('Using default workflowState', {
+          id,
+          workflowStateValue,
+        });
+      }
+    }
+
+    this.logger.info('Returning workflowState from updateDraft', {
+      id,
+      workflowStateValue,
+      dbValue: updatedDraft.workflow_state,
+      hasColumn: 'workflow_state' in updatedDraft,
+    });
 
     return {
       id: updatedDraft.id,
       title: updatedDraft.title,
       type: updatedDraft.type,
-      status: updatedDraft.status,
+      status: updatedDraft.status, // Legal status (stored in YAML + DB)
+      workflowState: workflowStateValue, // Internal editorial status (DB-only)
       markdownBody: updatedDraft.markdown_body,
       metadata: updatedDraft.metadata ? JSON.parse(updatedDraft.metadata) : {},
       geography: updatedDraft.geography
@@ -1045,15 +1226,19 @@ export class RecordsService {
       limit?: number;
       offset?: number;
     } = {}
-  ): Promise<{ records: any[]; total: number }> {
+  ): Promise<{ drafts: any[]; total: number }> {
     const result = await this.db.listDrafts(options);
 
     // Transform drafts to match record format
-    const records = result.drafts.map((draft) => ({
+    const drafts = result.drafts.map((draft) => ({
       id: draft.id,
       title: draft.title,
       type: draft.type,
-      status: draft.status,
+      status: draft.status, // Legal status (stored in YAML + DB)
+      workflowState:
+        draft.workflow_state !== undefined && draft.workflow_state !== null
+          ? draft.workflow_state
+          : 'draft', // Internal editorial status (DB-only)
       markdownBody: draft.markdown_body,
       content: draft.markdown_body, // Alias for compatibility
       metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
@@ -1076,7 +1261,7 @@ export class RecordsService {
     }));
 
     return {
-      records,
+      drafts,
       total: result.total,
     };
   }
@@ -1104,7 +1289,8 @@ export class RecordsService {
       id: recordData.id,
       title: recordData.title,
       type: recordData.type,
-      status: recordData.status,
+      status: recordData.status, // Legal status (stored in YAML + DB)
+      workflowState: recordData.workflowState, // Internal editorial status (DB-only, never in YAML)
       content: recordData.markdownBody || recordData.content || '',
       metadata: recordData.metadata || {},
       geography: recordData.geography,
@@ -1153,11 +1339,71 @@ export class RecordsService {
       // Check drafts first
       const draft = await this.db.getDraft(id);
       if (draft) {
+        // Handle both snake_case (from DB) and camelCase (from API)
+        const dbWorkflowState =
+          draft.workflow_state !== undefined
+            ? draft.workflow_state
+            : (draft as any).workflowState;
+
+        // If workflow_state is missing from draft, ensure column exists and try to read again
+        if (dbWorkflowState === undefined && !('workflow_state' in draft)) {
+          this.logger.warn(
+            'workflow_state missing from draft, attempting column migration',
+            { id: draft.id }
+          );
+          try {
+            // Ensure column exists
+            // Access adapter through database service
+            const dbService = this.civicPress.getDatabaseService();
+            const adapter = (dbService as any).adapter;
+            if (adapter) {
+              const tableInfo = await adapter.query(
+                'PRAGMA table_info(record_drafts)'
+              );
+              const hasColumn = tableInfo.some(
+                (col: any) => col.name === 'workflow_state'
+              );
+              if (!hasColumn) {
+                await adapter.execute(
+                  "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+                );
+                this.logger.info(
+                  'Added workflow_state column to record_drafts in getDraftOrRecord',
+                  { id: draft.id }
+                );
+              }
+            }
+            // Re-fetch draft with the new column
+            const refreshedDraft = await this.db.getDraft(draft.id);
+            if (refreshedDraft && 'workflow_state' in refreshedDraft) {
+              const refreshedValue = refreshedDraft.workflow_state || 'draft';
+              return {
+                ...draft,
+                workflowState: refreshedValue,
+                isDraft: true,
+              };
+            }
+          } catch (error) {
+            this.logger.error(
+              'Failed to add workflow_state column in getDraftOrRecord',
+              { id: draft.id, error }
+            );
+          }
+        }
+
         return {
           id: draft.id,
           title: draft.title,
           type: draft.type,
-          status: draft.status,
+          status: draft.status, // Legal status (stored in YAML + DB)
+          // workflowState: use the value from DB
+          // Note: If DB has default 'draft' but a different value was intended, it should have been fixed by createDraft verification
+          workflowState:
+            dbWorkflowState !== undefined &&
+            dbWorkflowState !== null &&
+            dbWorkflowState !== ''
+              ? dbWorkflowState
+              : 'draft', // Internal editorial status (DB-only)
           markdownBody: draft.markdown_body,
           metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
           geography: draft.geography ? JSON.parse(draft.geography) : undefined,
@@ -1185,6 +1431,7 @@ export class RecordsService {
     if (record) {
       return {
         ...record,
+        workflowState: record.workflowState || 'draft', // Internal editorial status (DB-only) - default to 'draft' if null
         isDraft: false,
       };
     }
@@ -1237,7 +1484,8 @@ export class RecordsService {
       linkedGeographyFiles: draft.linked_geography_files
         ? JSON.parse(draft.linked_geography_files)
         : undefined,
-      status: finalStatus,
+      status: finalStatus, // Legal status (stored in YAML + DB)
+      workflowState: draft.workflow_state || 'draft', // Internal editorial status (DB-only, never in YAML) - preserve from draft
       createdAt: draft.created_at,
       updatedAt: draft.updated_at,
     };
@@ -1256,7 +1504,8 @@ export class RecordsService {
       id: record.id,
       title: record.title,
       type: record.type,
-      status: record.status,
+      status: record.status, // Legal status (stored in YAML + DB)
+      workflowState: record.workflowState, // Internal editorial status (DB-only)
       content: record.content,
       metadata: record.metadata || {},
       authors: record.authors,

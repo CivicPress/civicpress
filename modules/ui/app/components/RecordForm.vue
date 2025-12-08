@@ -13,7 +13,8 @@ interface RecordFormData {
   title: string;
   type: string;
   markdownBody: string;
-  status: string;
+  status: string; // Legal status (stored in YAML + DB)
+  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   tags: string[];
   description: string;
   geography?: any;
@@ -85,7 +86,8 @@ const form = reactive({
   title: '',
   type: '',
   markdownBody: '',
-  status: 'draft',
+  status: 'draft', // Legal status (stored in YAML + DB)
+  workflowState: 'draft', // Internal editorial status (DB-only, never in YAML)
   tags: [] as string[],
   description: '',
   geography: undefined as any,
@@ -230,7 +232,12 @@ onMounted(async () => {
         form.id = data.id;
         form.title = data.title;
         form.type = data.type;
-        form.status = data.status;
+        form.status = data.status; // Legal status (stored in YAML + DB)
+        // Initialize workflowState from API, default to 'draft' only if not provided
+        form.workflowState =
+          data.workflowState !== undefined && data.workflowState !== null
+            ? data.workflowState
+            : 'draft'; // Internal editorial status (DB-only, never in YAML)
         form.markdownBody = data.markdownBody || data.content || '';
         form.description = data.metadata?.description || '';
         form.tags = data.metadata?.tags || [];
@@ -260,7 +267,13 @@ onMounted(async () => {
         form.id = props.record.id;
         form.title = props.record.title;
         form.type = props.record.type;
-        form.status = props.record.status;
+        form.status = props.record.status; // Legal status (stored in YAML + DB)
+        // Initialize workflowState from props, default to 'draft' only if not provided
+        form.workflowState =
+          (props.record as any).workflowState !== undefined &&
+          (props.record as any).workflowState !== null
+            ? (props.record as any).workflowState
+            : 'draft'; // Internal editorial status (DB-only, never in YAML)
         form.markdownBody = props.record.content || '';
         form.description = (props.record.metadata as any)?.description || '';
         form.tags = props.record.metadata?.tags || [];
@@ -320,7 +333,8 @@ const autosave = useAutosave(form, {
         body: {
           title: data.title,
           type: data.type,
-          status: data.status,
+          status: data.status, // Legal status (stored in YAML + DB)
+          workflowState: data.workflowState, // Internal editorial status (DB-only, never in YAML)
           markdownBody: data.markdownBody,
           metadata: {
             ...data.metadata,
@@ -377,7 +391,8 @@ const handleSaveDraft = async () => {
         body: {
           title: form.title,
           type: form.type,
-          status: form.status,
+          status: form.status, // Legal status (stored in YAML + DB)
+          workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
           markdownBody: form.markdownBody,
           metadata: {
             ...form.metadata,
@@ -397,7 +412,8 @@ const handleSaveDraft = async () => {
         body: {
           title: form.title,
           type: form.type,
-          status: form.status,
+          status: form.status, // Legal status (stored in YAML + DB)
+          workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
           content: form.markdownBody,
           metadata: {
             ...form.metadata,
@@ -430,14 +446,32 @@ const handleSaveDraft = async () => {
     // This ensures the UI stays in sync with the saved data
     if (props.isEditing && form.id) {
       try {
+        // Temporarily stop autosave to prevent triggering on refresh updates
+        autosave.stop();
+
         const refreshResponse = (await $civicApi(
           `/api/v1/records/${form.id}`
         )) as any;
         if (refreshResponse?.success && refreshResponse?.data) {
           const data = refreshResponse.data;
+          // Store current workflowState before updating (to preserve if API doesn't return it)
+          const currentWorkflowState = form.workflowState;
+
           // Update form with the latest data from the server
           form.type = data.type;
-          form.status = data.status;
+          form.status = data.status; // Legal status (stored in YAML + DB)
+          // Preserve workflowState if API returns a valid value, otherwise keep current form value
+          // This prevents resetting to 'draft' if the API returns null/undefined
+          if (
+            data.workflowState !== undefined &&
+            data.workflowState !== null &&
+            data.workflowState !== ''
+          ) {
+            form.workflowState = data.workflowState; // Internal editorial status (DB-only, never in YAML)
+          } else {
+            // If API doesn't return workflowState, keep the current form.workflowState value (don't reset)
+            form.workflowState = currentWorkflowState;
+          }
           form.title = data.title;
           // Update metadata for YAML display
           recordAuthor.value =
@@ -450,9 +484,18 @@ const handleSaveDraft = async () => {
           // Emit saved event with updated record data for parent components (e.g., to update breadcrumbs)
           emit('saved', data);
         }
+
+        // Restart autosave after refresh is complete
+        if (props.isEditing && form.id) {
+          autosave.start();
+        }
       } catch (err) {
         console.error('Failed to refresh record after save:', err);
         // Non-critical error, don't show to user
+        // Restart autosave even on error
+        if (props.isEditing && form.id) {
+          autosave.start();
+        }
       }
     }
 
@@ -841,7 +884,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="record-form h-full flex flex-col bg-gray-50 dark:bg-gray-950">
+  <div class="record-form h-full flex flex-col bg-white dark:bg-gray-900">
     <!-- Header - Sticky -->
     <div
       class="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800"
@@ -881,7 +924,7 @@ defineExpose({
     />
 
     <!-- Main Content Area - Responsive Grid Layout -->
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden bg-white dark:bg-gray-900">
       <!-- Editor + Preview Section (Left + Middle) -->
       <div
         ref="editorContainerRef"
@@ -890,7 +933,7 @@ defineExpose({
       >
         <!-- Editor Section -->
         <div
-          class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+          class="flex-1 flex flex-col overflow-hidden"
           :class="{
             'lg:w-1/2 border-r border-gray-200 dark:border-gray-800':
               showPreview && !isMobile,
@@ -902,7 +945,7 @@ defineExpose({
         >
           <!-- Mobile View Toggle -->
           <div
-            class="lg:hidden flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
+            class="lg:hidden flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-800"
           >
             <div class="flex gap-2">
               <UButton
@@ -973,7 +1016,7 @@ defineExpose({
         <!-- Preview Section -->
         <div
           v-if="showPreview || isMobile"
-          class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-900"
+          class="flex-1 flex flex-col overflow-hidden"
           :class="{
             'lg:w-1/2': !isMobile,
             'absolute inset-0 z-20': isMobile && showPreview,
@@ -984,7 +1027,7 @@ defineExpose({
         >
           <!-- Mobile Preview Header -->
           <div
-            class="lg:hidden flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900"
+            class="lg:hidden flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-800"
           >
             <span class="text-sm font-medium">Preview</span>
             <UButton
@@ -1018,6 +1061,7 @@ defineExpose({
           :record-type="form.type"
           :title="form.title"
           :status="form.status"
+          :workflow-state="form.workflowState"
           :author="recordAuthor || authStore.user?.username || ''"
           :created_at="recordCreatedAt"
           :updated_at="recordUpdatedAt"
@@ -1033,6 +1077,7 @@ defineExpose({
           @update:linked-geography-files="form.linkedGeographyFiles = $event"
           @update:record-type="form.type = $event"
           @update:status="form.status = $event"
+          @update:workflow-state="form.workflowState = $event"
           @update:tags="form.tags = $event"
           @close="showSidebar = false"
         />

@@ -161,6 +161,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         title TEXT NOT NULL,
         type TEXT NOT NULL,
         status TEXT DEFAULT 'draft',
+        workflow_state TEXT DEFAULT 'draft',
         content TEXT,
         metadata TEXT,
         geography TEXT,
@@ -219,6 +220,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         title TEXT NOT NULL,
         type TEXT NOT NULL,
         status TEXT DEFAULT 'draft',
+        workflow_state TEXT DEFAULT 'draft',
         markdown_body TEXT,
         metadata TEXT,
         geography TEXT,
@@ -300,6 +302,163 @@ export class SQLiteAdapter implements DatabaseAdapter {
       // Column already exists, ignore error
       coreDebug(
         'Linked geography files column already exists or migration not needed',
+        { operation: 'database:initialize' }
+      );
+    }
+
+    // Add workflow_state column to existing records table if it doesn't exist
+    try {
+      // Always check if table exists first (it should exist after CREATE TABLE above)
+      const tableExists = await this.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='records'"
+      );
+
+      if (tableExists.length > 0) {
+        // Table exists, check if column exists
+        const tableInfo = await this.query('PRAGMA table_info(records)');
+        const columnNames = tableInfo.map((col: any) => col.name);
+        const hasWorkflowState = columnNames.includes('workflow_state');
+
+        coreDebug('Checking workflow_state column in records', {
+          operation: 'database:initialize',
+          tableExists: true,
+          columnNames,
+          hasWorkflowState,
+        });
+
+        if (!hasWorkflowState) {
+          coreInfo(
+            'Adding workflow_state column to records table via migration',
+            { operation: 'database:initialize' }
+          );
+          await this.execute(
+            "ALTER TABLE records ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+
+          // Verify it was added
+          const verifyInfo = await this.query('PRAGMA table_info(records)');
+          const verifyColumns = verifyInfo.map((col: any) => col.name);
+          const verifyHasWorkflowState =
+            verifyColumns.includes('workflow_state');
+
+          if (verifyHasWorkflowState) {
+            coreInfo(
+              'Successfully added workflow_state column to records table',
+              { operation: 'database:initialize' }
+            );
+          } else {
+            coreError(
+              'Failed to verify workflow_state column was added to records',
+              'MIGRATION_VERIFICATION_FAILED',
+              {
+                columns: verifyColumns,
+                operation: 'database:initialize',
+              },
+              { operation: 'database:initialize' }
+            );
+          }
+        } else {
+          coreDebug('workflow_state column already exists in records table', {
+            operation: 'database:initialize',
+          });
+        }
+      } else {
+        // Table doesn't exist yet - it will be created with the column via CREATE TABLE above
+        coreDebug(
+          'records table does not exist yet, will be created with workflow_state column',
+          { operation: 'database:initialize' }
+        );
+      }
+    } catch (error: any) {
+      // Log the actual error for debugging, but don't fail initialization
+      coreError(
+        'Workflow state column migration check failed',
+        'MIGRATION_ERROR',
+        {
+          error: error?.message || String(error),
+          stack: error?.stack,
+          operation: 'database:initialize',
+        },
+        { operation: 'database:initialize' }
+      );
+    }
+
+    // Add workflow_state column to existing record_drafts table if it doesn't exist
+    try {
+      // Always check if table exists first (it should exist after CREATE TABLE above)
+      const tableExists = await this.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='record_drafts'"
+      );
+
+      if (tableExists.length > 0) {
+        // Table exists, check if column exists
+        const tableInfo = await this.query('PRAGMA table_info(record_drafts)');
+        const columnNames = tableInfo.map((col: any) => col.name);
+        const hasWorkflowState = columnNames.includes('workflow_state');
+
+        coreDebug('Checking workflow_state column in record_drafts', {
+          operation: 'database:initialize',
+          tableExists: true,
+          columnNames,
+          hasWorkflowState,
+        });
+
+        if (!hasWorkflowState) {
+          coreInfo(
+            'Adding workflow_state column to record_drafts table via migration',
+            { operation: 'database:initialize' }
+          );
+          await this.execute(
+            "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+
+          // Verify it was added
+          const verifyInfo = await this.query(
+            'PRAGMA table_info(record_drafts)'
+          );
+          const verifyColumns = verifyInfo.map((col: any) => col.name);
+          const verifyHasWorkflowState =
+            verifyColumns.includes('workflow_state');
+
+          if (verifyHasWorkflowState) {
+            coreInfo(
+              'Successfully added workflow_state column to record_drafts table',
+              { operation: 'database:initialize' }
+            );
+          } else {
+            coreError(
+              'Failed to verify workflow_state column was added to record_drafts',
+              'MIGRATION_VERIFICATION_FAILED',
+              {
+                columns: verifyColumns,
+                operation: 'database:initialize',
+              },
+              { operation: 'database:initialize' }
+            );
+          }
+        } else {
+          coreDebug(
+            'workflow_state column already exists in record_drafts table',
+            { operation: 'database:initialize' }
+          );
+        }
+      } else {
+        // Table doesn't exist yet - it will be created with the column via CREATE TABLE above
+        coreDebug(
+          'record_drafts table does not exist yet, will be created with workflow_state column',
+          { operation: 'database:initialize' }
+        );
+      }
+    } catch (error: any) {
+      // Log the actual error for debugging, but don't fail initialization
+      coreError(
+        'Workflow state column migration check failed',
+        'MIGRATION_ERROR',
+        {
+          error: error?.message || String(error),
+          stack: error?.stack,
+          operation: 'database:initialize',
+        },
         { operation: 'database:initialize' }
       );
     }
