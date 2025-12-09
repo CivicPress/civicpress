@@ -113,6 +113,10 @@ const createEditorState = (content: string) => {
         },
         '.cm-content': {
           padding: '0.5rem 0',
+          fontSize: '0.875rem', // Match prose-sm (14px) to align with preview
+        },
+        '.cm-line': {
+          fontSize: '0.875rem', // Ensure all lines use the same font size
         },
         '.cm-scroller': {
           overflow: 'auto',

@@ -35,21 +35,10 @@ const html = computed(() =>
   </div>
 </template>
 
-<style scoped>
-:deep(.markdown-empty-line) {
-  display: block;
-  height: 0.75rem;
-  margin: 0;
-  content: '';
-}
-
-:deep(.markdown-content p) {
-  margin: 0;
-  line-height: 1.4rem;
-}
-
-:deep(.markdown-content h2:first-of-type) {
-  margin-top: 0;
-  padding-top: 0;
+<style>
+.prose h2:first-of-type {
+  line-height: 1.25em !important;
+  margin-top: 0.22em !important;
+  margin-bottom: 0.5em !important;
 }
 </style>

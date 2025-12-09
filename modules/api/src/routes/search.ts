@@ -48,14 +48,16 @@ searchRouter.get(
         return handleValidationError(operation, errors.array(), req, res);
       }
 
-      const { q: query, type, status, limit, cursor } = req.query;
+      const { q: query, type, limit, cursor } = req.query;
+
+      // Query only records table - all records there are published (by table location)
+      // No status filtering needed - table location determines if record is published
 
       logger.info(
         `Searching records (${isAuthenticated ? 'authenticated' : 'public'})`,
         {
           query,
           type,
-          status,
           limit,
           cursor: cursor ? '***' : undefined, // Don't log the actual cursor
           requestId: (req as any).requestId,
@@ -73,12 +75,16 @@ searchRouter.get(
       const recordsService = new (
         await import('../services/records-service.js')
       ).RecordsService(civicPress);
-      const result = await recordsService.searchRecords(query as string, {
-        type: type as string,
-        status: status as string,
-        limit: limit ? parseInt(limit as string) : 20,
-        cursor: cursor as string,
-      });
+      const result = await recordsService.searchRecords(
+        query as string,
+        {
+          type: type as string,
+          // No status filter - table location (records table) determines published state
+          limit: limit ? parseInt(limit as string) : 20,
+          cursor: cursor as string,
+        },
+        (req as any).user
+      );
 
       logger.info(
         `Search completed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,

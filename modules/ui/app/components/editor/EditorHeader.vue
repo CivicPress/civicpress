@@ -264,7 +264,7 @@ const formatTime = (date: Date) => {
 
 <template>
   <div
-    class="editor-header bg-white dark:bg-gray-900 px-8 border-b border-gray-200 dark:border-gray-800 w-full"
+    class="editor-header bg-white dark:bg-gray-900 px-6 border-b border-gray-200 dark:border-gray-800 w-full"
   >
     <div class="flex items-center gap-6 w-full py-4">
       <!-- Left: Title Input (Full width) -->

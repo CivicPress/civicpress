@@ -85,15 +85,15 @@ describe('Draft → Publish Workflow Integration', () => {
     expect([200, 201]).toContain(publishResponse.status);
     expect(publishResponse.body.success).toBe(true);
 
-    // Step 5: Verify published record (workflowState should be preserved in DB)
+    // Step 5: Verify published record (workflowState should be cleared)
     const getResponse = await request(context.api.getApp())
       .get(`/api/v1/records/${recordId}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(getResponse.status).toBe(200);
     expect(getResponse.body.data.status).toBe('published');
-    // workflowState should be preserved from draft
-    expect(getResponse.body.data.workflowState).toBe('ready_for_publication');
+    // workflowState should be cleared when publishing (published records don't need editorial state)
+    expect(getResponse.body.data.workflowState).toBeNull();
   });
 
   it('should handle status and workflowState independently', async () => {

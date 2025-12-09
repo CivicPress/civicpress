@@ -27,16 +27,25 @@ const drafts = ref<any[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
-// Fetch drafts
+// Fetch all drafts from record_drafts table
 const fetchDrafts = async () => {
   loading.value = true;
   error.value = null;
 
   try {
+    // Fetch only from drafts endpoint - all drafts, unpublished changes, and internal docs are in record_drafts table
     const response = (await $civicApi('/api/v1/records/drafts')) as any;
 
-    if (response?.success && response?.data) {
-      drafts.value = response.data.records || [];
+    if (response?.success && response?.data?.drafts) {
+      // All drafts are in record_drafts table - no need to combine multiple sources
+      drafts.value = response.data.drafts;
+
+      // Sort by updated_at descending
+      drafts.value.sort((a, b) => {
+        const dateA = new Date(a.updated_at || a.last_draft_saved_at || 0);
+        const dateB = new Date(b.updated_at || b.last_draft_saved_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
     } else {
       throw new Error('Failed to load drafts');
     }
@@ -95,7 +104,7 @@ const breadcrumbItems = computed(() => [
     to: '/records',
   },
   {
-    label: 'Drafts',
+    label: t('records.drafts.title', 'Drafts'),
   },
 ]);
 </script>
@@ -105,10 +114,17 @@ const breadcrumbItems = computed(() => [
     <template #header>
       <UDashboardNavbar>
         <template #title>
-          <h1 class="text-2xl font-semibold">My Drafts</h1>
+          <h1 class="text-2xl font-semibold">
+            {{ t('records.drafts.title', 'Drafts') }}
+          </h1>
         </template>
         <template #description>
-          View and manage your saved draft records
+          {{
+            t(
+              'records.drafts.description',
+              'View all drafts and unpublished changes'
+            )
+          }}
         </template>
         <template #right>
           <HeaderActions
@@ -140,7 +156,7 @@ const breadcrumbItems = computed(() => [
               class="w-8 h-8 animate-spin text-gray-500 mx-auto mb-4"
             />
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Loading drafts...
+              {{ t('records.drafts.loading', 'Loading drafts...') }}
             </p>
           </div>
         </div>
@@ -159,7 +175,7 @@ const breadcrumbItems = computed(() => [
           <div
             v-for="draft in drafts"
             :key="draft.id"
-            class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md transition-all cursor-pointer"
+            class="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 hover:shadow-md transition-all cursor-pointer"
             @click="editDraft(draft)"
           >
             <div class="flex items-start justify-between gap-4">
@@ -169,10 +185,19 @@ const breadcrumbItems = computed(() => [
                   <h3
                     class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate"
                   >
-                    {{ draft.title || 'Untitled Draft' }}
+                    {{
+                      draft.title ||
+                      t('records.drafts.untitled', 'Untitled Draft')
+                    }}
                   </h3>
-                  <UBadge color="neutral" variant="soft" size="sm">
-                    Draft
+                  <!-- Optional: Show badge for internal documents -->
+                  <UBadge
+                    v-if="draft.workflowState === 'internal_only'"
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                  >
+                    {{ t('records.drafts.badge.internal', 'Internal') }}
                   </UBadge>
                 </div>
 
@@ -184,12 +209,61 @@ const breadcrumbItems = computed(() => [
                     <span>{{ getTypeLabel(draft.type) }}</span>
                   </div>
                   <span>•</span>
-                  <span v-if="draft.last_draft_saved_at">
-                    Last saved
-                    {{ formatRelativeTime(draft.last_draft_saved_at) }}
-                  </span>
-                  <span v-else-if="draft.updated_at">
-                    Updated {{ formatRelativeTime(draft.updated_at) }}
+                  <span v-if="draft.last_draft_saved_at || draft.updated_at">
+                    {{
+                      (() => {
+                        const dateStr =
+                          draft.last_draft_saved_at || draft.updated_at;
+                        const label = draft.last_draft_saved_at
+                          ? 'Last saved'
+                          : 'Updated';
+
+                        // Normalize date string (convert SQLite format to ISO with UTC indicator)
+                        const normalizedDateStr = (() => {
+                          if (!dateStr) return '';
+                          // If already has timezone indicator, ensure it's in ISO format
+                          if (
+                            dateStr.includes('Z') ||
+                            dateStr.includes('+') ||
+                            dateStr.includes('T')
+                          ) {
+                            return dateStr
+                              .replace(' ', 'T')
+                              .replace(/(\d{2}:\d{2}:\d{2})(?!Z|[+-])/, '$1Z');
+                          }
+                          // Convert SQLite format "YYYY-MM-DD HH:MM:SS" to ISO "YYYY-MM-DDTHH:MM:SSZ"
+                          return dateStr.replace(' ', 'T') + 'Z';
+                        })();
+
+                        const dateObj = new Date(normalizedDateStr);
+
+                        // Validate date
+                        if (isNaN(dateObj.getTime())) {
+                          return '';
+                        }
+
+                        // Calculate time difference
+                        const diffInSeconds = Math.floor(
+                          (Date.now() - dateObj.getTime()) / 1000
+                        );
+
+                        // Format time (e.g., "2:30 PM")
+                        const timeStr = dateObj.toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true,
+                        });
+
+                        // If date is in the future (likely a timezone/parsing issue), show formatted date with time
+                        if (diffInSeconds < 0) {
+                          return `${label} ${formatDate(dateStr, { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+                        }
+
+                        // For recent dates, show relative time with actual time
+                        const relativeTime = formatRelativeTime(dateStr);
+                        return `${label} ${relativeTime} at ${timeStr}`;
+                      })()
+                    }}
                   </span>
                 </div>
 
@@ -223,7 +297,7 @@ const breadcrumbItems = computed(() => [
                 >
                   Edit
                 </UButton>
-                <UDropdown
+                <UDropdownMenu
                   :items="[
                     [
                       {
@@ -233,6 +307,7 @@ const breadcrumbItems = computed(() => [
                       },
                     ],
                   ]"
+                  :content="{ align: 'end', collisionPadding: 8 }"
                 >
                   <UButton
                     icon="i-lucide-more-vertical"
@@ -241,7 +316,7 @@ const breadcrumbItems = computed(() => [
                     @click.stop
                     aria-label="More options"
                   />
-                </UDropdown>
+                </UDropdownMenu>
               </div>
             </div>
           </div>
@@ -257,11 +332,15 @@ const breadcrumbItems = computed(() => [
             <h3
               class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2"
             >
-              No drafts yet
+              {{ t('records.drafts.empty.title', 'No drafts yet') }}
             </h3>
             <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              When you save a record as a draft, it will appear here. You can
-              continue editing drafts before publishing them.
+              {{
+                t(
+                  'records.drafts.empty.description',
+                  'When you save a record as a draft or it has an unpublished workflow state, it will appear here. You can continue editing drafts before publishing them.'
+                )
+              }}
             </p>
             <UButton
               v-if="

@@ -14,7 +14,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 <template>
   <div v-if="show" class="preview-panel h-full overflow-y-auto">
-    <div class="max-w-4xl mx-auto px-6 py-8">
+    <div class="max-w-4xl mx-auto px-6 pt-0 pb-6">
       <RecordPreview :content="content" :wrap="true" />
     </div>
   </div>
@@ -29,7 +29,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 /* Custom scrollbar for preview */
 .preview-panel::-webkit-scrollbar {
-  width: 8px;
+  width: 4px;
 }
 
 .preview-panel::-webkit-scrollbar-track {

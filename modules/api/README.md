@@ -126,7 +126,7 @@ pnpm run build
 pnpm start
 ```
 
-### Environment Variables
+### Development Environment Variables
 
 - `CIVIC_DATA_DIR` - Path to CivicPress data directory (defaults to
   `../../data`)
@@ -149,9 +149,11 @@ Currently using API key authentication (placeholder). Set `X-API-Key` header:
 curl -H "X-API-Key: your-api-key" http://localhost:3000/api/v1/records
 ```
 
-### Endpoints
+<!-- markdownlint-disable MD024 -->
 
-#### Health Check
+### API Endpoints
+
+#### System Health Check
 
 ```http
 GET /health
@@ -171,7 +173,7 @@ GET /health
 
 #### Records API
 
-##### List Records
+##### List All Records
 
 ```http
 GET /api/v1/records
@@ -194,32 +196,45 @@ curl "http://localhost:3000/api/v1/records?type=bylaw&status=active&limit=5"
 
 ```json
 {
-  "records": [
-    {
-      "id": "article-001---animal-control",
-      "title": "Article 001 - Animal Control",
-      "type": "bylaw",
-      "status": "active",
-      "content": "All dogs must be leashed in public parks at all times.",
-      "metadata": {
-        "author": "City Council",
-        "created": "2024-01-01",
-        "updated": "2024-01-01",
-        "version": "1.0.0"
-      },
-      "path": "records/bylaw/article-001---animal-control.md"
-    }
-  ],
-  "total": 40,
-  "page": 1,
-  "limit": 10
+  "success": true,
+  "data": {
+    "records": [
+      {
+        "id": "article-001---animal-control",
+        "title": "Article 001 - Animal Control",
+        "type": "bylaw",
+        "status": "active",
+        "content": "All dogs must be leashed in public parks at all times.",
+        "hasUnpublishedChanges": true,
+        "metadata": {
+          "author": "City Council",
+          "created": "2024-01-01",
+          "updated": "2024-01-01",
+          "version": "1.0.0"
+        },
+        "path": "records/bylaw/article-001---animal-control.md",
+        "created_at": "2024-01-01T00:00:00.000Z",
+        "updated_at": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "nextCursor": "article-002---parking",
+    "hasMore": true,
+    "total": 40
+  }
 }
 ```
 
-##### Get Record
+**Note:** The `hasUnpublishedChanges` field is only included for authenticated
+users with `records:edit` permission. It indicates whether a draft version
+exists for the published record. Public users will not see this field.
+
+#### Records API
+
+##### Get Single Record
 
 ```http
 GET /api/v1/records/{id}
+GET /api/v1/records/{id}?edit=true
 ```
 
 **Path Parameters:**
@@ -229,33 +244,88 @@ GET /api/v1/records/{id}
 **Query Parameters:**
 
 - `type` - Record type (optional, for faster lookup)
+- `edit` - When set to `"true"` and user is authenticated with `records:edit`
+  permission, returns draft version if it exists. Otherwise, always returns
+  published version. Defaults to `false` (view mode).
 
-**Example:**
+**Behavior:**
+
+- **View Mode (default or `edit=false`)**: Always returns the published record
+  from the `records` table. For authenticated users with `records:edit`
+  permission, includes `hasUnpublishedChanges` flag if a draft exists.
+- **Edit Mode (`edit=true`)**: For authenticated users with `records:edit`
+  permission, returns the draft version if it exists, otherwise falls back to
+  the published version. For public users or users without permission, returns
+  published version regardless.
+
+**Example - View Mode (Published Record):**
 
 ```bash
-curl "http://localhost:3000/api/v1/records/article-001---animal-control"
+curl "http://localhost:3000/api/v1/records/article-001---animal-control" \
+  -H "Authorization: Bearer <token>"
 ```
 
-**Response:**
+**Example - Edit Mode (Draft if Available):**
+
+```bash
+curl "http://localhost:3000/api/v1/records/article-001---animal-control?edit=true" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response - View Mode (with unpublished changes):**
 
 ```json
 {
-  "id": "article-001---animal-control",
-  "title": "Article 001 - Animal Control",
-  "type": "bylaw",
-  "status": "active",
-  "content": "All dogs must be leashed in public parks at all times.",
-  "metadata": {
-    "author": "City Council",
-    "created": "2024-01-01",
-    "updated": "2024-01-01",
-    "version": "1.0.0"
-  },
-  "path": "records/bylaw/article-001---animal-control.md"
+  "success": true,
+  "data": {
+    "id": "article-001---animal-control",
+    "title": "Article 001 - Animal Control",
+    "type": "bylaw",
+    "status": "active",
+    "content": "All dogs must be leashed in public parks at all times.",
+    "isDraft": false,
+    "hasUnpublishedChanges": true,
+    "metadata": {
+      "author": "City Council",
+      "created": "2024-01-01",
+      "updated": "2024-01-01",
+      "version": "1.0.0"
+    },
+    "path": "records/bylaw/article-001---animal-control.md"
+  }
 }
 ```
 
-##### Create Record
+**Response - Edit Mode (Draft):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "article-001---animal-control",
+    "title": "Article 001 - Animal Control (Updated)",
+    "type": "bylaw",
+    "status": "draft",
+    "markdownBody": "# Article 001 - Animal Control\n\nAll dogs must be leashed in public parks at all times.\n\nNew draft content...",
+    "isDraft": true,
+    "workflowState": "under_review",
+    "metadata": {
+      "author": "City Council",
+      "created": "2024-01-01",
+      "updated": "2024-12-09",
+      "version": "1.0.0"
+    },
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "updated_at": "2024-12-09T15:30:00.000Z",
+    "last_draft_saved_at": "2024-12-09T15:30:00.000Z"
+  }
+}
+```
+
+**Note:** The `hasUnpublishedChanges` field is only included for authenticated
+users with `records:edit` permission. Public users will not see this field.
+
+##### Create New Record
 
 ```http
 POST /api/v1/records
@@ -325,7 +395,7 @@ curl -X POST http://localhost:3000/api/v1/records \
 }
 ```
 
-##### Update Record
+##### Update Existing Record
 
 ```http
 PUT /api/v1/records/{id}
@@ -360,6 +430,59 @@ curl -X PUT http://localhost:3000/api/v1/records/api-test-record \
     "content": "# Updated API Test Record\n\nThis record has been updated."
   }'
 ```
+
+##### Search Records
+
+```http
+GET /api/v1/search
+```
+
+**Query Parameters:**
+
+- `q` (required) - Search query string
+- `type` - Filter by record type (optional)
+- `limit` - Number of results per page (default: 20, max: 300)
+- `cursor` - Pagination cursor (optional)
+
+**Example:**
+
+```bash
+curl "http://localhost:3000/api/v1/search?q=animal control&type=bylaw" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "id": "article-001---animal-control",
+        "title": "Article 001 - Animal Control",
+        "type": "bylaw",
+        "status": "active",
+        "content": "All dogs must be leashed...",
+        "hasUnpublishedChanges": true,
+        "metadata": {
+          "author": "City Council",
+          "created": "2024-01-01"
+        },
+        "path": "records/bylaw/article-001---animal-control.md",
+        "created_at": "2024-01-01T00:00:00.000Z",
+        "updated_at": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "nextCursor": "article-002---parking",
+    "hasMore": true,
+    "query": "animal control"
+  }
+}
+```
+
+**Note:** The `hasUnpublishedChanges` field is only included for authenticated
+users with `records:edit` permission. Public users will not see this field.
 
 ##### Archive Record (Logical Delete)
 
@@ -415,7 +538,7 @@ curl -X DELETE http://localhost:3000/api/v1/records/api-test-record \
 draft → proposed → reviewed → approved → archived
 ```
 
-## Development
+## Development Guide
 
 ### Project Structure
 
@@ -619,7 +742,7 @@ curl -X PUT http://localhost:3000/api/v1/records/test \
 
 ### Common Issues
 
-**1. "CivicPress config not found"**
+#### 1. CivicPress Config Not Found
 
 ```bash
 # Ensure data directory exists and has config
@@ -629,13 +752,13 @@ ls data/.civic/config.yml
 export CIVIC_DATA_DIR=/path/to/data
 ```
 
-**2. "Permission denied"**
+#### 2. Permission Denied
 
 - Check user role has required permissions
 - Verify API key is valid
 - Check workflow configuration
 
-**3. "Record not found"**
+#### 3. Record Not Found
 
 - Verify record ID (filename without extension)
 - Check record exists in data directory

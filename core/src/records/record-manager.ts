@@ -287,7 +287,9 @@ export class RecordManager {
         ? new Date(request.updatedAt).toISOString()
         : createdAt;
     const status = request.status || 'draft';
-    const workflowState = request.workflowState || 'draft'; // Internal editorial status (DB-only)
+    // Allow null for workflowState (published records don't need editorial state)
+    const workflowState =
+      request.workflowState !== undefined ? request.workflowState : 'draft'; // Internal editorial status (DB-only)
     const recordPath = request.relativePath
       ? request.relativePath.replace(/\\/g, '/')
       : buildRecordRelativePath(request.type, recordId, createdAt);

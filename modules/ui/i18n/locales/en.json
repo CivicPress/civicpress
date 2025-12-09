@@ -194,6 +194,7 @@
     "enterDescription": "Enter description (optional)",
     "enterContent": "Enter content...",
     "enterTags": "Enter tags (comma-separated)",
+    "unpublishedChanges": "Unpublished changes",
     "sortBy": {
       "relevance": "Relevance",
       "lastUpdated": "Last Updated",
@@ -358,7 +359,7 @@
     "templateLoadedSuccessfully": "Template \"{name}\" has been loaded successfully.",
     "filesAdded": "Files Added",
     "filesAttachedToRecord": "No files attached to record | 1 file attached to record | {count} files attached to record",
-    "recordTitle": "[Record Title]",
+    "recordTitle": "Enter the title of the record",
     "currentUser": "Current User",
     "recordType": "Record Type",
     "selectType": "Select record type",
@@ -495,6 +496,27 @@
       "contentReplaced": "Current content will be completely replaced",
       "variablesFilled": "Template variables will be filled with current form data",
       "cannotBeUndone": "This action cannot be undone"
+    },
+    "drafts": {
+      "title": "Drafts & Unpublished Records",
+      "description": "View all draft versions and unpublished records",
+      "loading": "Loading drafts and unpublished records...",
+      "loadingDrafts": "Loading drafts...",
+      "loadingUnpublished": "Loading unpublished records...",
+      "untitled": "Untitled Draft",
+      "badge": {
+        "draftVersion": "Draft Version",
+        "unpublished": "Unpublished"
+      },
+      "empty": {
+        "title": "No drafts yet",
+        "description": "When you save a record as a draft or it has an unpublished workflow state, it will appear here. You can continue editing drafts before publishing them."
+      }
+    }
+  },
+  "navigation": {
+    "records": {
+      "drafts": "Drafts"
     }
   },
   "geography": {

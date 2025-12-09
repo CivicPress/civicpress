@@ -176,6 +176,16 @@ describe('Database Integration', () => {
   describe('Search Index', () => {
     it('should index and search records', async () => {
       // Index a test record
+      // Create record in records table first (required for search with INNER JOIN)
+      await dbService.createRecord({
+        id: 'bylaw-001',
+        title: 'Test Bylaw',
+        type: 'bylaw',
+        status: 'draft',
+        content: 'This is a test bylaw about parking regulations.',
+        author: 'council',
+      });
+
       await dbService.indexRecord({
         recordId: 'bylaw-001',
         recordType: 'bylaw',

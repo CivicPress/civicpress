@@ -363,25 +363,29 @@ export class DatabaseService {
   }
 
   async searchRecords(query: string, recordType?: string): Promise<any[]> {
+    // Query search_index and join with records table to ensure we only return published records
+    // This ensures search_index doesn't contain stale or internal records
     let sql = `
-      SELECT * FROM search_index 
-      WHERE (title LIKE ? OR content LIKE ? OR tags LIKE ?)
+      SELECT si.* FROM search_index si
+      INNER JOIN records r ON si.record_id = r.id
+      WHERE (si.title LIKE ? OR si.content LIKE ? OR si.tags LIKE ?)
+      AND (r.workflow_state IS NULL OR r.workflow_state != ?)
     `;
-    const params = [`%${query}%`, `%${query}%`, `%${query}%`];
+    const params = [`%${query}%`, `%${query}%`, `%${query}%`, 'internal_only'];
 
     if (recordType) {
       const typeFilters = recordType.split(',').map((t) => t.trim());
       if (typeFilters.length === 1) {
-        sql += ' AND record_type = ?';
+        sql += ' AND si.record_type = ?';
         params.push(typeFilters[0]);
       } else {
         const placeholders = typeFilters.map(() => '?').join(',');
-        sql += ` AND record_type IN (${placeholders})`;
+        sql += ` AND si.record_type IN (${placeholders})`;
         params.push(...typeFilters);
       }
     }
 
-    sql += ' ORDER BY updated_at DESC';
+    sql += ' ORDER BY si.updated_at DESC';
 
     return await this.adapter.query(sql, params);
   }
@@ -419,7 +423,9 @@ export class DatabaseService {
         recordData.title,
         recordData.type,
         recordData.status || 'draft',
-        recordData.workflow_state || 'draft',
+        recordData.workflow_state !== undefined
+          ? recordData.workflow_state
+          : 'draft',
         recordData.content,
         recordData.metadata,
         recordData.geography,
@@ -1076,13 +1082,17 @@ export class DatabaseService {
   async listRecords(
     options: {
       type?: string;
-      status?: string;
+      status?: string; // Deprecated: All records in this table are published by definition
       limit?: number;
       offset?: number;
     } = {}
   ): Promise<{ records: any[]; total: number }> {
     let sql = 'SELECT * FROM records WHERE 1=1';
     const params: any[] = [];
+
+    // Defensive: Filter out internal_only records (shouldn't be in records table, but just in case)
+    sql += ' AND (workflow_state IS NULL OR workflow_state != ?)';
+    params.push('internal_only');
 
     // Apply type filter (handle comma-separated values)
     if (options.type) {
@@ -1097,7 +1107,8 @@ export class DatabaseService {
       }
     }
 
-    // Apply status filter (handle comma-separated values)
+    // Status filter is deprecated - all records in records table are published by definition
+    // Keeping for backward compatibility, but it's ignored for published endpoints
     if (options.status) {
       const statusFilters = options.status.split(',').map((s) => s.trim());
       if (statusFilters.length === 1) {

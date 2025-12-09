@@ -94,15 +94,19 @@ const getKindPriority = (record: any): number => {
 };
 
 const processedRecords = computed(() => {
-  const base = displayRecords.value.map((record) => ({
-    ...record,
-    formattedDate: formatDate(record.created_at),
-    statusColor: getStatusColor(record.status),
-    statusLabel: getStatusLabel(record.status),
-    typeIcon: getTypeIcon(record.type),
-    typeLabel: getTypeLabel(record.type),
-    summary: createSummary(record),
-  }));
+  const base = displayRecords.value.map((record) => {
+    // Preserve all record properties including hasUnpublishedChanges
+    const processed = {
+      ...record,
+      formattedDate: formatDate(record.created_at),
+      statusColor: getStatusColor(record.status),
+      statusLabel: getStatusLabel(record.status),
+      typeIcon: getTypeIcon(record.type),
+      typeLabel: getTypeLabel(record.type),
+      summary: createSummary(record),
+    };
+    return processed;
+  });
 
   // Sort by kind priority FIRST (primary sort)
   // This ensures: record -> chapter -> root document order
@@ -322,6 +326,19 @@ onMounted(async () => {
                           />
                           <span>{{ record.typeLabel }}</span>
                         </UBadge>
+                        <UBadge
+                          v-if="
+                            authStore.hasPermission('records:edit') &&
+                            record.hasUnpublishedChanges
+                          "
+                          size="xs"
+                          color="error"
+                          variant="soft"
+                          class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-300"
+                        >
+                          <UIcon name="i-lucide-file-edit" class="w-3 h-3" />
+                          {{ t('records.unpublishedChanges') }}
+                        </UBadge>
                         <span
                           class="flex items-center gap-1 text-gray-500 dark:text-gray-400"
                         >
@@ -446,6 +463,19 @@ onMounted(async () => {
                           class="w-3 h-3 text-gray-400"
                         />
                         <span>{{ record.typeLabel }}</span>
+                      </UBadge>
+                      <UBadge
+                        v-if="
+                          authStore.hasPermission('records:edit') &&
+                          record.hasUnpublishedChanges
+                        "
+                        size="xs"
+                        color="error"
+                        variant="soft"
+                        class="flex items-center gap-1"
+                      >
+                        <UIcon name="i-lucide-file-edit" class="w-3 h-3" />
+                        {{ t('records.unpublishedChanges') }}
                       </UBadge>
                       <span
                         class="flex items-center gap-1 text-gray-500 dark:text-gray-400"

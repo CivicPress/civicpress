@@ -21,6 +21,20 @@ const links = computed<NavigationMenuItem[][]>(() => {
       label: t('common.records'),
       to: '/records',
       icon: 'i-lucide-scale',
+      // Conditionally add children if user can edit
+      ...(authStore.isLoggedIn && authStore.hasPermission('records:edit')
+        ? {
+            children: [
+              {
+                label: t('navigation.records.drafts'),
+                icon: 'i-lucide-file-text',
+                to: '/records/drafts',
+              },
+            ],
+            // Make the submenu expanded by default if user has access
+            defaultOpen: true,
+          }
+        : {}),
     },
     {
       label: t('geography.title'),

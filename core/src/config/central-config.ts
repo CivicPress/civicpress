@@ -233,12 +233,25 @@ export class CentralConfigManager {
       mergedConfig.dataDir = path.resolve(projectRoot, mergedConfig.dataDir);
     }
     if (!mergedConfig.database) {
+      // Use project root (where .civicrc is located) instead of process.cwd()
+      // This ensures consistent database path regardless of execution context
+      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
       mergedConfig.database = {
         type: 'sqlite',
         sqlite: {
-          file: path.join(process.cwd(), '.system-data', 'civic.db'),
+          file: path.join(projectRoot, '.system-data', 'civic.db'),
         },
       };
+    } else if (
+      mergedConfig.database.sqlite?.file &&
+      !path.isAbsolute(mergedConfig.database.sqlite.file)
+    ) {
+      // If database path is relative, resolve it relative to project root
+      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
+      mergedConfig.database.sqlite.file = path.resolve(
+        projectRoot,
+        mergedConfig.database.sqlite.file
+      );
     }
 
     // Deprecation notices for legacy fields

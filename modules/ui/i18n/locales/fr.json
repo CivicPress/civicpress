@@ -194,6 +194,7 @@
     "enterDescription": "Entrez la description (optionnel)",
     "enterContent": "Entrez le contenu...",
     "enterTags": "Entrez les mots-clés (séparés par des virgules)",
+    "unpublishedChanges": "Modifications non publiées",
     "sortBy": {
       "relevance": "Pertinence",
       "lastUpdated": "Dernière mise à jour",
@@ -361,7 +362,7 @@
     "templateLoadedSuccessfully": "Le modèle \"{name}\" a été chargé avec succès.",
     "filesAdded": "Fichiers ajoutés",
     "filesAttachedToRecord": "Aucun fichier attaché au document | 1 fichier attaché au document | {count} fichiers attachés au document",
-    "recordTitle": "[Titre du document]",
+    "recordTitle": "Entrez le titre du document",
     "currentUser": "Utilisateur actuel",
     "recordType": "Type de document",
     "selectType": "Sélectionner le type de document",
@@ -498,6 +499,27 @@
       "contentReplaced": "Le contenu actuel sera complètement remplacé",
       "variablesFilled": "Les variables du modèle seront remplies avec les données du formulaire actuel",
       "cannotBeUndone": "Cette action ne peut pas être annulée"
+    },
+    "drafts": {
+      "title": "Brouillons et documents non publiés",
+      "description": "Afficher toutes les versions de brouillons et les documents non publiés",
+      "loading": "Chargement des brouillons et documents non publiés...",
+      "loadingDrafts": "Chargement des brouillons...",
+      "loadingUnpublished": "Chargement des documents non publiés...",
+      "untitled": "Brouillon sans titre",
+      "badge": {
+        "draftVersion": "Version de brouillon",
+        "unpublished": "Non publié"
+      },
+      "empty": {
+        "title": "Aucun brouillon pour le moment",
+        "description": "Lorsque vous enregistrez un document en tant que brouillon ou qu'il a un état de workflow non publié, il apparaîtra ici. Vous pouvez continuer à modifier les brouillons avant de les publier."
+      }
+    }
+  },
+  "navigation": {
+    "records": {
+      "drafts": "Brouillons"
     }
   },
   "geography": {

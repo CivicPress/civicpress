@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { ConfigDiscovery } from './config/config-discovery.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
 import { GitEngine } from './git/git-engine.js';
@@ -182,12 +183,36 @@ export class CivicPress {
     }
 
     // Initialize database service
-    const dbConfig = config.database || {
-      type: 'sqlite' as const,
-      sqlite: {
-        file: `.system-data/civic.db`,
-      },
-    };
+    // If no database config provided, use default relative to dataDir's parent (project root)
+    let dbConfig = config.database;
+    if (!dbConfig) {
+      // Resolve project root: if dataDir is 'data', project root is parent
+      // If dataDir is absolute like '/path/to/project/data', project root is its parent
+      const projectRoot = path.isAbsolute(config.dataDir)
+        ? path.dirname(config.dataDir)
+        : path.resolve(process.cwd(), path.dirname(config.dataDir));
+      dbConfig = {
+        type: 'sqlite' as const,
+        sqlite: {
+          file: path.join(projectRoot, '.system-data', 'civic.db'),
+        },
+      };
+    } else if (
+      dbConfig.sqlite?.file &&
+      !path.isAbsolute(dbConfig.sqlite.file)
+    ) {
+      // Resolve relative database paths to absolute using project root
+      const projectRoot = path.isAbsolute(config.dataDir)
+        ? path.dirname(config.dataDir)
+        : path.resolve(process.cwd(), path.dirname(config.dataDir));
+      dbConfig = {
+        ...dbConfig,
+        sqlite: {
+          ...dbConfig.sqlite,
+          file: path.resolve(projectRoot, dbConfig.sqlite.file),
+        },
+      };
+    }
 
     this.databaseService = new DatabaseService(dbConfig, this.logger);
     this.authService = new AuthService(this.databaseService, config.dataDir);

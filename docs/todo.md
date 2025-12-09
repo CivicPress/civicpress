@@ -4,7 +4,7 @@
 
 ### Recent Achievements
 
-- **All Tests Passing**: 600+ tests passing - system is stable and healthy
+- **All Tests Passing**: 733+ tests passing - system is stable and healthy
 - **CLI User Management**: Fixed JSON parsing issues in simulated authentication
 - **Authentication System**: Both simulated and password auth working perfectly
 - **Test Suite Stabilization**: Comprehensive test coverage across all modules
@@ -20,6 +20,18 @@
   - Raw YAML preview accordion
   - Word wrap enabled, flat document design
   - Complete internationalization (English/French)
+- **Unpublished Changes Badge**: Visual indicator for records with draft
+  modifications
+  - Badge displays on record list and single record view pages
+  - Only visible to authenticated users with `records:edit` permission
+  - API includes `hasUnpublishedChanges` flag for efficient draft detection
+  - Edit mode support with `?edit=true` query parameter
+  - Comprehensive test coverage (13 new tests)
+- **Documentation Cleanup**: Removed outdated analysis and test planning
+  documents
+  - Merged architecture documents into single source of truth
+  - Updated documentation to reflect implemented features
+  - Created feature documentation for new capabilities
 
 ### Immediate Tasks (Next 1-2 weeks)
 

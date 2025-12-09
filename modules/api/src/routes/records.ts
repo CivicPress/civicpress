@@ -7,7 +7,7 @@ import {
   optionalAuth,
 } from '../middleware/auth.js';
 import { RecordsService } from '../services/records-service.js';
-import { Logger } from '@civicpress/core';
+import { Logger, userCan } from '@civicpress/core';
 import { AuditLogger } from '@civicpress/core';
 import {
   sendSuccess,
@@ -46,55 +46,65 @@ export function createRecordsRouter(recordsService: RecordsService) {
   const router = Router();
 
   // GET /api/records - List records (handles both public and authenticated access)
-  router.get('/', async (req: any, res: Response) => {
-    const isAuthenticated = (req as any).user !== undefined;
-    const operation = isAuthenticated
-      ? 'list_records_authenticated'
-      : 'list_records_public';
+  // IMPORTANT: Only returns published records from records table (all records in this table are published)
+  router.get(
+    '/',
+    optionalAuth(recordsService.getCivicPress()),
+    async (req: any, res: Response) => {
+      const isAuthenticated = (req as any).user !== undefined;
+      const operation = isAuthenticated
+        ? 'list_records_authenticated'
+        : 'list_records_public';
 
-    logApiRequest(req, { operation });
+      logApiRequest(req, { operation });
 
-    try {
-      const { type, status, limit, cursor } = req.query;
+      try {
+        const { type, limit, cursor } = req.query;
 
-      logger.info(
-        `Listing records (${isAuthenticated ? 'authenticated' : 'public'})`,
-        {
-          type,
-          status,
-          limit,
-          cursor: cursor ? '***' : undefined, // Don't log the actual cursor
-          requestId: (req as any).requestId,
-          userId: (req as any).user?.id,
-          userRole: (req as any).user?.role,
-          isAuthenticated,
-        }
-      );
+        // Query only records table - all records there are published (by table location)
+        // No status filtering needed - table location determines if record is published
 
-      const result = await recordsService.listRecords({
-        type: type as string,
-        status: status as string,
-        limit: limit ? parseInt(limit as string) : 20,
-        cursor: cursor as string,
-      });
+        logger.info(
+          `Listing records (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            type,
+            limit,
+            cursor: cursor ? '***' : undefined, // Don't log the actual cursor
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
 
-      logger.info(
-        `Records listed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
-        {
-          totalRecords: result.records?.length || 0,
-          hasMore: result.hasMore,
-          requestId: (req as any).requestId,
-          userId: (req as any).user?.id,
-          userRole: (req as any).user?.role,
-          isAuthenticated,
-        }
-      );
+        const result = await recordsService.listRecords(
+          {
+            type: type as string,
+            // No status filter - table location (records table) determines published state
+            limit: limit ? parseInt(limit as string) : 20,
+            cursor: cursor as string,
+          },
+          (req as any).user
+        );
 
-      sendSuccess(result, req, res, { operation });
-    } catch (error) {
-      handleApiError(operation, error, req, res, 'Failed to list records');
+        logger.info(
+          `Records listed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            totalRecords: result.records?.length || 0,
+            hasMore: result.hasMore,
+            requestId: (req as any).requestId,
+            userId: (req as any).user?.id,
+            userRole: (req as any).user?.role,
+            isAuthenticated,
+          }
+        );
+
+        sendSuccess(result, req, res, { operation });
+      } catch (error) {
+        handleApiError(operation, error, req, res, 'Failed to list records');
+      }
     }
-  });
+  );
 
   // GET /api/records/summary - Aggregate counts
   router.get('/summary', async (req: any, res: Response) => {
@@ -106,13 +116,15 @@ export function createRecordsRouter(recordsService: RecordsService) {
     logApiRequest(req, { operation });
 
     try {
-      const { type, status } = req.query;
+      const { type } = req.query;
+
+      // Query only records table - all records there are published (by table location)
+      // No status filtering needed - table location determines if record is published
 
       logger.info(
         `Fetching record summary (${isAuthenticated ? 'authenticated' : 'public'})`,
         {
           type,
-          status,
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
@@ -122,7 +134,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       const summary = await recordsService.getRecordSummary({
         type: type as string,
-        status: status as string,
+        // No status filter - table location (records table) determines published state
       });
 
       sendSuccess(summary, req, res, { operation });
@@ -137,8 +149,9 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   });
 
-  // GET /api/records/drafts - Get user's draft records (authenticated only)
+  // GET /api/records/drafts - Get draft records (authenticated only)
   // NOTE: This must come BEFORE /:id route to avoid matching "drafts" as an ID
+  // If user has records:edit permission, shows ALL drafts. Otherwise, shows only user's drafts.
   router.get(
     '/drafts',
     authMiddleware(recordsService.getCivicPress()),
@@ -149,29 +162,35 @@ export function createRecordsRouter(recordsService: RecordsService) {
       try {
         const { type, limit, offset } = req.query;
 
-        logger.info('Listing user drafts', {
+        // Check if user has records:edit permission (can see all drafts)
+        const canEdit = await userCan(req.user!, 'records:edit');
+
+        logger.info('Listing drafts', {
           type,
           limit,
           offset,
           requestId: (req as any).requestId,
           userId: req.user?.id,
           userRole: req.user?.role,
+          showAllDrafts: canEdit,
         });
 
-        // List drafts from record_drafts table, optionally filtered by user
+        // List drafts from record_drafts table
+        // Only filter by user if they don't have edit permission
         const userId = req.user?.id?.toString() || req.user?.username;
         const result = await recordsService.listDrafts({
           type: type as string,
-          created_by: userId, // Filter by current user
+          created_by: canEdit ? undefined : userId, // Show all drafts if user can edit, otherwise filter by user
           limit: limit ? parseInt(limit as string) : undefined,
           offset: offset ? parseInt(offset as string) : undefined,
         });
 
-        logger.info('User drafts listed successfully', {
+        logger.info('Drafts listed successfully', {
           totalRecords: result.drafts?.length || 0,
           requestId: (req as any).requestId,
           userId: req.user?.id,
           userRole: req.user?.role,
+          showAllDrafts: canEdit,
         });
 
         sendSuccess(result, req, res, { operation: 'list_drafts' });
@@ -180,6 +199,10 @@ export function createRecordsRouter(recordsService: RecordsService) {
       }
     }
   );
+
+  // NOTE: /api/records/unpublished endpoint has been removed
+  // All drafts and unpublished changes are in record_drafts table
+  // Use /api/records/drafts endpoint instead
 
   // GET /api/records/:id/frontmatter - Get frontmatter YAML for a record (handles both public and authenticated access)
   // NOTE: This must come BEFORE /:id route to avoid matching "frontmatter" as an ID
@@ -284,21 +307,70 @@ export function createRecordsRouter(recordsService: RecordsService) {
 
       try {
         const { id } = req.params;
+        const { edit } = req.query; // Check if this is for edit mode
 
         logger.info(
-          `Getting record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
+          `Getting record ${id} (${isAuthenticated ? 'authenticated' : 'public'}, edit: ${edit === 'true'})`,
           {
             recordId: id,
             requestId: (req as any).requestId,
             userId: (req as any).user?.id,
             userRole: (req as any).user?.role,
             isAuthenticated,
+            editMode: edit === 'true',
           }
         );
 
-        // Check drafts first (if user can edit), then published records
+        // For edit mode: authenticated users with edit permission get draft if it exists
+        // For view mode: always return published records from records table
         const user = (req as any).user;
-        const record = await recordsService.getDraftOrRecord(id, user || {});
+        let record;
+
+        if (
+          edit === 'true' &&
+          user &&
+          typeof user === 'object' &&
+          user.role &&
+          user.username
+        ) {
+          // Edit mode: check for draft first, then fall back to published
+          record = await recordsService.getDraftOrRecord(id, user);
+        } else {
+          // View mode: always return published version
+          record = await recordsService.getRecord(id);
+
+          // Add isDraft flag for view mode (always false since we're returning published)
+          if (record) {
+            record.isDraft = false;
+          }
+
+          // Check if there's a draft for this published record (for badge display)
+          // Only check if record was found
+          if (
+            record &&
+            user &&
+            typeof user === 'object' &&
+            user.role &&
+            user.username
+          ) {
+            try {
+              const hasPermission = await userCan(user, 'records:edit', {
+                action: 'edit',
+              });
+              if (hasPermission) {
+                // Check if a draft exists for this record ID
+                const draft = await recordsService.getDraftOrRecord(id, user);
+                record.hasUnpublishedChanges = draft?.isDraft === true;
+              } else {
+                record.hasUnpublishedChanges = false;
+              }
+            } catch (error) {
+              // If permission check fails, assume no draft
+              record.hasUnpublishedChanges = false;
+            }
+          }
+          // If record is null (not found) or no valid user, hasUnpublishedChanges won't be set (which is fine for public users)
+        }
 
         if (!record) {
           const error = new Error('Record not found');
@@ -363,7 +435,56 @@ export function createRecordsRouter(recordsService: RecordsService) {
           }
         );
 
-        const record = await recordsService.getRawRecord(id);
+        // For public users, only allow access to published records
+        // For authenticated users with edit permission, allow access to drafts too
+        const user = (req as any).user;
+
+        if (!user) {
+          // Public users: verify the record is published before allowing access
+          const publishedRecord = await recordsService.getRecord(id);
+          if (!publishedRecord || publishedRecord.status !== 'published') {
+            const error = new Error('Record not found');
+            (error as any).statusCode = 404;
+            (error as any).code = 'RECORD_NOT_FOUND';
+            throw error;
+          }
+        }
+        // For authenticated users, getDraftOrRecord will handle draft vs published logic
+        // But getRawRecord only works for published records (files exist)
+        // So we'll check draft first for authenticated users, then fall back to raw
+        let record;
+        if (user) {
+          // For authenticated users, check if it's a draft first
+          const draftOrRecord = await recordsService.getDraftOrRecord(id, user);
+          if (draftOrRecord?.isDraft) {
+            // For drafts, construct raw content from draft data
+            const frontmatterYaml = await recordsService.getFrontmatterYaml(
+              id,
+              user
+            );
+            const content =
+              draftOrRecord.markdownBody || draftOrRecord.content || '';
+            record = {
+              id: draftOrRecord.id,
+              title: draftOrRecord.title,
+              type: draftOrRecord.type,
+              status: draftOrRecord.status,
+              content: frontmatterYaml
+                ? `---\n${frontmatterYaml}\n---\n\n${content}`
+                : content,
+              metadata: draftOrRecord.metadata || {},
+              path: draftOrRecord.path,
+              created: draftOrRecord.created_at,
+              author: draftOrRecord.author || draftOrRecord.created_by,
+            };
+          } else {
+            // For published records, get raw file content
+            record = await recordsService.getRawRecord(id);
+          }
+        } else {
+          // Public users: only get published records via getRawRecord
+          record = await recordsService.getRawRecord(id);
+        }
 
         if (!record) {
           const error = new Error('Record not found');

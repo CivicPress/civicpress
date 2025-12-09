@@ -3,6 +3,11 @@ import type { CivicRecord } from '~/stores/records';
 import RecordForm from '~/components/RecordForm.vue';
 import FormSkeleton from '~/components/FormSkeleton.vue';
 
+// Page metadata - require authentication for editing records
+definePageMeta({
+  middleware: ['require-auth'],
+});
+
 const { t } = useI18n();
 // Route parameters
 const route = useRoute();
@@ -18,6 +23,7 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 const recordFormRef = ref<InstanceType<typeof RecordForm> | null>(null);
+const hasSavedChanges = ref(false); // Track if changes have been saved (indicates draft editing)
 
 // Toast notifications
 const toast = useToast();
@@ -36,8 +42,9 @@ const fetchRecord = async () => {
   error.value = '';
 
   try {
+    // Add ?edit=true to get draft version if it exists (for authenticated users with edit permission)
     const response = (await useNuxtApp().$civicApi(
-      `/api/v1/records/${id}`
+      `/api/v1/records/${id}?edit=true`
     )) as any;
 
     if (response && response.success && response.data) {
@@ -60,6 +67,12 @@ const fetchRecord = async () => {
         linkedRecords: apiRecord.linkedRecords || [],
         metadata: apiRecord.metadata || {},
       };
+
+      // If the record is a draft (has isDraft flag or markdownBody), mark as having saved changes
+      // This means we're editing a draft, so breadcrumbs should show "All Drafts"
+      if (apiRecord.isDraft || apiRecord.markdownBody) {
+        hasSavedChanges.value = true;
+      }
     } else {
       throw new Error(t('records.failedToLoadRecord'));
     }
@@ -85,6 +98,9 @@ const handleSubmit = async (recordData: any) => {
 
 // Handle record saved - update local record state to reflect changes (e.g., type changes)
 const handleRecordSaved = (recordData: any) => {
+  // Mark that changes have been saved (this indicates we're working with a draft)
+  hasSavedChanges.value = true;
+
   if (record.value) {
     // Update the record with the latest data from the server
     record.value = {
@@ -140,16 +156,16 @@ const handleDelete = async (recordId: string) => {
   }
 };
 
-// Check if user can edit records
+// Check if user can edit records (permission-based instead of role-based)
 const authStore = useAuthStore();
 const canEditRecords = computed(() => {
-  const userRole = authStore.currentUser?.role;
-  return userRole === 'admin' || userRole === 'clerk';
+  // Use permission-based access control (consistent with API endpoints)
+  return authStore.isLoggedIn && authStore.hasPermission('records:edit');
 });
 
 const canDeleteRecords = computed(() => {
-  const userRole = authStore.currentUser?.role;
-  return userRole === 'admin' || userRole === 'clerk';
+  // Use permission-based access control (consistent with API endpoints)
+  return authStore.isLoggedIn && authStore.hasPermission('records:edit');
 });
 
 // Fetch record on mount
@@ -160,27 +176,53 @@ onMounted(() => {
 // Use the record's type if available, otherwise fall back to route param
 const currentType = computed(() => record.value?.type || type);
 
-const breadcrumbItems = computed(() => [
-  {
-    label: t('common.home'),
-    to: '/',
-  },
-  {
-    label: t('records.allRecords'),
-    to: '/records',
-  },
-  {
-    label: getTypeLabel(currentType.value),
-    to: `/records/${currentType.value}`,
-  },
-  {
-    label: record.value?.id || id || t('records.viewRecord'),
-    to: `/records/${currentType.value}/${id}`,
-  },
-  {
-    label: t('common.edit'),
-  },
-]);
+const breadcrumbItems = computed(() => {
+  const items = [
+    {
+      label: t('common.home'),
+      to: '/',
+    },
+    {
+      // Show "All Drafts" if changes have been saved, otherwise "All Records"
+      label: hasSavedChanges.value
+        ? t('navigation.records.drafts')
+        : t('records.allRecords'),
+      to: hasSavedChanges.value ? '/records/drafts' : '/records',
+    },
+  ];
+
+  // Only include type breadcrumb if changes haven't been saved yet
+  // After saving, we skip the type and go directly to the record
+  if (!hasSavedChanges.value) {
+    items.push({
+      label: getTypeLabel(currentType.value),
+      to: `/records/${currentType.value}`,
+    });
+  }
+
+  // If changes have been saved (draft), don't link to record view page (it's not published)
+  // Just show "Edit <record id>" without a link
+  if (hasSavedChanges.value) {
+    items.push({
+      label: `${t('common.edit')} ${record.value?.id || id || ''}`,
+      to: '', // No link - draft records aren't accessible via regular record view
+    });
+  } else {
+    // For published records, show record ID as link, then Edit
+    items.push(
+      {
+        label: record.value?.id || id || t('records.viewRecord'),
+        to: `/records/${currentType.value}/${id}`,
+      },
+      {
+        label: t('common.edit'),
+        to: '', // Current page, no link needed
+      }
+    );
+  }
+
+  return items;
+});
 </script>
 
 <template>

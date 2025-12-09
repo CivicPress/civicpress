@@ -26,6 +26,30 @@ export class RecordsService {
   private logger: Logger;
 
   /**
+   * Normalize date string from database format to ISO format with UTC indicator
+   * Converts "YYYY-MM-DD HH:MM:SS" (SQLite format, UTC but no timezone) to "YYYY-MM-DDTHH:MM:SSZ"
+   */
+  private normalizeDateString(
+    dateStr: string | null | undefined
+  ): string | null | undefined {
+    if (!dateStr) return dateStr;
+
+    // If already has timezone indicator (Z or +/- offset), return as is (already normalized)
+    if (dateStr.includes('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+
+    // If has 'T' separator but no timezone, add 'Z' (assume UTC)
+    if (dateStr.includes('T')) {
+      return dateStr + 'Z';
+    }
+
+    // Convert SQLite format "YYYY-MM-DD HH:MM:SS" to ISO "YYYY-MM-DDTHH:MM:SSZ"
+    // This assumes dates from database are in UTC (which SQLite CURRENT_TIMESTAMP returns)
+    return dateStr.replace(' ', 'T') + 'Z';
+  }
+
+  /**
    * Helper function to get kind priority for sorting
    * Priority: record (no kind) = 1, chapter = 2, root = 3
    * Lower priority number = appears first in list
@@ -45,6 +69,10 @@ export class RecordsService {
     const clauses: string[] = [];
     const params: any[] = [];
 
+    // Defensive: Filter out internal_only records (shouldn't be in records table, but just in case)
+    clauses.push('(workflow_state IS NULL OR workflow_state != ?)');
+    params.push('internal_only');
+
     if (filters.type) {
       const types = filters.type
         .split(',')
@@ -59,6 +87,8 @@ export class RecordsService {
       }
     }
 
+    // Status filter is deprecated - all records in records table are published by definition
+    // Keeping for backward compatibility, but it's ignored for published endpoints
     if (filters.status) {
       const statuses = filters.status
         .split(',')
@@ -206,8 +236,8 @@ export class RecordsService {
       linkedRecords: record.linkedRecords || [],
       linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
-      created_at: record.created_at,
-      updated_at: record.updated_at,
+      created_at: this.normalizeDateString(record.created_at),
+      updated_at: this.normalizeDateString(record.updated_at),
       author: record.author,
       commit_ref: record.commit_ref,
       commit_signature: record.commit_signature,
@@ -238,8 +268,8 @@ export class RecordsService {
       linkedRecords: record.linkedRecords || [],
       linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
-      created_at: record.created_at,
-      updated_at: record.updated_at,
+      created_at: this.normalizeDateString(record.created_at),
+      updated_at: this.normalizeDateString(record.updated_at),
       author: record.author,
       commit_ref: record.commit_ref,
       commit_signature: record.commit_signature,
@@ -420,8 +450,8 @@ export class RecordsService {
       linkedRecords: updatedRecord.linkedRecords || [],
       linkedGeographyFiles: updatedRecord.linkedGeographyFiles || [],
       path: updatedRecord.path,
-      created_at: updatedRecord.created_at,
-      updated_at: updatedRecord.updated_at,
+      created_at: this.normalizeDateString(updatedRecord.created_at),
+      updated_at: this.normalizeDateString(updatedRecord.updated_at),
       author: updatedRecord.author,
       commit_ref: updatedRecord.commit_ref,
       commit_signature: updatedRecord.commit_signature,
@@ -567,7 +597,8 @@ export class RecordsService {
       status?: string;
       limit?: number;
       cursor?: string;
-    } = {}
+    } = {},
+    user?: any
   ): Promise<{
     records: any[];
     nextCursor: string | null;
@@ -635,22 +666,80 @@ export class RecordsService {
     const hasMore = endIndex < filteredRecords.length;
     const nextCursor = hasMore ? records[records.length - 1]?.id || null : null;
 
+    // Check if user has permission and if there are drafts for these records
+    let draftIds = new Set<string>();
+    // Only check drafts if user exists and is a valid user object (not null, has required properties)
+    // Additional safety: ensure user is defined and has all required properties before calling userCan
+    const hasValidUser =
+      user !== undefined &&
+      user !== null &&
+      typeof user === 'object' &&
+      'role' in user &&
+      typeof (user as any).role === 'string' &&
+      ((user as any).role as string).length > 0 &&
+      'username' in user &&
+      typeof (user as any).username === 'string' &&
+      ((user as any).username as string).length > 0 &&
+      records.length > 0;
+
+    if (hasValidUser) {
+      try {
+        const hasPermission = await userCan(user, 'records:edit', {
+          action: 'edit',
+        });
+
+        if (hasPermission) {
+          const recordIds = records.map((r) => r.id);
+
+          if (recordIds.length > 0) {
+            // Batch query to check which IDs have drafts (handle SQLite IN limit)
+            const BATCH_SIZE = 999;
+            for (let i = 0; i < recordIds.length; i += BATCH_SIZE) {
+              const batch = recordIds.slice(i, i + BATCH_SIZE);
+              const placeholders = batch.map(() => '?').join(',');
+              const query = `SELECT id FROM record_drafts WHERE id IN (${placeholders})`;
+
+              const rows = await this.db.query(query, batch);
+              rows.forEach((row: any) => draftIds.add(row.id));
+            }
+          }
+        }
+      } catch (error) {
+        // If permission check fails, skip draft checking silently
+        this.logger.warn('Failed to check drafts for unpublished changes', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // Transform records for API response
-    const transformedRecords = records.map((record: any) => ({
-      id: record.id,
-      title: record.title,
-      type: record.type,
-      status: record.status, // Legal status (stored in YAML + DB)
-      workflowState: record.workflowState, // Internal editorial status (DB-only)
-      content: record.content,
-      metadata: record.metadata || {},
-      path: record.path,
-      created_at: record.created_at,
-      updated_at: record.updated_at,
-      author: record.author,
-      commit_ref: record.commit_ref,
-      commit_signature: record.commit_signature,
-    }));
+    const transformedRecords = records.map((record: any) => {
+      const base = {
+        id: record.id,
+        title: record.title,
+        type: record.type,
+        status: record.status, // Legal status (stored in YAML + DB)
+        workflowState: record.workflowState, // Internal editorial status (DB-only)
+        content: record.content,
+        metadata: record.metadata || {},
+        path: record.path,
+        created_at: this.normalizeDateString(record.created_at),
+        updated_at: this.normalizeDateString(record.updated_at),
+        author: record.author,
+        commit_ref: record.commit_ref,
+        commit_signature: record.commit_signature,
+      };
+
+      // Include hasUnpublishedChanges if user has edit permission (was checked)
+      if (hasValidUser) {
+        return {
+          ...base,
+          hasUnpublishedChanges: draftIds.has(record.id),
+        };
+      }
+
+      return base;
+    });
 
     return {
       records: transformedRecords,
@@ -670,7 +759,8 @@ export class RecordsService {
       status?: string;
       limit?: number;
       cursor?: string;
-    } = {}
+    } = {},
+    user?: any
   ): Promise<{
     records: any[];
     nextCursor: string | null;
@@ -713,19 +803,77 @@ export class RecordsService {
     const records = hasMore ? result.records.slice(0, limit) : result.records;
     const nextCursor = hasMore ? (offset + limit).toString() : null;
 
+    // Check if user has permission and if there are drafts for these records
+    let draftIds = new Set<string>();
+    // Only check drafts if user exists and is a valid user object (not null, has required properties)
+    // Additional safety: ensure user is defined and has all required properties before calling userCan
+    const hasValidUser =
+      user !== undefined &&
+      user !== null &&
+      typeof user === 'object' &&
+      'role' in user &&
+      typeof (user as any).role === 'string' &&
+      ((user as any).role as string).length > 0 &&
+      'username' in user &&
+      typeof (user as any).username === 'string' &&
+      ((user as any).username as string).length > 0 &&
+      records.length > 0;
+
+    if (hasValidUser) {
+      try {
+        const hasPermission = await userCan(user, 'records:edit', {
+          action: 'edit',
+        });
+
+        if (hasPermission) {
+          const recordIds = records.map((r) => r.id);
+
+          if (recordIds.length > 0) {
+            // Batch query to check which IDs have drafts (handle SQLite IN limit)
+            const BATCH_SIZE = 999;
+            for (let i = 0; i < recordIds.length; i += BATCH_SIZE) {
+              const batch = recordIds.slice(i, i + BATCH_SIZE);
+              const placeholders = batch.map(() => '?').join(',');
+              const query = `SELECT id FROM record_drafts WHERE id IN (${placeholders})`;
+
+              const rows = await this.db.query(query, batch);
+              rows.forEach((row: any) => draftIds.add(row.id));
+            }
+          }
+        }
+      } catch (error) {
+        // If permission check fails, skip draft checking silently
+        this.logger.warn('Failed to check drafts for unpublished changes', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // Transform records for API response
-    const transformedRecords = records.map((record: any) => ({
-      id: record.id,
-      title: record.title,
-      type: record.type,
-      status: record.status,
-      content: record.content,
-      metadata: record.metadata || {},
-      path: record.path,
-      created_at: record.created_at,
-      updated_at: record.updated_at,
-      author: record.author,
-    }));
+    const transformedRecords = records.map((record: any) => {
+      const base = {
+        id: record.id,
+        title: record.title,
+        type: record.type,
+        status: record.status,
+        content: record.content,
+        metadata: record.metadata || {},
+        path: record.path,
+        created_at: this.normalizeDateString(record.created_at),
+        updated_at: this.normalizeDateString(record.updated_at),
+        author: record.author,
+      };
+
+      // Include hasUnpublishedChanges if user has edit permission (was checked)
+      if (hasValidUser) {
+        return {
+          ...base,
+          hasUnpublishedChanges: draftIds.has(record.id),
+        };
+      }
+
+      return base;
+    });
 
     return {
       records: transformedRecords,
@@ -954,9 +1102,9 @@ export class RecordsService {
         : [],
       author: draft.author,
       created_by: draft.created_by,
-      created_at: draft.created_at,
-      updated_at: draft.updated_at,
-      last_draft_saved_at: draft.last_draft_saved_at,
+      created_at: this.normalizeDateString(draft.created_at),
+      updated_at: this.normalizeDateString(draft.updated_at),
+      last_draft_saved_at: this.normalizeDateString(draft.last_draft_saved_at),
     };
   }
 
@@ -1210,9 +1358,11 @@ export class RecordsService {
         : [],
       author: updatedDraft.author,
       created_by: updatedDraft.created_by,
-      created_at: updatedDraft.created_at,
-      updated_at: updatedDraft.updated_at,
-      last_draft_saved_at: updatedDraft.last_draft_saved_at,
+      created_at: this.normalizeDateString(updatedDraft.created_at),
+      updated_at: this.normalizeDateString(updatedDraft.updated_at),
+      last_draft_saved_at: this.normalizeDateString(
+        updatedDraft.last_draft_saved_at
+      ),
     };
   }
 
@@ -1254,15 +1404,118 @@ export class RecordsService {
         : [],
       author: draft.author,
       created_by: draft.created_by,
-      created_at: draft.created_at,
-      updated_at: draft.updated_at,
-      last_draft_saved_at: draft.last_draft_saved_at,
+      created_at: this.normalizeDateString(draft.created_at),
+      updated_at: this.normalizeDateString(draft.updated_at),
+      last_draft_saved_at: this.normalizeDateString(draft.last_draft_saved_at),
       isDraft: true,
     }));
 
     return {
       drafts,
       total: result.total,
+    };
+  }
+
+  /**
+   * List unpublished records from records table (filtered by workflowState)
+   * Returns records where workflowState indicates draft/unpublished state
+   */
+  async listUnpublishedRecords(
+    options: {
+      type?: string;
+      limit?: number;
+      cursor?: string;
+    } = {}
+  ): Promise<{
+    records: any[];
+    nextCursor: string | null;
+    hasMore: boolean;
+    total: number;
+  }> {
+    const { type, limit = 20, cursor } = options;
+
+    // Workflow states that indicate draft/unpublished
+    const unpublishedWorkflowStates = [
+      'draft',
+      'under_review',
+      'ready_for_publication',
+    ];
+
+    // Query records table with workflowState filter
+    const db = this.civicPress.getDatabaseService();
+    let query = `
+      SELECT * FROM records
+      WHERE workflow_state IN (${unpublishedWorkflowStates
+        .map(() => '?')
+        .join(',')})
+    `;
+    const params: any[] = [...unpublishedWorkflowStates];
+
+    if (type) {
+      const types = type.split(',').map((t) => t.trim());
+      query += ` AND type IN (${types.map(() => '?').join(',')})`;
+      params.push(...types);
+    }
+
+    // Order by updated_at descending
+    query += ' ORDER BY updated_at DESC';
+
+    const allRecords = await db.query(query, params);
+
+    // Transform records
+    let records = allRecords.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      type: record.type,
+      status: record.status, // Legal status
+      workflowState:
+        record.workflow_state !== undefined && record.workflow_state !== null
+          ? record.workflow_state
+          : null, // Internal editorial status
+      content: record.content,
+      metadata: record.metadata ? JSON.parse(record.metadata) : {},
+      geography: record.geography ? JSON.parse(record.geography) : undefined,
+      attachedFiles: record.attached_files
+        ? JSON.parse(record.attached_files)
+        : [],
+      linkedRecords: record.linked_records
+        ? JSON.parse(record.linked_records)
+        : [],
+      linkedGeographyFiles: record.linked_geography_files
+        ? JSON.parse(record.linked_geography_files)
+        : [],
+      author: record.author,
+      created_at: this.normalizeDateString(record.created_at),
+      updated_at: this.normalizeDateString(record.updated_at),
+      isUnpublished: true,
+    }));
+
+    // Find starting index based on cursor
+    let startIndex = 0;
+    if (cursor) {
+      const cursorIndex = records.findIndex(
+        (record: any) => record.id === cursor
+      );
+      if (cursorIndex !== -1) {
+        startIndex = cursorIndex + 1;
+      }
+    }
+
+    // Get requested number of records
+    const endIndex = startIndex + limit;
+    const paginatedRecords = records.slice(startIndex, endIndex);
+
+    // Determine if there are more records
+    const hasMore = endIndex < records.length;
+    const nextCursor = hasMore
+      ? paginatedRecords[paginatedRecords.length - 1]?.id || null
+      : null;
+
+    return {
+      records: paginatedRecords,
+      nextCursor,
+      hasMore,
+      total: records.length,
     };
   }
 
@@ -1299,11 +1552,13 @@ export class RecordsService {
       linkedGeographyFiles: recordData.linkedGeographyFiles || [],
       author: recordData.author || recordData.created_by || 'unknown',
       authors: recordData.authors,
-      created_at: recordData.created_at || new Date().toISOString(),
-      updated_at:
-        recordData.updated_at ||
-        recordData.last_draft_saved_at ||
+      created_at:
+        this.normalizeDateString(recordData.created_at) ||
         new Date().toISOString(),
+      updated_at:
+        this.normalizeDateString(
+          recordData.updated_at || recordData.last_draft_saved_at
+        ) || new Date().toISOString(),
       source: recordData.source,
       commit_ref: recordData.commit_ref,
       commit_signature: recordData.commit_signature,
@@ -1418,9 +1673,11 @@ export class RecordsService {
             : [],
           author: draft.author,
           created_by: draft.created_by,
-          created_at: draft.created_at,
-          updated_at: draft.updated_at,
-          last_draft_saved_at: draft.last_draft_saved_at,
+          created_at: this.normalizeDateString(draft.created_at),
+          updated_at: this.normalizeDateString(draft.updated_at),
+          last_draft_saved_at: this.normalizeDateString(
+            draft.last_draft_saved_at
+          ),
           isDraft: true,
         };
       }
@@ -1433,6 +1690,8 @@ export class RecordsService {
         ...record,
         workflowState: record.workflowState || 'draft', // Internal editorial status (DB-only) - default to 'draft' if null
         isDraft: false,
+        // Ensure content is available as both content and markdownBody for frontend compatibility
+        markdownBody: record.content,
       };
     }
 
@@ -1468,36 +1727,77 @@ export class RecordsService {
     // Use target status or draft's current status
     const finalStatus = targetStatus || draft.status;
 
-    // Create record request
-    const request: CreateRecordRequest = {
-      title: draft.title,
-      type: draft.type,
-      content: draft.markdown_body,
-      metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
-      geography: draft.geography ? JSON.parse(draft.geography) : undefined,
-      attachedFiles: draft.attached_files
-        ? JSON.parse(draft.attached_files)
-        : undefined,
-      linkedRecords: draft.linked_records
-        ? JSON.parse(draft.linked_records)
-        : undefined,
-      linkedGeographyFiles: draft.linked_geography_files
-        ? JSON.parse(draft.linked_geography_files)
-        : undefined,
-      status: finalStatus, // Legal status (stored in YAML + DB)
-      workflowState: draft.workflow_state || 'draft', // Internal editorial status (DB-only, never in YAML) - preserve from draft
-      createdAt: draft.created_at,
-      updatedAt: draft.updated_at,
-    };
+    // Check if record already exists in records table
+    const existingRecord = await this.db.getRecord(id);
+    let record: any;
 
-    // Create record using RecordManager (this will create file and save to records table)
-    const record = await this.recordManager.createRecordWithId(
-      id,
-      request,
-      user
-    );
+    if (existingRecord) {
+      // Record exists: UPDATE it (publishing changes to existing published record)
+      // Map draft fields to UpdateRecordRequest format
+      // Note: type is not included in UpdateRecordRequest - record type shouldn't change after creation
+      const updateRequest = {
+        title: draft.title,
+        content: draft.markdown_body, // Map markdown_body → content
+        metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
+        status: finalStatus, // Legal status (stored in YAML + DB)
+        workflowState: null, // Clear editorial state for published records
+        geography: draft.geography ? JSON.parse(draft.geography) : undefined,
+        attachedFiles: draft.attached_files
+          ? JSON.parse(draft.attached_files)
+          : undefined,
+        linkedRecords: draft.linked_records
+          ? JSON.parse(draft.linked_records)
+          : undefined,
+        linkedGeographyFiles: draft.linked_geography_files
+          ? JSON.parse(draft.linked_geography_files)
+          : undefined,
+      };
 
-    // Delete draft
+      // Update existing record (this will update file via updateRecordFile())
+      const updatedRecord = await this.recordManager.updateRecord(
+        id,
+        updateRequest,
+        user
+      );
+
+      if (!updatedRecord) {
+        throw new Error(`Failed to update record ${id}`);
+      }
+
+      record = updatedRecord;
+    } else {
+      // Record doesn't exist: CREATE it (publishing new record)
+      // Map draft fields to CreateRecordRequest format
+      const createRequest: CreateRecordRequest = {
+        title: draft.title,
+        type: draft.type,
+        content: draft.markdown_body,
+        metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
+        geography: draft.geography ? JSON.parse(draft.geography) : undefined,
+        attachedFiles: draft.attached_files
+          ? JSON.parse(draft.attached_files)
+          : undefined,
+        linkedRecords: draft.linked_records
+          ? JSON.parse(draft.linked_records)
+          : undefined,
+        linkedGeographyFiles: draft.linked_geography_files
+          ? JSON.parse(draft.linked_geography_files)
+          : undefined,
+        status: finalStatus, // Legal status (stored in YAML + DB)
+        workflowState: null, // Clear editorial state for published records (should be NULL)
+        createdAt: draft.created_at, // Preserve draft's created_at for new records
+        updatedAt: new Date().toISOString(), // Set to current time when publishing
+      };
+
+      // Create new record (this will create file via createRecordFile())
+      record = await this.recordManager.createRecordWithId(
+        id,
+        createRequest,
+        user
+      );
+    }
+
+    // Delete draft after successful publish (same for both UPDATE and CREATE)
     await this.db.deleteDraft(id);
 
     return {
@@ -1505,7 +1805,7 @@ export class RecordsService {
       title: record.title,
       type: record.type,
       status: record.status, // Legal status (stored in YAML + DB)
-      workflowState: record.workflowState, // Internal editorial status (DB-only)
+      workflowState: record.workflowState || null, // Internal editorial status (DB-only) - should be null for published
       content: record.content,
       metadata: record.metadata || {},
       authors: record.authors,
@@ -1515,8 +1815,8 @@ export class RecordsService {
       linkedRecords: record.linkedRecords || [],
       linkedGeographyFiles: record.linkedGeographyFiles || [],
       path: record.path,
-      created_at: record.created_at,
-      updated_at: record.updated_at,
+      created_at: this.normalizeDateString(record.created_at),
+      updated_at: this.normalizeDateString(record.updated_at),
       author: record.author,
       commit_ref: record.commit_ref,
       commit_signature: record.commit_signature,

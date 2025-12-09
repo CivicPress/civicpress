@@ -23,6 +23,7 @@ export interface CivicRecord {
     | 'archived'
     | 'expired'; // Legal status (stored in YAML + DB)
   workflowState?: string; // Internal editorial status (DB-only, never in YAML)
+  hasUnpublishedChanges?: boolean; // Indicates if there's a draft version of this published record
   path: string;
   author: string; // Required: primary author username
   authors?: Array<{

@@ -159,6 +159,49 @@ const recordAuthor = ref<string>('');
 const recordCreatedAt = ref<string>('');
 const recordUpdatedAt = ref<string>('');
 
+// Helper functions for title/content separation
+const extractTitleFromMarkdown = (content: string): string | null => {
+  if (!content) return null;
+  const lines = content.split('\n');
+  const firstLine = lines[0]?.trim();
+  // Check if first line is an H1 heading (# Title)
+  if (firstLine?.startsWith('# ')) {
+    return firstLine.substring(2).trim();
+  }
+  return null;
+};
+
+const stripFirstLineFromMarkdown = (content: string): string => {
+  if (!content) return '';
+  const lines = content.split('\n');
+  const firstLine = lines[0]?.trim();
+  // If first line is an H1, remove it and any following blank lines
+  if (firstLine?.startsWith('# ')) {
+    // Remove first line and any immediately following blank lines
+    let startIndex = 1;
+    while (startIndex < lines.length && lines[startIndex]?.trim() === '') {
+      startIndex++;
+    }
+    return lines.slice(startIndex).join('\n');
+  }
+  return content;
+};
+
+const prependTitleToMarkdown = (title: string, content: string): string => {
+  const titleLine = `# ${title}`;
+  // If content is empty, just return title
+  if (!content.trim()) {
+    return titleLine;
+  }
+  // Ensure there's a blank line between title and content
+  return `${titleLine}\n\n${content}`;
+};
+
+// Computed property for preview content (includes title as H1)
+const previewContent = computed(() => {
+  return prependTitleToMarkdown(form.title || '', form.markdownBody || '');
+});
+
 // Initialize lock (only in edit mode) - moved to after form.id is set
 let lockComposable: ReturnType<typeof useRecordLock> | null = null;
 const initializeLock = () => {
@@ -220,9 +263,10 @@ onMounted(async () => {
 
   if (props.isEditing && props.record) {
     // Load record (check draft first, then published)
+    // Use ?edit=true to get draft version if it exists (for authenticated users with edit permission)
     try {
       const response = (await $civicApi(
-        `/api/v1/records/${props.record.id}`
+        `/api/v1/records/${props.record.id}?edit=true`
       )) as any;
 
       if (response?.success && response?.data) {
@@ -230,7 +274,6 @@ onMounted(async () => {
         isDraft.value = data.isDraft || false;
 
         form.id = data.id;
-        form.title = data.title;
         form.type = data.type;
         form.status = data.status; // Legal status (stored in YAML + DB)
         // Initialize workflowState from API, default to 'draft' only if not provided
@@ -238,7 +281,15 @@ onMounted(async () => {
           data.workflowState !== undefined && data.workflowState !== null
             ? data.workflowState
             : 'draft'; // Internal editorial status (DB-only, never in YAML)
-        form.markdownBody = data.markdownBody || data.content || '';
+
+        // Extract title from markdown content if first line is H1, otherwise use data.title
+        const rawContent = data.markdownBody || data.content || '';
+        const extractedTitle = extractTitleFromMarkdown(rawContent);
+        form.title = extractedTitle || data.title || '';
+        form.markdownBody = extractedTitle
+          ? stripFirstLineFromMarkdown(rawContent)
+          : rawContent;
+
         form.description = data.metadata?.description || '';
         form.tags = data.metadata?.tags || [];
         form.geography = data.geography;
@@ -265,7 +316,6 @@ onMounted(async () => {
       // Fallback to props.record if API fails
       if (props.record) {
         form.id = props.record.id;
-        form.title = props.record.title;
         form.type = props.record.type;
         form.status = props.record.status; // Legal status (stored in YAML + DB)
         // Initialize workflowState from props, default to 'draft' only if not provided
@@ -274,7 +324,14 @@ onMounted(async () => {
           (props.record as any).workflowState !== null
             ? (props.record as any).workflowState
             : 'draft'; // Internal editorial status (DB-only, never in YAML)
-        form.markdownBody = props.record.content || '';
+
+        // Extract title from markdown content if first line is H1, otherwise use props.record.title
+        const rawContent = props.record.content || '';
+        const extractedTitle = extractTitleFromMarkdown(rawContent);
+        form.title = extractedTitle || props.record.title || '';
+        form.markdownBody = extractedTitle
+          ? stripFirstLineFromMarkdown(rawContent)
+          : rawContent;
         form.description = (props.record.metadata as any)?.description || '';
         form.tags = props.record.metadata?.tags || [];
         form.geography = (props.record as any).geography;
@@ -302,6 +359,13 @@ onMounted(async () => {
     }
   } else if (props.recordType) {
     form.type = props.recordType;
+  } else if (!props.isEditing) {
+    // For new records: Set default type to first item in dropdown
+    const recordTypeOptions = getRecordTypeOptions();
+    const firstOption = recordTypeOptions[0];
+    if (firstOption && !form.type) {
+      form.type = firstOption.value;
+    }
   }
 
   // Initialize author for new records
@@ -312,8 +376,8 @@ onMounted(async () => {
     recordUpdatedAt.value = now;
   }
 
-  // Start autosave (only in edit mode)
-  if (props.isEditing && form.id) {
+  // Start autosave ONLY if record already has a draft
+  if (props.isEditing && form.id && isDraft.value) {
     startAutosave();
   }
 });
@@ -335,7 +399,7 @@ const autosave = useAutosave(form, {
           type: data.type,
           status: data.status, // Legal status (stored in YAML + DB)
           workflowState: data.workflowState, // Internal editorial status (DB-only, never in YAML)
-          markdownBody: data.markdownBody,
+          markdownBody: prependTitleToMarkdown(data.title, data.markdownBody),
           metadata: {
             ...data.metadata,
             tags: data.tags,
@@ -372,6 +436,23 @@ const startAutosave = () => {
   autosave.start();
 };
 
+// Watch isDraft and automatically start/stop autosave when draft status changes
+watch(
+  () => isDraft.value,
+  (newValue) => {
+    if (props.isEditing && form.id) {
+      if (newValue) {
+        // Draft created - start autosave
+        autosave.start();
+      } else {
+        // Draft published or deleted - stop autosave
+        autosave.stop();
+      }
+    }
+  },
+  { immediate: false } // Don't run on initial mount (handled in onMounted)
+);
+
 // Save draft manually
 const handleSaveDraft = async () => {
   if (!form.title || !form.type) {
@@ -393,7 +474,7 @@ const handleSaveDraft = async () => {
           type: form.type,
           status: form.status, // Legal status (stored in YAML + DB)
           workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
-          markdownBody: form.markdownBody,
+          markdownBody: prependTitleToMarkdown(form.title, form.markdownBody),
           metadata: {
             ...form.metadata,
             tags: form.tags,
@@ -414,7 +495,7 @@ const handleSaveDraft = async () => {
           type: form.type,
           status: form.status, // Legal status (stored in YAML + DB)
           workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
-          content: form.markdownBody,
+          content: prependTitleToMarkdown(form.title, form.markdownBody),
           metadata: {
             ...form.metadata,
             tags: form.tags,
@@ -430,6 +511,21 @@ const handleSaveDraft = async () => {
       if (response?.success && response?.data) {
         form.id = response.data.id;
         isDraft.value = true;
+
+        // Start autosave now that draft exists (before navigation)
+        if (props.isEditing) {
+          startAutosave();
+        }
+
+        toast.add({
+          title: 'Draft saved',
+          description: 'Your changes have been saved',
+          color: 'primary',
+        });
+
+        // Navigate to the record edit page after first save
+        navigateTo(`/records/${form.type}/${form.id}/edit`);
+        return; // Exit early after navigation
       }
     }
 
@@ -457,6 +553,9 @@ const handleSaveDraft = async () => {
           // Store current workflowState before updating (to preserve if API doesn't return it)
           const currentWorkflowState = form.workflowState;
 
+          // Update isDraft based on response (record might have been published externally)
+          isDraft.value = data.isDraft || false;
+
           // Update form with the latest data from the server
           form.type = data.type;
           form.status = data.status; // Legal status (stored in YAML + DB)
@@ -472,7 +571,14 @@ const handleSaveDraft = async () => {
             // If API doesn't return workflowState, keep the current form.workflowState value (don't reset)
             form.workflowState = currentWorkflowState;
           }
-          form.title = data.title;
+          // Extract title from markdown content if first line is H1, otherwise use data.title
+          const rawContent = data.markdownBody || data.content || '';
+          const extractedTitle = extractTitleFromMarkdown(rawContent);
+          form.title = extractedTitle || data.title || '';
+          form.markdownBody = extractedTitle
+            ? stripFirstLineFromMarkdown(rawContent)
+            : rawContent;
+
           // Update metadata for YAML display
           recordAuthor.value =
             data.author || data.created_by || authStore.user?.username || '';
@@ -486,14 +592,15 @@ const handleSaveDraft = async () => {
         }
 
         // Restart autosave after refresh is complete
-        if (props.isEditing && form.id) {
+        // Only restart if it's still a draft (might have been published externally)
+        if (props.isEditing && form.id && isDraft.value) {
           autosave.start();
         }
       } catch (err) {
         console.error('Failed to refresh record after save:', err);
         // Non-critical error, don't show to user
-        // Restart autosave even on error
-        if (props.isEditing && form.id) {
+        // Restart autosave even on error, but only if it's still a draft
+        if (props.isEditing && form.id && isDraft.value) {
           autosave.start();
         }
       }
@@ -546,6 +653,9 @@ const handlePublish = async (targetStatus?: string) => {
 
       isDraft.value = false;
 
+      // Stop autosave after publishing (no longer a draft)
+      autosave.stop();
+
       // Navigate to view page
       navigateTo(`/records/${form.type}/${form.id}`);
     }
@@ -583,6 +693,11 @@ const handleUnpublish = async () => {
 
       form.status = 'draft';
       isDraft.value = true;
+
+      // Start autosave after unpublishing (now it's a draft)
+      if (props.isEditing && form.id) {
+        startAutosave();
+      }
 
       // Refresh record data
       if (props.isEditing && form.id) {
@@ -673,14 +788,21 @@ const handleDuplicate = async () => {
     if (response?.success && response?.data) {
       const record = response.data;
 
+      // Extract content without title if it exists in markdown
+      const rawContent = record.markdownBody || record.content || '';
+      const contentWithoutTitle = extractTitleFromMarkdown(rawContent)
+        ? stripFirstLineFromMarkdown(rawContent)
+        : rawContent;
+      const newTitle = `${record.title} (Copy)`;
+
       // Create a new record with duplicated data
       const duplicateResponse = (await $civicApi('/api/v1/records', {
         method: 'POST',
         body: {
-          title: `${record.title} (Copy)`,
+          title: newTitle,
           type: record.type,
           status: 'draft',
-          content: record.markdownBody || record.content || '',
+          content: prependTitleToMarkdown(newTitle, contentWithoutTitle),
           metadata: {
             ...record.metadata,
             tags: record.tags || [],
@@ -1039,7 +1161,7 @@ defineExpose({
             />
           </div>
           <PreviewPanel
-            :content="form.markdownBody"
+            :content="previewContent"
             :show="showPreview || !isMobile"
           />
         </div>

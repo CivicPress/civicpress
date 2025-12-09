@@ -8,6 +8,52 @@ and this project adheres to
 
 ## [Unreleased]
 
+<!-- markdownlint-disable MD024 -->
+
+### Added
+
+- **Unpublished Changes Badge**: Added visual indicator for records with
+  unpublished draft changes
+  - Badge displays on record list page and single record view page
+  - Only visible to authenticated users with `records:edit` permission
+  - Badge shows "Unpublished changes" with edit icon
+  - API endpoints now include `hasUnpublishedChanges` flag in responses
+
+- **Draft Detection API**: Added automatic draft detection for listing and
+  search endpoints
+  - `GET /api/v1/records` now includes `hasUnpublishedChanges` flag for
+    authenticated editors
+  - `GET /api/v1/search` now includes `hasUnpublishedChanges` flag for
+    authenticated editors
+  - Efficient batch querying of drafts to minimize database calls
+  - Field only included for users with `records:edit` permission
+
+- **Edit Mode Query Parameter**: Added `?edit=true` parameter to single record
+  endpoint
+  - `GET /api/v1/records/:id?edit=true` returns draft version if available (for
+    authenticated editors)
+  - `GET /api/v1/records/:id` (default) always returns published version
+  - Allows frontend to fetch draft content when editing, published content when
+    viewing
+  - Public users always receive published version regardless of parameter
+
+### Changed
+
+- **Record View Behavior**: Single record endpoint now differentiates between
+  view and edit modes
+  - View mode (default): Always returns published record, includes
+    `hasUnpublishedChanges` flag for editors
+  - Edit mode (`?edit=true`): Returns draft if available for authenticated
+    editors with permission
+  - Ensures published content is always shown to public users and in view
+    contexts
+
+- **Test Coverage**: Added comprehensive test suite for unpublished changes
+  feature
+  - 13 new tests covering draft detection, edit mode, and permission handling
+  - Tests verify proper behavior for authenticated and public users
+  - All existing tests remain passing
+
 ## [0.1.3] - 2025-11-26
 
 ### Changed

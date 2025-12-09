@@ -591,7 +591,7 @@ describe('API Records Integration', () => {
 
       // Get draft
       const response = await request(context.api.getApp())
-        .get('/api/v1/records/draft-get-1')
+        .get('/api/v1/records/draft-get-1?edit=true')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect([200, 201]).toContain(response.status);
@@ -662,6 +662,561 @@ describe('API Records Integration', () => {
 
       expect([200, 201]).toContain(response.status);
       expect(response.body.data.workflowState).toBe('internal_only');
+    });
+  });
+
+  describe('GET /api/v1/records - Draft Detection (hasUnpublishedChanges)', () => {
+    it('should include hasUnpublishedChanges flag when draft exists', async () => {
+      // Create draft, then publish to create published record
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Published Record with Draft',
+          content: '# Published\n\nPublished content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft for this record
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Published Record with Draft',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // List records - should include hasUnpublishedChanges flag
+      const listResponse = await request(context.api.getApp())
+        .get('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(listResponse.status).toBe(200);
+      expect(listResponse.body.success).toBe(true);
+
+      const recordWithDraft = listResponse.body.data.records.find(
+        (r: any) => r.id === recordId
+      );
+      expect(recordWithDraft).toBeDefined();
+      expect(recordWithDraft.hasUnpublishedChanges).toBe(true);
+    });
+
+    it('should set hasUnpublishedChanges to false when no draft exists', async () => {
+      // Create draft, then publish to create published record (no draft)
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Published Record No Draft',
+          content: '# Published\n\nContent.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // List records
+      const listResponse = await request(context.api.getApp())
+        .get('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(listResponse.status).toBe(200);
+      const record = listResponse.body.data.records.find(
+        (r: any) => r.id === recordId
+      );
+      expect(record).toBeDefined();
+      expect(record.hasUnpublishedChanges).toBe(false);
+    });
+
+    it('should not include hasUnpublishedChanges for public users', async () => {
+      // Create draft, then publish to create published record with draft
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Record for Public Test',
+          content: '# Published\n\nContent.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Record for Public Test',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // List records as public user (no auth)
+      const listResponse = await request(context.api.getApp()).get(
+        '/api/v1/records'
+      );
+
+      expect(listResponse.status).toBe(200);
+      const record = listResponse.body.data.records.find(
+        (r: any) => r.id === recordId
+      );
+      expect(record).toBeDefined();
+      // Public users should not see hasUnpublishedChanges
+      expect(record.hasUnpublishedChanges).toBeUndefined();
+    });
+
+    it('should handle batch draft detection for many records', async () => {
+      // Create multiple published records
+      const recordIds: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        // Create draft first
+        const draftResponse = await request(context.api.getApp())
+          .post('/api/v1/records')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            type: 'policy',
+            title: `Record ${i}`,
+            content: `# Record ${i}\n\nContent.`,
+          });
+        expect(draftResponse.status).toBe(201);
+        recordIds.push(draftResponse.body.data.id);
+
+        // Publish to create published record
+        await request(context.api.getApp())
+          .post(`/api/v1/records/${recordIds[recordIds.length - 1]}/publish`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ status: 'published' });
+      }
+
+      // Create drafts for first 3 records
+      for (let i = 0; i < 3; i++) {
+        await request(context.api.getApp())
+          .put(`/api/v1/records/${recordIds[i]}/draft`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            title: `Record ${i}`,
+            type: 'policy',
+            markdownBody: `# Draft ${i}\n\nDraft content.`,
+          });
+      }
+
+      // List records
+      const listResponse = await request(context.api.getApp())
+        .get('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(listResponse.status).toBe(200);
+
+      // Check first 3 have drafts
+      for (let i = 0; i < 3; i++) {
+        const record = listResponse.body.data.records.find(
+          (r: any) => r.id === recordIds[i]
+        );
+        expect(record).toBeDefined();
+        expect(record.hasUnpublishedChanges).toBe(true);
+      }
+
+      // Check last 2 don't have drafts
+      for (let i = 3; i < 5; i++) {
+        const record = listResponse.body.data.records.find(
+          (r: any) => r.id === recordIds[i]
+        );
+        expect(record).toBeDefined();
+        expect(record.hasUnpublishedChanges).toBe(false);
+      }
+    });
+  });
+
+  describe('GET /api/v1/records/:id - Edit Mode (?edit=true)', () => {
+    it('should return draft when edit=true and user has permission', async () => {
+      // Create draft, then publish to create published record
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Original Title',
+          content: '# Original\n\nOriginal content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft with different content
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Updated Title',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // Get with edit=true should return draft
+      const editResponse = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}?edit=true`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(editResponse.status).toBe(200);
+      expect(editResponse.body.success).toBe(true);
+      expect(editResponse.body.data.isDraft).toBe(true);
+      expect(editResponse.body.data.markdownBody).toContain('Draft content');
+      expect(editResponse.body.data.title).toBe('Updated Title');
+    });
+
+    it('should return published record when edit=false', async () => {
+      // Create draft, then publish to create published record
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Original Title',
+          content: '# Original\n\nOriginal content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft with different content
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Updated Title',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // Get with edit=false should return published
+      const viewResponse = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}?edit=false`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(viewResponse.status).toBe(200);
+      expect(viewResponse.body.success).toBe(true);
+      expect(viewResponse.body.data.isDraft).toBe(false);
+      expect(viewResponse.body.data.content).toContain('Original content');
+      expect(viewResponse.body.data.title).toBe('Original Title');
+    });
+
+    it('should return published record when edit parameter is missing (default view mode)', async () => {
+      // Create draft, then publish to create published record
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Original Title',
+          content: '# Original\n\nOriginal content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Updated Title',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // Get without edit parameter should return published (default)
+      const viewResponse = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(viewResponse.status).toBe(200);
+      expect(viewResponse.body.success).toBe(true);
+      expect(viewResponse.body.data.isDraft).toBe(false);
+      expect(viewResponse.body.data.content).toContain('Original content');
+    });
+
+    it('should return published record for public users even with edit=true', async () => {
+      // Create draft, then publish to create published record
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Original Title',
+          content: '# Original\n\nOriginal content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Updated Title',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // Public user (no auth) with edit=true should still get published
+      const publicResponse = await request(context.api.getApp()).get(
+        `/api/v1/records/${recordId}?edit=true`
+      );
+
+      expect(publicResponse.status).toBe(200);
+      expect(publicResponse.body.success).toBe(true);
+      expect(publicResponse.body.data.isDraft).toBe(false);
+      expect(publicResponse.body.data.content).toContain('Original content');
+    });
+
+    it('should include hasUnpublishedChanges when draft exists (view mode)', async () => {
+      // Create draft, then publish to create published record
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Original Title',
+          content: '# Original\n\nOriginal content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Updated Title',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // Get in view mode (no edit param) - should include hasUnpublishedChanges
+      const viewResponse = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(viewResponse.status).toBe(200);
+      expect(viewResponse.body.data.hasUnpublishedChanges).toBe(true);
+      expect(viewResponse.body.data.isDraft).toBe(false); // Still published content
+    });
+
+    it('should not include hasUnpublishedChanges when no draft exists', async () => {
+      // Create draft, then publish to create published record (no draft)
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Original Title',
+          content: '# Original\n\nOriginal content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Get in view mode
+      const viewResponse = await request(context.api.getApp())
+        .get(`/api/v1/records/${recordId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(viewResponse.status).toBe(200);
+      expect(viewResponse.body.data.hasUnpublishedChanges).toBe(false);
+    });
+  });
+
+  describe('GET /api/v1/search - Draft Detection (hasUnpublishedChanges)', () => {
+    it('should include hasUnpublishedChanges flag when draft exists', async () => {
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Search Test Record',
+          content: '# Published\n\nPublished content.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft for this record
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Search Test Record',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // Search records - should include hasUnpublishedChanges flag
+      const searchResponse = await request(context.api.getApp())
+        .get('/api/v1/search?q=Search Test')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(searchResponse.status).toBe(200);
+      expect(searchResponse.body.success).toBe(true);
+
+      const recordWithDraft = searchResponse.body.data.results.find(
+        (r: any) => r.id === recordId
+      );
+      expect(recordWithDraft).toBeDefined();
+      expect(recordWithDraft.hasUnpublishedChanges).toBe(true);
+    });
+
+    it('should set hasUnpublishedChanges to false when no draft exists', async () => {
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Search Test No Draft',
+          content: '# Published\n\nContent.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Search records
+      const searchResponse = await request(context.api.getApp())
+        .get('/api/v1/search?q=Search Test No Draft')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(searchResponse.status).toBe(200);
+      const record = searchResponse.body.data.results.find(
+        (r: any) => r.id === recordId
+      );
+      expect(record).toBeDefined();
+      expect(record.hasUnpublishedChanges).toBe(false);
+    });
+
+    it('should not include hasUnpublishedChanges for public users', async () => {
+      // Create draft first
+      const draftResponse = await request(context.api.getApp())
+        .post('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'policy',
+          title: 'Public Search Test',
+          content: '# Published\n\nContent.',
+        });
+
+      expect(draftResponse.status).toBe(201);
+      const recordId = draftResponse.body.data.id;
+
+      // Publish to create published record
+      await request(context.api.getApp())
+        .post(`/api/v1/records/${recordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      // Create draft
+      await request(context.api.getApp())
+        .put(`/api/v1/records/${recordId}/draft`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Public Search Test',
+          type: 'policy',
+          markdownBody: '# Draft\n\nDraft content.',
+        });
+
+      // Search as public user (no auth)
+      const searchResponse = await request(context.api.getApp()).get(
+        '/api/v1/search?q=Public Search Test'
+      );
+
+      expect(searchResponse.status).toBe(200);
+      const record = searchResponse.body.data.results.find(
+        (r: any) => r.id === recordId
+      );
+      expect(record).toBeDefined();
+      // Public users should not see hasUnpublishedChanges
+      expect(record.hasUnpublishedChanges).toBeUndefined();
     });
   });
 });
