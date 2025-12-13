@@ -128,6 +128,7 @@ const previewWidth = ref(
 const isResizing = ref(false);
 const allowedTransitions = ref<string[]>([]);
 const isDraft = ref(false);
+const hasUnpublishedChanges = ref(false); // Track if there's an unpublished draft for a published record
 const showSidebar = ref(false);
 
 // Responsive state
@@ -272,6 +273,8 @@ onMounted(async () => {
       if (response?.success && response?.data) {
         const data = response.data;
         isDraft.value = data.isDraft || false;
+        // Track if there are unpublished changes (when viewing a published record with a draft)
+        hasUnpublishedChanges.value = data.hasUnpublishedChanges || false;
 
         form.id = data.id;
         form.type = data.type;
@@ -545,8 +548,9 @@ const handleSaveDraft = async () => {
         // Temporarily stop autosave to prevent triggering on refresh updates
         autosave.stop();
 
+        // Use ?edit=true to fetch the draft version (not the published version)
         const refreshResponse = (await $civicApi(
-          `/api/v1/records/${form.id}`
+          `/api/v1/records/${form.id}?edit=true`
         )) as any;
         if (refreshResponse?.success && refreshResponse?.data) {
           const data = refreshResponse.data;
@@ -555,6 +559,8 @@ const handleSaveDraft = async () => {
 
           // Update isDraft based on response (record might have been published externally)
           isDraft.value = data.isDraft || false;
+          // Update hasUnpublishedChanges flag
+          hasUnpublishedChanges.value = data.hasUnpublishedChanges || false;
 
           // Update form with the latest data from the server
           form.type = data.type;
@@ -675,13 +681,47 @@ const handleDelete = () => {
   }
 };
 
+// Handle delete unpublished changes (delete draft)
+const handleDeleteUnpublishedChanges = async () => {
+  if (!form.id) return;
+
+  try {
+    const response = (await $civicApi(`/api/v1/records/${form.id}/draft`, {
+      method: 'DELETE',
+    })) as any;
+
+    if (response?.success) {
+      toast.add({
+        title: t('records.editor.unpublishedChangesDeleted'),
+        description: t('records.editor.unpublishedChangesDeletedDescription'),
+        color: 'primary',
+      });
+
+      // Navigate to drafts list page - the draft has been deleted from record_drafts table
+      // and will no longer appear in the drafts list
+      navigateTo('/records/drafts');
+    }
+  } catch (err: any) {
+    const errorMessage =
+      err.message || t('records.editor.failedToDeleteUnpublishedChanges');
+    toast.add({
+      title: t('common.error'),
+      description: errorMessage,
+      color: 'error',
+    });
+  }
+};
+
 // Handle unpublish (revert to draft)
 const handleUnpublish = async () => {
   if (!form.id) return;
 
   try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/publish`, {
-      method: 'DELETE',
+    const response = (await $civicApi(`/api/v1/records/${form.id}/status`, {
+      method: 'POST',
+      body: {
+        status: 'draft',
+      },
     })) as any;
 
     if (response?.success) {
@@ -703,7 +743,7 @@ const handleUnpublish = async () => {
       if (props.isEditing && form.id) {
         try {
           const refreshResponse = (await $civicApi(
-            `/api/v1/records/${form.id}`
+            `/api/v1/records/${form.id}?edit=true`
           )) as any;
           if (refreshResponse?.success && refreshResponse?.data) {
             const data = refreshResponse.data;
@@ -1015,6 +1055,7 @@ defineExpose({
         :title="form.title"
         :status="form.status"
         :is-draft="isDraft"
+        :has-unpublished-changes="hasUnpublishedChanges"
         :is-editing="isEditing"
         :autosave-status="autosaveStatus"
         :last-saved="lastSaved"
@@ -1026,6 +1067,7 @@ defineExpose({
         @save-draft="handleSaveDraft"
         @publish="handlePublish"
         @unpublish="handleUnpublish"
+        @delete-unpublished-changes="handleDeleteUnpublishedChanges"
         @archive="handleArchive"
         @delete="handleDelete"
         @view-history="handleViewHistory"

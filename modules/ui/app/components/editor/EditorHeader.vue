@@ -9,6 +9,7 @@ interface Props {
   title: string;
   status: string;
   isDraft?: boolean;
+  hasUnpublishedChanges?: boolean;
   isEditing?: boolean;
   autosaveStatus?: 'idle' | 'saving' | 'saved' | 'error';
   lastSaved?: Date | null;
@@ -18,6 +19,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   isDraft: false,
+  hasUnpublishedChanges: false,
   isEditing: false,
   autosaveStatus: 'idle',
   disabled: false,
@@ -31,6 +33,7 @@ const emit = defineEmits<{
   'save-draft': [];
   publish: [status?: string];
   unpublish: [];
+  'delete-unpublished-changes': [];
   archive: [];
   delete: [];
   'view-history': [];
@@ -44,6 +47,7 @@ const { getStatusConfig } = useRecordUtils();
 // Modal states
 const showPublishModal = ref(false);
 const showUnpublishModal = ref(false);
+const showDeleteUnpublishedModal = ref(false);
 const showArchiveModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedPublishStatus = ref<string | null>(null);
@@ -85,6 +89,23 @@ const dropdownItems = computed(() => {
       onClick: () => {
         selectedPublishStatus.value = props.status;
         showPublishModal.value = true;
+      },
+    });
+  }
+
+  // Show "Delete unpublished changes" option if:
+  // - We're editing a draft (isDraft=true) - this means there are unpublished changes
+  // - OR we're editing a published record that has unpublished changes (hasUnpublishedChanges=true)
+  if (
+    props.isEditing &&
+    !isArchived.value &&
+    (props.isDraft || props.hasUnpublishedChanges)
+  ) {
+    firstSection.push({
+      label: t('records.editor.deleteUnpublishedChanges'),
+      icon: 'i-lucide-trash-2',
+      onClick: () => {
+        showDeleteUnpublishedModal.value = true;
       },
     });
   }
@@ -205,6 +226,11 @@ const confirmPublish = () => {
 const confirmUnpublish = () => {
   emit('unpublish');
   showUnpublishModal.value = false;
+};
+
+const confirmDeleteUnpublishedChanges = () => {
+  emit('delete-unpublished-changes');
+  showDeleteUnpublishedModal.value = false;
 };
 
 const confirmArchive = () => {
@@ -468,6 +494,51 @@ const formatTime = (date: Date) => {
           </UButton>
           <UButton color="primary" @click="confirmArchive">
             {{ t('records.editor.archiveRecord') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Delete Unpublished Changes Confirmation Modal -->
+    <UModal
+      v-model:open="showDeleteUnpublishedModal"
+      :title="t('records.editor.deleteUnpublishedChanges')"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-gray-700 dark:text-gray-300">
+            {{ t('records.editor.deleteUnpublishedChangesDescription') }}
+          </p>
+          <div
+            class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4"
+          >
+            <div class="flex items-start space-x-3">
+              <UIcon
+                name="i-lucide-alert-triangle"
+                class="w-5 h-5 text-yellow-600 mt-0.5"
+              />
+              <div class="text-sm text-yellow-700 dark:text-yellow-300">
+                <p class="font-medium">{{ t('records.editor.warning') }}</p>
+                <ul class="mt-1 space-y-1">
+                  <li>• {{ t('records.editor.willDeleteDraftChanges') }}</li>
+                  <li>
+                    • {{ t('records.editor.publishedVersionWillRemain') }}
+                  </li>
+                  <li>• {{ t('records.editor.cannotBeUndone') }}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template #footer="{ close }">
+        <div class="flex justify-end space-x-3">
+          <UButton color="neutral" variant="outline" @click="close">
+            {{ t('common.cancel') }}
+          </UButton>
+          <UButton color="error" @click="confirmDeleteUnpublishedChanges">
+            {{ t('records.editor.deleteUnpublishedChanges') }}
           </UButton>
         </div>
       </template>
