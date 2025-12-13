@@ -21,7 +21,6 @@
     "@codemirror/view": "6.38.8",
     "@nuxt/eslint": "^1.10.0",
     "@nuxt/scripts": "^0.13.0",
-    "@nuxt/test-utils": "^3.20.1",
     "@nuxt/ui-pro": "^3.3.7",
     "@nuxtjs/i18n": "10.2.1",
     "@pinia/nuxt": "^0.11.3",
@@ -42,8 +41,13 @@
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.57",
+    "@nuxt/test-utils": "^3.20.1",
+    "@vitejs/plugin-vue": "6.0.3",
+    "@vue/test-utils": "2.4.6",
     "autoprefixer": "^10.4.0",
+    "happy-dom": "20.0.11",
     "postcss": "^8.4.0",
-    "tailwindcss": "^4.1.11"
+    "tailwindcss": "^4.1.11",
+    "unplugin-auto-import": "20.3.0"
   }
 }
