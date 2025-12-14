@@ -42,6 +42,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "test:ui:run": "vitest run --config vitest.config.ui.mjs",
+    "test:all": "vitest run && vitest run --config vitest.config.ui.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "gen": "plop",

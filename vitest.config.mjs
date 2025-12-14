@@ -1,14 +1,24 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
-import { join } from 'path';
+import { join, resolve } from 'path';
+import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
+  plugins: [
+    vue({
+      script: {
+        defineModel: true,
+        propsDestructure: true,
+      },
+    }),
+  ],
   test: {
     globals: true,
     environment: 'node',
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
       '~': join(__dirname, 'modules', 'ui', 'app'),
+      '@': join(__dirname, 'modules', 'ui', 'app'),
     },
     // ONLY run CivicPress tests, exclude everything else
     include: [
@@ -21,11 +31,18 @@ export default defineConfig({
       '**/build/**',               // Skip build artifacts
       '**/modules/**/node_modules/**', // Skip UI module dependencies
       '**/cli/node_modules/**',    // Skip CLI dependencies
-      '**/core/node_modules/**'    // Skip core dependencies
+      '**/core/node_modules/**',   // Skip core dependencies
+      'tests/ui/**',               // Exclude UI tests (use vitest.config.ui.mjs with happy-dom)
     ],
     // Be very strict about what we include
     testNamePattern: undefined,
     // Don't search recursively in dependencies
     root: '.',
+  },
+  resolve: {
+    alias: {
+      '~': resolve(__dirname, 'modules/ui/app'),
+      '@': resolve(__dirname, 'modules/ui/app'),
+    },
   },
 });
