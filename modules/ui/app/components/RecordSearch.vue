@@ -22,7 +22,8 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-  search: [query: string];
+  search: [query: string]; // Emitted on every keystroke (for suggestions)
+  searchSubmit: [query: string]; // Emitted on Enter key or suggestion click
   filterChange: [
     filters: { search: string; types: string[]; statuses: string[] },
   ];
@@ -67,6 +68,7 @@ const { t } = useI18n();
 const searchQuery = ref(props.initialFilters.search || '');
 const selectedRecordTypes = ref<any[]>([]);
 const selectedRecordStatuses = ref<any[]>([]);
+const inputHasFocus = ref(false);
 
 // Track if we're syncing from props to prevent emitting during initial sync
 const isSyncingFromProps = ref(false);
@@ -160,15 +162,27 @@ const recordStatusOptionsComputed = computed(() => {
 });
 
 // Watch for changes and emit events (but skip if syncing from props)
-watch(searchQuery, (newQuery) => {
+watch(searchQuery, (newQuery, oldQuery) => {
   // Don't emit if we're syncing from props (prevents duplicate API calls on mount)
   if (isSyncingFromProps.value) return;
 
+  // Only emit search event - don't emit filterChange for search query changes
+  // Filter changes should only fire when type/status filters change
   emit('search', newQuery);
-  emitFilterChange();
 
-  // Fetch suggestions while typing (when query has 2+ characters)
-  if (newQuery && newQuery.trim().length >= 2) {
+  // If query was cleared (empty string), submit the search to reset the list
+  if (!newQuery || newQuery.trim().length === 0) {
+    if (oldQuery && oldQuery.trim().length > 0) {
+      // Query was cleared - submit to reset search results
+      emit('searchSubmit', '');
+    }
+    clearSuggestions();
+    return;
+  }
+
+  // Only fetch suggestions while typing if input has focus
+  // This prevents suggestions from appearing after clicking a suggestion
+  if (inputHasFocus.value && newQuery && newQuery.trim().length >= 2) {
     fetchSuggestions(newQuery);
   } else {
     clearSuggestions();
@@ -207,25 +221,60 @@ const emitFilterChange = () => {
   });
 };
 
+// Timeout to delay blur handling (allows suggestion clicks to register)
+let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+
 // Search suggestions
-const handleInputBlur = () => {
+const handleInputFocus = () => {
+  // Clear any pending blur timeout
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+    blurTimeout = null;
+  }
+  inputHasFocus.value = true;
+  // Fetch suggestions when input gains focus (if query has 2+ characters)
   if (searchQuery.value && searchQuery.value.trim().length >= 2) {
     fetchSuggestions(searchQuery.value);
   }
 };
 
+const handleInputBlur = () => {
+  // Delay blur handling slightly to allow suggestion clicks to register
+  blurTimeout = setTimeout(() => {
+    inputHasFocus.value = false;
+    clearSuggestions();
+    blurTimeout = null;
+  }, 200); // Small delay to allow click events to fire first
+};
+
+// Handle Enter key press to submit search
+const handleInputKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    clearSuggestions();
+    emit('searchSubmit', searchQuery.value);
+  }
+};
+
 const handleSuggestionClick = (suggestion: string) => {
+  // Clear any pending blur timeout
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+    blurTimeout = null;
+  }
+  // Remove focus from input to hide suggestions
+  inputHasFocus.value = false;
   searchQuery.value = suggestion;
   clearSuggestions();
+  // Submit the search when suggestion is clicked
+  emit('searchSubmit', suggestion);
 };
 
 const handleClickOutside = (event: Event) => {
   const target = event.target as Element;
-  if (
-    !target.closest('.search-suggestions-container') &&
-    searchQuery.value &&
-    searchQuery.value.trim()
-  ) {
+  if (!target.closest('.search-suggestions-container')) {
+    // Clicked outside - remove focus (this will hide suggestions via blur handler)
+    inputHasFocus.value = false;
     clearSuggestions();
   }
 };
@@ -236,6 +285,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
+  // Clean up blur timeout
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+  }
 });
 </script>
 
@@ -256,7 +309,9 @@ onUnmounted(() => {
         <div class="flex-1 relative search-suggestions-container">
           <UInput
             v-model="searchQuery"
+            @focus="handleInputFocus"
             @blur="handleInputBlur"
+            @keydown="handleInputKeydown"
             :placeholder="t('records.filters.searchPlaceholder')"
             icon="i-lucide-search"
             class="w-full"
@@ -274,9 +329,9 @@ onUnmounted(() => {
             </template>
           </UInput>
 
-          <!-- Suggestions Dropdown -->
+          <!-- Suggestions Dropdown (only show when input has focus) -->
           <div
-            v-if="suggestions.length > 0"
+            v-if="inputHasFocus && suggestions.length > 0"
             class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
           >
             <div class="p-2">
@@ -299,9 +354,10 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Loading indicator for suggestions -->
+          <!-- Loading indicator for suggestions (only show when input has focus) -->
           <div
             v-if="
+              inputHasFocus &&
               suggestionsLoading &&
               searchQuery &&
               searchQuery.trim().length >= 2

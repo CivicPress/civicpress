@@ -152,7 +152,11 @@ export class SQLiteAdapter implements DatabaseAdapter {
         content TEXT,
         tags TEXT,
         metadata TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        title_normalized TEXT,
+        content_preview TEXT,
+        word_count INTEGER,
+        UNIQUE(record_id, record_type)
       )`,
 
       // Records table
@@ -522,6 +526,109 @@ export class SQLiteAdapter implements DatabaseAdapter {
       coreDebug('Auth provider update not needed or already completed', {
         operation: 'database:initialize',
       });
+    }
+
+    // Migrate search_index table (add new columns if needed)
+    await this.migrateSearchIndex();
+
+    // Create FTS5 virtual table and triggers
+    await this.createFTS5Table();
+  }
+
+  /**
+   * Migrate search_index table to add new columns
+   */
+  private async migrateSearchIndex(): Promise<void> {
+    const columns = [
+      { name: 'title_normalized', type: 'TEXT' },
+      { name: 'content_preview', type: 'TEXT' },
+      { name: 'word_count', type: 'INTEGER' },
+    ];
+
+    for (const column of columns) {
+      try {
+        await this.execute(
+          `ALTER TABLE search_index ADD COLUMN ${column.name} ${column.type}`
+        );
+        coreDebug(`Added column ${column.name} to search_index`);
+      } catch (error: any) {
+        // Column might already exist, ignore
+        if (
+          !error.message?.includes('duplicate column') &&
+          !error.message?.includes('already exists')
+        ) {
+          coreDebug(`Error adding column ${column.name}:`, error.message);
+        }
+      }
+    }
+  }
+
+  /**
+   * Create FTS5 virtual table and triggers
+   */
+  private async createFTS5Table(): Promise<void> {
+    try {
+      // Create FTS5 virtual table
+      await this.execute(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS search_index_fts5 USING fts5(
+          record_id UNINDEXED,
+          record_type UNINDEXED,
+          title,
+          content,
+          tags,
+          metadata_json UNINDEXED,
+          content='search_index',
+          content_rowid='rowid'
+        );
+      `);
+      coreDebug('Created FTS5 virtual table');
+
+      // Drop existing triggers if they exist (for clean migration)
+      try {
+        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_insert');
+        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_update');
+        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_delete');
+      } catch {
+        // Triggers might not exist yet, that's fine
+      }
+
+      // Create insert trigger
+      await this.execute(`
+        CREATE TRIGGER search_index_fts5_insert 
+        AFTER INSERT ON search_index 
+        BEGIN
+          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata_json)
+          VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
+        END;
+      `);
+
+      // Create update trigger
+      await this.execute(`
+        CREATE TRIGGER search_index_fts5_update 
+        AFTER UPDATE ON search_index 
+        BEGIN
+          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata_json)
+          VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
+          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata_json)
+          VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
+        END;
+      `);
+
+      // Create delete trigger
+      await this.execute(`
+        CREATE TRIGGER search_index_fts5_delete 
+        AFTER DELETE ON search_index 
+        BEGIN
+          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata_json)
+          VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
+        END;
+      `);
+
+      coreDebug('Created FTS5 triggers');
+    } catch (error: any) {
+      coreError('Error creating FTS5 table or triggers:', error.message);
+      // Don't throw - FTS5 might not be available in some SQLite builds
+      // System will fall back to LIKE queries if needed
     }
   }
 }

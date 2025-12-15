@@ -2,18 +2,42 @@ import {
   DatabaseAdapter,
   DatabaseConfig,
   createDatabaseAdapter,
+  SQLiteAdapter,
 } from './database-adapter.js';
 import { Logger } from '../utils/logger.js';
 import * as process from 'process';
+import { SearchService } from '../search/search-service.js';
+import { SQLiteSearchService } from '../search/sqlite-search-service.js';
 
 export class DatabaseService {
   private adapter: DatabaseAdapter;
   private isConnected = false;
   private logger: Logger;
+  private searchService?: SearchService;
 
   constructor(config: DatabaseConfig, logger?: Logger) {
     this.adapter = createDatabaseAdapter(config);
     this.logger = logger || new Logger();
+
+    // Initialize search service based on adapter type
+    if (this.adapter instanceof SQLiteAdapter) {
+      this.searchService = new SQLiteSearchService(this.adapter);
+    }
+    // TODO: Add PostgreSQL search service when PostgresAdapter is implemented
+  }
+
+  /**
+   * Get the search service instance
+   */
+  getSearchService(): SearchService | undefined {
+    return this.searchService;
+  }
+
+  /**
+   * Get the database adapter
+   */
+  getAdapter(): DatabaseAdapter {
+    return this.adapter;
   }
 
   async initialize(): Promise<void> {
@@ -342,6 +366,39 @@ export class DatabaseService {
     tags?: string;
     metadata?: string;
   }): Promise<void> {
+    // Use search service if available (handles FTS indexing)
+    if (this.searchService) {
+      try {
+        let metadata: any = null;
+        if (recordData.metadata) {
+          try {
+            metadata = JSON.parse(recordData.metadata);
+          } catch {
+            metadata = null;
+          }
+        }
+
+        await this.searchService.indexRecord({
+          recordId: recordData.recordId,
+          recordType: recordData.recordType,
+          title: recordData.title,
+          content: recordData.content,
+          tags: recordData.tags,
+          metadata,
+        });
+        return;
+      } catch (error) {
+        // Fall back to old method if search service fails
+        this.logger.warn(
+          'Search service indexing failed, falling back to basic indexing',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
+    }
+
+    // Fallback: Basic indexing (no FTS)
     // Delete existing index entry if it exists
     await this.adapter.execute(
       'DELETE FROM search_index WHERE record_id = ? AND record_type = ?',
@@ -362,9 +419,35 @@ export class DatabaseService {
     );
   }
 
-  async searchRecords(query: string, recordType?: string): Promise<any[]> {
-    // Query search_index and join with records table to ensure we only return published records
-    // This ensures search_index doesn't contain stale or internal records
+  async searchRecords(
+    query: string,
+    options?: {
+      type?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ): Promise<any[]> {
+    // Use search service if available (FTS search)
+    if (this.searchService) {
+      try {
+        const result = await this.searchService.search(query, {
+          type: options?.type,
+          status: options?.status,
+          limit: options?.limit || 20,
+          offset: options?.offset || 0,
+        });
+        return result.results;
+      } catch (error) {
+        // Fall back to old method if search service fails
+        this.logger.warn('Search service failed, falling back to LIKE search', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // Fallback: Old LIKE-based search
+    const recordType = options?.type;
     let sql = `
       SELECT si.* FROM search_index si
       INNER JOIN records r ON si.record_id = r.id
@@ -385,7 +468,21 @@ export class DatabaseService {
       }
     }
 
+    if (options?.status) {
+      sql += ' AND r.status = ?';
+      params.push(options.status);
+    }
+
     sql += ' ORDER BY si.updated_at DESC';
+
+    if (options?.limit) {
+      sql += ' LIMIT ?';
+      params.push(options.limit);
+      if (options.offset) {
+        sql += ' OFFSET ?';
+        params.push(options.offset);
+      }
+    }
 
     return await this.adapter.query(sql, params);
   }
@@ -437,13 +534,31 @@ export class DatabaseService {
       ]
     );
 
+    // Extract tags from metadata for indexing
+    let tags = '';
+    if (recordData.metadata) {
+      try {
+        const metadata = JSON.parse(recordData.metadata);
+        if (metadata.tags) {
+          // Handle both array and string formats
+          tags = Array.isArray(metadata.tags)
+            ? metadata.tags.join(',')
+            : typeof metadata.tags === 'string'
+              ? metadata.tags
+              : '';
+        }
+      } catch {
+        // If metadata parsing fails, tags remain empty
+      }
+    }
+
     // Index the record for search
     await this.indexRecord({
       recordId: recordData.id,
       recordType: recordData.type,
       title: recordData.title,
       content: recordData.content,
-      tags: '',
+      tags,
       metadata: recordData.metadata,
     });
   }
@@ -1060,13 +1175,37 @@ export class DatabaseService {
     // Update search index
     const record = await this.getRecord(id);
     if (record) {
+      // Extract tags from metadata for indexing
+      let tags = '';
+      if (record.metadata) {
+        try {
+          const metadata =
+            typeof record.metadata === 'string'
+              ? JSON.parse(record.metadata)
+              : record.metadata;
+          if (metadata.tags) {
+            // Handle both array and string formats
+            tags = Array.isArray(metadata.tags)
+              ? metadata.tags.join(',')
+              : typeof metadata.tags === 'string'
+                ? metadata.tags
+                : '';
+          }
+        } catch {
+          // If metadata parsing fails, tags remain empty
+        }
+      }
+
       await this.indexRecord({
         recordId: record.id,
         recordType: record.type,
         title: record.title,
         content: record.content,
-        tags: '',
-        metadata: record.metadata,
+        tags,
+        metadata:
+          typeof record.metadata === 'string'
+            ? record.metadata
+            : JSON.stringify(record.metadata || {}),
       });
     }
   }

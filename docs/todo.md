@@ -97,20 +97,17 @@
     config)
   - Head/body injection support for analytics scripts
   - Configuration management via UI
-- [ ] **Design Analytics API endpoints** - Planned
-  - `GET /api/analytics/usage` - Usage statistics
-  - `GET /api/analytics/records` - Record analytics
-  - `GET /api/analytics/users` - User activity
-  - `GET /api/analytics/system` - System performance
-- [ ] **Implement analytics collection**
-  - Usage tracking and metrics
-  - Performance monitoring
-  - User activity tracking
-  - System health analytics
-- [ ] **Create analytics documentation**
-  - API endpoint documentation
-  - Metrics explanation
-  - Dashboard integration guide
+  - **Note**: Frontend analytics handled via Plausible.io or other external
+    tracking tools
+- [ ] **Design Backend Analytics API** - Low Priority (Deferred)
+  - **Status**: Requires specific specifications before implementation
+  - **Note**: Frontend analytics is covered externally. Backend analytics would
+    focus on:
+    - Internal system metrics (`GET /api/analytics/system` - System performance)
+    - API usage statistics (`GET /api/analytics/usage` - Usage statistics)
+    - Record/User analytics (if needed for internal dashboards)
+  - **Action**: Create detailed specifications before starting implementation
+  - **Priority**: Low - defer until specifications are defined
 
 #### Bulk Operations API
 
@@ -129,21 +126,45 @@
   - Performance considerations
   - Error handling guide
 
-#### Advanced Search API
+#### Advanced Search API (Future Enhancements)
 
-- [ ] **Enhance search functionality**
-  - Full-text search implementation
-  - Advanced filtering options
-  - Search result ranking
-  - Search analytics
-- [ ] **Design search endpoints**
-  - `GET /api/search/advanced` - Advanced search
-  - `GET /api/search/suggestions` - Search suggestions
-  - `GET /api/search/history` - Search history
-- [ ] **Create search documentation**
-  - Search syntax documentation
-  - Filter options guide
-  - Performance optimization tips
+**Current Status**: ✅ Core search functionality is fully implemented (Search
+V2)
+
+- ✅ Full-text search with FTS5 (`GET /api/v1/search`)
+- ✅ Search suggestions/autocomplete (`GET /api/v1/search/suggestions`)
+- ✅ Relevance ranking (BM25 + composite scoring)
+- ✅ Multi-word queries and phrase matching
+- ✅ Typo tolerance (JavaScript Levenshtein)
+- ✅ Basic faceting (type/status counts)
+- ✅ Result caching
+
+**Remaining Enhancements** (from `docs/specs/search.md`):
+
+**Short Term (3-6 months)**:
+
+- [ ] PostgreSQL implementation with native typo tolerance (`pg_trgm`)
+- [ ] Advanced faceting (date ranges, numeric ranges)
+- [ ] Search analytics and popular queries tracking
+- [ ] Custom ranking weights per instance configuration
+- [ ] `GET /api/v1/search/history` - Search history endpoint (user query
+      tracking)
+
+**Medium Term (6-12 months)**:
+
+- [ ] Multi-language stemming (French/English)
+- [ ] Search result personalization
+- [ ] Query suggestions based on past searches
+- [ ] Advanced filters (geography, date ranges, numeric ranges)
+- [ ] `GET /api/v1/search/advanced` - Advanced search endpoint with complex
+      filters
+
+**Long Term (12+ months)**:
+
+- [ ] Optional Meilisearch integration (for advanced features)
+- [ ] Federated search across instances
+- [ ] Machine learning relevance tuning
+- [ ] Voice search support
 
 #### Templates API Implementation
 

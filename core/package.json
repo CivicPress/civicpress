@@ -34,6 +34,7 @@
     "@types/jsonwebtoken": "9.0.10",
     "ajv": "8.17.1",
     "ajv-formats": "3.0.1",
+    "fast-levenshtein": "3.0.0",
     "gray-matter": "^4.0.3",
     "jsonwebtoken": "9.0.2",
     "nodemailer": "7.0.5",

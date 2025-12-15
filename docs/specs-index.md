@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD024 -->
+
 # CivicPress Specifications Index
 
 This document provides an index to all CivicPress platform specifications,
@@ -20,13 +22,13 @@ organized by category and implementation status.
 | [CLI](specs/cli.md)                             | Implemented | Command-line interface with JSON output support          |
 | [Authentication](specs/auth.md)                 | Implemented | Multi-method authentication (OAuth, password, simulated) |
 | [Database](specs/database.md)                   | Implemented | SQLite database with Git integration                     |
-| [Testing Framework](specs/testing-framework.md) | Implemented | Comprehensive test suite with 600+ tests                  |
+| [Testing Framework](specs/testing-framework.md) | Implemented | Comprehensive test suite with 600+ tests                 |
 
 ### In Progress
 
 | Specification                   | Status      | Description                                 |
 | ------------------------------- | ----------- | ------------------------------------------- |
-| [Search](specs/search.md)       | In Progress | Full-text search with filtering and ranking |
+| [Search](specs/search.md)       | Implemented | Full-text search with filtering and ranking |
 | [Indexing](specs/indexing.md)   | In Progress | Advanced indexing and discovery system      |
 | [Workflows](specs/workflows.md) | In Progress | Configurable civic approval processes       |
 

@@ -737,38 +737,123 @@ export class RecordManager {
       offset?: number;
     } = {}
   ): Promise<{ records: any[]; total: number }> {
-    // Use the recordType parameter for type filtering
-    const recordType = options.type;
-    const searchResults = await this.db.searchRecords(query, recordType);
+    // Use search service if available (includes pagination and relevance ranking)
+    const searchService = this.db.getSearchService();
+    if (searchService) {
+      try {
+        const searchResult = await searchService.search(query, {
+          type: options.type,
+          status: options.status,
+          limit: options.limit || 20,
+          offset: options.offset || 0,
+        });
 
-    // Get full record details for search results
-    const records: any[] = [];
-    for (const searchResult of searchResults) {
-      const record = await this.getRecord(searchResult.record_id);
-      if (record) {
-        // Handle comma-separated status filters
-        if (options.status) {
-          const statusFilters = options.status.split(',').map((s) => s.trim());
-          if (!statusFilters.includes(record.status)) {
-            continue;
-          }
+        if (searchResult.results.length === 0) {
+          return { records: [], total: searchResult.total };
         }
-        records.push(record);
+
+        // Batch fetch records (no N+1 queries!)
+        const recordIds = searchResult.results.map((r) => r.record_id);
+        const records = await this.batchGetRecords(recordIds);
+
+        // Map search results to records, preserving relevance scores
+        const recordsMap = new Map(records.map((r) => [r.id, r]));
+        const resultRecords = searchResult.results
+          .map((searchResultItem) => {
+            const record = recordsMap.get(searchResultItem.record_id);
+            if (!record) return null;
+
+            // Add search metadata (relevance score, excerpt, etc.)
+            return {
+              ...record,
+              _search: {
+                relevance_score: searchResultItem.relevance_score,
+                excerpt: searchResultItem.excerpt,
+                match_highlights: searchResultItem.match_highlights,
+              },
+            };
+          })
+          .filter((r) => r !== null);
+
+        return {
+          records: resultRecords,
+          total: searchResult.total,
+        };
+      } catch (error) {
+        // Fall back to old method if search service fails
+        this.logger.warn(
+          'Search service failed, falling back to basic search',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
       }
     }
 
-    // Apply pagination
-    const total = records.length;
-    const offset = options.offset || 0;
-    const limit = options.limit || 10;
-    const paginatedRecords = records.slice(offset, offset + limit);
+    // Fallback: Old method (with N+1 fix)
+    const searchResults = await this.db.searchRecords(query, {
+      type: options.type,
+      status: options.status,
+      limit: options.limit || 20,
+      offset: options.offset || 0,
+    });
 
-    return { records: paginatedRecords, total };
+    if (searchResults.length === 0) {
+      return { records: [], total: 0 };
+    }
+
+    // Batch fetch records (no N+1 queries!)
+    const recordIds = searchResults.map((r: any) => r.record_id);
+    const records = await this.batchGetRecords(recordIds);
+
+    // Map search results to records
+    const recordsMap = new Map(records.map((r) => [r.id, r]));
+    const resultRecords = searchResults
+      .map((searchResult: any) => {
+        const record = recordsMap.get(searchResult.record_id);
+        if (!record) return null;
+        return record;
+      })
+      .filter((r) => r !== null);
+
+    return {
+      records: resultRecords,
+      total: resultRecords.length, // Approximate total
+    };
+  }
+
+  /**
+   * Batch fetch records to avoid N+1 query problem
+   */
+  private async batchGetRecords(recordIds: string[]): Promise<any[]> {
+    if (recordIds.length === 0) return [];
+
+    // Handle SQLite IN clause limit (999)
+    const BATCH_SIZE = 999;
+    const records: any[] = [];
+
+    for (let i = 0; i < recordIds.length; i += BATCH_SIZE) {
+      const batch = recordIds.slice(i, i + BATCH_SIZE);
+      const placeholders = batch.map(() => '?').join(',');
+      const sql = `SELECT * FROM records WHERE id IN (${placeholders})`;
+
+      const batchRecords = await this.db.query(sql, batch);
+      records.push(...batchRecords);
+    }
+
+    return records;
   }
 
   /**
    * Get search suggestions based on record titles and content
+   * Optimized: Uses lightweight query + caching (no full record fetches)
    */
+  private suggestionsCache = new Map<
+    string,
+    { suggestions: string[]; timestamp: number }
+  >();
+  private readonly SUGGESTIONS_TTL = 5 * 60 * 1000; // 5 minutes
+
   async getSearchSuggestions(
     query: string,
     options: {
@@ -776,50 +861,79 @@ export class RecordManager {
     } = {}
   ): Promise<string[]> {
     const limit = options.limit || 10;
+    const normalized = query.toLowerCase().trim();
 
-    // Get search results from database
-    const searchResults = await this.db.searchRecords(query);
+    if (normalized.length < 2) {
+      return [];
+    }
 
-    // Extract unique suggestions from titles and content
-    const suggestions = new Set<string>();
+    // Check cache
+    const cached = this.suggestionsCache.get(normalized);
+    if (cached && Date.now() - cached.timestamp < this.SUGGESTIONS_TTL) {
+      return cached.suggestions.slice(0, limit);
+    }
 
-    for (const result of searchResults.slice(0, limit * 2)) {
-      // Get more results to filter
-      const record = await this.getRecord(result.record_id);
-      if (record) {
-        // Add title as suggestion
-        if (record.title.toLowerCase().includes(query.toLowerCase())) {
-          suggestions.add(record.title);
+    // Use search service if available (lightweight query with typo tolerance)
+    const searchService = this.db.getSearchService();
+    if (searchService) {
+      try {
+        // Enable typo tolerance for better UX
+        const suggestions = await searchService.getSuggestions(
+          normalized,
+          limit,
+          true // enableTypoTolerance
+        );
+        const suggestionTexts = suggestions.map((s) => s.text);
+
+        // Update cache
+        this.suggestionsCache.set(normalized, {
+          suggestions: suggestionTexts,
+          timestamp: Date.now(),
+        });
+
+        // Cleanup old cache entries
+        if (this.suggestionsCache.size > 1000) {
+          const cutoff = Date.now() - this.SUGGESTIONS_TTL;
+          for (const [key, value] of this.suggestionsCache.entries()) {
+            if (value.timestamp < cutoff) {
+              this.suggestionsCache.delete(key);
+            }
+          }
         }
 
-        // Extract words from content that match the query
-        if (record.content) {
-          const words = record.content
-            .split(/\s+/)
-            .filter(
-              (word) =>
-                word.length > 2 &&
-                word.toLowerCase().includes(query.toLowerCase()) &&
-                !suggestions.has(word)
-            );
-
-          words.slice(0, 3).forEach((word) => suggestions.add(word));
-        }
-
-        // Add record type as suggestion if it matches
-        if (record.type.toLowerCase().includes(query.toLowerCase())) {
-          suggestions.add(record.type);
-        }
-      }
-
-      // Stop if we have enough suggestions
-      if (suggestions.size >= limit) {
-        break;
+        return suggestionTexts;
+      } catch (error) {
+        // Fall back to old method if search service fails
+        this.logger.warn(
+          'Search service suggestions failed, falling back to basic method',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
       }
     }
 
-    // Convert to array and limit results
-    return Array.from(suggestions).slice(0, limit);
+    // Fallback: Old method (lightweight query - no full record fetches)
+    const sql = `
+      SELECT DISTINCT si.title as suggestion
+      FROM search_index si
+      INNER JOIN records r ON si.record_id = r.id
+      WHERE si.title_normalized LIKE ? || '%'
+        AND (r.workflow_state IS NULL OR r.workflow_state != 'internal_only')
+      ORDER BY si.updated_at DESC
+      LIMIT ?
+    `;
+
+    const results = await this.db.query(sql, [normalized, limit]);
+    const suggestions = results.map((r: any) => r.suggestion);
+
+    // Update cache
+    this.suggestionsCache.set(normalized, {
+      suggestions,
+      timestamp: Date.now(),
+    });
+
+    return suggestions;
   }
 
   /**

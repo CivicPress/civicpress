@@ -83,18 +83,27 @@ const debouncedApiSearch = useDebounceFn(async (query: string) => {
   isSearching.value = false;
 }, 300);
 
-// Handle search changes
+// Handle search input changes (only updates local state, doesn't execute search)
 const handleSearch = (query: string) => {
   searchQuery.value = query;
   filters.value.search = query;
+  // Don't update URL or trigger search - wait for Enter key or suggestion click
+};
+
+// Handle search submission (Enter key or suggestion click)
+const handleSearchSubmit = (query?: string) => {
+  const queryToUse = query !== undefined ? query : searchQuery.value;
+  searchQuery.value = queryToUse;
+  filters.value.search = queryToUse;
+
+  const trimmedQuery = queryToUse?.trim() || '';
+
+  // Update URL when search is actually submitted
   updateURL();
 
-  const trimmedQuery = query?.trim() || '';
-
-  // If query is cleared or less than 3 chars, load initial records immediately
-  // Otherwise, trigger debounced search
+  // Execute search or load initial records
   if (trimmedQuery.length === 0) {
-    // Clear search immediately
+    // Clear search
     isSearching.value = false;
     const typeFilter =
       filters.value.types.length > 0
@@ -108,12 +117,21 @@ const handleSearch = (query: string) => {
       type: typeFilter,
       status: statusFilter,
     });
-  } else if (trimmedQuery.length >= 3) {
-    // Only trigger debounced search if we have at least 3 characters
-    isSearching.value = true; // Set searching state
-    debouncedApiSearch(query);
   } else {
-    // Query is 1-2 characters - keep records visible, no search happening yet
+    // Execute search (no minimum character requirement when user explicitly submits)
+    isSearching.value = true;
+    const typeFilter =
+      filters.value.types.length > 0
+        ? filters.value.types.join(',')
+        : undefined;
+    const statusFilter =
+      filters.value.statuses.length > 0
+        ? filters.value.statuses.join(',')
+        : undefined;
+    recordsStore.searchRecords(trimmedQuery, {
+      type: typeFilter,
+      status: statusFilter,
+    });
     isSearching.value = false;
   }
 };
@@ -254,6 +272,14 @@ watch(
 
     // Restore state from URL when route changes
     restoreFromURL();
+
+    // Don't reload records if search query is 1-2 characters (user is still typing)
+    const trimmedSearchQuery = searchQuery.value?.trim() || '';
+    if (trimmedSearchQuery.length > 0 && trimmedSearchQuery.length < 3) {
+      // User is typing 1-2 characters - don't reload records, just update state
+      return;
+    }
+
     // Reload records based on new state
     await loadRecordsFromState();
   },
@@ -321,6 +347,7 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
           :key="filtersResetKey"
           :initial-filters="filters"
           @search="handleSearch"
+          @search-submit="handleSearchSubmit"
           @filter-change="handleFilterChange"
         />
 
