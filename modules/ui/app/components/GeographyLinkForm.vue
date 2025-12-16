@@ -2,100 +2,63 @@
   <div class="space-y-4">
     <!-- Current Links -->
     <div v-if="linkedFiles.length > 0" class="space-y-3">
-      <div class="flex items-center justify-end mb-4">
-        <UPopover
-          :popper="{ placement: 'bottom-end' }"
-          :close-on-click-outside="true"
-        >
-          <UButton color="primary" variant="outline" icon="i-lucide-plus">
-            {{ t('records.geography.addGeographyFiles') }}
-          </UButton>
-
-          <template #content>
-            <GeographySelector
-              :selected-ids="selectedIds"
-              :multiple="true"
-              @update:selected-ids="
-                (ids) => {
-                  selectedIds = ids;
-                }
-              "
-              @selection-change="handleSelectionConfirm"
-              @preview="handlePreview"
-              @create-new="handleCreateNew"
-            />
-          </template>
-        </UPopover>
-      </div>
       <div
         v-for="(link, index) in linkedFiles"
         :key="link.id"
-        class="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+        class="border border-gray-200 dark:border-gray-800 rounded-lg p-3 bg-white dark:bg-gray-800"
       >
-        <div class="flex items-start justify-between">
-          <div class="flex-1">
-            <div class="flex items-center gap-2 mb-2">
-              <h4 class="font-medium text-gray-900 dark:text-gray-100">
-                {{ link.name }}
-              </h4>
-              <UBadge color="primary" variant="soft">
+        <!-- Top: Title and Actions -->
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium truncate">{{ link.name }}</p>
+            <div class="flex items-center gap-2 mt-0.5">
+              <p class="text-xs text-gray-500 font-mono truncate">
+                {{ link.id }}
+              </p>
+              <span
+                v-if="link.category"
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex-shrink-0"
+              >
                 {{ link.category }}
-              </UBadge>
-            </div>
-
-            <!-- Description Input -->
-            <UInput
-              v-model="link.description"
-              :placeholder="t('records.geography.addDescriptionPlaceholder')"
-              class="mb-2"
-              @input="updateLink(index, link)"
-            />
-
-            <!-- File Info -->
-            <div
-              class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500"
-            >
-              <span class="flex items-center gap-1">
-                <UIcon name="i-lucide-file" class="w-3 h-3" />
-                {{ link.type?.toUpperCase() || 'UNKNOWN' }}
-              </span>
-              <span class="flex items-center gap-1">
-                <UIcon name="i-lucide-calendar" class="w-3 h-3" />
-                {{
-                  link.created_at
-                    ? formatDate(link.created_at)
-                    : t('records.geography.unknownDate')
-                }}
-              </span>
-              <span v-if="link.stats" class="flex items-center gap-1">
-                <UIcon name="i-lucide-map-pin" class="w-3 h-3" />
-                {{ link.stats.featureCount }}
-                {{ t('records.geography.features') }}
               </span>
             </div>
           </div>
-
-          <div class="flex items-center gap-2 ml-4">
-            <!-- Preview Button -->
+          <div class="flex items-center gap-1 flex-shrink-0 -mt-2 -mr-2">
             <UButton
-              size="sm"
-              color="neutral"
+              icon="i-lucide-external-link"
               variant="ghost"
+              size="xs"
               @click="() => handlePreview(link as any)"
-            >
-              <UIcon name="i-lucide-eye" class="w-4 h-4" />
-            </UButton>
-
-            <!-- Remove Button -->
+              :disabled="disabled"
+            />
             <UButton
-              size="sm"
-              color="error"
+              icon="i-lucide-x"
               variant="ghost"
+              size="xs"
+              color="error"
               @click="removeLink(index)"
-            >
-              <UIcon name="i-lucide-trash-2" class="w-4 h-4" />
-            </UButton>
+              :disabled="disabled"
+            />
           </div>
+        </div>
+
+        <!-- Bottom: Content (Full Width) -->
+        <div class="space-y-2">
+          <UFormField :label="t('common.description')" size="xs">
+            <UInput
+              :model-value="link.description || ''"
+              @update:model-value="
+                (val) => {
+                  const updated = { ...link, description: val };
+                  updateLink(index, updated);
+                }
+              "
+              :disabled="disabled"
+              size="xs"
+              :placeholder="t('records.attachments.optionalDescription')"
+              class="w-full"
+            />
+          </UFormField>
         </div>
       </div>
     </div>
@@ -105,12 +68,9 @@
       v-else
       class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
     >
-      <UIcon name="i-lucide-map" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-      <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-        {{ t('records.geography.noGeographyFilesLinked') }}
-      </h4>
-      <p class="text-gray-600 dark:text-gray-400">
-        {{ t('records.geography.linkGeographyFilesDesc') }}
+      <UIcon name="i-lucide-map" class="w-8 h-8 text-gray-400 mx-auto mb-2" />
+      <p class="text-sm text-gray-500">
+        {{ t('records.geography.noLinkedGeographyFiles') }}
       </p>
     </div>
 
@@ -192,9 +152,12 @@ interface Props {
     created_at?: string;
     stats?: any;
   }>;
+  disabled?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  disabled: false,
+});
 
 // Emits
 const emit = defineEmits<{

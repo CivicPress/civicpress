@@ -6,7 +6,15 @@ import inquirer from 'inquirer';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 // Node.js globals
 declare const process: any;
@@ -24,11 +32,11 @@ export const loginCommand = (cli: CAC) => {
     .option('--logout', 'Log out and clear current session')
     .option('--status', 'Show current authentication status')
     .action(async (options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
 
-      // Check if we should output JSON
-      const shouldOutputJson = globalOptions.json;
+      const endOperation = cliStartOperation('login');
 
       try {
         // If --help is present, let CAC handle it and exit 0
@@ -43,16 +51,13 @@ export const loginCommand = (cli: CAC) => {
 
         // Check if CivicPress is initialized
         if (!fs.existsSync(dataDir)) {
-          const errorMsg =
-            'CivicPress not initialized. Run "civic init" first.';
-          if (shouldOutputJson) {
-            console.log(JSON.stringify({ error: errorMsg }, null, 2));
-          } else {
-            process.stderr.write(chalk.red(`❌ ${errorMsg}\n`), () =>
-              process.exit(1)
-            );
-          }
-          return;
+          cliError(
+            'CivicPress not initialized. Run "civic init" first.',
+            'NOT_INITIALIZED',
+            undefined,
+            'login'
+          );
+          process.exit(1);
         }
 
         // Initialize CivicPress with database configuration
@@ -64,49 +69,33 @@ export const loginCommand = (cli: CAC) => {
 
         if (options.logout) {
           // Handle logout
-          await handleLogout(
-            civic,
-            shouldOutputJson || false,
-            initializeLogger()
-          );
+          await handleLogout(civic);
         } else if (options.status) {
           // Handle status check
-          await handleStatus(
-            civic,
-            shouldOutputJson || false,
-            initializeLogger()
-          );
+          await handleStatus(civic);
         } else {
           // Handle login
-          await handleLogin(
-            civic,
-            options,
-            shouldOutputJson || false,
-            initializeLogger()
-          );
+          await handleLogin(civic, options);
         }
 
         await civic.shutdown();
       } catch (error) {
-        const errorMsg =
-          error instanceof Error ? error.message : 'Unknown error occurred';
-        if (shouldOutputJson) {
-          console.log(JSON.stringify({ error: errorMsg }, null, 2));
-        } else {
-          process.stderr.write(chalk.red(`❌ ${errorMsg}\n`), () =>
-            process.exit(1)
-          );
-        }
+        cliError(
+          error instanceof Error ? error.message : 'Unknown error occurred',
+          'LOGIN_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'login'
+        );
+        process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };
 
-async function handleLogin(
-  civic: CivicPress,
-  options: any,
-  shouldOutputJson: boolean,
-  logger: any
-): Promise<void> {
+async function handleLogin(civic: CivicPress, options: any): Promise<void> {
   const authService = civic.getAuthService();
   let session: any;
 
@@ -171,122 +160,89 @@ async function handleLogin(
       session = await authService.authenticateWithPassword(username, password);
     }
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'Successfully authenticated',
-            session: {
-              token: session.token,
-              user: session.user,
-              expiresAt: session.expiresAt,
-            },
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.success('✅ Successfully authenticated!');
-      logger.info(`👤 User: ${session.user.username} (${session.user.role})`);
-      logger.info(`📧 Email: ${session.user.email || 'Not provided'}`);
-      logger.info(`⏰ Session expires: ${session.expiresAt.toISOString()}`);
-      logger.info(`🎫 Session token: ${session.token.substring(0, 20)}...`);
-      logger.info(
-        '💡 You can now use CivicPress commands with --token <token>'
-      );
-    }
+    cliSuccess(
+      {
+        session: {
+          token: session.token,
+          user: session.user,
+          expiresAt: session.expiresAt,
+        },
+      },
+      `Successfully authenticated as ${session.user.username}`,
+      {
+        operation: 'login',
+        username: session.user.username,
+        role: session.user.role,
+      }
+    );
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : 'Authentication failed';
-    if (shouldOutputJson) {
-      console.log(JSON.stringify({ error: errorMsg }, null, 2));
-    } else {
-      process.stderr.write(chalk.red(`❌ ${errorMsg}\n`), () =>
-        process.exit(1)
-      );
-    }
+    cliError(
+      error instanceof Error ? error.message : 'Authentication failed',
+      'AUTHENTICATION_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        method: options.method || 'password',
+      },
+      'login'
+    );
+    throw error;
   }
 }
 
-async function handleLogout(
-  civic: CivicPress,
-  shouldOutputJson: boolean,
-  logger: any
-): Promise<void> {
+async function handleLogout(civic: CivicPress): Promise<void> {
   try {
     const authService = civic.getAuthService();
     await authService.logout();
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            message: 'Successfully logged out',
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.success('✅ Successfully logged out');
-      logger.info(
-        '💡 You will need to authenticate again for protected operations'
-      );
-    }
+    cliSuccess({ success: true }, 'Successfully logged out', {
+      operation: 'logout',
+    });
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Logout failed';
-    if (shouldOutputJson) {
-      console.log(JSON.stringify({ error: errorMsg }, null, 2));
-    } else {
-      process.stderr.write(chalk.red(`❌ ${errorMsg}\n`), () =>
-        process.exit(1)
-      );
-    }
+    cliError(
+      error instanceof Error ? error.message : 'Logout failed',
+      'LOGOUT_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'logout'
+    );
+    throw error;
   }
 }
 
-async function handleStatus(
-  civic: CivicPress,
-  shouldOutputJson: boolean,
-  logger: any
-): Promise<void> {
+async function handleStatus(civic: CivicPress): Promise<void> {
   try {
     const authService = civic.getAuthService();
     const currentUser = await authService.getCurrentUser();
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            authenticated: !!currentUser,
-            user: currentUser || null,
-          },
-          null,
-          2
-        )
+    if (currentUser) {
+      cliSuccess(
+        {
+          authenticated: true,
+          user: currentUser,
+        },
+        `Authenticated as ${currentUser.username}`,
+        {
+          operation: 'login:status',
+          username: currentUser.username,
+          role: currentUser.role,
+        }
       );
     } else {
-      if (currentUser) {
-        logger.success('✅ Authenticated');
-        logger.info(`👤 User: ${currentUser.username} (${currentUser.role})`);
-        logger.info(`📧 Email: ${currentUser.email || 'Not provided'}`);
-      } else {
-        logger.warn('❌ Not authenticated');
-        logger.info('💡 Run "civic login" to authenticate');
-      }
+      cliWarn(
+        'Not authenticated. Run "civic login" to authenticate',
+        'login:status'
+      );
     }
   } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : 'Failed to check status';
-    if (shouldOutputJson) {
-      console.log(JSON.stringify({ error: errorMsg }, null, 2));
-    } else {
-      process.stderr.write(chalk.red(`❌ ${errorMsg}\n`), () =>
-        process.exit(1)
-      );
-    }
+    cliError(
+      error instanceof Error ? error.message : 'Failed to check status',
+      'STATUS_CHECK_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'login:status'
+    );
+    throw error;
   }
 }

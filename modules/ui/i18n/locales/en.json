@@ -194,10 +194,11 @@
     "enterDescription": "Enter description (optional)",
     "enterContent": "Enter content...",
     "enterTags": "Enter tags (comma-separated)",
-    "sortBy": {
+    "unpublishedChanges": "Unpublished changes",
+    "sort": {
       "relevance": "Relevance",
-      "lastUpdated": "Last Updated",
-      "recentlyCreated": "Recently Created",
+      "updatedDesc": "Last Updated",
+      "createdDesc": "Recently Created",
       "titleAsc": "Title A→Z",
       "titleDesc": "Title Z→A"
     },
@@ -209,6 +210,8 @@
       "searchPlaceholder": "Search records...",
       "filterByTypePlaceholder": "Filter by type...",
       "statusPlaceholder": "Status...",
+      "sort": "Sort",
+      "sortPlaceholder": "Sort by...",
       "suggestions": "Suggestions",
       "loadingSuggestions": "Loading suggestions...",
       "showingFilteredRecords": "Showing filtered records",
@@ -219,10 +222,13 @@
     "noRecordsMatchFiltersDesc": "Try adjusting or clearing your filters to see all available records.",
     "loadingData": "Loading records...",
     "pagination": {
-      "pageOf": "Page {current} of {total}"
+      "pageOf": "Page {current} of {total}",
+      "showing": "Showing {start} to {end} of {total} results",
+      "perPage": "Per page"
     },
     "attachments": {
       "title": "File Attachments",
+      "titleSingular": "File Attachment",
       "addAttachment": "Add Attachment",
       "noAttachments": "No attachments",
       "noFilesAttachedTitle": "No files attached",
@@ -251,12 +257,15 @@
     },
     "linkedRecords": {
       "title": "Linked Records",
+      "titleSingular": "Linked Record",
       "addLink": "Add Linked Record",
       "noLinks": "No linked records",
       "noRecordsLinkedTitle": "No records linked",
       "noRecordsLinkedDesc": "This record doesn't have any records linked to it yet.",
       "linkDescription": "Link Description",
-      "linkRecordsDescription": "Link related records to create connections between documents."
+      "linkRecordsDescription": "Link related records to create connections between documents.",
+      "loading": "Loading records...",
+      "noRecordsFound": "No records found"
     },
     "templates": {
       "title": "Templates",
@@ -289,7 +298,8 @@
     "statusChangedTo": "Record status changed to {status}",
     "fileAttachments": "File Attachments",
     "statusTransitions": "Status Transitions",
-    "linkedGeography": "Linked Geography",
+    "linkedGeography": "Linked Geographies",
+    "linkedGeographySingular": "Linked Geography",
     "additionalInformation": "Additional Information",
     "viewRaw": "View Raw",
     "raw": {
@@ -353,11 +363,22 @@
     "templateLoadedSuccessfully": "Template \"{name}\" has been loaded successfully.",
     "filesAdded": "Files Added",
     "filesAttachedToRecord": "No files attached to record | 1 file attached to record | {count} files attached to record",
-    "recordTitle": "[Record Title]",
+    "recordTitle": "Enter the title of the record",
     "currentUser": "Current User",
     "recordType": "Record Type",
     "selectType": "Select record type",
     "selectStatus": "Select status",
+    "statusHelper": "Legal/public status of the document.",
+    "workflowState": {
+      "label": "Workflow State",
+      "select": "Select workflow state",
+      "draft": "Draft",
+      "underReview": "Under Review",
+      "readyForPublication": "Ready for Publication",
+      "internalOnly": "Internal Only",
+      "helper": "Internal work state (draft, under review, etc.)."
+    },
+    "workflowStateHelper": "Internal work state (draft, under review, etc.).",
     "enterTitle": "Enter record title",
     "enterRecordContent": "Enter the record content",
     "linkRecords": "Link Records",
@@ -394,7 +415,85 @@
       "failedToLoad": "Failed to load geography files",
       "noGeographyFilesLinked": "No geography files linked",
       "noGeographyFilesLinkedDesc": "This record doesn't have any geography files linked to it yet.",
-      "file": "file"
+      "noLinkedGeographyFiles": "No linked geography files",
+      "file": "file",
+      "linkGeography": "Link Geography"
+    },
+    "editor": {
+      "details": "Details",
+      "activity": "Activity",
+      "rawYaml": "Raw YAML",
+      "recordDetails": "Record Details",
+      "relations": "Relations",
+      "technicalDetails": "Technical Details",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "saveFailed": "Save failed",
+      "notSaved": "Not saved",
+      "justNow": "just now",
+      "oneMinuteAgo": "1 minute ago",
+      "minutesAgo": "{count} minutes ago",
+      "draft": "Draft",
+      "saveDraft": "Save Draft",
+      "saveChanges": "Save changes",
+      "saveAndPublish": "Save and Publish",
+      "saveOptions": "Save options",
+      "publish": "Publish",
+      "publishShort": "Pub",
+      "publishNow": "Publish now",
+      "updateAndPublish": "Update & publish",
+      "publishOptions": "Publish options",
+      "publishAs": "Publish as {status}",
+      "publishRecord": "Publish Record",
+      "publishDescription": "This record will become publicly accessible and will be saved to the data repository.",
+      "unpublishToDraft": "Unpublish to draft",
+      "unpublishRecord": "Unpublish Record",
+      "unpublishDescription": "This record will be reverted to draft status and will no longer be publicly accessible.",
+      "willRevertToDraft": "The record will revert to draft status",
+      "willNoLongerBePublic": "The record will no longer be publicly accessible",
+      "deleteUnpublishedChanges": "Delete unpublished changes",
+      "deleteUnpublishedChangesDescription": "This will delete the draft version with unpublished changes. The published version will remain unchanged.",
+      "willDeleteDraftChanges": "All draft changes will be permanently deleted",
+      "publishedVersionWillRemain": "The published version will remain unchanged",
+      "failedToDeleteUnpublishedChanges": "Failed to delete unpublished changes",
+      "unpublishedChangesDeleted": "Unpublished changes deleted",
+      "unpublishedChangesDeletedDescription": "The draft has been deleted. The published version remains unchanged.",
+      "archiveRecord": "Archive record",
+      "archiveDescription": "This record will be archived. Archived records are read-only and not publicly accessible, but remain in the system history.",
+      "willBeArchived": "The record will be archived",
+      "willBeReadOnly": "The record will become read-only",
+      "willNotBePublic": "The record will not be publicly accessible",
+      "changeStatusTo": "Change status to {status}",
+      "deleteRecord": "Delete Record",
+      "deleteDescription": "Are you sure you want to delete this record? This action cannot be undone.",
+      "allDataWillBeLost": "All record data will be permanently lost",
+      "viewHistory": "View history",
+      "duplicateRecord": "Duplicate record",
+      "exportAsMarkdown": "Export as Markdown",
+      "warning": "Warning:",
+      "willBeCommittedToGit": "The record will be committed to Git",
+      "changesPubliclyVisible": "Changes will be publicly visible",
+      "cannotBeUndone": "This action cannot be undone",
+      "loadingYaml": "Loading YAML...",
+      "rawYamlDescription": "This is a read-only preview of the YAML frontmatter that will be included in the record file. Generated using RecordParser to match the standard format.",
+      "saveToSeeYaml": "Save the record to see frontmatter YAML",
+      "toolbar": {
+        "bold": "Bold (Ctrl+B)",
+        "italic": "Italic (Ctrl+I)",
+        "underline": "Underline (Ctrl+U)",
+        "inlineCode": "Inline Code",
+        "heading1": "Heading 1",
+        "heading2": "Heading 2",
+        "heading3": "Heading 3",
+        "bulletList": "Bullet List",
+        "numberedList": "Numbered List",
+        "blockquote": "Blockquote",
+        "horizontalRule": "Horizontal Rule",
+        "insertLink": "Insert Link",
+        "insertImage": "Insert Image",
+        "showPreview": "Show Preview",
+        "hidePreview": "Hide Preview"
+      }
     },
     "updateRecord": "Update Record",
     "templates": {
@@ -408,6 +507,27 @@
       "contentReplaced": "Current content will be completely replaced",
       "variablesFilled": "Template variables will be filled with current form data",
       "cannotBeUndone": "This action cannot be undone"
+    },
+    "drafts": {
+      "title": "Drafts & Unpublished Records",
+      "description": "View all draft versions and unpublished records",
+      "loading": "Loading drafts and unpublished records...",
+      "loadingDrafts": "Loading drafts...",
+      "loadingUnpublished": "Loading unpublished records...",
+      "untitled": "Untitled Draft",
+      "badge": {
+        "draftVersion": "Draft Version",
+        "unpublished": "Unpublished"
+      },
+      "empty": {
+        "title": "No drafts yet",
+        "description": "When you save a record as a draft or it has an unpublished workflow state, it will appear here. You can continue editing drafts before publishing them."
+      }
+    }
+  },
+  "navigation": {
+    "records": {
+      "drafts": "Drafts"
     }
   },
   "geography": {

@@ -2,6 +2,7 @@ import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import { parse, stringify } from 'yaml';
+import { coreWarn } from '../utils/core-output.js';
 
 export interface ConfigurationServiceOptions {
   dataPath?: string;
@@ -281,7 +282,11 @@ export class ConfigurationService {
         });
       } catch (error) {
         // Skip configs that can't be loaded
-        console.warn(`Failed to load metadata for ${configType}:`, error);
+        coreWarn(`Failed to load metadata for ${configType}`, {
+          operation: 'config:load-metadata',
+          configType,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -603,7 +608,10 @@ export class ConfigurationService {
         'utf-8'
       );
     } catch (error) {
-      console.warn('Notifications config migration failed:', error);
+      coreWarn('Notifications config migration failed', {
+        operation: 'config:migrate-notifications',
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

@@ -12,19 +12,37 @@ interface Props {
   };
   recordType?: string | null; // Pre-select a specific record type
   disableTypeFilter?: boolean; // Disable type filter (for type-specific pages)
+  sort?:
+    | 'relevance'
+    | 'updated_desc'
+    | 'created_desc'
+    | 'title_asc'
+    | 'title_desc';
+  isSearching?: boolean; // Whether we're in search mode (affects sort options)
 }
 
 const props = withDefaults(defineProps<Props>(), {
   initialFilters: () => ({}),
   recordType: null,
   disableTypeFilter: false,
+  sort: 'created_desc',
+  isSearching: false,
 });
 
 // Emits
 const emit = defineEmits<{
-  search: [query: string];
+  search: [query: string]; // Emitted on every keystroke (for suggestions)
+  searchSubmit: [query: string]; // Emitted on Enter key or suggestion click
   filterChange: [
     filters: { search: string; types: string[]; statuses: string[] },
+  ];
+  sortChange: [
+    sort:
+      | 'relevance'
+      | 'updated_desc'
+      | 'created_desc'
+      | 'title_asc'
+      | 'title_desc',
   ];
 }>();
 
@@ -51,6 +69,8 @@ const {
 // Search suggestions composable
 const {
   suggestions,
+  words: suggestionWords,
+  titles: suggestionTitles,
   isLoading: suggestionsLoading,
   error: suggestionsError,
   fetchSuggestions,
@@ -67,6 +87,10 @@ const { t } = useI18n();
 const searchQuery = ref(props.initialFilters.search || '');
 const selectedRecordTypes = ref<any[]>([]);
 const selectedRecordStatuses = ref<any[]>([]);
+const selectedSort = ref(
+  props.sort || (props.isSearching ? 'relevance' : 'created_desc')
+);
+const inputHasFocus = ref(false);
 
 // Track if we're syncing from props to prevent emitting during initial sync
 const isSyncingFromProps = ref(false);
@@ -149,6 +173,91 @@ const recordTypeOptionsComputed = computed(() => {
   });
 });
 
+// Sort options - different for search vs records listing
+const sortOptions = computed(() => {
+  if (props.isSearching) {
+    // Search context - include relevance
+    return [
+      { value: 'relevance', label: t('records.sort.relevance') },
+      { value: 'updated_desc', label: t('records.sort.updatedDesc') },
+      { value: 'created_desc', label: t('records.sort.createdDesc') },
+      { value: 'title_asc', label: t('records.sort.titleAsc') },
+      { value: 'title_desc', label: t('records.sort.titleDesc') },
+    ];
+  } else {
+    // Records listing context - no relevance
+    return [
+      { value: 'created_desc', label: t('records.sort.createdDesc') },
+      { value: 'updated_desc', label: t('records.sort.updatedDesc') },
+      { value: 'title_asc', label: t('records.sort.titleAsc') },
+      { value: 'title_desc', label: t('records.sort.titleDesc') },
+    ];
+  }
+});
+
+// Type guard for sort options
+const isValidSortOption = (
+  value: string
+): value is
+  | 'relevance'
+  | 'updated_desc'
+  | 'created_desc'
+  | 'title_asc'
+  | 'title_desc' => {
+  return [
+    'relevance',
+    'updated_desc',
+    'created_desc',
+    'title_asc',
+    'title_desc',
+  ].includes(value);
+};
+
+// Computed property to get the selected sort option object
+const selectedSortOption = computed({
+  get: () => {
+    return (
+      sortOptions.value.find((opt) => opt.value === selectedSort.value) ||
+      sortOptions.value[0]
+    );
+  },
+  set: (option: any) => {
+    if (option && typeof option === 'object' && option.value) {
+      if (isValidSortOption(option.value)) {
+        selectedSort.value = option.value;
+        emit('sortChange', option.value);
+      }
+    } else if (typeof option === 'string' && isValidSortOption(option)) {
+      selectedSort.value = option;
+      emit('sortChange', option);
+    }
+  },
+});
+
+// Watch for sort prop changes
+watch(
+  () => props.sort,
+  (newSort) => {
+    if (newSort && newSort !== selectedSort.value) {
+      selectedSort.value = newSort;
+    }
+  }
+);
+
+// Watch for isSearching changes to update default sort
+watch(
+  () => props.isSearching,
+  (isSearching) => {
+    if (isSearching && selectedSort.value === 'created_desc') {
+      selectedSort.value = 'relevance';
+      emit('sortChange', 'relevance');
+    } else if (!isSearching && selectedSort.value === 'relevance') {
+      selectedSort.value = 'created_desc';
+      emit('sortChange', 'created_desc');
+    }
+  }
+);
+
 const recordStatusOptionsComputed = computed(() => {
   return recordStatusOptions().map((option: any) => {
     return {
@@ -160,15 +269,27 @@ const recordStatusOptionsComputed = computed(() => {
 });
 
 // Watch for changes and emit events (but skip if syncing from props)
-watch(searchQuery, (newQuery) => {
+watch(searchQuery, (newQuery, oldQuery) => {
   // Don't emit if we're syncing from props (prevents duplicate API calls on mount)
   if (isSyncingFromProps.value) return;
 
+  // Only emit search event - don't emit filterChange for search query changes
+  // Filter changes should only fire when type/status filters change
   emit('search', newQuery);
-  emitFilterChange();
 
-  // Fetch suggestions while typing (when query has 2+ characters)
-  if (newQuery && newQuery.trim().length >= 2) {
+  // If query was cleared (empty string), submit the search to reset the list
+  if (!newQuery || newQuery.trim().length === 0) {
+    if (oldQuery && oldQuery.trim().length > 0) {
+      // Query was cleared - submit to reset search results
+      emit('searchSubmit', '');
+    }
+    clearSuggestions();
+    return;
+  }
+
+  // Only fetch suggestions while typing if input has focus
+  // This prevents suggestions from appearing after clicking a suggestion
+  if (inputHasFocus.value && newQuery && newQuery.trim().length >= 2) {
     fetchSuggestions(newQuery);
   } else {
     clearSuggestions();
@@ -207,25 +328,80 @@ const emitFilterChange = () => {
   });
 };
 
+// Timeout to delay blur handling (allows suggestion clicks to register)
+let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+
 // Search suggestions
-const handleInputBlur = () => {
+const handleInputFocus = () => {
+  // Clear any pending blur timeout
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+    blurTimeout = null;
+  }
+  inputHasFocus.value = true;
+  // Fetch suggestions when input gains focus (if query has 2+ characters)
   if (searchQuery.value && searchQuery.value.trim().length >= 2) {
     fetchSuggestions(searchQuery.value);
   }
 };
 
+const handleInputBlur = () => {
+  // Delay blur handling slightly to allow suggestion clicks to register
+  blurTimeout = setTimeout(() => {
+    inputHasFocus.value = false;
+    clearSuggestions();
+    blurTimeout = null;
+  }, 200); // Small delay to allow click events to fire first
+};
+
+// Handle Enter key press to submit search
+const handleInputKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    clearSuggestions();
+    emit('searchSubmit', searchQuery.value);
+  }
+};
+
 const handleSuggestionClick = (suggestion: string) => {
+  // Clear any pending blur timeout
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+    blurTimeout = null;
+  }
+  // Remove focus from input to hide suggestions
+  inputHasFocus.value = false;
   searchQuery.value = suggestion;
   clearSuggestions();
+  // Submit the search when suggestion is clicked
+  emit('searchSubmit', suggestion);
 };
 
 const handleClickOutside = (event: Event) => {
   const target = event.target as Element;
+  // Don't hide suggestions if clicking:
+  // 1. Inside the search suggestions container (input + dropdown)
+  // 2. On the suggestions dropdown itself
+  // 3. On any USelectMenu dropdown (type, status, sort filters)
+  const isInSuggestionsContainer = target.closest(
+    '.search-suggestions-container'
+  );
+  const isInSuggestionsDropdown = target.closest(
+    '.search-suggestions-dropdown'
+  );
+  const isInSelectMenu =
+    target.closest('[role="listbox"]') ||
+    target.closest('[role="option"]') ||
+    target.closest('.ui-select-menu') ||
+    target.closest('[data-headlessui-state]');
+
   if (
-    !target.closest('.search-suggestions-container') &&
-    searchQuery.value &&
-    searchQuery.value.trim()
+    !isInSuggestionsContainer &&
+    !isInSuggestionsDropdown &&
+    !isInSelectMenu
   ) {
+    // Clicked outside - remove focus (this will hide suggestions via blur handler)
+    inputHasFocus.value = false;
     clearSuggestions();
   }
 };
@@ -236,6 +412,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
+  // Clean up blur timeout
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+  }
 });
 </script>
 
@@ -256,7 +436,9 @@ onUnmounted(() => {
         <div class="flex-1 relative search-suggestions-container">
           <UInput
             v-model="searchQuery"
+            @focus="handleInputFocus"
             @blur="handleInputBlur"
+            @keydown="handleInputKeydown"
             :placeholder="t('records.filters.searchPlaceholder')"
             icon="i-lucide-search"
             class="w-full"
@@ -274,34 +456,63 @@ onUnmounted(() => {
             </template>
           </UInput>
 
-          <!-- Suggestions Dropdown -->
+          <!-- Suggestions Dropdown (only show when input has focus) -->
           <div
-            v-if="suggestions.length > 0"
-            class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
+            v-if="
+              inputHasFocus &&
+              (suggestionWords.length > 0 || suggestionTitles.length > 0)
+            "
+            class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto search-suggestions-dropdown"
           >
             <div class="p-2">
               <div class="text-xs text-gray-500 mb-2 px-2">
                 <UIcon name="i-lucide-lightbulb" class="w-3 h-3 inline mr-1" />
                 {{ t('records.filters.suggestions') }}
               </div>
+
+              <!-- Word Suggestions (as badges) -->
+              <div v-if="suggestionWords.length > 0" class="mb-2 px-2">
+                <div class="flex flex-wrap gap-1.5">
+                  <button
+                    v-for="word in suggestionWords"
+                    :key="`word-${word}`"
+                    class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+                    @click="handleSuggestionClick(word)"
+                  >
+                    <UIcon name="i-lucide-hash" class="w-3 h-3" />
+                    {{ word }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Separator between words and titles -->
               <div
-                v-for="suggestion in suggestions"
-                :key="suggestion"
-                class="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer text-sm"
-                @click="handleSuggestionClick(suggestion)"
-              >
-                <UIcon
-                  name="i-lucide-search"
-                  class="w-3 h-3 inline mr-2 text-gray-400"
-                />
-                {{ suggestion }}
+                v-if="suggestionWords.length > 0 && suggestionTitles.length > 0"
+                class="border-t border-gray-200 my-2"
+              />
+
+              <!-- Title Suggestions (with icons) -->
+              <div v-if="suggestionTitles.length > 0">
+                <div
+                  v-for="title in suggestionTitles"
+                  :key="`title-${title}`"
+                  class="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer text-sm"
+                  @click="handleSuggestionClick(title)"
+                >
+                  <UIcon
+                    name="i-lucide-file-text"
+                    class="w-3 h-3 inline mr-2 text-gray-400"
+                  />
+                  {{ title }}
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Loading indicator for suggestions -->
+          <!-- Loading indicator for suggestions (only show when input has focus) -->
           <div
             v-if="
+              inputHasFocus &&
               suggestionsLoading &&
               searchQuery &&
               searchQuery.trim().length >= 2
@@ -356,6 +567,18 @@ onUnmounted(() => {
               size="xs"
               @click="selectedRecordStatuses = []"
             />
+          </template>
+        </USelectMenu>
+
+        <!-- Sort Dropdown -->
+        <USelectMenu
+          v-model="selectedSortOption"
+          :items="sortOptions"
+          :placeholder="t('records.filters.sortPlaceholder')"
+          class="w-full sm:w-40"
+        >
+          <template #leading>
+            <UIcon name="i-lucide-arrow-up-down" class="w-4 h-4" />
           </template>
         </USelectMenu>
       </div>

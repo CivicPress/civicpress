@@ -8,8 +8,16 @@ import { userCan } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 interface ImportOptions {
   token?: string;
@@ -50,39 +58,31 @@ export function registerImportCommand(cli: CAC) {
     .option('--validate', 'Validate imported records')
     .option('--template <template>', 'Default template for imported records')
     .action(async (file: string, options: ImportOptions) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
-      const shouldOutputJson = globalOptions.json;
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('import');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
-        shouldOutputJson
+        globalOptions.json
       );
       const dataDir = civic.getDataDir();
 
       // Check import permissions
       const canImport = await userCan(user, 'records:import');
       if (!canImport) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to import records',
-                requiredPermission: 'records:import',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to import records');
-          logger.info(`Role '${user.role}' cannot import records`);
-        }
+        cliError(
+          'Insufficient permissions to import records',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'records:import',
+            userRole: user.role,
+          },
+          'import'
+        );
         process.exit(1);
       }
 
@@ -97,19 +97,23 @@ export function registerImportCommand(cli: CAC) {
 
         // If specific file is provided, import just that file
         if (file) {
-          await importSingleFile(
-            dataDir,
-            file,
-            importOptions,
-            shouldOutputJson
-          );
+          await importSingleFile(dataDir, file, importOptions);
         } else {
           // Import from input directory or file
-          await importRecords(dataDir, importOptions, shouldOutputJson);
+          await importRecords(dataDir, importOptions);
         }
       } catch (error) {
-        logger.error('❌ Import failed:', error);
+        cliError(
+          'Import failed',
+          'IMPORT_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'import'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
@@ -117,101 +121,70 @@ export function registerImportCommand(cli: CAC) {
 async function importSingleFile(
   dataDir: string,
   filePath: string,
-  options: ImportOptions,
-  shouldOutputJson?: boolean
+  options: ImportOptions
 ) {
-  const logger = initializeLogger();
   try {
     if (!fs.existsSync(filePath)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `File not found: ${filePath}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ File not found: ${filePath}`);
-        process.exit(1);
-      }
-    }
-
-    const content = await readFile(filePath, 'utf-8');
-    const records = await parseImportFile(content, options);
-
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            records,
-            summary: {
-              totalRecords: records.length,
-              format: options.format,
-              file: filePath,
-            },
-          },
-          null,
-          2
-        )
+      cliError(
+        `File not found: ${filePath}`,
+        'FILE_NOT_FOUND',
+        { filePath },
+        'import'
       );
       return;
     }
 
-    logger.info(`📦 Importing ${records.length} record(s) from ${filePath}...`);
+    const content = await readFile(filePath, 'utf-8');
+    const records = await parseImportFile(content, options);
 
     if (options.dryRun) {
       await dryRunImport(records, options);
     } else {
       await performImport(records, dataDir, options);
     }
+
+    cliSuccess(
+      {
+        records,
+        summary: {
+          totalRecords: records.length,
+          format: options.format,
+          file: filePath,
+        },
+      },
+      `Imported ${records.length} record${records.length === 1 ? '' : 's'} from ${filePath}`,
+      {
+        operation: 'import',
+        recordCount: records.length,
+        format: options.format,
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: `Error importing ${filePath}`,
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error(`❌ Error importing ${filePath}:`, error);
-      process.exit(1);
-    }
+    cliError(
+      `Error importing ${filePath}`,
+      'IMPORT_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        filePath,
+      },
+      'import'
+    );
+    throw error;
   }
 }
 
-async function importRecords(
-  dataDir: string,
-  options: ImportOptions,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function importRecords(dataDir: string, options: ImportOptions) {
   const inputPath = options.input || '.';
 
   try {
     if (!fs.existsSync(inputPath)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Input path not found: ${inputPath}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Input path not found: ${inputPath}`);
-        process.exit(1);
-      }
+      cliError(
+        `Input path not found: ${inputPath}`,
+        'INPUT_PATH_NOT_FOUND',
+        { inputPath },
+        'import'
+      );
+      process.exit(1);
     }
 
     const stats = fs.statSync(inputPath);
@@ -235,66 +208,43 @@ async function importRecords(
     }
 
     if (allRecords.length === 0) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: 'No records found to import',
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.warn('🔍 No records found to import.');
-        return;
-      }
-    }
-
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            records: allRecords,
-            summary: {
-              totalRecords: allRecords.length,
-              format: options.format,
-              input: inputPath,
-            },
-          },
-          null,
-          2
-        )
-      );
+      cliWarn('No records found to import', 'import');
       return;
     }
-
-    logger.info(
-      `📦 Importing ${allRecords.length} record(s) from ${inputPath}...`
-    );
 
     if (options.dryRun) {
       await dryRunImport(allRecords, options);
     } else {
       await performImport(allRecords, dataDir, options);
     }
+
+    cliSuccess(
+      {
+        records: allRecords,
+        summary: {
+          totalRecords: allRecords.length,
+          format: options.format,
+          input: inputPath,
+        },
+      },
+      `Imported ${allRecords.length} record${allRecords.length === 1 ? '' : 's'} from ${inputPath}`,
+      {
+        operation: 'import',
+        recordCount: allRecords.length,
+        format: options.format,
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error importing records',
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error importing records:', error);
-      process.exit(1);
-    }
+    cliError(
+      'Error importing records',
+      'IMPORT_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        inputPath,
+      },
+      'import'
+    );
+    throw error;
   }
 }
 

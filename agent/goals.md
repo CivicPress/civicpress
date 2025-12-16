@@ -53,8 +53,8 @@
 
 - ✅ **Nuxt 4 Framework**: Vue 3 with Nuxt UI Pro components
 - ✅ **Authentication Flow**: Complete login/logout with JWT token management
-- ✅ **Records Interface**: Complete with search, filtering, pagination, and URL
-  state management
+- ✅ **Records Interface**: Complete with search, filtering, page-based
+  pagination, and URL state management
 - ✅ **Record Detail**: Complete with Markdown rendering and metadata display
 - ✅ **API Integration**: Complete integration with backend REST API
 - ✅ **Composables**: Complete reusable composables for DRY principle

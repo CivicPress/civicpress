@@ -2,18 +2,42 @@ import {
   DatabaseAdapter,
   DatabaseConfig,
   createDatabaseAdapter,
+  SQLiteAdapter,
 } from './database-adapter.js';
 import { Logger } from '../utils/logger.js';
 import * as process from 'process';
+import { SearchService } from '../search/search-service.js';
+import { SQLiteSearchService } from '../search/sqlite-search-service.js';
 
 export class DatabaseService {
   private adapter: DatabaseAdapter;
   private isConnected = false;
   private logger: Logger;
+  private searchService?: SearchService;
 
   constructor(config: DatabaseConfig, logger?: Logger) {
     this.adapter = createDatabaseAdapter(config);
     this.logger = logger || new Logger();
+
+    // Initialize search service based on adapter type
+    if (this.adapter instanceof SQLiteAdapter) {
+      this.searchService = new SQLiteSearchService(this.adapter);
+    }
+    // TODO: Add PostgreSQL search service when PostgresAdapter is implemented
+  }
+
+  /**
+   * Get the search service instance
+   */
+  getSearchService(): SearchService | undefined {
+    return this.searchService;
+  }
+
+  /**
+   * Get the database adapter
+   */
+  getAdapter(): DatabaseAdapter {
+    return this.adapter;
   }
 
   async initialize(): Promise<void> {
@@ -342,6 +366,39 @@ export class DatabaseService {
     tags?: string;
     metadata?: string;
   }): Promise<void> {
+    // Use search service if available (handles FTS indexing)
+    if (this.searchService) {
+      try {
+        let metadata: any = null;
+        if (recordData.metadata) {
+          try {
+            metadata = JSON.parse(recordData.metadata);
+          } catch {
+            metadata = null;
+          }
+        }
+
+        await this.searchService.indexRecord({
+          recordId: recordData.recordId,
+          recordType: recordData.recordType,
+          title: recordData.title,
+          content: recordData.content,
+          tags: recordData.tags,
+          metadata,
+        });
+        return;
+      } catch (error) {
+        // Fall back to old method if search service fails
+        this.logger.warn(
+          'Search service indexing failed, falling back to basic indexing',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
+    }
+
+    // Fallback: Basic indexing (no FTS)
     // Delete existing index entry if it exists
     await this.adapter.execute(
       'DELETE FROM search_index WHERE record_id = ? AND record_type = ?',
@@ -362,26 +419,101 @@ export class DatabaseService {
     );
   }
 
-  async searchRecords(query: string, recordType?: string): Promise<any[]> {
+  async searchRecords(
+    query: string,
+    options?: {
+      type?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+      sort?: string;
+    }
+  ): Promise<any[]> {
+    // Use search service if available (FTS search)
+    if (this.searchService) {
+      try {
+        const result = await this.searchService.search(query, {
+          type: options?.type,
+          status: options?.status,
+          limit: options?.limit || 20,
+          offset: options?.offset || 0,
+          sort: options?.sort,
+        });
+        return result.results;
+      } catch (error) {
+        // Fall back to old method if search service fails
+        this.logger.warn('Search service failed, falling back to LIKE search', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // Fallback: Old LIKE-based search
+    const recordType = options?.type;
     let sql = `
-      SELECT * FROM search_index 
-      WHERE (title LIKE ? OR content LIKE ? OR tags LIKE ?)
+      SELECT si.* FROM search_index si
+      INNER JOIN records r ON si.record_id = r.id
+      WHERE (si.title LIKE ? OR si.content LIKE ? OR si.tags LIKE ?)
+      AND (r.workflow_state IS NULL OR r.workflow_state != ?)
     `;
-    const params = [`%${query}%`, `%${query}%`, `%${query}%`];
+    const params: any[] = [
+      `%${query}%`,
+      `%${query}%`,
+      `%${query}%`,
+      'internal_only',
+    ];
 
     if (recordType) {
       const typeFilters = recordType.split(',').map((t) => t.trim());
       if (typeFilters.length === 1) {
-        sql += ' AND record_type = ?';
+        sql += ' AND si.record_type = ?';
         params.push(typeFilters[0]);
       } else {
         const placeholders = typeFilters.map(() => '?').join(',');
-        sql += ` AND record_type IN (${placeholders})`;
+        sql += ` AND si.record_type IN (${placeholders})`;
         params.push(...typeFilters);
       }
     }
 
-    sql += ' ORDER BY updated_at DESC';
+    if (options?.status) {
+      sql += ' AND r.status = ?';
+      params.push(options.status);
+    }
+
+    // Apply ordering with kind priority and user sort
+    const sortOption = options?.sort || 'updated_desc';
+    const kindPriority = `CASE 
+      WHEN json_extract(r.metadata, '$.kind') = 'root' THEN 3
+      WHEN json_extract(r.metadata, '$.kind') = 'chapter' THEN 2
+      ELSE 1
+    END`;
+    let userSort = '';
+    switch (sortOption) {
+      case 'updated_desc':
+        userSort = 'si.updated_at DESC';
+        break;
+      case 'created_desc':
+        userSort = 'r.created_at DESC';
+        break;
+      case 'title_asc':
+        userSort = 'LOWER(si.title) ASC, r.created_at DESC';
+        break;
+      case 'title_desc':
+        userSort = 'LOWER(si.title) DESC, r.created_at DESC';
+        break;
+      default:
+        userSort = 'si.updated_at DESC';
+    }
+    sql += ` ORDER BY ${kindPriority} ASC, ${userSort}`;
+
+    if (options?.limit) {
+      sql += ' LIMIT ?';
+      params.push(options.limit);
+      if (options.offset) {
+        sql += ' OFFSET ?';
+        params.push(options.offset);
+      }
+    }
 
     return await this.adapter.query(sql, params);
   }
@@ -390,6 +522,12 @@ export class DatabaseService {
     recordId: string,
     recordType: string
   ): Promise<void> {
+    // Remove from search service if available (clears FTS5 and cache)
+    if (this.searchService) {
+      await this.searchService.removeRecord(recordId, recordType);
+    }
+
+    // Also remove from search_index table directly (for fallback searches)
     await this.adapter.execute(
       'DELETE FROM search_index WHERE record_id = ? AND record_type = ?',
       [recordId, recordType]
@@ -402,6 +540,7 @@ export class DatabaseService {
     title: string;
     type: string;
     status?: string;
+    workflow_state?: string;
     content?: string;
     metadata?: string;
     geography?: string;
@@ -412,12 +551,15 @@ export class DatabaseService {
     author: string;
   }): Promise<void> {
     await this.adapter.execute(
-      'INSERT INTO records (id, title, type, status, content, metadata, geography, attached_files, linked_records, linked_geography_files, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO records (id, title, type, status, workflow_state, content, metadata, geography, attached_files, linked_records, linked_geography_files, path, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         recordData.id,
         recordData.title,
         recordData.type,
         recordData.status || 'draft',
+        recordData.workflow_state !== undefined
+          ? recordData.workflow_state
+          : 'draft',
         recordData.content,
         recordData.metadata,
         recordData.geography,
@@ -429,13 +571,31 @@ export class DatabaseService {
       ]
     );
 
+    // Extract tags from metadata for indexing
+    let tags = '';
+    if (recordData.metadata) {
+      try {
+        const metadata = JSON.parse(recordData.metadata);
+        if (metadata.tags) {
+          // Handle both array and string formats
+          tags = Array.isArray(metadata.tags)
+            ? metadata.tags.join(',')
+            : typeof metadata.tags === 'string'
+              ? metadata.tags
+              : '';
+        }
+      } catch {
+        // If metadata parsing fails, tags remain empty
+      }
+    }
+
     // Index the record for search
     await this.indexRecord({
       recordId: recordData.id,
       recordType: recordData.type,
       title: recordData.title,
       content: recordData.content,
-      tags: '',
+      tags,
       metadata: recordData.metadata,
     });
   }
@@ -448,11 +608,546 @@ export class DatabaseService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  // Draft management
+  async createDraft(draftData: {
+    id: string;
+    title: string;
+    type: string;
+    status?: string;
+    workflow_state?: string;
+    markdown_body?: string | null;
+    metadata?: string | null;
+    geography?: string | null;
+    attached_files?: string | null;
+    linked_records?: string | null;
+    linked_geography_files?: string | null;
+    author: string;
+    created_by: string;
+  }): Promise<void> {
+    // Track if we had to add the column - if so, we may need to UPDATE after INSERT
+    let columnAdded = false;
+
+    // Ensure workflow_state column exists before inserting
+    // This is critical to prevent silent failures when column doesn't exist
+    try {
+      // Check if table exists first
+      const tableExists = await this.adapter.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='record_drafts'"
+      );
+
+      if (tableExists.length > 0) {
+        // Table exists, check if column exists
+        const tableInfo = await this.adapter.query(
+          'PRAGMA table_info(record_drafts)'
+        );
+        const columnNames = tableInfo.map((col: any) => col.name);
+        const hasColumn = columnNames.includes('workflow_state');
+
+        if (!hasColumn) {
+          this.logger.info(
+            'workflow_state column missing in record_drafts, adding it before insert',
+            {
+              id: draftData.id,
+              existingColumns: columnNames,
+            }
+          );
+          await this.adapter.execute(
+            "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+          // Verify it was added
+          const verifyInfo = await this.adapter.query(
+            'PRAGMA table_info(record_drafts)'
+          );
+          const verifyColumns = verifyInfo.map((col: any) => col.name);
+          if (!verifyColumns.includes('workflow_state')) {
+            throw new Error(
+              'Failed to add workflow_state column to record_drafts table'
+            );
+          }
+          this.logger.info(
+            'Successfully added workflow_state column to record_drafts',
+            { id: draftData.id }
+          );
+          // Mark that we need to UPDATE after INSERT to ensure the value is set correctly
+          // (since ALTER TABLE with DEFAULT might set default value for existing rows)
+          columnAdded = true;
+        }
+      }
+      // If table doesn't exist, CREATE TABLE will include the column
+    } catch (error: any) {
+      // Log error but continue - if INSERT fails, we'll get a clear error
+      this.logger.error(
+        'Error checking/adding workflow_state column before insert',
+        {
+          id: draftData.id,
+          error: error?.message || String(error),
+        }
+      );
+      // Don't throw - let INSERT attempt proceed, it will fail with clear error if needed
+    }
+
+    // Attempt INSERT with workflow_state column
+    try {
+      await this.adapter.execute(
+        'INSERT INTO record_drafts (id, title, type, status, workflow_state, markdown_body, metadata, geography, attached_files, linked_records, linked_geography_files, author, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          draftData.id,
+          draftData.title,
+          draftData.type,
+          draftData.status || 'draft',
+          draftData.workflow_state || 'draft',
+          draftData.markdown_body || null,
+          draftData.metadata || null,
+          draftData.geography || null,
+          draftData.attached_files || null,
+          draftData.linked_records || null,
+          draftData.linked_geography_files || null,
+          draftData.author,
+          draftData.created_by,
+        ]
+      );
+    } catch (error: any) {
+      // If INSERT fails due to missing column, try to add it and retry
+      if (
+        error?.message?.includes('no such column: workflow_state') ||
+        error?.message?.includes('no column named workflow_state')
+      ) {
+        this.logger.warn(
+          'INSERT failed due to missing workflow_state column, adding it and retrying',
+          {
+            id: draftData.id,
+          }
+        );
+        try {
+          await this.adapter.execute(
+            "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+          // Retry INSERT
+          await this.adapter.execute(
+            'INSERT INTO record_drafts (id, title, type, status, workflow_state, markdown_body, metadata, geography, attached_files, linked_records, linked_geography_files, author, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              draftData.id,
+              draftData.title,
+              draftData.type,
+              draftData.status || 'draft',
+              draftData.workflow_state || 'draft',
+              draftData.markdown_body || null,
+              draftData.metadata || null,
+              draftData.geography || null,
+              draftData.attached_files || null,
+              draftData.linked_records || null,
+              draftData.linked_geography_files || null,
+              draftData.author,
+              draftData.created_by,
+            ]
+          );
+          this.logger.info(
+            'Successfully created draft after adding workflow_state column',
+            { id: draftData.id }
+          );
+          columnAdded = true;
+        } catch (retryError: any) {
+          this.logger.error(
+            'Failed to create draft even after adding workflow_state column',
+            {
+              id: draftData.id,
+              error: retryError?.message || String(retryError),
+            }
+          );
+          throw retryError;
+        }
+      } else {
+        // Different error, re-throw
+        throw error;
+      }
+    }
+
+    // Always verify and ensure workflow_state was saved correctly if a specific non-default value was provided
+    // This handles edge cases where the column might have been added with a DEFAULT
+    // and the value didn't get set correctly during INSERT
+    const requestedWorkflowState = draftData.workflow_state;
+
+    // Force verification if we had to add the column OR if a non-default value was requested
+    if (
+      columnAdded ||
+      (requestedWorkflowState && requestedWorkflowState !== 'draft')
+    ) {
+      try {
+        // Verify the value was actually saved correctly
+        const verifyRows = await this.adapter.query(
+          'SELECT workflow_state FROM record_drafts WHERE id = ?',
+          [draftData.id]
+        );
+        const savedValue = verifyRows[0]?.workflow_state;
+
+        this.logger.debug('Verifying workflow_state after INSERT', {
+          id: draftData.id,
+          requested: requestedWorkflowState,
+          saved: savedValue,
+          columnAdded,
+          matches: savedValue === requestedWorkflowState,
+        });
+
+        // If the saved value doesn't match what we intended, update it
+        // This can happen if the column was added with DEFAULT 'draft' and the INSERT used the default
+        if (savedValue !== requestedWorkflowState) {
+          this.logger.info(
+            'workflow_state value mismatch after INSERT, correcting it',
+            {
+              id: draftData.id,
+              expected: requestedWorkflowState,
+              actual: savedValue,
+              columnAdded,
+            }
+          );
+          await this.adapter.execute(
+            'UPDATE record_drafts SET workflow_state = ? WHERE id = ?',
+            [requestedWorkflowState, draftData.id]
+          );
+
+          // Verify the UPDATE worked
+          const verifyAfterUpdate = await this.adapter.query(
+            'SELECT workflow_state FROM record_drafts WHERE id = ?',
+            [draftData.id]
+          );
+          const updatedValue = verifyAfterUpdate[0]?.workflow_state;
+
+          if (updatedValue === requestedWorkflowState) {
+            this.logger.info('Successfully corrected workflow_state value', {
+              id: draftData.id,
+              workflow_state: requestedWorkflowState,
+            });
+          } else {
+            this.logger.error('Failed to verify workflow_state UPDATE', {
+              id: draftData.id,
+              expected: requestedWorkflowState,
+              actual: updatedValue,
+            });
+          }
+        } else {
+          this.logger.debug(
+            'workflow_state value correctly saved during INSERT',
+            {
+              id: draftData.id,
+              workflow_state: savedValue,
+            }
+          );
+        }
+      } catch (verifyError: any) {
+        this.logger.error(
+          'Failed to verify/update workflow_state after INSERT',
+          {
+            id: draftData.id,
+            requested: requestedWorkflowState,
+            error: verifyError?.message || String(verifyError),
+            stack: verifyError?.stack,
+          }
+        );
+        // Don't throw - the INSERT succeeded, just the verification/UPDATE failed
+      }
+    } else {
+      this.logger.debug(
+        'Skipping workflow_state verification (default value or not provided)',
+        {
+          id: draftData.id,
+          requested: requestedWorkflowState,
+        }
+      );
+    }
+  }
+
+  async getDraft(id: string): Promise<any | null> {
+    const rows = await this.adapter.query(
+      'SELECT * FROM record_drafts WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    const draft = rows[0];
+
+    // Defensive: Ensure workflow_state exists, default to 'draft' if missing
+    // This handles edge cases where column might not exist despite migrations
+    if (
+      !('workflow_state' in draft) ||
+      draft.workflow_state === null ||
+      draft.workflow_state === undefined
+    ) {
+      // Check if column actually exists in schema
+      try {
+        const tableInfo = await this.adapter.query(
+          'PRAGMA table_info(record_drafts)'
+        );
+        const hasColumn = tableInfo.some(
+          (col: any) => col.name === 'workflow_state'
+        );
+
+        if (!hasColumn) {
+          // Column doesn't exist - try to add it
+          this.logger.warn(
+            'workflow_state column missing from record_drafts, attempting migration',
+            { id }
+          );
+          await this.adapter.execute(
+            "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+          // Re-query to get the draft with the new column
+          const updatedRows = await this.adapter.query(
+            'SELECT * FROM record_drafts WHERE id = ?',
+            [id]
+          );
+          if (updatedRows.length > 0) {
+            return {
+              ...updatedRows[0],
+              workflow_state: updatedRows[0].workflow_state || 'draft',
+            };
+          }
+        }
+      } catch (error) {
+        this.logger.error('Failed to verify/add workflow_state column', {
+          id,
+          error,
+        });
+      }
+
+      // Return with default if column exists but value is null
+      return { ...draft, workflow_state: 'draft' };
+    }
+
+    return draft;
+  }
+
+  async listDrafts(
+    options: {
+      type?: string;
+      created_by?: string;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<{ drafts: any[]; total: number }> {
+    const clauses: string[] = [];
+    const params: any[] = [];
+
+    if (options.type) {
+      clauses.push('type = ?');
+      params.push(options.type);
+    }
+
+    if (options.created_by) {
+      clauses.push('created_by = ?');
+      params.push(options.created_by);
+    }
+
+    const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    // Get total count
+    const countRows = await this.adapter.query(
+      `SELECT COUNT(*) as total FROM record_drafts ${whereClause}`,
+      params
+    );
+    const total = countRows[0]?.total || 0;
+
+    // Get drafts with pagination
+    let query = `SELECT * FROM record_drafts ${whereClause} ORDER BY last_draft_saved_at DESC`;
+    if (options.limit) {
+      query += ` LIMIT ${options.limit}`;
+      if (options.offset) {
+        query += ` OFFSET ${options.offset}`;
+      }
+    }
+
+    const rows = await this.adapter.query(query, params);
+
+    return {
+      drafts: rows,
+      total,
+    };
+  }
+
+  async updateDraft(
+    id: string,
+    updates: {
+      title?: string;
+      type?: string;
+      status?: string;
+      workflow_state?: string;
+      markdown_body?: string;
+      metadata?: string;
+      geography?: string;
+      attached_files?: string;
+      linked_records?: string;
+      linked_geography_files?: string;
+    }
+  ): Promise<void> {
+    // Ensure workflow_state column exists before updating
+    if (updates.workflow_state !== undefined) {
+      try {
+        const tableInfo = await this.adapter.query(
+          'PRAGMA table_info(record_drafts)'
+        );
+        const hasColumn = tableInfo.some(
+          (col: any) => col.name === 'workflow_state'
+        );
+
+        if (!hasColumn) {
+          this.logger.warn(
+            'workflow_state column missing, adding it before update',
+            { id }
+          );
+          await this.adapter.execute(
+            "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          'Could not verify workflow_state column, proceeding with update',
+          { id, error }
+        );
+      }
+    }
+    const fields = [];
+    const values = [];
+
+    if (updates.title !== undefined) {
+      fields.push('title = ?');
+      values.push(updates.title);
+    }
+    if (updates.type !== undefined) {
+      fields.push('type = ?');
+      values.push(updates.type);
+    }
+    if (updates.status !== undefined) {
+      fields.push('status = ?');
+      values.push(updates.status);
+    }
+    if (updates.workflow_state !== undefined) {
+      fields.push('workflow_state = ?');
+      values.push(updates.workflow_state);
+    }
+    if (updates.markdown_body !== undefined) {
+      fields.push('markdown_body = ?');
+      values.push(updates.markdown_body);
+    }
+    if (updates.metadata !== undefined) {
+      fields.push('metadata = ?');
+      values.push(updates.metadata);
+    }
+    if (updates.geography !== undefined) {
+      fields.push('geography = ?');
+      values.push(updates.geography);
+    }
+    if (updates.attached_files !== undefined) {
+      fields.push('attached_files = ?');
+      values.push(updates.attached_files);
+    }
+    if (updates.linked_records !== undefined) {
+      fields.push('linked_records = ?');
+      values.push(updates.linked_records);
+    }
+    if (updates.linked_geography_files !== undefined) {
+      fields.push('linked_geography_files = ?');
+      values.push(updates.linked_geography_files);
+    }
+
+    if (fields.length === 0) {
+      return; // No updates to perform
+    }
+
+    // Always update last_draft_saved_at and updated_at
+    fields.push('last_draft_saved_at = CURRENT_TIMESTAMP');
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+
+    values.push(id);
+
+    const sql = `UPDATE record_drafts SET ${fields.join(', ')} WHERE id = ?`;
+
+    // Debug logging for workflow_state updates
+    if (updates.workflow_state !== undefined) {
+      console.log('[DatabaseService] Updating workflow_state:', {
+        id,
+        workflow_state: updates.workflow_state,
+        sql,
+        fields,
+        values: values.map((v, i) => (i === values.length - 1 ? '[id]' : v)),
+      });
+    }
+
+    await this.adapter.execute(sql, values);
+  }
+
+  async deleteDraft(id: string): Promise<void> {
+    await this.adapter.execute('DELETE FROM record_drafts WHERE id = ?', [id]);
+  }
+
+  // Lock management
+  async acquireLock(
+    recordId: string,
+    lockedBy: string,
+    expiresAt: Date
+  ): Promise<boolean> {
+    // First, clean up expired locks for this record
+    await this.adapter.execute(
+      'DELETE FROM record_locks WHERE record_id = ? AND expires_at < CURRENT_TIMESTAMP',
+      [recordId]
+    );
+
+    // Check if record is already locked
+    const existingLock = await this.getLock(recordId);
+    if (existingLock && existingLock.expires_at > new Date().toISOString()) {
+      // Lock exists and is not expired
+      return false;
+    }
+
+    // Acquire lock (INSERT OR REPLACE to handle existing expired locks)
+    await this.adapter.execute(
+      'INSERT OR REPLACE INTO record_locks (record_id, locked_by, expires_at) VALUES (?, ?, ?)',
+      [recordId, lockedBy, expiresAt.toISOString()]
+    );
+
+    return true;
+  }
+
+  async releaseLock(recordId: string, lockedBy: string): Promise<boolean> {
+    const result = await this.adapter.execute(
+      'DELETE FROM record_locks WHERE record_id = ? AND locked_by = ?',
+      [recordId, lockedBy]
+    );
+    return (result as any).changes > 0;
+  }
+
+  async getLock(recordId: string): Promise<any | null> {
+    // Clean up expired locks first
+    await this.adapter.execute(
+      'DELETE FROM record_locks WHERE expires_at < CURRENT_TIMESTAMP'
+    );
+
+    const rows = await this.adapter.query(
+      'SELECT * FROM record_locks WHERE record_id = ?',
+      [recordId]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  async refreshLock(
+    recordId: string,
+    lockedBy: string,
+    expiresAt: Date
+  ): Promise<boolean> {
+    const result = await this.adapter.execute(
+      'UPDATE record_locks SET expires_at = ? WHERE record_id = ? AND locked_by = ?',
+      [expiresAt.toISOString(), recordId, lockedBy]
+    );
+    return (result as any).changes > 0;
+  }
+
   async updateRecord(
     id: string,
     updates: {
       title?: string;
       status?: string;
+      workflow_state?: string;
       content?: string;
       metadata?: string;
       geography?: string;
@@ -472,6 +1167,10 @@ export class DatabaseService {
     if (updates.status !== undefined) {
       fields.push('status = ?');
       values.push(updates.status);
+    }
+    if (updates.workflow_state !== undefined) {
+      fields.push('workflow_state = ?');
+      values.push(updates.workflow_state);
     }
     if (updates.content !== undefined) {
       fields.push('content = ?');
@@ -513,13 +1212,37 @@ export class DatabaseService {
     // Update search index
     const record = await this.getRecord(id);
     if (record) {
+      // Extract tags from metadata for indexing
+      let tags = '';
+      if (record.metadata) {
+        try {
+          const metadata =
+            typeof record.metadata === 'string'
+              ? JSON.parse(record.metadata)
+              : record.metadata;
+          if (metadata.tags) {
+            // Handle both array and string formats
+            tags = Array.isArray(metadata.tags)
+              ? metadata.tags.join(',')
+              : typeof metadata.tags === 'string'
+                ? metadata.tags
+                : '';
+          }
+        } catch {
+          // If metadata parsing fails, tags remain empty
+        }
+      }
+
       await this.indexRecord({
         recordId: record.id,
         recordType: record.type,
         title: record.title,
         content: record.content,
-        tags: '',
-        metadata: record.metadata,
+        tags,
+        metadata:
+          typeof record.metadata === 'string'
+            ? record.metadata
+            : JSON.stringify(record.metadata || {}),
       });
     }
   }
@@ -532,16 +1255,54 @@ export class DatabaseService {
   /**
    * List records with optional filtering
    */
+  /**
+   * Build ORDER BY clause with kind priority and user sort
+   */
+  private buildOrderByClause(sort: string = 'created_desc'): string {
+    // Kind priority calculation (record=1, chapter=2, root=3)
+    const kindPriority = `CASE 
+      WHEN json_extract(metadata, '$.kind') = 'root' THEN 3
+      WHEN json_extract(metadata, '$.kind') = 'chapter' THEN 2
+      ELSE 1
+    END`;
+
+    // User sort clause
+    let userSort = '';
+    switch (sort) {
+      case 'updated_desc':
+        userSort = 'updated_at DESC, created_at DESC';
+        break;
+      case 'created_desc':
+        userSort = 'created_at DESC';
+        break;
+      case 'title_asc':
+        userSort = 'LOWER(title) ASC, created_at DESC';
+        break;
+      case 'title_desc':
+        userSort = 'LOWER(title) DESC, created_at DESC';
+        break;
+      default:
+        userSort = 'created_at DESC';
+    }
+
+    return `ORDER BY ${kindPriority} ASC, ${userSort}`;
+  }
+
   async listRecords(
     options: {
       type?: string;
-      status?: string;
+      status?: string; // Deprecated: All records in this table are published by definition
       limit?: number;
       offset?: number;
+      sort?: string;
     } = {}
   ): Promise<{ records: any[]; total: number }> {
     let sql = 'SELECT * FROM records WHERE 1=1';
     const params: any[] = [];
+
+    // Defensive: Filter out internal_only records (shouldn't be in records table, but just in case)
+    sql += ' AND (workflow_state IS NULL OR workflow_state != ?)';
+    params.push('internal_only');
 
     // Apply type filter (handle comma-separated values)
     if (options.type) {
@@ -556,7 +1317,8 @@ export class DatabaseService {
       }
     }
 
-    // Apply status filter (handle comma-separated values)
+    // Status filter is deprecated - all records in records table are published by definition
+    // Keeping for backward compatibility, but it's ignored for published endpoints
     if (options.status) {
       const statusFilters = options.status.split(',').map((s) => s.trim());
       if (statusFilters.length === 1) {
@@ -574,8 +1336,9 @@ export class DatabaseService {
     const countResult = await this.adapter.query(countSql, params);
     const total = countResult[0].count;
 
-    // Apply ordering and pagination
-    sql += ' ORDER BY created_at DESC';
+    // Apply ordering and pagination (with kind priority and user sort)
+    const sortOption = options.sort || 'created_desc';
+    sql += ' ' + this.buildOrderByClause(sortOption);
 
     // Always apply limit (default to 10 if not provided)
     const limit = options.limit || 10;

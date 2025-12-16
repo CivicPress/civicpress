@@ -3,7 +3,7 @@
 _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha to a stable, production-ready civic infrastructure platform._
 
-**Current Version:** v0.1.3 (Alpha)  
+**Current Version:** v0.1.4 (Alpha)  
 **Status:** Early development, preparing for pilot collaborations
 
 ---
@@ -39,7 +39,7 @@ architecture, core concepts, and overall feasibility of the platform.
 
 ### DevOps & Demo Environment
 
-- Full deployment of **https://demo.civicpress.io**
+- Full deployment of **<https://demo.civicpress.io>**
 - EC2-based hosting with Nginx reverse proxy
 - Automated build + prerender pipeline for UI
 - Structured project documentation created
@@ -82,13 +82,15 @@ Each phase includes objectives and expected deliverables.
 
 ### Goals
 
-- Improve search performance and indexing logic
+- Improve search performance and indexing logic ✅ (Search V2 implemented with
+  FTS5)
 - Refine record schema validation
 - Enhance storage abstraction layer (additional providers, performance
   optimizations)
 - Add CLI improvements (diagnostics, repair, validation)
 - Improve error handling and logs
-- Polish UI navigation and list views
+- Polish UI navigation and list views ✅ (Page-based pagination, improved search
+  UX)
 - Add basic documentation for architecture
 
 **Note:** Basic storage abstraction (local, S3, Azure) is already implemented
@@ -272,4 +274,4 @@ This roadmap will evolve as:
 - feedback and civic needs shape priorities
 
 For contributions or roadmap suggestions:  
-Contact: **hello@civicpress.io**
+Contact: **<hello@civicpress.io>**

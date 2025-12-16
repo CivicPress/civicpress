@@ -1,228 +1,135 @@
-# Current Development Session
+# 💾 Memory Update - 2025-01-27
 
-## Session Overview
+## 📊 **Current Status**
 
-**Date**: 2025-01-27  
-**Focus**: Notification System Implementation & CLI Integration  
-**Status**: ✅ Notification System Complete, Ready for User Management
+**Focus**: Record Editor UI Refinement & Simplified Button System
 
-## Recent Accomplishments
+### ✅ **Major Accomplishments**
 
-### ✅ Notification System Complete
+#### **1. Record Editor UI Refinement**
 
-- **Multi-Provider Email**: SendGrid, AWS SES, SMTP, Nodemailer support
-- **Core Architecture**: NotificationService with audit, queue, security, rate
-  limiting
-- **Configuration Management**: Sensitive config in
-  `.system-data/notifications.yml`
-- **CLI Integration**: `civic notify:test`, `civic notify:queue`,
-  `civic notify:retry`
-- **Template System**: AuthTemplate for email verification, password reset, 2FA,
-  security alerts
-- **Queue Monitoring**: Real-time notification history and statistics
-- **Proper Logging**: Uses CLI logger system instead of console.log
-- **SendGrid Integration**: Real email sending with API key configuration
+- **Title Bar Improvements**:
+  - Full-width title input with larger font size (`text-xl`)
+  - Standard UInput styling with rounded corners
+  - Proper padding and focus states
+  - Removed footer from edit page for full-height content
+- **Sidebar Accordion Headers**:
+  - More compact headers with reduced padding (`py-1.5`)
+  - Default hover color (no hover effect)
+  - Better icon and chevron alignment
+  - Pluralized accordion titles based on count
+- **Editor + Preview Styling**:
+  - Removed card wrappers for flat document look
+  - Simple border divider between editor and preview
+  - Consistent background with main content area
+  - Fixed double scrollbar issue
+  - Enabled word wrap (`EditorView.lineWrapping`) to remove horizontal scrollbar
 
-### ✅ Search Suggestions Implementation
+#### **2. Simplified Button System**
 
-- **API Endpoint**: New `/api/search/suggestions` endpoint with intelligent
-  suggestion generation
-- **UI Integration**: Auto-complete dropdown with click handling and blur
-  management
-- **Race Condition Prevention**: Track current query to prevent old responses
-  from overwriting new ones
-- **Immediate Reactivity**: Client-side filtering for instant search feedback
-- **Clean UX**: Suggestions disappear on selection or blur with proper timing
+- **Single Split-Button Design**:
+  - Replaced two buttons (Save Draft + Publish) with single "Save changes"
+    split-button
+  - Contextual dropdown menu with state-aware actions
+  - Always shows "Save changes" as default action
+- **Dropdown Menu Structure**:
+  - Save changes (always visible)
+  - Publish now (for drafts)
+  - Unpublish to draft (for published records)
+  - Archive record (when allowed)
+  - Individual status transition items
+- **Confirmation Modals**:
+  - Publish confirmation (updated)
+  - Unpublish confirmation (new)
+  - Archive confirmation (new)
+  - Delete confirmation (moved from More menu)
+- **More Menu Enhanced**:
+  - View history
+  - Duplicate record
+  - Export as Markdown
+  - Delete record
 
-### ✅ Records Listing Page Enhanced
+#### **3. Additional Features**
 
-- **Search & Filtering**: Full-text search with debounced input and suggestions
-- **Multi-Filter Support**: Type and status filters with OR logic within types,
-  AND logic between types
-- **Pagination**: Client-side pagination with page size controls (10, 25,
-  50, 100) - **🐛 BUG IDENTIFIED**
-- **URL State Management**: Filters, search, and pagination preserved across
-  navigation
-- **Loading States**: Proper loading indicators and error handling
-- **Clear Functionality**: Individual clear buttons for filters and search
+- **Status Dropdown in Details**: Added status selector similar to type dropdown
+- **Raw YAML Preview**: Added accordion item showing formatted YAML frontmatter
+- **Date/Time Display**: Added creation and last updated date/time in Details
+  section
+- **Tag Management**: Integrated UInputTags component
+- **Geography Accordion**: Moved linked geography to its own accordion item
+- **Internationalization**: All editor strings translated (English and French)
+- **Reactive Counts**: Accordion item counts update when items are added/removed
 
-### ✅ Single Record Detail Page Complete
+#### **4. Bug Fixes**
 
-- **Markdown Rendering**: Custom renderer with heading level adjustment
-- **Record Metadata**: Complete display of type, status, dates, author, tags
-- **Back Navigation**: Preserves previous page state using `router.back()`
-- **Responsive Design**: Mobile-friendly layout with proper loading states
-- **Error Handling**: User-friendly error messages with retry options
+- Fixed `UDropdown` → `UDropdownMenu` component name
+- Fixed lifecycle hooks in composables (`useRecordLock`, `useAutosave`)
+- Fixed double scrollbar in editor
+- Fixed content cutoff past line 24
+- Fixed route order conflicts (`/drafts` before `/:id`)
+- Fixed authentication flow for drafts endpoint
+- Fixed TypeScript errors for status dropdown
 
-### ✅ Reusable Composables Enhanced
+## 🎯 **Next Steps**
 
-- **`useMarkdown`**: Markdown rendering with custom heading levels
-- **`useRecordUtils`**: Date formatting, status colors, type icons, labels,
-  validation
-- **`useRecordTypes`**: Record type management and caching
-- **`useRecordStatuses`**: Record status management and caching
-- **`useSearchSuggestions`**: New composable for search auto-complete
-  functionality
+1. **Testing**: Test all new button actions (unpublish, archive, duplicate,
+   export)
+2. **API Endpoints**: Verify unpublish and archive endpoints exist and work
+   correctly
+3. **History Page**: Implement history view page for records
+4. **Export Functionality**: Ensure export endpoint works or implement fallback
+5. **Polish**: Review UX flow and make any final adjustments
 
-### ✅ API Integration Complete
+## 📁 **Key Files Modified**
 
-- **Request Interceptors**: Automatic token injection in API calls
-- **Response Handling**: Proper error handling for API responses
-- **Type Safety**: TypeScript interfaces for API responses
-- **Headers Management**: Handles different header formats correctly
+### Components
 
-### ✅ Data Management Optimized
-
-- **Record Accumulation**: Store accumulates records, never replaces
-- **Client-Side Pagination**: Pagination handled in `filteredRecords` getter
-- **Caching**: Record types and statuses cached globally
-- **Parallel Loading**: Records and configuration data fetched in parallel
-
-## Current Working State
-
-### ✅ What's Working
-
-- **Records Listing**: Complete with search, filtering, pagination, and URL
-  state management
-- **Record Detail**: Complete with Markdown rendering and metadata display
-- **API Integration**: Full integration with backend REST API
-- **Authentication**: JWT token management with automatic injection
-- **Loading States**: Proper loading indicators throughout the interface
-- **Error Handling**: Comprehensive error handling with user feedback
-
-### 🔄 In Progress
-
-- **🐛 Pagination Bug Fix**: Client-side pagination and "records per page" not
-  working correctly
-  - Mixing client-side and server-side pagination logic causing conflicts
-  - Page size changes not working properly
-  - Navigation between pages not functioning correctly
-  - **Priority**: High - affects core UI functionality
-
-### 📋 Next Steps
-
-1. **Immediate**: Implement user registration and account management
-2. **Short Term**: Create admin dashboard for user management
-3. **Medium Term**: Integrate notification system with authentication flows
-4. **Long Term**: Add advanced features (bulk operations, export/import)
-
-## Key Files Modified
-
-### Frontend Components
-
-- `modules/ui/app/pages/records/index.vue` - Enhanced with performance
-  optimizations and search suggestions
-- `modules/ui/app/pages/records/[type]/[id].vue` - Complete record detail page
-- `modules/ui/app/stores/records.ts` - Enhanced Pinia store with pagination
-- `modules/ui/app/plugins/civicApi.ts` - API integration with token injection
-- `modules/ui/app/components/PerformanceMonitor.vue` - New performance
-  monitoring component
+- `modules/ui/app/components/editor/EditorHeader.vue` - Complete rewrite with
+  simplified button system
+- `modules/ui/app/components/editor/RecordSidebar.vue` - Added status dropdown,
+  date/time fields, improved accordion structure
+- `modules/ui/app/components/editor/MarkdownEditor.vue` - Fixed scrollbar
+  issues, enabled word wrap
+- `modules/ui/app/components/editor/PreviewPanel.vue` - Removed card wrapper for
+  flat design
+- `modules/ui/app/components/records/RecordForm.vue` - Added new event handlers
+  (unpublish, archive, duplicate, export, view-history)
+- `modules/ui/app/components/editor/EditorAttachments.vue` - Improved card
+  layout, translations
+- `modules/ui/app/components/records/LinkedRecordList.vue` - Improved card
+  layout, translations
+- `modules/ui/app/components/GeographyLinkForm.vue` - Improved card layout,
+  translations
+- `modules/ui/app/components/editor/EditorToolbar.vue` - Moved preview toggle to
+  right side
+- `modules/ui/app/pages/records/[type]/[id]/edit.vue` - Removed footer, added
+  saved event handler
 
 ### Composables
 
-- `modules/ui/app/composables/useSearchSuggestions.ts` - New composable for
-  search auto-complete
-- `modules/ui/app/composables/useMarkdown.ts` - Markdown rendering utility
-- `modules/ui/app/composables/useRecordUtils.ts` - Record utility functions
-- `modules/ui/app/composables/useRecordTypes.ts` - Record type management
-- `modules/ui/app/composables/useRecordStatuses.ts` - Record status management
+- `modules/ui/app/composables/useRecordLock.ts` - Fixed lifecycle hooks
+- `modules/ui/app/composables/useAutosave.ts` - Fixed lifecycle hooks
 
-### Backend API
+### API Routes
 
-- `modules/api/src/routes/records.ts` - Records API endpoints
-- `modules/api/src/routes/search.ts` - Enhanced with search suggestions endpoint
-- `modules/api/src/services/records-service.ts` - Records service layer
-- `core/src/database/database-service.ts` - Database service with pagination
-- `core/src/records/record-manager.ts` - Enhanced with search suggestions method
-- `modules/api/src/index.ts` - Enhanced with configurable delay middleware
+- `modules/api/src/routes/records.ts` - Added `/frontmatter` endpoint, fixed
+  route order, added auth middleware
 
-### Documentation
+### Translations
 
-- `TODO.md` - Added pagination bug to high-priority tasks
-- `agent/memory/project-state.md` - Updated UI module status (95% → 90% due to
-  pagination bug)
-- `agent/memory/lessons.md` - Added search suggestions and pagination
-  architecture lessons
+- `modules/ui/i18n/locales/en.json` - Added all editor-related translations
+- `modules/ui/i18n/locales/fr.json` - Added all editor-related translations
 
-## Technical Achievements
+## 🚧 **Blockers**
 
-### Vue 3 and Nuxt UI Pro Integration
+None - All major features implemented and working.
 
-- **Component Resolution**: Handled missing components (ULoadingBlock → UIcon
-  with animate-spin)
-- **Reactive State Management**: Direct store access for reliable reactivity
-- **Type Safety**: Proper TypeScript casting for component props
-- **Composable Architecture**: DRY principle with reusable composables
+## ✅ **Memory Updated**
 
-### URL State Management
+- Project state: `agent/memory/project-state.md` (updated below)
+- Lessons learned: `agent/memory/lessons.md` (editor UI patterns added)
+- Decisions made: `agent/memory/decisions.md` (simplified button system
+  decision)
+- Current session: `agent/sessions/current-session.md` (this file)
 
-- **Query Parameter Sync**: Filters, search, and pagination in URL
-- **State Persistence**: Preserved across navigation
-- **Back Navigation**: Proper state restoration
-
-### Pagination and Data Management
-
-- **Client-Side Pagination**: Efficient pagination without server calls
-- **Record Accumulation**: Store accumulates records, display shows subset
-- **Page Size Reactivity**: Computed properties for accurate display
-
-### Markdown Rendering
-
-- **Custom Renderer**: Heading level adjustment to avoid conflicts
-- **HTML Rendering**: Proper v-html directive usage
-- **Styling Integration**: Tailwind prose classes for consistent theme
-
-## Issues Resolved
-
-### ✅ Major Issues Fixed
-
-- **Component Resolution**: Fixed ULoadingBlock missing component error
-- **Reactive State**: Fixed loading state reactivity issues
-- **Pagination Display**: Fixed pagination showing all records instead of page
-  subset
-- **Search Integration**: Fixed search and filter conflicts
-- **Markdown Rendering**: Fixed literal HTML display instead of formatted
-  content
-- **API Pagination**: Fixed API not respecting limit parameter
-- **URL State**: Fixed state loss on navigation
-
-### ✅ Minor Issues Fixed
-
-- **Type Safety**: Fixed TypeScript errors for component props
-- **Clear Buttons**: Fixed search field clear functionality
-- **Loading States**: Fixed loading indicator visibility
-- **Debug Code**: Removed all debug console.log statements
-- **API Delays**: Removed artificial delays from API endpoints
-
-## Memory Updated
-
-✅ **Current Status**: Performance optimizations and search suggestions
-complete  
-✅ **Next Steps**: Fix pagination bug, then account management  
-✅ **Key Files**: Enhanced records interface with performance features  
-✅ **Blockers**: Pagination bug needs immediate attention
-
-**Memory Updated**: ✅  
-**Ready for handover**: ✅
-
-## Lessons Learned
-
-### UI Development Patterns
-
-- **Component Resolution**: Check for missing components and use alternatives
-- **Reactive State**: Direct store access more reliable than storeToRefs for
-  certain properties
-- **URL State Management**: Essential for preserving user state across
-  navigation
-- **Client-Side Pagination**: More efficient than server-side for frequent page
-  changes
-- **Markdown Rendering**: Custom renderer needed for proper heading levels
-- **API Integration**: Request interceptors for automatic token injection
-- **Error Handling**: Comprehensive error boundaries with user feedback
-
-### Development Workflow
-
-- **Build Process**: Remember to rebuild core module for API changes
-- **Debugging**: Extensive console.log for tracing reactive state issues
-- **Testing**: Use temporary API delays for testing loading states
-- **Cleanup**: Remove debug code and artificial delays after testing
+**Ready for handover** ✅

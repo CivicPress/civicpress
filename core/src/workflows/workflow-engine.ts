@@ -5,8 +5,12 @@
  * Manages approval processes, lifecycle transitions, and business rules.
  */
 import { IndexingService } from '../indexing/indexing-service.js';
-
-/* global console */
+import {
+  coreInfo,
+  coreWarn,
+  coreError,
+  coreDebug,
+} from '../utils/core-output.js';
 
 export class WorkflowEngine {
   private workflows: Map<string, any>;
@@ -98,7 +102,10 @@ export class WorkflowEngine {
     // - Check permissions
     // - Send notifications
     // - Update record status
-    console.log('Approval workflow started:', { workflowId, data });
+    coreInfo('Approval workflow started', {
+      operation: 'workflow:approval',
+      workflowId,
+    });
   }
 
   private async publicationWorkflow(
@@ -109,7 +116,10 @@ export class WorkflowEngine {
     // - Validate record
     // - Update status to published
     // - Notify stakeholders
-    console.log('Publication workflow started:', { workflowId, data });
+    coreInfo('Publication workflow started', {
+      operation: 'workflow:publication',
+      workflowId,
+    });
   }
 
   private async archivalWorkflow(data: any, workflowId: string): Promise<void> {
@@ -117,7 +127,10 @@ export class WorkflowEngine {
     // - Archive record
     // - Update metadata
     // - Notify stakeholders
-    console.log('Archival workflow started:', { workflowId, data });
+    coreInfo('Archival workflow started', {
+      operation: 'workflow:archival',
+      workflowId,
+    });
   }
 
   /**
@@ -128,12 +141,16 @@ export class WorkflowEngine {
     workflowId: string
   ): Promise<void> {
     if (!this.indexingService) {
-      console.warn('IndexingService not available for auto-indexing workflow');
+      coreWarn('IndexingService not available for auto-indexing workflow', {
+        operation: 'workflow:update-index',
+        workflowId,
+      });
       return;
     }
 
     try {
-      console.log('🔄 Auto-indexing workflow started:', {
+      coreInfo('Auto-indexing workflow started', {
+        operation: 'workflow:update-index',
         workflowId,
         record: data?.record?.title,
       });
@@ -152,8 +169,13 @@ export class WorkflowEngine {
       // Generate indexes with the determined scope
       const index = await this.indexingService.generateIndexes(indexingOptions);
 
-      console.log(
-        `✅ Auto-indexing completed: ${index.metadata.totalRecords} records indexed`
+      coreInfo(
+        `Auto-indexing completed: ${index.metadata.totalRecords} records indexed`,
+        {
+          operation: 'workflow:update-index',
+          workflowId,
+          totalRecords: index.metadata.totalRecords,
+        }
       );
 
       // Log the workflow completion
@@ -164,7 +186,15 @@ export class WorkflowEngine {
         generated: index.metadata.generated,
       };
     } catch (error) {
-      console.error('❌ Auto-indexing workflow failed:', error);
+      coreError(
+        'Auto-indexing workflow failed',
+        'INDEXING_WORKFLOW_FAILED',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          workflowId,
+        },
+        { operation: 'workflow:update-index' }
+      );
       throw error;
     }
   }

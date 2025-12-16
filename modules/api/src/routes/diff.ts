@@ -15,6 +15,7 @@ import {
 } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
+import { coreError } from '@civicpress/core';
 
 interface DiffOptions {
   commit1?: string;
@@ -561,7 +562,17 @@ async function compareRecordVersions(
       summary,
     };
   } catch (error) {
-    console.error('Error comparing record versions:', error);
+    coreError(
+      'Error comparing record versions',
+      'DIFF_COMPARE_ERROR',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        recordPath,
+        commit1,
+        commit2,
+      },
+      { operation: 'diff:compare' }
+    );
     return null;
   }
 }
@@ -858,7 +869,15 @@ async function getRecordCommitHistory(
       changes: commit.diff?.files?.map((file) => file.file) || [],
     }));
   } catch (error) {
-    console.error('Error getting commit history:', error);
+    coreError(
+      'Error getting commit history',
+      'DIFF_HISTORY_ERROR',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        filePath,
+      },
+      { operation: 'diff:history' }
+    );
     return [];
   }
 }
@@ -874,7 +893,16 @@ async function getCommitChanges(
       .split('\n')
       .filter((line) => line.startsWith('+') || line.startsWith('-'));
   } catch (error) {
-    console.error('Error getting commit changes:', error);
+    coreError(
+      'Error getting commit changes',
+      'DIFF_COMMIT_CHANGES_ERROR',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        commitHash,
+        filePath,
+      },
+      { operation: 'diff:commit-changes' }
+    );
     return [];
   }
 }
@@ -901,7 +929,16 @@ async function getChangedFiles(
     const diff = await git.diff([commit1, commit2, '--name-only']);
     return diff.split('\n').filter((file) => file.trim());
   } catch (error) {
-    console.error('Error getting changed files:', error);
+    coreError(
+      'Error getting changed files',
+      'DIFF_CHANGED_FILES_ERROR',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        commit1,
+        commit2,
+      },
+      { operation: 'diff:changed-files' }
+    );
     return [];
   }
 }

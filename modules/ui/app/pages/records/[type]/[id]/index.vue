@@ -336,6 +336,7 @@ const fetchRecord = async () => {
         metadata: apiRecord.metadata || {},
         attachedFiles: apiRecord.attachedFiles || [],
         linkedRecords: apiRecord.linkedRecords || [],
+        hasUnpublishedChanges: apiRecord.hasUnpublishedChanges || false,
       };
     } else {
       throw new Error(t('records.failedToLoadRecord'));
@@ -625,6 +626,19 @@ const downloadFile = async (fileId: string, fileName: string) => {
               <UIcon name="i-lucide-badge-check" class="w-4 h-4" />
               {{ statusDisplay }}
             </span>
+            <UBadge
+              v-if="
+                authStore.hasPermission('records:edit') &&
+                record.hasUnpublishedChanges
+              "
+              size="xs"
+              color="error"
+              variant="soft"
+              class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-300"
+            >
+              <UIcon name="i-lucide-file-edit" class="w-3 h-3" />
+              {{ t('records.unpublishedChanges') }}
+            </UBadge>
           </div>
 
           <div

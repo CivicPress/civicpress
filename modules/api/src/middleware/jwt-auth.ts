@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logApiError } from '../utils/api-logger.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -72,7 +73,7 @@ export function jwtAuth(
         next();
       })
       .catch((error: any) => {
-        console.error('JWT auth error:', error);
+        logApiError('jwt_auth', error, req as any);
         res.status(500).json({
           error: {
             message: 'Authentication failed',
@@ -82,7 +83,7 @@ export function jwtAuth(
         });
       });
   } catch (error) {
-    console.error('JWT auth error:', error);
+    logApiError('jwt_auth', error, req as any);
     res.status(500).json({
       error: {
         message: 'Authentication failed',
@@ -193,7 +194,11 @@ export function optionalAuth(
       (req as any).civicPress;
     if (!civicPress) {
       // Log error but continue without user
-      console.error('Optional auth error: CivicPress instance not available');
+      logApiError(
+        'optional_auth',
+        new Error('CivicPress instance not available'),
+        req as any
+      );
       next();
       return;
     }
@@ -211,12 +216,12 @@ export function optionalAuth(
       })
       .catch((error: any) => {
         // Log error but continue without user
-        console.error('Optional auth error:', error);
+        logApiError('optional_auth', error, req as any);
         next();
       });
   } catch (error) {
     // Log error but continue without user
-    console.error('Optional auth error:', error);
+    logApiError('optional_auth', error, req as any);
     next();
   }
 }

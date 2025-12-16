@@ -5,6 +5,7 @@ import { spawn, execSync } from 'child_process';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import { userCan } from '@civicpress/core';
@@ -12,6 +13,13 @@ import {
   getAvailableRecords,
   resolveRecordReference,
 } from '../utils/record-locator.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export const editCommand = (cli: CAC) => {
   cli
@@ -20,9 +28,14 @@ export const editCommand = (cli: CAC) => {
     .option('-e, --editor <editor>', 'Specify editor (code, vim, nano, etc.)')
     .option('--dry-run', 'Show what would be done without opening the editor')
     .action(async (recordName: string, options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
       const logger = initializeLogger();
+      const endOperation = cliStartOperation('edit');
+
+      // Check if we should output JSON
       const shouldOutputJson = globalOptions.json;
 
       // Validate authentication and get civic instance
@@ -35,24 +48,15 @@ export const editCommand = (cli: CAC) => {
       // Check edit permissions
       const canEdit = await userCan(user, 'records:edit');
       if (!canEdit) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to edit records',
-                requiredPermission: 'records:edit',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to edit records');
-          logger.info(`Role '${user.role}' cannot edit records`);
-        }
+        cliError(
+          'Insufficient permissions to edit records',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'records:edit',
+            userRole: user.role,
+          },
+          'edit'
+        );
         process.exit(1);
       }
 
@@ -63,23 +67,12 @@ export const editCommand = (cli: CAC) => {
 
         const recordsDir = path.join(dataDir, 'records');
         if (!fs.existsSync(recordsDir)) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'No records directory found',
-                  details: 'Create some records first',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.warn(
-              '📁 No records directory found. Create some records first!'
-            );
-          }
+          cliError(
+            'No records directory found',
+            'RECORDS_DIR_NOT_FOUND',
+            { dataDir },
+            'edit'
+          );
           process.exit(1);
         }
 
@@ -88,32 +81,15 @@ export const editCommand = (cli: CAC) => {
         if (!resolvedRecord) {
           const availableRecords = getAvailableRecords(dataDir);
 
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Record not found',
-                  details: `Record "${recordName}" not found`,
-                  availableRecords,
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.error(`❌ Record "${recordName}" not found.`);
-            logger.info('Available records:');
-
-            for (const [type, files] of Object.entries(availableRecords)) {
-              if (files.length > 0) {
-                logger.info(`  ${type}:`);
-                for (const file of files) {
-                  logger.debug(`    ${file}`);
-                }
-              }
-            }
-          }
+          cliError(
+            `Record "${recordName}" not found`,
+            'RECORD_NOT_FOUND',
+            {
+              recordName,
+              availableRecords,
+            },
+            'edit'
+          );
           process.exit(1);
         }
 
@@ -154,62 +130,50 @@ export const editCommand = (cli: CAC) => {
         }
 
         if (!editor) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'No editor found',
-                  details: 'Please specify one with --editor',
-                  example: 'civic edit <record> --editor code',
-                  availableEditors: [
-                    'code',
-                    'vim',
-                    'nano',
-                    'notepad++',
-                    'subl',
-                  ],
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.error(
-              '❌ No editor found. Please specify one with --editor'
-            );
-            logger.info('Available editors: code, vim, nano, notepad++, subl');
-          }
+          cliError(
+            'No editor found. Please specify one with --editor',
+            'EDITOR_NOT_FOUND',
+            {
+              availableEditors: ['code', 'vim', 'nano', 'notepad++', 'subl'],
+            },
+            'edit'
+          );
           process.exit(1);
         }
 
         if (options.dryRun) {
-          if (!shouldOutputJson) {
-            logger.info(`Would open editor: ${editor} ${recordPath}`);
-          }
+          cliInfo(`Would open editor: ${editor} ${recordPath}`, 'edit');
         } else {
           // Actually open the editor
           spawn(editor, [recordPath], {
             stdio: 'inherit',
           });
+          cliSuccess(
+            {
+              editor,
+              recordPath,
+            },
+            `Opened ${recordName} in ${editor}`,
+            {
+              operation: 'edit',
+              editor,
+              recordName,
+            }
+          );
         }
       } catch (error) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Failed to edit record',
-                details: error instanceof Error ? error.message : String(error),
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Failed to edit record:', error);
-        }
+        cliError(
+          'Failed to edit record',
+          'EDIT_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            recordName,
+          },
+          'edit'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

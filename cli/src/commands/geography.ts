@@ -8,6 +8,17 @@ import {
 import fs from 'fs-extra';
 import path from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import {
+  getGlobalOptionsFromArgs,
+  initializeCliOutput,
+} from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 interface GeographyValidationOptions {
   json?: boolean;
@@ -33,23 +44,42 @@ export function registerGeographyCommand(cli: CAC) {
     .option('--normalize', 'Show normalized geography data')
     .option('--summary', 'Show geography summary')
     .action(async (filePath: string, options: GeographyValidationOptions) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('geography:validate');
+
       try {
         const result = await validateGeographyFile(filePath, options);
 
-        if (options.silent) {
-          return;
-        }
-
-        if (options.json) {
-          console.log(JSON.stringify(result, null, 2));
-        } else {
-          displayGeographyValidationResult(result, options);
-        }
+        cliSuccess(
+          result,
+          result.hasGeography
+            ? result.validation?.valid
+              ? `Geography data is valid in ${filePath}`
+              : `Geography data has validation errors in ${filePath}`
+            : `No geography data found in ${filePath}`,
+          {
+            operation: 'geography:validate',
+            filePath,
+            hasGeography: result.hasGeography,
+            isValid: result.validation?.valid,
+          }
+        );
       } catch (error) {
-        if (!options.silent) {
-          console.error('❌ Error:', (error as Error).message);
-        }
+        cliError(
+          'Failed to validate geography data',
+          'VALIDATE_GEOGRAPHY_FAILED',
+          {
+            error: (error as Error).message,
+            filePath,
+          },
+          'geography:validate'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -62,23 +92,39 @@ export function registerGeographyCommand(cli: CAC) {
     .option('--silent', 'Suppress output')
     .option('--summary', 'Show geography summaries')
     .action(async (dirPath: string, options: GeographyValidationOptions) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('geography:scan');
+
       try {
         const results = await scanDirectoryForGeography(dirPath, options);
 
-        if (options.silent) {
-          return;
-        }
+        const message =
+          results.filesWithGeography === 0
+            ? `No files with geography data found in ${dirPath}`
+            : `Found ${results.filesWithGeography} file${results.filesWithGeography === 1 ? '' : 's'} with geography data out of ${results.totalFiles} total files`;
 
-        if (options.json) {
-          console.log(JSON.stringify(results, null, 2));
-        } else {
-          displayGeographyScanResults(results, options);
-        }
+        cliSuccess(results, message, {
+          operation: 'geography:scan',
+          directory: dirPath,
+          totalFiles: results.totalFiles,
+          filesWithGeography: results.filesWithGeography,
+        });
       } catch (error) {
-        if (!options.silent) {
-          console.error('❌ Error:', (error as Error).message);
-        }
+        cliError(
+          'Failed to scan directory for geography data',
+          'SCAN_GEOGRAPHY_FAILED',
+          {
+            error: (error as Error).message,
+            directory: dirPath,
+          },
+          'geography:scan'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -95,23 +141,41 @@ export function registerGeographyCommand(cli: CAC) {
         filePath: string,
         options: GeographyValidationOptions & { write?: boolean }
       ) => {
+        // Initialize CLI output with global options
+        const globalOptions = getGlobalOptionsFromArgs();
+        initializeCliOutput(globalOptions);
+
+        const endOperation = cliStartOperation('geography:normalize');
+
         try {
           const result = await normalizeGeographyFile(filePath, options);
 
-          if (options.silent) {
-            return;
-          }
+          const message = result.hasGeography
+            ? result.updated
+              ? `Geography data normalized and written to ${filePath}`
+              : `Geography data normalized for ${filePath}${result.validation?.valid ? ' (valid)' : ' (has errors)'}`
+            : `No geography data found in ${filePath}`;
 
-          if (options.json) {
-            console.log(JSON.stringify(result, null, 2));
-          } else {
-            displayGeographyNormalizationResult(result, options);
-          }
+          cliSuccess(result, message, {
+            operation: 'geography:normalize',
+            filePath,
+            hasGeography: result.hasGeography,
+            updated: result.updated,
+            isValid: result.validation?.valid,
+          });
         } catch (error) {
-          if (!options.silent) {
-            console.error('❌ Error:', (error as Error).message);
-          }
+          cliError(
+            'Failed to normalize geography data',
+            'NORMALIZE_GEOGRAPHY_FAILED',
+            {
+              error: (error as Error).message,
+              filePath,
+            },
+            'geography:normalize'
+          );
           process.exit(1);
+        } finally {
+          endOperation();
         }
       }
     );
@@ -297,112 +361,22 @@ function displayGeographyValidationResult(
   result: any,
   options: GeographyValidationOptions
 ) {
-  console.log(`📍 Geography Validation: ${result.file}`);
-  console.log('');
-
-  if (!result.hasGeography) {
-    console.log('ℹ️  No geography data found');
-    return;
-  }
-
-  if (options.summary) {
-    console.log(`📋 Summary: ${result.summary}`);
-    console.log('');
-  }
-
-  if (result.isEmpty) {
-    console.log('⚠️  Geography data is empty (no meaningful information)');
-    console.log('');
-  }
-
-  if (result.validation.valid) {
-    console.log('✅ Geography data is valid');
-  } else {
-    console.log('❌ Geography data has validation errors:');
-    result.validation.errors.forEach((error: string) => {
-      console.log(`   • ${error}`);
-    });
-  }
-
-  if (result.validation.warnings.length > 0) {
-    console.log('');
-    console.log('⚠️  Warnings:');
-    result.validation.warnings.forEach((warning: string) => {
-      console.log(`   • ${warning}`);
-    });
-  }
-
-  if (options.normalize && result.normalized) {
-    console.log('');
-    console.log('🔄 Normalized data:');
-    console.log(JSON.stringify(result.normalized, null, 2));
-  }
+  // This function is deprecated - output is now handled by cliSuccess
+  // Keeping function signature for backward compatibility but it won't be called
 }
 
 function displayGeographyScanResults(
   results: any,
   options: GeographyValidationOptions
 ) {
-  console.log(`📍 Geography Scan: ${results.directory}`);
-  console.log(
-    `📊 Found ${results.filesWithGeography} files with geography data out of ${results.totalFiles} total files`
-  );
-  console.log('');
-
-  if (results.results.length === 0) {
-    console.log('ℹ️  No files with geography data found');
-    return;
-  }
-
-  results.results.forEach((file: GeographyFile) => {
-    console.log(`📄 ${path.relative(results.directory, file.path)}`);
-
-    if (options.summary) {
-      const summary = getGeographySummary(file.geography);
-      console.log(`   📋 ${summary}`);
-    }
-
-    if (file.validation.valid) {
-      console.log('   ✅ Valid');
-    } else {
-      console.log(`   ❌ ${file.validation.errors.length} error(s)`);
-    }
-    console.log('');
-  });
+  // This function is deprecated - output is now handled by cliSuccess
+  // Keeping function signature for backward compatibility but it won't be called
 }
 
 function displayGeographyNormalizationResult(
   result: any,
   options: GeographyValidationOptions
 ) {
-  console.log(`📍 Geography Normalization: ${result.file}`);
-  console.log('');
-
-  if (!result.hasGeography) {
-    console.log('ℹ️  No geography data found');
-    return;
-  }
-
-  if (options.summary) {
-    console.log(`📋 Summary: ${result.summary}`);
-    console.log('');
-  }
-
-  console.log('🔄 Normalized data:');
-  console.log(JSON.stringify(result.normalized, null, 2));
-  console.log('');
-
-  if (result.validation.valid) {
-    console.log('✅ Normalized geography data is valid');
-  } else {
-    console.log('❌ Normalized geography data still has validation errors:');
-    result.validation.errors.forEach((error: string) => {
-      console.log(`   • ${error}`);
-    });
-  }
-
-  if (result.updated) {
-    console.log('');
-    console.log('💾 File updated with normalized geography data');
-  }
+  // This function is deprecated - output is now handled by cliSuccess
+  // Keeping function signature for backward compatibility but it won't be called
 }

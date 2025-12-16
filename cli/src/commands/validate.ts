@@ -9,7 +9,16 @@ import * as yaml from 'yaml';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliDebug,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 import {
   Logger,
   TemplateEngine,
@@ -52,15 +61,20 @@ export function registerValidateCommand(cli: CAC) {
     .option('-s, --strict', 'Treat warnings as errors')
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (record: string, options: any) => {
-      const logger = new Logger();
-      try {
-        // Initialize logger with global options
-        const globalOptions = getGlobalOptionsFromArgs();
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
 
+      const endOperation = cliStartOperation('validate');
+
+      try {
         const config = await loadConfig();
         if (!config) {
-          logger.error(
-            '❌ No CivicPress configuration found. Run "civic init" first.'
+          cliError(
+            'No CivicPress configuration found. Run "civic init" first.',
+            'NOT_INITIALIZED',
+            undefined,
+            'validate'
           );
           process.exit(1);
         }
@@ -71,120 +85,113 @@ export function registerValidateCommand(cli: CAC) {
           format: options.format || 'human',
         };
 
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
-
         if (!config.dataDir) {
           throw new Error('dataDir is not configured');
         }
 
         if (options.all) {
-          await validateAllRecords(
-            config.dataDir,
-            validateOptions,
-            shouldOutputJson
-          );
+          await validateAllRecords(config.dataDir, validateOptions);
         } else if (record) {
-          await validateSingleRecord(
-            config.dataDir,
-            record,
-            validateOptions,
-            shouldOutputJson
-          );
+          await validateSingleRecord(config.dataDir, record, validateOptions);
         } else {
-          logger.info('📋 Validation Commands:');
-          logger.info(
-            '  civic validate <record>              # Validate a single record'
+          cliInfo('📋 Validation Commands:', 'validate');
+          cliInfo(
+            '  civic validate <record>              # Validate a single record',
+            'validate'
           );
-          logger.info(
-            '  civic validate --all                 # Validate all records'
+          cliInfo(
+            '  civic validate --all                 # Validate all records',
+            'validate'
           );
-          logger.info(
-            '  civic validate --all --fix           # Auto-fix validation issues'
+          cliInfo(
+            '  civic validate --all --fix           # Auto-fix validation issues',
+            'validate'
           );
-          logger.info(
-            '  civic validate --all --strict        # Treat warnings as errors'
+          cliInfo(
+            '  civic validate --all --strict        # Treat warnings as errors',
+            'validate'
           );
-          logger.info('  civic validate --all --json          # JSON output');
+          cliInfo(
+            '  civic validate --all --json          # JSON output',
+            'validate'
+          );
         }
       } catch (error) {
-        logger.error('❌ Validation failed:', error);
+        cliError(
+          'Validation failed',
+          'VALIDATION_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'validate'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
 
-async function validateAllRecords(
-  dataDir: string,
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = new Logger();
+async function validateAllRecords(dataDir: string, options: any) {
   const recordsDir = join(dataDir, 'records');
 
   try {
     if (!fs.existsSync(recordsDir)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify({ error: 'No records directory found' }, null, 2)
-        );
-        return;
-      } else {
-        logger.warn('📁 No records directory found.');
-        return;
-      }
+      cliError(
+        'No records directory found',
+        'NO_RECORDS_DIR',
+        undefined,
+        'validate'
+      );
+      return;
     }
 
     const recordFiles = await glob('**/*.md', { cwd: recordsDir });
     const results: ValidationResult[] = [];
 
-    if (!shouldOutputJson) {
-      logger.info(`🔍 Validating ${recordFiles.length} record(s)...\n`);
-    }
+    cliInfo(`🔍 Validating ${recordFiles.length} record(s)...\n`, 'validate');
 
     for (const file of recordFiles) {
       const result = await validateRecord(dataDir, file, options);
       results.push(result);
     }
 
-    displayValidationResults(results, options, shouldOutputJson);
+    displayValidationResults(results, options);
   } catch (error) {
-    logger.error('❌ Error validating records:', error);
+    cliError(
+      'Error validating records',
+      'VALIDATION_ERROR',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'validate'
+    );
   }
 }
 
 async function validateSingleRecord(
   dataDir: string,
   recordPath: string,
-  options: any,
-  shouldOutputJson?: boolean
+  options: any
 ) {
-  const logger = new Logger();
   const resolvedRecord = resolveRecordReference(dataDir, recordPath);
 
   if (!resolvedRecord) {
     const availableRecords = getAvailableRecords(dataDir);
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: `Record "${recordPath}" not found`,
-            availableRecords,
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error(`❌ Record "${recordPath}" not found.`);
-      logger.info('Available records:');
-      for (const [type, files] of Object.entries(availableRecords)) {
-        if (files.length > 0) {
-          logger.info(`  ${type}:`);
-          for (const file of files) {
-            logger.debug(`    ${file}`);
-          }
+    cliError(
+      `Record "${recordPath}" not found`,
+      'RECORD_NOT_FOUND',
+      { recordPath, availableRecords },
+      'validate'
+    );
+
+    cliInfo('Available records:', 'validate');
+    for (const [type, files] of Object.entries(availableRecords)) {
+      if (files.length > 0) {
+        cliInfo(`  ${type}:`, 'validate');
+        for (const file of files) {
+          cliDebug(`    ${file}`, 'validate');
         }
       }
     }
@@ -202,9 +209,17 @@ async function validateSingleRecord(
       options,
       fullPath
     );
-    displayValidationResults([result], options, shouldOutputJson);
+    displayValidationResults([result], options);
   } catch (error) {
-    logger.error(`❌ Error validating ${recordPath}:`, error);
+    cliError(
+      `Error validating ${recordPath}`,
+      'VALIDATION_ERROR',
+      {
+        recordPath,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'validate'
+    );
   }
 }
 
@@ -214,7 +229,6 @@ async function validateRecord(
   options: any,
   absoluteOverride?: string
 ): Promise<ValidationResult> {
-  const logger = new Logger();
   const normalizedPathRaw = recordPath.startsWith('records/')
     ? recordPath.replace(/^records\//, '')
     : recordPath;
@@ -809,12 +823,7 @@ function extractSectionContent(
   return match ? match[1] : null;
 }
 
-function displayValidationResults(
-  results: ValidationResult[],
-  options: any,
-  shouldOutputJson?: boolean
-) {
-  const logger = new Logger();
+function displayValidationResults(results: ValidationResult[], options: any) {
   const totalRecords = results.length;
   const validRecords = results.filter((r) => r.isValid).length;
   const invalidRecords = totalRecords - validRecords;
@@ -822,34 +831,26 @@ function displayValidationResults(
   let totalErrors = 0;
   let totalWarnings = 0;
 
-  if (shouldOutputJson) {
-    console.log(
-      JSON.stringify(
-        {
-          results,
-          summary: {
-            totalRecords,
-            validRecords,
-            invalidRecords,
-            totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
-            totalWarnings: results.reduce(
-              (sum, r) => sum + r.warnings.length,
-              0
-            ),
-          },
-        },
-        null,
-        2
-      )
-    );
-    return;
-  }
+  const summary = {
+    results,
+    summary: {
+      totalRecords,
+      validRecords,
+      invalidRecords,
+      totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
+      totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
+    },
+  };
+
+  cliSuccess(summary, 'Validation completed', {
+    operation: 'validate',
+  });
 
   // Summary
-  logger.info('📊 Validation Summary:');
-  logger.info(`  Total records: ${totalRecords}`);
-  logger.info(`  Valid records: ${validRecords}`);
-  logger.info(`  Invalid records: ${invalidRecords}`);
+  cliInfo('📊 Validation Summary:', 'validate');
+  cliInfo(`  Total records: ${totalRecords}`, 'validate');
+  cliInfo(`  Valid records: ${validRecords}`, 'validate');
+  cliInfo(`  Invalid records: ${invalidRecords}`, 'validate');
 
   // Detailed results
   for (const result of results) {
@@ -858,50 +859,64 @@ function displayValidationResults(
       result.errors.length > 0 ||
       result.warnings.length > 0
     ) {
-      logger.info(`\n📄 ${result.record}`);
+      cliInfo(`\n📄 ${result.record}`, 'validate');
 
       if (result.isValid) {
-        logger.info('  ✅ Valid');
+        cliInfo('  ✅ Valid', 'validate');
       } else {
-        logger.error('  ❌ Invalid');
+        cliError(
+          '  Invalid',
+          'RECORD_INVALID',
+          { record: result.record },
+          'validate'
+        );
       }
 
       // Show errors
       for (const error of result.errors) {
-        logger.error(`    ❌ ${error.field}: ${error.message}`);
+        cliError(
+          `    ${error.field}: ${error.message}`,
+          'VALIDATION_ERROR',
+          { field: error.field, message: error.message },
+          'validate'
+        );
         totalErrors++;
       }
 
       // Show warnings
       for (const warning of result.warnings) {
-        logger.warn(`    ⚠️  ${warning.field}: ${warning.message}`);
+        cliWarn(`    ${warning.field}: ${warning.message}`, 'validate');
         if (warning.suggestion) {
-          logger.info(`       💡 ${warning.suggestion}`);
+          cliInfo(`       💡 ${warning.suggestion}`, 'validate');
         }
         totalWarnings++;
       }
 
       // Show suggestions
       for (const suggestion of result.suggestions) {
-        logger.info(`    💡 ${suggestion}`);
+        cliInfo(`    💡 ${suggestion}`, 'validate');
       }
     }
   }
 
   // Final summary
-  logger.info('\n📊 Final Summary:');
-  logger.info(`  Total errors: ${totalErrors}`);
-  logger.info(`  Total warnings: ${totalWarnings}`);
+  cliInfo('\n📊 Final Summary:', 'validate');
+  cliInfo(`  Total errors: ${totalErrors}`, 'validate');
+  cliInfo(`  Total warnings: ${totalWarnings}`, 'validate');
 
   if (totalErrors === 0 && totalWarnings === 0) {
-    logger.info('\n🎉 All records are valid!');
+    cliInfo('\n🎉 All records are valid!', 'validate');
   } else if (totalErrors === 0) {
-    logger.warn(
-      '\n⚠️  All records are valid, but there are warnings to address.'
+    cliWarn(
+      '\n⚠️  All records are valid, but there are warnings to address.',
+      'validate'
     );
   } else {
-    logger.error(
-      '\n❌ Some records have validation errors that need to be fixed.'
+    cliError(
+      '\n❌ Some records have validation errors that need to be fixed.',
+      'VALIDATION_ERRORS',
+      { totalErrors, totalWarnings },
+      'validate'
     );
   }
 }

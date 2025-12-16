@@ -401,7 +401,8 @@ hooks:
 ### UI Components
 
 - **Authentication**: Complete login/logout with JWT token management
-- **Records Interface**: Complete with search, filtering, pagination
+- **Records Interface**: Complete with search, filtering, page-based server-side
+  pagination
 - **Record Detail**: Complete with Markdown rendering and metadata
 - **API Integration**: Complete integration with backend REST API
 - **Composables**: Complete reusable composables for DRY principle
@@ -430,7 +431,8 @@ Config Update → Validation → Service Reload → Hook Event → Workflow Trig
 
 ### 1. **Scalability**
 
-- **Client-Side Pagination**: Efficient pagination without server calls
+- **Server-Side Pagination**: Page-based pagination with URL state management,
+  page size selector, and scroll-to-top
 - **Caching**: Global caching for record types and statuses
 - **Indexing**: Fast search with advanced filtering and ranking
 - **Git Operations**: Efficient for large repositories

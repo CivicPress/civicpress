@@ -10,6 +10,7 @@ export interface RecordQueryState {
   types?: string[];
   statuses?: string[];
   page?: number;
+  pageSize?: number;
   sort?: RecordSortOption;
 }
 
@@ -27,7 +28,21 @@ export function buildQueryFromState(
   if (state.statuses && state.statuses.length > 0)
     query.statuses = state.statuses.join(',');
   if (state.page && state.page > 1) query.page = String(state.page);
-  if (state.sort && state.sort !== 'relevance') query.sort = state.sort;
+  if (state.pageSize && state.pageSize !== 50)
+    query.pageSize = String(state.pageSize);
+  // Only include sort if it's not the default for the context
+  // (relevance is default for search, created_desc for records)
+  if (state.sort) {
+    // For records listing, default is created_desc, so include if different
+    // For search, default is relevance, so include if different
+    if (state.search) {
+      // Search context - include if not relevance
+      if (state.sort !== 'relevance') query.sort = state.sort;
+    } else {
+      // Records context - include if not created_desc
+      if (state.sort !== 'created_desc') query.sort = state.sort;
+    }
+  }
 
   return query;
 }
@@ -49,8 +64,22 @@ export function parseQueryToState(route: {
     const parsed = Number(q.page);
     if (!Number.isNaN(parsed) && parsed > 0) result.page = parsed;
   }
-  if (q.sort && typeof q.sort === 'string')
-    result.sort = q.sort as RecordSortOption;
+  if (q.pageSize) {
+    const parsed = Number(q.pageSize);
+    if (!Number.isNaN(parsed) && parsed > 0) result.pageSize = parsed;
+  }
+  if (q.sort && typeof q.sort === 'string') {
+    const validSorts: RecordSortOption[] = [
+      'relevance',
+      'updated_desc',
+      'created_desc',
+      'title_asc',
+      'title_desc',
+    ];
+    if (validSorts.includes(q.sort as RecordSortOption)) {
+      result.sort = q.sort as RecordSortOption;
+    }
+  }
 
   return result;
 }

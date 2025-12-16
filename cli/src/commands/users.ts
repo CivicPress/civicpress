@@ -1,6 +1,16 @@
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
+import {
+  getGlobalOptionsFromArgs,
+  initializeCliOutput,
+} from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export default function setupUsersCommand(cli: CAC) {
   cli
@@ -14,6 +24,12 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:create');
+
       try {
         let username = options.username;
         let email = options.email;
@@ -102,21 +118,16 @@ export default function setupUsersCommand(cli: CAC) {
           user.role !== 'admin' &&
           !(await civic.getAuthService().userCan(user, 'users:manage'))
         ) {
-          if (options.json) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Insufficient permissions',
-                  details: 'You do not have permission to create users',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            console.error('❌ Insufficient permissions to create users');
-          }
+          cliError(
+            'Insufficient permissions to create users',
+            'PERMISSION_DENIED',
+            {
+              requiredPermission: 'users:manage',
+              userRole: user.role,
+              details: 'You do not have permission to create users',
+            },
+            'users:create'
+          );
           process.exit(1);
         }
 
@@ -125,10 +136,15 @@ export default function setupUsersCommand(cli: CAC) {
         // Validate role
         if (!(await authService.isValidRole(role))) {
           const availableRoles = await authService.getAvailableRoles();
-          if (!options.silent) {
-            console.error(`Error: Invalid role '${role}'`);
-            console.error(`Available roles: ${availableRoles.join(', ')}`);
-          }
+          cliError(
+            `Invalid role '${role}'`,
+            'INVALID_ROLE',
+            {
+              providedRole: role,
+              availableRoles,
+            },
+            'users:create'
+          );
           process.exit(1);
         }
 
@@ -148,45 +164,40 @@ export default function setupUsersCommand(cli: CAC) {
           email_verified: false, // Require email verification for new users
         });
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                user: {
-                  id: newUser.id,
-                  username: newUser.username,
-                  role: newUser.role,
-                  email: newUser.email,
-                  name: newUser.name,
-                  created_at: newUser.created_at,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log('✅ User created successfully!');
-          console.log(`👤 Username: ${newUser.username}`);
-          console.log(`📝 Name: ${newUser.name || 'Not provided'}`);
-          console.log(`📧 Email: ${newUser.email || 'Not provided'}`);
-          console.log(`🔑 Role: ${newUser.role}`);
-          console.log(`🆔 User ID: ${newUser.id}`);
-          console.log('');
-          console.log('💡 You can now login with:');
-          console.log(`   civic auth:password --username ${newUser.username}`);
-        }
+        cliSuccess(
+          {
+            user: {
+              id: newUser.id,
+              username: newUser.username,
+              role: newUser.role,
+              email: newUser.email,
+              name: newUser.name,
+              created_at: newUser.created_at,
+            },
+            loginCommand: `civic auth:password --username ${newUser.username}`,
+          },
+          `User created successfully: ${newUser.username}`,
+          {
+            operation: 'users:create',
+            userId: newUser.id,
+            username: newUser.username,
+            role: newUser.role,
+          }
+        );
 
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Failed to create user:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Failed to create user',
+          'CREATE_USER_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'users:create'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -196,79 +207,74 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:list');
+
       try {
-        const shouldOutputJson = options.json;
         // Require authentication and get user/civic
         const { user, civic } = await AuthUtils.requireAuthWithCivic(
           options.token,
-          shouldOutputJson
+          globalOptions.json
         );
         // Check permission
         if (
           user.role !== 'admin' &&
           !(await civic.getAuthService().userCan(user, 'users:manage'))
         ) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Insufficient permissions',
-                  details: 'You do not have permission to list users',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            console.error('❌ Insufficient permissions to list users');
-          }
+          cliError(
+            'Insufficient permissions to list users',
+            'PERMISSION_DENIED',
+            {
+              requiredPermission: 'users:manage',
+              userRole: user.role,
+              details: 'You do not have permission to list users',
+            },
+            'users:list'
+          );
           process.exit(1);
         }
         const dbService = civic.getDatabaseService();
         const users = await dbService.listUsers({ limit: 100, offset: 0 });
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                users: users.users.map((user) => ({
-                  id: user.id,
-                  username: user.username,
-                  role: user.role,
-                  email: user.email,
-                  name: user.name,
-                  created_at: user.created_at,
-                })),
-                total: users.total,
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log('👥 Users:');
-          if (users.users.length === 0) {
-            console.log('  No users found');
-          } else {
-            users.users.forEach((user) => {
-              console.log(`  • ${user.username} (${user.role})`);
-              if (user.name) console.log(`    Name: ${user.name}`);
-              if (user.email) console.log(`    Email: ${user.email}`);
-              console.log(`    Created: ${user.created_at}`);
-              console.log('');
-            });
+
+        const userList = users.users.map((user) => ({
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          email: user.email,
+          name: user.name,
+          created_at: user.created_at,
+        }));
+
+        cliSuccess(
+          {
+            users: userList,
+            total: users.total,
+          },
+          users.total === 0
+            ? 'No users found'
+            : `Found ${users.total} user${users.total === 1 ? '' : 's'}`,
+          {
+            operation: 'users:list',
+            totalUsers: users.total,
           }
-        }
+        );
+
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Failed to list users:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Failed to list users',
+          'LIST_USERS_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'users:list'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -284,36 +290,41 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:update');
+
       try {
-        const shouldOutputJson = options.json;
         const { user, civic } = await AuthUtils.requireAuthWithCivic(
           options.token,
-          shouldOutputJson
+          globalOptions.json
         );
         if (
           user.role !== 'admin' &&
           !(await civic.getAuthService().userCan(user, 'users:manage'))
         ) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Insufficient permissions',
-                  details: 'You do not have permission to update users',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            console.error('❌ Insufficient permissions to update users');
-          }
+          cliError(
+            'Insufficient permissions to update users',
+            'PERMISSION_DENIED',
+            {
+              requiredPermission: 'users:manage',
+              userRole: user.role,
+              details: 'You do not have permission to update users',
+            },
+            'users:update'
+          );
           process.exit(1);
         }
         const { username, id, email, name, role, password } = options;
         if (!username && !id) {
-          console.error('Error: --username or --id is required');
+          cliError(
+            '--username or --id is required',
+            'VALIDATION_ERROR',
+            undefined,
+            'users:update'
+          );
           process.exit(1);
         }
         const dbService = civic.getDatabaseService();
@@ -324,7 +335,12 @@ export default function setupUsersCommand(cli: CAC) {
           targetUser = await dbService.getUserByUsername(username);
         }
         if (!targetUser) {
-          if (!options.silent) console.error('User not found');
+          cliError(
+            'User not found',
+            'USER_NOT_FOUND',
+            undefined,
+            'users:update'
+          );
           process.exit(1);
         }
         const authService = civic.getAuthService();
@@ -337,14 +353,17 @@ export default function setupUsersCommand(cli: CAC) {
           // SECURITY GUARD: Check if user can set password
           if (!authService.canSetPassword(targetUser)) {
             const provider = authService.getUserAuthProvider(targetUser);
-            if (!options.silent) {
-              console.error(
-                `Error: User '${targetUser.username}' is authenticated via ${provider}`
-              );
-              console.error(
-                'Password management is handled by the external provider'
-              );
-            }
+            cliError(
+              `User '${targetUser.username}' is authenticated via ${provider}`,
+              'EXTERNAL_AUTH_USER',
+              {
+                username: targetUser.username,
+                provider,
+                details:
+                  'Password management is handled by the external provider',
+              },
+              'users:update'
+            );
             process.exit(1);
           }
 
@@ -352,7 +371,12 @@ export default function setupUsersCommand(cli: CAC) {
           updates.passwordHash = await bcrypt.hash(password, 12);
         }
         if (Object.keys(updates).length === 0) {
-          if (!options.silent) console.error('No updates specified');
+          cliError(
+            'No updates specified',
+            'VALIDATION_ERROR',
+            undefined,
+            'users:update'
+          );
           process.exit(1);
         }
         await dbService.updateUser(targetUser.id, updates);
@@ -360,41 +384,41 @@ export default function setupUsersCommand(cli: CAC) {
         // Get the updated user data
         const updatedUser = await dbService.getUserById(targetUser.id);
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                user: {
-                  id: updatedUser.id,
-                  username: updatedUser.username,
-                  role: updatedUser.role,
-                  email: updatedUser.email,
-                  name: updatedUser.name,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          if (role) {
-            console.log(
-              `✅ User updated successfully: ${targetUser.username} (role: ${role})`
-            );
-          } else {
-            console.log(`✅ User updated successfully: ${targetUser.username}`);
+        const message = role
+          ? `User updated successfully: ${targetUser.username} (role: ${role})`
+          : `User updated successfully: ${targetUser.username}`;
+
+        cliSuccess(
+          {
+            user: {
+              id: updatedUser.id,
+              username: updatedUser.username,
+              role: updatedUser.role,
+              email: updatedUser.email,
+              name: updatedUser.name,
+            },
+          },
+          message,
+          {
+            operation: 'users:update',
+            userId: updatedUser.id,
+            username: updatedUser.username,
           }
-        }
+        );
+
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Failed to update user:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Failed to update user',
+          'UPDATE_USER_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'users:update'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -406,36 +430,41 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:delete');
+
       try {
-        const shouldOutputJson = options.json;
         const { user, civic } = await AuthUtils.requireAuthWithCivic(
           options.token,
-          shouldOutputJson
+          globalOptions.json
         );
         if (
           user.role !== 'admin' &&
           !(await civic.getAuthService().userCan(user, 'users:manage'))
         ) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Insufficient permissions',
-                  details: 'You do not have permission to delete users',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            console.error('❌ Insufficient permissions to delete users');
-          }
+          cliError(
+            'Insufficient permissions to delete users',
+            'PERMISSION_DENIED',
+            {
+              requiredPermission: 'users:manage',
+              userRole: user.role,
+              details: 'You do not have permission to delete users',
+            },
+            'users:delete'
+          );
           process.exit(1);
         }
         const { username, id } = options;
         if (!username && !id) {
-          console.error('Error: --username or --id is required');
+          cliError(
+            '--username or --id is required',
+            'VALIDATION_ERROR',
+            undefined,
+            'users:delete'
+          );
           process.exit(1);
         }
         const dbService = civic.getDatabaseService();
@@ -446,40 +475,45 @@ export default function setupUsersCommand(cli: CAC) {
           targetUser = await dbService.getUserByUsername(username);
         }
         if (!targetUser) {
-          if (!options.silent) console.error('User not found');
+          cliError(
+            'User not found',
+            'USER_NOT_FOUND',
+            undefined,
+            'users:delete'
+          );
           process.exit(1);
         }
         await dbService.deleteUser(targetUser.id);
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                message: 'User deleted successfully',
-                user: {
-                  id: targetUser.id,
-                  username: targetUser.username,
-                  role: targetUser.role,
-                  email: targetUser.email,
-                  name: targetUser.name,
-                },
-              },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log(`✅ User deleted successfully: ${targetUser.username}`);
-        }
+        cliSuccess(
+          {
+            user: {
+              id: targetUser.id,
+              username: targetUser.username,
+              role: targetUser.role,
+              email: targetUser.email,
+              name: targetUser.name,
+            },
+          },
+          `User deleted successfully: ${targetUser.username}`,
+          {
+            operation: 'users:delete',
+            userId: targetUser.id,
+            username: targetUser.username,
+          }
+        );
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Failed to delete user:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Failed to delete user',
+          'DELETE_USER_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'users:delete'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -492,31 +526,31 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:delete-all-test');
+
       try {
-        const shouldOutputJson = options.json;
         const { user, civic } = await AuthUtils.requireAuthWithCivic(
           options.token,
-          shouldOutputJson
+          globalOptions.json
         );
         if (
           user.role !== 'admin' &&
           !(await civic.getAuthService().userCan(user, 'users:manage'))
         ) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Insufficient permissions',
-                  details: 'You do not have permission to delete test users',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            console.error('❌ Insufficient permissions to delete test users');
-          }
+          cliError(
+            'Insufficient permissions to delete test users',
+            'PERMISSION_DENIED',
+            {
+              requiredPermission: 'users:manage',
+              userRole: user.role,
+              details: 'You do not have permission to delete test users',
+            },
+            'users:delete-all-test'
+          );
           process.exit(1);
         }
         const dbService = civic.getDatabaseService();
@@ -527,26 +561,27 @@ export default function setupUsersCommand(cli: CAC) {
         for (const user of testUsers) {
           await dbService.deleteUser(user.id);
         }
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              { success: true, deleted: testUsers.length },
-              null,
-              2
-            )
-          );
-        } else if (!options.silent) {
-          console.log(`✅ Deleted ${testUsers.length} test users.`);
-        }
+        cliSuccess(
+          { deleted: testUsers.length },
+          `Deleted ${testUsers.length} test user${testUsers.length === 1 ? '' : 's'}`,
+          {
+            operation: 'users:delete-all-test',
+            deletedCount: testUsers.length,
+          }
+        );
         await civic.shutdown();
       } catch (error) {
-        if (!options.silent) {
-          console.error(
-            '❌ Failed to delete test users:',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
-        }
+        cliError(
+          'Failed to delete test users',
+          'DELETE_TEST_USERS_FAILED',
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'users:delete-all-test'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -562,13 +597,22 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (username, options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:change-password');
+
       try {
         // Validate authentication
         const authInfo = await AuthUtils.validateAuth(options.token);
         if (!authInfo.isValid) {
-          if (!options.silent) {
-            console.error('Error: Authentication required');
-          }
+          cliError(
+            'Authentication required',
+            'AUTH_REQUIRED',
+            undefined,
+            'users:change-password'
+          );
           process.exit(1);
         }
 
@@ -582,8 +626,8 @@ export default function setupUsersCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -593,23 +637,29 @@ export default function setupUsersCommand(cli: CAC) {
         // Get user by username
         const user = await authService.getUserByUsername(username);
         if (!user) {
-          if (!options.silent) {
-            console.error(`Error: User '${username}' not found`);
-          }
+          cliError(
+            `User '${username}' not found`,
+            'USER_NOT_FOUND',
+            undefined,
+            'users:change-password'
+          );
           process.exit(1);
         }
 
         // Check if user can set password
         if (!authService.canSetPassword(user)) {
           const provider = authService.getUserAuthProvider(user);
-          if (!options.silent) {
-            console.error(
-              `Error: User '${username}' is authenticated via ${provider}`
-            );
-            console.error(
-              'Password changes must be done through the external provider'
-            );
-          }
+          cliError(
+            `User '${username}' is authenticated via ${provider}`,
+            'EXTERNAL_AUTH_USER',
+            {
+              username,
+              provider,
+              details:
+                'Password changes must be done through the external provider',
+            },
+            'users:change-password'
+          );
           process.exit(1);
         }
 
@@ -662,34 +712,44 @@ export default function setupUsersCommand(cli: CAC) {
         );
 
         if (result.success) {
-          const output = {
-            success: true,
-            message: result.message,
-            user: {
-              id: user.id,
-              username: user.username,
-              email: user.email,
+          cliSuccess(
+            {
+              user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+              },
             },
-          };
-
-          if (options.json) {
-            console.log(JSON.stringify(output, null, 2));
-          } else if (!options.silent) {
-            console.log(
-              `✓ Password changed successfully for user '${username}'`
-            );
-          }
+            `Password changed successfully for user '${username}'`,
+            {
+              operation: 'users:change-password',
+              username,
+              userId: user.id,
+            }
+          );
         } else {
-          if (!options.silent) {
-            console.error(`Error: ${result.message}`);
-          }
+          cliError(
+            result.message || 'Failed to change password',
+            'CHANGE_PASSWORD_FAILED',
+            { username },
+            'users:change-password'
+          );
           process.exit(1);
         }
+        await civic.shutdown();
       } catch (error: any) {
-        if (!options.silent) {
-          console.error(`Error changing password: ${error.message}`);
-        }
+        cliError(
+          'Error changing password',
+          'CHANGE_PASSWORD_ERROR',
+          {
+            error: error.message || 'Unknown error',
+            username,
+          },
+          'users:change-password'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -703,13 +763,22 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (username, options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:set-password');
+
       try {
         // Validate authentication
         const authInfo = await AuthUtils.validateAuth(options.token);
         if (!authInfo.isValid) {
-          if (!options.silent) {
-            console.error('Error: Authentication required');
-          }
+          cliError(
+            'Authentication required',
+            'AUTH_REQUIRED',
+            undefined,
+            'users:set-password'
+          );
           process.exit(1);
         }
 
@@ -723,8 +792,8 @@ export default function setupUsersCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -737,32 +806,41 @@ export default function setupUsersCommand(cli: CAC) {
           !adminUser ||
           !(await authService.userCan(adminUser, 'users:manage'))
         ) {
-          if (!options.silent) {
-            console.error('Error: Admin privileges required');
-          }
+          cliError(
+            'Admin privileges required',
+            'PERMISSION_DENIED',
+            undefined,
+            'users:set-password'
+          );
           process.exit(1);
         }
 
         // Get target user
         const user = await authService.getUserByUsername(username);
         if (!user) {
-          if (!options.silent) {
-            console.error(`Error: User '${username}' not found`);
-          }
+          cliError(
+            `User '${username}' not found`,
+            'USER_NOT_FOUND',
+            undefined,
+            'users:set-password'
+          );
           process.exit(1);
         }
 
         // Check if user can set password
         if (!authService.canSetPassword(user)) {
           const provider = authService.getUserAuthProvider(user);
-          if (!options.silent) {
-            console.error(
-              `Error: User '${username}' is authenticated via ${provider}`
-            );
-            console.error(
-              'Password management is handled by the external provider'
-            );
-          }
+          cliError(
+            `User '${username}' is authenticated via ${provider}`,
+            'EXTERNAL_AUTH_USER',
+            {
+              username,
+              provider,
+              details:
+                'Password management is handled by the external provider',
+            },
+            'users:set-password'
+          );
           process.exit(1);
         }
 
@@ -795,32 +873,44 @@ export default function setupUsersCommand(cli: CAC) {
         );
 
         if (result.success) {
-          const output = {
-            success: true,
-            message: result.message,
-            user: {
-              id: user.id,
-              username: user.username,
-              email: user.email,
+          cliSuccess(
+            {
+              user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+              },
             },
-          };
-
-          if (options.json) {
-            console.log(JSON.stringify(output, null, 2));
-          } else if (!options.silent) {
-            console.log(`✓ Password set successfully for user '${username}'`);
-          }
+            `Password set successfully for user '${username}'`,
+            {
+              operation: 'users:set-password',
+              username,
+              userId: user.id,
+            }
+          );
         } else {
-          if (!options.silent) {
-            console.error(`Error: ${result.message}`);
-          }
+          cliError(
+            result.message || 'Failed to set password',
+            'SET_PASSWORD_FAILED',
+            { username },
+            'users:set-password'
+          );
           process.exit(1);
         }
+        await civic.shutdown();
       } catch (error: any) {
-        if (!options.silent) {
-          console.error(`Error setting password: ${error.message}`);
-        }
+        cliError(
+          'Error setting password',
+          'SET_PASSWORD_ERROR',
+          {
+            error: error.message || 'Unknown error',
+            username,
+          },
+          'users:set-password'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -834,13 +924,22 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (username, options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:request-email-change');
+
       try {
         // Validate authentication
         const authInfo = await AuthUtils.validateAuth(options.token);
         if (!authInfo.isValid) {
-          if (!options.silent) {
-            console.error('Error: Authentication required');
-          }
+          cliError(
+            'Authentication required',
+            'AUTH_REQUIRED',
+            undefined,
+            'users:request-email-change'
+          );
           process.exit(1);
         }
 
@@ -854,8 +953,8 @@ export default function setupUsersCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -865,18 +964,24 @@ export default function setupUsersCommand(cli: CAC) {
         // Get user by username
         const user = await authService.getUserByUsername(username);
         if (!user) {
-          if (!options.silent) {
-            console.error(`Error: User '${username}' not found`);
-          }
+          cliError(
+            `User '${username}' not found`,
+            'USER_NOT_FOUND',
+            undefined,
+            'users:request-email-change'
+          );
           process.exit(1);
         }
 
         // Check permissions (self or admin)
         const requestingUser = await authService.getUserById(authInfo.userId);
         if (!requestingUser) {
-          if (!options.silent) {
-            console.error('Error: Invalid authentication');
-          }
+          cliError(
+            'Invalid authentication',
+            'AUTH_ERROR',
+            undefined,
+            'users:request-email-change'
+          );
           process.exit(1);
         }
 
@@ -885,9 +990,12 @@ export default function setupUsersCommand(cli: CAC) {
           'users:manage'
         );
         if (user.id !== requestingUser.id && !isAdmin) {
-          if (!options.silent) {
-            console.error('Error: You can only change your own email address');
-          }
+          cliError(
+            'You can only change your own email address',
+            'PERMISSION_DENIED',
+            undefined,
+            'users:request-email-change'
+          );
           process.exit(1);
         }
 
@@ -916,39 +1024,46 @@ export default function setupUsersCommand(cli: CAC) {
         const result = await authService.requestEmailChange(user.id, email);
 
         if (result.success) {
-          const output = {
-            success: true,
-            message: result.message,
-            requiresVerification: result.requiresVerification,
-            user: {
-              id: user.id,
-              username: user.username,
-              currentEmail: user.email,
-              pendingEmail: email,
+          cliSuccess(
+            {
+              requiresVerification: result.requiresVerification,
+              user: {
+                id: user.id,
+                username: user.username,
+                currentEmail: user.email,
+                pendingEmail: email,
+              },
             },
-          };
-
-          if (options.json) {
-            console.log(JSON.stringify(output, null, 2));
-          } else if (!options.silent) {
-            console.log(`✓ Email change requested for user '${username}'`);
-            console.log(`  Current email: ${user.email}`);
-            console.log(`  Pending email: ${email}`);
-            console.log(
-              '  A verification email has been sent to the new address'
-            );
-          }
+            `Email change requested for user '${username}'. A verification email has been sent to the new address`,
+            {
+              operation: 'users:request-email-change',
+              username,
+              userId: user.id,
+            }
+          );
         } else {
-          if (!options.silent) {
-            console.error(`Error: ${result.message}`);
-          }
+          cliError(
+            result.message || 'Failed to request email change',
+            'REQUEST_EMAIL_CHANGE_FAILED',
+            { username },
+            'users:request-email-change'
+          );
           process.exit(1);
         }
+        await civic.shutdown();
       } catch (error: any) {
-        if (!options.silent) {
-          console.error(`Error requesting email change: ${error.message}`);
-        }
+        cliError(
+          'Error requesting email change',
+          'REQUEST_EMAIL_CHANGE_ERROR',
+          {
+            error: error.message || 'Unknown error',
+            username,
+          },
+          'users:request-email-change'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -957,6 +1072,12 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (token, options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:verify-email');
+
       try {
         // Get configuration from central config
         const { CentralConfigManager } = await import('@civicpress/core');
@@ -968,8 +1089,8 @@ export default function setupUsersCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -980,27 +1101,31 @@ export default function setupUsersCommand(cli: CAC) {
         const result = await authService.completeEmailChange(token);
 
         if (result.success) {
-          const output = {
-            success: true,
-            message: result.message,
-          };
-
-          if (options.json) {
-            console.log(JSON.stringify(output, null, 2));
-          } else if (!options.silent) {
-            console.log(`✓ ${result.message}`);
-          }
+          cliSuccess({}, result.message, {
+            operation: 'users:verify-email',
+          });
         } else {
-          if (!options.silent) {
-            console.error(`Error: ${result.message}`);
-          }
+          cliError(
+            result.message || 'Failed to verify email',
+            'VERIFY_EMAIL_FAILED',
+            undefined,
+            'users:verify-email'
+          );
           process.exit(1);
         }
+        await civic.shutdown();
       } catch (error: any) {
-        if (!options.silent) {
-          console.error(`Error verifying email: ${error.message}`);
-        }
+        cliError(
+          'Error verifying email',
+          'VERIFY_EMAIL_ERROR',
+          {
+            error: error.message || 'Unknown error',
+          },
+          'users:verify-email'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -1013,13 +1138,22 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (username, options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:cancel-email-change');
+
       try {
         // Validate authentication
         const authInfo = await AuthUtils.validateAuth(options.token);
         if (!authInfo.isValid) {
-          if (!options.silent) {
-            console.error('Error: Authentication required');
-          }
+          cliError(
+            'Authentication required',
+            'AUTH_REQUIRED',
+            undefined,
+            'users:cancel-email-change'
+          );
           process.exit(1);
         }
 
@@ -1033,8 +1167,8 @@ export default function setupUsersCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -1044,18 +1178,24 @@ export default function setupUsersCommand(cli: CAC) {
         // Get user by username
         const user = await authService.getUserByUsername(username);
         if (!user) {
-          if (!options.silent) {
-            console.error(`Error: User '${username}' not found`);
-          }
+          cliError(
+            `User '${username}' not found`,
+            'USER_NOT_FOUND',
+            undefined,
+            'users:cancel-email-change'
+          );
           process.exit(1);
         }
 
         // Check permissions (self or admin)
         const requestingUser = await authService.getUserById(authInfo.userId);
         if (!requestingUser) {
-          if (!options.silent) {
-            console.error('Error: Invalid authentication');
-          }
+          cliError(
+            'Invalid authentication',
+            'AUTH_ERROR',
+            undefined,
+            'users:cancel-email-change'
+          );
           process.exit(1);
         }
 
@@ -1064,11 +1204,12 @@ export default function setupUsersCommand(cli: CAC) {
           'users:manage'
         );
         if (user.id !== requestingUser.id && !isAdmin) {
-          if (!options.silent) {
-            console.error(
-              'Error: You can only cancel your own email change request'
-            );
-          }
+          cliError(
+            'You can only cancel your own email change request',
+            'PERMISSION_DENIED',
+            undefined,
+            'users:cancel-email-change'
+          );
           process.exit(1);
         }
 
@@ -1076,32 +1217,44 @@ export default function setupUsersCommand(cli: CAC) {
         const result = await authService.cancelEmailChange(user.id);
 
         if (result.success) {
-          const output = {
-            success: true,
-            message: result.message,
-            user: {
-              id: user.id,
-              username: user.username,
-              email: user.email,
+          cliSuccess(
+            {
+              user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+              },
             },
-          };
-
-          if (options.json) {
-            console.log(JSON.stringify(output, null, 2));
-          } else if (!options.silent) {
-            console.log(`✓ Email change cancelled for user '${username}'`);
-          }
+            `Email change cancelled for user '${username}'`,
+            {
+              operation: 'users:cancel-email-change',
+              username,
+              userId: user.id,
+            }
+          );
         } else {
-          if (!options.silent) {
-            console.error(`Error: ${result.message}`);
-          }
+          cliError(
+            result.message || 'Failed to cancel email change',
+            'CANCEL_EMAIL_CHANGE_FAILED',
+            { username },
+            'users:cancel-email-change'
+          );
           process.exit(1);
         }
+        await civic.shutdown();
       } catch (error: any) {
-        if (!options.silent) {
-          console.error(`Error cancelling email change: ${error.message}`);
-        }
+        cliError(
+          'Error cancelling email change',
+          'CANCEL_EMAIL_CHANGE_ERROR',
+          {
+            error: error.message || 'Unknown error',
+            username,
+          },
+          'users:cancel-email-change'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 
@@ -1111,13 +1264,22 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (username, options) => {
+      // Initialize CLI output with global options
+      const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('users:security-info');
+
       try {
         // Validate authentication
         const authInfo = await AuthUtils.validateAuth(options.token);
         if (!authInfo.isValid) {
-          if (!options.silent) {
-            console.error('Error: Authentication required');
-          }
+          cliError(
+            'Authentication required',
+            'AUTH_REQUIRED',
+            undefined,
+            'users:security-info'
+          );
           process.exit(1);
         }
 
@@ -1131,8 +1293,8 @@ export default function setupUsersCommand(cli: CAC) {
           dataDir,
           database: dbConfig,
           logger: {
-            json: options.json,
-            silent: options.silent,
+            json: globalOptions.json,
+            silent: globalOptions.silent,
           },
         });
         await civic.initialize();
@@ -1142,18 +1304,24 @@ export default function setupUsersCommand(cli: CAC) {
         // Get user by username
         const user = await authService.getUserByUsername(username);
         if (!user) {
-          if (!options.silent) {
-            console.error(`Error: User '${username}' not found`);
-          }
+          cliError(
+            `User '${username}' not found`,
+            'USER_NOT_FOUND',
+            undefined,
+            'users:security-info'
+          );
           process.exit(1);
         }
 
         // Check permissions (self or admin)
         const requestingUser = await authService.getUserById(authInfo.userId);
         if (!requestingUser) {
-          if (!options.silent) {
-            console.error('Error: Invalid authentication');
-          }
+          cliError(
+            'Invalid authentication',
+            'AUTH_ERROR',
+            undefined,
+            'users:security-info'
+          );
           process.exit(1);
         }
 
@@ -1162,11 +1330,12 @@ export default function setupUsersCommand(cli: CAC) {
           'users:manage'
         );
         if (user.id !== requestingUser.id && !isAdmin) {
-          if (!options.silent) {
-            console.error(
-              'Error: You can only view your own security information'
-            );
-          }
+          cliError(
+            'You can only view your own security information',
+            'PERMISSION_DENIED',
+            undefined,
+            'users:security-info'
+          );
           process.exit(1);
         }
 
@@ -1189,39 +1358,26 @@ export default function setupUsersCommand(cli: CAC) {
           },
         };
 
-        if (options.json) {
-          console.log(JSON.stringify(securityInfo, null, 2));
-        } else if (!options.silent) {
-          console.log(`Security Information for '${username}':`);
-          console.log(`  User ID: ${securityInfo.userId}`);
-          console.log(`  Email: ${securityInfo.email}`);
-          console.log(
-            `  Email Verified: ${securityInfo.emailVerified ? '✓' : '✗'}`
-          );
-          console.log(`  Auth Provider: ${securityInfo.authProvider}`);
-          console.log(
-            `  Can Set Password: ${securityInfo.canSetPassword ? '✓' : '✗'}`
-          );
-          console.log(
-            `  External Auth: ${securityInfo.isExternalAuth ? '✓' : '✗'}`
-          );
+        cliSuccess(securityInfo, `Security information for '${username}'`, {
+          operation: 'users:security-info',
+          username,
+          userId: user.id,
+        });
 
-          if (securityInfo.pendingEmailChange.email) {
-            console.log(
-              `  Pending Email: ${securityInfo.pendingEmailChange.email}`
-            );
-            console.log(
-              `  Expires At: ${securityInfo.pendingEmailChange.expiresAt}`
-            );
-          } else {
-            console.log(`  Pending Email: None`);
-          }
-        }
+        await civic.shutdown();
       } catch (error: any) {
-        if (!options.silent) {
-          console.error(`Error getting security info: ${error.message}`);
-        }
+        cliError(
+          'Error getting security info',
+          'GET_SECURITY_INFO_ERROR',
+          {
+            error: error.message || 'Unknown error',
+            username,
+          },
+          'users:security-info'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }

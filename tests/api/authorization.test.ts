@@ -67,6 +67,22 @@ describe('Authorization System', () => {
     }
 
     recordId = createResponse.body.data.id;
+
+    // Publish the draft record so it's available as a published record
+    const publishResponse = await request(context.api.getApp())
+      .post(`/api/v1/records/${recordId}/publish`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'published' });
+
+    if (!publishResponse.body.success) {
+      console.error('Record publish failed:', {
+        status: publishResponse.status,
+        body: publishResponse.body,
+      });
+      throw new Error(
+        `Record publish failed: ${JSON.stringify(publishResponse.body)}`
+      );
+    }
   });
 
   afterEach(async () => {
@@ -183,6 +199,16 @@ describe('Authorization System', () => {
         });
 
       const newRecordId = response.body.data.id;
+
+      // Publish the record before deleting
+      const publishResponse = await request(context.api.getApp())
+        .post(`/api/v1/records/${newRecordId}/publish`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'published' });
+
+      if (!publishResponse.body.success) {
+        throw new Error('Failed to publish record before delete');
+      }
 
       const deleteResponse = await request(context.api.getApp())
         .delete(`/api/v1/records/${newRecordId}`)

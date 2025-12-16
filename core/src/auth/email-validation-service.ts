@@ -3,6 +3,7 @@ import { DatabaseService } from '../database/database-service.js';
 import { Logger } from '../utils/logger.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { NotificationConfig } from '../notifications/notification-config.js';
+import { coreError, coreDebug } from '../utils/core-output.js';
 
 const logger = new Logger();
 
@@ -530,7 +531,14 @@ export class EmailValidationService {
       return deletedCount;
     } catch (error) {
       logger.error('Error cleaning up expired tokens:', error);
-      console.error('Detailed error in cleanupExpiredTokens:', error);
+      coreError(
+        'Detailed error in cleanupExpiredTokens',
+        'CLEANUP_TOKENS_ERROR',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'auth:email-validation' }
+      );
       // Don't throw error in tests, just return 0
       return 0;
     }
@@ -582,7 +590,14 @@ export class EmailValidationService {
       }
 
       if (!user.email) {
-        console.log(`❌ [DEBUG] User ${user.username} has no email address`);
+        coreDebug(
+          `User ${user.username} has no email address`,
+          {
+            userId,
+            username: user.username,
+          },
+          { operation: 'auth:email-validation' }
+        );
         return {
           success: false,
           message: 'User has no email address to verify',
@@ -590,7 +605,14 @@ export class EmailValidationService {
       }
 
       if (user.email_verified) {
-        console.log(`❌ [DEBUG] User ${user.username} email already verified`);
+        coreDebug(
+          `User ${user.username} email already verified`,
+          {
+            userId,
+            username: user.username,
+          },
+          { operation: 'auth:email-validation' }
+        );
         return {
           success: false,
           message: 'Email address is already verified',
@@ -613,7 +635,15 @@ export class EmailValidationService {
         verificationToken,
       };
     } catch (error) {
-      console.log(`❌ [DEBUG] Error in sendEmailVerification:`, error);
+      coreError(
+        'Error in sendEmailVerification',
+        'EMAIL_VERIFICATION_ERROR',
+        {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'auth:email-validation' }
+      );
       logger.error('Error sending email verification:', error);
       throw new Error('Failed to send email verification');
     }

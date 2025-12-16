@@ -2,7 +2,16 @@ import { CAC } from 'cac';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliDebug,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export const historyCommand = (cli: CAC) => {
   cli
@@ -12,9 +21,12 @@ export const historyCommand = (cli: CAC) => {
     })
     .option('--format <format>', 'Output format', { default: 'human' })
     .action(async (record: string, options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOptions);
+
       const logger = initializeLogger();
+      const endOperation = cliStartOperation('history');
 
       try {
         // Initialize CivicPress (will auto-discover config)
@@ -66,39 +78,32 @@ export const historyCommand = (cli: CAC) => {
           }
         }
 
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
+        const summary = {
+          history,
+          summary: {
+            totalCommits: history.length,
+            limit,
+            record: record || 'all',
+          },
+        };
 
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                history,
-                summary: {
-                  totalCommits: history.length,
-                  limit,
-                  record: record || 'all',
-                },
-              },
-              null,
-              2
-            )
-          );
-          return;
-        }
+        cliSuccess(summary, 'History retrieved', {
+          operation: 'history',
+        });
 
-        logger.info('📜 Viewing civic record history...');
+        cliInfo('📜 Viewing civic record history...', 'history');
 
         if (history.length === 0) {
-          logger.warn('📜 No commits found yet');
-          logger.info(
-            '💡 Try creating a record first: civic create <type> <title>'
+          cliWarn('📜 No commits found yet', 'history');
+          cliInfo(
+            '💡 Try creating a record first: civic create <type> <title>',
+            'history'
           );
           return;
         }
 
-        logger.info(`📜 Showing last ${history.length} commits:`);
-        logger.debug('');
+        cliInfo(`📜 Showing last ${history.length} commits:`, 'history');
+        cliDebug('', 'history');
 
         // Display commit history
         for (const commit of history) {
@@ -107,20 +112,27 @@ export const historyCommand = (cli: CAC) => {
           const role =
             commit.message.match(/feat\(([^)]+)\):/)?.[1] || 'unknown';
 
-          logger.info(`🔗 ${commit.hash.substring(0, 8)}`);
-          logger.debug(`   📅 ${date} ${time}`);
-          logger.debug(`   👤 ${role}`);
-          logger.output(`   💬 ${commit.message}`);
-          logger.debug('');
+          cliInfo(`🔗 ${commit.hash.substring(0, 8)}`, 'history');
+          cliDebug(`   📅 ${date} ${time}`, 'history');
+          cliDebug(`   👤 ${role}`, 'history');
+          cliInfo(`   💬 ${commit.message}`, 'history');
+          cliDebug('', 'history');
         }
 
-        logger.success('✅ History displayed successfully!');
+        cliInfo('✅ History displayed successfully!', 'history');
       } catch (error: any) {
-        logger.error('❌ Failed to view history:', error.message);
-        if (error.stack) {
-          logger.debug('Stack trace:', error.stack);
-        }
+        cliError(
+          'Failed to view history',
+          'HISTORY_ERROR',
+          {
+            error: error.message,
+            stack: error.stack,
+          },
+          'history'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

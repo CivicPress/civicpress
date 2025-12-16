@@ -12,12 +12,20 @@ import {
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import {
   getAvailableRecords,
   resolveRecordReference,
 } from '../utils/record-locator.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 interface ExportOptions {
   token?: string;
@@ -63,39 +71,31 @@ export function registerExportCommand(cli: CAC) {
     .option('--pretty', 'Pretty-print JSON output')
     .option('--template <template>', 'Custom HTML template file')
     .action(async (record: string, options: ExportOptions) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
-      const shouldOutputJson = globalOptions.json;
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('export');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
-        shouldOutputJson
+        globalOptions.json
       );
       const dataDir = civic.getDataDir();
 
       // Check export permissions
       const canExport = await userCan(user, 'records:export');
       if (!canExport) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to export records',
-                requiredPermission: 'records:export',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to export records');
-          logger.info(`Role '${user.role}' cannot export records`);
-        }
+        cliError(
+          'Insufficient permissions to export records',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'records:export',
+            userRole: user.role,
+          },
+          'export'
+        );
         process.exit(1);
       }
 
@@ -110,19 +110,23 @@ export function registerExportCommand(cli: CAC) {
 
         // If specific record is provided, export just that record
         if (record) {
-          await exportSingleRecord(
-            dataDir,
-            record,
-            exportOptions,
-            shouldOutputJson
-          );
+          await exportSingleRecord(dataDir, record, exportOptions);
         } else {
           // Export filtered records
-          await exportRecords(dataDir, exportOptions, shouldOutputJson);
+          await exportRecords(dataDir, exportOptions);
         }
       } catch (error) {
-        logger.error('❌ Export failed:', error);
+        cliError(
+          'Export failed',
+          'EXPORT_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'export'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
@@ -130,34 +134,22 @@ export function registerExportCommand(cli: CAC) {
 async function exportSingleRecord(
   dataDir: string,
   recordRef: string,
-  options: ExportOptions,
-  shouldOutputJson?: boolean
+  options: ExportOptions
 ) {
-  const logger = initializeLogger();
   const resolvedRecord = resolveRecordReference(dataDir, recordRef);
 
   if (!resolvedRecord) {
     const availableRecords = getAvailableRecords(dataDir);
 
-    const errorPayload = {
-      error: `Record not found: ${recordRef}`,
-      availableRecords,
-    };
-
-    if (shouldOutputJson) {
-      console.log(JSON.stringify(errorPayload, null, 2));
-    } else {
-      logger.error(`❌ Record not found: ${recordRef}`);
-      logger.info('Available records:');
-      for (const [type, files] of Object.entries(availableRecords)) {
-        if (files.length > 0) {
-          logger.info(`  ${type}:`);
-          for (const file of files) {
-            logger.debug(`    ${file}`);
-          }
-        }
-      }
-    }
+    cliError(
+      `Record not found: ${recordRef}`,
+      'RECORD_NOT_FOUND',
+      {
+        recordRef,
+        availableRecords,
+      },
+      'export'
+    );
     return;
   }
 
@@ -168,21 +160,13 @@ async function exportSingleRecord(
 
   try {
     if (!fs.existsSync(fullPath)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: `Record not found: ${recordRef}`,
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.error(`❌ Record not found: ${recordRef}`);
-        process.exit(1);
-      }
+      cliError(
+        `Record not found: ${recordRef}`,
+        'RECORD_NOT_FOUND',
+        { recordRef },
+        'export'
+      );
+      process.exit(1);
     }
 
     const content = await readFile(fullPath, 'utf-8');
@@ -213,71 +197,47 @@ async function exportSingleRecord(
         : {},
     };
 
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            record: exportRecord,
-            summary: {
-              totalRecords: 1,
-              format: options.format,
-              includeContent: options.includeContent,
-              includeMetadata: options.includeMetadata,
-            },
-          },
-          null,
-          2
-        )
-      );
-      return;
-    }
-
     const output = await formatExport([exportRecord], options);
     await writeExport(output, options);
+
+    cliSuccess(
+      {
+        record: exportRecord,
+        summary: {
+          totalRecords: 1,
+          format: options.format,
+          includeContent: options.includeContent,
+          includeMetadata: options.includeMetadata,
+        },
+      },
+      `Exported record: ${exportRecord.title}`,
+      {
+        operation: 'export',
+        recordType: exportRecord.type,
+        format: options.format,
+      }
+    );
   } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: `Error exporting ${recordRef}`,
-            details: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error(`❌ Error exporting ${recordRef}:`, error);
-      process.exit(1);
-    }
+    cliError(
+      `Error exporting ${recordRef}`,
+      'EXPORT_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+        recordRef,
+      },
+      'export'
+    );
+    throw error;
   }
 }
 
-async function exportRecords(
-  dataDir: string,
-  options: ExportOptions,
-  shouldOutputJson?: boolean
-) {
-  const logger = initializeLogger();
+async function exportRecords(dataDir: string, options: ExportOptions) {
   const recordsDir = join(dataDir, 'records');
 
   try {
     if (!fs.existsSync(recordsDir)) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: 'No records directory found',
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.warn('📁 No records directory found.');
-        return;
-      }
+      cliWarn('No records directory found', 'export');
+      return;
     }
 
     // Get all record files
@@ -332,68 +292,46 @@ async function exportRecords(
     }
 
     if (records.length === 0) {
-      if (shouldOutputJson) {
-        console.log(
-          JSON.stringify(
-            {
-              error: 'No records found matching your criteria',
-            },
-            null,
-            2
-          )
-        );
-        return;
-      } else {
-        logger.warn('🔍 No records found matching your criteria.');
-        return;
-      }
-    }
-
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            records,
-            summary: {
-              totalRecords: records.length,
-              format: options.format,
-              includeContent: options.includeContent,
-              includeMetadata: options.includeMetadata,
-              filters: {
-                type: options.type,
-                status: options.status,
-                author: options.author,
-                date: options.date,
-              },
-            },
-          },
-          null,
-          2
-        )
-      );
+      cliWarn('No records found matching your criteria', 'export');
       return;
     }
 
-    logger.info(`📦 Exporting ${records.length} record(s)...`);
-
     const output = await formatExport(records, options);
     await writeExport(output, options);
-  } catch (error) {
-    if (shouldOutputJson) {
-      console.log(
-        JSON.stringify(
-          {
-            error: 'Error exporting records',
-            details: error instanceof Error ? error.message : String(error),
+
+    cliSuccess(
+      {
+        records,
+        summary: {
+          totalRecords: records.length,
+          format: options.format,
+          includeContent: options.includeContent,
+          includeMetadata: options.includeMetadata,
+          filters: {
+            type: options.type,
+            status: options.status,
+            author: options.author,
+            date: options.date,
           },
-          null,
-          2
-        )
-      );
-    } else {
-      logger.error('❌ Error exporting records:', error);
-      process.exit(1);
-    }
+        },
+      },
+      `Exported ${records.length} record${records.length === 1 ? '' : 's'}`,
+      {
+        operation: 'export',
+        recordCount: records.length,
+        format: options.format,
+      }
+    );
+  } catch (error) {
+    cliError(
+      'Error exporting records',
+      'EXPORT_FAILED',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'export'
+    );
+    throw error;
   }
 }
 
@@ -569,7 +507,6 @@ function parseDateFilter(dateFilter: string): Date | null {
 }
 
 async function writeExport(output: string, options: ExportOptions) {
-  const logger = initializeLogger();
   if (options.output) {
     // Ensure output directory exists
     const outputDir = dirname(options.output);
@@ -578,10 +515,13 @@ async function writeExport(output: string, options: ExportOptions) {
     }
 
     await writeFile(options.output, output);
-    logger.success(`✅ Export saved to: ${options.output}`);
+    cliInfo(`Export saved to: ${options.output}`, 'export');
   } else {
-    // Output to stdout
-    logger.output(output);
+    // Output to stdout - use cliSuccess for this case
+    cliSuccess({ output }, 'Export completed', {
+      operation: 'export',
+      format: 'stdout',
+    });
   }
 }
 

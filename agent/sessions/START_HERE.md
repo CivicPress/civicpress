@@ -39,7 +39,7 @@ CivicPress is a comprehensive civic technology platform with:
 pnpm run build
 
 # Run all tests
-pnpm run test:run
+pnpm run test
 
 # Start development
 pnpm run dev
@@ -85,7 +85,7 @@ cat agent/sessions/current-session.md
 ### **Testing**
 
 - **All tests passing** - Don't break the test suite!
-- Use `pnpm run test:run` to verify before committing
+- Use `pnpm run test` to verify before committing
 - Tests cover CLI, API, and core functionality
 
 ### **Documentation**

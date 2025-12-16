@@ -48,6 +48,12 @@ ready for development and testing.
   attachments
 - **File Attachments**: Link existing files to records with categorization
 - **Secure Downloads**: Authenticated file access with proper error handling
+- **Record Editor**: Professional markdown editor with simplified button system
+  - Single "Save changes" split-button with contextual dropdown menu
+  - Status dropdown in Details sidebar
+  - Raw YAML preview accordion
+  - Word wrap enabled, flat document design
+  - Complete internationalization (English/French)
 - **Source Tracking**: Legacy document tracking with reference, original_title,
   original_filename
 - **Schema Validation**: JSON Schema-based validation with dynamic schema
@@ -293,13 +299,13 @@ ready for development and testing.
 
 ### Test Coverage Summary
 
-| Component | Tests | Status     | Coverage |
-| --------- | ----- | ---------- | -------- |
-| **CLI**   | 120+  | Passing    | 95%      |
-| **API**   | 200+  | Passing    | 90%      |
-| **Core**  | 160+  | Passing    | 90%      |
-| **UI**    | 80+   | Passing    | 85%      |
-| **Total** | 600+  | Passing    | 90%      |
+| Component | Tests | Status  | Coverage |
+| --------- | ----- | ------- | -------- |
+| **CLI**   | 120+  | Passing | 95%      |
+| **API**   | 200+  | Passing | 90%      |
+| **Core**  | 160+  | Passing | 90%      |
+| **UI**    | 80+   | Passing | 85%      |
+| **Total** | 600+  | Passing | 90%      |
 
 ### Test Categories
 
@@ -413,8 +419,7 @@ pnpm run clean
 
 #### **Advanced Security Features**
 
-- **Email Validation Service**: RFC 5321 compliant with uniqueness
-  enforcement
+- **Email Validation Service**: RFC 5321 compliant with uniqueness enforcement
 - **Secure Email Change Workflow**: Token-based verification with expiration
 - **External Auth Protection**: Prevents password management for OAuth users
 - **Security Guards**: Multi-layer enforcement across API, UI, and CLI

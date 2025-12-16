@@ -91,6 +91,28 @@ export const useRecordUtils = () => {
   };
 
   /**
+   * Normalize date string from database format to ISO format with UTC indicator
+   * Converts "YYYY-MM-DD HH:MM:SS" (SQLite format, UTC but no timezone) to "YYYY-MM-DDTHH:MM:SSZ"
+   */
+  const normalizeDateString = (date: string | Date): string | Date => {
+    if (!date || typeof date === 'object') return date;
+
+    // If already has timezone indicator (Z or +/- offset), return as is (already normalized)
+    if (date.includes('Z') || /[+-]\d{2}:\d{2}$/.test(date)) {
+      return date;
+    }
+
+    // If has 'T' separator but no timezone, add 'Z' (assume UTC)
+    if (date.includes('T')) {
+      return date + 'Z';
+    }
+
+    // Convert SQLite format "YYYY-MM-DD HH:MM:SS" to ISO "YYYY-MM-DDTHH:MM:SSZ"
+    // This assumes dates from database are in UTC (which SQLite CURRENT_TIMESTAMP returns)
+    return date.replace(' ', 'T') + 'Z';
+  };
+
+  /**
    * Format date with flexible options for i18n support
    */
   const formatDate = (
@@ -107,7 +129,12 @@ export const useRecordUtils = () => {
     };
 
     try {
-      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      // Normalize date string to ensure UTC timezone is properly indicated
+      const normalizedDate = normalizeDateString(date);
+      const dateObj =
+        typeof normalizedDate === 'string'
+          ? new Date(normalizedDate)
+          : normalizedDate;
       return new Intl.DateTimeFormat('en-US', defaultOptions).format(dateObj);
     } catch (error) {
       console.error('Error formatting date:', error);
@@ -122,7 +149,12 @@ export const useRecordUtils = () => {
     if (!date) return '';
 
     try {
-      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      // Normalize date string to ensure UTC timezone is properly indicated
+      const normalizedDate = normalizeDateString(date);
+      const dateObj =
+        typeof normalizedDate === 'string'
+          ? new Date(normalizedDate)
+          : normalizedDate;
       const now = new Date();
       const diffInSeconds = Math.floor(
         (now.getTime() - dateObj.getTime()) / 1000

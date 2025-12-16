@@ -20,10 +20,13 @@ const filters = ref({
   types: [] as string[],
   statuses: [] as string[],
 });
+const page = ref(1);
+const pageSize = ref(50); // Default page size
 const sort = ref<
   'relevance' | 'updated_desc' | 'created_desc' | 'title_asc' | 'title_desc'
->('relevance');
-const page = ref(1);
+>(
+  'created_desc' // Default for records listing
+);
 const filtersResetKey = ref(0);
 
 // Track when user is typing/searching (for showing loading state)
@@ -36,6 +39,7 @@ const updateURL = () => {
     types: filters.value.types,
     statuses: filters.value.statuses,
     page: page.value,
+    pageSize: pageSize.value,
     sort: sort.value,
   });
   navigateTo({ query }, { replace: true });
@@ -50,7 +54,21 @@ const restoreFromURL = () => {
   if (state.types) filters.value.types = state.types;
   if (state.statuses) filters.value.statuses = state.statuses;
   if (state.page) page.value = state.page;
-  if (state.sort) sort.value = state.sort;
+  if (state.pageSize) {
+    pageSize.value = state.pageSize;
+    recordsStore.setPageSize(state.pageSize);
+  }
+  if (state.sort) {
+    // Sanitize: relevance is only valid when there's a search query
+    if (state.sort === 'relevance' && !searchQuery.value) {
+      sort.value = 'created_desc';
+    } else {
+      sort.value = state.sort;
+    }
+  } else {
+    // Set default based on context
+    sort.value = searchQuery.value ? 'relevance' : 'created_desc';
+  }
 };
 
 // Debounced API search function
@@ -70,12 +88,14 @@ const debouncedApiSearch = useDebounceFn(async (query: string) => {
     await recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
+      sort: sort.value,
     });
   } else {
     // Query is empty or less than 3 chars - load initial records
     await recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
+      sort: sort.value,
     });
   }
 
@@ -83,18 +103,27 @@ const debouncedApiSearch = useDebounceFn(async (query: string) => {
   isSearching.value = false;
 }, 300);
 
-// Handle search changes
+// Handle search input changes (only updates local state, doesn't execute search)
 const handleSearch = (query: string) => {
   searchQuery.value = query;
   filters.value.search = query;
+  // Don't update URL or trigger search - wait for Enter key or suggestion click
+};
+
+// Handle search submission (Enter key or suggestion click)
+const handleSearchSubmit = (query?: string) => {
+  const queryToUse = query !== undefined ? query : searchQuery.value;
+  searchQuery.value = queryToUse;
+  filters.value.search = queryToUse;
+
+  const trimmedQuery = queryToUse?.trim() || '';
+
+  // Update URL when search is actually submitted
   updateURL();
 
-  const trimmedQuery = query?.trim() || '';
-
-  // If query is cleared or less than 3 chars, load initial records immediately
-  // Otherwise, trigger debounced search
+  // Execute search or load initial records
   if (trimmedQuery.length === 0) {
-    // Clear search immediately
+    // Clear search
     isSearching.value = false;
     const typeFilter =
       filters.value.types.length > 0
@@ -107,13 +136,30 @@ const handleSearch = (query: string) => {
     recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
+      sort: sort.value,
     });
-  } else if (trimmedQuery.length >= 3) {
-    // Only trigger debounced search if we have at least 3 characters
-    isSearching.value = true; // Set searching state
-    debouncedApiSearch(query);
   } else {
-    // Query is 1-2 characters - keep records visible, no search happening yet
+    // Execute search (no minimum character requirement when user explicitly submits)
+    isSearching.value = true;
+    page.value = 1; // Reset to page 1 when search is submitted
+    const typeFilter =
+      filters.value.types.length > 0
+        ? filters.value.types.join(',')
+        : undefined;
+    const statusFilter =
+      filters.value.statuses.length > 0
+        ? filters.value.statuses.join(',')
+        : undefined;
+    // Set sort to relevance for search if not already set
+    if (!sort.value || sort.value === 'created_desc') {
+      sort.value = 'relevance';
+    }
+    recordsStore.searchRecords(trimmedQuery, {
+      type: typeFilter,
+      status: statusFilter,
+      page: 1, // Always start at page 1 for new searches
+      sort: sort.value,
+    });
     isSearching.value = false;
   }
 };
@@ -125,7 +171,7 @@ const handleFilterChange = (newFilters: {
   statuses: string[];
 }) => {
   filters.value = newFilters;
-  page.value = 1;
+  page.value = 1; // Reset to page 1 when filters change
   updateURL();
 
   // Trigger search with new filters
@@ -137,14 +183,22 @@ const handleFilterChange = (newFilters: {
   // Only use searchRecords if there's a search query with at least 3 characters
   const trimmedQuery = searchQuery.value?.trim() || '';
   if (trimmedQuery.length >= 3) {
+    // Reset to page 1 when filters change during search
+    page.value = 1;
     recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
+      page: 1,
+      sort: sort.value,
     });
   } else {
+    // Sanitize sort: relevance is only valid for search, not for records listing
+    const sanitizedSort =
+      sort.value === 'relevance' ? 'created_desc' : sort.value;
     recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
+      sort: sanitizedSort,
     });
   }
 };
@@ -157,53 +211,35 @@ const resetAllFilters = async () => {
     statuses: [],
   };
   page.value = 1;
-  sort.value = 'relevance';
   filtersResetKey.value += 1;
   updateURL();
   await recordsStore.loadInitialRecords({});
 };
 
-// Sort handling
-const sortOptions = computed(() => [
-  { label: t('records.sortBy.relevance'), value: 'relevance' },
-  { label: t('records.sortBy.lastUpdated'), value: 'updated_desc' },
-  { label: t('records.sortBy.recentlyCreated'), value: 'created_desc' },
-  { label: t('records.sortBy.titleAsc'), value: 'title_asc' },
-  { label: t('records.sortBy.titleDesc'), value: 'title_desc' },
-]);
-
-watch(sort, () => {
-  page.value = 1;
+// Handle pagination changes
+const handlePageChange = async (newPage: number) => {
+  page.value = newPage;
   updateURL();
-  // Re-run search or load with current filters
-  const trimmedQuery = searchQuery.value?.trim() || '';
-  if (trimmedQuery.length >= 3) {
-    recordsStore.searchRecords(trimmedQuery, {
-      type:
-        filters.value.types.length > 0
-          ? filters.value.types.join(',')
-          : undefined,
-      status:
-        filters.value.statuses.length > 0
-          ? filters.value.statuses.join(',')
-          : undefined,
-    });
-  } else {
-    recordsStore.loadInitialRecords({
-      type:
-        filters.value.types.length > 0
-          ? filters.value.types.join(',')
-          : undefined,
-      status:
-        filters.value.statuses.length > 0
-          ? filters.value.statuses.join(',')
-          : undefined,
-    });
-  }
-});
+  await loadRecordsFromState();
+  scrollToTop();
+};
+
+const handlePageSizeChange = async (newSize: number) => {
+  pageSize.value = newSize;
+  page.value = 1;
+  recordsStore.setPageSize(newSize);
+  updateURL();
+  await loadRecordsFromState();
+  scrollToTop();
+};
 
 // Function to load records based on current state
 const loadRecordsFromState = async () => {
+  // Prevent duplicate concurrent calls
+  if (isLoading.value) {
+    return;
+  }
+
   const typeFilter =
     filters.value.types.length > 0 ? filters.value.types.join(',') : undefined;
   const statusFilter =
@@ -211,53 +247,104 @@ const loadRecordsFromState = async () => {
       ? filters.value.statuses.join(',')
       : undefined;
 
+  // Ensure pageSize is synced to store
+  recordsStore.setPageSize(pageSize.value);
+
   // Ensure we have a valid search query with at least 3 characters before calling searchRecords
   const trimmedQuery = searchQuery.value?.trim() || '';
   if (trimmedQuery.length >= 3) {
-    // URL has a search query with at least 3 chars, trigger search
+    // URL has a search query with at least 3 chars, trigger search with page-based pagination
     await recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
+      page: page.value,
+      sort: sort.value,
     });
   } else {
-    // No search query or less than 3 chars, load initial records
-    await recordsStore.loadInitialRecords({
+    // No search query or less than 3 chars, load page using page-based pagination
+    // Sanitize sort: relevance is only valid for search, not for records listing
+    const sanitizedSort =
+      sort.value === 'relevance' ? 'created_desc' : sort.value;
+    await recordsStore.loadPage(page.value, {
       type: typeFilter,
       status: statusFilter,
+      sort: sanitizedSort,
     });
   }
 };
 
 // Track initial query to detect actual changes
-const initialQuery = ref<string>(JSON.stringify(route.query));
+const initialQuery = ref<string | null>(null);
+const isInitialMount = ref(true);
+const isLoading = ref(false); // Guard to prevent duplicate loads
 
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
-  // Restore state from URL first
-  restoreFromURL();
-  // Load records based on restored state
-  await loadRecordsFromState();
-  // Store initial query state after first load
-  initialQuery.value = JSON.stringify(route.query);
+  // Skip if not on client side (SSR)
+  if (!process.client) return;
+
+  // Prevent duplicate calls
+  if (isLoading.value) return;
+  isLoading.value = true;
+
+  try {
+    // Restore state from URL first
+    restoreFromURL();
+    // Store initial query state BEFORE loading (to prevent watcher from triggering)
+    initialQuery.value = JSON.stringify(route.query);
+    // Load records based on restored state
+    await loadRecordsFromState();
+  } finally {
+    // Mark initial mount as complete
+    isInitialMount.value = false;
+    isLoading.value = false;
+  }
 });
 
 // Watch for route query changes (e.g., browser back/forward)
+// Use immediate: false to prevent firing on initial mount
 watch(
   () => route.query,
-  async (newQuery) => {
+  async (newQuery, oldQuery) => {
+    // Skip watcher on initial mount - onMounted handles it
+    if (isInitialMount.value || isLoading.value) return;
+
+    // Skip if oldQuery is null/undefined (first watch after mount)
+    if (!oldQuery) return;
+
     const newQueryString = JSON.stringify(newQuery);
-    // Only run if query actually changed (skip initial mount)
-    if (newQueryString === initialQuery.value) return;
+    const oldQueryString = JSON.stringify(oldQuery);
 
-    // Update initial query reference
-    initialQuery.value = newQueryString;
+    // Only run if query actually changed
+    if (
+      newQueryString === oldQueryString ||
+      newQueryString === initialQuery.value
+    ) {
+      return;
+    }
 
-    // Restore state from URL when route changes
-    restoreFromURL();
-    // Reload records based on new state
-    await loadRecordsFromState();
+    isLoading.value = true;
+    try {
+      // Update initial query reference
+      initialQuery.value = newQueryString;
+
+      // Restore state from URL when route changes
+      restoreFromURL();
+
+      // Don't reload records if search query is 1-2 characters (user is still typing)
+      const trimmedSearchQuery = searchQuery.value?.trim() || '';
+      if (trimmedSearchQuery.length > 0 && trimmedSearchQuery.length < 3) {
+        // User is typing 1-2 characters - don't reload records, just update state
+        return;
+      }
+
+      // Reload records based on new state
+      await loadRecordsFromState();
+    } finally {
+      isLoading.value = false;
+    }
   },
-  { deep: true }
+  { deep: true, immediate: false }
 );
 
 const breadcrumbItems = computed(() => [
@@ -272,6 +359,26 @@ const breadcrumbItems = computed(() => [
 
 // Breadcrumbs ref for scroll-to-top functionality
 const breadcrumbsRef = ref<HTMLElement | undefined>();
+
+// Scroll to top helper - scrolls the scrollable pane inside the dashboard panel
+const scrollToTop = () => {
+  // Use a small delay to ensure DOM updates are complete before scrolling
+  setTimeout(() => {
+    // Find the scrollable container (the div with overflow-y-auto inside dashboard panel)
+    const dashboardPanel = document.querySelector('[id^="dashboard-panel"]');
+    if (dashboardPanel) {
+      const scrollablePane = dashboardPanel.querySelector(
+        '.overflow-y-auto'
+      ) as HTMLElement;
+      if (scrollablePane) {
+        scrollablePane.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+    // Fallback to window scroll if we can't find the pane
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, 100);
+};
 </script>
 
 <template>
@@ -286,13 +393,6 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
         </template>
         <template #right>
           <div class="flex items-center gap-2">
-            <USelectMenu
-              v-model="sort"
-              :items="sortOptions"
-              value-key="value"
-              option-attribute="label"
-              class="w-44"
-            />
             <HeaderActions
               v-if="
                 authStore.isLoggedIn &&
@@ -320,8 +420,19 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
         <RecordSearch
           :key="filtersResetKey"
           :initial-filters="filters"
+          :sort="sort"
+          :is-searching="!!searchQuery"
           @search="handleSearch"
+          @search-submit="handleSearchSubmit"
           @filter-change="handleFilterChange"
+          @sort-change="
+            (newSort) => {
+              sort = newSort;
+              page = 1;
+              updateURL();
+              loadRecordsFromState();
+            }
+          "
         />
 
         <!-- Records List Component -->
@@ -329,9 +440,12 @@ const breadcrumbsRef = ref<HTMLElement | undefined>();
           :filters="filters"
           :search-query="searchQuery"
           :breadcrumbs-ref="breadcrumbsRef as any"
-          :sort="sort"
           :is-searching="isSearching"
+          :current-page="page"
+          :page-size="pageSize"
           @resetFilters="resetAllFilters"
+          @page-change="handlePageChange"
+          @page-size-change="handlePageSizeChange"
         />
 
         <!-- Footer -->

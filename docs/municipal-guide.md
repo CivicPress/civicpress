@@ -5,7 +5,7 @@ municipal staff._
 
 **Audience:** Municipal clerks, archives staff, DGs, communications officers,
 and IT managers  
-**Version:** v0.1.3 (Alpha)
+**Version:** v0.1.4 (Alpha)
 
 ---
 
@@ -32,7 +32,7 @@ access for the public**.
 
 CivicPress focuses on **public information and civic records**.
 
-### Replaces:
+### Replaces
 
 - PDF repositories and SharePoint folders
 - Word documents used for bylaws, resolutions, minutes, or policies
@@ -40,7 +40,7 @@ CivicPress focuses on **public information and civic records**.
 - Confusing public portals spread across multiple websites
 - Difficulty searching across decades of documents
 
-### Does _not_ replace:
+### Does _not_ replace
 
 - Accounting, taxation, or ERP systems
 - Permitting or licensing platforms
@@ -109,17 +109,21 @@ This creates a transparent, tamper-evident audit trail.
 CivicPress supports configurable workflows for record lifecycle management:
 
 - Draft → Proposed → Reviewed → Approved → Published → Archived
-- Role-based status transitions (clerks, council, mayor can perform different actions)
-- Automated workflows triggered by events (e.g., auto-indexing on record changes)
+- Role-based status transitions (clerks, council, mayor can perform different
+  actions)
+- Automated workflows triggered by events (e.g., auto-indexing on record
+  changes)
 - Custom workflow definitions via `data/.civic/workflows.yml`
 
-Workflows are fully implemented and configurable to match each municipality's approval processes.
+Workflows are fully implemented and configurable to match each municipality's
+approval processes.
 
 ---
 
 # 4. Daily Workflow for Clerks
 
-This section explains how municipal staff use CivicPress for daily record management.
+This section explains how municipal staff use CivicPress for daily record
+management.
 
 ### **1. Create or update a record**
 
@@ -172,21 +176,21 @@ Municipal archives often include:
 
 CivicPress provides tools to help transition into structured civic records.
 
-### What can be imported automatically today:
+### What can be imported automatically today
 
 - PDFs (converted to text with OCR)
 - Existing Markdown or text documents
 - Folder structures of bylaws and minutes
 - Geographical data (GeoJSON, KML, Shapefile → GeoJSON)
 
-### What requires manual review:
+### What requires manual review
 
 - Accuracy of OCR for scanned PDFs
 - Splitting bylaws into articles
 - Consolidating amendments
 - Verifying metadata and categorization
 
-### Recommended migration process:
+### Recommended migration process
 
 1. **Identify** the 5–10 most important bylaws or policies
 2. **Convert** them with CivicPress tools
@@ -311,10 +315,10 @@ Upcoming versions will include:
 
 For more information, pilot participation, or support inquiries:
 
-**Email:** hello@civicpress.io  
-**Website:** https://civicpress.io  
-**Demo:** https://demo.civicpress.io  
-**GitHub:** https://github.com/CivicPress/civicpress
+**Email:** <hello@civicpress.io>  
+**Website:** <https://civicpress.io>  
+**Demo:** <https://demo.civicpress.io>  
+**GitHub:** <https://github.com/CivicPress/civicpress>
 
 ---
 

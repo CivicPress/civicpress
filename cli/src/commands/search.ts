@@ -7,7 +7,15 @@ import { loadConfig } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 interface SearchOptions {
   content?: string;
@@ -63,15 +71,20 @@ export function registerSearchCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (query: string, options: SearchOptions) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
+      initializeCliOutput(globalOptions);
+
+      const endOperation = cliStartOperation('search');
 
       try {
         const config = await loadConfig();
         if (!config) {
-          logger.error(
-            '❌ No CivicPress configuration found. Run "civic init" first.'
+          cliError(
+            'No CivicPress configuration found. Run "civic init" first.',
+            'NOT_INITIALIZED',
+            undefined,
+            'search'
           );
           process.exit(1);
         }
@@ -84,9 +97,6 @@ export function registerSearchCommand(cli: CAC) {
           format: options.format || 'table',
         };
 
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
-
         // If query is provided as first argument, use it as content search
         if (query && !options.content) {
           searchOptions.content = query;
@@ -97,34 +107,38 @@ export function registerSearchCommand(cli: CAC) {
         }
         const results = await searchRecords(config.dataDir, searchOptions);
 
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                results,
-                summary: {
-                  totalResults: results.length,
-                  searchOptions: {
-                    content: searchOptions.content,
-                    title: searchOptions.title,
-                    status: searchOptions.status,
-                    type: searchOptions.type,
-                    author: searchOptions.author,
-                    limit: searchOptions.limit,
-                  },
-                },
-              },
-              null,
-              2
-            )
-          );
-          return;
-        }
+        const summary = {
+          results,
+          summary: {
+            totalResults: results.length,
+            searchOptions: {
+              content: searchOptions.content,
+              title: searchOptions.title,
+              status: searchOptions.status,
+              type: searchOptions.type,
+              author: searchOptions.author,
+              limit: searchOptions.limit,
+            },
+          },
+        };
+
+        cliSuccess(summary, 'Search completed', {
+          operation: 'search',
+        });
 
         displayResults(results, searchOptions);
       } catch (error) {
-        logger.error('❌ Search failed:', error);
+        cliError(
+          'Search failed',
+          'SEARCH_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'search'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 }
@@ -307,7 +321,14 @@ async function searchRecords(
     const uniqueResults = removeDuplicates(results);
     return uniqueResults.slice(0, options.limit);
   } catch (error) {
-    console.error('Error searching records:', error);
+    cliError(
+      'Error searching records',
+      'SEARCH_ERROR',
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'search'
+    );
     return [];
   }
 }
@@ -350,7 +371,7 @@ function searchInText(
         matches.push(...matches_array);
       }
     } catch {
-      console.warn('Invalid regex pattern:', searchTerm);
+      cliWarn(`Invalid regex pattern: ${searchTerm}`, 'search');
     }
   } else {
     const searchText = caseSensitive ? text : text.toLowerCase();

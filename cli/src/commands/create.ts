@@ -12,9 +12,17 @@ import * as path from 'path';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import matter from 'gray-matter';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 
 export const createCommand = (cli: CAC) => {
   cli
@@ -33,17 +41,16 @@ export const createCommand = (cli: CAC) => {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (type: string, title: string, options: any) => {
-      // Initialize logger with global options
+      // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
-      const logger = initializeLogger();
+      initializeCliOutput(globalOptions);
 
-      // Check if we should output JSON
-      const shouldOutputJson = globalOptions.json;
+      const endOperation = cliStartOperation('create');
 
       // Validate authentication
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
-        shouldOutputJson
+        globalOptions.json
       );
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
@@ -53,32 +60,19 @@ export const createCommand = (cli: CAC) => {
       // Check create permissions
       const canCreate = await userCan(user, 'records:create');
       if (!canCreate) {
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Insufficient permissions',
-                details: 'You do not have permission to create records',
-                requiredPermission: 'records:create',
-                userRole: user.role,
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Insufficient permissions to create records');
-          logger.info(`Role '${user.role}' cannot create records`);
-        }
+        cliError(
+          'Insufficient permissions to create records',
+          'PERMISSION_DENIED',
+          {
+            requiredPermission: 'records:create',
+            userRole: user.role,
+          },
+          'create'
+        );
         process.exit(1);
       }
 
       try {
-        if (!shouldOutputJson) {
-          logger.info(`📝 Creating ${type}: ${title}`);
-        }
-
         // Validate record type (includes new types)
         const validTypes = [
           'bylaw',
@@ -91,23 +85,15 @@ export const createCommand = (cli: CAC) => {
           'session',
         ];
         if (!validTypes.includes(type)) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Invalid record type',
-                  details: `Invalid type: ${type}`,
-                  validTypes: validTypes,
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.error(`❌ Invalid record type: ${type}`);
-            logger.info('Valid types: ' + validTypes.join(', '));
-          }
+          cliError(
+            `Invalid record type: ${type}`,
+            'INVALID_RECORD_TYPE',
+            {
+              requestedType: type,
+              validTypes,
+            },
+            'create'
+          );
           process.exit(1);
         }
 
@@ -121,31 +107,16 @@ export const createCommand = (cli: CAC) => {
         );
 
         if (!actionValidation.valid) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Insufficient permissions',
-                  details: actionValidation.reason,
-                  data: {
-                    action: 'create',
-                    recordType: type,
-                    role: role,
-                  },
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.error(
-              `❌ Insufficient permissions: ${actionValidation.reason}`
-            );
-            logger.info(
-              `Role '${role}' cannot create records of type '${type}'`
-            );
-          }
+          cliError(
+            `Insufficient permissions: ${actionValidation.reason}`,
+            'PERMISSION_DENIED',
+            {
+              action: 'create',
+              recordType: type,
+              role,
+            },
+            'create'
+          );
           process.exit(1);
         }
 
@@ -156,25 +127,16 @@ export const createCommand = (cli: CAC) => {
         const template = await templateEngine.loadTemplate(type, templateName);
 
         if (!template) {
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Template not found',
-                  details: `Template ${type}/${templateName} not found`,
-                  availableTemplates: templateEngine.listTemplates(type),
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.error(`❌ Template ${type}/${templateName} not found`);
-            logger.info('Available templates:');
-            const templates = templateEngine.listTemplates(type);
-            templates.forEach((t: string) => logger.info(`  ${t}`));
-          }
+          const availableTemplates = templateEngine.listTemplates(type);
+          cliError(
+            `Template ${type}/${templateName} not found`,
+            'TEMPLATE_NOT_FOUND',
+            {
+              templateName: `${type}/${templateName}`,
+              availableTemplates,
+            },
+            'create'
+          );
           process.exit(1);
         }
 
@@ -261,40 +223,23 @@ export const createCommand = (cli: CAC) => {
             .map((err) => `${err.field}: ${err.message}`)
             .join('; ');
 
-          if (shouldOutputJson) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: false,
-                  error: 'Schema validation failed',
-                  details: errorMessages,
-                  errors: schemaValidation.errors,
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            logger.error('❌ Schema validation failed:');
-            for (const error of schemaValidation.errors) {
-              logger.error(`  ${error.field}: ${error.message}`);
-              if (error.suggestion) {
-                logger.info(`    💡 ${error.suggestion}`);
-              }
-            }
-          }
+          cliError(
+            `Schema validation failed: ${errorMessages}`,
+            'VALIDATION_FAILED',
+            {
+              errors: schemaValidation.errors,
+            },
+            'create'
+          );
           process.exit(1);
         }
 
         // Log schema validation warnings if any
-        if (schemaValidation.warnings.length > 0 && !shouldOutputJson) {
-          logger.warn('⚠️  Schema validation warnings:');
-          for (const warning of schemaValidation.warnings) {
-            logger.warn(`  ${warning.field}: ${warning.message}`);
-            if (warning.suggestion) {
-              logger.info(`    💡 ${warning.suggestion}`);
-            }
-          }
+        if (schemaValidation.warnings.length > 0) {
+          cliWarn(
+            `Schema validation warnings: ${schemaValidation.warnings.map((w) => `${w.field}: ${w.message}`).join('; ')}`,
+            'create'
+          );
         }
 
         // Handle dry-run modes
@@ -304,102 +249,66 @@ export const createCommand = (cli: CAC) => {
           : [];
 
         if (isCompleteDryRun) {
-          if (!shouldOutputJson) {
-            logger.warn(`📋 Would create: ${filePath}`);
-            logger.warn(`📋 Would write content: ${title}`);
-          }
+          cliWarn(`Would create: ${filePath}`, 'create');
         } else {
           // Write the file
           fs.writeFileSync(filePath, fullContent);
-          if (!shouldOutputJson) {
-            logger.success(`📄 Created record: ${filePath}`);
-          }
-        }
 
-        // Emit record created hook
-        const hooks = civic.getHookSystem();
+          // Emit record created hook
+          const hooks = civic.getHookSystem();
 
-        if (isCompleteDryRun || dryRunHooks.includes('record:created')) {
-          if (!shouldOutputJson) {
-            logger.warn(`📋 Would fire hook: record:created`);
-            logger.debug(`   Record: ${title} (${type})`);
+          if (!dryRunHooks.includes('record:created')) {
+            await hooks.emit('record:created', {
+              record: {
+                title,
+                type,
+                status: 'draft',
+                path: filePath,
+              },
+              user: 'system',
+            });
           }
-        } else {
-          await hooks.emit('record:created', {
-            record: {
-              title,
-              type,
-              status: 'draft',
-              path: filePath,
-            },
-            user: 'system',
-          });
-        }
 
-        // Stage in Git
-        if (isCompleteDryRun) {
-          if (!shouldOutputJson) {
-            logger.warn(
-              `📋 Would commit: feat(record): create ${type} "${title}"`
-            );
-            logger.warn(`📋 Would stage: ${filePath}`);
-          }
-        } else {
+          // Stage in Git
           const git = new (await import('@civicpress/core')).GitEngine(dataDir);
           await git.initialize();
           await git.commit(`feat(record): create ${type} "${title}"`, [
             filePath,
           ]);
-          if (!shouldOutputJson) {
-            logger.success(`💾 Committed to Git`);
-          }
-        }
 
-        // Emit record committed hook
-        if (isCompleteDryRun || dryRunHooks.includes('record:committed')) {
-          if (!shouldOutputJson) {
-            logger.warn(`📋 Would fire hook: record:committed`);
-            logger.debug(`   Record: ${title} (${type})`);
-          }
-        } else {
-          await hooks.emit('record:committed', {
-            record: {
-              title,
-              type,
-              status: 'draft',
-              path: filePath,
-            },
-            user: 'system',
-          });
-        }
-
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: true,
-                message: `Created ${type}: ${title}`,
-                data: {
-                  type: type,
-                  title: title,
-                  filename: filename,
-                  filePath: filePath,
-                  status: 'draft',
-                  template: templateName,
-                  templatePath: `${type}/${templateName}`,
-                  dryRun: isCompleteDryRun,
-                  hooksFired: !isCompleteDryRun && dryRunHooks.length === 0,
-                },
+          // Emit record committed hook
+          if (!dryRunHooks.includes('record:committed')) {
+            await hooks.emit('record:committed', {
+              record: {
+                title,
+                type,
+                status: 'draft',
+                path: filePath,
               },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.success(`✅ Created ${type}: ${title}`);
-          logger.info(`📁 Location: ${filePath}`);
-          logger.info(`📋 Template: ${type}/${templateName}`);
+              user: 'system',
+            });
+          }
         }
+
+        cliSuccess(
+          {
+            type,
+            title,
+            filename,
+            filePath,
+            status: 'draft',
+            template: templateName,
+            templatePath: `${type}/${templateName}`,
+            dryRun: isCompleteDryRun,
+            hooksFired: !isCompleteDryRun && dryRunHooks.length === 0,
+          },
+          `Created ${type}: ${title}`,
+          {
+            operation: 'create',
+            recordType: type,
+            recordTitle: title,
+          }
+        );
         await audit.log({
           source: 'cli',
           actor: { username: user.username, role: user.role },
@@ -421,22 +330,19 @@ export const createCommand = (cli: CAC) => {
           outcome: 'failure',
           message: error instanceof Error ? error.message : String(error),
         });
-        if (shouldOutputJson) {
-          console.log(
-            JSON.stringify(
-              {
-                success: false,
-                error: 'Failed to create record',
-                details: error instanceof Error ? error.message : String(error),
-              },
-              null,
-              2
-            )
-          );
-        } else {
-          logger.error('❌ Failed to create record:', error);
-        }
+        cliError(
+          'Failed to create record',
+          'CREATE_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            type,
+            title,
+          },
+          'create'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

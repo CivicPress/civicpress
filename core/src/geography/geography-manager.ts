@@ -25,6 +25,7 @@ import {
 } from '../types/geography.js';
 import { GeographyParser } from './geography-parser.js';
 import { Logger } from '../utils/logger.js';
+import { coreWarn } from '../utils/core-output.js';
 
 const logger = new Logger();
 
@@ -426,20 +427,32 @@ export class GeographyManager {
                   files.push(geographyFile);
                 } catch (parseError) {
                   // Skip files that can't be parsed
-                  console.warn(
-                    `Skipping unparseable geography file: ${fileName}`,
-                    parseError
-                  );
+                  coreWarn(`Skipping unparseable geography file: ${fileName}`, {
+                    operation: 'geography:list-files',
+                    fileName,
+                    error:
+                      parseError instanceof Error
+                        ? parseError.message
+                        : String(parseError),
+                  });
                 }
               }
             } catch (error) {
               // Skip categories that can't be read
-              console.warn(`Skipping category: ${cat}`, error);
+              coreWarn(`Skipping category: ${cat}`, {
+                operation: 'geography:list-files',
+                category: cat,
+                error: error instanceof Error ? error.message : String(error),
+              });
             }
           }
         } catch (error) {
           // Skip types that can't be read
-          console.warn(`Skipping type: ${fileType}`, error);
+          coreWarn(`Skipping type: ${fileType}`, {
+            operation: 'geography:list-files',
+            fileType,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
       }
 

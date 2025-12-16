@@ -1,6 +1,7 @@
 import sqlite3 from 'sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
+import { coreError, coreInfo, coreDebug } from '../utils/core-output.js';
 
 export interface DatabaseAdapter {
   connect(): Promise<void>;
@@ -151,7 +152,11 @@ export class SQLiteAdapter implements DatabaseAdapter {
         content TEXT,
         tags TEXT,
         metadata TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        title_normalized TEXT,
+        content_preview TEXT,
+        word_count INTEGER,
+        UNIQUE(record_id, record_type)
       )`,
 
       // Records table
@@ -160,6 +165,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         title TEXT NOT NULL,
         type TEXT NOT NULL,
         status TEXT DEFAULT 'draft',
+        workflow_state TEXT DEFAULT 'draft',
         content TEXT,
         metadata TEXT,
         geography TEXT,
@@ -211,14 +217,50 @@ export class SQLiteAdapter implements DatabaseAdapter {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
       )`,
+
+      // Record drafts table (temporary until v3 collaboration)
+      `CREATE TABLE IF NOT EXISTS record_drafts (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        status TEXT DEFAULT 'draft',
+        workflow_state TEXT DEFAULT 'draft',
+        markdown_body TEXT,
+        metadata TEXT,
+        geography TEXT,
+        attached_files TEXT,
+        linked_records TEXT,
+        linked_geography_files TEXT,
+        author TEXT,
+        created_by TEXT,
+        last_draft_saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      // Record locks table (temporary until v3 collaboration)
+      `CREATE TABLE IF NOT EXISTS record_locks (
+        record_id TEXT PRIMARY KEY,
+        locked_by TEXT NOT NULL,
+        locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME,
+        FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+      )`,
     ];
 
     for (const table of tables) {
       try {
         await this.execute(table);
       } catch (error) {
-        console.error('Error creating table:', error);
-        console.error('Table SQL:', table);
+        coreError(
+          'Error creating table',
+          'TABLE_CREATION_ERROR',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            table: table.substring(0, 100), // Truncate for readability
+          },
+          { operation: 'database:initialize' }
+        );
         throw error;
       }
     }
@@ -228,7 +270,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       await this.execute('ALTER TABLE records ADD COLUMN geography TEXT');
     } catch (error) {
       // Column already exists, ignore error
-      console.log('Geography column already exists or migration not needed');
+      coreDebug('Geography column already exists or migration not needed', {
+        operation: 'database:initialize',
+      });
     }
 
     // Add attached_files column to existing records table if it doesn't exist
@@ -236,8 +280,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       await this.execute('ALTER TABLE records ADD COLUMN attached_files TEXT');
     } catch (error) {
       // Column already exists, ignore error
-      console.log(
-        'Attached files column already exists or migration not needed'
+      coreDebug(
+        'Attached files column already exists or migration not needed',
+        { operation: 'database:initialize' }
       );
     }
 
@@ -246,8 +291,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       await this.execute('ALTER TABLE records ADD COLUMN linked_records TEXT');
     } catch (error) {
       // Column already exists, ignore error
-      console.log(
-        'Linked records column already exists or migration not needed'
+      coreDebug(
+        'Linked records column already exists or migration not needed',
+        { operation: 'database:initialize' }
       );
     }
 
@@ -258,8 +304,166 @@ export class SQLiteAdapter implements DatabaseAdapter {
       );
     } catch (error) {
       // Column already exists, ignore error
-      console.log(
-        'Linked geography files column already exists or migration not needed'
+      coreDebug(
+        'Linked geography files column already exists or migration not needed',
+        { operation: 'database:initialize' }
+      );
+    }
+
+    // Add workflow_state column to existing records table if it doesn't exist
+    try {
+      // Always check if table exists first (it should exist after CREATE TABLE above)
+      const tableExists = await this.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='records'"
+      );
+
+      if (tableExists.length > 0) {
+        // Table exists, check if column exists
+        const tableInfo = await this.query('PRAGMA table_info(records)');
+        const columnNames = tableInfo.map((col: any) => col.name);
+        const hasWorkflowState = columnNames.includes('workflow_state');
+
+        coreDebug('Checking workflow_state column in records', {
+          operation: 'database:initialize',
+          tableExists: true,
+          columnNames,
+          hasWorkflowState,
+        });
+
+        if (!hasWorkflowState) {
+          coreInfo(
+            'Adding workflow_state column to records table via migration',
+            { operation: 'database:initialize' }
+          );
+          await this.execute(
+            "ALTER TABLE records ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+
+          // Verify it was added
+          const verifyInfo = await this.query('PRAGMA table_info(records)');
+          const verifyColumns = verifyInfo.map((col: any) => col.name);
+          const verifyHasWorkflowState =
+            verifyColumns.includes('workflow_state');
+
+          if (verifyHasWorkflowState) {
+            coreInfo(
+              'Successfully added workflow_state column to records table',
+              { operation: 'database:initialize' }
+            );
+          } else {
+            coreError(
+              'Failed to verify workflow_state column was added to records',
+              'MIGRATION_VERIFICATION_FAILED',
+              {
+                columns: verifyColumns,
+                operation: 'database:initialize',
+              },
+              { operation: 'database:initialize' }
+            );
+          }
+        } else {
+          coreDebug('workflow_state column already exists in records table', {
+            operation: 'database:initialize',
+          });
+        }
+      } else {
+        // Table doesn't exist yet - it will be created with the column via CREATE TABLE above
+        coreDebug(
+          'records table does not exist yet, will be created with workflow_state column',
+          { operation: 'database:initialize' }
+        );
+      }
+    } catch (error: any) {
+      // Log the actual error for debugging, but don't fail initialization
+      coreError(
+        'Workflow state column migration check failed',
+        'MIGRATION_ERROR',
+        {
+          error: error?.message || String(error),
+          stack: error?.stack,
+          operation: 'database:initialize',
+        },
+        { operation: 'database:initialize' }
+      );
+    }
+
+    // Add workflow_state column to existing record_drafts table if it doesn't exist
+    try {
+      // Always check if table exists first (it should exist after CREATE TABLE above)
+      const tableExists = await this.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='record_drafts'"
+      );
+
+      if (tableExists.length > 0) {
+        // Table exists, check if column exists
+        const tableInfo = await this.query('PRAGMA table_info(record_drafts)');
+        const columnNames = tableInfo.map((col: any) => col.name);
+        const hasWorkflowState = columnNames.includes('workflow_state');
+
+        coreDebug('Checking workflow_state column in record_drafts', {
+          operation: 'database:initialize',
+          tableExists: true,
+          columnNames,
+          hasWorkflowState,
+        });
+
+        if (!hasWorkflowState) {
+          coreInfo(
+            'Adding workflow_state column to record_drafts table via migration',
+            { operation: 'database:initialize' }
+          );
+          await this.execute(
+            "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
+          );
+
+          // Verify it was added
+          const verifyInfo = await this.query(
+            'PRAGMA table_info(record_drafts)'
+          );
+          const verifyColumns = verifyInfo.map((col: any) => col.name);
+          const verifyHasWorkflowState =
+            verifyColumns.includes('workflow_state');
+
+          if (verifyHasWorkflowState) {
+            coreInfo(
+              'Successfully added workflow_state column to record_drafts table',
+              { operation: 'database:initialize' }
+            );
+          } else {
+            coreError(
+              'Failed to verify workflow_state column was added to record_drafts',
+              'MIGRATION_VERIFICATION_FAILED',
+              {
+                columns: verifyColumns,
+                operation: 'database:initialize',
+              },
+              { operation: 'database:initialize' }
+            );
+          }
+        } else {
+          coreDebug(
+            'workflow_state column already exists in record_drafts table',
+            { operation: 'database:initialize' }
+          );
+        }
+      } else {
+        // Table doesn't exist yet - it will be created with the column via CREATE TABLE above
+        coreDebug(
+          'record_drafts table does not exist yet, will be created with workflow_state column',
+          { operation: 'database:initialize' }
+        );
+      }
+    } catch (error: any) {
+      // Log the actual error for debugging, but don't fail initialization
+      coreError(
+        'Workflow state column migration check failed',
+        'MIGRATION_ERROR',
+        {
+          error: error?.message || String(error),
+          stack: error?.stack,
+          operation: 'database:initialize',
+        },
+        { operation: 'database:initialize' }
       );
     }
 
@@ -295,13 +499,15 @@ export class SQLiteAdapter implements DatabaseAdapter {
     for (const migration of userSecurityMigrations) {
       try {
         await this.execute(migration.sql);
-        console.log(
-          `✓ Added ${migration.column} column for ${migration.description}`
+        coreInfo(
+          `✓ Added ${migration.column} column for ${migration.description}`,
+          { operation: 'database:initialize' }
         );
       } catch (error) {
         // Column already exists, ignore error
-        console.log(
-          `${migration.column} column already exists or migration not needed`
+        coreDebug(
+          `${migration.column} column already exists or migration not needed`,
+          { operation: 'database:initialize' }
         );
       }
     }
@@ -313,9 +519,167 @@ export class SQLiteAdapter implements DatabaseAdapter {
         SET auth_provider = 'password', email_verified = TRUE 
         WHERE password_hash IS NOT NULL AND auth_provider IS NULL
       `);
-      console.log('✓ Updated existing password users with auth_provider');
+      coreInfo('✓ Updated existing password users with auth_provider', {
+        operation: 'database:initialize',
+      });
     } catch (error) {
-      console.log('Auth provider update not needed or already completed');
+      coreDebug('Auth provider update not needed or already completed', {
+        operation: 'database:initialize',
+      });
+    }
+
+    // Migrate search_index table (add new columns if needed)
+    await this.migrateSearchIndex();
+
+    // Create FTS5 virtual table and triggers
+    await this.createFTS5Table();
+
+    // Create indexes for sort performance
+    await this.createSortIndexes();
+  }
+
+  /**
+   * Create indexes for sort performance
+   */
+  private async createSortIndexes(): Promise<void> {
+    const indexes = [
+      {
+        name: 'idx_records_updated_at',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_records_updated_at ON records(updated_at DESC)',
+        description: 'Index for updated_desc sort',
+      },
+      {
+        name: 'idx_records_created_at',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_records_created_at ON records(created_at DESC)',
+        description: 'Index for created_desc sort',
+      },
+      {
+        name: 'idx_records_title',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_records_title ON records(title COLLATE NOCASE)',
+        description: 'Index for title_asc/title_desc sort',
+      },
+      {
+        name: 'idx_search_index_updated_at',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_search_index_updated_at ON search_index(updated_at DESC)',
+        description: 'Index for search updated_desc sort',
+      },
+      {
+        name: 'idx_search_index_title',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_search_index_title ON search_index(title COLLATE NOCASE)',
+        description: 'Index for search title sort',
+      },
+    ];
+
+    for (const index of indexes) {
+      try {
+        await this.execute(index.sql);
+        coreDebug(`Created index ${index.name} for ${index.description}`, {
+          operation: 'database:initialize',
+        });
+      } catch (error: any) {
+        // Index might already exist, log but don't fail
+        coreDebug(
+          `Index ${index.name} already exists or creation failed: ${error.message}`,
+          { operation: 'database:initialize' }
+        );
+      }
+    }
+  }
+
+  /**
+   * Migrate search_index table to add new columns
+   */
+  private async migrateSearchIndex(): Promise<void> {
+    const columns = [
+      { name: 'title_normalized', type: 'TEXT' },
+      { name: 'content_preview', type: 'TEXT' },
+      { name: 'word_count', type: 'INTEGER' },
+    ];
+
+    for (const column of columns) {
+      try {
+        await this.execute(
+          `ALTER TABLE search_index ADD COLUMN ${column.name} ${column.type}`
+        );
+        coreDebug(`Added column ${column.name} to search_index`);
+      } catch (error: any) {
+        // Column might already exist, ignore
+        if (
+          !error.message?.includes('duplicate column') &&
+          !error.message?.includes('already exists')
+        ) {
+          coreDebug(`Error adding column ${column.name}:`, error.message);
+        }
+      }
+    }
+  }
+
+  /**
+   * Create FTS5 virtual table and triggers
+   */
+  private async createFTS5Table(): Promise<void> {
+    try {
+      // Create FTS5 virtual table
+      await this.execute(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS search_index_fts5 USING fts5(
+          record_id UNINDEXED,
+          record_type UNINDEXED,
+          title,
+          content,
+          tags,
+          metadata UNINDEXED,
+          content='search_index',
+          content_rowid='rowid'
+        );
+      `);
+      coreDebug('Created FTS5 virtual table');
+
+      // Drop existing triggers if they exist (for clean migration)
+      try {
+        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_insert');
+        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_update');
+        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_delete');
+      } catch {
+        // Triggers might not exist yet, that's fine
+      }
+
+      // Create insert trigger
+      await this.execute(`
+        CREATE TRIGGER search_index_fts5_insert 
+        AFTER INSERT ON search_index 
+        BEGIN
+          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata)
+          VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
+        END;
+      `);
+
+      // Create update trigger
+      await this.execute(`
+        CREATE TRIGGER search_index_fts5_update 
+        AFTER UPDATE ON search_index 
+        BEGIN
+          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata)
+          VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
+          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata)
+          VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
+        END;
+      `);
+
+      // Create delete trigger
+      await this.execute(`
+        CREATE TRIGGER search_index_fts5_delete 
+        AFTER DELETE ON search_index 
+        BEGIN
+          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata)
+          VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
+        END;
+      `);
+
+      coreDebug('Created FTS5 triggers');
+    } catch (error: any) {
+      coreError('Error creating FTS5 table or triggers:', error.message);
+      // Don't throw - FTS5 might not be available in some SQLite builds
+      // System will fall back to LIKE queries if needed
     }
   }
 }

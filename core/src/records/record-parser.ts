@@ -295,7 +295,8 @@ ${record.content || ''}`;
       id: record.id,
       title: record.title,
       type: record.type,
-      status: record.status,
+      status: record.status, // Legal status - included in YAML
+      // Note: workflowState is DB-only and never included in YAML frontmatter
 
       // Authorship (Required)
       author: record.author,

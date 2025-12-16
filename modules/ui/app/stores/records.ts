@@ -21,7 +21,9 @@ export interface CivicRecord {
     | 'published'
     | 'rejected'
     | 'archived'
-    | 'expired';
+    | 'expired'; // Legal status (stored in YAML + DB)
+  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
+  hasUnpublishedChanges?: boolean; // Indicates if there's a draft version of this published record
   path: string;
   author: string; // Required: primary author username
   authors?: Array<{
@@ -98,11 +100,11 @@ export interface RecordsState {
     status?: string;
     search?: string;
   };
-  // Cursor-based pagination
-  nextCursor: string | null;
-  hasMore: boolean;
-  // Configurable page size
+  // Page-based pagination
+  currentPage: number;
   pageSize: number;
+  totalCount: number;
+  totalPages: number;
   summaryCounts: RecordSummaryCounts | null;
 }
 
@@ -134,6 +136,10 @@ const calculateCountsFromRecords = (
   return summary;
 };
 
+// Track last fetch times to prevent duplicate calls (outside store state)
+const summaryFetchCache = new Map<string, number>();
+const searchFetchCache = new Map<string, number>();
+
 export const useRecordsStore = defineStore('records', {
   state: (): RecordsState => ({
     records: [],
@@ -141,9 +147,10 @@ export const useRecordsStore = defineStore('records', {
     loadingMessage: '',
     error: null,
     filters: {},
-    nextCursor: null,
-    hasMore: true,
-    pageSize: 1000, // Large enough to load full datasets like bylaws
+    currentPage: 1,
+    pageSize: 50, // Default page size
+    totalCount: 0,
+    totalPages: 0,
     summaryCounts: null,
   }),
 
@@ -257,7 +264,7 @@ export const useRecordsStore = defineStore('records', {
      * Check if we have more records to load
      */
     hasMoreRecords: (state) => {
-      return state.hasMore;
+      return state.currentPage < state.totalPages;
     },
   },
 
@@ -280,6 +287,22 @@ export const useRecordsStore = defineStore('records', {
      * Fetch aggregated record counts from API (fallback to local counts on error)
      */
     async fetchSummaryCounts(params?: { type?: string; status?: string }) {
+      // Create a cache key to prevent duplicate calls with same params
+      const cacheKey = JSON.stringify({
+        type: params?.type,
+        status: params?.status,
+      });
+      const lastFetchTime = summaryFetchCache.get(cacheKey);
+      const now = Date.now();
+
+      // Skip if we fetched this exact query within the last 200ms (prevent rapid duplicate calls)
+      if (lastFetchTime && now - lastFetchTime < 200) {
+        return;
+      }
+
+      // Update cache
+      summaryFetchCache.set(cacheKey, now);
+
       try {
         const queryParams = new URLSearchParams();
         if (params?.type) queryParams.append('type', params.type);
@@ -302,53 +325,52 @@ export const useRecordsStore = defineStore('records', {
     },
 
     /**
-     * Load initial records (first batch)
+     * Load records for a specific page
      */
-    async loadInitialRecords(params?: { type?: string; status?: string }) {
+    async loadPage(
+      page: number,
+      params?: { type?: string; status?: string; sort?: string }
+    ) {
+      // Prevent duplicate concurrent calls
+      if (this.loading) {
+        return;
+      }
+
       this.loading = true;
-      this.loadingMessage = 'Loading records...';
+      this.loadingMessage = `Loading page ${page}...`;
       this.error = null;
 
       try {
         const queryParams = new URLSearchParams();
-        // API max limit is 300, cap at that
-        const apiLimit = Math.min(this.pageSize, 300);
-        queryParams.append('limit', apiLimit.toString());
+        queryParams.append('page', page.toString());
+        queryParams.append('limit', this.pageSize.toString());
 
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
+        if (params?.sort) queryParams.append('sort', params.sort);
 
         const url = `/api/v1/records?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
-        if (
-          typeof response === 'object' &&
-          response !== null &&
-          'success' in response &&
-          (response as any).success &&
-          'data' in response &&
-          (response as any).data
-        ) {
-          const data = (response as any).data;
-          const newRecords = data.records || [];
+        const data = validateApiResponse(response);
 
-          // Replace records with initial batch
-          this.replaceRecords(newRecords);
+        // Replace records with current page's records (not accumulating)
+        this.replaceRecords(data.records || []);
 
-          // Update cursor and hasMore
-          this.nextCursor = data.nextCursor || null;
-          this.hasMore = data.hasMore || false;
+        // Update pagination state
+        this.currentPage = data.currentPage || page;
+        this.totalCount = data.totalCount || 0;
+        this.totalPages = data.totalPages || 0;
 
-          this.filters = {
-            type: params?.type,
-            status: params?.status,
-          };
+        this.filters = {
+          type: params?.type,
+          status: params?.status,
+        };
 
-          await this.fetchSummaryCounts({
-            type: params?.type,
-            status: params?.status,
-          });
-        }
+        await this.fetchSummaryCounts({
+          type: params?.type,
+          status: params?.status,
+        });
       } catch (error: any) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
@@ -364,60 +386,29 @@ export const useRecordsStore = defineStore('records', {
     },
 
     /**
-     * Load more records (next batch)
+     * Load initial records (page 1) - convenience method
      */
-    async loadMoreRecords(params?: { type?: string; status?: string }) {
-      if (!this.hasMore || !this.nextCursor) {
-        return;
-      }
-
-      this.loading = true;
-      this.loadingMessage = 'Loading more records...';
-      this.error = null;
-
-      try {
-        const queryParams = new URLSearchParams();
-        queryParams.append('cursor', this.nextCursor);
-        // API max limit is 300, cap at that
-        const apiLimit = Math.min(this.pageSize, 300);
-        queryParams.append('limit', apiLimit.toString());
-
-        if (params?.type) queryParams.append('type', params.type);
-        if (params?.status) queryParams.append('status', params.status);
-
-        const url = `/api/v1/records?${queryParams.toString()}`;
-        const response = await useNuxtApp().$civicApi(url);
-
-        const data = validateApiResponse(response);
-        const newRecords = data.records || [];
-
-        // Add new records to existing ones
-        this.addRecords(newRecords);
-
-        // Update cursor and hasMore
-        this.nextCursor = data.nextCursor || null;
-        this.hasMore = data.hasMore || false;
-      } catch (error: any) {
-        const { handleError } = useErrorHandler();
-        const errorMessage = handleError(error, {
-          title: 'Failed to Load More Records',
-          showToast: true,
-        });
-        this.error = errorMessage;
-        throw error;
-      } finally {
-        this.loading = false;
-        this.loadingMessage = '';
-      }
+    async loadInitialRecords(params?: {
+      type?: string;
+      status?: string;
+      sort?: string;
+    }) {
+      this.currentPage = 1;
+      return this.loadPage(1, params);
     },
 
     /**
-     * Search records using API
+     * Search records using API with page-based pagination
      */
     async searchRecords(
       query: string,
-      params?: { type?: string; status?: string }
+      params?: { type?: string; status?: string; page?: number; sort?: string }
     ) {
+      // Prevent duplicate concurrent calls
+      if (this.loading) {
+        return;
+      }
+
       // Don't search with empty queries
       if (!query || !query.trim()) {
         console.warn(
@@ -426,6 +417,25 @@ export const useRecordsStore = defineStore('records', {
         return this.loadInitialRecords(params);
       }
 
+      // Create a cache key to prevent duplicate calls with same params
+      const cacheKey = JSON.stringify({
+        query: query.trim(),
+        type: params?.type,
+        status: params?.status,
+        page: params?.page || 1,
+        sort: params?.sort,
+      });
+      const lastFetchTime = searchFetchCache.get(cacheKey);
+      const now = Date.now();
+
+      // Skip if we fetched this exact query within the last 200ms (prevent rapid duplicate calls)
+      if (lastFetchTime && now - lastFetchTime < 200) {
+        return;
+      }
+
+      // Update cache
+      searchFetchCache.set(cacheKey, now);
+
       this.loading = true;
       this.loadingMessage = `Searching for "${query}"...`;
       this.error = null;
@@ -433,12 +443,15 @@ export const useRecordsStore = defineStore('records', {
       try {
         const queryParams = new URLSearchParams();
         queryParams.append('q', query);
+        const pageToLoad = params?.page || 1;
+        queryParams.append('page', pageToLoad.toString());
         // API max limit is 300, cap at that
         const apiLimit = Math.min(this.pageSize, 300);
         queryParams.append('limit', apiLimit.toString());
 
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
+        if (params?.sort) queryParams.append('sort', params.sort);
 
         const url = `/api/v1/search?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
@@ -446,12 +459,13 @@ export const useRecordsStore = defineStore('records', {
         const data = validateApiResponse(response);
         const apiResults = data.results || [];
 
-        // Replace records with search results
+        // Replace records with search results (not accumulating - paginated)
         this.replaceRecords(apiResults);
 
-        // Update cursor and hasMore
-        this.nextCursor = data.nextCursor || null;
-        this.hasMore = data.hasMore || false;
+        // Update pagination state from API response
+        this.currentPage = data.currentPage || pageToLoad;
+        this.totalCount = data.totalCount || 0;
+        this.totalPages = data.totalPages || 0;
 
         // Update filters
         this.filters = {
@@ -471,6 +485,10 @@ export const useRecordsStore = defineStore('records', {
           showToast: true,
         });
         this.error = errorMessage;
+        // Clear records on search error to avoid showing stale data
+        this.replaceRecords([]);
+        this.totalCount = 0;
+        this.totalPages = 0;
         throw error;
       } finally {
         this.loading = false;
@@ -547,8 +565,9 @@ export const useRecordsStore = defineStore('records', {
     clearRecords() {
       this.records = [];
       this.filters = {};
-      this.nextCursor = null;
-      this.hasMore = true;
+      this.currentPage = 1;
+      this.totalCount = 0;
+      this.totalPages = 0;
     },
 
     /**

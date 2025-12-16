@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildQueryFromState,
   parseQueryToState,
-} from '../..//modules/ui/app/composables/useRecordQueryState';
+} from '../../modules/ui/app/composables/useRecordQueryState';
 
 describe('Record query URL state helpers', () => {
   it('builds query from state omitting defaults', () => {
@@ -11,7 +11,7 @@ describe('Record query URL state helpers', () => {
       types: ['bylaw', 'policy'],
       statuses: ['adopted'],
       page: 1,
-      sort: 'relevance',
+      pageSize: 50, // default, should be omitted
     });
 
     expect(query).toEqual({
@@ -28,7 +28,7 @@ describe('Record query URL state helpers', () => {
         types: 'bylaw,policy',
         statuses: 'adopted,draft',
         page: '3',
-        sort: 'title_asc',
+        pageSize: '25',
       },
     } as any);
 
@@ -37,7 +37,7 @@ describe('Record query URL state helpers', () => {
       types: ['bylaw', 'policy'],
       statuses: ['adopted', 'draft'],
       page: 3,
-      sort: 'title_asc',
+      pageSize: 25,
     });
   });
 });

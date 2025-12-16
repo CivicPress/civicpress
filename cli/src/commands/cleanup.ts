@@ -2,7 +2,15 @@ import { CAC } from 'cac';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
+  initializeCliOutput,
 } from '../utils/global-options.js';
+import {
+  cliSuccess,
+  cliError,
+  cliInfo,
+  cliWarn,
+  cliStartOperation,
+} from '../utils/cli-output.js';
 import { readFileSync, existsSync, rmSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -19,10 +27,14 @@ export const cleanupCommand = (cli: CAC) => {
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     .action(async (options: any) => {
-      try {
-        const globalOpts = getGlobalOptionsFromArgs();
-        const logger = initializeLogger();
+      // Initialize CLI output with global options
+      const globalOpts = getGlobalOptionsFromArgs();
+      initializeCliOutput(globalOpts);
 
+      const logger = initializeLogger();
+      const endOperation = cliStartOperation('cleanup');
+
+      try {
         // Get project root
         const projectRoot = resolve(__dirname, '../../../');
 
@@ -41,26 +53,19 @@ export const cleanupCommand = (cli: CAC) => {
         );
 
         if (existingPaths.length === 0) {
-          if (!globalOpts.silent) {
-            if (globalOpts.json) {
-              console.log(
-                JSON.stringify(
-                  {
-                    success: true,
-                    message:
-                      'No data to clean up - project is already in clean state',
-                    cleanedPaths: [],
-                  },
-                  null,
-                  2
-                )
-              );
-            } else {
-              logger.success(
-                '✅ Project is already in clean state - no data to remove'
-              );
+          const result = {
+            success: true,
+            message: 'No data to clean up - project is already in clean state',
+            cleanedPaths: [],
+          };
+
+          cliSuccess(
+            result,
+            'Project is already in clean state - no data to remove',
+            {
+              operation: 'cleanup',
             }
-          }
+          );
           return;
         }
 
@@ -186,48 +191,55 @@ export const cleanupCommand = (cli: CAC) => {
         }
 
         // Output results
-        if (!globalOpts.silent) {
-          if (globalOpts.json) {
-            console.log(
-              JSON.stringify(
-                {
-                  success: errors.length === 0,
-                  cleanedPaths,
-                  errors,
-                  message:
-                    errors.length === 0
-                      ? 'Cleanup completed successfully'
-                      : 'Cleanup completed with some errors',
-                },
-                null,
-                2
-              )
-            );
-          } else {
-            if (cleanedPaths.length > 0) {
-              logger.success('✅ Cleanup completed successfully!');
-              logger.info(`🗑️  Removed ${cleanedPaths.length} data locations:`);
-              cleanedPaths.forEach((path) => {
-                logger.info(`   - ${path}`);
-              });
-            }
+        const result = {
+          success: errors.length === 0,
+          cleanedPaths,
+          errors,
+          message:
+            errors.length === 0
+              ? 'Cleanup completed successfully'
+              : 'Cleanup completed with some errors',
+        };
 
-            if (errors.length > 0) {
-              logger.warn(
-                `⚠️  ${errors.length} errors occurred during cleanup`
-              );
-            }
+        cliSuccess(result, result.message, {
+          operation: 'cleanup',
+        });
 
-            logger.info('');
-            logger.info('🎯 Project is now in clean default state');
-            logger.info(
-              '📝 Run "civic init" to initialize with fresh configuration'
-            );
-          }
+        if (cleanedPaths.length > 0) {
+          cliInfo(
+            `🗑️  Removed ${cleanedPaths.length} data locations:`,
+            'cleanup'
+          );
+          cleanedPaths.forEach((path) => {
+            cliInfo(`   - ${path}`, 'cleanup');
+          });
         }
+
+        if (errors.length > 0) {
+          cliWarn(
+            `⚠️  ${errors.length} errors occurred during cleanup`,
+            'cleanup'
+          );
+        }
+
+        cliInfo('', 'cleanup');
+        cliInfo('🎯 Project is now in clean default state', 'cleanup');
+        cliInfo(
+          '📝 Run "civic init" to initialize with fresh configuration',
+          'cleanup'
+        );
       } catch (error) {
-        console.error('Cleanup command failed:', error);
+        cliError(
+          'Cleanup command failed',
+          'CLEANUP_FAILED',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'cleanup'
+        );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

@@ -8,8 +8,8 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - comprehensive version tracking documentation
 - dependency management
 - compatibility matrices fixes: [] migration_guide: null compatibility:
- min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
- - 'spec-versioning.md: >=1.0.0' authors:
+  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+- 'spec-versioning.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
@@ -47,21 +47,21 @@ Out of Scope:
 
 ## Inputs & Outputs
 
-| Input | Description |
+| Input                   | Description                             |
 | ----------------------- | --------------------------------------- |
-| Spec files | CivicPress specification markdown files |
-| Version metadata | Version numbers, status, and dates |
-| Dependency declarations | Spec-to-spec dependency relationships |
-| Change requests | Proposed version updates and changes |
-| Compatibility rules | Version compatibility constraints |
+| Spec files              | CivicPress specification markdown files |
+| Version metadata        | Version numbers, status, and dates      |
+| Dependency declarations | Spec-to-spec dependency relationships   |
+| Change requests         | Proposed version updates and changes    |
+| Compatibility rules     | Version compatibility constraints       |
 
-| Output | Description |
+| Output                | Description                           |
 | --------------------- | ------------------------------------- |
-| Version matrices | Comprehensive version tracking tables |
-| Dependency graphs | Visual dependency relationship maps |
-| Compatibility reports | Version compatibility analysis |
-| Migration paths | Breaking change migration guides |
-| Version analytics | Spec health and adoption metrics |
+| Version matrices      | Comprehensive version tracking tables |
+| Dependency graphs     | Visual dependency relationship maps   |
+| Compatibility reports | Version compatibility analysis        |
+| Migration paths       | Breaking change migration guides      |
+| Version analytics     | Spec health and adoption metrics      |
 
 ---
 
@@ -123,63 +123,63 @@ tests/
 
 ### Core Specifications
 
-| Spec | Version | Status | Last Updated | Breaking Changes | Dependencies |
+| Spec             | Version | Status   | Last Updated | Breaking Changes | Dependencies                                     |
 | ---------------- | ------- | -------- | ------------ | ---------------- | ------------------------------------------------ |
-| `manifest.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[]` |
-| `auth.md` | `1.2.0` | `stable` | `2025-07-15` | `0` | `[permissions.md >=1.1.0, roles.yml.md >=1.0.0]` |
-| `permissions.md` | `1.1.0` | `stable` | `2025-07-15` | `0` | `[auth.md >=1.2.0, workflows.md >=1.3.0]` |
-| `git-policy.md` | `1.1.0` | `stable` | `2025-07-05` | `0` | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
-| `workflows.md` | `1.3.0` | `stable` | `2025-07-10` | `0` | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
-| `hooks.md` | `1.2.0` | `stable` | `2025-07-10` | `0` | `[workflows.md >=1.3.0]` |
+| `manifest.md`    | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[]`                                             |
+| `auth.md`        | `1.2.0` | `stable` | `2025-07-15` | `0`              | `[permissions.md >=1.1.0, roles.yml.md >=1.0.0]` |
+| `permissions.md` | `1.1.0` | `stable` | `2025-07-15` | `0`              | `[auth.md >=1.2.0, workflows.md >=1.3.0]`        |
+| `git-policy.md`  | `1.1.0` | `stable` | `2025-07-05` | `0`              | `[auth.md >=1.2.0, permissions.md >=1.1.0]`      |
+| `workflows.md`   | `1.3.0` | `stable` | `2025-07-10` | `0`              | `[auth.md >=1.2.0, permissions.md >=1.1.0]`      |
+| `hooks.md`       | `1.2.0` | `stable` | `2025-07-10` | `0`              | `[workflows.md >=1.3.0]`                         |
 
 ### Plugin System
 
-| Spec | Version | Status | Last Updated | Breaking Changes | Dependencies |
+| Spec                    | Version | Status   | Last Updated | Breaking Changes | Dependencies                                  |
 | ----------------------- | ------- | -------- | ------------ | ---------------- | --------------------------------------------- |
-| `plugins.md` | `1.5.0` | `stable` | `2025-07-15` | `0` | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
-| `plugin-api.md` | `1.0.0` | `stable` | `2025-07-15` | `0` | `[plugins.md >=1.5.0, hooks.md >=1.2.0]` |
-| `plugin-development.md` | `1.0.0` | `stable` | `2025-07-15` | `0` | `[plugins.md >=1.5.0, plugin-api.md >=1.0.0]` |
+| `plugins.md`            | `1.5.0` | `stable` | `2025-07-15` | `0`              | `[auth.md >=1.2.0, permissions.md >=1.1.0]`   |
+| `plugin-api.md`         | `1.0.0` | `stable` | `2025-07-15` | `0`              | `[plugins.md >=1.5.0, hooks.md >=1.2.0]`      |
+| `plugin-development.md` | `1.0.0` | `stable` | `2025-07-15` | `0`              | `[plugins.md >=1.5.0, plugin-api.md >=1.0.0]` |
 
 ### Testing & Quality
 
-| Spec | Version | Status | Last Updated | Breaking Changes | Dependencies |
+| Spec                   | Version | Status   | Last Updated | Breaking Changes | Dependencies                            |
 | ---------------------- | ------- | -------- | ------------ | ---------------- | --------------------------------------- |
-| `testing-framework.md` | `1.0.0` | `stable` | `2025-07-15` | `0` | `[plugins.md >=1.5.0, auth.md >=1.2.0]` |
+| `testing-framework.md` | `1.0.0` | `stable` | `2025-07-15` | `0`              | `[plugins.md >=1.5.0, auth.md >=1.2.0]` |
 
 ### Security & Compliance
 
-| Spec | Version | Status | Last Updated | Breaking Changes | Dependencies |
+| Spec          | Version | Status   | Last Updated | Breaking Changes | Dependencies                                |
 | ------------- | ------- | -------- | ------------ | ---------------- | ------------------------------------------- |
-| `security.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
-| `backup.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[storage.md >=1.0.0]` |
-| `storage.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[]` |
+| `security.md` | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
+| `backup.md`   | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[storage.md >=1.0.0]`                      |
+| `storage.md`  | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[]`                                        |
 
 ### User Experience
 
-| Spec | Version | Status | Last Updated | Breaking Changes | Dependencies |
+| Spec               | Version | Status   | Last Updated | Breaking Changes | Dependencies                                |
 | ------------------ | ------- | -------- | ------------ | ---------------- | ------------------------------------------- |
-| `ui.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
-| `accessibility.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[ui.md >=1.0.0]` |
-| `themes.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[ui.md >=1.0.0]` |
-| `translations.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[ui.md >=1.0.0]` |
+| `ui.md`            | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
+| `accessibility.md` | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[ui.md >=1.0.0]`                           |
+| `themes.md`        | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[ui.md >=1.0.0]`                           |
+| `translations.md`  | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[ui.md >=1.0.0]`                           |
 
 ### Data & Records
 
-| Spec | Version | Status | Last Updated | Breaking Changes | Dependencies |
-| -------------------------- | ------- | -------- | ------------ | ---------------- | ------------------------------------ |
-| `public-data-structure.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[manifest.md >=1.0.0]` |
-| `records-validation.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[public-data-structure.md >=1.0.0]` |
-| `indexing.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[public-data-structure.md >=1.0.0]` |
-| `search.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[indexing.md >=1.0.0]` |
+| Spec                       | Version | Status   | Last Updated | Breaking Changes | Dependencies                         |
+| -------------------------- | ------- | -------- | ------------ | ---------------- | ------------------------------------ | --------------------------------- |
+| `public-data-structure.md` | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[manifest.md >=1.0.0]`              |
+| `records-validation.md`    | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[public-data-structure.md >=1.0.0]` |
+| `indexing.md`              | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[public-data-structure.md >=1.0.0]` |
+| `search.md`                | `2.0.0` | `stable` | `2025-12-14` | `0`              | `[indexing.md >=1.0.0]`              | Replaced v1.0.0 (see git history) |
 
 ### System & Infrastructure
 
-| Spec | Version | Status | Last Updated | Breaking Changes | Dependencies |
+| Spec            | Version | Status   | Last Updated | Breaking Changes | Dependencies                                |
 | --------------- | ------- | -------- | ------------ | ---------------- | ------------------------------------------- |
-| `api.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
-| `cli.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
-| `deployment.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[manifest.md >=1.0.0]` |
-| `scheduler.md` | `1.0.0` | `stable` | `2025-07-03` | `0` | `[workflows.md >=1.3.0, hooks.md >=1.2.0]` |
+| `api.md`        | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
+| `cli.md`        | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[auth.md >=1.2.0, permissions.md >=1.1.0]` |
+| `deployment.md` | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[manifest.md >=1.0.0]`                     |
+| `scheduler.md`  | `1.0.0` | `stable` | `2025-07-03` | `0`              | `[workflows.md >=1.3.0, hooks.md >=1.2.0]`  |
 
 ---
 
@@ -772,7 +772,7 @@ export class PerformanceTests {
 ## Related Specs
 
 - [`spec-versioning.md`](./spec-versioning.md) — Versioning system and change
- management
+  management
 - [`manifest.md`](./manifest.md) — CivicPress manifest versioning
 - [`git-policy.md`](./git-policy.md) — Git-based version control
 - [`workflows.md`](./workflows.md) — Change management workflows
