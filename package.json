@@ -1,6 +1,6 @@
 {
   "name": "civicpress",
-  "version": "1.0.0",
+  "version": "0.1.4",
   "description": "CivicPress project",
   "type": "module",
   "packageManager": "pnpm@8.15.0",

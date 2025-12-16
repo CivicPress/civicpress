@@ -3,7 +3,7 @@
 _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha to a stable, production-ready civic infrastructure platform._
 
-**Current Version:** v0.1.3 (Alpha)  
+**Current Version:** v0.1.4 (Alpha)  
 **Status:** Early development, preparing for pilot collaborations
 
 ---

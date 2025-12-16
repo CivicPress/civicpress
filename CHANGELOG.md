@@ -54,6 +54,119 @@ and this project adheres to
   - Tests verify proper behavior for authenticated and public users
   - All existing tests remain passing
 
+## [0.1.4] - 2025-01-27
+
+### Added
+
+- **Database-Level Sort Options**: Implemented comprehensive sorting at API and
+  database level
+  - Added sort parameter support to `/api/v1/records` and `/api/v1/search`
+    endpoints
+  - Sort options: `updated_desc`, `created_desc`, `title_asc`, `title_desc`,
+    `relevance` (search only)
+  - Kind priority (record=1, chapter=2, root=3) as primary sort, user-specified
+    sort as secondary
+  - Database indexes created automatically for optimal sort performance
+  - Removed inefficient in-memory sorting in favor of SQL-level sorting
+
+- **Word Extraction in Search Suggestions**: Enhanced search suggestions with
+  word extraction
+  - Extracts relevant words from record titles and tags (up to 5 words)
+  - Filters out common stop words (English and French)
+  - Words displayed as badges in UI, titles as list items
+  - Typo tolerance using Levenshtein distance for better user experience
+  - Separate `words` and `titles` arrays in API response for easier UI
+    consumption
+
+- **Enhanced Search Query Parsing**: Improved FTS5 query generation
+  - Queries now match both exact words and prefixes: `"word" OR word*`
+  - Better handling of multi-word queries
+  - Improved relevance scoring with title-match boost
+
+- **Search Cache Improvements**: Enhanced cache invalidation
+  - Search cache and suggestions cache cleared when records are removed
+  - Prevents stale search results after record deletion
+  - Improved cache key generation for better cache hit rates
+
+- **Upgrade Protocol Documentation**: Comprehensive upgrade guide
+  - Step-by-step upgrade procedures for demo and production
+  - Pre-upgrade backup checklist
+  - Post-upgrade verification steps
+  - Rollback procedures
+  - Version-specific migration notes
+
+### Changed
+
+- **Sort UI Integration**: Re-introduced sort dropdown in RecordSearch component
+  - Dynamic sort options based on context (relevance for search, created_desc
+    for listings)
+  - Automatically switches to relevance sort when searching
+  - Sort state synced with URL query parameters
+  - Improved UX with clear sort labels and icons
+
+- **API Response Structure**: Enhanced search suggestions API response
+  - New structure:
+    `{ suggestions: string[], words: string[], titles: string[] }`
+  - Maintains backward compatibility with flat `suggestions` array
+  - Separate arrays make UI rendering more efficient
+
+- **Database Migrations**: Automatic migration system
+  - New indexes created automatically on startup
+  - FTS5 table and triggers updated automatically
+  - All migrations are additive only (no data loss)
+  - Idempotent (safe to run multiple times)
+
+### Fixed
+
+- **Search Suggestions**: Fixed empty suggestions issue
+  - Fixed substring matching for suggestions (changed from prefix-only to full
+    substring)
+  - Improved NULL handling for `title_normalized` column
+  - Fixed type field consistency in cached suggestions
+
+- **Search Results**: Fixed empty results when not using suggestions
+  - Enhanced FTS5 query to match both exact words and prefixes
+  - Improved relevance scoring for better result ranking
+
+- **API Call Optimization**: Reduced duplicate API calls
+  - Fixed duplicate calls on page load (from 6 calls to 2)
+  - Added 200ms cache for `fetchSummaryCounts` and `searchRecords`
+  - Added `isLoading` guards to prevent concurrent calls
+  - Fixed route watcher firing on initial mount
+
+- **Sort Parameter Validation**: Fixed invalid sort parameter handling
+  - Added explicit validation to reject `sort=relevance` on records listing
+    endpoint
+  - UI sanitizes sort parameter (converts relevance to created_desc for
+    non-search contexts)
+  - Better error messages for invalid sort options
+
+- **TypeScript Errors**: Fixed CommonJS/ESM interoperability
+  - Fixed `fast-levenshtein` import using `createRequire` for ES module context
+  - Fixed `workflowState` type errors (null → undefined)
+  - Added explicit type annotations where needed
+
+- **Database Corruption**: Fixed FTS5 table definition mismatch
+  - Fixed column name mismatch (`metadata_json` vs `metadata`)
+  - Recreated FTS5 table and triggers with correct schema
+  - Improved database integrity checks
+
+### Technical Details
+
+- **Core Implementation**: `core/src/database/database-service.ts` with
+  `buildOrderByClause` helper
+- **Search Service**: `core/src/search/sqlite-search-service.ts` with word
+  extraction and enhanced query parsing
+- **API Endpoints**: Updated `/api/v1/records` and `/api/v1/search` with sort
+  parameter support
+- **UI Components**: Enhanced `RecordSearch.vue` with sort dropdown and improved
+  suggestions display
+- **Database Schema**: New indexes for `records(updated_at)`,
+  `records(created_at)`, `records(LOWER(title))`
+- **Testing**: Comprehensive unit tests for sort query generation and word
+  extraction
+- **Documentation**: Complete upgrade protocol and migration guide
+
 ## [0.1.3] - 2025-11-26
 
 ### Changed

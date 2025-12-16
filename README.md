@@ -3,7 +3,8 @@
 _A modern, open-source platform for transparent, accountable, and resilient
 local governance._
 
-**Website:** [civicpress.io](https://civicpress.io) | **Contact:** [hello@civicpress.io](mailto:hello@civicpress.io)
+**Website:** [civicpress.io](https://civicpress.io) | **Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io)
 
 ---
 
@@ -40,10 +41,14 @@ that are as open as the values they represent.**
 
 CivicPress is designed for:
 
-- **Municipal clerks and staff** — daily workflows for managing bylaws, minutes, and civic records
-- **Elected officials and CAOs** — transparent governance tools that build public trust
-- **Civic tech folks and integrators** — open APIs and modular architecture for building connected civic systems
-- **Researchers and journalists** — accessible, searchable public records with full version history
+- **Municipal clerks and staff** — daily workflows for managing bylaws, minutes,
+  and civic records
+- **Elected officials and CAOs** — transparent governance tools that build
+  public trust
+- **Civic tech folks and integrators** — open APIs and modular architecture for
+  building connected civic systems
+- **Researchers and journalists** — accessible, searchable public records with
+  full version history
 
 ---
 
@@ -59,8 +64,8 @@ Cities rely on digital systems that are often:
 
 Many municipal records are currently trapped in PDFs or Word files. These
 formats are difficult to search, hard to index, and not future-proof as primary
-storage. This limits transparency, access to information, and long-term
-archival value.
+storage. This limits transparency, access to information, and long-term archival
+value.
 
 CivicPress takes the opposite approach:
 
@@ -78,8 +83,10 @@ easy to share, and built to last.**
 
 For deeper context on the vision and values behind CivicPress:
 
-- **[Manifesto & Values](https://github.com/CivicPress/manifesto/blob/master/manifesto.md)** — core principles and philosophy
-- **[Appendix: Public IT Failures](https://github.com/CivicPress/manifesto/blob/master/appendix-failures.md)** — case studies on why transparent civic systems matter
+- **[Manifesto & Values](https://github.com/CivicPress/manifesto/blob/master/manifesto.md)**
+  — core principles and philosophy
+- **[Appendix: Public IT Failures](https://github.com/CivicPress/manifesto/blob/master/appendix-failures.md)**
+  — case studies on why transparent civic systems matter
 
 ---
 
@@ -94,8 +101,8 @@ public information.
   structured metadata
 - **File attachments** — PDFs, images, and other files with metadata and
   categorization
-- **Full Git versioning** — every change is tracked with commit history,
-  author, and timestamp
+- **Full Git versioning** — every change is tracked with commit history, author,
+  and timestamp
 - **Demo datasets** — Springfield, VA and Richmond, QC sample data for
   exploration and testing
 
@@ -124,8 +131,8 @@ public information.
 
 ## Infrastructure & Operations
 
-- **Local-first architecture** — offline-ready, resilient deployments for
-  small towns and large cities
+- **Local-first architecture** — offline-ready, resilient deployments for small
+  towns and large cities
 - **Backup and restore** — CLI tools for data backup, restore, and migration
 - **Multi-provider storage** — configurable storage backends (local, S3, Azure)
 - **CLI tools** — initialization, validation, maintenance, and administrative
@@ -145,8 +152,8 @@ This instance showcases a complete sample dataset — including public records,
 geography layers, meeting minutes, and fully accessible API endpoints — offering
 a hands‑on look at how CivicPress structures and publishes civic information.
 
-**Current status:** v0.1.3 (Alpha). Suitable for demos and pilots with
-support, not yet for unsupervised production use.
+**Current status:** v0.1.4 (Alpha). Suitable for demos and pilots with support,
+not yet for unsupervised production use.
 
 ---
 
@@ -190,8 +197,8 @@ directory:
 
 ## For Municipal Staff
 
-- **[Municipal Guide](docs/municipal-guide.md)** — what CivicPress is and how
-  it works for clerks, councils, and municipal staff
+- **[Municipal Guide](docs/municipal-guide.md)** — what CivicPress is and how it
+  works for clerks, councils, and municipal staff
 
 ## For Developers & IT Teams
 
@@ -272,15 +279,14 @@ This stack was chosen because it:
   development machines
 - **Strong ecosystem** — mature tooling for web UIs, accessibility, and civic
   portals
-- **Open, versionable formats** — storage in text-based formats (Markdown,
-  YAML, JSON) that are human-readable and Git-friendly
+- **Open, versionable formats** — storage in text-based formats (Markdown, YAML,
+  JSON) that are human-readable and Git-friendly
 - **Avoids vendor lock‑in** — all technologies are open-source and widely
   understood
 - **Works at any scale** — equally suitable for small towns and large cities
 - **Supports local-first philosophy** — offline-capable and resilient
 - **Ensures data longevity** — data remains transparent, inspectable, and
   durable for decades
-
 
 ---
 

@@ -3,7 +3,7 @@
 _A transparent, community-driven governance structure designed to protect the
 public good._
 
-**Version:** v0.1.3 (Alpha)  
+**Version:** v0.1.4 (Alpha)  
 **Audience:** Municipalities, contributors, advisors, and partner organizations
 
 ---
@@ -77,7 +77,7 @@ their civic records for decades to come.
 
 # 3. Current Governance (Founding Phase)
 
-During the v0.1.3 (Alpha) phase, CivicPress is stewarded by a **Founding
+During the v0.1.4 (Alpha) phase, CivicPress is stewarded by a **Founding
 Maintainer** who oversees:
 
 - technical architecture
@@ -156,7 +156,7 @@ municipal autonomy.
 - **Municipal autonomy**: Municipalities retain full autonomy over their data
   and can migrate away from CivicPress if needed
 
-## **Current Phase (v0.1.3 Alpha)**
+## **Current Phase (v0.1.4 Alpha)**
 
 During the founding phase, maintainers must disclose any vendor relationships
 that could influence technical or governance decisions. All major technology
@@ -179,7 +179,7 @@ implemented:
 
 Financial transparency is essential for public trust in civic infrastructure.
 
-## **Current Phase (v0.1.3 Alpha)**
+## **Current Phase (v0.1.4 Alpha)**
 
 During the founding phase, CivicPress has minimal financial structure. Funding
 sources are disclosed publicly when they exist, and expenses are tracked
@@ -309,7 +309,7 @@ established.
 ## **Activation Timeline**
 
 This progression path will be formalized as the project grows beyond the alpha
-phase. During v0.1.3 (Alpha), the founding maintainer handles these
+phase. During v0.1.4 (Alpha), the founding maintainer handles these
 responsibilities. As the community expands, the Contributor → Maintainer → TSC
 path will activate to distribute governance and technical leadership.
 
@@ -325,8 +325,8 @@ municipal data.
 Security vulnerabilities must be reported privately. **Do not post security
 issues in public GitHub issues or discussions.**
 
-Report security vulnerabilities to: **security@civicpress.io** (or
-**hello@civicpress.io** as fallback)
+Report security vulnerabilities to: **<security@civicpress.io>** (or
+**<hello@civicpress.io>** as fallback)
 
 Include as much detail as possible about the vulnerability, including steps to
 reproduce if applicable.
@@ -336,7 +336,7 @@ reproduce if applicable.
 CivicPress commits to responsible disclosure practices:
 
 1. **Initial Report** - Reporter submits vulnerability details privately to
-   security@civicpress.io
+   <security@civicpress.io>
 2. **Acknowledgment** - Maintainers acknowledge receipt within 48 hours
 3. **Assessment** - Security team evaluates severity and impact
 4. **Fix Development** - Patch developed and tested
@@ -564,8 +564,8 @@ itself.
 - Review the [Project Roadmap](roadmap.md) for current priorities and direction
 
 For inquiries or pilot participation:  
-**Email:** hello@civicpress.io  
-**Website:** https://civicpress.io
+**Email:** <hello@civicpress.io>  
+**Website:** <https://civicpress.io>
 
 ---
 
