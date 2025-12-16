@@ -29,10 +29,10 @@ searchRouter.get(
       .optional()
       .isInt({ min: 1, max: 300 })
       .withMessage('Limit must be between 1 and 300'),
-    query('cursor')
+    query('page')
       .optional()
-      .isString()
-      .withMessage('Cursor must be a string'),
+      .isInt({ min: 1 })
+      .withMessage('Page must be a positive integer'),
   ],
   async (req: any, res: Response) => {
     const isAuthenticated = (req as any).user !== undefined;
@@ -48,18 +48,22 @@ searchRouter.get(
         return handleValidationError(operation, errors.array(), req, res);
       }
 
-      const { q: query, type, limit, cursor } = req.query;
+      const { q: query, type, limit, page } = req.query;
 
       // Query only records table - all records there are published (by table location)
       // No status filtering needed - table location determines if record is published
+
+      // Parse pagination parameters
+      const pageSize = limit ? parseInt(limit as string) : 50;
+      const currentPage = page ? parseInt(page as string) : 1;
 
       logger.info(
         `Searching records (${isAuthenticated ? 'authenticated' : 'public'})`,
         {
           query,
           type,
-          limit,
-          cursor: cursor ? '***' : undefined, // Don't log the actual cursor
+          pageSize,
+          currentPage,
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
@@ -80,8 +84,8 @@ searchRouter.get(
         {
           type: type as string,
           // No status filter - table location (records table) determines published state
-          limit: limit ? parseInt(limit as string) : 20,
-          cursor: cursor as string,
+          limit: pageSize,
+          page: currentPage,
         },
         (req as any).user
       );
@@ -91,7 +95,9 @@ searchRouter.get(
         {
           query,
           totalResults: result.records.length,
-          hasMore: result.hasMore,
+          totalCount: result.totalCount,
+          currentPage: result.currentPage,
+          totalPages: result.totalPages,
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
@@ -102,8 +108,10 @@ searchRouter.get(
       sendSuccess(
         {
           results: result.records,
-          nextCursor: result.nextCursor,
-          hasMore: result.hasMore,
+          totalCount: result.totalCount,
+          currentPage: result.currentPage,
+          totalPages: result.totalPages,
+          pageSize: result.pageSize,
           query: query as string,
         },
         req,

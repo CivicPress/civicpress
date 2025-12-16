@@ -12,6 +12,14 @@ const { formatDate } = useRecordUtils();
 const runtimeConfig = useRuntimeConfig();
 const { t } = useI18n();
 
+// Search suggestions composable
+const {
+  suggestions,
+  isLoading: suggestionsLoading,
+  fetchSuggestions,
+  clearSuggestions,
+} = useSearchSuggestions();
+
 // Reactive state
 const organizationInfo = ref<any>(null);
 const recentRecords = ref<CivicRecord[]>([]);
@@ -19,6 +27,7 @@ const loading = ref(true);
 const error = ref('');
 const homeSearchQuery = ref('');
 const aboutSectionRef = ref<HTMLElement | null>(null);
+const inputHasFocus = ref(false);
 
 // Auth
 const isAuthenticated = computed(() => authStore.isAuthenticated);
@@ -59,6 +68,8 @@ const orgVersionLabel = computed(
 // Search submit
 const submitHomeSearch = () => {
   const query = homeSearchQuery.value.trim();
+  clearSuggestions();
+  inputHasFocus.value = false;
 
   if (!query) {
     navigateTo('/records');
@@ -69,6 +80,63 @@ const submitHomeSearch = () => {
     path: '/records',
     query: { search: query },
   });
+};
+
+// Watch search query for suggestions
+watch(homeSearchQuery, (newQuery) => {
+  if (inputHasFocus.value && newQuery && newQuery.trim().length >= 2) {
+    fetchSuggestions(newQuery);
+  } else {
+    clearSuggestions();
+  }
+});
+
+// Handle input focus/blur for suggestions
+let blurTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const handleInputFocus = () => {
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+    blurTimeout = null;
+  }
+  inputHasFocus.value = true;
+  if (homeSearchQuery.value && homeSearchQuery.value.trim().length >= 2) {
+    fetchSuggestions(homeSearchQuery.value);
+  }
+};
+
+const handleInputBlur = () => {
+  blurTimeout = setTimeout(() => {
+    inputHasFocus.value = false;
+    clearSuggestions();
+    blurTimeout = null;
+  }, 200);
+};
+
+const handleInputKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitHomeSearch();
+  }
+};
+
+const handleSuggestionClick = (suggestion: string) => {
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+    blurTimeout = null;
+  }
+  inputHasFocus.value = false;
+  homeSearchQuery.value = suggestion;
+  clearSuggestions();
+  submitHomeSearch();
+};
+
+const handleClickOutside = (event: Event) => {
+  const target = event.target as Element;
+  if (!target.closest('.home-search-container')) {
+    inputHasFocus.value = false;
+    clearSuggestions();
+  }
 };
 
 // Fetch organization info (public endpoint)
@@ -142,6 +210,14 @@ const scrollToAboutSection = () => {
 // Init
 onMounted(() => {
   loadDashboardData();
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+  if (blurTimeout) {
+    clearTimeout(blurTimeout);
+  }
 });
 
 // Watch auth changes
@@ -207,13 +283,78 @@ watch(isAuthenticated, (newValue) => {
             class="max-w-xl mx-auto mt-6 mb-12"
             @submit.prevent="submitHomeSearch"
           >
-            <UInput
-              v-model="homeSearchQuery"
-              :placeholder="t('home.searchPlaceholder')"
-              size="lg"
-              icon="i-lucide-search"
-              class="w-full"
-            />
+            <div class="relative home-search-container">
+              <UInput
+                v-model="homeSearchQuery"
+                :placeholder="t('home.searchPlaceholder')"
+                size="lg"
+                icon="i-lucide-search"
+                class="w-full"
+                @focus="handleInputFocus"
+                @blur="handleInputBlur"
+                @keydown="handleInputKeydown"
+              >
+                <template v-if="homeSearchQuery?.length" #trailing>
+                  <UButton
+                    color="neutral"
+                    variant="link"
+                    size="sm"
+                    icon="i-lucide-circle-x"
+                    aria-label="Clear search"
+                    @click="homeSearchQuery = ''"
+                  />
+                </template>
+              </UInput>
+
+              <!-- Suggestions Dropdown (only show when input has focus) -->
+              <div
+                v-if="inputHasFocus && suggestions.length > 0"
+                class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
+              >
+                <div class="p-2">
+                  <div class="text-xs text-gray-500 mb-2 px-2 text-left">
+                    <UIcon
+                      name="i-lucide-lightbulb"
+                      class="w-3 h-3 inline mr-1"
+                    />
+                    {{ t('records.filters.suggestions') }}
+                  </div>
+                  <div
+                    v-for="suggestion in suggestions"
+                    :key="suggestion"
+                    class="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer text-sm text-left"
+                    @click="handleSuggestionClick(suggestion)"
+                  >
+                    <UIcon
+                      name="i-lucide-search"
+                      class="w-3 h-3 inline mr-2 text-gray-400"
+                    />
+                    {{ suggestion }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Loading indicator for suggestions -->
+              <div
+                v-if="
+                  inputHasFocus &&
+                  suggestionsLoading &&
+                  homeSearchQuery &&
+                  homeSearchQuery.trim().length >= 2
+                "
+                class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3"
+              >
+                <div
+                  class="flex items-center justify-center text-sm text-gray-500"
+                >
+                  <UIcon
+                    name="i-lucide-loader-2"
+                    class="w-4 h-4 animate-spin mr-2"
+                  />
+                  {{ t('records.filters.loadingSuggestions') }}
+                </div>
+              </div>
+            </div>
           </form>
         </div>
 

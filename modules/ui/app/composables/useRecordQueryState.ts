@@ -1,16 +1,19 @@
-export type RecordSortOption =
-  | 'relevance'
-  | 'updated_desc'
-  | 'created_desc'
-  | 'title_asc'
-  | 'title_desc';
+// TODO: Add RecordSortOption type back when sort is implemented at API/DB level
+// export type RecordSortOption =
+//   | 'relevance'
+//   | 'updated_desc'
+//   | 'created_desc'
+//   | 'title_asc'
+//   | 'title_desc';
 
 export interface RecordQueryState {
   search?: string;
   types?: string[];
   statuses?: string[];
   page?: number;
-  sort?: RecordSortOption;
+  pageSize?: number;
+  // TODO: Add sort back when implemented at API/DB level
+  // sort?: RecordSortOption;
 }
 
 /**
@@ -27,7 +30,10 @@ export function buildQueryFromState(
   if (state.statuses && state.statuses.length > 0)
     query.statuses = state.statuses.join(',');
   if (state.page && state.page > 1) query.page = String(state.page);
-  if (state.sort && state.sort !== 'relevance') query.sort = state.sort;
+  if (state.pageSize && state.pageSize !== 50)
+    query.pageSize = String(state.pageSize);
+  // TODO: Add sort back when implemented at API/DB level
+  // if (state.sort && state.sort !== 'relevance') query.sort = state.sort;
 
   return query;
 }
@@ -49,8 +55,13 @@ export function parseQueryToState(route: {
     const parsed = Number(q.page);
     if (!Number.isNaN(parsed) && parsed > 0) result.page = parsed;
   }
-  if (q.sort && typeof q.sort === 'string')
-    result.sort = q.sort as RecordSortOption;
+  if (q.pageSize) {
+    const parsed = Number(q.pageSize);
+    if (!Number.isNaN(parsed) && parsed > 0) result.pageSize = parsed;
+  }
+  // TODO: Add sort back when implemented at API/DB level
+  // if (q.sort && typeof q.sort === 'string')
+  //   result.sort = q.sort as RecordSortOption;
 
   return result;
 }

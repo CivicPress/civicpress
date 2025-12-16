@@ -596,75 +596,50 @@ export class RecordsService {
       type?: string;
       status?: string;
       limit?: number;
-      cursor?: string;
+      page?: number;
     } = {},
     user?: any
   ): Promise<{
     records: any[];
-    nextCursor: string | null;
-    hasMore: boolean;
-    total: number;
+    totalCount: number;
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
   }> {
-    const { type, status, limit = 20, cursor } = options;
+    const { type, status, limit = 50, page = 1 } = options;
 
-    // Get all records from the record manager
+    // Calculate offset from page number (page is 1-based)
+    const offset = (page - 1) * limit;
+
+    // Get records from the record manager with pagination
+    // Note: For proper kind priority sorting, we need to fetch all matching records,
+    // sort them, then paginate. However, this is inefficient for large datasets.
+    // For now, we'll fetch a reasonable page size from DB, then sort in memory.
+    // TODO: Optimize by moving kind priority sorting to database level if possible
     const result = await this.recordManager.listRecords({
       type,
       status,
-      limit: 1000, // Get a large number of records for cursor-based pagination
-      offset: undefined,
+      limit: limit,
+      offset: offset,
     });
 
-    // Apply filters to the records array
-    let filteredRecords = result.records;
-
-    if (type) {
-      const types = type.split(',').map((t) => t.trim());
-      filteredRecords = filteredRecords.filter((record: any) =>
-        types.includes(record.type)
-      );
-    }
-
-    if (status) {
-      const statuses = status.split(',').map((s) => s.trim());
-      filteredRecords = filteredRecords.filter((record: any) =>
-        statuses.includes(record.status)
-      );
-    }
-
-    // Sort records by kind priority first (record -> chapter -> root)
-    // Then by creation date (newest first) for consistent cursor behavior
-    filteredRecords.sort((a: any, b: any) => {
-      // First sort by kind priority
+    // Note: Database already handles type/status filtering and basic pagination
+    // We apply kind priority sorting in memory (within the current page)
+    // TODO: Optimize by moving kind priority sorting to database level if possible
+    const records = result.records.sort((a: any, b: any) => {
+      // First sort by kind priority (record -> chapter -> root)
       const priorityA = this.getKindPriority(a);
       const priorityB = this.getKindPriority(b);
       if (priorityA !== priorityB) {
         return priorityA - priorityB;
       }
-      // If same priority, sort by creation date (newest first)
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      // If same priority, maintain DB order (created_at DESC)
+      return 0; // DB already sorted by created_at DESC
     });
 
-    // Find the starting index based on cursor
-    let startIndex = 0;
-    if (cursor) {
-      const cursorIndex = filteredRecords.findIndex(
-        (record: any) => record.id === cursor
-      );
-      if (cursorIndex !== -1) {
-        startIndex = cursorIndex + 1; // Start after the cursor
-      }
-    }
-
-    // Get the requested number of records
-    const endIndex = startIndex + limit;
-    const records = filteredRecords.slice(startIndex, endIndex);
-
-    // Determine if there are more records
-    const hasMore = endIndex < filteredRecords.length;
-    const nextCursor = hasMore ? records[records.length - 1]?.id || null : null;
+    // Calculate total pages from total count
+    const totalCount = result.total;
+    const totalPages = Math.ceil(totalCount / limit);
 
     // Check if user has permission and if there are drafts for these records
     let draftIds = new Set<string>();
@@ -743,14 +718,15 @@ export class RecordsService {
 
     return {
       records: transformedRecords,
-      nextCursor,
-      hasMore,
-      total: filteredRecords.length,
+      totalCount,
+      currentPage: page,
+      totalPages,
+      pageSize: limit,
     };
   }
 
   /**
-   * Search records with offset-based pagination (more efficient than cursor-based for search)
+   * Search records with page-based pagination
    */
   async searchRecords(
     query: string,
@@ -758,50 +734,49 @@ export class RecordsService {
       type?: string;
       status?: string;
       limit?: number;
-      cursor?: string;
+      page?: number;
     } = {},
     user?: any
   ): Promise<{
     records: any[];
-    nextCursor: string | null;
-    hasMore: boolean;
+    totalCount: number;
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
   }> {
-    const { type, status, limit = 20, cursor } = options;
+    const { type, status, limit = 50, page = 1 } = options;
 
-    // Convert cursor to offset for simpler pagination
-    let offset = 0;
-    if (cursor) {
-      // For now, we'll use a simple approach: assume cursor is the last record ID
-      // In a real implementation, you'd store cursor->offset mapping or use a different approach
-      offset = parseInt(cursor) || 0;
-    }
+    // Calculate offset from page number (page is 1-based)
+    const offset = (page - 1) * limit;
 
     // Get search results with proper pagination
     const result = await this.recordManager.searchRecords(query, {
       type,
       status,
-      limit: limit + 1, // Get one extra to determine if there are more results
-      offset,
+      limit: limit,
+      offset: offset,
     });
 
     // Sort search results by kind priority (record -> chapter -> root)
     // Then by creation date as secondary sort
+    // Note: This sorting happens in memory after pagination
+    // TODO: Move kind priority sorting to database level (see Limitation 2 fix)
     result.records.sort((a: any, b: any) => {
       const priorityA = this.getKindPriority(a);
       const priorityB = this.getKindPriority(b);
       if (priorityA !== priorityB) {
         return priorityA - priorityB;
       }
-      // If same priority, sort by creation date (newest first)
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      // If same priority, maintain database order (already sorted by relevance/date)
+      return 0;
     });
 
-    // Determine if there are more records
-    const hasMore = result.records.length > limit;
-    const records = hasMore ? result.records.slice(0, limit) : result.records;
-    const nextCursor = hasMore ? (offset + limit).toString() : null;
+    // Get sorted records
+    const records = result.records;
+
+    // Calculate total pages from total count
+    const totalCount = result.total;
+    const totalPages = Math.ceil(totalCount / limit);
 
     // Check if user has permission and if there are drafts for these records
     let draftIds = new Set<string>();
@@ -877,8 +852,10 @@ export class RecordsService {
 
     return {
       records: transformedRecords,
-      nextCursor,
-      hasMore,
+      totalCount,
+      currentPage: page,
+      totalPages,
+      pageSize: limit,
     };
   }
 

@@ -329,6 +329,130 @@ describe('API Records Integration', () => {
     });
   });
 
+  describe('GET /api/v1/records - Pagination', () => {
+    it('should return paginated results with page=1 and limit=10', async () => {
+      const response = await request(context.api.getApp())
+        .get('/api/v1/records?page=1&limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('records');
+      expect(response.body.data).toHaveProperty('currentPage', 1);
+      expect(response.body.data).toHaveProperty('totalPages');
+      expect(response.body.data).toHaveProperty('totalCount');
+      expect(response.body.data).toHaveProperty('pageSize', 10);
+      expect(Array.isArray(response.body.data.records)).toBe(true);
+      expect(response.body.data.records.length).toBeLessThanOrEqual(10);
+    });
+
+    it('should return different records for page=2', async () => {
+      // Get first page
+      const page1Response = await request(context.api.getApp())
+        .get('/api/v1/records?page=1&limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(page1Response.status).toBe(200);
+      const page1Ids = page1Response.body.data.records.map((r: any) => r.id);
+
+      // Get second page
+      const page2Response = await request(context.api.getApp())
+        .get('/api/v1/records?page=2&limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(page2Response.status).toBe(200);
+      expect(page2Response.body.data.currentPage).toBe(2);
+      const page2Ids = page2Response.body.data.records.map((r: any) => r.id);
+
+      // Verify no duplicates between pages
+      const intersection = page1Ids.filter((id: string) =>
+        page2Ids.includes(id)
+      );
+      expect(intersection.length).toBe(0);
+    });
+
+    it('should include correct pagination fields in response', async () => {
+      const response = await request(context.api.getApp())
+        .get('/api/v1/records?page=1&limit=25')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveProperty('currentPage');
+      expect(response.body.data).toHaveProperty('totalPages');
+      expect(response.body.data).toHaveProperty('totalCount');
+      expect(response.body.data).toHaveProperty('pageSize', 25);
+      expect(response.body.data).toHaveProperty('records');
+
+      // Verify totalPages calculation
+      const { totalCount, pageSize, totalPages } = response.body.data;
+      expect(totalPages).toBe(Math.ceil(totalCount / pageSize));
+    });
+
+    it('should default to page=1 and limit=50 when no params provided', async () => {
+      const response = await request(context.api.getApp())
+        .get('/api/v1/records')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.currentPage).toBe(1);
+      expect(response.body.data.pageSize).toBe(50);
+      expect(response.body.data.records.length).toBeLessThanOrEqual(50);
+    });
+
+    it('should work with type filter and pagination', async () => {
+      const response = await request(context.api.getApp())
+        .get('/api/v1/records?type=policy&page=1&limit=5')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.currentPage).toBe(1);
+      expect(response.body.data.pageSize).toBe(5);
+      // Verify all returned records match the type filter
+      response.body.data.records.forEach((record: any) => {
+        expect(record.type).toBe('policy');
+      });
+      // Verify totalCount reflects filtered count
+      expect(response.body.data.totalCount).toBeGreaterThanOrEqual(
+        response.body.data.records.length
+      );
+    });
+
+    it('should handle empty results gracefully', async () => {
+      // Search for a type that likely doesn't exist
+      const response = await request(context.api.getApp())
+        .get('/api/v1/records?type=nonexistenttype12345&page=1&limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.records).toEqual([]);
+      expect(response.body.data.totalCount).toBe(0);
+      expect(response.body.data.totalPages).toBe(0);
+      expect(response.body.data.currentPage).toBe(1);
+    });
+
+    it('should handle page beyond available pages', async () => {
+      // First, get total pages
+      const firstResponse = await request(context.api.getApp())
+        .get('/api/v1/records?page=1&limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(firstResponse.status).toBe(200);
+      const totalPages = firstResponse.body.data.totalPages;
+
+      if (totalPages > 0) {
+        // Try to access a page beyond available pages
+        const response = await request(context.api.getApp())
+          .get(`/api/v1/records?page=${totalPages + 10}&limit=10`)
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.currentPage).toBe(totalPages + 10);
+        // Should return empty array or handle gracefully
+        expect(Array.isArray(response.body.data.records)).toBe(true);
+      }
+    });
+  });
+
   describe('GET /api/v1/records/drafts - List Drafts', () => {
     it('should list user drafts when authenticated', async () => {
       const response = await request(context.api.getApp())
@@ -1217,6 +1341,185 @@ describe('API Records Integration', () => {
       expect(record).toBeDefined();
       // Public users should not see hasUnpublishedChanges
       expect(record.hasUnpublishedChanges).toBeUndefined();
+    });
+
+    describe('GET /api/v1/search - Pagination', () => {
+      // Create some test records for search pagination tests
+      let testRecordIds: string[] = [];
+
+      beforeEach(async () => {
+        // Create multiple test records with searchable content
+        testRecordIds = [];
+        for (let i = 1; i <= 15; i++) {
+          const response = await request(context.api.getApp())
+            .post('/api/v1/records')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+              type: 'policy',
+              title: `Search Pagination Test Record ${i}`,
+              content: `# Search Pagination Test Record ${i}
+
+Content for pagination test.`,
+            });
+          if (response.status === 201) {
+            testRecordIds.push(response.body.data.id);
+            // Publish the record
+            await request(context.api.getApp())
+              .post(`/api/v1/records/${response.body.data.id}/publish`)
+              .set('Authorization', `Bearer ${adminToken}`)
+              .send({ status: 'published' });
+          }
+        }
+        // Wait a bit for indexing to complete before running tests
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      it('should return paginated search results with page=1 and limit=10', async () => {
+        const response = await request(context.api.getApp())
+          .get('/api/v1/search?q=Search Pagination Test&page=1&limit=10')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(response.body.data).toHaveProperty('results');
+        expect(response.body.data).toHaveProperty('currentPage', 1);
+        expect(response.body.data).toHaveProperty('totalPages');
+        expect(response.body.data).toHaveProperty('totalCount');
+        expect(response.body.data).toHaveProperty('pageSize', 10);
+        expect(response.body.data).toHaveProperty(
+          'query',
+          'Search Pagination Test'
+        );
+        expect(Array.isArray(response.body.data.results)).toBe(true);
+        expect(response.body.data.results.length).toBeLessThanOrEqual(10);
+      });
+
+      it('should return different results for page=2', async () => {
+        // Get first page
+        const page1Response = await request(context.api.getApp())
+          .get('/api/v1/search?q=Search Pagination Test&page=1&limit=10')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(page1Response.status).toBe(200);
+        const page1Ids = page1Response.body.data.results.map((r: any) => r.id);
+
+        // Get second page
+        const page2Response = await request(context.api.getApp())
+          .get('/api/v1/search?q=Search Pagination Test&page=2&limit=10')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(page2Response.status).toBe(200);
+        expect(page2Response.body.data.currentPage).toBe(2);
+        const page2Ids = page2Response.body.data.results.map((r: any) => r.id);
+
+        // Verify no duplicates between pages
+        const intersection = page1Ids.filter((id: string) =>
+          page2Ids.includes(id)
+        );
+        expect(intersection.length).toBe(0);
+      });
+
+      it('should include correct pagination fields in search response', async () => {
+        const response = await request(context.api.getApp())
+          .get('/api/v1/search?q=Search Pagination Test&page=1&limit=5')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.data).toHaveProperty('currentPage');
+        expect(response.body.data).toHaveProperty('totalPages');
+        expect(response.body.data).toHaveProperty('totalCount');
+        expect(response.body.data).toHaveProperty('pageSize', 5);
+        expect(response.body.data).toHaveProperty('results');
+        expect(response.body.data).toHaveProperty('query');
+
+        // Verify totalPages calculation
+        const { totalCount, pageSize, totalPages } = response.body.data;
+        expect(totalPages).toBe(Math.ceil(totalCount / pageSize));
+      });
+
+      it('should default to page=1 and limit=50 for search when no params provided', async () => {
+        const response = await request(context.api.getApp())
+          .get('/api/v1/search?q=Search Pagination Test')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.currentPage).toBe(1);
+        expect(response.body.data.pageSize).toBe(50);
+        expect(response.body.data.results.length).toBeLessThanOrEqual(50);
+      });
+
+      it('should work with type filter and search pagination', async () => {
+        const response = await request(context.api.getApp())
+          .get(
+            '/api/v1/search?q=Search Pagination Test&type=policy&page=1&limit=5'
+          )
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.currentPage).toBe(1);
+        expect(response.body.data.pageSize).toBe(5);
+        // Verify all returned records match the type filter
+        response.body.data.results.forEach((record: any) => {
+          expect(record.type).toBe('policy');
+        });
+        // Verify totalCount reflects filtered count
+        expect(response.body.data.totalCount).toBeGreaterThanOrEqual(
+          response.body.data.results.length
+        );
+      });
+
+      it('should handle empty search results gracefully', async () => {
+        const response = await request(context.api.getApp())
+          .get('/api/v1/search?q=NonexistentSearchTerm12345XYZ&page=1&limit=10')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.results).toEqual([]);
+        expect(response.body.data.totalCount).toBe(0);
+        expect(response.body.data.totalPages).toBe(0);
+        expect(response.body.data.currentPage).toBe(1);
+        expect(response.body.data.query).toBe('NonexistentSearchTerm12345XYZ');
+      });
+
+      it('should handle search with exactly limit results', async () => {
+        // Search and get first page with limit
+        const response = await request(context.api.getApp())
+          .get('/api/v1/search?q=Search Pagination Test&page=1&limit=10')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(response.status).toBe(200);
+        const totalCount = response.body.data.totalCount;
+
+        if (totalCount >= 10) {
+          // If we have at least 10 results, verify pagination
+          expect(response.body.data.results.length).toBeLessThanOrEqual(10);
+          expect(response.body.data.totalPages).toBeGreaterThanOrEqual(1);
+        }
+      });
+
+      it('should handle page beyond available search results', async () => {
+        // First, get total pages for search
+        const firstResponse = await request(context.api.getApp())
+          .get('/api/v1/search?q=Search Pagination Test&page=1&limit=10')
+          .set('Authorization', `Bearer ${adminToken}`);
+
+        expect(firstResponse.status).toBe(200);
+        const totalPages = firstResponse.body.data.totalPages;
+
+        if (totalPages > 0) {
+          // Try to access a page beyond available pages
+          const response = await request(context.api.getApp())
+            .get(
+              `/api/v1/search?q=Search Pagination Test&page=${totalPages + 10}&limit=10`
+            )
+            .set('Authorization', `Bearer ${adminToken}`);
+
+          expect(response.status).toBe(200);
+          expect(response.body.data.currentPage).toBe(totalPages + 10);
+          // Should return empty array or handle gracefully
+          expect(Array.isArray(response.body.data.results)).toBe(true);
+        }
+      });
     });
   });
 });

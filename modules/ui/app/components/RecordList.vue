@@ -14,28 +14,26 @@ interface Props {
   };
   searchQuery?: string;
   breadcrumbsRef?: Ref<HTMLElement | undefined>;
-  sort?:
-    | 'relevance'
-    | 'updated_desc'
-    | 'created_desc'
-    | 'title_asc'
-    | 'title_desc';
   isSearching?: boolean; // True when user is typing or search is in progress
+  currentPage?: number; // Current page number (from parent)
+  pageSize?: number; // Records per page
 }
 
 const props = withDefaults(defineProps<Props>(), {
   recordType: null,
   filters: () => ({}),
   searchQuery: '',
-  sort: 'relevance',
   isSearching: false,
+  currentPage: 1,
+  pageSize: 50,
 });
 
 // Emits
 const emit = defineEmits<{
-  loadMore: [];
   recordClick: [record: CivicRecord];
   resetFilters: [];
+  pageChange: [page: number];
+  pageSizeChange: [pageSize: number];
 }>();
 
 // Store
@@ -81,22 +79,11 @@ const createSummary = (record: CivicRecord): string => {
     : normalized;
 };
 
-// Helper function to get kind priority for sorting
-// Priority: record (no kind) = 1, chapter = 2, root = 3
-// Lower priority number = appears first in list
-const getKindPriority = (record: any): number => {
-  // Check both direct and nested metadata paths
-  // Some records have kind at metadata.kind, others at metadata.metadata.kind
-  const kind = record.metadata?.kind || record.metadata?.metadata?.kind;
-  if (kind === 'root') return 3; // Root documents last
-  if (kind === 'chapter') return 2; // Chapters in middle
-  return 1; // Regular records first
-};
-
 const processedRecords = computed(() => {
-  const base = displayRecords.value.map((record) => {
-    // Preserve all record properties including hasUnpublishedChanges
-    const processed = {
+  // API already handles sorting (kind priority + created_at for listings, relevance for searches)
+  // No client-side sorting needed - just format the records for display
+  return displayRecords.value.map((record) => {
+    return {
       ...record,
       formattedDate: formatDate(record.created_at),
       statusColor: getStatusColor(record.status),
@@ -105,38 +92,6 @@ const processedRecords = computed(() => {
       typeLabel: getTypeLabel(record.type),
       summary: createSummary(record),
     };
-    return processed;
-  });
-
-  // Sort by kind priority FIRST (primary sort)
-  // This ensures: record -> chapter -> root document order
-  // Then apply selected sort option as secondary sort within each kind group
-  return base.sort((a, b) => {
-    // Primary sort: kind priority (record=1, chapter=2, root=3)
-    const priorityA = getKindPriority(a);
-    const priorityB = getKindPriority(b);
-    if (priorityA !== priorityB) {
-      return priorityA - priorityB;
-    }
-
-    // Secondary sort: selected sort option within same kind group
-    switch (props.sort) {
-      case 'updated_desc':
-        return (
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-        );
-      case 'created_desc':
-        return (
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-      case 'title_asc':
-        return a.title.localeCompare(b.title);
-      case 'title_desc':
-        return b.title.localeCompare(a.title);
-      default:
-        // For 'relevance', maintain API order (already sorted by kind+date)
-        return 0;
-    }
   });
 });
 
@@ -155,37 +110,10 @@ const shouldHideRecords = computed(() => {
   );
 });
 
-// Check if we should show "Load More" button
-const shouldShowLoadMore = computed(() => {
-  return (
-    recordsStore.hasMore &&
-    displayRecords.value.length > 0 &&
-    !recordsStore.isLoading
-  );
-});
-
 const canCreateRecords = computed(() => {
   const role = authStore.currentUser?.role;
   return role === 'admin' || role === 'clerk';
 });
-
-// Load more records
-const loadMoreRecords = async () => {
-  if (!recordsStore.hasMore || recordsStore.isLoading) return;
-
-  loading.value = true;
-  try {
-    await recordsStore.loadMoreRecords({
-      type: props.filters?.types?.join(','),
-      status: props.filters?.statuses?.join(','),
-    });
-    emit('loadMore');
-  } catch (error) {
-    console.error('Error loading more records:', error);
-  } finally {
-    loading.value = false;
-  }
-};
 
 const resetFilters = () => {
   emit('resetFilters');
@@ -205,20 +133,7 @@ const navigateToRecord = (record: CivicRecord) => {
   navigateTo(`/records/${record.type}/${record.id}`);
 };
 
-// Simple pagination for large datasets instead of virtual scrolling
-const itemsPerPage = 50;
-const currentPage = ref(1);
-
-const paginatedRecords = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
-  return processedRecords.value.slice(start, end);
-});
-
-const totalPages = computed(() =>
-  Math.ceil(displayRecords.value.length / itemsPerPage)
-);
-
+// Pagination helpers
 const scrollToTop = () => {
   // Scroll to the breadcrumbs instead of the very top
   if (props.breadcrumbsRef?.value) {
@@ -229,17 +144,52 @@ const scrollToTop = () => {
   }
 };
 
-const nextPage = () => {
-  if (currentPage.value < totalPages.value) {
-    currentPage.value++;
-    scrollToTop();
+// Get pagination info from store
+const totalPages = computed(() => recordsStore.totalPages);
+const totalCount = computed(() => recordsStore.totalCount);
+const currentPageNum = computed(
+  () => props.currentPage || recordsStore.currentPage
+);
+
+// Calculate "Showing X-Y of Z" range
+const showingRange = computed(() => {
+  if (totalCount.value === 0) return { start: 0, end: 0 };
+  const pageSize = props.pageSize || 50;
+  const start = (currentPageNum.value - 1) * pageSize + 1;
+  const end = Math.min(
+    start + displayRecords.value.length - 1,
+    totalCount.value
+  );
+  return { start, end };
+});
+
+// Handle page changes
+const handlePageChange = (newPage: number) => {
+  if (newPage >= 1 && newPage <= totalPages.value) {
+    emit('pageChange', newPage);
+    // Don't call scrollToTop here - let the parent handle it after data loads
   }
 };
 
-const prevPage = () => {
-  if (currentPage.value > 1) {
-    currentPage.value--;
-    scrollToTop();
+const handlePageSizeChange = (value: any) => {
+  // USelectMenu passes SelectMenuItem, but with simple number options it may be the number directly
+  // Extract number value - handle both direct number and SelectMenuItem object
+  let pageSize: number;
+  if (typeof value === 'number') {
+    pageSize = value;
+  } else if (typeof value === 'string') {
+    pageSize = parseInt(value, 10);
+  } else if (value && typeof value === 'object' && 'value' in value) {
+    pageSize =
+      typeof value.value === 'number'
+        ? value.value
+        : parseInt(String(value.value), 10);
+  } else {
+    pageSize = 50; // default fallback
+  }
+
+  if (!isNaN(pageSize) && pageSize > 0) {
+    emit('pageSizeChange', pageSize);
   }
 };
 
@@ -276,148 +226,8 @@ onMounted(async () => {
 
       <!-- Show existing records if we have them and not searching -->
       <div v-else-if="displayRecords.length > 0" class="space-y-6">
-        <!-- Pagination for Large Lists -->
-        <div v-if="displayRecords.length > 50" class="space-y-6">
-          <!-- Paginated Records -->
-          <div class="space-y-6">
-            <UCard
-              v-for="record in paginatedRecords"
-              :key="record.id"
-              :ui="{ body: 'p-0' }"
-              class="hover:shadow-md transition-shadow cursor-pointer"
-              @click="navigateToRecord(record)"
-            >
-              <div class="px-6 py-4">
-                <div class="flex items-start justify-between gap-4">
-                  <div class="flex items-start gap-4">
-                    <!-- Type Icon -->
-                    <div class="flex-shrink-0 mt-1">
-                      <UIcon
-                        :name="record.typeIcon"
-                        class="w-4 h-4 text-gray-400"
-                      />
-                    </div>
-
-                    <!-- Record Info -->
-                    <div class="flex-1 min-w-0">
-                      <h3
-                        class="text-xl font-semibold leading-tight text-gray-900 dark:text-white line-clamp-2"
-                      >
-                        {{ record.title }}
-                      </h3>
-                      <p
-                        v-if="record.summary"
-                        class="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 leading-snug"
-                      >
-                        {{ record.summary }}
-                      </p>
-                      <div
-                        class="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400"
-                      >
-                        <UBadge
-                          size="xs"
-                          color="neutral"
-                          variant="soft"
-                          class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-300"
-                        >
-                          <UIcon
-                            :name="record.typeIcon"
-                            class="w-3 h-3 text-gray-400"
-                          />
-                          <span>{{ record.typeLabel }}</span>
-                        </UBadge>
-                        <UBadge
-                          v-if="
-                            authStore.hasPermission('records:edit') &&
-                            record.hasUnpublishedChanges
-                          "
-                          size="xs"
-                          color="error"
-                          variant="soft"
-                          class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-300"
-                        >
-                          <UIcon name="i-lucide-file-edit" class="w-3 h-3" />
-                          {{ t('records.unpublishedChanges') }}
-                        </UBadge>
-                        <span
-                          class="flex items-center gap-1 text-gray-500 dark:text-gray-400"
-                        >
-                          <UIcon
-                            name="i-lucide-calendar"
-                            class="w-3 h-3 text-gray-400"
-                          />
-                          {{ record.formattedDate }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <span
-                    class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-200 dark:text-green-200 dark:ring-green-800"
-                  >
-                    <UIcon
-                      name="i-lucide-badge-check"
-                      class="w-4 h-4 text-current"
-                    />
-                    {{ record.statusLabel }}
-                  </span>
-                </div>
-
-                <div
-                  v-if="
-                    record.metadata?.tags && record.metadata.tags.length > 0
-                  "
-                  class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800"
-                >
-                  <div class="flex flex-wrap gap-1">
-                    <UBadge
-                      v-for="tag in record.metadata.tags"
-                      :key="tag"
-                      color="neutral"
-                      variant="soft"
-                      size="xs"
-                    >
-                      {{ tag }}
-                    </UBadge>
-                  </div>
-                </div>
-              </div>
-            </UCard>
-          </div>
-
-          <!-- Pagination Controls -->
-          <div class="flex items-center justify-between">
-            <UButton
-              @click="prevPage"
-              :disabled="currentPage === 1"
-              variant="outline"
-              size="sm"
-            >
-              <UIcon name="i-lucide-chevron-left" class="w-4 h-4 mr-1" />
-              {{ t('common.previous') }}
-            </UButton>
-            <span class="text-sm text-gray-600 dark:text-gray-400">
-              {{
-                t('records.pagination.pageOf', {
-                  current: currentPage,
-                  total: totalPages,
-                })
-              }}
-            </span>
-            <UButton
-              @click="nextPage"
-              :disabled="currentPage === totalPages"
-              variant="outline"
-              size="sm"
-            >
-              {{ t('common.next') }}
-              <UIcon name="i-lucide-chevron-right" class="w-4 h-4 ml-1" />
-            </UButton>
-          </div>
-        </div>
-
-        <!-- Regular List for Smaller Datasets -->
-        <div v-else class="space-y-6">
+        <!-- Records List -->
+        <div class="space-y-6">
           <UCard
             v-for="record in processedRecords"
             :key="record.id"
@@ -472,7 +282,7 @@ onMounted(async () => {
                         size="xs"
                         color="error"
                         variant="soft"
-                        class="flex items-center gap-1"
+                        class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-300"
                       >
                         <UIcon name="i-lucide-file-edit" class="w-3 h-3" />
                         {{ t('records.unpublishedChanges') }}
@@ -519,6 +329,47 @@ onMounted(async () => {
               </div>
             </div>
           </UCard>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div
+          v-if="totalPages > 1"
+          class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-gray-800"
+        >
+          <!-- Showing X-Y of Z results -->
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            {{
+              t('records.pagination.showing', {
+                start: showingRange.start,
+                end: showingRange.end,
+                total: totalCount,
+              })
+            }}
+          </div>
+
+          <!-- Page Size Selector -->
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-600 dark:text-gray-400">
+              {{ t('records.pagination.perPage') }}
+            </span>
+            <USelectMenu
+              :model-value="props.pageSize"
+              :options="[10, 25, 50, 100]"
+              @update:model-value="handlePageSizeChange"
+              class="w-20"
+            />
+          </div>
+
+          <!-- Page Navigation using UPagination -->
+          <UPagination
+            :page="currentPageNum"
+            :total="totalCount"
+            :items-per-page="props.pageSize"
+            :sibling-count="2"
+            :show-edges="totalPages > 7"
+            size="sm"
+            @update:page="handlePageChange"
+          />
         </div>
       </div>
 
@@ -587,19 +438,6 @@ onMounted(async () => {
           >Loading more records...</span
         >
       </div>
-    </div>
-
-    <!-- Load More Button -->
-    <div v-if="shouldShowLoadMore" class="text-center py-6">
-      <UButton
-        @click="loadMoreRecords"
-        color="primary"
-        variant="outline"
-        size="lg"
-      >
-        <UIcon name="i-lucide-plus" class="w-4 h-4 mr-2" />
-        Load More Records
-      </UButton>
     </div>
 
     <!-- Error Display -->

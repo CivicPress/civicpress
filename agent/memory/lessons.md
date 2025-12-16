@@ -45,7 +45,8 @@
 - **Virtual Scrolling**: For datasets > 50 records to maintain performance
 - **Skeleton Loading**: Better perceived performance than spinners
 - **Debounced Search**: 300ms delay to prevent excessive API calls
-- **Lazy Loading**: Load more records on demand with cursor-based pagination
+- **Pagination**: Server-side page-based pagination with URL state management
+  (cursor-based removed)
 
 ### Record Editor UI Patterns 📝
 

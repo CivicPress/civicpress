@@ -27,11 +27,70 @@
   - API includes `hasUnpublishedChanges` flag for efficient draft detection
   - Edit mode support with `?edit=true` query parameter
   - Comprehensive test coverage (13 new tests)
+- **Pagination System Overhaul**: Complete page-based pagination implementation
+  - Unified server-side pagination across all record listings and search
+  - URL state management for page and pageSize parameters
+  - Pagination controls with page numbers, page size selector, and result counts
+  - Search pagination fixed (Limitation 1 - completed)
+  - Pagination scroll-to-top functionality
+  - Fixed multiple API calls during pagination on type index pages
+  - Removed client-side pagination complexity
+- **Search UX Improvements**: Enhanced search user experience
+  - Explicit search submission (no list refresh while typing)
+  - Search suggestions only visible when input has focus
+  - Search suggestions added to home page
+  - Improved autocomplete behavior and interaction
+- **Code Quality Improvements**: Removed redundant and misleading features
+  - Removed kind priority sorting from UI (now handled exclusively by API)
+  - Removed sort dropdown from UI (was misleading - only sorted current page)
+  - Simplified RecordList component logic
+  - Cleaner separation of concerns (API handles sorting, UI handles display)
 - **Documentation Cleanup**: Removed outdated analysis and test planning
   documents
   - Merged architecture documents into single source of truth
   - Updated documentation to reflect implemented features
   - Created feature documentation for new capabilities
+
+### Immediate Tasks (Next 1-2 weeks)
+
+#### Sort Options Feature (Removed from UI - TODO: API/DB Implementation)
+
+- [ ] **Implement sort options at API/DB level**
+  - **Status**: ⏳ Planned
+  - **Context**: Sort dropdown removed from UI because it only sorted current
+    page (misleading UX)
+  - **Requirements**:
+    - Add `sort` parameter to `/api/v1/records` and `/api/v1/search` endpoints
+    - Implement database-level sorting in queries (ORDER BY clauses)
+    - Ensure kind priority remains primary sort, user sort is secondary
+    - Support sort options: `updated_desc`, `created_desc`, `title_asc`,
+      `title_desc`, `relevance`
+    - **Search Results Relevance**:
+      - For search: `relevance` uses existing relevance scoring system
+      - Relevance scores include: BM25 score, field match weights (title 10x,
+        tags 5x, content 1x), recency score
+      - These scores are already calculated in `sqlite-search-service.ts` and
+        returned in `_search.relevance_score`
+      - Sort by relevance should use these scores:
+        `ORDER BY kind_priority ASC, relevance_score DESC`
+    - **List Results Relevance**:
+      - For listings (non-search): `relevance` maintains default API order (kind
+        priority + created_at DESC)
+    - **User Sort Options**:
+      - `updated_desc`:
+        `ORDER BY kind_priority ASC, updated_at DESC, created_at DESC`
+      - `created_desc`: `ORDER BY kind_priority ASC, created_at DESC` (same as
+        default)
+      - `title_asc`: `ORDER BY kind_priority ASC, title ASC, created_at DESC`
+      - `title_desc`: `ORDER BY kind_priority ASC, title DESC, created_at DESC`
+  - **Database Implementation**:
+    - Add CASE statement in ORDER BY for user sort options
+    - Ensure kind_priority is always first in ORDER BY (primary sort)
+    - User sort becomes secondary sort within same kind priority
+    - For search: Include relevance_score in ORDER BY when sort='relevance'
+  - **Estimated Effort**: 3-4 hours
+  - **Note**: Sort dropdown removed from UI (completed), pending API/DB
+    implementation
 
 ### Immediate Tasks (Next 1-2 weeks)
 
@@ -59,16 +118,24 @@
 - [x] **Fix documentation file name mismatch** - Complete
   - **Status**: ✅ Fixed - All references updated to `api-logger.ts`
 
-#### UI Pagination Bug Fix
+#### UI Pagination Implementation ✅ COMPLETED
 
-- [ ] **Verify and fix client-side pagination in UI**
-      (`modules/ui/app/pages/records/index.vue`)
-  - **Issue**: Pagination and "records per page" not working correctly
-  - **Problem**: Mixing client-side and server-side pagination logic
-  - **Impact**: Users can't navigate pages or change page size properly
-  - **Priority**: High - affects core UI functionality
-  - **Status**: Server-side pagination works, client-side needs fixing
-  - **Note**: Code shows pagination implementation exists, needs verification
+- [x] **Page-based pagination system** - Complete
+  - **Status**: ✅ Fully implemented and working
+  - **Implementation**: Unified server-side pagination across all record
+    listings
+  - **Features**:
+    - Page-based pagination with URL state management
+    - Page size selector (10, 25, 50, 100 records per page)
+    - Pagination controls with page numbers
+    - Result count display ("Showing X-Y of Z results")
+    - Scroll-to-top on page change
+    - Works on both main records page and type-specific pages
+  - **API Integration**: Both `/api/v1/records` and `/api/v1/search` support
+    page-based pagination
+  - **Search Pagination**: Fixed Limitation 1 - search now properly paginated
+  - **Reference**: `docs/analysis-pagination-limitations-fix.md` (Limitation 1
+    marked as complete)
 
 #### Diff API Implementation
 

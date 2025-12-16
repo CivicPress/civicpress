@@ -42,9 +42,11 @@ You are the CivicPress coding assistant. Always follow these rails:
 - When running tests for a specific file, always use:
   `pnpm vitest run --related {file}` where `{file}` is the file currently being
   edited or referenced.
-- When the user does not specify a file, default to: `pnpm run test:run`
-  (single-run for the whole suite)
-- Never use `pnpm run test` or any watch/interactive mode unless the user
-  explicitly requests “watch mode”.
+- When the user does not specify a file, default to: `pnpm run test` (runs all
+  tests: API/core/CLI + UI tests)
+- For API/core/CLI tests only, use: `pnpm run test:api`
+- For UI tests only, use: `pnpm run test:ui:run`
+- Never use watch/interactive mode unless the user explicitly requests "watch
+  mode".
 - Always prefer file-scoped or related test runs over running the entire suite
   for performance.

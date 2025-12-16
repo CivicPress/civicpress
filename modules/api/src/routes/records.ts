@@ -59,17 +59,21 @@ export function createRecordsRouter(recordsService: RecordsService) {
       logApiRequest(req, { operation });
 
       try {
-        const { type, limit, cursor } = req.query;
+        const { type, limit, page } = req.query;
 
         // Query only records table - all records there are published (by table location)
         // No status filtering needed - table location determines if record is published
+
+        // Parse pagination parameters
+        const pageSize = limit ? parseInt(limit as string) : 50;
+        const currentPage = page ? parseInt(page as string) : 1;
 
         logger.info(
           `Listing records (${isAuthenticated ? 'authenticated' : 'public'})`,
           {
             type,
-            limit,
-            cursor: cursor ? '***' : undefined, // Don't log the actual cursor
+            pageSize,
+            currentPage,
             requestId: (req as any).requestId,
             userId: (req as any).user?.id,
             userRole: (req as any).user?.role,
@@ -81,8 +85,8 @@ export function createRecordsRouter(recordsService: RecordsService) {
           {
             type: type as string,
             // No status filter - table location (records table) determines published state
-            limit: limit ? parseInt(limit as string) : 20,
-            cursor: cursor as string,
+            limit: pageSize,
+            page: currentPage,
           },
           (req as any).user
         );
@@ -91,7 +95,9 @@ export function createRecordsRouter(recordsService: RecordsService) {
           `Records listed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
           {
             totalRecords: result.records?.length || 0,
-            hasMore: result.hasMore,
+            totalCount: result.totalCount,
+            currentPage: result.currentPage,
+            totalPages: result.totalPages,
             requestId: (req as any).requestId,
             userId: (req as any).user?.id,
             userRole: (req as any).user?.role,

@@ -83,7 +83,7 @@ Always respond in this order:
 - API routes must use `/api/v1/` prefix consistently.
 - UI rules: inline validation errors; show API interaction errors via toasts.
 - Use the correct project scripts: `pnpm run dev:api`, `pnpm run dev:ui` (UI on
-  3030), `pnpm run preview:serve`, `pnpm run test:run`, `pnpm run spec:all`.
+  3030), `pnpm run preview:serve`, `pnpm run test`, `pnpm run spec:all`.
 - Do not use Astro (deprecated in this project).
 
 ## Out‑of‑Scope Requests
