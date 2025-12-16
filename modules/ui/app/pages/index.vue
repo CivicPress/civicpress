@@ -15,6 +15,8 @@ const { t } = useI18n();
 // Search suggestions composable
 const {
   suggestions,
+  words: suggestionWords,
+  titles: suggestionTitles,
   isLoading: suggestionsLoading,
   fetchSuggestions,
   clearSuggestions,
@@ -308,7 +310,10 @@ watch(isAuthenticated, (newValue) => {
 
               <!-- Suggestions Dropdown (only show when input has focus) -->
               <div
-                v-if="inputHasFocus && suggestions.length > 0"
+                v-if="
+                  inputHasFocus &&
+                  (suggestionWords.length > 0 || suggestionTitles.length > 0)
+                "
                 class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
               >
                 <div class="p-2">
@@ -319,17 +324,44 @@ watch(isAuthenticated, (newValue) => {
                     />
                     {{ t('records.filters.suggestions') }}
                   </div>
+
+                  <!-- Word Suggestions (as badges) -->
+                  <div v-if="suggestionWords.length > 0" class="mb-2 px-2">
+                    <div class="flex flex-wrap gap-1.5">
+                      <button
+                        v-for="word in suggestionWords"
+                        :key="`word-${word}`"
+                        class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+                        @click="handleSuggestionClick(word)"
+                      >
+                        <UIcon name="i-lucide-hash" class="w-3 h-3" />
+                        {{ word }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Separator between words and titles -->
                   <div
-                    v-for="suggestion in suggestions"
-                    :key="suggestion"
-                    class="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer text-sm text-left"
-                    @click="handleSuggestionClick(suggestion)"
-                  >
-                    <UIcon
-                      name="i-lucide-search"
-                      class="w-3 h-3 inline mr-2 text-gray-400"
-                    />
-                    {{ suggestion }}
+                    v-if="
+                      suggestionWords.length > 0 && suggestionTitles.length > 0
+                    "
+                    class="border-t border-gray-200 my-2"
+                  />
+
+                  <!-- Title Suggestions (with icons) -->
+                  <div v-if="suggestionTitles.length > 0">
+                    <div
+                      v-for="title in suggestionTitles"
+                      :key="`title-${title}`"
+                      class="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer text-sm text-left"
+                      @click="handleSuggestionClick(title)"
+                    >
+                      <UIcon
+                        name="i-lucide-file-text"
+                        class="w-3 h-3 inline mr-2 text-gray-400"
+                      />
+                      {{ title }}
+                    </div>
                   </div>
                 </div>
               </div>

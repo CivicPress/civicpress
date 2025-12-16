@@ -193,15 +193,8 @@ const handlePageSizeChange = (value: any) => {
   }
 };
 
-// Initialize records if needed
-onMounted(async () => {
-  if (displayRecords.value.length === 0) {
-    await recordsStore.loadInitialRecords({
-      type: props.filters?.types?.join(','),
-      status: props.filters?.statuses?.join(','),
-    });
-  }
-});
+// Don't load records here - parent component (records/index.vue) handles loading
+// This prevents duplicate API calls when both parent and child try to load on mount
 </script>
 
 <template>

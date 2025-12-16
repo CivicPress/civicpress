@@ -195,10 +195,10 @@
     "enterContent": "Enter content...",
     "enterTags": "Enter tags (comma-separated)",
     "unpublishedChanges": "Unpublished changes",
-    "sortBy": {
+    "sort": {
       "relevance": "Relevance",
-      "lastUpdated": "Last Updated",
-      "recentlyCreated": "Recently Created",
+      "updatedDesc": "Last Updated",
+      "createdDesc": "Recently Created",
       "titleAsc": "Title A→Z",
       "titleDesc": "Title Z→A"
     },
@@ -210,6 +210,8 @@
       "searchPlaceholder": "Search records...",
       "filterByTypePlaceholder": "Filter by type...",
       "statusPlaceholder": "Status...",
+      "sort": "Sort",
+      "sortPlaceholder": "Sort by...",
       "suggestions": "Suggestions",
       "loadingSuggestions": "Loading suggestions...",
       "showingFilteredRecords": "Showing filtered records",

@@ -106,13 +106,16 @@ export function buildFTS5Query(parsed: ParsedQuery): string {
     }
   });
 
-  // Add words with prefix matching for autocomplete feel
+  // Add words - use exact match OR prefix match for better results
+  // FTS5: "word" matches exact word, "word*" matches prefix
+  // We use both: word OR word* to match both exact words and prefixes
   parsed.words.forEach((word) => {
     if (word.length > 0) {
       // Escape special FTS5 characters
       const escaped = word.replace(/["']/g, '');
-      // Add prefix match for autocomplete
-      terms.push(`${escaped}*`);
+      // Use exact match OR prefix match for better coverage
+      // This matches both "bruit" (exact) and "bruit..." (prefix)
+      terms.push(`"${escaped}" OR ${escaped}*`);
     }
   });
 

@@ -597,6 +597,7 @@ export class RecordsService {
       status?: string;
       limit?: number;
       page?: number;
+      sort?: string;
     } = {},
     user?: any
   ): Promise<{
@@ -605,37 +606,31 @@ export class RecordsService {
     currentPage: number;
     totalPages: number;
     pageSize: number;
+    sort?: string;
   }> {
-    const { type, status, limit = 50, page = 1 } = options;
+    const {
+      type,
+      status,
+      limit = 50,
+      page = 1,
+      sort = 'created_desc',
+    } = options;
 
     // Calculate offset from page number (page is 1-based)
     const offset = (page - 1) * limit;
 
-    // Get records from the record manager with pagination
-    // Note: For proper kind priority sorting, we need to fetch all matching records,
-    // sort them, then paginate. However, this is inefficient for large datasets.
-    // For now, we'll fetch a reasonable page size from DB, then sort in memory.
-    // TODO: Optimize by moving kind priority sorting to database level if possible
+    // Get records from the record manager with pagination and sorting
+    // Sort is now handled at database level with kind priority
     const result = await this.recordManager.listRecords({
       type,
       status,
       limit: limit,
       offset: offset,
+      sort: sort,
     });
 
-    // Note: Database already handles type/status filtering and basic pagination
-    // We apply kind priority sorting in memory (within the current page)
-    // TODO: Optimize by moving kind priority sorting to database level if possible
-    const records = result.records.sort((a: any, b: any) => {
-      // First sort by kind priority (record -> chapter -> root)
-      const priorityA = this.getKindPriority(a);
-      const priorityB = this.getKindPriority(b);
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-      // If same priority, maintain DB order (created_at DESC)
-      return 0; // DB already sorted by created_at DESC
-    });
+    // Records are already sorted by database (kind priority + user sort)
+    const records = result.records;
 
     // Calculate total pages from total count
     const totalCount = result.total;
@@ -722,6 +717,7 @@ export class RecordsService {
       currentPage: page,
       totalPages,
       pageSize: limit,
+      sort: sort,
     };
   }
 
@@ -735,6 +731,7 @@ export class RecordsService {
       status?: string;
       limit?: number;
       page?: number;
+      sort?: string;
     } = {},
     user?: any
   ): Promise<{
@@ -743,35 +740,24 @@ export class RecordsService {
     currentPage: number;
     totalPages: number;
     pageSize: number;
+    sort?: string;
   }> {
-    const { type, status, limit = 50, page = 1 } = options;
+    const { type, status, limit = 50, page = 1, sort = 'relevance' } = options;
 
     // Calculate offset from page number (page is 1-based)
     const offset = (page - 1) * limit;
 
-    // Get search results with proper pagination
+    // Get search results with proper pagination and sorting
+    // Sort is now handled at database level with kind priority
     const result = await this.recordManager.searchRecords(query, {
       type,
       status,
       limit: limit,
       offset: offset,
+      sort: sort,
     });
 
-    // Sort search results by kind priority (record -> chapter -> root)
-    // Then by creation date as secondary sort
-    // Note: This sorting happens in memory after pagination
-    // TODO: Move kind priority sorting to database level (see Limitation 2 fix)
-    result.records.sort((a: any, b: any) => {
-      const priorityA = this.getKindPriority(a);
-      const priorityB = this.getKindPriority(b);
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-      // If same priority, maintain database order (already sorted by relevance/date)
-      return 0;
-    });
-
-    // Get sorted records
+    // Records are already sorted by database (kind priority + user sort)
     const records = result.records;
 
     // Calculate total pages from total count
@@ -856,6 +842,7 @@ export class RecordsService {
       currentPage: page,
       totalPages,
       pageSize: limit,
+      sort: sort,
     };
   }
 
@@ -1712,12 +1699,12 @@ export class RecordsService {
       // Record exists: UPDATE it (publishing changes to existing published record)
       // Map draft fields to UpdateRecordRequest format
       // Note: type is not included in UpdateRecordRequest - record type shouldn't change after creation
-      const updateRequest = {
+      const updateRequest: UpdateRecordRequest = {
         title: draft.title,
         content: draft.markdown_body, // Map markdown_body → content
         metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
         status: finalStatus, // Legal status (stored in YAML + DB)
-        workflowState: null, // Clear editorial state for published records
+        workflowState: undefined, // Clear editorial state for published records
         geography: draft.geography ? JSON.parse(draft.geography) : undefined,
         attachedFiles: draft.attached_files
           ? JSON.parse(draft.attached_files)
@@ -1761,7 +1748,7 @@ export class RecordsService {
           ? JSON.parse(draft.linked_geography_files)
           : undefined,
         status: finalStatus, // Legal status (stored in YAML + DB)
-        workflowState: null, // Clear editorial state for published records (should be NULL)
+        workflowState: undefined, // Clear editorial state for published records
         createdAt: draft.created_at, // Preserve draft's created_at for new records
         updatedAt: new Date().toISOString(), // Set to current time when publishing
       };

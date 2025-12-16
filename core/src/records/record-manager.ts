@@ -134,6 +134,7 @@ export class RecordManager {
         ? new Date(request.updatedAt).toISOString()
         : createdAt;
     const status = request.status || 'draft';
+    const workflowState = request.workflowState || 'draft';
     const recordPath = request.relativePath
       ? request.relativePath.replace(/\\/g, '/')
       : buildRecordRelativePath(request.type, recordId, createdAt);
@@ -707,7 +708,7 @@ export class RecordManager {
   }
 
   /**
-   * List records with optional filtering
+   * List records with optional filtering and sorting
    */
   async listRecords(
     options: {
@@ -715,6 +716,7 @@ export class RecordManager {
       status?: string;
       limit?: number;
       offset?: number;
+      sort?: string;
     } = {}
   ): Promise<{ records: any[]; total: number }> {
     const result = await this.db.listRecords(options);
@@ -726,7 +728,7 @@ export class RecordManager {
   }
 
   /**
-   * Search records with pagination and filtering
+   * Search records with pagination, filtering, and sorting
    */
   async searchRecords(
     query: string,
@@ -735,6 +737,7 @@ export class RecordManager {
       status?: string;
       limit?: number;
       offset?: number;
+      sort?: string;
     } = {}
   ): Promise<{ records: any[]; total: number }> {
     // Use search service if available (includes pagination and relevance ranking)
@@ -746,6 +749,7 @@ export class RecordManager {
           status: options.status,
           limit: options.limit || 20,
           offset: options.offset || 0,
+          sort: options.sort,
         });
 
         if (searchResult.results.length === 0) {
@@ -781,12 +785,9 @@ export class RecordManager {
         };
       } catch (error) {
         // Fall back to old method if search service fails
-        this.logger.warn(
-          'Search service failed, falling back to basic search',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          }
-        );
+        logger.warn('Search service failed, falling back to basic search', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -796,6 +797,7 @@ export class RecordManager {
       status: options.status,
       limit: options.limit || 20,
       offset: options.offset || 0,
+      sort: options.sort,
     });
 
     if (searchResults.length === 0) {
@@ -883,6 +885,8 @@ export class RecordManager {
           limit,
           true // enableTypoTolerance
         );
+        // Return full suggestions with type information
+        // The API will handle formatting
         const suggestionTexts = suggestions.map((s) => s.text);
 
         // Update cache
@@ -904,7 +908,7 @@ export class RecordManager {
         return suggestionTexts;
       } catch (error) {
         // Fall back to old method if search service fails
-        this.logger.warn(
+        logger.warn(
           'Search service suggestions failed, falling back to basic method',
           {
             error: error instanceof Error ? error.message : String(error),
@@ -918,7 +922,7 @@ export class RecordManager {
       SELECT DISTINCT si.title as suggestion
       FROM search_index si
       INNER JOIN records r ON si.record_id = r.id
-      WHERE si.title_normalized LIKE ? || '%'
+      WHERE (COALESCE(si.title_normalized, LOWER(si.title)) LIKE '%' || ? || '%')
         AND (r.workflow_state IS NULL OR r.workflow_state != 'internal_only')
       ORDER BY si.updated_at DESC
       LIMIT ?

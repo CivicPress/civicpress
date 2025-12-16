@@ -22,6 +22,11 @@ const filters = ref({
 });
 const page = ref(1);
 const pageSize = ref(50); // Default page size
+const sort = ref<
+  'relevance' | 'updated_desc' | 'created_desc' | 'title_asc' | 'title_desc'
+>(
+  'created_desc' // Default for records listing
+);
 const filtersResetKey = ref(0);
 
 // Track when user is typing/searching (for showing loading state)
@@ -35,6 +40,7 @@ const updateURL = () => {
     statuses: filters.value.statuses,
     page: page.value,
     pageSize: pageSize.value,
+    sort: sort.value,
   });
   navigateTo({ query }, { replace: true });
 };
@@ -51,6 +57,17 @@ const restoreFromURL = () => {
   if (state.pageSize) {
     pageSize.value = state.pageSize;
     recordsStore.setPageSize(state.pageSize);
+  }
+  if (state.sort) {
+    // Sanitize: relevance is only valid when there's a search query
+    if (state.sort === 'relevance' && !searchQuery.value) {
+      sort.value = 'created_desc';
+    } else {
+      sort.value = state.sort;
+    }
+  } else {
+    // Set default based on context
+    sort.value = searchQuery.value ? 'relevance' : 'created_desc';
   }
 };
 
@@ -71,12 +88,14 @@ const debouncedApiSearch = useDebounceFn(async (query: string) => {
     await recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
+      sort: sort.value,
     });
   } else {
     // Query is empty or less than 3 chars - load initial records
     await recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
+      sort: sort.value,
     });
   }
 
@@ -117,6 +136,7 @@ const handleSearchSubmit = (query?: string) => {
     recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
+      sort: sort.value,
     });
   } else {
     // Execute search (no minimum character requirement when user explicitly submits)
@@ -130,10 +150,15 @@ const handleSearchSubmit = (query?: string) => {
       filters.value.statuses.length > 0
         ? filters.value.statuses.join(',')
         : undefined;
+    // Set sort to relevance for search if not already set
+    if (!sort.value || sort.value === 'created_desc') {
+      sort.value = 'relevance';
+    }
     recordsStore.searchRecords(trimmedQuery, {
       type: typeFilter,
       status: statusFilter,
       page: 1, // Always start at page 1 for new searches
+      sort: sort.value,
     });
     isSearching.value = false;
   }
@@ -164,11 +189,16 @@ const handleFilterChange = (newFilters: {
       type: typeFilter,
       status: statusFilter,
       page: 1,
+      sort: sort.value,
     });
   } else {
+    // Sanitize sort: relevance is only valid for search, not for records listing
+    const sanitizedSort =
+      sort.value === 'relevance' ? 'created_desc' : sort.value;
     recordsStore.loadInitialRecords({
       type: typeFilter,
       status: statusFilter,
+      sort: sanitizedSort,
     });
   }
 };
@@ -205,6 +235,11 @@ const handlePageSizeChange = async (newSize: number) => {
 
 // Function to load records based on current state
 const loadRecordsFromState = async () => {
+  // Prevent duplicate concurrent calls
+  if (isLoading.value) {
+    return;
+  }
+
   const typeFilter =
     filters.value.types.length > 0 ? filters.value.types.join(',') : undefined;
   const statusFilter =
@@ -223,54 +258,93 @@ const loadRecordsFromState = async () => {
       type: typeFilter,
       status: statusFilter,
       page: page.value,
+      sort: sort.value,
     });
   } else {
     // No search query or less than 3 chars, load page using page-based pagination
+    // Sanitize sort: relevance is only valid for search, not for records listing
+    const sanitizedSort =
+      sort.value === 'relevance' ? 'created_desc' : sort.value;
     await recordsStore.loadPage(page.value, {
       type: typeFilter,
       status: statusFilter,
+      sort: sanitizedSort,
     });
   }
 };
 
 // Track initial query to detect actual changes
-const initialQuery = ref<string>(JSON.stringify(route.query));
+const initialQuery = ref<string | null>(null);
+const isInitialMount = ref(true);
+const isLoading = ref(false); // Guard to prevent duplicate loads
 
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
-  // Restore state from URL first
-  restoreFromURL();
-  // Load records based on restored state
-  await loadRecordsFromState();
-  // Store initial query state after first load
-  initialQuery.value = JSON.stringify(route.query);
+  // Skip if not on client side (SSR)
+  if (!process.client) return;
+
+  // Prevent duplicate calls
+  if (isLoading.value) return;
+  isLoading.value = true;
+
+  try {
+    // Restore state from URL first
+    restoreFromURL();
+    // Store initial query state BEFORE loading (to prevent watcher from triggering)
+    initialQuery.value = JSON.stringify(route.query);
+    // Load records based on restored state
+    await loadRecordsFromState();
+  } finally {
+    // Mark initial mount as complete
+    isInitialMount.value = false;
+    isLoading.value = false;
+  }
 });
 
 // Watch for route query changes (e.g., browser back/forward)
+// Use immediate: false to prevent firing on initial mount
 watch(
   () => route.query,
-  async (newQuery) => {
+  async (newQuery, oldQuery) => {
+    // Skip watcher on initial mount - onMounted handles it
+    if (isInitialMount.value || isLoading.value) return;
+
+    // Skip if oldQuery is null/undefined (first watch after mount)
+    if (!oldQuery) return;
+
     const newQueryString = JSON.stringify(newQuery);
-    // Only run if query actually changed (skip initial mount)
-    if (newQueryString === initialQuery.value) return;
+    const oldQueryString = JSON.stringify(oldQuery);
 
-    // Update initial query reference
-    initialQuery.value = newQueryString;
-
-    // Restore state from URL when route changes
-    restoreFromURL();
-
-    // Don't reload records if search query is 1-2 characters (user is still typing)
-    const trimmedSearchQuery = searchQuery.value?.trim() || '';
-    if (trimmedSearchQuery.length > 0 && trimmedSearchQuery.length < 3) {
-      // User is typing 1-2 characters - don't reload records, just update state
+    // Only run if query actually changed
+    if (
+      newQueryString === oldQueryString ||
+      newQueryString === initialQuery.value
+    ) {
       return;
     }
 
-    // Reload records based on new state
-    await loadRecordsFromState();
+    isLoading.value = true;
+    try {
+      // Update initial query reference
+      initialQuery.value = newQueryString;
+
+      // Restore state from URL when route changes
+      restoreFromURL();
+
+      // Don't reload records if search query is 1-2 characters (user is still typing)
+      const trimmedSearchQuery = searchQuery.value?.trim() || '';
+      if (trimmedSearchQuery.length > 0 && trimmedSearchQuery.length < 3) {
+        // User is typing 1-2 characters - don't reload records, just update state
+        return;
+      }
+
+      // Reload records based on new state
+      await loadRecordsFromState();
+    } finally {
+      isLoading.value = false;
+    }
   },
-  { deep: true }
+  { deep: true, immediate: false }
 );
 
 const breadcrumbItems = computed(() => [
@@ -346,9 +420,19 @@ const scrollToTop = () => {
         <RecordSearch
           :key="filtersResetKey"
           :initial-filters="filters"
+          :sort="sort"
+          :is-searching="!!searchQuery"
           @search="handleSearch"
           @search-submit="handleSearchSubmit"
           @filter-change="handleFilterChange"
+          @sort-change="
+            (newSort) => {
+              sort = newSort;
+              page = 1;
+              updateURL();
+              loadRecordsFromState();
+            }
+          "
         />
 
         <!-- Records List Component -->

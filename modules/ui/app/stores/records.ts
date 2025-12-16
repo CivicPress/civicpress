@@ -136,6 +136,10 @@ const calculateCountsFromRecords = (
   return summary;
 };
 
+// Track last fetch times to prevent duplicate calls (outside store state)
+const summaryFetchCache = new Map<string, number>();
+const searchFetchCache = new Map<string, number>();
+
 export const useRecordsStore = defineStore('records', {
   state: (): RecordsState => ({
     records: [],
@@ -283,6 +287,22 @@ export const useRecordsStore = defineStore('records', {
      * Fetch aggregated record counts from API (fallback to local counts on error)
      */
     async fetchSummaryCounts(params?: { type?: string; status?: string }) {
+      // Create a cache key to prevent duplicate calls with same params
+      const cacheKey = JSON.stringify({
+        type: params?.type,
+        status: params?.status,
+      });
+      const lastFetchTime = summaryFetchCache.get(cacheKey);
+      const now = Date.now();
+
+      // Skip if we fetched this exact query within the last 200ms (prevent rapid duplicate calls)
+      if (lastFetchTime && now - lastFetchTime < 200) {
+        return;
+      }
+
+      // Update cache
+      summaryFetchCache.set(cacheKey, now);
+
       try {
         const queryParams = new URLSearchParams();
         if (params?.type) queryParams.append('type', params.type);
@@ -307,7 +327,15 @@ export const useRecordsStore = defineStore('records', {
     /**
      * Load records for a specific page
      */
-    async loadPage(page: number, params?: { type?: string; status?: string }) {
+    async loadPage(
+      page: number,
+      params?: { type?: string; status?: string; sort?: string }
+    ) {
+      // Prevent duplicate concurrent calls
+      if (this.loading) {
+        return;
+      }
+
       this.loading = true;
       this.loadingMessage = `Loading page ${page}...`;
       this.error = null;
@@ -319,6 +347,7 @@ export const useRecordsStore = defineStore('records', {
 
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
+        if (params?.sort) queryParams.append('sort', params.sort);
 
         const url = `/api/v1/records?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
@@ -359,7 +388,11 @@ export const useRecordsStore = defineStore('records', {
     /**
      * Load initial records (page 1) - convenience method
      */
-    async loadInitialRecords(params?: { type?: string; status?: string }) {
+    async loadInitialRecords(params?: {
+      type?: string;
+      status?: string;
+      sort?: string;
+    }) {
       this.currentPage = 1;
       return this.loadPage(1, params);
     },
@@ -369,8 +402,13 @@ export const useRecordsStore = defineStore('records', {
      */
     async searchRecords(
       query: string,
-      params?: { type?: string; status?: string; page?: number }
+      params?: { type?: string; status?: string; page?: number; sort?: string }
     ) {
+      // Prevent duplicate concurrent calls
+      if (this.loading) {
+        return;
+      }
+
       // Don't search with empty queries
       if (!query || !query.trim()) {
         console.warn(
@@ -378,6 +416,25 @@ export const useRecordsStore = defineStore('records', {
         );
         return this.loadInitialRecords(params);
       }
+
+      // Create a cache key to prevent duplicate calls with same params
+      const cacheKey = JSON.stringify({
+        query: query.trim(),
+        type: params?.type,
+        status: params?.status,
+        page: params?.page || 1,
+        sort: params?.sort,
+      });
+      const lastFetchTime = searchFetchCache.get(cacheKey);
+      const now = Date.now();
+
+      // Skip if we fetched this exact query within the last 200ms (prevent rapid duplicate calls)
+      if (lastFetchTime && now - lastFetchTime < 200) {
+        return;
+      }
+
+      // Update cache
+      searchFetchCache.set(cacheKey, now);
 
       this.loading = true;
       this.loadingMessage = `Searching for "${query}"...`;
@@ -394,6 +451,7 @@ export const useRecordsStore = defineStore('records', {
 
         if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
+        if (params?.sort) queryParams.append('sort', params.sort);
 
         const url = `/api/v1/search?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);

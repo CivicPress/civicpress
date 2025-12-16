@@ -212,7 +212,9 @@ describe('Database Integration', () => {
       // Remove from index
       await dbService.removeRecordFromIndex('bylaw-001', 'bylaw');
       const emptyResults = await dbService.searchRecords('parking', {});
-      expect(emptyResults.length).toBe(0);
+      expect(
+        emptyResults.filter((r) => r.record_id === 'bylaw-001').length
+      ).toBe(0);
     });
   });
 

@@ -33,13 +33,13 @@ describe('Query Parser', () => {
     it('should build simple FTS5 query', () => {
       const parsed = parseSearchQuery('budget');
       const query = buildFTS5Query(parsed);
-      expect(query).toBe('budget*');
+      expect(query).toBe('"budget" OR budget*');
     });
 
     it('should build multi-word query', () => {
       const parsed = parseSearchQuery('budget 2024');
       const query = buildFTS5Query(parsed);
-      expect(query).toBe('budget* 2024*');
+      expect(query).toBe('"budget" OR budget* "2024" OR 2024*');
     });
   });
 

@@ -19,7 +19,13 @@ import {
   buildFTS5Query,
   calculateSimilarity,
 } from './query-parser.js';
-import * as levenshtein from 'fast-levenshtein';
+// Import fast-levenshtein - it exports { get: function }
+// Use createRequire for proper CommonJS interop in ES modules
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const levenshtein = require('fast-levenshtein') as {
+  get: (str1: string, str2: string) => number;
+};
 import { SearchCache } from './search-cache.js';
 
 export class SQLiteSearchService implements SearchService {
@@ -48,6 +54,7 @@ export class SQLiteSearchService implements SearchService {
       status,
       limit = 20,
       offset = 0,
+      sort = 'relevance',
       enable_typo_tolerance = false,
       enable_accent_insensitive = true,
     } = options;
@@ -59,6 +66,7 @@ export class SQLiteSearchService implements SearchService {
       status,
       limit,
       offset,
+      sort,
     });
 
     // Check cache (only for first page)
@@ -84,13 +92,19 @@ export class SQLiteSearchService implements SearchService {
       };
     }
 
+    // Extract first word for title boost (normalized)
+    const firstWord =
+      parsedQuery.words[0]?.toLowerCase().trim() || query.toLowerCase().trim();
+
     // Build search SQL with relevance scoring
     const sql = this.buildSearchSQL(ftsQuery, {
       type,
       status,
       limit,
       offset,
+      sort,
       parsedQuery,
+      titleBoostTerm: firstWord,
     });
 
     const results = await this.adapter.query(sql.query, sql.params);
@@ -133,22 +147,37 @@ export class SQLiteSearchService implements SearchService {
     });
     const cached = this.suggestionsCache.get(cacheKey);
     if (cached) {
-      return cached.results as SearchSuggestions[];
+      const cachedResults = cached.results as SearchSuggestions[];
+      // Ensure cached results have type field (for backward compatibility)
+      return cachedResults.map((s) => ({
+        ...s,
+        type: s.type || ('title' as const), // Default to 'title' if type is missing
+      }));
     }
 
-    // Lightweight query - only fetch titles, no full records
-    // Get more results than needed for typo tolerance filtering
-    const fetchLimit = enableTypoTolerance ? limit * 3 : limit;
+    // Extract words first (4-5 words), then titles (remaining slots)
+    const wordLimit = Math.min(5, Math.floor(limit * 0.4)); // Up to 5 words, or 40% of limit
+    const titleLimit = limit - wordLimit;
+
+    // Get words from titles and tags
+    const words = await this.getWordSuggestions(
+      normalized,
+      wordLimit,
+      enableTypoTolerance
+    );
+
+    // Get titles (remaining slots)
+    const fetchLimit = enableTypoTolerance ? titleLimit * 3 : titleLimit;
 
     const sql = `
       SELECT DISTINCT 
         si.title as suggestion,
         'title' as source,
         COUNT(*) as frequency,
-        si.title_normalized
+        COALESCE(si.title_normalized, LOWER(si.title)) as title_normalized
       FROM search_index si
       INNER JOIN records r ON si.record_id = r.id
-      WHERE si.title_normalized LIKE ? || '%'
+      WHERE (COALESCE(si.title_normalized, LOWER(si.title)) LIKE '%' || ? || '%')
         AND (r.workflow_state IS NULL OR r.workflow_state != 'internal_only')
       GROUP BY si.title, si.title_normalized
       ORDER BY frequency DESC, si.title
@@ -157,71 +186,313 @@ export class SQLiteSearchService implements SearchService {
 
     const results = await this.adapter.query(sql, [normalized, fetchLimit]);
 
-    if (!enableTypoTolerance || results.length >= limit) {
+    // Process titles
+    let titleSuggestions: SearchSuggestions[];
+
+    if (!enableTypoTolerance || results.length >= titleLimit) {
       // Return exact matches if we have enough, or typo tolerance disabled
-      return results.slice(0, limit).map((row: any) => ({
+      titleSuggestions = results.slice(0, titleLimit).map((row: any) => ({
         text: row.suggestion,
         source: row.source,
+        type: 'title' as const,
         frequency: row.frequency || 1,
       }));
+    } else {
+      // Apply typo tolerance filtering
+      const suggestionsWithSimilarity = results.map((row: any) => {
+        const similarity = this.calculateTypoSimilarity(
+          normalized,
+          row.title_normalized
+        );
+        return {
+          text: row.suggestion,
+          source: row.source,
+          frequency: row.frequency || 1,
+          similarity,
+        };
+      });
+
+      // Sort by similarity (higher is better), then frequency, then alphabetically
+      suggestionsWithSimilarity.sort((a, b) => {
+        // Exact prefix matches first (similarity >= 0.9)
+        if (a.similarity >= 0.9 && b.similarity < 0.9) return -1;
+        if (a.similarity < 0.9 && b.similarity >= 0.9) return 1;
+
+        // Then by similarity (threshold 0.7)
+        if (a.similarity >= 0.7 && b.similarity >= 0.7) {
+          if (Math.abs(a.similarity - b.similarity) > 0.05) {
+            return b.similarity - a.similarity;
+          }
+          // Similar similarity - sort by frequency
+          if (a.frequency !== b.frequency) {
+            return b.frequency - a.frequency;
+          }
+        } else if (a.similarity >= 0.7) {
+          return -1;
+        } else if (b.similarity >= 0.7) {
+          return 1;
+        } else {
+          // Both below threshold - prefer exact prefix matches
+          return 0;
+        }
+
+        // Finally alphabetically
+        return a.text.localeCompare(b.text);
+      });
+
+      // Filter by similarity threshold and return top results
+      titleSuggestions = suggestionsWithSimilarity
+        .filter((item) => item.similarity >= 0.7 || item.similarity >= 0.5) // Allow lower threshold for suggestions
+        .slice(0, titleLimit)
+        .map((item) => ({
+          text: item.text,
+          source: item.source,
+          type: 'title' as const,
+          frequency: item.frequency,
+        }));
     }
 
-    // Apply typo tolerance filtering
-    const suggestionsWithSimilarity = results.map((row: any) => {
-      const similarity = this.calculateTypoSimilarity(
-        normalized,
-        row.title_normalized
-      );
-      return {
-        text: row.suggestion,
-        source: row.source,
-        frequency: row.frequency || 1,
-        similarity,
-      };
+    // Combine words (first) and titles (after)
+    const allSuggestions = [...words, ...titleSuggestions];
+
+    // Cache suggestions
+    this.suggestionsCache.set(cacheKey, allSuggestions, allSuggestions.length);
+
+    return allSuggestions;
+  }
+
+  /**
+   * Extract and rank word suggestions from titles and tags
+   */
+  private async getWordSuggestions(
+    query: string,
+    limit: number,
+    enableTypoTolerance: boolean
+  ): Promise<SearchSuggestions[]> {
+    // Use fallback method (more reliable across SQLite versions)
+    try {
+      const words = await this.getWordSuggestionsFallback(query, limit);
+      coreDebug('getWordSuggestions completed', {
+        query,
+        limit,
+        wordsFound: words.length,
+        words: words.map((w) => w.text),
+      });
+      return words;
+    } catch (error) {
+      coreDebug('getWordSuggestions error', {
+        query,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Fallback method for word extraction (for older SQLite versions)
+   */
+  private async getWordSuggestionsFallback(
+    query: string,
+    limit: number
+  ): Promise<SearchSuggestions[]> {
+    const stopWords = new Set([
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'from',
+      'as',
+      'is',
+      'was',
+      'are',
+      'were',
+      'been',
+      'be',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'should',
+      'could',
+      'may',
+      'might',
+      'must',
+      'can',
+      'this',
+      'that',
+      'these',
+      'those',
+      'i',
+      'you',
+      'he',
+      'she',
+      'it',
+      'we',
+      'they',
+      'me',
+      'him',
+      'her',
+      'us',
+      'them',
+      'le',
+      'la',
+      'les',
+      'un',
+      'une',
+      'des',
+      'de',
+      'du',
+      'et',
+      'ou',
+      'mais',
+      'dans',
+      'sur',
+      'avec',
+      'pour',
+      'par',
+      'sans',
+      'sous',
+      'entre',
+      'parmi',
+    ]);
+
+    // Get titles and tags that match the query
+    const sql = `
+      SELECT 
+        si.title,
+        si.tags
+      FROM search_index si
+      INNER JOIN records r ON si.record_id = r.id
+      WHERE (COALESCE(si.title_normalized, LOWER(si.title)) LIKE '%' || ? || '%'
+             OR (si.tags IS NOT NULL AND LOWER(si.tags) LIKE '%' || ? || '%'))
+        AND (r.workflow_state IS NULL OR r.workflow_state != 'internal_only')
+      LIMIT 100
+    `;
+
+    const queryLower = query.toLowerCase();
+    const results = await this.adapter.query(sql, [queryLower, queryLower]);
+
+    if (results.length === 0) {
+      coreDebug('Word extraction: no results from SQL query', {
+        query: queryLower,
+      });
+      return [];
+    }
+
+    coreDebug('Word extraction query results', {
+      query: queryLower,
+      resultsCount: results.length,
+      sampleTitles: results.slice(0, 3).map((r: any) => r.title),
     });
 
-    // Sort by similarity (higher is better), then frequency, then alphabetically
-    suggestionsWithSimilarity.sort((a, b) => {
-      // Exact prefix matches first (similarity >= 0.9)
-      if (a.similarity >= 0.9 && b.similarity < 0.9) return -1;
-      if (a.similarity < 0.9 && b.similarity >= 0.9) return 1;
+    // Extract words in JavaScript
+    const wordMap = new Map<string, number>();
 
-      // Then by similarity (threshold 0.7)
-      if (a.similarity >= 0.7 && b.similarity >= 0.7) {
-        if (Math.abs(a.similarity - b.similarity) > 0.05) {
-          return b.similarity - a.similarity;
+    for (const row of results) {
+      // Extract from title
+      if (row.title) {
+        const words = this.extractWords(row.title);
+        for (const word of words) {
+          // extractWords already returns lowercase, so word is already lowercase
+          const isStopWord = stopWords.has(word);
+          const hasQuery = word.includes(queryLower);
+          const isLongEnough = word.length >= 3;
+
+          if (!isStopWord && isLongEnough && hasQuery) {
+            wordMap.set(word, (wordMap.get(word) || 0) + 1);
+          }
         }
-        // Similar similarity - sort by frequency
+      }
+
+      // Extract from tags
+      if (row.tags) {
+        const tagWords = row.tags
+          .split(',')
+          .map((t: string) => t.trim().toLowerCase())
+          .filter((t: string) => t.length >= 3);
+        for (const word of tagWords) {
+          if (!stopWords.has(word) && word.includes(queryLower)) {
+            wordMap.set(word, (wordMap.get(word) || 0) + 1);
+          }
+        }
+      }
+    }
+
+    coreDebug('Word extraction results', {
+      query: queryLower,
+      wordMapSize: wordMap.size,
+      words: Array.from(wordMap.keys()),
+    });
+
+    if (wordMap.size === 0) {
+      coreDebug('Word extraction: no words found after filtering', {
+        query: queryLower,
+        resultsCount: results.length,
+      });
+      return [];
+    }
+
+    // Sort by frequency and match quality
+    const wordSuggestions = Array.from(wordMap.entries())
+      .map(([word, frequency]) => {
+        let matchQuality = 0;
+        if (word.startsWith(queryLower)) {
+          matchQuality = 3; // Prefix match (best)
+        } else if (word.includes(queryLower)) {
+          matchQuality = 2; // Contains match (good)
+        } else {
+          matchQuality = 1; // Fuzzy match
+        }
+        return { word, frequency, matchQuality };
+      })
+      .sort((a, b) => {
+        if (a.matchQuality !== b.matchQuality) {
+          return b.matchQuality - a.matchQuality;
+        }
         if (a.frequency !== b.frequency) {
           return b.frequency - a.frequency;
         }
-      } else if (a.similarity >= 0.7) {
-        return -1;
-      } else if (b.similarity >= 0.7) {
-        return 1;
-      } else {
-        // Both below threshold - prefer exact prefix matches
-        return 0;
-      }
-
-      // Finally alphabetically
-      return a.text.localeCompare(b.text);
-    });
-
-    // Filter by similarity threshold and return top results
-    const suggestions = suggestionsWithSimilarity
-      .filter((item) => item.similarity >= 0.7 || item.similarity >= 0.5) // Allow lower threshold for suggestions
+        return a.word.localeCompare(b.word);
+      })
       .slice(0, limit)
       .map((item) => ({
-        text: item.text,
-        source: item.source,
+        text: item.word,
+        source: 'word',
+        type: 'word' as const,
         frequency: item.frequency,
       }));
 
-    // Cache suggestions
-    this.suggestionsCache.set(cacheKey, suggestions, suggestions.length);
+    return wordSuggestions;
+  }
 
-    return suggestions;
+  /**
+   * Extract words from text (helper method)
+   */
+  private extractWords(text: string): string[] {
+    if (!text) return [];
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s-àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ]/g, ' ') // Replace punctuation, keep accented chars
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim()
+      .split(' ')
+      .filter((word) => word && word.length >= 3)
+      .map((word) => word.trim())
+      .filter((word) => word.length >= 3);
   }
 
   async getFacets(
@@ -383,10 +654,55 @@ export class SQLiteSearchService implements SearchService {
   }
 
   async removeRecord(recordId: string, recordType: string): Promise<void> {
+    // Delete from search_index table (FTS5 trigger will handle FTS5 table)
     await this.adapter.execute(
       'DELETE FROM search_index WHERE record_id = ? AND record_type = ?',
       [recordId, recordType]
     );
+
+    // Clear search cache to ensure removed records don't appear in cached results
+    // We clear the entire cache since we can't easily determine which queries
+    // might have included this record
+    this.searchCache.clear();
+  }
+
+  /**
+   * Build ORDER BY clause for search queries with kind priority and user sort
+   */
+  private buildSearchOrderBy(sort: string = 'relevance'): string {
+    // Kind priority for tiebreaking
+    const kindPriority = `CASE 
+      WHEN json_extract(si.metadata, '$.kind') = 'root' THEN 3
+      WHEN json_extract(si.metadata, '$.kind') = 'chapter' THEN 2
+      ELSE 1
+    END`;
+
+    // User sort clause
+    if (sort === 'relevance') {
+      // For relevance: prioritize relevance score first, then kind priority as tiebreaker
+      return `ORDER BY composite_relevance_score DESC, ${kindPriority} ASC, si.updated_at DESC`;
+    } else {
+      // For other sorts: kind priority first (maintains document hierarchy)
+      let userSort = '';
+      switch (sort) {
+        case 'updated_desc':
+          userSort = 'si.updated_at DESC, r.created_at DESC';
+          break;
+        case 'created_desc':
+          userSort = 'r.created_at DESC';
+          break;
+        case 'title_asc':
+          userSort = 'LOWER(si.title) ASC, r.created_at DESC';
+          break;
+        case 'title_desc':
+          userSort = 'LOWER(si.title) DESC, r.created_at DESC';
+          break;
+        default:
+          // Default to relevance
+          return `ORDER BY composite_relevance_score DESC, ${kindPriority} ASC, si.updated_at DESC`;
+      }
+      return `ORDER BY ${kindPriority} ASC, ${userSort}`;
+    }
   }
 
   /**
@@ -399,7 +715,9 @@ export class SQLiteSearchService implements SearchService {
       status?: string;
       limit: number;
       offset: number;
+      sort?: string;
       parsedQuery?: ReturnType<typeof parseSearchQuery>;
+      titleBoostTerm?: string;
     }
   ): {
     query: string;
@@ -407,7 +725,14 @@ export class SQLiteSearchService implements SearchService {
     countQuery: string;
     countParams: any[];
   } {
-    const { type, status, limit, offset } = options;
+    const {
+      type,
+      status,
+      limit,
+      offset,
+      sort = 'relevance',
+      titleBoostTerm = '',
+    } = options;
 
     let params: any[] = [ftsQuery];
     let countParams: any[] = [ftsQuery];
@@ -458,11 +783,9 @@ export class SQLiteSearchService implements SearchService {
         bm25(search_index_fts5) as relevance_score,
         
         -- Field match score (weighted: title 10x, tags 5x, content 1x)
-        (
-          CASE WHEN search_index_fts5.title MATCH ? THEN 10 ELSE 0 END +
-          CASE WHEN search_index_fts5.tags MATCH ? THEN 5 ELSE 0 END +
-          CASE WHEN search_index_fts5.content MATCH ? THEN 1 ELSE 0 END
-        ) as field_match_score,
+        -- Note: FTS5 MATCH can't be used in CASE statements, so we approximate
+        -- by using BM25 score as a proxy (title matches naturally score higher)
+        0 as field_match_score,
         
         -- Recency score (0-1, newer = higher)
         CASE 
@@ -496,21 +819,19 @@ export class SQLiteSearchService implements SearchService {
           '</mark>',
           '...',
           32
-        ) as excerpt
-
-      FROM search_index_fts5
-      INNER JOIN search_index si ON search_index_fts5.rowid = si.rowid
-      INNER JOIN records r ON si.record_id = r.id
-      WHERE ${whereClause}
-      ORDER BY 
-        -- Composite score calculation
+        ) as excerpt,
+        
+        -- Kind priority for sorting (record=1, chapter=2, root=3)
+        CASE 
+          WHEN json_extract(si.metadata, '$.kind') = 'root' THEN 3
+          WHEN json_extract(si.metadata, '$.kind') = 'chapter' THEN 2
+          ELSE 1
+        END as kind_priority,
+        
+        -- Composite relevance score (for relevance sort)
+        -- Note: Title boost removed - BM25 already favors title matches naturally
         (
-          bm25(search_index_fts5) * 0.50 +
-          (
-            CASE WHEN search_index_fts5.title MATCH ? THEN 10 ELSE 0 END +
-            CASE WHEN search_index_fts5.tags MATCH ? THEN 5 ELSE 0 END +
-            CASE WHEN search_index_fts5.content MATCH ? THEN 1 ELSE 0 END
-          ) * 0.25 +
+          bm25(search_index_fts5) * 0.80 +
           CASE 
             WHEN julianday('now') - julianday(si.updated_at) < 365 THEN
               (1.0 - (julianday('now') - julianday(si.updated_at)) / 365.0)
@@ -521,7 +842,7 @@ export class SQLiteSearchService implements SearchService {
             WHEN 'article' THEN 8
             WHEN 'chapter' THEN 6
             ELSE 5
-          END * 0.10 +
+          END * 0.05 +
           CASE COALESCE(r.status, 'published')
             WHEN 'published' THEN 10
             WHEN 'approved' THEN 9
@@ -529,13 +850,17 @@ export class SQLiteSearchService implements SearchService {
             WHEN 'archived' THEN 1
             ELSE 5
           END * 0.05
-        ) DESC,
-        si.updated_at DESC
+        ) as composite_relevance_score
+
+      FROM search_index_fts5
+      INNER JOIN search_index si ON search_index_fts5.rowid = si.rowid
+      INNER JOIN records r ON si.record_id = r.id
+      WHERE ${whereClause}
+      ${this.buildSearchOrderBy(sort)}
       LIMIT ? OFFSET ?
     `;
 
-    // Add FTS query for field match calculations (used multiple times)
-    params.push(ftsQuery, ftsQuery, ftsQuery, ftsQuery, ftsQuery, ftsQuery);
+    // Add limit and offset
     params.push(limit, offset);
 
     // Count query

@@ -33,6 +33,19 @@ searchRouter.get(
       .optional()
       .isInt({ min: 1 })
       .withMessage('Page must be a positive integer'),
+    query('sort')
+      .optional()
+      .isIn([
+        'relevance',
+        'updated_desc',
+        'created_desc',
+        'title_asc',
+        'title_desc',
+      ])
+      .withMessage(
+        'Sort must be one of: relevance, updated_desc, created_desc, title_asc, title_desc'
+      )
+      .customSanitizer((value) => value?.toLowerCase()),
   ],
   async (req: any, res: Response) => {
     const isAuthenticated = (req as any).user !== undefined;
@@ -48,7 +61,7 @@ searchRouter.get(
         return handleValidationError(operation, errors.array(), req, res);
       }
 
-      const { q: query, type, limit, page } = req.query;
+      const { q: query, type, limit, page, sort } = req.query;
 
       // Query only records table - all records there are published (by table location)
       // No status filtering needed - table location determines if record is published
@@ -86,6 +99,7 @@ searchRouter.get(
           // No status filter - table location (records table) determines published state
           limit: pageSize,
           page: currentPage,
+          sort: (sort as string) || 'relevance', // Default to relevance for search
         },
         (req as any).user
       );
@@ -113,10 +127,16 @@ searchRouter.get(
           totalPages: result.totalPages,
           pageSize: result.pageSize,
           query: query as string,
+          sort: result.sort || 'relevance',
         },
         req,
         res,
-        { operation }
+        {
+          operation,
+          meta: {
+            sort: result.sort || 'relevance',
+          },
+        }
       );
     } catch (error) {
       handleApiError(operation, error, req, res, 'Failed to search records');
@@ -169,18 +189,54 @@ searchRouter.get(
       }
 
       const recordManager = civicPress.getRecordManager();
-      const suggestions = await recordManager.getSearchSuggestions(
-        query as string,
-        {
-          limit: parseInt(limit as string),
-        }
-      );
+      const searchService = civicPress.getDatabaseService().getSearchService();
+
+      let suggestions: any[] = [];
+      if (searchService) {
+        // Use search service to get structured suggestions (words + titles)
+        const structuredSuggestions = await searchService.getSuggestions(
+          query as string,
+          parseInt(limit as string),
+          true // enableTypoTolerance
+        );
+        // Ensure all suggestions have type field
+        suggestions = structuredSuggestions.map((s: any) => ({
+          text: s.text,
+          source: s.source,
+          type: s.type || ('title' as const), // Default to 'title' if type is missing
+          frequency: s.frequency,
+        }));
+      } else {
+        // Fallback to record manager
+        const textSuggestions = await recordManager.getSearchSuggestions(
+          query as string,
+          {
+            limit: parseInt(limit as string),
+          }
+        );
+        // Convert to structured format
+        suggestions = textSuggestions.map((text: string) => ({
+          text,
+          source: 'title',
+          type: 'title' as const,
+        }));
+      }
+
+      // Separate words and titles for easier UI consumption
+      const words = suggestions
+        .filter((s) => s.type === 'word')
+        .map((s) => s.text);
+      const titles = suggestions
+        .filter((s) => s.type === 'title')
+        .map((s) => s.text);
 
       logger.info(
         `Search suggestions completed successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
         {
           query,
-          suggestionsCount: suggestions.length,
+          wordsCount: words.length,
+          titlesCount: titles.length,
+          totalCount: suggestions.length,
           requestId: (req as any).requestId,
           userId: (req as any).user?.id,
           userRole: (req as any).user?.role,
@@ -190,7 +246,9 @@ searchRouter.get(
 
       sendSuccess(
         {
-          suggestions,
+          suggestions: suggestions.map((s) => s.text), // Keep flat array for backward compatibility
+          words, // New: separate words array
+          titles, // New: separate titles array
           query: query as string,
         },
         req,

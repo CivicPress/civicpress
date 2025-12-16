@@ -426,6 +426,7 @@ export class DatabaseService {
       status?: string;
       limit?: number;
       offset?: number;
+      sort?: string;
     }
   ): Promise<any[]> {
     // Use search service if available (FTS search)
@@ -436,6 +437,7 @@ export class DatabaseService {
           status: options?.status,
           limit: options?.limit || 20,
           offset: options?.offset || 0,
+          sort: options?.sort,
         });
         return result.results;
       } catch (error) {
@@ -454,7 +456,12 @@ export class DatabaseService {
       WHERE (si.title LIKE ? OR si.content LIKE ? OR si.tags LIKE ?)
       AND (r.workflow_state IS NULL OR r.workflow_state != ?)
     `;
-    const params = [`%${query}%`, `%${query}%`, `%${query}%`, 'internal_only'];
+    const params: any[] = [
+      `%${query}%`,
+      `%${query}%`,
+      `%${query}%`,
+      'internal_only',
+    ];
 
     if (recordType) {
       const typeFilters = recordType.split(',').map((t) => t.trim());
@@ -473,7 +480,31 @@ export class DatabaseService {
       params.push(options.status);
     }
 
-    sql += ' ORDER BY si.updated_at DESC';
+    // Apply ordering with kind priority and user sort
+    const sortOption = options?.sort || 'updated_desc';
+    const kindPriority = `CASE 
+      WHEN json_extract(r.metadata, '$.kind') = 'root' THEN 3
+      WHEN json_extract(r.metadata, '$.kind') = 'chapter' THEN 2
+      ELSE 1
+    END`;
+    let userSort = '';
+    switch (sortOption) {
+      case 'updated_desc':
+        userSort = 'si.updated_at DESC';
+        break;
+      case 'created_desc':
+        userSort = 'r.created_at DESC';
+        break;
+      case 'title_asc':
+        userSort = 'LOWER(si.title) ASC, r.created_at DESC';
+        break;
+      case 'title_desc':
+        userSort = 'LOWER(si.title) DESC, r.created_at DESC';
+        break;
+      default:
+        userSort = 'si.updated_at DESC';
+    }
+    sql += ` ORDER BY ${kindPriority} ASC, ${userSort}`;
 
     if (options?.limit) {
       sql += ' LIMIT ?';
@@ -491,6 +522,12 @@ export class DatabaseService {
     recordId: string,
     recordType: string
   ): Promise<void> {
+    // Remove from search service if available (clears FTS5 and cache)
+    if (this.searchService) {
+      await this.searchService.removeRecord(recordId, recordType);
+    }
+
+    // Also remove from search_index table directly (for fallback searches)
     await this.adapter.execute(
       'DELETE FROM search_index WHERE record_id = ? AND record_type = ?',
       [recordId, recordType]
@@ -1218,12 +1255,46 @@ export class DatabaseService {
   /**
    * List records with optional filtering
    */
+  /**
+   * Build ORDER BY clause with kind priority and user sort
+   */
+  private buildOrderByClause(sort: string = 'created_desc'): string {
+    // Kind priority calculation (record=1, chapter=2, root=3)
+    const kindPriority = `CASE 
+      WHEN json_extract(metadata, '$.kind') = 'root' THEN 3
+      WHEN json_extract(metadata, '$.kind') = 'chapter' THEN 2
+      ELSE 1
+    END`;
+
+    // User sort clause
+    let userSort = '';
+    switch (sort) {
+      case 'updated_desc':
+        userSort = 'updated_at DESC, created_at DESC';
+        break;
+      case 'created_desc':
+        userSort = 'created_at DESC';
+        break;
+      case 'title_asc':
+        userSort = 'LOWER(title) ASC, created_at DESC';
+        break;
+      case 'title_desc':
+        userSort = 'LOWER(title) DESC, created_at DESC';
+        break;
+      default:
+        userSort = 'created_at DESC';
+    }
+
+    return `ORDER BY ${kindPriority} ASC, ${userSort}`;
+  }
+
   async listRecords(
     options: {
       type?: string;
       status?: string; // Deprecated: All records in this table are published by definition
       limit?: number;
       offset?: number;
+      sort?: string;
     } = {}
   ): Promise<{ records: any[]; total: number }> {
     let sql = 'SELECT * FROM records WHERE 1=1';
@@ -1265,8 +1336,9 @@ export class DatabaseService {
     const countResult = await this.adapter.query(countSql, params);
     const total = countResult[0].count;
 
-    // Apply ordering and pagination
-    sql += ' ORDER BY created_at DESC';
+    // Apply ordering and pagination (with kind priority and user sort)
+    const sortOption = options.sort || 'created_desc';
+    sql += ' ' + this.buildOrderByClause(sortOption);
 
     // Always apply limit (default to 10 if not provided)
     const limit = options.limit || 10;

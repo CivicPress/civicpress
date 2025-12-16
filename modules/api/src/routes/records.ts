@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, param, query, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
   requireRecordPermission,
@@ -49,6 +49,24 @@ export function createRecordsRouter(recordsService: RecordsService) {
   // IMPORTANT: Only returns published records from records table (all records in this table are published)
   router.get(
     '/',
+    [
+      query('type').optional().isString().withMessage('Type must be a string'),
+      query('limit')
+        .optional()
+        .isInt({ min: 1, max: 300 })
+        .withMessage('Limit must be between 1 and 300'),
+      query('page')
+        .optional()
+        .isInt({ min: 1 })
+        .withMessage('Page must be a positive integer'),
+      query('sort')
+        .optional()
+        .isIn(['updated_desc', 'created_desc', 'title_asc', 'title_desc'])
+        .withMessage(
+          'Sort must be one of: updated_desc, created_desc, title_asc, title_desc'
+        )
+        .customSanitizer((value) => value?.toLowerCase()),
+    ],
     optionalAuth(recordsService.getCivicPress()),
     async (req: any, res: Response) => {
       const isAuthenticated = (req as any).user !== undefined;
@@ -59,7 +77,29 @@ export function createRecordsRouter(recordsService: RecordsService) {
       logApiRequest(req, { operation });
 
       try {
-        const { type, limit, page } = req.query;
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return handleRecordsValidationError(
+            'list_records',
+            errors.array(),
+            req,
+            res
+          );
+        }
+
+        const { type, limit, page, sort } = req.query;
+
+        // Validate relevance sort is not used on records endpoint
+        if (sort === 'relevance') {
+          const error = new Error(
+            'Relevance sort not available for records listing'
+          );
+          (error as any).statusCode = 400;
+          (error as any).code = 'INVALID_SORT_CONTEXT';
+          (error as any).details =
+            'Relevance sort is only available for search endpoint';
+          throw error;
+        }
 
         // Query only records table - all records there are published (by table location)
         // No status filtering needed - table location determines if record is published
@@ -87,6 +127,7 @@ export function createRecordsRouter(recordsService: RecordsService) {
             // No status filter - table location (records table) determines published state
             limit: pageSize,
             page: currentPage,
+            sort: (sort as string) || 'created_desc', // Default to created_desc
           },
           (req as any).user
         );
@@ -105,7 +146,20 @@ export function createRecordsRouter(recordsService: RecordsService) {
           }
         );
 
-        sendSuccess(result, req, res, { operation });
+        sendSuccess(
+          {
+            ...result,
+            sort: result.sort || 'created_desc',
+          },
+          req,
+          res,
+          {
+            operation,
+            meta: {
+              sort: result.sort || 'created_desc',
+            },
+          }
+        );
       } catch (error) {
         handleApiError(operation, error, req, res, 'Failed to list records');
       }

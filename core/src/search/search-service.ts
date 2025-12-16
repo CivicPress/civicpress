@@ -33,6 +33,7 @@ export interface SearchOptions {
   status?: string;
   limit?: number;
   offset?: number;
+  sort?: string;
   enable_typo_tolerance?: boolean;
   enable_accent_insensitive?: boolean;
 }
@@ -40,6 +41,7 @@ export interface SearchOptions {
 export interface SearchSuggestions {
   text: string;
   source: string;
+  type: 'word' | 'title';
   frequency?: number;
 }
 

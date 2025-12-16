@@ -533,6 +533,57 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     // Create FTS5 virtual table and triggers
     await this.createFTS5Table();
+
+    // Create indexes for sort performance
+    await this.createSortIndexes();
+  }
+
+  /**
+   * Create indexes for sort performance
+   */
+  private async createSortIndexes(): Promise<void> {
+    const indexes = [
+      {
+        name: 'idx_records_updated_at',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_records_updated_at ON records(updated_at DESC)',
+        description: 'Index for updated_desc sort',
+      },
+      {
+        name: 'idx_records_created_at',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_records_created_at ON records(created_at DESC)',
+        description: 'Index for created_desc sort',
+      },
+      {
+        name: 'idx_records_title',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_records_title ON records(title COLLATE NOCASE)',
+        description: 'Index for title_asc/title_desc sort',
+      },
+      {
+        name: 'idx_search_index_updated_at',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_search_index_updated_at ON search_index(updated_at DESC)',
+        description: 'Index for search updated_desc sort',
+      },
+      {
+        name: 'idx_search_index_title',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_search_index_title ON search_index(title COLLATE NOCASE)',
+        description: 'Index for search title sort',
+      },
+    ];
+
+    for (const index of indexes) {
+      try {
+        await this.execute(index.sql);
+        coreDebug(`Created index ${index.name} for ${index.description}`, {
+          operation: 'database:initialize',
+        });
+      } catch (error: any) {
+        // Index might already exist, log but don't fail
+        coreDebug(
+          `Index ${index.name} already exists or creation failed: ${error.message}`,
+          { operation: 'database:initialize' }
+        );
+      }
+    }
   }
 
   /**
@@ -576,7 +627,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
           title,
           content,
           tags,
-          metadata_json UNINDEXED,
+          metadata UNINDEXED,
           content='search_index',
           content_rowid='rowid'
         );
@@ -597,7 +648,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         CREATE TRIGGER search_index_fts5_insert 
         AFTER INSERT ON search_index 
         BEGIN
-          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata_json)
+          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata)
           VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
         END;
       `);
@@ -607,9 +658,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
         CREATE TRIGGER search_index_fts5_update 
         AFTER UPDATE ON search_index 
         BEGIN
-          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata_json)
+          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata)
           VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
-          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata_json)
+          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata)
           VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
         END;
       `);
@@ -619,7 +670,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         CREATE TRIGGER search_index_fts5_delete 
         AFTER DELETE ON search_index 
         BEGIN
-          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata_json)
+          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata)
           VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
         END;
       `);

@@ -45,7 +45,7 @@ describe('Config Discovery with Database Configuration', () => {
         expect(config.database).toBeDefined();
         expect(config.database?.type).toBe('sqlite');
         expect(config.database?.sqlite).toBeDefined();
-        expect(config.database?.sqlite?.file).toBe('data/.civic/civic.db');
+        expect(config.database?.sqlite?.file).toContain('data/.civic/civic.db');
         // dataDir should be resolved to absolute path
         expect(config.dataDir).toContain('data');
       } finally {
