@@ -95,6 +95,31 @@ and this project adheres to
   - Rollback procedures
   - Version-specific migration notes
 
+- **Record Editor UI Improvements**: Major refinement of the record editor
+  interface
+  - **Title Bar**: Full-width title input with larger font size, improved
+    styling and focus states
+  - **Simplified Button System**: Replaced dual buttons with single "Save
+    changes" split-button
+    - Contextual dropdown menu with state-aware actions (Save, Publish,
+      Unpublish, Archive)
+    - Confirmation modals for publish, unpublish, archive, and delete actions
+    - Enhanced "More" menu with history, duplicate, export, and delete options
+  - **Editor & Preview Styling**: Flat document look with border divider, fixed
+    double scrollbar
+    - Enabled word wrap to remove horizontal scrollbar
+    - Consistent background with main content area
+    - Removed card wrappers for cleaner appearance
+  - **Sidebar Enhancements**: Improved accordion headers with better spacing and
+    alignment
+    - Status dropdown in Details section (similar to type dropdown)
+    - Raw YAML preview accordion item showing formatted frontmatter
+    - Date/Time display for creation and last updated timestamps
+    - Integrated tag management with UInputTags component
+    - Geography accordion moved to its own section
+    - Reactive counts that update when items are added/removed
+  - **Internationalization**: All editor strings translated (English and French)
+
 ### Changed
 
 - **Sort UI Integration**: Re-introduced sort dropdown in RecordSearch component
@@ -115,6 +140,12 @@ and this project adheres to
   - FTS5 table and triggers updated automatically
   - All migrations are additive only (no data loss)
   - Idempotent (safe to run multiple times)
+
+- **Record Editor UX**: Streamlined editing workflow
+  - Removed footer from edit page for full-height content
+  - More compact sidebar accordion headers with reduced padding
+  - Pluralized accordion titles based on item count
+  - Better icon and chevron alignment throughout sidebar
 
 ### Fixed
 
@@ -150,6 +181,15 @@ and this project adheres to
   - Fixed column name mismatch (`metadata_json` vs `metadata`)
   - Recreated FTS5 table and triggers with correct schema
   - Improved database integrity checks
+
+- **Editor Bug Fixes**: Fixed various editor UI issues
+  - Fixed `UDropdown` → `UDropdownMenu` component name migration
+  - Fixed lifecycle hooks in composables (`useRecordLock`, `useAutosave`)
+  - Fixed double scrollbar in editor
+  - Fixed content cutoff past line 24
+  - Fixed route order conflicts (`/drafts` before `/:id`)
+  - Fixed authentication flow for drafts endpoint
+  - Fixed TypeScript errors for status dropdown
 
 ### Technical Details
 
