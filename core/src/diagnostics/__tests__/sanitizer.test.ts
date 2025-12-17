@@ -36,7 +36,7 @@ describe('Data Sanitization', () => {
 
     it('should redact API keys', () => {
       const data = {
-        apiKey: 'sk_live_1234567890abcdef1234567890abcdef',
+        apiKey: 'fake_api_key_for_testing_purposes_only_12345',
         token: 'bearer_token_here',
       };
 

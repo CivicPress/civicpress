@@ -15,6 +15,8 @@ The assistant must **always** follow these instructions when generating code.
 - ALWAYS return complete code + Vitest tests + a doc stub.
 - Follow conventions from `conventions.md` (Nuxt 4 + TS, Prettier, ESLint,
   WCAG/i18n).
+- **Test file organization**: Unit tests in `__tests__` folders co-located with
+  source; integration/E2E tests in root `tests/` directory.
 - **⚠️ CRITICAL**: Never use `console.log()`, `console.error()`, or direct
   console output. Always use centralized output functions (cliSuccess,
   coreError, sendSuccess, etc.). See `docs/centralized-output-patterns.md`.

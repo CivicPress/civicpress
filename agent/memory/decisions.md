@@ -733,6 +733,10 @@ notifications:
 - **Isolation**: Each test runs in its own environment
 - **CI/CD Ready**: Automated testing pipeline
 - **Quality**: High test coverage ensures stability
+- **Test Organization**:
+  - Unit tests use `__tests__` folders co-located with source code
+  - Integration/E2E tests use root `tests/` directory
+  - Both patterns are configured in `vitest.config.mjs`
 
 ### Documentation
 

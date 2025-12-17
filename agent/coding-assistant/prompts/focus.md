@@ -76,6 +76,8 @@ Always respond in this order:
   `--silent` (tests rely on this).
 - Tests: use shared setup/fixtures; never touch the real
   `.system-data/civic.db`. Use isolated test data and temp dirs.
+- **Test file organization**: Unit tests in `__tests__` folders co-located with
+  source; integration/E2E tests in root `tests/` directory.
 - Data layout: `data/records/` for user records; `data/.civic/` for system
   configs; never commit user data.
 - DB base path lives under `.system-data` and is configured via `.civicsrc`.

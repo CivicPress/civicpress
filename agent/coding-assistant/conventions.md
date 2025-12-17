@@ -22,7 +22,11 @@ humans and the AI coding assistant.
 - **Components**: `modules/<module>/components/<PascalCaseName>.vue`.
 - **Composables**: `modules/<module>/composables/use<Name>.ts`.
 - **CLI commands**: `tools/cli/commands/<kebab-case>.ts`.
-- **Tests**: `modules/<module>/tests/<kebab-case>.spec.ts`.
+- **Tests**: Use two patterns based on test type:
+  - **Unit tests**: Co-locate with source using `__tests__` folders (e.g.,
+    `core/src/diagnostics/__tests__/system-checker.test.ts`)
+  - **Integration/E2E tests**: Place in root `tests/` directory (e.g.,
+    `tests/api/records.test.ts`, `tests/cli/export.test.ts`)
 - **Docs**: `modules/<module>/docs/<kebab-case>.md`.
 
 ---
@@ -106,8 +110,24 @@ cliError('Error occurred', 'ERROR_CODE', { error }, 'my-command');
 
 ## Testing
 
+### Test File Organization
+
+- **Unit Tests**: Place in `__tests__` folders co-located with source code
+  - Example: `core/src/diagnostics/__tests__/system-checker.test.ts`
+  - Benefits: Easy to find, maintain, and keep tests close to code
+  - Use for: Testing individual functions, classes, or modules in isolation
+- **Integration/E2E Tests**: Place in root `tests/` directory
+  - Example: `tests/api/records.test.ts`, `tests/cli/export.test.ts`
+  - Benefits: Clear separation, tests multiple components together
+  - Use for: Testing API endpoints, CLI commands, cross-module interactions,
+    end-to-end workflows
+- **Vitest Configuration**: Both patterns are configured in `vitest.config.mjs`
+  and will be discovered automatically
+
+### Test Writing Standards
+
 - At least **1 happy-path** and **1 edge-case** per feature.
-- Use Vitest’s `describe`, `it`, and `expect` consistently; apply
+- Use Vitest's `describe`, `it`, and `expect` consistently; apply
   `TEST_CONFIG.DEFAULT_TIMEOUT` to async tests.
 - Prefer unit tests; use integration tests only when necessary (CLI/API
   spin-up).
