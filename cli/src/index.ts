@@ -32,6 +32,7 @@ import { infoCommand } from './commands/info.js';
 import notifyCommand from './commands/notify.js';
 import { registerBackupCommand } from './commands/backup.js';
 import { registerRecordsCommand } from './commands/records.js';
+import { registerDiagnoseCommand } from './commands/diagnose.js';
 
 // Set logger options immediately to prevent warnings during config loading
 CentralConfigManager.setLoggerOptions({
@@ -76,6 +77,7 @@ cleanupCommand(cli);
 registerConfigCommands(cli);
 registerBackupCommand(cli);
 registerRecordsCommand(cli);
+registerDiagnoseCommand(cli);
 
 infoCommand(cli);
 

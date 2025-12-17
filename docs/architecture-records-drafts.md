@@ -256,6 +256,3 @@ changes:
 - **API includes** `hasUnpublishedChanges` flag in responses for authenticated
   editors
 - **Efficient detection** via batch querying of `record_drafts` table
-
-For more details, see
-[`docs/features/unpublished-changes-badge.md`](./features/unpublished-changes-badge.md).

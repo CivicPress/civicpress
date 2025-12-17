@@ -2,6 +2,9 @@
 export { CivicPress } from './civic-core.js';
 export { CreateRecordRequest, UpdateRecordRequest } from './civic-core.js';
 
+// Export diagnostic tools
+export * from './diagnostics/index.js';
+
 // Export record management
 export { RecordManager, RecordData } from './records/record-manager.js';
 export { RecordParser } from './records/record-parser.js';

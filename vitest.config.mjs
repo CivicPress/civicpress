@@ -23,7 +23,13 @@ export default defineConfig({
     // ONLY run CivicPress tests, exclude everything else
     include: [
       'tests/**/*.test.ts',        // Our test files
-      'tests/**/*.spec.ts'         // Alternative test naming
+      'tests/**/*.spec.ts',        // Alternative test naming
+      'core/src/**/__tests__/**/*.test.ts',  // Core unit tests
+      'core/src/**/__tests__/**/*.spec.ts',  // Core unit tests (spec naming)
+      'cli/src/**/__tests__/**/*.test.ts',   // CLI unit tests
+      'cli/src/**/__tests__/**/*.spec.ts',   // CLI unit tests (spec naming)
+      'modules/api/src/**/__tests__/**/*.test.ts',  // API unit tests
+      'modules/api/src/**/__tests__/**/*.spec.ts'  // API unit tests (spec naming)
     ],
     exclude: [
       '**/node_modules/**',        // Skip all dependency tests

@@ -25,6 +25,7 @@ import { workflowsRouter } from './routes/workflows.js';
 import { createIndexingRouter } from './routes/indexing.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createStatusRouter } from './routes/status.js';
+import { createDiagnoseRouter } from './routes/diagnose.js';
 import docsRouter from './routes/docs.js';
 import { createValidationRouter } from './routes/validation.js';
 import { createDiffRouter } from './routes/diff.js';
@@ -271,6 +272,15 @@ export class CivicPressAPI {
       searchRouter
     );
     this.app.use(apiPath('status'), createStatusRouter());
+    this.app.use(
+      apiPath('diagnose'),
+      authMiddleware(this.civicPress),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      createDiagnoseRouter()
+    );
     this.app.use(apiPath('validation'), createValidationRouter());
     this.app.use(
       apiPath('config'),
