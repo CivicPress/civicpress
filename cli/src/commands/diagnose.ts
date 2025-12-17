@@ -15,6 +15,7 @@ import {
   cliInfo,
   cliWarn,
   cliStartOperation,
+  cliRaw,
 } from '../utils/cli-output.js';
 import {
   CivicPress,
@@ -171,15 +172,15 @@ export function registerDiagnoseCommand(cli: CAC) {
                 'diagnose'
               );
               for (const issue of fixableIssues) {
-                console.log(`   • ${issue.message}`);
+                cliRaw(`   • ${issue.message}`);
                 if (issue.fix) {
-                  console.log(`     Fix: ${issue.fix.description}`);
+                  cliRaw(`     Fix: ${issue.fix.description}`);
                   if (issue.fix.command) {
-                    console.log(`     Command: ${issue.fix.command}`);
+                    cliRaw(`     Command: ${issue.fix.command}`);
                   }
                 }
               }
-              console.log('');
+              cliRaw('');
             }
           }
         } else {
@@ -377,7 +378,7 @@ async function outputDiagnosticResult(
 
   if (format === 'yaml') {
     const yaml = await import('yaml');
-    console.log(yaml.stringify(result));
+    cliRaw(yaml.stringify(result));
     return;
   }
 
@@ -401,7 +402,7 @@ async function outputDiagnosticReport(
 
   if (format === 'yaml') {
     const yaml = await import('yaml');
-    console.log(yaml.stringify(report));
+    cliRaw(yaml.stringify(report));
     return;
   }
 
@@ -429,15 +430,13 @@ function outputHumanReadable(
         ? 'yellow'
         : 'red';
 
-  console.log(
-    `\n${statusIcon} ${result.component.toUpperCase()}: ${result.status}`
-  );
-  console.log(`   Duration: ${result.duration}ms`);
-  console.log(`   Checks: ${result.checks.length}`);
-  console.log(`   Issues: ${result.issues.length}\n`);
+  cliRaw(`\n${statusIcon} ${result.component.toUpperCase()}: ${result.status}`);
+  cliRaw(`   Duration: ${result.duration}ms`);
+  cliRaw(`   Checks: ${result.checks.length}`);
+  cliRaw(`   Issues: ${result.issues.length}\n`);
 
   if (result.issues.length > 0) {
-    console.log('Issues:');
+    cliRaw('Issues:');
     for (const issue of result.issues) {
       const severityIcon =
         issue.severity === 'critical'
@@ -447,7 +446,7 @@ function outputHumanReadable(
             : issue.severity === 'medium'
               ? '🟡'
               : '🔵';
-      console.log(`  ${severityIcon} ${issue.message}`);
+      cliRaw(`  ${severityIcon} ${issue.message}`);
 
       // Show issue details if available
       if (issue.details) {
@@ -455,7 +454,7 @@ function outputHumanReadable(
           issue.details.missingTables &&
           Array.isArray(issue.details.missingTables)
         ) {
-          console.log(
+          cliRaw(
             `     Missing tables: ${issue.details.missingTables.join(', ')}`
           );
         }
@@ -463,7 +462,7 @@ function outputHumanReadable(
           issue.details.missingColumns &&
           Array.isArray(issue.details.missingColumns)
         ) {
-          console.log(
+          cliRaw(
             `     Missing columns: ${issue.details.missingColumns.join(', ')}`
           );
         }
@@ -471,7 +470,7 @@ function outputHumanReadable(
           issue.details.missingIndexes &&
           Array.isArray(issue.details.missingIndexes)
         ) {
-          console.log(
+          cliRaw(
             `     Missing indexes: ${issue.details.missingIndexes.join(', ')}`
           );
         }
@@ -479,30 +478,28 @@ function outputHumanReadable(
           issue.details.extraTables &&
           Array.isArray(issue.details.extraTables)
         ) {
-          console.log(
-            `     Extra tables: ${issue.details.extraTables.join(', ')}`
-          );
+          cliRaw(`     Extra tables: ${issue.details.extraTables.join(', ')}`);
         }
         if (issue.details.integrityResult) {
-          console.log(
+          cliRaw(
             `     Integrity check result: ${issue.details.integrityResult}`
           );
         }
         if (issue.details.path) {
-          console.log(`     Path: ${issue.details.path}`);
+          cliRaw(`     Path: ${issue.details.path}`);
         }
         if (issue.details.size) {
-          console.log(`     Size: ${issue.details.size} bytes`);
+          cliRaw(`     Size: ${issue.details.size} bytes`);
         }
         // Show missing directories/files
         if (issue.details.missing && Array.isArray(issue.details.missing)) {
-          console.log(`     Missing: ${issue.details.missing.join(', ')}`);
+          cliRaw(`     Missing: ${issue.details.missing.join(', ')}`);
         }
         if (
           issue.details.missingDirectories &&
           Array.isArray(issue.details.missingDirectories)
         ) {
-          console.log(
+          cliRaw(
             `     Missing directories: ${issue.details.missingDirectories.join(', ')}`
           );
         }
@@ -510,69 +507,67 @@ function outputHumanReadable(
           issue.details.missingFiles &&
           Array.isArray(issue.details.missingFiles)
         ) {
-          console.log(
+          cliRaw(
             `     Missing files: ${issue.details.missingFiles.join(', ')}`
           );
         }
         // Show memory details
         if (issue.details.systemMemory) {
           const mem = issue.details.systemMemory as any;
-          console.log(
+          cliRaw(
             `     System Memory: ${mem.usedGB}GB / ${mem.totalGB}GB used (${mem.usagePercent}), ${mem.freeGB}GB free`
           );
         }
         if (issue.details.processMemory) {
           const proc = issue.details.processMemory as any;
           if (proc.heapUsedMB && proc.heapTotalMB) {
-            console.log(
+            cliRaw(
               `     Process Heap: ${proc.heapUsedMB}MB / ${proc.heapTotalMB}MB (${proc.heapUsagePercent})`
             );
           }
           if (proc.rssGB) {
-            console.log(`     Process RSS: ${proc.rssGB}GB`);
+            cliRaw(`     Process RSS: ${proc.rssGB}GB`);
           }
         }
         // Show CPU load details
         if (issue.details.loadAverage) {
           const load = issue.details.loadAverage as any;
-          console.log(
+          cliRaw(
             `     Load Average: ${load['1min']} (1min), ${load['5min']} (5min), ${load['15min']} (15min)`
           );
-          console.log(
+          cliRaw(
             `     Load as % of cores: ${load['1minPercent']} (1min), ${load['5minPercent']} (5min)`
           );
-          console.log(`     CPU Cores: ${load.cpuCount}`);
+          cliRaw(`     CPU Cores: ${load.cpuCount}`);
         }
         if (issue.details.note) {
-          console.log(`     Note: ${issue.details.note}`);
+          cliRaw(`     Note: ${issue.details.note}`);
         }
       }
 
       // Show fix information
       if (issue.fix) {
-        console.log(`     Fix: ${issue.fix.description}`);
+        cliRaw(`     Fix: ${issue.fix.description}`);
         if (issue.fix.command) {
-          console.log(`     Command: ${issue.fix.command}`);
+          cliRaw(`     Command: ${issue.fix.command}`);
         }
         if (issue.fix.estimatedDuration) {
-          console.log(
-            `     Estimated duration: ${issue.fix.estimatedDuration}ms`
-          );
+          cliRaw(`     Estimated duration: ${issue.fix.estimatedDuration}ms`);
         }
       }
 
       if (issue.recommendations) {
         for (const rec of issue.recommendations) {
-          console.log(`     → ${rec}`);
+          cliRaw(`     → ${rec}`);
         }
       }
     }
-    console.log('');
+    cliRaw('');
   }
 
   // Show check details in verbose mode
   if (options?.verbose && result.checks && result.checks.length > 0) {
-    console.log('Check Details:');
+    cliRaw('Check Details:');
     for (const check of result.checks) {
       const checkIcon =
         check.status === 'pass'
@@ -580,85 +575,79 @@ function outputHumanReadable(
           : check.status === 'warning'
             ? '⚠️'
             : '❌';
-      console.log(`  ${checkIcon} ${check.name}: ${check.status}`);
+      cliRaw(`  ${checkIcon} ${check.name}: ${check.status}`);
       if (check.message) {
-        console.log(`     ${check.message}`);
+        cliRaw(`     ${check.message}`);
       }
       if (check.details && typeof check.details === 'object') {
         const details = check.details as any;
         if (details.missing && Array.isArray(details.missing)) {
-          console.log(`     Missing: ${details.missing.join(', ')}`);
+          cliRaw(`     Missing: ${details.missing.join(', ')}`);
         }
         if (details.missingTables && Array.isArray(details.missingTables)) {
-          console.log(
-            `     Missing tables: ${details.missingTables.join(', ')}`
-          );
+          cliRaw(`     Missing tables: ${details.missingTables.join(', ')}`);
         }
         if (details.missingColumns && Array.isArray(details.missingColumns)) {
-          console.log(
-            `     Missing columns: ${details.missingColumns.join(', ')}`
-          );
+          cliRaw(`     Missing columns: ${details.missingColumns.join(', ')}`);
         }
         if (details.missingIndexes && Array.isArray(details.missingIndexes)) {
-          console.log(
-            `     Missing indexes: ${details.missingIndexes.join(', ')}`
-          );
+          cliRaw(`     Missing indexes: ${details.missingIndexes.join(', ')}`);
         }
         if (details.extra && Array.isArray(details.extra)) {
-          console.log(`     Extra: ${details.extra.join(', ')}`);
+          cliRaw(`     Extra: ${details.extra.join(', ')}`);
         }
         if (details.extraTables && Array.isArray(details.extraTables)) {
-          console.log(`     Extra tables: ${details.extraTables.join(', ')}`);
+          cliRaw(`     Extra tables: ${details.extraTables.join(', ')}`);
         }
         if (details.existing && Array.isArray(details.existing)) {
-          console.log(`     Existing: ${details.existing.join(', ')}`);
+          cliRaw(`     Existing: ${details.existing.join(', ')}`);
         }
         if (details.tables) {
-          console.log(`     Tables found: ${details.tables}`);
+          cliRaw(`     Tables found: ${details.tables}`);
         }
         if (details.path) {
-          console.log(`     Path: ${details.path}`);
+          cliRaw(`     Path: ${details.path}`);
         }
         if (details.size) {
-          console.log(`     Size: ${details.size} bytes`);
+          cliRaw(`     Size: ${details.size} bytes`);
         }
         // Show memory details in check details
         if (details.totalGB && details.usedGB) {
-          console.log(
+          cliRaw(
             `     System Memory: ${details.usedGB}GB / ${details.totalGB}GB used (${details.usagePercent || 'N/A'}), ${details.freeGB || 'N/A'}GB free`
           );
         }
         if (details.processRssGB) {
-          console.log(`     Process RSS: ${details.processRssGB}GB`);
+          cliRaw(`     Process RSS: ${details.processRssGB}GB`);
         }
         if (details.heapUsagePercent) {
-          console.log(`     Heap Usage: ${details.heapUsagePercent}`);
+          cliRaw(`     Heap Usage: ${details.heapUsagePercent}`);
         }
         if (details.heapUsedMB && details.heapTotalMB) {
-          console.log(
+          cliRaw(
             `     Heap: ${details.heapUsedMB}MB / ${details.heapTotalMB}MB`
           );
         }
         // Show CPU load details
         if (details.load1Min !== undefined) {
-          console.log(
+          cliRaw(
             `     Load Average: ${details.load1Min} (1min), ${details.load5Min || 'N/A'} (5min), ${details.load15Min || 'N/A'} (15min)`
           );
         }
         if (details.loadPercent1Min) {
-          console.log(
+          cliRaw(
             `     Load as % of cores: ${details.loadPercent1Min} (1min), ${details.loadPercent5Min || 'N/A'} (5min)`
           );
         }
         if (details.cpuCount) {
-          console.log(`     CPU Cores: ${details.cpuCount}`);
+          cliRaw(`     CPU Cores: ${details.cpuCount}`);
         }
         if (details.recommendation) {
-          console.log(`     Recommendation: ${details.recommendation}`);
+          cliRaw(`     Recommendation: ${details.recommendation}`);
         }
       }
     }
-    console.log('');
+    cliRaw('');
   }
 }
 
@@ -676,15 +665,15 @@ function outputHumanReadableReport(
         ? '⚠️'
         : '❌';
 
-  console.log(
+  cliRaw(
     `\n${statusIcon} OVERALL STATUS: ${report.overallStatus.toUpperCase()}`
   );
-  console.log(`   Run ID: ${report.runId}`);
-  console.log(`   Duration: ${report.duration}ms`);
-  console.log(`   Total Checks: ${report.summary.totalChecks}`);
-  console.log(`   Passed: ${report.summary.passed}`);
-  console.log(`   Warnings: ${report.summary.warnings}`);
-  console.log(`   Errors: ${report.summary.errors}\n`);
+  cliRaw(`   Run ID: ${report.runId}`);
+  cliRaw(`   Duration: ${report.duration}ms`);
+  cliRaw(`   Total Checks: ${report.summary.totalChecks}`);
+  cliRaw(`   Passed: ${report.summary.passed}`);
+  cliRaw(`   Warnings: ${report.summary.warnings}`);
+  cliRaw(`   Errors: ${report.summary.errors}\n`);
 
   // Component results
   for (const component of report.components) {
@@ -693,11 +682,11 @@ function outputHumanReadableReport(
 
   // Summary recommendations
   if (report.recommendations.length > 0) {
-    console.log('Recommendations:');
+    cliRaw('Recommendations:');
     for (const rec of report.recommendations) {
-      console.log(`  • ${rec}`);
+      cliRaw(`  • ${rec}`);
     }
-    console.log('');
+    cliRaw('');
   }
 }
 
@@ -746,15 +735,15 @@ async function handleAutoFix(
 
       // Show details of what was fixed
       for (const result of successful) {
-        console.log(`  ✅ ${result.message}`);
+        cliRaw(`  ✅ ${result.message}`);
         if (result.backupId) {
-          console.log(`     Backup created: ${result.backupId}`);
+          cliRaw(`     Backup created: ${result.backupId}`);
         }
         if (result.rollbackAvailable) {
-          console.log(`     Rollback available: Yes`);
+          cliRaw(`     Rollback available: Yes`);
         }
         if (result.duration) {
-          console.log(`     Duration: ${result.duration}ms`);
+          cliRaw(`     Duration: ${result.duration}ms`);
         }
       }
     }
@@ -762,16 +751,16 @@ async function handleAutoFix(
     if (failed.length > 0) {
       cliWarn(`Failed to fix ${failed.length} issue(s)`, 'diagnose');
       for (const result of failed) {
-        console.log(`  ❌ ${result.message}`);
+        cliRaw(`  ❌ ${result.message}`);
         if (result.error) {
-          console.log(`     Error: ${result.error.message || result.error}`);
+          cliRaw(`     Error: ${result.error.message || result.error}`);
         }
         // Check for recommendation property (may be in error.details or as a direct property)
         const recommendation =
           (result as any).recommendation ||
           result.error?.details?.recommendation;
         if (recommendation) {
-          console.log(`     Recommendation: ${recommendation}`);
+          cliRaw(`     Recommendation: ${recommendation}`);
         }
       }
     }
@@ -797,12 +786,12 @@ function confirmAutoFix(issues: any[]): Promise<boolean> {
       output: process.stdout,
     });
 
-    console.log(`\n⚠️  Found ${issues.length} fixable issue(s):`);
+    cliWarn(`Found ${issues.length} fixable issue(s):`, 'diagnose');
     for (const issue of issues.slice(0, 5)) {
-      console.log(`   • ${issue.message}`);
+      cliRaw(`   • ${issue.message}`);
     }
     if (issues.length > 5) {
-      console.log(`   ... and ${issues.length - 5} more`);
+      cliRaw(`   ... and ${issues.length - 5} more`);
     }
 
     rl.question('\nDo you want to attempt auto-fix? (yes/no): ', (answer) => {
