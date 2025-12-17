@@ -131,6 +131,24 @@ export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
 export {
+  TemplateService,
+  TemplateCache,
+  TemplateValidator,
+} from './templates/index.js';
+export type {
+  TemplateResponse,
+  TemplateId,
+  TemplateFilters,
+  TemplateListResponse,
+  CreateTemplateRequest,
+  UpdateTemplateRequest,
+  TemplatePreviewResponse,
+  ValidationResult as TemplateValidationResult,
+  ITemplateService,
+  TemplateServiceOptions,
+  TemplateCacheOptions,
+} from './templates/index.js';
+export {
   coreSuccess,
   coreError,
   coreInfo,

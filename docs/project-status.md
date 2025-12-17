@@ -42,8 +42,13 @@ ready for development and testing.
   internal `.md` links to in-app routes for seamless navigation
 - **Validation**: Config-driven validation with dynamic type/status checking
 - **RecordParser**: Central parsing/serialization ensuring format consistency
-- **Templates**: Template system for record creation with confirmation modal
-  (all updated to new format)
+- **Templates**: Complete template management system with API, service layer,
+  caching, and security
+  - Full CRUD API endpoints for template management
+  - Template service layer with file watching and cache invalidation
+  - Security hardening (path traversal prevention, variable sanitization)
+  - UI integration with template selection, preview, and loading
+  - Comprehensive unit tests and API usage documentation
 - **Geography Data**: Spatial data support with SRID, coordinates, and
   attachments
 - **File Attachments**: Link existing files to records with categorization

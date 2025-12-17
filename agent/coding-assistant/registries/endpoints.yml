@@ -464,6 +464,20 @@ endpoints:
     desc: Delete template
     status: stable
 
+  - id: templates:preview
+    method: POST
+    path: /api/v1/templates/:id/preview
+    file: modules/api/src/routes/templates.ts
+    desc: Preview template with variable substitution
+    status: stable
+
+  - id: templates:validate
+    method: POST
+    path: /api/v1/templates/:id/validate
+    file: modules/api/src/routes/templates.ts
+    desc: Validate template structure and inheritance
+    status: stable
+
   - id: workflows:list
     method: GET
     path: /api/v1/workflows

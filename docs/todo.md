@@ -45,6 +45,12 @@
   - Removed sort dropdown from UI (was misleading - only sorted current page)
   - Simplified RecordList component logic
   - Cleaner separation of concerns (API handles sorting, UI handles display)
+- **Templates API Implementation**: Complete template management system
+  - Full CRUD API endpoints for template management
+  - Template service layer with caching and file watching
+  - Security hardening (path traversal prevention, variable sanitization)
+  - UI integration with template selection and preview
+  - Comprehensive unit tests and documentation
 - **Sort Options API**: Complete database-level sorting implementation
   - Sort parameter added to `/api/v1/records` and `/api/v1/search` endpoints
   - Supports `updated_desc`, `created_desc`, `title_asc`, `title_desc`,
@@ -229,20 +235,18 @@ V2)
 
 #### Templates API Implementation
 
-- [ ] **Implement Templates API endpoints**
-  - **Current Status**: API endpoints exist but are stubbed (return empty
-    arrays/mock data)
-  - **Files**: `modules/api/src/routes/templates.ts` (all endpoints return
-    placeholders)
-  - **UI Integration**: `modules/ui/app/composables/useTemplates.ts` has TODOs
-    to use API
-  - **Priority**: Medium - affects template functionality
-  - **Action**: Implement actual template loading from `data/.civic/templates/`
-    directory
-  - **Action**: Update UI to fetch templates from API instead of hardcoded
-    defaults
-  - **Reference**: `core/src/utils/template-engine.ts` has file system loading
-    logic
+- [x] **Implement Templates API endpoints** ✅ **COMPLETED**
+  - **Status**: Fully implemented and production-ready
+  - **Service Layer**: `TemplateService` with CRUD operations, caching, and
+    validation
+  - **API Endpoints**: All 7 endpoints implemented (`GET`, `POST`, `PUT`,
+    `DELETE`, `POST /preview`, `POST /validate`)
+  - **UI Integration**: `useTemplates` composable fully integrated with API
+  - **Security**: Path traversal prevention, variable sanitization, file system
+    permission checks
+  - **Caching**: In-memory cache with file watching for automatic invalidation
+  - **Tests**: Comprehensive unit tests for service, cache, and validator
+  - **Documentation**: Complete API usage guide and specifications
 
 #### Configuration Export/Import
 
