@@ -350,15 +350,27 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       const usedGB = usedMemory / (1024 * 1024 * 1024);
       const processRssGB = processRss / (1024 * 1024 * 1024);
 
-      // Thresholds consider both percentage AND absolute free memory:
+      // Thresholds consider both percentage AND absolute free memory, scaled by total RAM:
+      // For systems with large RAM (>32GB), we use percentage-based free memory thresholds
       // - >95% = critical (regardless of free memory)
-      // - >90% with <2GB free = critical
-      // - >85% with <1GB free = error
-      // - >80% with <500MB free = error
-      // - >90% with >=2GB free = warning
-      // - >85% with >=1GB free = warning
-      // - >80% with >=500MB free = low warning
+      // - >90% with <2GB free = critical (all systems)
+      // - >85% with <1GB free = error (all systems)
+      // - >80% with <500MB free = error (all systems)
+      // - >90% with >=2GB free = warning (all systems)
+      // - >85% with <10% free = warning (systems >=32GB RAM)
+      // - >85% with >=1GB free = warning (systems <32GB RAM)
+      // - >80% with <10% free = low warning (systems >=32GB RAM)
+      // - >80% with >=500MB free = low warning (systems <16GB RAM)
+      // - >80% with >=2GB free = low warning (systems 16-32GB RAM)
       // - Otherwise healthy (even if >70%, if there's plenty of free memory)
+
+      // Calculate free memory threshold based on total RAM
+      // For large systems (>=32GB), use 10% of total RAM as threshold
+      // For smaller systems, use fixed thresholds
+      const freeMemoryPercent = (freeGB / totalGB) * 100;
+      const lowWarningFreeThreshold =
+        totalGB >= 32 ? totalGB * 0.1 : totalGB >= 16 ? 2 : 0.5;
+      const warningFreeThreshold = totalGB >= 32 ? totalGB * 0.1 : 1;
 
       if (memoryUsagePercent > 95) {
         return this.createErrorResult(
@@ -436,34 +448,28 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         );
       }
 
-      if (memoryUsagePercent > 85 && freeGB >= 1) {
-        return this.createWarningResult(
-          'System memory usage is elevated but sufficient free memory available',
-          {
-            totalGB: totalGB.toFixed(2),
-            freeGB: freeGB.toFixed(2),
-            usedGB: usedGB.toFixed(2),
-            usagePercent: memoryUsagePercent.toFixed(1) + '%',
-            processRssGB: processRssGB.toFixed(2),
-            recommendation:
-              'Monitor memory usage - sufficient free memory available',
-          }
-        );
+      // Only warn if usage is high AND free memory is below threshold
+      // For large systems, we're more lenient - only warn if free memory is actually low
+      if (memoryUsagePercent > 85 && freeGB < warningFreeThreshold) {
+        return this.createWarningResult('System memory usage is elevated', {
+          totalGB: totalGB.toFixed(2),
+          freeGB: freeGB.toFixed(2),
+          usedGB: usedGB.toFixed(2),
+          usagePercent: memoryUsagePercent.toFixed(1) + '%',
+          processRssGB: processRssGB.toFixed(2),
+          recommendation: 'Monitor memory usage - free memory is getting low',
+        });
       }
 
-      if (memoryUsagePercent > 80 && freeGB >= 0.5) {
-        return this.createWarningResult(
-          'System memory usage is elevated but sufficient free memory available',
-          {
-            totalGB: totalGB.toFixed(2),
-            freeGB: freeGB.toFixed(2),
-            usedGB: usedGB.toFixed(2),
-            usagePercent: memoryUsagePercent.toFixed(1) + '%',
-            processRssGB: processRssGB.toFixed(2),
-            recommendation:
-              'Monitor memory usage - sufficient free memory available',
-          }
-        );
+      if (memoryUsagePercent > 80 && freeGB < lowWarningFreeThreshold) {
+        return this.createWarningResult('System memory usage is elevated', {
+          totalGB: totalGB.toFixed(2),
+          freeGB: freeGB.toFixed(2),
+          usedGB: usedGB.toFixed(2),
+          usagePercent: memoryUsagePercent.toFixed(1) + '%',
+          processRssGB: processRssGB.toFixed(2),
+          recommendation: 'Monitor memory usage - free memory is getting low',
+        });
       }
 
       // Check process memory (heap usage)

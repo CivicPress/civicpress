@@ -689,6 +689,8 @@
     "activity": "Activity",
     "activityLog": "Activity Log",
     "activityLogDescription": "View system audit trail",
+    "diagnosticsNav": "Diagnostics",
+    "diagnosticsDescription": "System health checks and diagnostics",
     "setup": "Setup",
     "setupRecommended": "Setup recommended",
     "setupRecommendedDescription": "Some configuration files are not initialized. Run the setup to create user copies from defaults and validate.",
@@ -822,6 +824,41 @@
       "message": "Message",
       "paginationRange": "{start}-{end} of {total}",
       "failedToLoad": "Failed to load activity log"
+    },
+    "diagnostics": {
+      "title": "System Diagnostics",
+      "description": "Run system health checks and diagnose issues",
+      "diagnosticsNav": "Diagnostics",
+      "diagnosticsDescription": "System health checks and diagnostics",
+      "overallStatus": "Overall Status",
+      "lastRun": "Last run: {time}",
+      "notRun": "Diagnostics not run yet",
+      "runDiagnostics": "Run Diagnostics",
+      "running": "Running diagnostics...",
+      "autoFix": "Auto-Fix",
+      "autoFixable": "Auto-fixable",
+      "confirmFix": "Attempt to auto-fix {count} issue(s)?",
+      "summary": "{totalChecks} checks, {passed} passed, {warnings} warnings, {errors} errors",
+      "status": {
+        "healthy": "Healthy",
+        "warning": "Warning",
+        "error": "Error"
+      },
+      "components": {
+        "database": "Database",
+        "search": "Search",
+        "config": "Configuration",
+        "filesystem": "File System",
+        "system": "System"
+      },
+      "checks": "Checks",
+      "issues": "{count} issue | {count} issues",
+      "component": "Component",
+      "fix": "Fix",
+      "recommendations": "Recommendations",
+      "duration": "{ms}ms",
+      "noData": "No diagnostic data available. Click 'Run Diagnostics' to start.",
+      "noComponentData": "No data available for this component"
     },
     "storage": {
       "title": "File Storage",

@@ -76,6 +76,17 @@ ready for development and testing.
 - **Development Server**: Hot reload for API and UI development
 - **Documentation**: Comprehensive guides and specifications
 - **Storage Module**: File management system with API and CLI
+- **Diagnostic Tools**: Comprehensive system diagnostics with auto-fix
+  - `civic diagnose` command with component-specific checks (database, search,
+    config, filesystem, system)
+  - `--fix` flag provides automated repair for fixable issues
+  - Auto-fix capabilities with backup creation and rollback support
+  - Centralized output system (all commands support `--json`, `--silent`)
+- **Sort Options API**: Database-level sorting with kind priority
+  - Sort parameter on `/api/v1/records` and `/api/v1/search` endpoints
+  - Supports `updated_desc`, `created_desc`, `title_asc`, `title_desc`,
+    `relevance`
+  - Database indexes for optimal sort performance
 
 ### In Progress
 
@@ -115,6 +126,38 @@ ready for development and testing.
 - Admin dashboard - In Progress
 
 ### Recently Completed Features
+
+#### **Diagnostic & Repair System (January 2025)**
+
+- **Status**: Fully Implemented
+- **Diagnostic Command**: `civic diagnose` with component-specific checks
+  - Database diagnostics (integrity, schema, indexes, FTS5)
+  - Search diagnostics (index sync, performance, cache)
+  - Configuration diagnostics (validation, migration status)
+  - Filesystem diagnostics (file integrity, Git health)
+  - System diagnostics (memory, CPU, disk space)
+- **Auto-Fix Capabilities**: `--fix` flag provides automated repair
+  - Database: Missing indexes, FTS5 rebuild, VACUUM, schema fixes
+  - Search: Index rebuild, cache clearing, synchronization
+  - Config: YAML syntax fixes (limited)
+  - Filesystem: Directory structure, permissions
+  - Backup creation before fixes with rollback support
+- **Centralized Output**: All diagnostic output uses centralized functions
+  - Respects `--json` and `--silent` flags
+  - Consistent formatting across all commands
+
+#### **Sort Options API (January 2025)**
+
+- **Status**: Fully Implemented
+- **API Endpoints**: Sort parameter added to records and search endpoints
+  - `/api/v1/records`: `updated_desc`, `created_desc`, `title_asc`, `title_desc`
+  - `/api/v1/search`: `relevance`, `updated_desc`, `created_desc`, `title_asc`,
+    `title_desc`
+- **Database Implementation**: Database-level sorting with kind priority
+  - Kind priority always primary sort (root > chapter > other)
+  - User sort is secondary within same kind priority
+  - Database indexes created for optimal performance
+  - Comprehensive test coverage
 
 #### **Internationalization (i18n) System (December 2025)**
 

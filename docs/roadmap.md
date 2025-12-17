@@ -87,10 +87,12 @@ Each phase includes objectives and expected deliverables.
 - Refine record schema validation
 - Enhance storage abstraction layer (additional providers, performance
   optimizations)
-- Add CLI improvements (diagnostics, repair, validation)
-- Improve error handling and logs
+- Add CLI improvements (diagnostics, repair, validation) ✅ (Diagnostics with
+  --fix flag provides repair functionality, validation command implemented)
+- Improve error handling and logs ✅ (Centralized output migration complete,
+  diagnostic command uses centralized output)
 - Polish UI navigation and list views ✅ (Page-based pagination, improved search
-  UX)
+  UX, sort options API implemented)
 - Add basic documentation for architecture
 
 **Note:** Basic storage abstraction (local, S3, Azure) is already implemented

@@ -690,6 +690,8 @@
     "activity": "Activité",
     "activityLog": "Journal d'activité",
     "activityLogDescription": "Voir la piste d'audit du système",
+    "diagnosticsNav": "Diagnostics",
+    "diagnosticsDescription": "Vérifications de santé et diagnostics du système",
     "setup": "Configuration",
     "setupRecommended": "Configuration recommandée",
     "setupRecommendedDescription": "Certains fichiers de configuration ne sont pas initialisés. Exécutez la configuration pour créer des copies utilisateur à partir des valeurs par défaut et valider.",
@@ -823,6 +825,41 @@
       "message": "Message",
       "paginationRange": "{start}-{end} sur {total}",
       "failedToLoad": "Échec du chargement du journal d'activité"
+    },
+    "diagnostics": {
+      "title": "Diagnostics système",
+      "description": "Exécuter des vérifications de santé du système et diagnostiquer les problèmes",
+      "diagnosticsNav": "Diagnostics",
+      "diagnosticsDescription": "Vérifications de santé et diagnostics du système",
+      "overallStatus": "État général",
+      "lastRun": "Dernière exécution : {time}",
+      "notRun": "Diagnostics pas encore exécutés",
+      "runDiagnostics": "Exécuter les diagnostics",
+      "running": "Exécution des diagnostics...",
+      "autoFix": "Correction automatique",
+      "autoFixable": "Corrigeable automatiquement",
+      "confirmFix": "Tenter de corriger automatiquement {count} problème(s) ?",
+      "summary": "{totalChecks} vérifications, {passed} réussies, {warnings} avertissements, {errors} erreurs",
+      "status": {
+        "healthy": "Sain",
+        "warning": "Avertissement",
+        "error": "Erreur"
+      },
+      "components": {
+        "database": "Base de données",
+        "search": "Recherche",
+        "config": "Configuration",
+        "filesystem": "Système de fichiers",
+        "system": "Système"
+      },
+      "checks": "Vérifications",
+      "issues": "{count} problème | {count} problèmes",
+      "component": "Composant",
+      "fix": "Correction",
+      "recommendations": "Recommandations",
+      "duration": "{ms}ms",
+      "noData": "Aucune donnée de diagnostic disponible. Cliquez sur 'Exécuter les diagnostics' pour commencer.",
+      "noComponentData": "Aucune donnée disponible pour ce composant"
     },
     "storage": {
       "title": "Stockage de fichiers",
