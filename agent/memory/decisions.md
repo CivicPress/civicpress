@@ -36,8 +36,6 @@ container system for CivicPress.
 - User guide: `docs/dependency-injection-guide.md`
 - Performance summary: `docs/di-performance-summary.md`
 - Specification: `docs/specs/dependency-injection.md`
-- Implementation plan:
-  `docs/implementation-plans/dependency-injection-implementation.md`
 
 ## Unified Error Handling System (December 2025)
 
@@ -72,7 +70,6 @@ system.
 #### **Documentation**
 
 - Error handling guide: `docs/error-handling.md`
-- Implementation plan: `docs/implementation-plans/unified-error-handling.md`
 
 ## Geography Data System Architecture (Latest)
 

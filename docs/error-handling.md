@@ -427,8 +427,6 @@ expect(response.body.error.correlationId).toBeDefined();
 
 ## Related Documentation
 
-- [Unified Error Handling Implementation Plan](./implementation-plans/unified-error-handling.md) -
-  Implementation details
 - [API Integration Guide](./api-integration-guide.md) - API usage patterns
 - [Development Patterns](./dev-pattern.md) - Overall development approach
 
