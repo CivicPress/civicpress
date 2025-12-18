@@ -19,6 +19,10 @@ import {
   ensureDirectoryForRecordPath,
   parseRecordRelativePath,
 } from '../utils/record-paths.js';
+import type { ICacheStrategy } from '../cache/types.js';
+import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
+import { MemoryCache } from '../cache/strategies/memory-cache.js';
+import type { CacheConfig } from '../cache/types.js';
 
 const logger = new Logger();
 
@@ -98,6 +102,7 @@ export class RecordManager {
   private workflows: WorkflowEngine;
   private templates: TemplateEngine;
   private dataDir: string;
+  private cacheManager?: UnifiedCacheManager;
 
   constructor(
     db: DatabaseService,
@@ -105,7 +110,8 @@ export class RecordManager {
     hooks: HookSystem,
     workflows: WorkflowEngine,
     templates: TemplateEngine,
-    dataDir: string
+    dataDir: string,
+    cacheManager?: UnifiedCacheManager
   ) {
     this.db = db;
     this.git = git;
@@ -113,6 +119,37 @@ export class RecordManager {
     this.workflows = workflows;
     this.templates = templates;
     this.dataDir = dataDir;
+    this.cacheManager = cacheManager;
+  }
+
+  /**
+   * Get or create suggestions cache (lazy initialization)
+   */
+  private getSuggestionsCache(): ICacheStrategy<{
+    suggestions: string[];
+    timestamp: number;
+  }> {
+    if (!this.suggestionsCache) {
+      if (this.cacheManager) {
+        this.suggestionsCache = this.cacheManager.getCache<{
+          suggestions: string[];
+          timestamp: number;
+        }>('recordSuggestions');
+      } else {
+        // Fallback: create MemoryCache directly (for backward compatibility)
+        const cacheConfig: CacheConfig = {
+          strategy: 'memory',
+          enabled: true,
+          defaultTTL: 5 * 60 * 1000, // 5 minutes
+          maxSize: 1000,
+        };
+        this.suggestionsCache = new MemoryCache<{
+          suggestions: string[];
+          timestamp: number;
+        }>(cacheConfig, logger);
+      }
+    }
+    return this.suggestionsCache;
   }
 
   /**
@@ -625,11 +662,11 @@ export class RecordManager {
       return null;
     }
 
-    // Use saga for published records (non-draft)
+    // Use saga for published records (non-draft) unless explicitly skipped
     const isPublished =
       existingRecordForCheck.status &&
       existingRecordForCheck.status !== 'draft';
-    if (isPublished) {
+    if (isPublished && !request.skipSaga) {
       return this.updateRecordSaga(id, request, user);
     }
 
@@ -732,23 +769,29 @@ export class RecordManager {
     // Update in database
     await this.db.updateRecord(id, dbUpdates);
 
-    // Update file in git repository
-    await this.updateRecordFile(updatedRecord);
+    // Update file in git repository (skip during sync operations)
+    if (!request.skipFileGeneration) {
+      await this.updateRecordFile(updatedRecord);
+    }
 
-    // Log audit event
-    await this.db.logAuditEvent({
-      action: 'update_record',
-      resourceType: 'record',
-      resourceId: id,
-      details: `Updated record ${id}`,
-    });
+    // Log audit event (skip during sync operations)
+    if (!request.skipAudit) {
+      await this.db.logAuditEvent({
+        action: 'update_record',
+        resourceType: 'record',
+        resourceId: id,
+        details: `Updated record ${id}`,
+      });
+    }
 
-    // Trigger hooks
-    await this.hooks.emit('record:updated', {
-      record: updatedRecord,
-      user: user,
-      action: 'update',
-    });
+    // Trigger hooks (skip during sync operations to avoid infinite loops)
+    if (!request.skipHooks && !request.skipFileGeneration) {
+      await this.hooks.emit('record:updated', {
+        record: updatedRecord,
+        user: user,
+        action: 'update',
+      });
+    }
 
     return updatedRecord;
   }
@@ -962,11 +1005,10 @@ export class RecordManager {
    * Get search suggestions based on record titles and content
    * Optimized: Uses lightweight query + caching (no full record fetches)
    */
-  private suggestionsCache = new Map<
-    string,
-    { suggestions: string[]; timestamp: number }
-  >();
-  private readonly SUGGESTIONS_TTL = 5 * 60 * 1000; // 5 minutes
+  private suggestionsCache?: ICacheStrategy<{
+    suggestions: string[];
+    timestamp: number;
+  }>;
 
   async getSearchSuggestions(
     query: string,
@@ -982,8 +1024,8 @@ export class RecordManager {
     }
 
     // Check cache
-    const cached = this.suggestionsCache.get(normalized);
-    if (cached && Date.now() - cached.timestamp < this.SUGGESTIONS_TTL) {
+    const cached = await this.getSuggestionsCache().get(normalized);
+    if (cached) {
       return cached.suggestions.slice(0, limit);
     }
 
@@ -1002,20 +1044,10 @@ export class RecordManager {
         const suggestionTexts = suggestions.map((s) => s.text);
 
         // Update cache
-        this.suggestionsCache.set(normalized, {
+        await this.getSuggestionsCache().set(normalized, {
           suggestions: suggestionTexts,
           timestamp: Date.now(),
         });
-
-        // Cleanup old cache entries
-        if (this.suggestionsCache.size > 1000) {
-          const cutoff = Date.now() - this.SUGGESTIONS_TTL;
-          for (const [key, value] of this.suggestionsCache.entries()) {
-            if (value.timestamp < cutoff) {
-              this.suggestionsCache.delete(key);
-            }
-          }
-        }
 
         return suggestionTexts;
       } catch (error) {
@@ -1044,7 +1076,7 @@ export class RecordManager {
     const suggestions = results.map((r: any) => r.suggestion);
 
     // Update cache
-    this.suggestionsCache.set(normalized, {
+    await this.getSuggestionsCache().set(normalized, {
       suggestions,
       timestamp: Date.now(),
     });

@@ -37,6 +37,7 @@ export function createTemplatesRouter() {
       dataDir,
       enableCache: true,
       enableWatching: true,
+      cacheManager: civicPress.getCacheManager(),
     });
   }
 

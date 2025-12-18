@@ -19,9 +19,10 @@ import * as path from 'path';
 import matter from 'gray-matter';
 import yaml from 'yaml';
 import { TemplateEngine, type Template } from '../utils/template-engine.js';
-import { TemplateCache } from './template-cache.js';
+import { TemplateCacheAdapter } from './template-cache-adapter.js';
 import { TemplateValidator } from './template-validator.js';
 import { Logger } from '../utils/logger.js';
+import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 import {
   TemplateNotFoundError,
   TemplateExistsError,
@@ -55,11 +56,12 @@ export interface TemplateServiceOptions {
   logger?: Logger;
   enableCache?: boolean;
   enableWatching?: boolean;
+  cacheManager?: UnifiedCacheManager;
 }
 
 export class TemplateService implements ITemplateService {
   private templateEngine: TemplateEngine;
-  private cache: TemplateCache;
+  private cache: TemplateCacheAdapter;
   private validator: TemplateValidator;
   private logger: Logger;
   private dataDir: string;
@@ -73,7 +75,7 @@ export class TemplateService implements ITemplateService {
     this.enableCache = options.enableCache ?? true;
 
     this.templateEngine = new TemplateEngine(options.dataDir);
-    this.cache = new TemplateCache({
+    this.cache = new TemplateCacheAdapter(options.cacheManager, {
       dataDir: options.dataDir,
       logger: this.logger,
       enableWatching: options.enableWatching ?? true,
@@ -91,7 +93,7 @@ export class TemplateService implements ITemplateService {
 
     // Check cache
     if (this.enableCache) {
-      const cached = this.cache.getList(cacheKey);
+      const cached = await this.cache.getList(cacheKey);
       if (cached) {
         return {
           templates: cached,
@@ -145,7 +147,7 @@ export class TemplateService implements ITemplateService {
 
     // Cache result
     if (this.enableCache) {
-      this.cache.setList(cacheKey, allTemplates);
+      await this.cache.setList(cacheKey, allTemplates);
     }
 
     return {
@@ -171,7 +173,7 @@ export class TemplateService implements ITemplateService {
 
     // Check cache
     if (this.enableCache) {
-      const cached = this.cache.get(id);
+      const cached = await this.cache.get(id);
       if (cached) {
         return cached;
       }
@@ -204,7 +206,7 @@ export class TemplateService implements ITemplateService {
 
     // Cache result
     if (this.enableCache) {
-      this.cache.set(id, response);
+      await this.cache.set(id, response);
     }
 
     return response;
@@ -299,7 +301,7 @@ export class TemplateService implements ITemplateService {
 
     // Invalidate cache
     if (this.enableCache) {
-      this.cache.invalidate();
+      await this.cache.invalidate();
     }
 
     // Load and return created template
@@ -381,7 +383,7 @@ export class TemplateService implements ITemplateService {
 
     // Invalidate cache
     if (this.enableCache) {
-      this.cache.invalidate(id);
+      await this.cache.invalidate(id);
     }
 
     // Load and return updated template
@@ -421,7 +423,7 @@ export class TemplateService implements ITemplateService {
 
     // Invalidate cache
     if (this.enableCache) {
-      this.cache.invalidate(id);
+      await this.cache.invalidate(id);
     }
   }
 
@@ -518,7 +520,7 @@ export class TemplateService implements ITemplateService {
    * Invalidate cache
    */
   async invalidateCache(id?: TemplateId): Promise<void> {
-    this.cache.invalidate(id);
+    await this.cache.invalidate(id);
   }
 
   /**
@@ -596,7 +598,7 @@ export class TemplateService implements ITemplateService {
   /**
    * Cleanup resources
    */
-  destroy(): void {
-    this.cache.stopWatching();
+  async destroy(): Promise<void> {
+    await this.cache.stopWatching();
   }
 }

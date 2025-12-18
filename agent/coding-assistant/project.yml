@@ -18,6 +18,8 @@ non_negotiables:
     error-handling.md).
   - All multi-step operations spanning storage boundaries MUST use the Saga
     Pattern (see saga-pattern.md and saga-pattern-usage-guide.md).
+  - All caching MUST use the Unified Caching Layer (see unified-caching-layer.md
+    and cache-usage-guide.md).
 
 defaults:
   language: TypeScript

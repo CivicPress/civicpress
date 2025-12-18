@@ -438,65 +438,71 @@ archiveRecord) span multiple storage boundaries:
 
 **Priority:** Medium  
 **Effort:** Medium  
-**Impact:** Medium
+**Impact:** Medium  
+**Status:** ✅ **COMPLETE**
 
-**Proposal:** Create a unified caching abstraction with consistent strategies.
+**Implementation:** Unified caching abstraction with consistent strategies.
 
-```typescript
-// New: core/src/cache/cache-manager.ts
-export interface CacheStrategy {
-  get<T>(key: string): Promise<T | null>;
-  set<T>(key: string, value: T, ttl?: number): Promise<void>;
-  invalidate(key: string): Promise<void>;
-  clear(): Promise<void>;
-}
+**Components Implemented:**
 
-export class UnifiedCacheManager implements CacheStrategy {
-  private caches = new Map<string, CacheStrategy>();
+1. **Unified Cache Interface** (`ICacheStrategy<T>`)
+   - Location: `core/src/cache/types.ts`
+   - Standardized interface for all cache implementations
+   - Supports TTL, invalidation, metrics, lifecycle management
 
-  register(name: string, strategy: CacheStrategy): void {
-    this.caches.set(name, strategy);
-  }
+2. **Cache Strategies**
+   - **MemoryCache**: TTL-based in-memory cache with LRU eviction
+     - Location: `core/src/cache/strategies/memory-cache.ts`
+     - Features: TTL expiration, LRU eviction, memory limits, hit/miss tracking
+   - **FileWatcherCache**: File watching + manual invalidation
+     - Location: `core/src/cache/strategies/file-watcher-cache.ts`
+     - Features: File system watching, debounced invalidation, pattern-based key
+       mapping
 
-  async get<T>(key: string, cacheName?: string): Promise<T | null> {
-    if (cacheName) {
-      return this.caches.get(cacheName)?.get<T>(key) ?? null;
-    }
-    // Try all caches
-    for (const cache of this.caches.values()) {
-      const result = await cache.get<T>(key);
-      if (result) return result;
-    }
-    return null;
-  }
+3. **Unified Cache Manager**
+   - Location: `core/src/cache/unified-cache-manager.ts`
+   - Centralized registry for all caches
+   - Global operations (clearAll, getGlobalStats)
+   - Lifecycle management (initialize, shutdown)
+   - Cache warming support
 
-  // ... other methods
-}
+4. **Cache Adapters**
+   - **SearchCacheAdapter**: Wraps MemoryCache for search results
+   - **DiagnosticCacheAdapter**: Wraps MemoryCache for diagnostic results
+   - **TemplateCacheAdapter**: Wraps FileWatcherCache for templates
+   - All maintain backward compatibility
 
-// Cache implementations
-export class MemoryCache implements CacheStrategy {
-  // TTL-based, size-limited
-}
+5. **Advanced Features**
+   - Cache warming (preload on startup, scheduled warming)
+   - Comprehensive metrics (hits, misses, hit rate, memory usage)
+   - Health monitoring (cache health checker in diagnostic system)
+   - API endpoints (`/api/v1/cache/metrics`, `/api/v1/cache/health`,
+     `/api/v1/cache/list`)
+   - CLI commands (`civic cache:metrics`, `civic cache:health`,
+     `civic cache:list`)
 
-export class FileWatcherCache implements CacheStrategy {
-  // File watching + manual invalidation
-}
-```
+**Benefits Achieved:**
 
-**Benefits:**
+- ✅ Consistent cache interface across all implementations
+- ✅ Easy to swap implementations (strategy pattern)
+- ✅ Centralized cache metrics and monitoring
+- ✅ Memory management with size and memory limits
+- ✅ Cache warming for improved performance
+- ✅ Health monitoring integrated with diagnostic system
 
-- Consistent cache interface
-- Easy to swap implementations
-- Centralized cache metrics
-- Memory management
+**Migration Status:**
 
-**Implementation Steps:**
+- ✅ `SearchCache` → `SearchCacheAdapter` (using UnifiedCacheManager)
+- ✅ `DiagnosticCache` → `DiagnosticCacheAdapter` (using UnifiedCacheManager)
+- ✅ `TemplateCache` → `TemplateCacheAdapter` (using UnifiedCacheManager)
+- ✅ `RecordManager.suggestionsCache` → Direct `MemoryCache` usage
 
-1. Design cache interface
-2. Create unified cache manager
-3. Migrate existing caches to use interface
-4. Add cache metrics/monitoring
-5. Document cache strategies
+**Documentation:**
+
+- Specification: `docs/specs/unified-caching-layer.md`
+- Usage Guide: `docs/cache-usage-guide.md`
+- API: Cache metrics endpoints in `modules/api/src/routes/cache.ts`
+- CLI: Cache commands in `cli/src/commands/cache.ts`
 
 ---
 
@@ -786,11 +792,16 @@ private async initializeOptionalServices(): Promise<void> {
 
 ### Phase 2: Quality (v0.3.x) - 2-3 months
 
-4. **Unified Caching Layer** (Medium Priority)
-   - Design cache interface
-   - Migrate existing caches
-   - Add metrics
-   - **Effort:** 2 weeks
+4. **Unified Caching Layer** (Medium Priority) ✅ **COMPLETE**
+   - ✅ Unified cache interface (`ICacheStrategy`)
+   - ✅ Cache strategies (MemoryCache, FileWatcherCache)
+   - ✅ Unified cache manager with centralized registry
+   - ✅ All existing caches migrated to unified interface
+   - ✅ Cache metrics and monitoring
+   - ✅ Cache warming support
+   - ✅ Health monitoring integration
+   - ✅ API and CLI endpoints
+   - **Effort:** 2 weeks (completed)
 
 5. **Health Check System** (Medium Priority) ✅ **PARTIALLY COMPLETE**
    - ✅ Basic `/health` endpoint implemented
@@ -897,7 +908,7 @@ Phase 1 improvements complete (Error Handling, DI Container, Saga Pattern), and
 | Unified Error Handling | ✅ Complete | High   | ✅ Implemented                       |
 | DI Container           | ✅ Complete | High   | ✅ Implemented                       |
 | Saga Pattern           | ✅ Complete | High   | ✅ Implemented                       |
-| Unified Caching        | Medium      | Medium | 🟡 Medium                            |
+| Unified Caching        | ✅ Complete | Medium | ✅ Implemented                       |
 | Health Checks          | ✅ Complete | Medium | ✅ Implemented (Basic + Diagnostics) |
 | Repository Pattern     | High        | Medium | 🟡 Medium                            |
 | Event Sourcing         | Very High   | High   | 🟢 Low (Future)                      |

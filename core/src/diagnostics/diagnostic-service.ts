@@ -23,9 +23,10 @@ import { Logger } from '../utils/logger.js';
 import { AuditLogger } from '../audit/audit-logger.js';
 import { DiagnosticCircuitBreaker } from './circuit-breaker.js';
 import { ResourceMonitor } from './resource-monitor.js';
-import { DiagnosticCache } from './cache.js';
+import { DiagnosticCacheAdapter } from './diagnostic-cache-adapter.js';
 import { CheckExecutor } from './check-executor.js';
 import { sanitizeDiagnosticReport } from './utils/sanitizer.js';
+import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 import * as crypto from 'crypto';
 
 export interface DiagnosticServiceOptions {
@@ -35,6 +36,7 @@ export interface DiagnosticServiceOptions {
   logger?: Logger;
   auditLogger?: AuditLogger;
   dataDir: string;
+  cacheManager?: UnifiedCacheManager;
 }
 
 export class DiagnosticService {
@@ -47,7 +49,7 @@ export class DiagnosticService {
 
   private checkers: Map<string, DiagnosticChecker[]> = new Map();
   private circuitBreaker: DiagnosticCircuitBreaker;
-  private cache: DiagnosticCache;
+  private cache: DiagnosticCacheAdapter;
   private checkExecutor: CheckExecutor;
   private resourceMonitor?: ResourceMonitor;
 
@@ -63,7 +65,9 @@ export class DiagnosticService {
     this.circuitBreaker = new DiagnosticCircuitBreaker({
       logger: this.logger,
     });
-    this.cache = new DiagnosticCache({
+    this.cache = new DiagnosticCacheAdapter(options.cacheManager, {
+      defaultTTL: 300000, // 5 minutes
+      maxSize: 100,
       logger: this.logger,
     });
     this.checkExecutor = new CheckExecutor({
@@ -168,7 +172,7 @@ export class DiagnosticService {
 
       // Cache results
       const cacheKey = this.cache.generateKey('all', options);
-      this.cache.set(cacheKey, report);
+      await this.cache.set(cacheKey, report);
 
       // Audit log
       if (this.auditLogger) {
@@ -254,7 +258,7 @@ export class DiagnosticService {
 
     // Check cache
     const cacheKey = this.cache.generateKey(component, options);
-    const cached = this.cache.get(cacheKey);
+    const cached = await this.cache.get(cacheKey);
     if (cached && typeof cached === 'object' && 'component' in cached) {
       this.logger.debug(`Cache hit for component: ${component}`);
       return cached as ComponentResult;
@@ -285,7 +289,7 @@ export class DiagnosticService {
     };
 
     // Cache result
-    this.cache.set(cacheKey, result);
+    await this.cache.set(cacheKey, result);
 
     return result;
   }
@@ -508,7 +512,7 @@ export class DiagnosticService {
   /**
    * Get cache statistics
    */
-  getCacheStats(): any {
-    return this.cache.getStats();
+  async getCacheStats(): Promise<any> {
+    return await this.cache.getStats();
   }
 }

@@ -95,6 +95,7 @@ export function registerDiagnoseCommand(cli: CAC) {
           logger: civic['logger'] as Logger,
           auditLogger: new AuditLogger({ dataDir }),
           dataDir,
+          cacheManager: civic.getCacheManager(),
         });
 
         // Register checkers

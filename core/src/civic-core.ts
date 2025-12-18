@@ -14,6 +14,7 @@ import {
   NotificationService,
   NotificationConfig,
 } from './notifications/index.js';
+import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { Geography } from './types/geography.js';
 import { ServiceContainer } from './di/container.js';
 import {
@@ -65,7 +66,10 @@ export interface CreateRecordRequest {
   createdAt?: string;
   updatedAt?: string;
   relativePath?: string;
-  skipFileGeneration?: boolean;
+  skipSaga?: boolean; // Skip saga pattern (for sync operations that update DB only)
+  skipFileGeneration?: boolean; // Skip file generation/updates
+  skipAudit?: boolean; // Skip audit logging (for sync operations)
+  skipHooks?: boolean; // Skip hook emissions (for sync operations)
   geography?: Geography;
   attachedFiles?: Array<{
     id: string;
@@ -110,6 +114,10 @@ export interface UpdateRecordRequest {
   status?: string; // Legal status (stored in YAML + DB)
   workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   relativePath?: string;
+  skipSaga?: boolean; // Skip saga pattern (for sync operations that update DB only)
+  skipFileGeneration?: boolean; // Skip file generation/updates
+  skipAudit?: boolean; // Skip audit logging (for sync operations)
+  skipHooks?: boolean; // Skip hook emissions (for sync operations)
   metadata?: Record<string, any>;
   geography?: Geography;
   attachedFiles?: Array<{
@@ -165,6 +173,7 @@ export class CivicPress {
   private _indexingService?: IndexingService;
   private _notificationService?: NotificationService;
   private _notificationConfig?: NotificationConfig;
+  private _cacheManager?: UnifiedCacheManager;
 
   constructor(config: CivicPressConfig) {
     this.config = config;
@@ -191,8 +200,7 @@ export class CivicPress {
       );
     }
 
-    // Complete service initialization (handles services that need CivicPress instance)
-    completeServiceInitialization(this.container, this);
+    // Note: completeServiceInitialization is now async and will be called during initialize()
 
     // Initialize lazy-loaded service references for backward compatibility
     this.initializeServiceReferences();
@@ -215,6 +223,12 @@ export class CivicPress {
       const db = this.container.resolve<DatabaseService>('database');
       await db.initialize();
       this.logger.info('Database initialized');
+
+      // Complete service initialization (cache registration, etc.)
+      const { completeServiceInitialization } = await import(
+        './civic-core-services.js'
+      );
+      await completeServiceInitialization(this.container, this);
 
       // Initialize other services
       const workflow = this.container.resolve<WorkflowEngine>('workflow');
@@ -273,11 +287,12 @@ export class CivicPress {
   }
 
   getIndexingService(): IndexingService {
-    if (!this._indexingService) {
-      this._indexingService =
-        this.container.resolve<IndexingService>('indexing');
-    }
-    return this._indexingService;
+    // Always resolve from container to get the latest instance
+    // (in case it was replaced during initialization)
+    const service = this.container.resolve<IndexingService>('indexing');
+    // Cache it for backward compatibility
+    this._indexingService = service;
+    return service;
   }
 
   // Existing services
@@ -331,6 +346,14 @@ export class CivicPress {
         this.container.resolve<NotificationConfig>('notificationConfig');
     }
     return this._notificationConfig;
+  }
+
+  getCacheManager(): UnifiedCacheManager {
+    if (!this._cacheManager) {
+      this._cacheManager =
+        this.container.resolve<UnifiedCacheManager>('cacheManager');
+    }
+    return this._cacheManager;
   }
 
   /**

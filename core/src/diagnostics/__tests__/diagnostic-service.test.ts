@@ -217,8 +217,8 @@ describe('DiagnosticService', () => {
       expect(stats).toBeDefined();
     });
 
-    it('should provide cache statistics', () => {
-      const stats = service.getCacheStats();
+    it('should provide cache statistics', async () => {
+      const stats = await service.getCacheStats();
 
       expect(stats).toMatchObject({
         size: expect.any(Number),

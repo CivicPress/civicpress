@@ -1,5 +1,5 @@
 import { CAC } from 'cac';
-import { CivicPress, IndexingService } from '@civicpress/core';
+import { CivicPress } from '@civicpress/core';
 import {
   initializeLogger,
   getGlobalOptionsFromArgs,
@@ -45,7 +45,7 @@ export const indexCommand = (cli: CAC) => {
 
         await civicPress.initialize();
 
-        const indexingService = new IndexingService(civicPress, 'data');
+        const indexingService = civicPress.getIndexingService();
 
         // Handle different sub-commands based on options
         if (options.search) {
@@ -59,6 +59,9 @@ export const indexCommand = (cli: CAC) => {
         }
 
         await civicPress.shutdown();
+
+        // Explicitly exit to ensure process terminates
+        process.exit(0);
       } catch (error) {
         cliError(
           'Index command failed',
@@ -69,6 +72,8 @@ export const indexCommand = (cli: CAC) => {
           'index'
         );
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

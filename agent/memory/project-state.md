@@ -20,7 +20,11 @@
 - **Indexing Service**: Full-text search capabilities
 - **Saga Pattern**: Multi-step operation orchestration with compensation
   - PublishDraftSaga, CreateRecordSaga, UpdateRecordSaga, ArchiveRecordSaga
-  - State persistence, idempotency, resource locking, recovery
+- **Unified Caching Layer**: Centralized caching system with consistent
+  strategies
+  - MemoryCache (TTL-based with LRU eviction), FileWatcherCache (file watching)
+  - UnifiedCacheManager for centralized registry and management
+  - Comprehensive metrics, health monitoring, cache warming support
 
 #### **API & CLI**
 
@@ -60,6 +64,39 @@
 - **Documentation**: Comprehensive API, CLI, and development guides
 - **Package Management**: pnpm workspaces for monorepo management
 - **TypeScript**: Full type safety across the platform
+
+### ✅ **Recently Completed Features (December 2025)**
+
+#### **Indexing & Sync Performance Optimizations**
+
+- **Status**: ✅ **Optimized and Production-Ready**
+- **Performance Improvements**: Significant optimizations to indexing and
+  database sync operations
+- **Core Optimizations**:
+  - **Cached Record Parsing**: Parsed records cached during index generation to
+    avoid duplicate parsing during sync
+  - **Direct Database Access**: Sync operations use database directly instead of
+    `getRecord()` to avoid unnecessary file reads
+  - **Skip Operations During Sync**: Added `skipSaga`, `skipFileGeneration`,
+    `skipAudit`, and `skipHooks` flags to bypass unnecessary operations during
+    sync
+  - **File Watcher Optimization**: File watcher initialization skipped in
+    test/CI environments and made non-blocking in production
+  - **Timeout Protection**: Added timeouts to prevent hangs during sync
+    operations
+- **Technical Details**:
+  - `CivicIndexEntry` interface extended with `_parsedRecord` cache field
+  - `IndexingService.syncToDatabase()` optimized to reuse cached parsed records
+  - `RecordManager.createRecordWithId()` and `updateRecord()` support skip flags
+  - `FileWatcherCache.initialize()` optimized for test environments
+- **Benefits**:
+  - Eliminated duplicate file reads and parsing during sync
+  - Reduced sync time by avoiding unnecessary operations (audit logging, hooks,
+    file generation)
+  - Improved test performance by skipping file watching in test environments
+  - Better error handling with timeout protection
+- **Documentation**: Performance optimizations documented in code comments and
+  architecture docs
 
 ### ✅ **Recently Completed Features (November 2025)**
 
@@ -207,7 +244,43 @@
 - **Format Standardization**: All templates updated to new standardized format
   with section comments
 
-### ✅ **Recently Completed (December 2025)**
+### ✅ **Recently Completed (December 2025 - January 2025)**
+
+#### **Unified Caching Layer**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Core Infrastructure**:
+  - `ICacheStrategy<T>` unified interface for all cache implementations
+  - `MemoryCache` strategy (TTL-based with LRU eviction)
+  - `FileWatcherCache` strategy (file watching + manual invalidation)
+  - `UnifiedCacheManager` for centralized registry and management
+- **Migration & Integration**:
+  - ✅ SearchCache → SearchCacheAdapter (using MemoryCache)
+  - ✅ DiagnosticCache → DiagnosticCacheAdapter (using MemoryCache)
+  - ✅ TemplateCache → TemplateCacheAdapter (using FileWatcherCache)
+  - ✅ RecordManager.suggestionsCache → Direct MemoryCache usage
+- **Advanced Features**:
+  - Cache warming support (`CacheWarmer` class)
+  - Comprehensive metrics (hits, misses, hit rate, memory usage, evictions)
+  - Health monitoring (`CacheHealthChecker` integrated with diagnostic system)
+  - API endpoints (`/api/v1/cache/metrics`, `/api/v1/cache/health`,
+    `/api/v1/cache/list`)
+  - CLI commands (`civic cache:metrics`, `civic cache:health`,
+    `civic cache:list`)
+- **Registered Caches**:
+  - `search` - Search results (MemoryCache, 5min TTL, 500 entries)
+  - `searchSuggestions` - Search suggestions (MemoryCache, 5min TTL, 1000
+    entries)
+  - `diagnostics` - Diagnostic results (MemoryCache, 5min TTL, 100 entries)
+  - `templates` - Template content (FileWatcherCache, infinite TTL, 1000
+    entries)
+  - `templateLists` - Template lists (MemoryCache, 5min TTL, 100 entries)
+  - `recordSuggestions` - Record suggestions (MemoryCache, 5min TTL, 1000
+    entries)
+- **Documentation**:
+  - Specification: `docs/specs/unified-caching-layer.md`
+  - Usage Guide: `docs/cache-usage-guide.md`
+  - Source Code: `core/src/cache/`
 
 #### **Saga Pattern for Multi-Step Operations**
 

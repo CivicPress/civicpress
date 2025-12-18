@@ -32,6 +32,12 @@ The assistant must **always** follow these instructions when generating code.
   directly. Use `SagaExecutor` with sagas extending `BaseSagaStep`. All steps
   must implement compensation logic. See `docs/specs/saga-pattern.md` and
   `docs/saga-pattern-usage-guide.md`.
+- **⚠️ CRITICAL - Unified Caching Layer**: All caching MUST use the Unified
+  Caching Layer. Never create custom cache implementations (Map, Set, etc.).
+  Always use `UnifiedCacheManager` and register caches in
+  `completeServiceInitialization()`. Use `MemoryCache` for TTL-based caching,
+  `FileWatcherCache` for file-based content. See
+  `docs/specs/unified-caching-layer.md` and `docs/cache-usage-guide.md`.
 - Pages MUST include proper accessibility landmarks.
 - No hard-coded UI strings; all text must be i18n-ready one the feature is
   implemented.

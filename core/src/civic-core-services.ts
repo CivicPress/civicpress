@@ -31,6 +31,7 @@ import {
   ResourceLockManager,
   SagaExecutor,
 } from './saga/index.js';
+import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 
 /**
  * Register all CivicPress services in the dependency injection container
@@ -81,10 +82,12 @@ export function registerCivicPressServices(
   container.registerInstance('dbConfig', dbConfig);
 
   // Step 3: Register database service (depends on: logger, dbConfig)
+  // Note: cacheManager is registered later, but DatabaseService can work without it initially
   container.singleton('database', (c) => {
     const logger = c.resolve<Logger>('logger');
     const dbConfig = c.resolve<typeof config.database>('dbConfig');
-    return new DatabaseService(dbConfig!, logger);
+    const cacheManager = c.resolve<UnifiedCacheManager>('cacheManager');
+    return new DatabaseService(dbConfig!, logger, cacheManager);
   });
 
   // Step 4: Register auth service (depends on: database, config)
@@ -127,11 +130,24 @@ export function registerCivicPressServices(
     return new NotificationService(notificationConfig);
   });
 
-  // Step 8: Register indexing service
+  // Step 8: Register indexing service placeholder
   // Note: IndexingService requires CivicPress instance, which we'll handle in completeServiceInitialization
-  // We'll register it there using registerInstance
+  // We register a placeholder instance here that will be replaced with the actual instance during initialization
+  // We use a minimal placeholder object that satisfies the type but will be replaced
+  // This allows tests to check for service existence before initialization
+  const placeholderIndexingService = {
+    // Minimal placeholder - will be replaced in completeServiceInitialization
+    _isPlaceholder: true,
+  } as unknown as IndexingService;
+  container.registerInstance('indexing', placeholderIndexingService, true);
 
-  // Step 9: Register saga services (depends on: database)
+  // Step 9: Register unified cache manager (depends on: logger)
+  container.singleton('cacheManager', (c) => {
+    const logger = c.resolve<Logger>('logger');
+    return new UnifiedCacheManager(logger);
+  });
+
+  // Step 10: Register saga services (depends on: database)
   container.singleton('sagaStateStore', (c) => {
     const db = c.resolve<DatabaseService>('database');
     return new SagaStateStore(db);
@@ -152,7 +168,7 @@ export function registerCivicPressServices(
     return new SagaExecutor(stateStore, idempotencyManager, lockManager);
   });
 
-  // Step 10: Register record manager (depends on: database, git, hooks, workflow, template, config)
+  // Step 11: Register record manager (depends on: database, git, hooks, workflow, template, config, cacheManager)
   container.singleton('recordManager', (c) => {
     const db = c.resolve<DatabaseService>('database');
     const git = c.resolve<GitEngine>('git');
@@ -160,13 +176,15 @@ export function registerCivicPressServices(
     const workflow = c.resolve<WorkflowEngine>('workflow');
     const template = c.resolve<TemplateEngine>('template');
     const config = c.resolve<CivicPressConfig>('config');
+    const cacheManager = c.resolve<UnifiedCacheManager>('cacheManager');
     return new RecordManager(
       db,
       git,
       hooks,
       workflow,
       template,
-      config.dataDir
+      config.dataDir,
+      cacheManager
     );
   });
 }
@@ -178,10 +196,10 @@ export function registerCivicPressServices(
  * @param container - Service container
  * @param civicPress - CivicPress instance
  */
-export function completeServiceInitialization(
+export async function completeServiceInitialization(
   container: ServiceContainer,
   civicPress: CivicPress
-): void {
+): Promise<void> {
   // Set up indexing service with CivicPress instance
   const indexingService = new IndexingService(
     civicPress,
@@ -196,4 +214,67 @@ export function completeServiceInitialization(
   // Set indexing service on workflow engine
   const workflow = container.resolve<WorkflowEngine>('workflow');
   workflow.setIndexingService(indexingService);
+
+  // Register all caches with UnifiedCacheManager
+  const cacheManager = container.resolve<UnifiedCacheManager>('cacheManager');
+  const config = container.resolve<CivicPressConfig>('config');
+  const logger = container.resolve<Logger>('logger');
+
+  // Register search caches
+  await cacheManager.registerFromConfig('search', {
+    strategy: 'memory',
+    enabled: true,
+    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    maxSize: 500,
+  });
+
+  await cacheManager.registerFromConfig('searchSuggestions', {
+    strategy: 'memory',
+    enabled: true,
+    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    maxSize: 1000,
+  });
+
+  // Register diagnostic cache
+  await cacheManager.registerFromConfig('diagnostics', {
+    strategy: 'memory',
+    enabled: true,
+    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    maxSize: 100,
+  });
+
+  // Register template cache
+  await cacheManager.registerFromConfig('templates', {
+    strategy: 'file_watcher',
+    enabled: true,
+    defaultTTL: 0, // Infinite (file watching handles invalidation)
+    maxSize: 1000,
+    watchDirectories: [
+      path.join(config.dataDir, '.civic', 'templates'),
+      path.join(config.dataDir, '.civic', 'partials'),
+    ],
+    debounceMs: 100,
+    enableWatching: true,
+  });
+
+  // Register template list cache
+  await cacheManager.registerFromConfig('templateLists', {
+    strategy: 'memory',
+    enabled: true,
+    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    maxSize: 100,
+  });
+
+  // Register record suggestions cache
+  await cacheManager.registerFromConfig('recordSuggestions', {
+    strategy: 'memory',
+    enabled: true,
+    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    maxSize: 1000,
+  });
+
+  // Initialize cache manager
+  await cacheManager.initialize();
+
+  logger.debug('Unified cache manager initialized with all caches');
 }

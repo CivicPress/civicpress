@@ -76,6 +76,12 @@ civicpress/
 │   │   └── errors.ts          # DI-specific errors
 │   ├── errors/                # Unified Error Handling (IMPLEMENTED)
 │   │   └── index.ts           # Error hierarchy and domain errors
+│   ├── cache/                 # Unified Caching Layer (IMPLEMENTED)
+│   │   ├── types.ts           # Cache interfaces and types
+│   │   ├── strategies/        # Cache strategies (MemoryCache, FileWatcherCache)
+│   │   ├── unified-cache-manager.ts # Centralized cache manager
+│   │   ├── warming/           # Cache warming support
+│   │   └── errors.ts          # Cache-specific errors
 │   ├── hooks/hook-system.ts   # Event system
 │   ├── workflows/workflow-engine.ts # Workflow execution
 │   ├── git/git-engine.ts      # Git operations
@@ -449,7 +455,11 @@ Config Update → Validation → Service Reload → Hook Event → Workflow Trig
 
 - **Server-Side Pagination**: Page-based pagination with URL state management,
   page size selector, and scroll-to-top
-- **Caching**: Global caching for record types and statuses
+- **Caching**: Unified Caching Layer with MemoryCache and FileWatcherCache
+  strategies
+  - Centralized cache management via UnifiedCacheManager
+  - Automatic metrics tracking and health monitoring
+  - Cache warming support for frequently accessed data
 - **Indexing**: Fast search with advanced filtering and ranking
 - **Git Operations**: Efficient for large repositories
 
@@ -486,6 +496,15 @@ Config Update → Validation → Service Reload → Hook Event → Workflow Trig
   - Domain-specific errors (Records, Templates, Geography, Auth, etc.)
   - Integration with centralized output system
   - API error handler middleware
+- **Unified Caching Layer**: Centralized caching system with consistent
+  strategies ✅
+  - `ICacheStrategy<T>` unified interface for all cache implementations
+  - `MemoryCache` strategy (TTL-based with LRU eviction)
+  - `FileWatcherCache` strategy (file watching + manual invalidation)
+  - `UnifiedCacheManager` for centralized registry and management
+  - Comprehensive metrics (hits, misses, hit rate, memory usage)
+  - Health monitoring integrated with diagnostic system
+  - Cache warming support
 - **Lifecycle Management**: Proper initialization and shutdown procedures ✅
 - **Error Handling**: Comprehensive error handling across all services ✅
 
@@ -532,6 +551,7 @@ Config Update → Validation → Service Reload → Hook Event → Workflow Trig
 - ✅ Implement `CivicPress` class orchestrator with DI container
 - ✅ Build Dependency Injection Container system
 - ✅ Implement Unified Error Handling System
+- ✅ Implement Unified Caching Layer
 - ✅ Build complete hook system with `emit()` method
 - ✅ Create workflow engine with auto-indexing
 - ✅ Add Git integration with role-aware commits

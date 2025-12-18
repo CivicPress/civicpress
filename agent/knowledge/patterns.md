@@ -204,6 +204,61 @@
 
 ## 🔧 **Technical Patterns**
 
+### **Unified Caching Layer Pattern**
+
+#### **Pattern**: Use Unified Caching Layer for all caching
+
+- **When to Use**: Any code that needs to cache data (search results, templates,
+  diagnostics, suggestions, etc.)
+- **How to Apply**:
+  1. Never create custom cache implementations (Map, Set, etc.)
+  2. Register all caches with `UnifiedCacheManager` in
+     `completeServiceInitialization()`
+  3. Access caches via `civicPress.getCacheManager().getCache<T>(name)`
+  4. Use `MemoryCache` for TTL-based caching
+  5. Use `FileWatcherCache` for file-based content that changes on disk
+  6. All caches automatically track metrics (hits, misses, hit rate, memory
+     usage)
+- **Benefits**:
+  - Consistent cache interface across all implementations
+  - Centralized metrics and monitoring
+  - Automatic memory management
+  - Health monitoring integration
+- **Examples**:
+  - Search cache (`search`, `searchSuggestions`)
+  - Template cache (`templates`, `templateLists`)
+  - Diagnostic cache (`diagnostics`)
+  - Record suggestions cache (`recordSuggestions`)
+- **Reference**: See `docs/specs/unified-caching-layer.md` and
+  `docs/cache-usage-guide.md`
+
+**Example:**
+
+```typescript
+// Register cache in completeServiceInitialization()
+await cacheManager.registerFromConfig('myCache', {
+  strategy: 'memory',
+  enabled: true,
+  defaultTTL: 5 * 60 * 1000, // 5 minutes
+  maxSize: 1000,
+});
+
+// Use cache in service
+class MyService {
+  constructor(private cacheManager: UnifiedCacheManager) {}
+
+  async getData(key: string) {
+    const cache = this.cacheManager.getCache<MyData>('myCache');
+    const cached = await cache.get(key);
+    if (cached) return cached;
+
+    const data = await this.fetchData();
+    await cache.set(key, data);
+    return data;
+  }
+}
+```
+
 ### **Module Development Pattern**
 
 ```typescript

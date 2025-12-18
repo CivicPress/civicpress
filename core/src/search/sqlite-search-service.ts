@@ -26,23 +26,69 @@ const require = createRequire(import.meta.url);
 const levenshtein = require('fast-levenshtein') as {
   get: (str1: string, str2: string) => number;
 };
-import { SearchCache } from './search-cache.js';
+import { SearchCacheAdapter } from './search-cache-adapter.js';
+import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 
 export class SQLiteSearchService implements SearchService {
-  private searchCache: SearchCache<SearchResult>;
-  private suggestionsCache: SearchCache<SearchSuggestions>;
+  private searchCache?: SearchCacheAdapter<SearchResult>;
+  private suggestionsCache?: SearchCacheAdapter<SearchSuggestions>;
+  private cacheManager?: UnifiedCacheManager;
 
-  constructor(private adapter: DatabaseAdapter) {
-    // Initialize caches
-    this.searchCache = new SearchCache<SearchResult>({
-      ttl: 5 * 60 * 1000, // 5 minutes for search results
-      maxSize: 500, // Cache up to 500 popular queries
-    });
+  constructor(
+    private adapter: DatabaseAdapter,
+    cacheManager?: UnifiedCacheManager
+  ) {
+    this.cacheManager = cacheManager;
+  }
 
-    this.suggestionsCache = new SearchCache<SearchSuggestions>({
-      ttl: 5 * 60 * 1000, // 5 minutes for suggestions
-      maxSize: 1000, // More suggestions cached (they're smaller)
-    });
+  /**
+   * Get or create search cache (lazy initialization)
+   */
+  private getSearchCache(): SearchCacheAdapter<SearchResult> {
+    if (!this.searchCache) {
+      if (this.cacheManager) {
+        this.searchCache = new SearchCacheAdapter<SearchResult>(
+          this.cacheManager,
+          'search'
+        );
+      } else {
+        // Fallback: create directly (for backward compatibility)
+        this.searchCache = new SearchCacheAdapter<SearchResult>(
+          undefined as any,
+          'search',
+          {
+            ttl: 5 * 60 * 1000,
+            maxSize: 500,
+          }
+        );
+      }
+    }
+    return this.searchCache;
+  }
+
+  /**
+   * Get or create suggestions cache (lazy initialization)
+   */
+  private getSuggestionsCache(): SearchCacheAdapter<SearchSuggestions> {
+    if (!this.suggestionsCache) {
+      if (this.cacheManager) {
+        this.suggestionsCache = new SearchCacheAdapter<SearchSuggestions>(
+          this.cacheManager,
+          'searchSuggestions'
+        );
+      } else {
+        // Fallback: create directly (for backward compatibility)
+        this.suggestionsCache = new SearchCacheAdapter<SearchSuggestions>(
+          undefined,
+          'searchSuggestions',
+          {
+            ttl: 5 * 60 * 1000,
+            maxSize: 1000,
+          }
+        );
+      }
+    }
+    return this.suggestionsCache;
   }
 
   async search(
@@ -61,7 +107,7 @@ export class SQLiteSearchService implements SearchService {
 
     // Generate cache key (only cache offset=0 for simplicity)
     // Different offsets are considered different queries
-    const cacheKey = this.searchCache.generateKey(query, {
+    const cacheKey = this.getSearchCache().generateKey(query, {
       type,
       status,
       limit,
@@ -71,7 +117,7 @@ export class SQLiteSearchService implements SearchService {
 
     // Check cache (only for first page)
     if (offset === 0) {
-      const cached = this.searchCache.get(cacheKey);
+      const cached = await this.getSearchCache().get(cacheKey);
       if (cached) {
         return {
           results: cached.results,
@@ -120,7 +166,7 @@ export class SQLiteSearchService implements SearchService {
 
     // Cache results (only for first page)
     if (offset === 0) {
-      this.searchCache.set(cacheKey, searchResults, total);
+      await this.getSearchCache().set(cacheKey, searchResults, total);
     }
 
     return {
@@ -141,11 +187,11 @@ export class SQLiteSearchService implements SearchService {
     }
 
     // Check cache
-    const cacheKey = this.suggestionsCache.generateKey(normalized, {
+    const cacheKey = this.getSuggestionsCache().generateKey(normalized, {
       limit,
       enableTypoTolerance,
     });
-    const cached = this.suggestionsCache.get(cacheKey);
+    const cached = await this.getSuggestionsCache().get(cacheKey);
     if (cached) {
       const cachedResults = cached.results as SearchSuggestions[];
       // Ensure cached results have type field (for backward compatibility)
@@ -256,7 +302,11 @@ export class SQLiteSearchService implements SearchService {
     const allSuggestions = [...words, ...titleSuggestions];
 
     // Cache suggestions
-    this.suggestionsCache.set(cacheKey, allSuggestions, allSuggestions.length);
+    await this.getSuggestionsCache().set(
+      cacheKey,
+      allSuggestions,
+      allSuggestions.length
+    );
 
     return allSuggestions;
   }
@@ -663,7 +713,7 @@ export class SQLiteSearchService implements SearchService {
     // Clear search cache to ensure removed records don't appear in cached results
     // We clear the entire cache since we can't easily determine which queries
     // might have included this record
-    this.searchCache.clear();
+    await this.getSearchCache().clear();
   }
 
   /**

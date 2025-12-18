@@ -71,6 +71,128 @@ system.
 
 - Error handling guide: `docs/error-handling.md`
 
+## Unified Caching Layer (January 2025)
+
+### **✅ IMPLEMENTED: Unified Caching Layer Architecture**
+
+**Decision**: Implemented a unified caching abstraction to address
+inconsistencies in caching strategies across the codebase.
+
+**Status**: ✅ **IMPLEMENTED** - Fully functional and in production use.
+
+#### **Why Unified Caching Layer**
+
+1. **Inconsistent Strategies**: Multiple cache implementations with different
+   TTL policies, invalidation strategies, and no unified management
+2. **No Metrics**: No hit/miss tracking, performance metrics, or memory usage
+   monitoring
+3. **Memory Management Issues**: Some caches had no size limits, others had
+   inconsistent limits
+4. **No Centralized Management**: No unified cache manager, global
+   configuration, or lifecycle management
+
+#### **Architecture**
+
+- **Unified Interface**: `ICacheStrategy<T>` interface for all cache
+  implementations
+- **Cache Strategies**:
+  - `MemoryCache` - TTL-based in-memory cache with LRU eviction
+  - `FileWatcherCache` - File watching + manual invalidation
+- **Unified Cache Manager**: Centralized registry for all caches with global
+  operations
+- **Cache Adapters**: Backward-compatible wrappers for existing caches
+- **Advanced Features**: Cache warming, comprehensive metrics, health monitoring
+
+#### **Implementation Details**
+
+- **Core Infrastructure**: `ICacheStrategy`, `MemoryCache`, `FileWatcherCache`,
+  `UnifiedCacheManager`
+- **Migration**: All existing caches migrated (SearchCache, DiagnosticCache,
+  TemplateCache, SuggestionsCache)
+- **Metrics & Monitoring**: Comprehensive metrics (hits, misses, hit rate,
+  memory usage), health monitoring
+- **API & CLI**: Cache metrics endpoints (`/api/v1/cache/metrics`,
+  `/api/v1/cache/health`), CLI commands (`civic cache:metrics`,
+  `civic cache:health`)
+
+#### **Registered Caches**
+
+- `search` - Search results (MemoryCache, 5min TTL, 500 entries)
+- `searchSuggestions` - Search suggestions (MemoryCache, 5min TTL, 1000 entries)
+- `diagnostics` - Diagnostic results (MemoryCache, 5min TTL, 100 entries)
+- `templates` - Template content (FileWatcherCache, infinite TTL, 1000 entries)
+- `templateLists` - Template lists (MemoryCache, 5min TTL, 100 entries)
+- `recordSuggestions` - Record suggestions (MemoryCache, 5min TTL, 1000 entries)
+
+#### **Documentation**
+
+- Specification: `docs/specs/unified-caching-layer.md`
+- Usage Guide: `docs/cache-usage-guide.md`
+- Source Code: `core/src/cache/`
+
+## Indexing & Sync Performance Optimizations (December 2025)
+
+### **✅ IMPLEMENTED: Performance Optimizations for Indexing and Database Sync**
+
+**Decision**: Optimized indexing and database sync operations to eliminate
+duplicate work and unnecessary operations.
+
+**Status**: ✅ **IMPLEMENTED** - All optimizations are in place and
+significantly improve sync performance.
+
+#### **Why Optimize**
+
+1. **Duplicate Parsing**: Files were being parsed twice - once during index
+   generation and again during sync
+2. **Unnecessary File Reads**: `getRecord()` was reading files even when we
+   already had the data from index
+3. **Redundant Operations**: Sync operations were triggering audit logging,
+   hooks, and file updates unnecessarily
+4. **Slow File Watching**: File watcher initialization was blocking startup in
+   test environments
+
+#### **Optimizations Implemented**
+
+1. **Cached Record Parsing**:
+   - Parsed records cached in `CivicIndexEntry._parsedRecord` during index
+     generation
+   - Sync operations reuse cached records instead of re-parsing files
+   - Eliminates duplicate schema validation
+
+2. **Direct Database Access**:
+   - Sync uses `db.getRecord()` directly instead of `RecordManager.getRecord()`
+   - Avoids unnecessary file reads when checking record existence
+
+3. **Skip Operations During Sync**:
+   - `skipSaga`: Bypasses saga pattern (not needed for file-to-database sync)
+   - `skipFileGeneration`: Skips file updates (syncing FROM files TO database)
+   - `skipAudit`: Skips audit logging (sync operations don't need audit trails)
+   - `skipHooks`: Skips hook emissions (prevents infinite loops and unnecessary
+     workflows)
+
+4. **File Watcher Optimization**:
+   - File watching completely skipped in test/CI environments
+   - Non-blocking initialization in production (background process)
+
+5. **Timeout Protection**:
+   - Added timeouts to prevent hangs during sync operations
+   - Clear error messages when operations timeout
+
+#### **Performance Impact**
+
+- **Eliminated duplicate parsing**: Files parsed once during index generation
+- **Reduced file I/O**: Direct database access avoids unnecessary file reads
+- **Faster sync operations**: Skipping audit, hooks, and file generation
+  significantly reduces sync time
+- **Faster test startup**: File watching skipped in test environments
+
+#### **Documentation**
+
+- Performance optimizations documented in `docs/indexing-system.md`
+- Code comments explain optimization strategies
+- Source Code: `core/src/indexing/indexing-service.ts`,
+  `core/src/records/record-manager.ts`
+
 ## Saga Pattern for Multi-Step Operations (December 2025)
 
 ### **✅ IMPLEMENTED: Saga Pattern Architecture**

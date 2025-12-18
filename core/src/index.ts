@@ -127,6 +127,9 @@ export { WorkflowConfigManager } from './config/workflow-config.js';
 export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
+// Export unified cache system
+export * from './cache/index.js';
+
 export {
   TemplateService,
   TemplateCache,

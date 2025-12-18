@@ -43,6 +43,7 @@ import infoRouter from './routes/info.js';
 import configRouter from './routes/config.js';
 import systemRouter from './routes/system.js';
 import { createGeographyRouter } from './routes/geography.js';
+import { createCacheRouter } from './routes/cache.js';
 import { API_PREFIX, apiPath } from './constants.js';
 
 // Import middleware
@@ -272,6 +273,18 @@ export class CivicPressAPI {
       searchRouter
     );
     this.app.use(apiPath('status'), createStatusRouter());
+
+    // Cache metrics (requires auth)
+    this.app.use(
+      apiPath('cache'),
+      authMiddleware(this.civicPress),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      createCacheRouter(this.civicPress.getCacheManager())
+    );
+
     this.app.use(
       apiPath('diagnose'),
       authMiddleware(this.civicPress),

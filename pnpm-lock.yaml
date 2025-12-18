@@ -154,6 +154,9 @@ importers:
       jsonwebtoken:
         specifier: 9.0.2
         version: 9.0.2
+      lru-cache:
+        specifier: 11.2.4
+        version: 11.2.4
       nodemailer:
         specifier: 7.0.5
         version: 7.0.5
@@ -176,6 +179,9 @@ importers:
       '@types/jest':
         specifier: ^29.0.0
         version: 29.5.14
+      '@types/lru-cache':
+        specifier: 7.10.10
+        version: 7.10.10
       '@types/node':
         specifier: ^20.19.4
         version: 20.19.7
@@ -7058,6 +7064,13 @@ packages:
       '@types/node': 20.19.7
     dev: true
 
+  /@types/lru-cache@7.10.10:
+    resolution: {integrity: sha512-nEpVRPWW9EBmx2SCfNn3ClYxPL7IktPX12HhIoSc/H5mMjdeW3+YsXIpseLQ2xF35+OcpwKQbEUw5VtqE4PDNA==}
+    deprecated: This is a stub types definition. lru-cache provides its own type definitions, so you do not need this installed.
+    dependencies:
+      lru-cache: 11.2.4
+    dev: true
+
   /@types/methods@1.1.4:
     resolution: {integrity: sha512-ymXWVrDiCxTBE3+RIrrP533E70eA+9qu7zdWoHuOmGujkYtzf4HQF96b8nwHLqhuf4ykX61IGRIB38CC6/sImQ==}
     dev: true
@@ -13135,6 +13148,10 @@ packages:
 
   /lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
+
+  /lru-cache@11.2.4:
+    resolution: {integrity: sha512-B5Y16Jr9LB9dHVkh6ZevG+vAbOsNOYCX+sXvFWFu7B3Iz5mijW3zdbMyhsh8ANd2mSWBYdJgnqi+mL7/LrOPYg==}
+    engines: {node: 20 || >=22}
 
   /lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}

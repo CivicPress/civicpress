@@ -24,6 +24,8 @@ export interface CivicIndexEntry {
   updated?: string;
   source?: string;
   slug?: string;
+  // Cached parsed record data to avoid re-parsing during sync
+  _parsedRecord?: any; // RecordData - cached from index generation
 }
 
 export interface CivicIndex {
@@ -185,6 +187,8 @@ export class IndexingService {
               role: author.role || 'unknown',
             }))
           : [],
+        // Cache the parsed record to avoid re-parsing during sync
+        _parsedRecord: record,
         created: record.created_at, // Use internal format
         updated: record.updated_at, // Use internal format
         // Map source object to string (use reference if available)
@@ -394,8 +398,39 @@ export class IndexingService {
         // Generate record ID from slug or filename
         const recordId = entry.slug || entry.file.replace('.md', '');
 
-        // Check if record exists in database
-        const existingRecord = await recordManager.getRecord(recordId);
+        // Check if record exists in database (use DB directly to avoid file reads)
+        // We already have file content from index, so no need to read it again
+        const db = this.civicPress.getDatabaseService();
+        const dbRecord = await db.getRecord(recordId);
+
+        // Convert DB record to RecordData format if it exists
+        const existingRecord = dbRecord
+          ? {
+              id: dbRecord.id,
+              title: dbRecord.title,
+              type: dbRecord.type,
+              status: dbRecord.status || 'draft',
+              workflowState: dbRecord.workflow_state || 'draft',
+              content: dbRecord.content || '',
+              path: dbRecord.path,
+              author: dbRecord.author || 'unknown',
+              created_at: dbRecord.created_at || new Date().toISOString(),
+              updated_at: dbRecord.updated_at || new Date().toISOString(),
+              metadata: dbRecord.metadata ? JSON.parse(dbRecord.metadata) : {},
+              geography: dbRecord.geography
+                ? JSON.parse(dbRecord.geography)
+                : undefined,
+              attachedFiles: dbRecord.attached_files
+                ? JSON.parse(dbRecord.attached_files)
+                : [],
+              linkedRecords: dbRecord.linked_records
+                ? JSON.parse(dbRecord.linked_records)
+                : [],
+              linkedGeographyFiles: dbRecord.linked_geography_files
+                ? JSON.parse(dbRecord.linked_geography_files)
+                : [],
+            }
+          : null;
 
         if (!existingRecord) {
           // Record doesn't exist - create it
@@ -411,6 +446,7 @@ export class IndexingService {
           );
 
           if (shouldUpdate) {
+            // Update record
             await this.updateRecordFromFile(
               entry,
               existingRecord,
@@ -452,11 +488,15 @@ export class IndexingService {
     recordManager: any,
     recordId: string
   ): Promise<void> {
-    const filePath = join(this.dataDir, 'records', entry.file);
-    const fileContent = readFileSync(filePath, 'utf-8');
+    // Use cached parsed record if available (from index generation) to avoid re-parsing
+    let record = entry._parsedRecord;
 
-    // Use RecordParser for consistent parsing
-    const record = RecordParser.parseFromMarkdown(fileContent, filePath);
+    if (!record) {
+      // Fallback: parse if not cached (shouldn't happen in normal flow)
+      const filePath = join(this.dataDir, 'records', entry.file);
+      const fileContent = readFileSync(filePath, 'utf-8');
+      record = RecordParser.parseFromMarkdown(fileContent, filePath);
+    }
 
     // Create record with the specified ID instead of generating a new one
     await recordManager.createRecordWithId(
@@ -481,6 +521,8 @@ export class IndexingService {
         updatedAt: record.updated_at,
         relativePath: ['records', entry.file].join('/'),
         skipFileGeneration: true,
+        skipAudit: true, // Skip audit logging during sync
+        skipHooks: true, // Skip hooks during sync
       },
       {
         id: 'admin',
@@ -501,11 +543,15 @@ export class IndexingService {
     existingRecord: any,
     recordManager: any
   ): Promise<void> {
-    const filePath = join(this.dataDir, 'records', entry.file);
-    const fileContent = readFileSync(filePath, 'utf-8');
+    // Use cached parsed record if available (from index generation) to avoid re-parsing
+    let record = entry._parsedRecord;
 
-    // Use RecordParser for consistent parsing
-    const record = RecordParser.parseFromMarkdown(fileContent, filePath);
+    if (!record) {
+      // Fallback: parse if not cached (shouldn't happen in normal flow)
+      const filePath = join(this.dataDir, 'records', entry.file);
+      const fileContent = readFileSync(filePath, 'utf-8');
+      record = RecordParser.parseFromMarkdown(fileContent, filePath);
+    }
 
     await recordManager.updateRecord(
       existingRecord.id,
@@ -513,6 +559,10 @@ export class IndexingService {
         title: record.title,
         content: record.content,
         status: record.status,
+        skipSaga: true, // Skip saga during sync - we're syncing FROM files TO DB
+        skipFileGeneration: true, // Don't update files during sync
+        skipAudit: true, // Skip audit logging during sync
+        skipHooks: true, // Skip hooks during sync
         metadata: {
           ...existingRecord.metadata,
           ...record.metadata,

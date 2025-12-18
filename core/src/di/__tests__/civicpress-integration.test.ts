@@ -109,12 +109,18 @@ describe('CivicPress DI Integration', () => {
       expect(git).toBeInstanceOf(GitEngine);
       expect(hooks).toBeInstanceOf(HookSystem);
       expect(template).toBeInstanceOf(TemplateEngine);
-      expect(indexing).toBeInstanceOf(IndexingService);
+      // IndexingService is registered as a placeholder before initialization
+      // and will be replaced with the real instance during initialize()
+      expect(indexing).toBeDefined();
 
       // Now initialize and test record manager (which might need initialized services)
       await civic.initialize();
       const recordManager = civic.getRecordManager();
       expect(recordManager).toBeInstanceOf(RecordManager);
+
+      // After initialization, indexing service should be a real instance
+      const realIndexing = civic.getIndexingService();
+      expect(realIndexing).toBeInstanceOf(IndexingService);
     });
 
     it('should resolve services through getService method', () => {

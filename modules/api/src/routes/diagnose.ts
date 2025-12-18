@@ -66,6 +66,7 @@ export function createDiagnoseRouter() {
         logger: civicPress['logger'] as Logger,
         auditLogger: new AuditLogger({ dataDir }),
         dataDir,
+        cacheManager: civicPress.getCacheManager(),
       });
 
       // Register checkers

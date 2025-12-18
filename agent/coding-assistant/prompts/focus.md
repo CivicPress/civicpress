@@ -101,6 +101,19 @@ Always respond in this order:
   - Register saga-related services in DI container
   - See `docs/specs/saga-pattern.md` and `docs/saga-pattern-usage-guide.md` for
     complete patterns
+- **⚠️ CRITICAL - Unified Caching Layer**: All caching MUST use the Unified
+  Caching Layer
+  - Never create custom cache implementations (Map, Set, etc.); always use
+    `UnifiedCacheManager`
+  - Register all caches in `completeServiceInitialization()` in
+    `core/src/civic-core-services.ts`
+  - Access caches via `civicPress.getCacheManager().getCache<T>(name)`
+  - Use `MemoryCache` for TTL-based caching, `FileWatcherCache` for file-based
+    content
+  - All caches automatically track metrics (hits, misses, hit rate, memory
+    usage)
+  - See `docs/specs/unified-caching-layer.md` and `docs/cache-usage-guide.md`
+    for complete patterns
 - Do not patch `dist/` outputs post‑build; fix source instead.
 - API/UI use hot reload; don't instruct manual restarts during dev.
 - CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and

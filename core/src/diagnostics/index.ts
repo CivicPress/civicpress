@@ -5,6 +5,8 @@
  */
 
 export * from './types.js';
+export { CacheHealthChecker } from './checkers/cache-health-checker.js';
+export type { CacheHealthCheckerOptions } from './checkers/cache-health-checker.js';
 export * from './diagnostic-service.js';
 export * from './base-checker.js';
 export * from './circuit-breaker.js';

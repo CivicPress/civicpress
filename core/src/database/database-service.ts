@@ -8,6 +8,7 @@ import { Logger } from '../utils/logger.js';
 import * as process from 'process';
 import { SearchService } from '../search/search-service.js';
 import { SQLiteSearchService } from '../search/sqlite-search-service.js';
+import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 
 export class DatabaseService {
   private adapter: DatabaseAdapter;
@@ -15,13 +16,19 @@ export class DatabaseService {
   private logger: Logger;
   private searchService?: SearchService;
 
-  constructor(config: DatabaseConfig, logger?: Logger) {
+  constructor(
+    config: DatabaseConfig,
+    logger?: Logger,
+    cacheManager?: UnifiedCacheManager
+  ) {
     this.adapter = createDatabaseAdapter(config);
     this.logger = logger || new Logger();
 
     // Initialize search service based on adapter type
+    // Note: Cache manager may not be available yet (caches registered later)
+    // SQLiteSearchService will use lazy initialization
     if (this.adapter instanceof SQLiteAdapter) {
-      this.searchService = new SQLiteSearchService(this.adapter);
+      this.searchService = new SQLiteSearchService(this.adapter, cacheManager);
     }
     // TODO: Add PostgreSQL search service when PostgresAdapter is implemented
   }

@@ -332,6 +332,85 @@ async publishDraft(draftId: string, user: AuthUser) {
 5. Add integration tests covering success, failure, and compensation scenarios
 6. See `core/src/saga/publish-draft-saga.ts` for reference implementation
 
+## Unified Caching Layer
+
+- **⚠️ CRITICAL**: All caching MUST use the Unified Caching Layer
+- **When to Use**: Any code that needs to cache data (search results, templates,
+  diagnostics, suggestions, etc.)
+- **Never Direct Cache Creation**: Do not create custom cache implementations
+  (Map, Set, etc.); always use `UnifiedCacheManager`
+- **Cache Registration**: All caches must be registered with
+  `UnifiedCacheManager` in `completeServiceInitialization()`
+- **Cache Access**: Get caches via
+  `civicPress.getCacheManager().getCache<T>(name)`
+- **Cache Strategies**: Use `MemoryCache` for TTL-based caching,
+  `FileWatcherCache` for file-based content
+- **Metrics**: All caches automatically track metrics (hits, misses, hit rate,
+  memory usage)
+- **Reference**: See `docs/specs/unified-caching-layer.md` and
+  `docs/cache-usage-guide.md`
+
+**❌ Don't:**
+
+```typescript
+// Custom cache implementation
+private cache = new Map<string, CachedData>();
+private ttl = new Map<string, number>();
+
+async get(key: string) {
+  const cached = this.cache.get(key);
+  if (cached && Date.now() - this.ttl.get(key)! < 300000) {
+    return cached;
+  }
+  return null;
+}
+```
+
+**✅ Do:**
+
+```typescript
+// Use UnifiedCacheManager
+import { UnifiedCacheManager } from '@civicpress/core';
+
+class MyService {
+  private cacheManager: UnifiedCacheManager;
+
+  constructor(cacheManager: UnifiedCacheManager) {
+    this.cacheManager = cacheManager;
+  }
+
+  async getData(key: string) {
+    const cache = this.cacheManager.getCache<CachedData>('myCache');
+    const cached = await cache.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const data = await this.fetchData();
+    await cache.set(key, data, { ttl: 5 * 60 * 1000 }); // 5 minutes
+    return data;
+  }
+}
+```
+
+**Registering New Caches:**
+
+1. Register cache in `completeServiceInitialization()` in
+   `core/src/civic-core-services.ts`:
+
+   ```typescript
+   await cacheManager.registerFromConfig('myCache', {
+     strategy: 'memory',
+     enabled: true,
+     defaultTTL: 5 * 60 * 1000, // 5 minutes
+     maxSize: 1000,
+   });
+   ```
+
+2. Access cache via `civicPress.getCacheManager().getCache<T>('myCache')`
+3. For file-based caches, use `FileWatcherCache` strategy
+4. See existing caches (`search`, `diagnostics`, `templates`) for reference
+
 ## Enforcement
 
 These rules are enforced by:
