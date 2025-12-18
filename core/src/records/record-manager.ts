@@ -117,11 +117,22 @@ export class RecordManager {
 
   /**
    * Create a new record
+   *
+   * Note: For published records (status !== 'draft'), this method uses the saga pattern
+   * for better error handling and compensation. Drafts use the legacy flow.
    */
   async createRecord(
     request: CreateRecordRequest,
     user: AuthUser
   ): Promise<RecordData> {
+    // Use saga for published records (non-draft) that will create files
+    // Drafts don't need saga since they don't commit to Git
+    const isPublished = request.status && request.status !== 'draft';
+    if (isPublished && !request.skipFileGeneration) {
+      return this.createRecordSaga(request, user);
+    }
+
+    // Legacy flow for drafts or when file generation is skipped
     const recordId = `record-${Date.now()}`;
     const creationDate = request.createdAt
       ? new Date(request.createdAt)
@@ -540,13 +551,89 @@ export class RecordManager {
   }
 
   /**
+   * Update a record using the saga pattern
+   * This orchestrates the multi-step process of updating a published record
+   */
+  async updateRecordSaga(
+    id: string,
+    request: UpdateRecordRequest,
+    user: AuthUser,
+    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
+    indexingService?: any, // IndexingService - injected to avoid circular dependency
+    correlationId?: string
+  ): Promise<RecordData | null> {
+    // Import saga components dynamically to avoid circular dependencies
+    const { UpdateRecordSaga } = await import('../saga/update-record-saga.js');
+    const {
+      SagaExecutor,
+      SagaStateStore,
+      IdempotencyManager,
+      ResourceLockManager,
+    } = await import('../saga/index.js');
+
+    // Create saga executor if not provided
+    let executor = sagaExecutor;
+    if (!executor) {
+      const stateStore = new SagaStateStore(this.db);
+      const idempotencyManager = new IdempotencyManager(stateStore);
+      const lockManager = new ResourceLockManager(this.db);
+      executor = new SagaExecutor(stateStore, idempotencyManager, lockManager);
+    }
+
+    // Create saga instance
+    const saga = new UpdateRecordSaga(
+      this.db,
+      this,
+      this.git,
+      this.hooks,
+      indexingService || null,
+      this.dataDir
+    );
+
+    // Create context
+    const context = {
+      correlationId: correlationId || `update-${id}-${Date.now()}`,
+      startedAt: new Date(),
+      recordId: id,
+      request,
+      user,
+      metadata: {
+        recordId: id,
+      },
+    };
+
+    // Execute saga
+    const result = await executor.execute(saga, context);
+
+    return result.result;
+  }
+
+  /**
    * Update a record
+   *
+   * Note: For published records, this method uses the saga pattern for better
+   * error handling and compensation. Drafts use the legacy flow.
    */
   async updateRecord(
     id: string,
     request: UpdateRecordRequest,
     user: AuthUser
   ): Promise<RecordData | null> {
+    // Check if record exists and is published
+    const existingRecordForCheck = await this.getRecord(id);
+    if (!existingRecordForCheck) {
+      return null;
+    }
+
+    // Use saga for published records (non-draft)
+    const isPublished =
+      existingRecordForCheck.status &&
+      existingRecordForCheck.status !== 'draft';
+    if (isPublished) {
+      return this.updateRecordSaga(id, request, user);
+    }
+
+    // Legacy flow for drafts
     const existingRecord = await this.getRecord(id);
     if (!existingRecord) {
       return null;
@@ -667,45 +754,69 @@ export class RecordManager {
   }
 
   /**
-   * Archive a record (soft delete)
+   * Archive a record using the saga pattern
+   * This orchestrates the multi-step process of archiving a record
    */
-  async archiveRecord(id: string, user: AuthUser): Promise<boolean> {
-    const record = await this.getRecord(id);
-    if (!record) {
-      return false;
+  async archiveRecordSaga(
+    id: string,
+    user: AuthUser,
+    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
+    correlationId?: string
+  ): Promise<boolean> {
+    // Import saga components dynamically to avoid circular dependencies
+    const { ArchiveRecordSaga } = await import(
+      '../saga/archive-record-saga.js'
+    );
+    const {
+      SagaExecutor,
+      SagaStateStore,
+      IdempotencyManager,
+      ResourceLockManager,
+    } = await import('../saga/index.js');
+
+    // Create saga executor if not provided
+    let executor = sagaExecutor;
+    if (!executor) {
+      const stateStore = new SagaStateStore(this.db);
+      const idempotencyManager = new IdempotencyManager(stateStore);
+      const lockManager = new ResourceLockManager(this.db);
+      executor = new SagaExecutor(stateStore, idempotencyManager, lockManager);
     }
 
-    // Update status to archived
-    await this.db.updateRecord(id, {
-      status: 'archived',
-      metadata: JSON.stringify({
-        ...record.metadata,
-        archived_by: user.username,
-        archived_by_id: user.id,
-        archived_by_name: user.name || user.username,
-        archived_at: new Date().toISOString(),
-      }),
-    });
+    // Create saga instance
+    const saga = new ArchiveRecordSaga(
+      this.db,
+      this,
+      this.git,
+      this.hooks,
+      this.dataDir
+    );
 
-    // Move file to archive
-    await this.archiveRecordFile(record);
+    // Create context
+    const context = {
+      correlationId: correlationId || `archive-${id}-${Date.now()}`,
+      startedAt: new Date(),
+      recordId: id,
+      user,
+      metadata: {
+        recordId: id,
+      },
+    };
 
-    // Log audit event
-    await this.db.logAuditEvent({
-      action: 'archive_record',
-      resourceType: 'record',
-      resourceId: id,
-      details: `Archived record ${id}`,
-    });
+    // Execute saga
+    const result = await executor.execute(saga, context);
 
-    // Trigger hooks
-    await this.hooks.emit('record:archived', {
-      record,
-      user: user,
-      action: 'archive',
-    });
+    return result.result;
+  }
 
-    return true;
+  /**
+   * Archive a record (soft delete)
+   *
+   * Note: This method uses the saga pattern for better error handling and compensation.
+   */
+  async archiveRecord(id: string, user: AuthUser): Promise<boolean> {
+    // Use saga for all archive operations
+    return this.archiveRecordSaga(id, user);
   }
 
   /**
@@ -1155,5 +1266,123 @@ export class RecordManager {
     }
 
     return obj;
+  }
+
+  /**
+   * Publish a draft record using the saga pattern
+   * This orchestrates the multi-step process of publishing a draft
+   */
+  async publishDraft(
+    draftId: string,
+    user: AuthUser,
+    targetStatus?: string,
+    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
+    indexingService?: any, // IndexingService - injected to avoid circular dependency
+    correlationId?: string
+  ): Promise<RecordData> {
+    // Import saga components dynamically to avoid circular dependencies
+    const { PublishDraftSaga } = await import('../saga/publish-draft-saga.js');
+    const {
+      SagaExecutor,
+      SagaStateStore,
+      IdempotencyManager,
+      ResourceLockManager,
+    } = await import('../saga/index.js');
+
+    // Create saga executor if not provided
+    let executor = sagaExecutor;
+    if (!executor) {
+      const stateStore = new SagaStateStore(this.db);
+      const idempotencyManager = new IdempotencyManager(stateStore);
+      const lockManager = new ResourceLockManager(this.db);
+      executor = new SagaExecutor(stateStore, idempotencyManager, lockManager);
+    }
+
+    // Create saga instance
+    const saga = new PublishDraftSaga(
+      this.db,
+      this,
+      this.git,
+      this.hooks,
+      indexingService || null, // Will be set if provided
+      this.dataDir
+    );
+
+    // Create context
+    const context = {
+      correlationId: correlationId || `publish-${draftId}-${Date.now()}`,
+      startedAt: new Date(),
+      draftId,
+      targetStatus,
+      user,
+      metadata: {
+        recordId: draftId,
+        draftId,
+      },
+    };
+
+    // Execute saga
+    const result = await executor.execute(saga, context);
+
+    return result.result;
+  }
+
+  /**
+   * Create a record using the saga pattern
+   * This orchestrates the multi-step process of creating a published record
+   */
+  async createRecordSaga(
+    request: CreateRecordRequest,
+    user: AuthUser,
+    recordId?: string,
+    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
+    indexingService?: any, // IndexingService - injected to avoid circular dependency
+    correlationId?: string
+  ): Promise<RecordData> {
+    // Import saga components dynamically to avoid circular dependencies
+    const { CreateRecordSaga } = await import('../saga/create-record-saga.js');
+    const {
+      SagaExecutor,
+      SagaStateStore,
+      IdempotencyManager,
+      ResourceLockManager,
+    } = await import('../saga/index.js');
+
+    // Create saga executor if not provided
+    let executor = sagaExecutor;
+    if (!executor) {
+      const stateStore = new SagaStateStore(this.db);
+      const idempotencyManager = new IdempotencyManager(stateStore);
+      const lockManager = new ResourceLockManager(this.db);
+      executor = new SagaExecutor(stateStore, idempotencyManager, lockManager);
+    }
+
+    // Create saga instance
+    const saga = new CreateRecordSaga(
+      this.db,
+      this,
+      this.git,
+      this.hooks,
+      indexingService || null, // Will be set if provided
+      this.dataDir
+    );
+
+    // Create context
+    const context = {
+      correlationId:
+        correlationId || `create-${recordId || 'record'}-${Date.now()}`,
+      startedAt: new Date(),
+      request,
+      user,
+      recordId,
+      metadata: {
+        recordType: request.type,
+      },
+    };
+
+    // Execute saga
+    const result = await executor.execute(saga, context);
+
+    return result.result;
   }
 }

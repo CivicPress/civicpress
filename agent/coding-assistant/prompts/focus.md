@@ -88,6 +88,19 @@ Always respond in this order:
   - Always include error codes for programmatic handling
   - Errors automatically include correlation IDs for tracing
   - See `docs/error-handling.md` for complete patterns
+
+- **⚠️ CRITICAL - Saga Pattern**: All multi-step operations spanning storage
+  boundaries MUST use the Saga Pattern
+  - Operations involving DB + Git, DB + File system + Git, or cross-boundary
+    operations must use sagas
+  - Never execute multi-step operations directly; always use `SagaExecutor` with
+    a saga
+  - All saga steps must extend `BaseSagaStep` and implement compensation logic
+  - Use existing sagas (`PublishDraftSaga`, `CreateRecordSaga`,
+    `UpdateRecordSaga`, `ArchiveRecordSaga`) as reference
+  - Register saga-related services in DI container
+  - See `docs/specs/saga-pattern.md` and `docs/saga-pattern-usage-guide.md` for
+    complete patterns
 - Do not patch `dist/` outputs post‑build; fix source instead.
 - API/UI use hot reload; don't instruct manual restarts during dev.
 - CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and

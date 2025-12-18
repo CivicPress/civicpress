@@ -71,6 +71,55 @@ system.
 
 - Error handling guide: `docs/error-handling.md`
 
+## Saga Pattern for Multi-Step Operations (December 2025)
+
+### **✅ IMPLEMENTED: Saga Pattern Architecture**
+
+**Decision**: Replaced Transaction Coordinator proposal with Saga Pattern for
+multi-step operations that span multiple storage boundaries.
+
+**Status**: ✅ **IMPLEMENTED** - All four sagas (PublishDraft, CreateRecord,
+UpdateRecord, ArchiveRecord) are implemented and in production use.
+
+#### **Why Saga, Not Transaction Coordinator**
+
+1. **Git commits are authoritative history** - Cannot be "rolled back" without
+   losing audit trail
+2. **CivicPress philosophy: auditability over invisibility** - Rolling back
+   commits erases evidence
+3. **Derived state is eventually consistent** - Indexing failures don't need to
+   rollback records
+4. **True distributed transactions (2PC) don't work** across Git/DB/filesystem
+   boundaries
+
+#### **Architecture**
+
+- **Local ACID:** Use SQLite transactions for database operations
+- **Global Saga:** Use Saga pattern for cross-boundary operations
+- **Git as Authoritative:** Git commits are never rolled back automatically
+- **Derived State:** Indexing and hooks are fire-and-forget with retry
+
+#### **Operations Requiring Saga Pattern**
+
+1. **PublishDraft:** Move from `record_drafts` → `records` table → file creation
+   → Git commit → delete draft
+2. **CreateRecord:** Create in `records` table → file creation → Git commit
+3. **UpdateRecord:** Update in `records` table → update file → Git commit
+4. **ArchiveRecord:** Update status → move file → Git commit
+
+#### **Failure Strategy**
+
+- **ACID steps (DB):** Rollback transaction on failure
+- **Authoritative steps (Git):** Operation fails, previous state remains (never
+  rollback commits)
+- **Derived state (indexing/hooks):** Queue for retry, don't fail operation
+
+#### **Documentation**
+
+- Specification: `docs/specs/saga-pattern.md`
+- Architecture analysis: `docs/architecture-analysis-and-improvements.md`
+- Records architecture: `docs/architecture-records-drafts.md`
+
 ## Geography Data System Architecture (Latest)
 
 ## Geography Data System Architecture (Latest)

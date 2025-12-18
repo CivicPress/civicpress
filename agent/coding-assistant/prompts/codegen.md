@@ -27,6 +27,11 @@ The assistant must **always** follow these instructions when generating code.
   Use domain-specific error classes (e.g., `RecordNotFoundError`,
   `ValidationError`). Never throw generic `Error` objects. See
   `docs/error-handling.md`.
+- **⚠️ CRITICAL - Saga Pattern**: All multi-step operations spanning storage
+  boundaries MUST use the Saga Pattern. Never execute multi-step operations
+  directly. Use `SagaExecutor` with sagas extending `BaseSagaStep`. All steps
+  must implement compensation logic. See `docs/specs/saga-pattern.md` and
+  `docs/saga-pattern-usage-guide.md`.
 - Pages MUST include proper accessibility landmarks.
 - No hard-coded UI strings; all text must be i18n-ready one the feature is
   implemented.
@@ -68,6 +73,8 @@ Always respond in the following order:
   instantiation.
 - ✅ **Errors use unified system** - domain-specific error classes, not generic
   `Error`.
+- ✅ **Multi-step operations use Saga Pattern** - no direct execution of
+  cross-boundary operations; use `SagaExecutor` with proper saga steps.
 - ✅ Tests compile and cover at least one happy + one edge case.
 - ✅ No duplicate IDs/names against registries.
 - ✅ Doc stub is clear and civic-friendly.

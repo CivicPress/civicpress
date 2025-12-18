@@ -42,19 +42,27 @@ or `workflowState`).
 
 ```
 record_drafts (draft)
-  → publishDraft()
-  → records (published) + file created
-  → DELETE from record_drafts
+  → publishDraft() [Saga Pattern]
+  → Step 1: Move to records table (ACID transaction)
+  → Step 2: Create file in Git working tree
+  → Step 3: Commit to Git (authoritative - cannot be rolled back)
+  → Step 4: Delete from record_drafts (ACID transaction)
+  → Step 5: Queue indexing (derived state - fire and forget)
+  → Step 6: Emit hooks (derived state - fire and forget)
   → workflowState cleared (set to NULL)
 ```
 
 **Implementation Details**:
 
+- Uses **Saga Pattern** for multi-step operation (see
+  `docs/specs/saga-pattern.md`)
 - Check if record exists in `records` table
 - If exists: UPDATE the record (publishing changes to existing published record)
 - If not exists: CREATE new record (publishing new record)
 - File is created/updated in `/data/records/`
+- Git commit is authoritative history (never rolled back)
 - `workflowState` is cleared to NULL
+- Indexing and hooks are queued (failures don't fail the operation)
 
 ### Editing Published Record
 

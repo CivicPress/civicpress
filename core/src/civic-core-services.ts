@@ -25,6 +25,12 @@ import {
 import { initializeRoleManager } from './auth/role-utils.js';
 import { coreOutput } from './utils/core-output.js';
 import type { CivicPress } from './civic-core.js';
+import {
+  SagaStateStore,
+  IdempotencyManager,
+  ResourceLockManager,
+  SagaExecutor,
+} from './saga/index.js';
 
 /**
  * Register all CivicPress services in the dependency injection container
@@ -125,7 +131,28 @@ export function registerCivicPressServices(
   // Note: IndexingService requires CivicPress instance, which we'll handle in completeServiceInitialization
   // We'll register it there using registerInstance
 
-  // Step 9: Register record manager (depends on: database, git, hooks, workflow, template, config)
+  // Step 9: Register saga services (depends on: database)
+  container.singleton('sagaStateStore', (c) => {
+    const db = c.resolve<DatabaseService>('database');
+    return new SagaStateStore(db);
+  });
+  container.singleton('idempotencyManager', (c) => {
+    const stateStore = c.resolve<SagaStateStore>('sagaStateStore');
+    return new IdempotencyManager(stateStore);
+  });
+  container.singleton('resourceLockManager', (c) => {
+    const db = c.resolve<DatabaseService>('database');
+    return new ResourceLockManager(db);
+  });
+  container.singleton('sagaExecutor', (c) => {
+    const stateStore = c.resolve<SagaStateStore>('sagaStateStore');
+    const idempotencyManager =
+      c.resolve<IdempotencyManager>('idempotencyManager');
+    const lockManager = c.resolve<ResourceLockManager>('resourceLockManager');
+    return new SagaExecutor(stateStore, idempotencyManager, lockManager);
+  });
+
+  // Step 10: Register record manager (depends on: database, git, hooks, workflow, template, config)
   container.singleton('recordManager', (c) => {
     const db = c.resolve<DatabaseService>('database');
     const git = c.resolve<GitEngine>('git');

@@ -18,6 +18,9 @@
 - **Record Manager**: CRUD operations for civic records
 - **Template Engine**: Dynamic content generation
 - **Indexing Service**: Full-text search capabilities
+- **Saga Pattern**: Multi-step operation orchestration with compensation
+  - PublishDraftSaga, CreateRecordSaga, UpdateRecordSaga, ArchiveRecordSaga
+  - State persistence, idempotency, resource locking, recovery
 
 #### **API & CLI**
 
@@ -205,6 +208,35 @@
   with section comments
 
 ### ✅ **Recently Completed (December 2025)**
+
+#### **Saga Pattern for Multi-Step Operations**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Core Infrastructure**:
+  - Saga executor with full lifecycle management
+  - State persistence in `saga_states` table
+  - Idempotency management with TTL support
+  - Resource locking for concurrency control
+  - Saga recovery mechanism for stuck/failed sagas
+  - Observability with metrics collection
+- **Saga Implementations**:
+  - ✅ PublishDraftSaga - Publishing draft records
+  - ✅ CreateRecordSaga - Creating published records directly
+  - ✅ UpdateRecordSaga - Updating published records
+  - ✅ ArchiveRecordSaga - Archiving records
+- **Features**:
+  - Automatic saga usage for published records
+  - Compensation logic for ACID steps
+  - Git commits as authoritative (never rolled back)
+  - Derived state (indexing/hooks) failures don't fail operations
+  - Comprehensive integration tests
+  - Complete documentation and usage guide
+- **Documentation**:
+  - Specification: `docs/specs/saga-pattern.md`
+  - Usage Guide: `docs/saga-pattern-usage-guide.md`
+  - Usage Guide: `docs/saga-pattern-usage-guide.md`
+
+### ✅ **Previously Completed (November 2025)**
 
 #### **Dependency Injection Container System**
 

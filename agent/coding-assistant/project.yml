@@ -16,6 +16,8 @@ non_negotiables:
     dependency-injection-guide.md).
   - All errors MUST use the unified error handling system (see
     error-handling.md).
+  - All multi-step operations spanning storage boundaries MUST use the Saga
+    Pattern (see saga-pattern.md and saga-pattern-usage-guide.md).
 
 defaults:
   language: TypeScript

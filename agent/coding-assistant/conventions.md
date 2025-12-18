@@ -267,6 +267,71 @@ throw new RecordNotFoundError(recordId, { recordId, type });
 throw new ValidationError('Invalid record data', { field: 'title', value: data.title });
 ```
 
+## Saga Pattern for Multi-Step Operations
+
+- **⚠️ CRITICAL**: All multi-step operations that span multiple storage
+  boundaries MUST use the Saga Pattern
+- **When to Use**: Operations that involve:
+  - Database + Git commits (e.g., publishDraft, createRecord, updateRecord,
+    archiveRecord)
+  - Database + File system + Git (e.g., record operations with file creation)
+  - Any operation crossing storage boundaries (DB, Git, filesystem, external
+    services)
+- **Never Direct Execution**: Do not execute multi-step operations directly;
+  always use a saga
+- **Saga Infrastructure**: Use `SagaExecutor`, `BaseSagaStep`, and existing saga
+  patterns
+- **Compensation**: All saga steps must implement compensation logic for
+  rollback
+- **Idempotency**: All sagas support idempotency via `IdempotencyManager`
+- **State Persistence**: Saga state is automatically persisted for recovery
+- **Reference**: See `docs/specs/saga-pattern.md` and
+  `docs/saga-pattern-usage-guide.md`
+
+**❌ Don't:**
+
+```typescript
+// Direct multi-step operation without saga
+async publishDraft(draftId: string) {
+  await this.db.moveRecordToPublished(draftId); // Step 1
+  await this.createFile(record); // Step 2
+  await this.git.commit(...); // Step 3 - What if this fails? DB already committed!
+}
+```
+
+**✅ Do:**
+
+```typescript
+// Use existing saga or create new one
+import { PublishDraftSaga } from '@civicpress/core/saga';
+
+async publishDraft(draftId: string, user: AuthUser) {
+  const saga = new PublishDraftSaga(
+    this.container.resolve('database'),
+    this.container.resolve('gitEngine'),
+    // ... other dependencies
+  );
+
+  const context: PublishDraftContext = {
+    draftId,
+    user,
+    correlationId: generateCorrelationId(),
+  };
+
+  const executor = this.container.resolve<SagaExecutor>('sagaExecutor');
+  return await executor.execute(saga, context);
+}
+```
+
+**Creating New Sagas:**
+
+1. Extend `BaseSagaStep<TContext, TResult>` for each step
+2. Implement `execute()` and `compensate()` methods
+3. Define saga class with array of steps
+4. Register saga-related services in DI container
+5. Add integration tests covering success, failure, and compensation scenarios
+6. See `core/src/saga/publish-draft-saga.ts` for reference implementation
+
 ## Enforcement
 
 These rules are enforced by:

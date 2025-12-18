@@ -40,6 +40,33 @@ export class DatabaseService {
     return this.adapter;
   }
 
+  /**
+   * Begin a database transaction
+   */
+  async beginTransaction(): Promise<
+    import('./database-adapter.js').Transaction
+  > {
+    return this.adapter.beginTransaction();
+  }
+
+  /**
+   * Commit a database transaction
+   */
+  async commitTransaction(
+    transaction: import('./database-adapter.js').Transaction
+  ): Promise<void> {
+    return this.adapter.commitTransaction(transaction);
+  }
+
+  /**
+   * Rollback a database transaction
+   */
+  async rollbackTransaction(
+    transaction: import('./database-adapter.js').Transaction
+  ): Promise<void> {
+    return this.adapter.rollbackTransaction(transaction);
+  }
+
   async initialize(): Promise<void> {
     try {
       await this.adapter.connect();
