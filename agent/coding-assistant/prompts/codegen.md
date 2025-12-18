@@ -20,6 +20,13 @@ The assistant must **always** follow these instructions when generating code.
 - **⚠️ CRITICAL**: Never use `console.log()`, `console.error()`, or direct
   console output. Always use centralized output functions (cliSuccess,
   coreError, sendSuccess, etc.). See `docs/centralized-output-patterns.md`.
+- **⚠️ CRITICAL - Dependency Injection**: All new services MUST be registered in
+  the DI container. Register in `core/src/civic-core-services.ts`. Never use
+  `new ServiceName()` directly. See `docs/dependency-injection-guide.md`.
+- **⚠️ CRITICAL - Error Handling**: All errors MUST use unified error system.
+  Use domain-specific error classes (e.g., `RecordNotFoundError`,
+  `ValidationError`). Never throw generic `Error` objects. See
+  `docs/error-handling.md`.
 - Pages MUST include proper accessibility landmarks.
 - No hard-coded UI strings; all text must be i18n-ready one the feature is
   implemented.
@@ -57,6 +64,10 @@ Always respond in the following order:
 - ✅ **No console.log/error/warn** - all output uses centralized functions.
 - ✅ **No manual JSON handling** - centralized functions handle `--json`
   automatically.
+- ✅ **Services registered in DI container** - no direct `new ServiceName()`
+  instantiation.
+- ✅ **Errors use unified system** - domain-specific error classes, not generic
+  `Error`.
 - ✅ Tests compile and cover at least one happy + one edge case.
 - ✅ No duplicate IDs/names against registries.
 - ✅ Doc stub is clear and civic-friendly.

@@ -208,6 +208,65 @@ cliError('Error occurred', 'ERROR_CODE', { error }, 'my-command');
 
 ---
 
+## Dependency Injection
+
+- **⚠️ CRITICAL**: All new services MUST be registered in the DI container
+- **Service Registration**: Use `registerCivicPressServices()` in
+  `core/src/civic-core-services.ts` for core services
+- **Service Resolution**: Access services via `civicPress.getService<T>()` or
+  use getter methods
+- **Never Direct Instantiation**: Do not use `new ServiceName()` directly in
+  CivicPress constructor or other services
+- **Testing**: Use `createTestContainer()` or `createMockContainer()` from
+  `core/src/di/test-utils.ts` for tests
+- **Reference**: See `docs/dependency-injection-guide.md` for complete patterns
+
+**❌ Don't:**
+
+```typescript
+// In CivicPress constructor or service
+this.myService = new MyService(config, logger);
+```
+
+**✅ Do:**
+
+```typescript
+// In civic-core-services.ts
+container.singleton('myService', (c) => {
+  const config = c.resolve<CivicPressConfig>('config');
+  const logger = c.resolve<Logger>('logger');
+  return new MyService(config, logger);
+});
+
+// Access via container
+const myService = civicPress.getService<MyService>('myService');
+```
+
+## Error Handling
+
+- **⚠️ CRITICAL**: All errors MUST use the unified error handling system
+- **Error Types**: Use domain-specific error classes extending `CivicPressError`
+- **Never Generic Errors**: Do not throw generic `Error` objects
+- **Error Codes**: Always include error codes for programmatic handling
+- **Correlation IDs**: Errors automatically include correlation IDs for tracing
+- **Reference**: See `docs/error-handling.md` for complete patterns
+
+**❌ Don't:**
+
+```typescript
+throw new Error('Record not found');
+throw new Error('Validation failed');
+```
+
+**✅ Do:**
+
+```typescript
+import { RecordNotFoundError, ValidationError } from '@civicpress/core/errors';
+
+throw new RecordNotFoundError(recordId, { recordId, type });
+throw new ValidationError('Invalid record data', { field: 'title', value: data.title });
+```
+
 ## Enforcement
 
 These rules are enforced by:

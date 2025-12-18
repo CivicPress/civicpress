@@ -53,53 +53,64 @@ scalability patterns.
 
 ### 1.2 Architectural Weaknesses
 
-#### ⚠️ **Dependency Management Issues**
+#### ✅ **Dependency Management - IMPLEMENTED**
 
-**Problem:** Services are tightly coupled through direct instantiation in
-`CivicPress` constructor.
+**Status:** Dependency Injection Container has been fully implemented.
+
+**Solution:** A lightweight DI container (`ServiceContainer`) now manages all
+service dependencies.
 
 ```typescript
-// Current pattern in civic-core.ts
-this.databaseService = new DatabaseService(dbConfig, this.logger);
-this.authService = new AuthService(this.databaseService, config.dataDir);
-this.recordManager = new RecordManager(
-  this.databaseService,
-  this.gitEngine,
-  this.hookSystem,
-  this.workflowEngine,
-  this.templateEngine,
-  config.dataDir
-);
+// New pattern in civic-core.ts
+this.container = new ServiceContainer();
+registerCivicPressServices(this.container, config);
+
+// Services are resolved lazily from container
+getDatabaseService(): DatabaseService {
+  if (!this._databaseService) {
+    this._databaseService = this.container.resolve<DatabaseService>('database');
+  }
+  return this._databaseService;
+}
 ```
 
-**Issues:**
+**Benefits:**
 
-- Hard to test in isolation (requires full `CivicPress` instance)
-- Difficult to swap implementations (e.g., different database adapters)
-- Circular dependency risks as services grow
-- No lazy initialization for expensive services
+- ✅ Services can be tested in isolation with mock containers
+- ✅ Easy to swap implementations (register different factories)
+- ✅ Circular dependencies are automatically detected
+- ✅ Lazy initialization for all services (created on first access)
+- ✅ Type-safe service resolution
+- ✅ Backward compatible (getter methods still work)
 
-**Impact:** Medium - Affects testability and flexibility
+**Impact:** High - Significantly improved testability and flexibility
 
-#### ⚠️ **Inconsistent Error Handling**
+#### ✅ **Unified Error Handling System - IMPLEMENTED**
 
-**Problem:** Multiple error handling patterns across layers.
+**Status:** ✅ **COMPLETE** - Unified error handling system fully implemented
 
-**Current State:**
+**Solution:** A comprehensive error hierarchy and handling system has been
+implemented.
 
-- API layer: `handleApiError()`, `handleValidationError()` (good)
-- Core services: Mix of throwing errors, returning null, and logging
-- CLI: Centralized output (good), but error propagation inconsistent
-- UI: `useErrorHandler` composable (good), but not all errors handled
+**Implementation Details:**
 
-**Issues:**
+- ✅ Type-safe error hierarchy with `CivicPressError` base class
+- ✅ Domain-specific error classes (ValidationError, NotFoundError, etc.)
+- ✅ Correlation IDs for error tracing
+- ✅ Integration with centralized output system
+- ✅ API error handler middleware
+- ✅ UI error handling composable integration
+- ✅ Complete error code reference
 
-- No unified error type hierarchy
-- Inconsistent error context (some include stack, some don't)
-- No error recovery strategies
-- Missing error correlation IDs for distributed tracing
+**Benefits Achieved:**
 
-**Impact:** High - Affects debugging and user experience
+- ✅ Consistent error responses across all layers
+- ✅ Better debugging with correlation IDs
+- ✅ Type-safe error handling
+- ✅ Clear error recovery paths
+- ✅ Improved user experience with structured error messages
+
+**Impact:** High - Significantly improved debugging and user experience
 
 #### ⚠️ **Transaction Management Gaps**
 
@@ -227,13 +238,20 @@ container.singleton('auth', () =>
 
 ---
 
-### 2.2 Unified Error Handling System
+### 2.2 Unified Error Handling System ✅ IMPLEMENTED
 
-**Priority:** High  
-**Effort:** Medium  
-**Impact:** High
+**Status:** ✅ **COMPLETE** - Fully implemented and integrated
 
-**Proposal:** Create a comprehensive error hierarchy and handling system.
+**Implementation:** A comprehensive error hierarchy and handling system has been
+implemented with:
+
+- Type-safe error classes extending `CivicPressError`
+- Domain-specific errors (Records, Templates, Geography, Auth, etc.)
+- Correlation IDs for distributed tracing
+- Integration with centralized output (`coreError()`, `cliError()`,
+  `handleApiError()`)
+- API error handler middleware
+- UI error handling composable integration
 
 ```typescript
 // New: core/src/errors/index.ts
@@ -700,17 +718,19 @@ private async initializeOptionalServices(): Promise<void> {
 
 ### Phase 1: Foundation (v0.2.x) - 2-3 months
 
-1. **Unified Error Handling** (High Priority)
-   - Create error hierarchy
-   - Refactor services
-   - Update API handlers
-   - **Effort:** 2-3 weeks
+1. **Unified Error Handling** ✅ **COMPLETE** (High Priority)
+   - ✅ Create error hierarchy
+   - ✅ Refactor services
+   - ✅ Update API handlers
+   - ✅ Comprehensive documentation
+   - **Effort:** 2-3 weeks (Completed)
 
-2. **Dependency Injection Container** (High Priority)
-   - Implement container
-   - Refactor `CivicPress`
-   - Update tests
-   - **Effort:** 2-3 weeks
+2. **Dependency Injection Container** ✅ **COMPLETE**
+   - ✅ Implement container
+   - ✅ Refactor `CivicPress`
+   - ✅ Update tests
+   - ✅ Comprehensive documentation
+   - **Effort:** 2-3 weeks (Completed)
 
 3. **Transaction Coordinator** (High Priority)
    - Design coordinator
@@ -814,15 +834,15 @@ enhancements.
 
 ### Improvement Impact Matrix
 
-| Improvement             | Effort    | Impact | Priority        |
-| ----------------------- | --------- | ------ | --------------- |
-| Unified Error Handling  | Medium    | High   | 🔴 High         |
-| DI Container            | Medium    | High   | 🔴 High         |
-| Transaction Coordinator | High      | High   | 🔴 High         |
-| Unified Caching         | Medium    | Medium | 🟡 Medium       |
-| Health Checks           | Low       | Medium | 🟡 Medium       |
-| Repository Pattern      | High      | Medium | 🟡 Medium       |
-| Event Sourcing          | Very High | High   | 🟢 Low (Future) |
+| Improvement             | Effort      | Impact | Priority        |
+| ----------------------- | ----------- | ------ | --------------- |
+| Unified Error Handling  | ✅ Complete | High   | ✅ Implemented  |
+| DI Container            | ✅ Complete | High   | ✅ Implemented  |
+| Transaction Coordinator | High        | High   | 🔴 High         |
+| Unified Caching         | Medium      | Medium | 🟡 Medium       |
+| Health Checks           | Low         | Medium | 🟡 Medium       |
+| Repository Pattern      | High        | Medium | 🟡 Medium       |
+| Event Sourcing          | Very High   | High   | 🟢 Low (Future) |
 
 ---
 

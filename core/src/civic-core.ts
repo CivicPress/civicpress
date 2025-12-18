@@ -9,13 +9,17 @@ import { RecordManager } from './records/record-manager.js';
 import { TemplateEngine } from './utils/template-engine.js';
 import { IndexingService } from './indexing/indexing-service.js';
 import { Logger } from './utils/logger.js';
-import { initializeRoleManager } from './auth/role-utils.js';
 import { coreOutput } from './utils/core-output.js';
 import {
   NotificationService,
   NotificationConfig,
 } from './notifications/index.js';
 import { Geography } from './types/geography.js';
+import { ServiceContainer } from './di/container.js';
+import {
+  registerCivicPressServices,
+  completeServiceInitialization,
+} from './civic-core-services.js';
 
 export interface CivicPressConfig {
   dataDir: string;
@@ -146,28 +150,33 @@ export interface UpdateRecordRequest {
 
 export class CivicPress {
   private config: CivicPressConfig;
-  private configDiscovery: ConfigDiscovery;
-  private workflowEngine: WorkflowEngine;
-  private gitEngine: GitEngine;
-  private hookSystem: HookSystem;
-  private databaseService: DatabaseService;
-  private authService: AuthService;
-  private recordManager: RecordManager;
-  private templateEngine: TemplateEngine;
-  private indexingService: IndexingService;
-  private notificationService: NotificationService;
-  private notificationConfig: NotificationConfig;
+  private container: ServiceContainer;
   private logger: Logger;
+
+  // Keep private properties for backward compatibility
+  private _configDiscovery?: ConfigDiscovery;
+  private _workflowEngine?: WorkflowEngine;
+  private _gitEngine?: GitEngine;
+  private _hookSystem?: HookSystem;
+  private _databaseService?: DatabaseService;
+  private _authService?: AuthService;
+  private _recordManager?: RecordManager;
+  private _templateEngine?: TemplateEngine;
+  private _indexingService?: IndexingService;
+  private _notificationService?: NotificationService;
+  private _notificationConfig?: NotificationConfig;
 
   constructor(config: CivicPressConfig) {
     this.config = config;
 
-    // Create logger with options from config
-    const loggerOptions = config.logger || {};
-    this.logger = new Logger(loggerOptions);
+    // Create dependency injection container
+    this.container = new ServiceContainer();
 
-    // Configure core output with the same options
-    coreOutput.setOptions(loggerOptions);
+    // Register all services
+    registerCivicPressServices(this.container, config);
+
+    // Get logger from container
+    this.logger = this.container.resolve<Logger>('logger');
 
     // Debug: log the config being passed (only in verbose mode)
     if (this.logger.isVerbose()) {
@@ -182,67 +191,20 @@ export class CivicPress {
       );
     }
 
-    // Initialize database service
-    // If no database config provided, use default relative to dataDir's parent (project root)
-    let dbConfig = config.database;
-    if (!dbConfig) {
-      // Resolve project root: if dataDir is 'data', project root is parent
-      // If dataDir is absolute like '/path/to/project/data', project root is its parent
-      const projectRoot = path.isAbsolute(config.dataDir)
-        ? path.dirname(config.dataDir)
-        : path.resolve(process.cwd(), path.dirname(config.dataDir));
-      dbConfig = {
-        type: 'sqlite' as const,
-        sqlite: {
-          file: path.join(projectRoot, '.system-data', 'civic.db'),
-        },
-      };
-    } else if (
-      dbConfig.sqlite?.file &&
-      !path.isAbsolute(dbConfig.sqlite.file)
-    ) {
-      // Resolve relative database paths to absolute using project root
-      const projectRoot = path.isAbsolute(config.dataDir)
-        ? path.dirname(config.dataDir)
-        : path.resolve(process.cwd(), path.dirname(config.dataDir));
-      dbConfig = {
-        ...dbConfig,
-        sqlite: {
-          ...dbConfig.sqlite,
-          file: path.resolve(projectRoot, dbConfig.sqlite.file),
-        },
-      };
-    }
+    // Complete service initialization (handles services that need CivicPress instance)
+    completeServiceInitialization(this.container, this);
 
-    this.databaseService = new DatabaseService(dbConfig, this.logger);
-    this.authService = new AuthService(this.databaseService, config.dataDir);
+    // Initialize lazy-loaded service references for backward compatibility
+    this.initializeServiceReferences();
+  }
 
-    // Initialize role manager
-    initializeRoleManager(config.dataDir);
-
-    // Initialize other services
-    this.configDiscovery = new ConfigDiscovery();
-    this.workflowEngine = new WorkflowEngine();
-    this.gitEngine = new GitEngine(config.dataDir);
-    this.hookSystem = new HookSystem(config.dataDir);
-    this.templateEngine = new TemplateEngine(config.dataDir);
-
-    // Initialize indexing service and integrate with workflow engine
-    this.indexingService = new IndexingService(this, config.dataDir);
-    this.workflowEngine.setIndexingService(this.indexingService);
-
-    this.recordManager = new RecordManager(
-      this.databaseService,
-      this.gitEngine,
-      this.hookSystem,
-      this.workflowEngine,
-      this.templateEngine,
-      config.dataDir
-    );
-
-    // Initialize notification system
-    this.notificationConfig = new NotificationConfig(config.dataDir);
-    this.notificationService = new NotificationService(this.notificationConfig);
+  /**
+   * Initialize service references for backward compatibility
+   * These are lazy-loaded from the container
+   */
+  private initializeServiceReferences(): void {
+    // Services are resolved on-demand from container
+    // This method ensures getters work correctly
   }
 
   async initialize(): Promise<void> {
@@ -250,13 +212,19 @@ export class CivicPress {
       this.logger.info('Initializing CivicPress...');
 
       // Initialize database first
-      await this.databaseService.initialize();
+      const db = this.container.resolve<DatabaseService>('database');
+      await db.initialize();
       this.logger.info('Database initialized');
 
       // Initialize other services
-      await this.workflowEngine.initialize();
-      await this.gitEngine.initialize();
-      await this.hookSystem.initialize();
+      const workflow = this.container.resolve<WorkflowEngine>('workflow');
+      await workflow.initialize();
+
+      const git = this.container.resolve<GitEngine>('git');
+      await git.initialize();
+
+      const hooks = this.container.resolve<HookSystem>('hooks');
+      await hooks.initialize();
 
       this.logger.info('CivicPress initialized successfully');
     } catch (error) {
@@ -270,7 +238,8 @@ export class CivicPress {
       this.logger.info('Shutting down CivicPress...');
 
       // Close database connection
-      await this.databaseService.close();
+      const db = this.container.resolve<DatabaseService>('database');
+      await db.close();
 
       this.logger.info('CivicPress shutdown complete');
     } catch (error) {
@@ -281,44 +250,98 @@ export class CivicPress {
 
   // Database and Auth services
   getDatabaseService(): DatabaseService {
-    return this.databaseService;
+    if (!this._databaseService) {
+      this._databaseService =
+        this.container.resolve<DatabaseService>('database');
+    }
+    return this._databaseService;
   }
 
   getAuthService(): AuthService {
-    return this.authService;
+    if (!this._authService) {
+      this._authService = this.container.resolve<AuthService>('auth');
+    }
+    return this._authService;
   }
 
   getRecordManager(): RecordManager {
-    return this.recordManager;
+    if (!this._recordManager) {
+      this._recordManager =
+        this.container.resolve<RecordManager>('recordManager');
+    }
+    return this._recordManager;
   }
 
   getIndexingService(): IndexingService {
-    return this.indexingService;
+    if (!this._indexingService) {
+      this._indexingService =
+        this.container.resolve<IndexingService>('indexing');
+    }
+    return this._indexingService;
   }
 
   // Existing services
   getConfigDiscovery(): ConfigDiscovery {
-    return this.configDiscovery;
+    if (!this._configDiscovery) {
+      this._configDiscovery =
+        this.container.resolve<ConfigDiscovery>('configDiscovery');
+    }
+    return this._configDiscovery;
   }
 
   getWorkflowEngine(): WorkflowEngine {
-    return this.workflowEngine;
+    if (!this._workflowEngine) {
+      this._workflowEngine = this.container.resolve<WorkflowEngine>('workflow');
+    }
+    return this._workflowEngine;
   }
 
   getGitEngine(): GitEngine {
-    return this.gitEngine;
+    if (!this._gitEngine) {
+      this._gitEngine = this.container.resolve<GitEngine>('git');
+    }
+    return this._gitEngine;
   }
 
   getHookSystem(): HookSystem {
-    return this.hookSystem;
+    if (!this._hookSystem) {
+      this._hookSystem = this.container.resolve<HookSystem>('hooks');
+    }
+    return this._hookSystem;
+  }
+
+  getTemplateEngine(): TemplateEngine {
+    if (!this._templateEngine) {
+      this._templateEngine = this.container.resolve<TemplateEngine>('template');
+    }
+    return this._templateEngine;
   }
 
   getNotificationService(): NotificationService {
-    return this.notificationService;
+    if (!this._notificationService) {
+      this._notificationService =
+        this.container.resolve<NotificationService>('notification');
+    }
+    return this._notificationService;
   }
 
   getNotificationConfig(): NotificationConfig {
-    return this.notificationConfig;
+    if (!this._notificationConfig) {
+      this._notificationConfig =
+        this.container.resolve<NotificationConfig>('notificationConfig');
+    }
+    return this._notificationConfig;
+  }
+
+  /**
+   * Get a service directly from the container
+   * This is the new preferred way to access services
+   *
+   * @param key - Service key (string or class constructor)
+   * @returns Service instance
+   */
+  getService<T>(key: string | any): T {
+    return this.container.resolve<T>(key);
   }
 
   getDataDir(): string {
@@ -330,7 +353,8 @@ export class CivicPress {
     status: 'healthy' | 'unhealthy';
     database: boolean;
   }> {
-    const dbHealthy = await this.databaseService.healthCheck();
+    const db = this.container.resolve<DatabaseService>('database');
+    const dbHealthy = await db.healthCheck();
     const status = dbHealthy ? 'healthy' : 'unhealthy';
 
     return {

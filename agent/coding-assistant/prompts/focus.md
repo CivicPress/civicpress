@@ -70,6 +70,24 @@ Always respond in this order:
   automatically.
 - Always include operation context in output calls.
 - See `docs/centralized-output-patterns.md` for complete patterns.
+
+- **⚠️ CRITICAL - Dependency Injection**: All new services MUST be registered in
+  the DI container
+  - Register services in `core/src/civic-core-services.ts` using
+    `registerCivicPressServices()`
+  - Access services via `civicPress.getService<T>()` or getter methods
+  - Never use `new ServiceName()` directly in CivicPress or other services
+  - Use `createTestContainer()` or `createMockContainer()` for tests
+  - See `docs/dependency-injection-guide.md` for patterns
+
+- **⚠️ CRITICAL - Error Handling**: All errors MUST use the unified error
+  handling system
+  - Use domain-specific error classes extending `CivicPressError` (e.g.,
+    `RecordNotFoundError`, `ValidationError`)
+  - Never throw generic `Error` objects
+  - Always include error codes for programmatic handling
+  - Errors automatically include correlation IDs for tracing
+  - See `docs/error-handling.md` for complete patterns
 - Do not patch `dist/` outputs post‑build; fix source instead.
 - API/UI use hot reload; don't instruct manual restarts during dev.
 - CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and

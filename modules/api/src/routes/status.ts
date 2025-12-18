@@ -30,7 +30,7 @@ export function createStatusRouter() {
       }
 
       const dataDir = civicPress.getDataDir();
-      const gitEngine = civicPress.gitEngine;
+      const gitEngine = civicPress.getGitEngine();
 
       // Get Git status
       let gitStatus = null;
@@ -110,7 +110,7 @@ export function createStatusRouter() {
         throw new Error('CivicPress not initialized');
       }
 
-      const gitEngine = civicPress.gitEngine;
+      const gitEngine = civicPress.getGitEngine();
       if (!gitEngine) {
         const error = new Error('Git engine not available');
         (error as any).statusCode = 503;
