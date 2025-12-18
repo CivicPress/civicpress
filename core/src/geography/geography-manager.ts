@@ -18,11 +18,13 @@ import {
   ParsedGeographyData,
   BoundingBox,
   GeographyMetadata,
-  GeographyError,
-  GeographyValidationError,
-  GeographyNotFoundError,
   SRID,
 } from '../types/geography.js';
+import {
+  GeographyNotFoundError,
+  GeographyValidationError,
+} from '../errors/domain-errors.js';
+import { InternalError } from '../errors/index.js';
 import { GeographyParser } from './geography-parser.js';
 import { Logger } from '../utils/logger.js';
 import { coreWarn } from '../utils/core-output.js';
@@ -115,13 +117,15 @@ export class GeographyManager {
 
       return geographyFile;
     } catch (error) {
-      if (error instanceof GeographyError) {
+      if (
+        error instanceof GeographyValidationError ||
+        error instanceof GeographyNotFoundError
+      ) {
         throw error;
       }
-      throw new GeographyError(
+      throw new InternalError(
         `Failed to create geography file: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'CREATE_ERROR',
-        { request, error }
+        { operation: 'create_geography_file', request, error }
       );
     }
   }
@@ -205,13 +209,15 @@ export class GeographyManager {
       // File not found
       return null;
     } catch (error) {
-      if (error instanceof GeographyError) {
+      if (
+        error instanceof GeographyValidationError ||
+        error instanceof GeographyNotFoundError
+      ) {
         throw error;
       }
-      throw new GeographyError(
+      throw new InternalError(
         `Failed to get geography file: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'GET_ERROR',
-        { id, error }
+        { operation: 'get_geography_file', id, error }
       );
     }
   }
@@ -288,13 +294,15 @@ export class GeographyManager {
 
       return updatedFile;
     } catch (error) {
-      if (error instanceof GeographyError) {
+      if (
+        error instanceof GeographyValidationError ||
+        error instanceof GeographyNotFoundError
+      ) {
         throw error;
       }
-      throw new GeographyError(
+      throw new InternalError(
         `Failed to update geography file: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'UPDATE_ERROR',
-        { id, request, error }
+        { operation: 'update_geography_file', id, request, error }
       );
     }
   }
@@ -322,10 +330,15 @@ export class GeographyManager {
       const markdownContent = await fs.readFile(filePath, 'utf8');
       return GeographyParser.extractRawContent(markdownContent);
     } catch (error) {
-      throw new GeographyError(
+      if (
+        error instanceof GeographyValidationError ||
+        error instanceof GeographyNotFoundError
+      ) {
+        throw error;
+      }
+      throw new InternalError(
         `Failed to get raw content: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'GET_RAW_ERROR',
-        { id, error }
+        { operation: 'get_raw_content', id, error }
       );
     }
   }
@@ -347,13 +360,15 @@ export class GeographyManager {
       // TODO: Delete from database
       // await this.deleteFromDatabase(id);
     } catch (error) {
-      if (error instanceof GeographyError) {
+      if (
+        error instanceof GeographyValidationError ||
+        error instanceof GeographyNotFoundError
+      ) {
         throw error;
       }
-      throw new GeographyError(
+      throw new InternalError(
         `Failed to delete geography file: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'DELETE_ERROR',
-        { id, error }
+        { operation: 'delete_geography_file', id, error }
       );
     }
   }
@@ -469,10 +484,22 @@ export class GeographyManager {
 
       return { files: paginatedFiles, total: files.length };
     } catch (error) {
-      throw new GeographyError(
+      if (
+        error instanceof GeographyValidationError ||
+        error instanceof GeographyNotFoundError
+      ) {
+        throw error;
+      }
+      throw new InternalError(
         `Failed to list geography files: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'LIST_ERROR',
-        { category, type, page, limit, error }
+        {
+          operation: 'list_geography_files',
+          category,
+          type,
+          page,
+          limit,
+          error,
+        }
       );
     }
   }

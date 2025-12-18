@@ -1,5 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import { Logger } from '@civicpress/core';
+import {
+  Logger,
+  CivicPressError,
+  isCivicPressError,
+  getErrorCode,
+  getStatusCode,
+  getCorrelationId,
+} from '@civicpress/core';
 
 const logger = new Logger();
 
@@ -49,11 +56,54 @@ function extractRequestContext(req: Request): RequestContext {
 }
 
 // Categorize errors for better handling
-function categorizeError(error: any): {
+export function categorizeError(error: any): {
   category: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   actionable: boolean;
 } {
+  // First check if it's a CivicPressError
+  if (isCivicPressError(error)) {
+    const code = error.code;
+    const statusCode = error.statusCode;
+
+    // Map error codes to categories
+    if (code.includes('VALIDATION') || code.includes('VALIDATION_ERROR')) {
+      return { category: 'validation', severity: 'low', actionable: true };
+    }
+    if (code.includes('UNAUTHORIZED') || code.includes('AUTHENTICATION')) {
+      return {
+        category: 'authentication',
+        severity: 'medium',
+        actionable: true,
+      };
+    }
+    if (code.includes('FORBIDDEN') || code.includes('AUTHORIZATION')) {
+      return {
+        category: 'authorization',
+        severity: 'medium',
+        actionable: true,
+      };
+    }
+    if (code.includes('NOT_FOUND')) {
+      return { category: 'not_found', severity: 'low', actionable: true };
+    }
+    if (code.includes('CONFLICT')) {
+      return { category: 'conflict', severity: 'medium', actionable: true };
+    }
+    if (code.includes('DATABASE')) {
+      return { category: 'database', severity: 'high', actionable: true };
+    }
+    if (code.includes('FILE_SYSTEM')) {
+      return { category: 'file_system', severity: 'medium', actionable: true };
+    }
+    if (statusCode >= 500) {
+      return { category: 'system', severity: 'high', actionable: false };
+    }
+
+    return { category: 'unknown', severity: 'medium', actionable: false };
+  }
+
+  // Fallback to old error name-based categorization
   if (error.name === 'ValidationError' || error.name === 'SyntaxError') {
     return { category: 'validation', severity: 'low', actionable: true };
   }
@@ -80,29 +130,50 @@ function categorizeError(error: any): {
 }
 
 export function errorHandler(
-  err: ApiError,
+  err: ApiError | CivicPressError,
   req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ): void {
-  let statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
-
-  // Handle JSON parsing errors
-  if (err.name === 'SyntaxError') {
-    statusCode = 400;
-  }
   const context = extractRequestContext(req);
   const categorization = categorizeError(err);
+
+  // Extract error details - prioritize CivicPressError
+  let statusCode: number;
+  let message: string;
+  let errorCode: string | undefined;
+  let errorContext: Record<string, any> | undefined;
+  let correlationId: string | undefined;
+
+  if (isCivicPressError(err)) {
+    // Use CivicPressError details
+    statusCode = err.statusCode;
+    message = err.message;
+    errorCode = err.code;
+    errorContext = err.context;
+    correlationId = err.correlationId;
+  } else {
+    // Fallback to ApiError or generic Error
+    statusCode = err.statusCode || 500;
+    message = err.message || 'Internal Server Error';
+    errorCode = err.code;
+    errorContext = err.context;
+
+    // Handle JSON parsing errors
+    if (err.name === 'SyntaxError') {
+      statusCode = 400;
+    }
+  }
 
   // Log error with comprehensive context
   logger.error('API Error', {
     error: {
       name: err.name,
-      message: err.message,
-      code: err.code,
+      message,
+      code: errorCode,
       stack: err.stack,
+      ...(correlationId && { correlationId }),
     },
     request: context,
     response: {
@@ -111,6 +182,7 @@ export function errorHandler(
       severity: categorization.severity,
       actionable: categorization.actionable,
     },
+    ...(errorContext && { errorContext }),
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
   });
@@ -120,6 +192,7 @@ export function errorHandler(
     logger.error('Critical error details', {
       error: err,
       context,
+      ...(correlationId && { correlationId }),
       stack: err.stack,
     });
   }
@@ -127,13 +200,15 @@ export function errorHandler(
   // Don't leak error details in production
   const isDevelopment = process.env.NODE_ENV === 'development';
   const errorResponse = {
+    success: false,
     error: {
       message: isDevelopment ? message : 'Internal Server Error',
-      code: err.code || categorization.category,
+      code: errorCode || categorization.category,
       ...(isDevelopment && {
         stack: err.stack,
-        details: err.context,
+        details: errorContext,
       }),
+      ...(correlationId && { correlationId }),
     },
     requestId: context.requestId,
     timestamp: new Date().toISOString(),

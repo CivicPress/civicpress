@@ -208,12 +208,31 @@ export function coreSuccess<T>(
 }
 
 export function coreError(
-  message: string,
+  message: string | Error,
   code?: string,
   details?: any,
   context?: Record<string, any>
 ): void {
-  coreOutput.error(message, code, details, context);
+  // If first argument is a CivicPressError, extract details automatically
+  if (message instanceof Error && 'getOutputDetails' in message) {
+    const error = message as any;
+    const outputDetails = error.getOutputDetails();
+    coreOutput.error(
+      outputDetails.message,
+      outputDetails.code,
+      outputDetails.details,
+      outputDetails.context
+    );
+    return;
+  }
+
+  // Original behavior for backward compatibility
+  coreOutput.error(
+    typeof message === 'string' ? message : message.message || 'Unknown error',
+    code,
+    details,
+    context
+  );
 }
 
 export function coreInfo(message: string, context?: Record<string, any>): void {

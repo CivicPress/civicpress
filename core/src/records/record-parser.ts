@@ -16,6 +16,8 @@ import { stringify } from 'yaml';
 import { RecordData } from './record-manager.js';
 import { Logger } from '../utils/logger.js';
 import { RecordSchemaValidator } from './record-schema-validator.js';
+import { RecordValidationError } from '../errors/domain-errors.js';
+import { ValidationError } from '../errors/index.js';
 
 const logger = new Logger();
 
@@ -122,7 +124,9 @@ export class RecordParser {
       const { data: frontmatter, content: markdownContent } = matter(content);
 
       if (!frontmatter || typeof frontmatter !== 'object') {
-        throw new Error('Invalid or missing frontmatter');
+        throw new ValidationError('Invalid or missing frontmatter', {
+          filePath,
+        });
       }
 
       // Normalize old format to new format
@@ -144,8 +148,9 @@ export class RecordParser {
         const errorMessages = schemaValidation.errors
           .map((err) => `${err.field}: ${err.message}`)
           .join('; ');
-        throw new Error(
-          `Schema validation failed for record${filePath ? ` at ${filePath}` : ''}: ${errorMessages}`
+        throw new RecordValidationError(
+          `Schema validation failed for record${filePath ? ` at ${filePath}` : ''}: ${errorMessages}`,
+          { filePath, validationErrors: schemaValidation.errors }
         );
       }
 
@@ -560,7 +565,10 @@ ${record.content || ''}`;
     if (missing.length > 0) {
       const errorMsg = `Missing required fields${filePath ? ` in ${filePath}` : ''}: ${missing.join(', ')}`;
       logger.error(errorMsg);
-      throw new Error(errorMsg);
+      throw new RecordValidationError(errorMsg, {
+        filePath,
+        missingFields: missing,
+      });
     }
   }
 

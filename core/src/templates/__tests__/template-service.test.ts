@@ -327,7 +327,7 @@ type: bylaw
       };
 
       await expect(service.createTemplate(templateData)).rejects.toThrow(
-        'Template already exists'
+        "Template 'bylaw/existing' already exists"
       );
     });
 
@@ -394,7 +394,7 @@ description: Original description
     it('should throw error if template does not exist', async () => {
       await expect(
         service.updateTemplate('bylaw/nonexistent', { description: 'test' })
-      ).rejects.toThrow('Template not found');
+      ).rejects.toThrow("Template 'bylaw/nonexistent' not found");
     });
 
     it('should throw error for invalid template ID', async () => {
@@ -432,7 +432,7 @@ type: bylaw
 
     it('should throw error if template does not exist', async () => {
       await expect(service.deleteTemplate('bylaw/nonexistent')).rejects.toThrow(
-        'Template not found'
+        "Template 'bylaw/nonexistent' not found"
       );
     });
 
@@ -506,7 +506,7 @@ Missing: {{missing}}
     it('should throw error if template does not exist', async () => {
       await expect(
         service.previewTemplate('bylaw/nonexistent', {})
-      ).rejects.toThrow('Template not found');
+      ).rejects.toThrow("Template 'bylaw/nonexistent' not found");
     });
   });
 
@@ -565,7 +565,7 @@ type: bylaw
     it('should throw error if template does not exist', async () => {
       await expect(
         service.validateTemplate('bylaw/nonexistent')
-      ).rejects.toThrow('Template not found');
+      ).rejects.toThrow("Template 'bylaw/nonexistent' not found");
     });
   });
 

@@ -22,6 +22,17 @@ import { TemplateEngine, type Template } from '../utils/template-engine.js';
 import { TemplateCache } from './template-cache.js';
 import { TemplateValidator } from './template-validator.js';
 import { Logger } from '../utils/logger.js';
+import {
+  TemplateNotFoundError,
+  TemplateExistsError,
+  TemplateValidationError,
+  TemplateSystemError,
+} from '../errors/domain-errors.js';
+import {
+  ValidationError,
+  FileSystemError,
+  InternalError,
+} from '../errors/index.js';
 import type {
   ITemplateService,
   TemplateResponse,
@@ -152,8 +163,9 @@ export class TemplateService implements ITemplateService {
     // Validate ID format
     const pathValidation = this.validator.validatePath(id);
     if (!pathValidation.valid) {
-      throw new Error(
-        `Invalid template ID: ${pathValidation.errors.join(', ')}`
+      throw new ValidationError(
+        `Invalid template ID: ${pathValidation.errors.join(', ')}`,
+        { templateId: id, validationErrors: pathValidation.errors }
       );
     }
 
@@ -214,7 +226,13 @@ export class TemplateService implements ITemplateService {
   async createTemplate(data: CreateTemplateRequest): Promise<TemplateResponse> {
     // Validate request
     if (!data.type || !data.name || !data.content) {
-      throw new Error('Type, name, and content are required');
+      throw new ValidationError('Type, name, and content are required', {
+        provided: {
+          type: data.type,
+          name: data.name,
+          hasContent: !!data.content,
+        },
+      });
     }
 
     // Build template ID
@@ -223,14 +241,15 @@ export class TemplateService implements ITemplateService {
     // Check if template already exists
     const existing = await this.getTemplate(templateId);
     if (existing) {
-      throw new Error(`Template already exists: ${templateId}`);
+      throw new TemplateExistsError(templateId);
     }
 
     // Validate path security (prevents path traversal)
     const pathValidation = this.validator.validatePath(templateId);
     if (!pathValidation.valid) {
-      throw new Error(
-        `Invalid template ID: ${pathValidation.errors.join(', ')}`
+      throw new ValidationError(
+        `Invalid template ID: ${pathValidation.errors.join(', ')}`,
+        { templateId, validationErrors: pathValidation.errors }
       );
     }
 
@@ -240,7 +259,11 @@ export class TemplateService implements ITemplateService {
     const resolvedCustomPath = path.resolve(this.customTemplatePath);
 
     if (!resolvedDir.startsWith(resolvedCustomPath)) {
-      throw new Error('Invalid template directory path');
+      throw new FileSystemError(
+        'Invalid template directory path',
+        templateDir,
+        'create'
+      );
     }
 
     await fs.promises.mkdir(templateDir, { recursive: true });
@@ -252,8 +275,9 @@ export class TemplateService implements ITemplateService {
       `---\ntype: ${data.type}\n---\n${data.content}`
     );
     if (!frontmatterValidation.valid) {
-      throw new Error(
-        `Invalid template frontmatter: ${frontmatterValidation.errors.join(', ')}`
+      throw new TemplateValidationError(
+        `Invalid template frontmatter: ${frontmatterValidation.errors.join(', ')}`,
+        { templateId, validationErrors: frontmatterValidation.errors }
       );
     }
 
@@ -281,7 +305,13 @@ export class TemplateService implements ITemplateService {
     // Load and return created template
     const created = await this.getTemplate(templateId);
     if (!created) {
-      throw new Error(`Failed to load created template: ${templateId}`);
+      throw new InternalError(
+        `Failed to load created template: ${templateId}`,
+        {
+          templateId,
+          operation: 'create_template',
+        }
+      );
     }
     return created;
   }
@@ -304,7 +334,7 @@ export class TemplateService implements ITemplateService {
     // Check if template exists
     const existing = await this.getTemplate(id);
     if (!existing) {
-      throw new Error(`Template not found: ${id}`);
+      throw new TemplateNotFoundError(id);
     }
 
     const { type, name } = parseTemplateId(id);
@@ -316,9 +346,7 @@ export class TemplateService implements ITemplateService {
     const resolvedCustomPath = path.resolve(this.customTemplatePath);
 
     if (!resolvedPath.startsWith(resolvedCustomPath)) {
-      throw new Error(
-        `Template ${id} is a system template and cannot be modified`
-      );
+      throw new TemplateSystemError(id);
     }
 
     if (!fs.existsSync(templatePath)) {
@@ -359,7 +387,10 @@ export class TemplateService implements ITemplateService {
     // Load and return updated template
     const updated = await this.getTemplate(id);
     if (!updated) {
-      throw new Error(`Failed to load updated template: ${id}`);
+      throw new InternalError(`Failed to load updated template: ${id}`, {
+        templateId: id,
+        operation: 'update_template',
+      });
     }
     return updated;
   }
@@ -371,8 +402,9 @@ export class TemplateService implements ITemplateService {
     // Validate ID
     const pathValidation = this.validator.validatePath(id);
     if (!pathValidation.valid) {
-      throw new Error(
-        `Invalid template ID: ${pathValidation.errors.join(', ')}`
+      throw new ValidationError(
+        `Invalid template ID: ${pathValidation.errors.join(', ')}`,
+        { templateId: id, validationErrors: pathValidation.errors }
       );
     }
 
@@ -381,7 +413,7 @@ export class TemplateService implements ITemplateService {
 
     // Check if template exists and is writable
     if (!fs.existsSync(templatePath)) {
-      throw new Error(`Template not found: ${id}`);
+      throw new TemplateNotFoundError(id);
     }
 
     // Delete template file
@@ -413,14 +445,14 @@ export class TemplateService implements ITemplateService {
     // Get template
     const template = await this.getTemplate(id);
     if (!template) {
-      throw new Error(`Template not found: ${id}`);
+      throw new TemplateNotFoundError(id);
     }
 
     // Load core template for rendering
     const { type, name } = parseTemplateId(id);
     const coreTemplate = await this.templateEngine.loadTemplate(type, name);
     if (!coreTemplate) {
-      throw new Error(`Template not found: ${id}`);
+      throw new TemplateNotFoundError(id);
     }
 
     // Generate rendered content
@@ -468,14 +500,14 @@ export class TemplateService implements ITemplateService {
     // Get template
     const template = await this.getTemplate(id);
     if (!template) {
-      throw new Error(`Template not found: ${id}`);
+      throw new TemplateNotFoundError(id);
     }
 
     // Load core template for validation
     const { type, name } = parseTemplateId(id);
     const coreTemplate = await this.templateEngine.loadTemplate(type, name);
     if (!coreTemplate) {
-      throw new Error(`Template not found: ${id}`);
+      throw new TemplateNotFoundError(id);
     }
 
     // Run comprehensive validation

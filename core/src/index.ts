@@ -20,10 +20,8 @@ export {
   listRecordFilesSync,
   parseRecordRelativePath,
 } from './utils/record-paths.js';
-export type {
-  ValidationError,
-  ValidationResult,
-} from './records/record-validator.js';
+export type { ValidationResult } from './records/record-validator.js';
+// Note: ValidationError is now exported from errors/index.ts
 
 // Export geography types and utilities
 export {
@@ -79,13 +77,12 @@ export type {
   GeographyFormData,
   GeographyFormErrors,
   GeographyPreviewData,
-  GeographyError,
-  GeographyValidationError,
-  GeographyNotFoundError,
   ColorMapping,
   IconMapping,
   IconConfig,
 } from './types/geography.js';
+// Note: GeographyError, GeographyValidationError, GeographyNotFoundError
+// are now exported from errors/domain-errors.ts (new unified error system)
 
 // Export database services
 export { DatabaseService } from './database/database-service.js';
@@ -159,6 +156,48 @@ export {
   coreErrorRaw,
   coreStartOperation,
 } from './utils/core-output.js';
+
+// Export error handling system
+export {
+  CivicPressError,
+  ValidationError,
+  NotFoundError,
+  UnauthorizedError,
+  ForbiddenError,
+  ConflictError,
+  DatabaseError,
+  FileSystemError,
+  InternalError,
+} from './errors/index.js';
+
+export {
+  RecordNotFoundError,
+  RecordValidationError,
+  RecordConflictError,
+  TemplateNotFoundError,
+  TemplateExistsError,
+  TemplateValidationError,
+  TemplateInvalidError,
+  TemplateSystemError,
+  GeographyNotFoundError,
+  GeographyValidationError,
+  AuthenticationFailedError,
+  AuthorizationFailedError,
+  SessionExpiredError,
+  GitError,
+  GitConflictError,
+  WorkflowError,
+  WorkflowTransitionError,
+} from './errors/domain-errors.js';
+
+export {
+  isCivicPressError,
+  getErrorCode,
+  getStatusCode,
+  getCorrelationId,
+  normalizeError,
+  reportError,
+} from './errors/utils.js';
 export { AuditLogger } from './audit/audit-logger.js';
 export { DocumentNumberGenerator } from './utils/document-number-generator.js';
 export { ComplianceFieldHelpers } from './utils/compliance-helpers.js';

@@ -1,5 +1,12 @@
 import { Request, Response } from 'express';
-import { Logger } from '@civicpress/core';
+import {
+  Logger,
+  CivicPressError,
+  isCivicPressError,
+  getErrorCode,
+  getStatusCode,
+  getCorrelationId,
+} from '@civicpress/core';
 
 export interface LogContext {
   requestId?: string;
@@ -108,13 +115,31 @@ export class ApiLogger {
     req: Request,
     context: LogContext = {}
   ): void {
+    // Extract error details - prioritize CivicPressError
+    let errorName: string;
+    let errorMessage: string;
+    let errorCode: string | undefined;
+    let correlationId: string | undefined;
+
+    if (isCivicPressError(error)) {
+      errorName = error.name;
+      errorMessage = error.message;
+      errorCode = error.code;
+      correlationId = error.correlationId;
+    } else {
+      errorName = error.name || 'UnknownError';
+      errorMessage = error.message || 'Unknown error';
+      errorCode = error.code;
+    }
+
     const errorContext = {
       operation,
       error: {
-        name: error.name || 'UnknownError',
-        message: error.message || 'Unknown error',
-        code: error.code,
+        name: errorName,
+        message: errorMessage,
+        code: errorCode,
         stack: error.stack,
+        ...(correlationId && { correlationId }),
       },
       requestId: (req as any).requestId,
       userId: (req as any).user?.id,
@@ -216,6 +241,22 @@ export class ApiLogger {
     req: Request,
     defaultMessage: string = 'Operation failed'
   ): { statusCode: number; success: false; error: any } {
+    // Prioritize CivicPressError
+    if (isCivicPressError(error)) {
+      const outputDetails = error.getOutputDetails();
+      return {
+        statusCode: error.statusCode,
+        success: false,
+        error: {
+          message: outputDetails.message,
+          code: outputDetails.code,
+          ...(outputDetails.details && { details: outputDetails.details }),
+          correlationId: error.correlationId,
+        },
+      };
+    }
+
+    // Fallback to ApiError or generic Error
     if (error instanceof Error && 'statusCode' in error) {
       return {
         statusCode: (error as any).statusCode || 500,

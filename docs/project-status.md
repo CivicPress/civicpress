@@ -92,6 +92,12 @@ ready for development and testing.
   - Supports `updated_desc`, `created_desc`, `title_asc`, `title_desc`,
     `relevance`
   - Database indexes for optimal sort performance
+- **Unified Error Handling**: Type-safe error system with correlation IDs
+  - Error hierarchy with domain-specific error types
+  - Automatic error recognition in API layer
+  - Correlation ID tracking for debugging
+  - Enhanced UI error handling with dev mode visibility
+  - Comprehensive test coverage (1048+ tests passing)
 
 ### In Progress
 

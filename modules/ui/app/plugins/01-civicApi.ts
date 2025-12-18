@@ -37,6 +37,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       const { handleError } = useErrorHandler();
 
       // Create error object with status and response data
+      // Include correlation ID and error code if present
       const apiError = {
         status: response.status,
         statusText: response.statusText,
@@ -46,6 +47,10 @@ export default defineNuxtPlugin((nuxtApp) => {
           response._data?.error?.message ||
           response.statusText ||
           'Request failed',
+        // Include correlation ID and error code for tracing
+        correlationId: response._data?.error?.correlationId,
+        errorCode: response._data?.error?.code,
+        requestId: response._data?.requestId,
       };
 
       // Determine if the request attempted authenticated access

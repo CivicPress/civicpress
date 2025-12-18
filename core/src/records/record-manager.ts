@@ -6,6 +6,7 @@ import { TemplateEngine } from '../utils/template-engine.js';
 import { AuthUser } from '../auth/auth-service.js';
 import { Logger } from '../utils/logger.js';
 import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
+import { RecordValidationError } from '../errors/domain-errors.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { RecordParser } from './record-parser.js';
@@ -982,8 +983,9 @@ export class RecordManager {
       const errorMessages = schemaValidation.errors
         .map((err) => `${err.field}: ${err.message}`)
         .join('; ');
-      throw new Error(
-        `Schema validation failed before saving record ${record.id}: ${errorMessages}`
+      throw new RecordValidationError(
+        `Schema validation failed before saving record ${record.id}: ${errorMessages}`,
+        { recordId: record.id, validationErrors: schemaValidation.errors }
       );
     }
 
@@ -1040,8 +1042,9 @@ export class RecordManager {
       const errorMessages = schemaValidation.errors
         .map((err) => `${err.field}: ${err.message}`)
         .join('; ');
-      throw new Error(
-        `Schema validation failed before updating record ${record.id}: ${errorMessages}`
+      throw new RecordValidationError(
+        `Schema validation failed before updating record ${record.id}: ${errorMessages}`,
+        { recordId: record.id, validationErrors: schemaValidation.errors }
       );
     }
 
