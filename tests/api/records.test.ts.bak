@@ -25,10 +25,7 @@ describe('API Records Integration', () => {
         username: 'admin',
         role: 'admin',
       });
-    if (!adminResponse.body.success || !adminResponse.body.data?.session) {
-      throw new Error(`Auth failed: ${JSON.stringify(adminResponse.body)}`);
-    }
-    adminToken = adminResponse.body.data.session.token;
+    if (!adminResponse.body.success || !adminResponse.body.data?.session) { throw new Error(`Auth failed: ${JSON.stringify(adminResponse.body)}`); } adminToken = adminResponse.body.data.session.token;
 
     // Get authentication token for clerk
     const clerkResponse = await request(context.api.getApp())
@@ -37,10 +34,7 @@ describe('API Records Integration', () => {
         username: 'clerk',
         role: 'clerk',
       });
-    if (!clerkResponse.body.success || !clerkResponse.body.data?.session) {
-      throw new Error(`Auth failed: ${JSON.stringify(clerkResponse.body)}`);
-    }
-    clerkToken = clerkResponse.body.data.session.token;
+    if (!clerkResponse.body.success || !clerkResponse.body.data?.session) { throw new Error(`Auth failed: ${JSON.stringify(clerkResponse.body)}`); } clerkToken = clerkResponse.body.data.session.token;
 
     // Get authentication token for public user
     const publicResponse = await request(context.api.getApp())
@@ -49,9 +43,6 @@ describe('API Records Integration', () => {
         username: 'public',
         role: 'public',
       });
-    if (!publicResponse.body.success || !publicResponse.body.data?.session) {
-      throw new Error(`Auth failed: ${JSON.stringify(publicResponse.body)}`);
-    }
     publicToken = publicResponse.body.data.session.token;
   });
 

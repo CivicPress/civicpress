@@ -45,6 +45,14 @@
     "tar": "^6.2.1",
     "yaml": "^2.8.0"
   },
+  "peerDependencies": {
+    "@civicpress/storage": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@civicpress/storage": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/jest": "^29.0.0",
     "@types/lru-cache": "7.10.10",

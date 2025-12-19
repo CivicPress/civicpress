@@ -1,5 +1,6 @@
 // Export main CivicPress class
 export { CivicPress } from './civic-core.js';
+export type { CivicPressConfig } from './civic-core.js';
 export { CreateRecordRequest, UpdateRecordRequest } from './civic-core.js';
 
 // Export diagnostic tools
@@ -129,6 +130,10 @@ export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
 // Export unified cache system
 export * from './cache/index.js';
+
+// Export DI container (for module integration)
+export { ServiceContainer } from './di/container.js';
+export type { ServiceContainer as IServiceContainer } from './di/container.js';
 
 export {
   TemplateService,

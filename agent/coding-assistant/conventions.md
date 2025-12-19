@@ -347,6 +347,8 @@ async publishDraft(draftId: string, user: AuthUser) {
   `FileWatcherCache` for file-based content
 - **Metrics**: All caches automatically track metrics (hits, misses, hit rate,
   memory usage)
+- **Reference**: See `docs/cache-usage-guide.md` and
+  `docs/specs/unified-caching-layer.md` for complete patterns
 - **Reference**: See `docs/specs/unified-caching-layer.md` and
   `docs/cache-usage-guide.md`
 
@@ -504,6 +506,92 @@ registerStorageServices(container, config);
   `core/src/defaults/storage.yml` for template)
 - All new configuration options must be validated
 - Use metadata format for configuration fields when applicable
+
+## Module Integration
+
+- **⚠️ CRITICAL**: All modules must follow established integration patterns
+- **Core Dependency**: Modules depend on `@civicpress/core` for types and
+  utilities
+- **Service Registration**: Consider DI container registration for module
+  services
+- **Error Handling**: Use core error types (`CivicPressError`, domain-specific
+  errors)
+- **Logging**: Use `Logger` from core for consistent logging
+- **Pattern Selection**: Choose appropriate integration pattern based on module
+  needs
+- **Reference**: See `docs/module-integration-guide.md` for complete patterns
+
+**Integration Patterns:**
+
+1. **Pattern 1: Direct Core Dependency** - Simple modules using core
+   types/utilities
+2. **Pattern 2: Service Registration** - Modules registering services in DI
+   container (future)
+3. **Pattern 3: Independent Initialization** - Modules initializing services
+   independently (current storage pattern)
+
+**❌ Don't:**
+
+```typescript
+// Module directly instantiating services without core dependency
+import { MyService } from './my-service';
+const service = new MyService(); // No core integration
+
+// Module using console.log instead of Logger
+console.log('Module operation complete');
+
+// Module throwing generic errors
+throw new Error('Module error');
+```
+
+**✅ Do:**
+
+```typescript
+// Module using core types and utilities
+import { Logger, CivicPressError } from '@civicpress/core';
+
+class MyModuleService {
+  constructor(private logger: Logger) {}
+
+  async doSomething() {
+    this.logger.info('Module operation started');
+    // ... operation
+  }
+}
+
+// Module using core error types
+import { ValidationError } from '@civicpress/core/errors';
+throw new ValidationError('Invalid module data', { field: 'value' });
+```
+
+**Module Development Checklist:**
+
+- ✅ Uses `@civicpress/core` for types and utilities
+- ✅ Uses `Logger` from core (not console.log)
+- ✅ Uses `CivicPressError` hierarchy for errors
+- ✅ Documents integration pattern used
+- ✅ Documents core services used
+- ✅ Documents configuration requirements
+- ✅ Follows established patterns from existing modules
+
+**Reference**: See `docs/module-integration-guide.md` for complete module
+integration patterns and examples
+
+## Architecture References
+
+When developing new features, always reference:
+
+- **Architecture Overview**: `docs/architecture.md` - Complete system
+  architecture
+- **Module Integration**: `docs/module-integration-guide.md` - How modules
+  integrate with core
+- **Dependency Injection**: `docs/dependency-injection-guide.md` - DI container
+  usage
+- **Error Handling**: `docs/error-handling.md` - Error handling patterns
+- **Caching**: `docs/cache-usage-guide.md` - Caching system usage
+- **Saga Pattern**: `docs/saga-pattern-usage-guide.md` - Saga pattern usage
+- **Architecture Decisions**: `docs/architecture/decisions/` - ADRs for major
+  decisions
 
 ## Enforcement
 

@@ -127,6 +127,15 @@ Always respond in this order:
     `registerStorageServices()` in `modules/storage/src/storage-services.ts`
   - See `docs/specs/storage.md` and `docs/uuid-storage-system.md` for complete
     patterns
+
+- **⚠️ CRITICAL - Module Integration**: All modules MUST follow module
+  integration patterns
+  - Modules depend on `@civicpress/core` for types and utilities
+  - Use `Logger` from core (never `console.log`)
+  - Use `CivicPressError` hierarchy for errors (never generic `Error`)
+  - Document integration pattern used (Pattern 1, 2, or 3)
+  - Document core services used
+  - See `docs/module-integration-guide.md` for complete patterns
 - Do not patch `dist/` outputs post‑build; fix source instead.
 - API/UI use hot reload; don't instruct manual restarts during dev.
 - CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and

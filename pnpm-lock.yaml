@@ -130,6 +130,9 @@ importers:
 
   core:
     dependencies:
+      '@civicpress/storage':
+        specifier: workspace:*
+        version: link:../modules/storage
       '@octokit/rest':
         specifier: ^21.0.0
         version: 21.1.1

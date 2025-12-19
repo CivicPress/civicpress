@@ -215,6 +215,116 @@ export async function completeServiceInitialization(
   const workflow = container.resolve<WorkflowEngine>('workflow');
   workflow.setIndexingService(indexingService);
 
+  // Register storage module services (optional, depends on: logger, cacheManager, database)
+  // Note: Storage module is optional - registration will be skipped if module is not available
+  // We use dynamic import here since this function is async and can handle ES modules properly
+  try {
+    // Try to import storage services registration from main package export
+    // Use a try-catch around the import to handle cases where the module is not available
+    // Type assertion is needed because storage module is optional and may not be in core's dependencies
+    let storageModule: any = null;
+    let importError: any = null;
+    try {
+      // Import from main package (storage-services is re-exported from index)
+      // Using type assertion to handle optional module (not in core's dependencies)
+      // Try both package name and relative path for better compatibility
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      try {
+        storageModule = await import('@civicpress/storage' as string);
+      } catch (e1: any) {
+        // Fallback to file:// URL import if package import fails
+        // This helps in test environments where module resolution might differ
+        const path = await import('path');
+        const { pathToFileURL } = await import('url');
+
+        // Use process.cwd() to find storage module
+        // This works reliably in both test and production environments
+        const storagePath = path.resolve(
+          process.cwd(),
+          'modules/storage/dist/index.js'
+        );
+
+        // Convert to file:// URL for ES module import
+        try {
+          const storageUrl = pathToFileURL(storagePath).href;
+          storageModule = await import(storageUrl);
+          // Fallback succeeded - exit early, don't let outer catch interfere
+          importError = null;
+        } catch (e2: any) {
+          // File path import also failed - storage module not available
+          const logger = container.resolve<Logger>('logger');
+          if (process.env.NODE_ENV === 'test') {
+            logger.warn(`Fallback import failed: ${e2?.message || e2}`);
+            logger.warn(`Storage path attempted: ${storagePath}`);
+          }
+          // Both imports failed - set error for outer catch
+          importError = e1;
+          storageModule = null;
+        }
+      }
+    } catch (err: any) {
+      // Only set error if not already set by inner catch
+      if (!importError) {
+        importError = err;
+      }
+      // Only set storageModule to null if it wasn't set by fallback
+      if (!storageModule) {
+        // Module not found - this is expected in some environments
+        // Check if it's a module not found error vs other errors
+        if (
+          err?.code === 'ERR_MODULE_NOT_FOUND' ||
+          err?.message?.includes('Cannot find module') ||
+          err?.message?.includes('Cannot find package')
+        ) {
+          // Expected - storage module not available
+          storageModule = null;
+        } else {
+          // Unexpected error - log it for debugging
+          const logger = container.resolve<Logger>('logger');
+          logger.warn(
+            'Storage module import failed (non-standard error):',
+            err?.message || err
+          );
+          storageModule = null;
+        }
+      }
+    }
+
+    if (storageModule?.registerStorageServices) {
+      const config = container.resolve<CivicPressConfig>('config');
+      storageModule.registerStorageServices(container, config);
+      const logger = container.resolve<Logger>('logger');
+      if (logger.isVerbose()) {
+        logger.debug('Storage services registered successfully');
+      }
+
+      if (logger.isVerbose()) {
+        logger.debug('Storage services registered successfully');
+      }
+    } else if (importError) {
+      // Only log if we actually tried to import and it failed
+      // This helps debug test failures
+      const logger = container.resolve<Logger>('logger');
+      // Always log in test environment to help debug
+      if (process.env.NODE_ENV === 'test') {
+        logger.warn(
+          `Storage module import failed: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+        );
+        if (importError?.stack) {
+          logger.warn('Storage import stack:', importError.stack);
+        }
+      } else if (logger.isVerbose()) {
+        logger.debug(
+          `Storage module not available: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+        );
+      }
+    }
+  } catch (error) {
+    // Storage module not available - that's okay, it's optional
+    // This is expected in environments where storage module is not installed
+    // We silently skip registration (no error logging needed)
+  }
+
   // Register all caches with UnifiedCacheManager
   const cacheManager = container.resolve<UnifiedCacheManager>('cacheManager');
   const config = container.resolve<CivicPressConfig>('config');

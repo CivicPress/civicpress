@@ -38,6 +38,11 @@ The assistant must **always** follow these instructions when generating code.
   `completeServiceInitialization()`. Use `MemoryCache` for TTL-based caching,
   `FileWatcherCache` for file-based content. See
   `docs/specs/unified-caching-layer.md` and `docs/cache-usage-guide.md`.
+- **⚠️ CRITICAL - Module Integration**: All modules MUST follow module
+  integration patterns. Use `@civicpress/core` for types and utilities. Use
+  `Logger` from core (not console.log). Use `CivicPressError` hierarchy for
+  errors. Document integration pattern used. See
+  `docs/module-integration-guide.md`.
 - Pages MUST include proper accessibility landmarks.
 - No hard-coded UI strings; all text must be i18n-ready one the feature is
   implemented.
@@ -81,6 +86,8 @@ Always respond in the following order:
   `Error`.
 - ✅ **Multi-step operations use Saga Pattern** - no direct execution of
   cross-boundary operations; use `SagaExecutor` with proper saga steps.
+- ✅ **Module integration follows patterns** - uses core types, Logger, error
+  types; documents integration pattern.
 - ✅ Tests compile and cover at least one happy + one edge case.
 - ✅ No duplicate IDs/names against registries.
 - ✅ Doc stub is clear and civic-friendly.

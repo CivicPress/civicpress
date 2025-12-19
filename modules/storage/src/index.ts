@@ -6,7 +6,10 @@ export { StorageMetadataCacheAdapter } from './cache/storage-metadata-cache-adap
 export { ConcurrencyLimiter } from './limiter/concurrency-limiter.js';
 export { RetryManager } from './retry/retry-manager.js';
 export { StorageFailoverManager } from './failover/storage-failover-manager.js';
-export { CircuitBreaker, CircuitBreakerManager } from './circuit-breaker/circuit-breaker.js';
+export {
+  CircuitBreaker,
+  CircuitBreakerManager,
+} from './circuit-breaker/circuit-breaker.js';
 export { StorageHealthChecker } from './health/storage-health-checker.js';
 export { StorageMetricsCollector } from './metrics/storage-metrics-collector.js';
 export { StorageUsageReporter } from './reporting/storage-usage-reporter.js';
@@ -15,6 +18,12 @@ export { OrphanedFileCleaner } from './cleanup/orphaned-file-cleaner.js';
 export { LifecycleManager } from './lifecycle/lifecycle-manager.js';
 export * from './errors/storage-errors.js';
 export type * from './types/storage.types.js';
+
+// Service registration (Pattern 2: Service Registration)
+export {
+  registerStorageServices,
+  initializeStorageService,
+} from './storage-services.js';
 
 // Default export for easy importing
 export { CloudUuidStorageService as default } from './cloud-uuid-storage-service.js';
