@@ -409,7 +409,101 @@ class MyService {
 
 2. Access cache via `civicPress.getCacheManager().getCache<T>('myCache')`
 3. For file-based caches, use `FileWatcherCache` strategy
-4. See existing caches (`search`, `diagnostics`, `templates`) for reference
+4. See existing caches (`search`, `diagnostics`, `templates`, `storageMetadata`)
+   for reference
+
+## Storage System Patterns
+
+- **⚠️ CRITICAL**: All storage operations MUST follow established patterns
+- **Performance**: Use metadata caching, batch operations, streaming for large
+  files
+- **Reliability**: Implement retry, failover, circuit breaker, health checks,
+  timeouts
+- **Observability**: Collect metrics, usage reporting, quota enforcement
+- **Error Handling**: Use storage-specific error classes extending
+  `CivicPressError`
+- **Service Registration**: All storage services must be registered in DI
+  container
+- **Reference**: See `docs/specs/storage.md` and `docs/uuid-storage-system.md`
+
+**❌ Don't:**
+
+```typescript
+// Direct storage operations without retry/failover
+async uploadFile(file: Buffer) {
+  await s3Client.putObject({ Bucket: bucket, Key: key, Body: file });
+}
+
+// No caching for list operations
+async listFiles(folder: string) {
+  return await db.query('SELECT * FROM storage_files WHERE folder = ?', [folder]);
+}
+
+// Generic errors
+throw new Error('Storage quota exceeded');
+```
+
+**✅ Do:**
+
+```typescript
+// Use CloudUuidStorageService with all enhancements
+import { CloudUuidStorageService } from '@civicpress/storage';
+import { QuotaExceededError } from '@civicpress/storage/errors';
+
+// Service automatically handles:
+// - Retry with exponential backoff
+// - Automatic failover
+// - Circuit breaker
+// - Health checks
+// - Timeout handling
+// - Metadata caching
+// - Metrics collection
+const result = await storageService.uploadFile(request);
+
+// Use structured errors
+if (quotaExceeded) {
+  throw new QuotaExceededError(quota, { folder, fileSize });
+}
+```
+
+**Storage Service Patterns:**
+
+1. **Metadata Caching**: Always use `StorageMetadataCacheAdapter` for list
+   operations
+2. **Batch Operations**: Use `batchUpload()` and `batchDelete()` for multiple
+   files
+3. **Streaming**: Use `uploadFileStream()` and `downloadFileStream()` for large
+   files (>10MB)
+4. **Concurrency Limits**: Respect configured limits via `ConcurrencyLimiter`
+5. **Retry Logic**: Wrap operations with `RetryManager.withRetry()`
+6. **Failover**: Use `StorageFailoverManager.executeWithFailover()` for provider
+   switching
+7. **Circuit Breaker**: Check circuit breaker state before operations
+8. **Health Checks**: Use `StorageHealthChecker` for provider monitoring
+9. **Timeouts**: Wrap operations with `withTimeout()` utility
+10. **Metrics**: Record operations via `StorageMetricsCollector`
+11. **Quota**: Check quotas via `QuotaManager` before uploads
+12. **Error Handling**: Use storage-specific error classes (see
+    `modules/storage/src/errors/storage-errors.ts`)
+
+**Storage Service Registration:**
+
+All storage services are registered in `modules/storage/src/storage-services.ts`
+and called from `core/src/civic-core-services.ts`:
+
+```typescript
+// Storage services automatically registered
+import { registerStorageServices } from '@civicpress/storage/storage-services';
+
+registerStorageServices(container, config);
+```
+
+**Storage Configuration:**
+
+- Configuration in `.system-data/storage.yml` (see
+  `core/src/defaults/storage.yml` for template)
+- All new configuration options must be validated
+- Use metadata format for configuration fields when applicable
 
 ## Enforcement
 

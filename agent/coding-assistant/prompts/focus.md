@@ -114,6 +114,19 @@ Always respond in this order:
     usage)
   - See `docs/specs/unified-caching-layer.md` and `docs/cache-usage-guide.md`
     for complete patterns
+- **⚠️ CRITICAL - Storage System**: All storage operations MUST follow
+  established storage patterns
+  - Use `CloudUuidStorageService` for all storage operations (automatically
+    provides retry, failover, circuit breaker, health checks, timeouts)
+  - Use `StorageMetadataCacheAdapter` for list operations (caching)
+  - Use `batchUpload()` and `batchDelete()` for multiple files
+  - Use `uploadFileStream()` and `downloadFileStream()` for large files (>10MB)
+  - Use storage-specific error classes extending `CivicPressError` (see
+    `modules/storage/src/errors/storage-errors.ts`)
+  - Register all storage services in DI container via
+    `registerStorageServices()` in `modules/storage/src/storage-services.ts`
+  - See `docs/specs/storage.md` and `docs/uuid-storage-system.md` for complete
+    patterns
 - Do not patch `dist/` outputs post‑build; fix source instead.
 - API/UI use hot reload; don't instruct manual restarts during dev.
 - CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and

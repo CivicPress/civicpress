@@ -2,7 +2,7 @@
 
 ---
 
-version: 2.0.0 status: stable created: '2025-07-03' updated: '2025-09-03'
+version: 2.1.0 status: stable created: '2025-07-03' updated: '2025-12-03'
 deprecated: false sunset_date: null additions:
 
 - comprehensive storage documentation
@@ -10,8 +10,15 @@ deprecated: false sunset_date: null additions:
 - multi-provider backend support
 - file attachment system integration
 - data management
-- security considerations compatibility: min_civicpress: 2.0.0 max_civicpress:
- 'null' dependencies: [] authors:
+- security considerations
+- performance optimizations (caching, batch, streaming)
+- reliability improvements (retry, failover, circuit breaker)
+- observability & management (metrics, quota, lifecycle)
+- enhanced error handling
+
+compatibility: min_civicpress: 2.0.0 max_civicpress: 'null' dependencies: []
+authors:
+
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
@@ -25,9 +32,9 @@ Civic Storage Layer
 ## Purpose
 
 Define how CivicPress handles **non-Markdown content**, such as audio/video
-files, PDFs, scanned permits, meeting recordings, and attachments. 
-Ensure files are stored predictably, retrievably, and securely — whether
-local-first or backed by remote object storage.
+files, PDFs, scanned permits, meeting recordings, and attachments. Ensure files
+are stored predictably, retrievably, and securely — whether local-first or
+backed by remote object storage.
 
 **Version 2.0** introduces UUID-based file management, multi-provider backend
 support, and seamless integration with the file attachment system for linking
@@ -59,11 +66,11 @@ Out of Scope:
 
 ## Inputs & Outputs
 
-| Source | Output | UUID Reference |
+| Source             | Output                                    | UUID Reference                         |
 | ------------------ | ----------------------------------------- | -------------------------------------- |
-| Uploaded video | `/storage/public-sessions/2025-06-12.mp4` | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` |
-| Scanned permit PDF | `/storage/permits/2025/perm-1189.pdf` | `b2c3d4e5-f6g7-8901-bcde-f23456789012` |
-| Audio feedback | `/storage/feedback/audio123.ogg` | `c3d4e5f6-g7h8-9012-cdef-345678901234` |
+| Uploaded video     | `/storage/public-sessions/2025-06-12.mp4` | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` |
+| Scanned permit PDF | `/storage/permits/2025/perm-1189.pdf`     | `b2c3d4e5-f6g7-8901-bcde-f23456789012` |
+| Audio feedback     | `/storage/feedback/audio123.ogg`          | `c3d4e5f6-g7h8-9012-cdef-345678901234` |
 
 ---
 
@@ -149,21 +156,21 @@ Future versions may define `.civic/backup.yml` for more advanced control.
 **Encryption & Privacy:**
 
 - Sensitive files (e.g. permits, legal docs) should be encrypted at rest and in
- transit (future: S3, MinIO, or local encryption)
+  transit (future: S3, MinIO, or local encryption)
 - Store encryption keys securely and rotate regularly
 - Do not store unencrypted personal data unless required by law
 
 **Access Control:**
 
 - Only authorized users/roles may upload, download, or delete files in private
- folders
+  folders
 - Public folders should be read-only for unauthenticated users
 - Log all access to private or sensitive files for audit
 
 **Compliance:**
 
 - Ensure storage practices comply with local privacy and data protection laws
- (e.g. GDPR, municipal regulations)
+  (e.g. GDPR, municipal regulations)
 - Redact or restrict access to files containing PII or confidential information
 - Document storage structure and access policies for auditability
 
@@ -197,11 +204,53 @@ Future versions may define `.civic/backup.yml` for more advanced control.
 - **Secure downloads** - Authenticated file access with proper headers
 - **Configuration management** - Dynamic storage configuration
 
+### **Storage Abstraction Enhancements (December 2025)**
+
+**Status:** ✅ Complete - All enhancements implemented and production-ready
+
+#### Performance Optimizations
+
+- **Metadata Caching** - UnifiedCacheManager-based caching for 10-100x faster
+  list operations
+- **Batch Operations** - Concurrent upload/delete with 5-10x throughput
+  improvement
+- **Streaming** - Large file streaming (upload/download) without memory limits
+- **Concurrency Limits** - Configurable limits for uploads, downloads, and
+  deletes
+
+#### Reliability Improvements
+
+- **Retry with Exponential Backoff** - Automatic retry for transient failures
+- **Automatic Failover** - Seamless switching between storage providers
+- **Circuit Breaker** - Prevents cascading failures by blocking requests to
+  failing providers
+- **Health Checks** - Periodic monitoring of provider health status
+- **Timeout Handling** - Configurable timeouts for all operations
+
+#### Observability & Management
+
+- **Metrics Collection** - Comprehensive metrics (operation counts, latency,
+  errors)
+- **Storage Usage Reporting** - Usage by folder and provider with caching
+- **Quota Enforcement** - Global and per-folder storage quotas
+- **Orphaned File Cleanup** - Automatic detection and cleanup of orphaned files
+- **Lifecycle Management** - Automated retention, archival, and deletion
+  policies
+
+#### Error Handling
+
+- **Structured Errors** - Complete error class hierarchy extending
+  CivicPressError
+- **Partial Failure Handling** - Batch operations with error aggregation and
+  summaries
+
 ### **API Endpoints**
+
+#### Core Operations
 
 ```http
 # Upload file
-POST /api/v1/storage/upload/:folder
+POST /api/v1/storage/files
 Content-Type: multipart/form-data
 
 # Get file by UUID
@@ -221,10 +270,38 @@ DELETE /api/v1/storage/files/:id
 Authorization: Bearer <token>
 ```
 
+#### Batch Operations
+
+```http
+# Batch upload
+POST /api/v1/storage/files/batch
+Content-Type: multipart/form-data
+
+# Batch delete
+DELETE /api/v1/storage/files/batch
+Content-Type: application/json
+```
+
+#### Management & Observability
+
+```http
+# Health check
+GET /api/v1/storage/health
+
+# Metrics
+GET /api/v1/storage/metrics
+
+# Usage report
+GET /api/v1/storage/usage
+
+# Orphaned file cleanup
+GET /api/v1/storage/cleanup
+POST /api/v1/storage/cleanup
+```
+
 ## ️ Future Enhancements
 
 - Support encrypted attachments
-- Auto-cleanup orphaned files
 - Support file deduplication
 - Advanced file versioning
 - Content-based file search

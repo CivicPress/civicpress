@@ -20,6 +20,10 @@ non_negotiables:
     Pattern (see saga-pattern.md and saga-pattern-usage-guide.md).
   - All caching MUST use the Unified Caching Layer (see unified-caching-layer.md
     and cache-usage-guide.md).
+  - ? All storage operations MUST follow established storage patterns (see
+      storage.md and uuid-storage-system.md)
+    : use CloudUuidStorageService with retry, failover, circuit breaker, health
+      checks, timeouts, metrics, quota, and structured errors.
 
 defaults:
   language: TypeScript

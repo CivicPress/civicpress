@@ -1,7 +1,7 @@
 # 🧩 CivicPress Development Patterns
 
-**Last Updated**: 2025-01-27  
-**Pattern Categories**: 5
+**Last Updated**: 2025-12-03  
+**Pattern Categories**: 6
 
 ## 🎯 **Core Development Patterns**
 
@@ -258,6 +258,96 @@ class MyService {
   }
 }
 ```
+
+### **Storage System Pattern**
+
+#### **Pattern**: Use CloudUuidStorageService with all enhancements
+
+- **When to Use**: For all file storage operations (upload, download, delete,
+  list)
+- **How to Apply**:
+  1. Use `CloudUuidStorageService` for all storage operations
+  2. Service automatically provides: retry, failover, circuit breaker, health
+     checks, timeouts
+  3. Use `StorageMetadataCacheAdapter` for list operations (caching)
+  4. Use `batchUpload()` and `batchDelete()` for multiple files
+  5. Use `uploadFileStream()` and `downloadFileStream()` for large files (>10MB)
+  6. Use storage-specific error classes extending `CivicPressError`
+  7. Register all storage services in DI container
+- **Benefits**: Performance, reliability, observability, and proper error
+  handling
+- **Examples**: All storage operations in `modules/storage/src/`
+
+#### **Pattern**: Storage error handling
+
+- **When to Use**: For all storage-related errors
+- **How to Apply**:
+  1. Use storage-specific error classes from
+     `modules/storage/src/errors/storage-errors.ts`
+  2. All errors extend `CivicPressError` with correlation IDs
+  3. Use appropriate error codes (`STORAGE_QUOTA_EXCEEDED`,
+     `STORAGE_PROVIDER_UNAVAILABLE`, etc.)
+  4. Set `retryable` flag correctly for retry logic
+  5. Include context (provider, operation, fileId, folder, quota, etc.)
+- **Benefits**: Consistent error handling, correlation IDs for tracing, proper
+  retry logic
+- **Examples**: `QuotaExceededError`, `ProviderUnavailableError`,
+  `StorageTimeoutError`
+
+#### **Pattern**: Storage service registration
+
+- **When to Use**: When creating new storage-related services
+- **How to Apply**:
+  1. Register services in `modules/storage/src/storage-services.ts`
+  2. Call `registerStorageServices()` from `core/src/civic-core-services.ts`
+  3. Use DI container for service resolution
+  4. Follow dependency graph (RetryManager → FailoverManager, etc.)
+- **Benefits**: Proper service lifecycle, testability, dependency management
+- **Examples**: `RetryManager`, `StorageFailoverManager`,
+  `CircuitBreakerManager`, `StorageHealthChecker`
+
+#### **Pattern**: Storage performance optimization
+
+- **When to Use**: For all storage operations
+- **How to Apply**:
+  1. Use metadata caching for list operations (via
+     `StorageMetadataCacheAdapter`)
+  2. Use batch operations for multiple files (5-10x faster)
+  3. Use streaming for large files (>10MB) to avoid memory issues
+  4. Respect concurrency limits (configurable per operation type)
+  5. Collect metrics via `StorageMetricsCollector`
+- **Benefits**: 10-100x faster list operations, 5-10x faster batch operations,
+  constant memory for large files
+- **Examples**: Cached list operations, batch upload/delete, streaming
+  upload/download
+
+#### **Pattern**: Storage reliability
+
+- **When to Use**: For all storage operations
+- **How to Apply**:
+  1. Wrap operations with `RetryManager.withRetry()` for transient failures
+  2. Use `StorageFailoverManager.executeWithFailover()` for provider switching
+  3. Check circuit breaker state before operations
+  4. Use `StorageHealthChecker` for periodic provider monitoring
+  5. Wrap operations with `withTimeout()` utility
+- **Benefits**: >99.9% success rate, automatic failover, prevents cascading
+  failures
+- **Examples**: Retry with exponential backoff, automatic failover, circuit
+  breaker pattern
+
+#### **Pattern**: Storage observability and management
+
+- **When to Use**: For storage monitoring and resource management
+- **How to Apply**:
+  1. Record operations via `StorageMetricsCollector` (counts, latency, errors)
+  2. Use `StorageUsageReporter` for usage statistics (by folder, by provider)
+  3. Check quotas via `QuotaManager` before uploads (global and per-folder)
+  4. Use `OrphanedFileCleaner` for data consistency (dry-run and cleanup)
+  5. Use `LifecycleManager` for retention, archival, and deletion policies
+- **Benefits**: Full visibility, quota enforcement, data consistency, automated
+  lifecycle management
+- **Examples**: Metrics collection, usage reporting, quota enforcement, orphaned
+  file cleanup
 
 ### **Module Development Pattern**
 
