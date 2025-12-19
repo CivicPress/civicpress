@@ -18,6 +18,10 @@ build/
 .cache/
 .nyc_output/
 
+# Nuxt build artifacts
+.nuxt/
+.output/
+
 # Compiled JavaScript files
 *.js
 *.js.map

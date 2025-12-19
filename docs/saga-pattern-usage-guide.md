@@ -470,6 +470,5 @@ await recovery.recoverStuckSagas();
   specification
 - [Saga Pattern Specification](../specs/saga-pattern.md) - Complete
   specification
-- [Architecture Analysis](../architecture-analysis-and-improvements.md) -
-  Overall architecture
+- [Architecture Documentation](../architecture.md) - Overall architecture
 - [Error Handling](../error-handling.md) - Error handling patterns

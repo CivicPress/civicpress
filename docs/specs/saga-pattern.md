@@ -370,10 +370,8 @@ compatibility).
 
 ## Related Documentation
 
-- [Architecture Analysis](../architecture-analysis-and-improvements.md) -
-  Overall architecture
+- [Architecture Documentation](../architecture.md) - Overall architecture
 - [Usage Guide](../saga-pattern-usage-guide.md) - How to use sagas in your code
-- [Records Architecture](../architecture-records-drafts.md) - Draft vs Published
 - [Git Engine Spec](./git-engine.md) - Git operations
 - [Indexing Spec](./indexing.md) - Indexing system
 - [Hooks Spec](./hooks.md) - Hook system

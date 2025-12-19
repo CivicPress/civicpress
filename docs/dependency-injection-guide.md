@@ -472,4 +472,4 @@ const db2 = civic.getService<DatabaseService>('database');
 ## See Also
 
 - [Dependency Injection Specification](../specs/dependency-injection.md)
-- [Architecture Analysis](../architecture-analysis-and-improvements.md)
+- [Architecture Documentation](../architecture.md) - Overall architecture
