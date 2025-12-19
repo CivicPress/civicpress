@@ -15,6 +15,7 @@ import {
   BlockBlobClient,
   StorageSharedKeyCredential,
 } from '@azure/storage-blob';
+import { Storage, Bucket, File } from '@google-cloud/storage';
 import type {
   StorageConfig,
   StorageFolder,
@@ -39,12 +40,19 @@ import { CredentialManager } from './credential-manager.js';
 import { Logger } from '@civicpress/core';
 import type { UnifiedCacheManager } from '@civicpress/core';
 import { StorageMetadataCacheAdapter } from './cache/storage-metadata-cache-adapter.js';
-import { ConcurrencyLimiter, type ConcurrencyLimits } from './limiter/concurrency-limiter.js';
+import {
+  ConcurrencyLimiter,
+  type ConcurrencyLimits,
+} from './limiter/concurrency-limiter.js';
 import { RetryManager } from './retry/retry-manager.js';
 import { StorageFailoverManager } from './failover/storage-failover-manager.js';
 import { CircuitBreakerManager } from './circuit-breaker/circuit-breaker.js';
 import { StorageHealthChecker } from './health/storage-health-checker.js';
-import { withTimeout, getTimeoutForOperation, type TimeoutConfig } from './utils/timeout.js';
+import {
+  withTimeout,
+  getTimeoutForOperation,
+  type TimeoutConfig,
+} from './utils/timeout.js';
 import { StorageMetricsCollector } from './metrics/storage-metrics-collector.js';
 import { StorageUsageReporter } from './reporting/storage-usage-reporter.js';
 import { QuotaManager } from './quota/quota-manager.js';
@@ -61,6 +69,8 @@ export class CloudUuidStorageService {
   private s3Client: S3Client | null = null;
   private azureBlobServiceClient: BlobServiceClient | null = null;
   private azureContainerClient: ContainerClient | null = null;
+  private gcsStorage: Storage | null = null;
+  private gcsBucket: Bucket | null = null;
   private cacheAdapter: StorageMetadataCacheAdapter | null = null;
   private concurrencyLimiter: ConcurrencyLimiter | null = null;
   private retryManager: RetryManager | null = null;
@@ -81,15 +91,22 @@ export class CloudUuidStorageService {
     this.basePath = basePath;
     this.logger = new Logger();
     this.credentialManager = new CredentialManager();
-    
+
     // Initialize cache adapter if cache manager provided
     if (cacheManager) {
-      this.cacheAdapter = new StorageMetadataCacheAdapter(cacheManager, this.logger);
+      this.cacheAdapter = new StorageMetadataCacheAdapter(
+        cacheManager,
+        this.logger
+      );
     }
 
     // Initialize concurrency limiter from config if limits provided
     const globalConfig = config.global;
-    if (globalConfig?.max_concurrent_uploads || globalConfig?.max_concurrent_downloads || globalConfig?.max_concurrent_deletes) {
+    if (
+      globalConfig?.max_concurrent_uploads ||
+      globalConfig?.max_concurrent_downloads ||
+      globalConfig?.max_concurrent_deletes
+    ) {
       this.concurrencyLimiter = new ConcurrencyLimiter(
         {
           uploads: globalConfig?.max_concurrent_uploads,
@@ -104,7 +121,8 @@ export class CloudUuidStorageService {
     if (globalConfig?.circuit_breaker_enabled !== false) {
       this.circuitBreakerManager = new CircuitBreakerManager(
         {
-          failureThreshold: globalConfig?.circuit_breaker_failure_threshold || 5,
+          failureThreshold:
+            globalConfig?.circuit_breaker_failure_threshold || 5,
           timeout: globalConfig?.circuit_breaker_timeout || 60000,
         },
         this.logger
@@ -113,8 +131,11 @@ export class CloudUuidStorageService {
 
     // Initialize health checker if enabled
     if (globalConfig?.health_checks) {
-      const checkOperations = new Map<string, (provider: string) => Promise<void>>();
-      
+      const checkOperations = new Map<
+        string,
+        (provider: string) => Promise<void>
+      >();
+
       // Add health check operations for each provider
       const allProviders = [
         config.active_provider || 'local',
@@ -194,8 +215,18 @@ export class CloudUuidStorageService {
         const blobs = this.azureContainerClient!.listBlobsFlat();
         await blobs.next(); // Just check if we can access the container
         break;
+      case 'gcs':
+        if (!this.gcsBucket) {
+          await this.initializeGCSStorage(provider);
+        }
+        // Try to list files (limit 1)
+        const [files] = await this.gcsBucket!.getFiles({ maxResults: 1 });
+        // Just check if we can access the bucket
+        break;
       default:
-        throw new Error(`Unsupported provider type for health check: ${provider.type}`);
+        throw new Error(
+          `Unsupported provider type for health check: ${provider.type}`
+        );
     }
   }
 
@@ -204,7 +235,7 @@ export class CloudUuidStorageService {
    */
   setDatabaseService(databaseService: any): void {
     this.databaseService = databaseService;
-    
+
     // Initialize usage reporter when database service is set
     if (this.cacheAdapter) {
       const cacheManager = (this.cacheAdapter as any).cache?.manager || null;
@@ -231,8 +262,14 @@ export class CloudUuidStorageService {
       };
 
       // Add folder quotas
-      for (const [folderName, folderConfig] of Object.entries(this.config.folders)) {
-        if (folderConfig.quota && folderConfig.quota !== '0' && folderConfig.quota !== '') {
+      for (const [folderName, folderConfig] of Object.entries(
+        this.config.folders
+      )) {
+        if (
+          folderConfig.quota &&
+          folderConfig.quota !== '0' &&
+          folderConfig.quota !== ''
+        ) {
           quotaConfig.folders[folderName] = {
             limit: this.parseSizeString(folderConfig.quota),
             limitFormatted: folderConfig.quota,
@@ -260,7 +297,10 @@ export class CloudUuidStorageService {
    * Set cache manager for metadata caching
    */
   setCacheManager(cacheManager: UnifiedCacheManager): void {
-    this.cacheAdapter = new StorageMetadataCacheAdapter(cacheManager, this.logger);
+    this.cacheAdapter = new StorageMetadataCacheAdapter(
+      cacheManager,
+      this.logger
+    );
   }
 
   /**
@@ -275,9 +315,12 @@ export class CloudUuidStorageService {
    */
   setRetryManager(retryManager: RetryManager): void {
     this.retryManager = retryManager;
-    
+
     // Initialize failover manager if retry manager is set and failover is configured
-    if (this.config.failover_providers && this.config.failover_providers.length > 0) {
+    if (
+      this.config.failover_providers &&
+      this.config.failover_providers.length > 0
+    ) {
       this.failoverManager = new StorageFailoverManager(
         retryManager,
         this.config,
@@ -439,7 +482,8 @@ export class CloudUuidStorageService {
           await this.initializeAzureStorage(provider);
           break;
         case 'gcs':
-          throw new Error('Google Cloud Storage not yet implemented');
+          await this.initializeGCSStorage(provider);
+          break;
         default:
           throw new Error(`Unsupported storage provider: ${provider.type}`);
       }
@@ -460,16 +504,16 @@ export class CloudUuidStorageService {
       : path.resolve(this.basePath, storagePath);
     await fs.ensureDir(resolvedPath);
 
-        // Create configured folders
-        for (const [folderName, folderConfig] of Object.entries(
-          this.config.folders
-        )) {
-          const folderPath = path.join(resolvedPath, folderConfig.path);
-          await fs.ensureDir(folderPath);
-          this.logger.info(
-            `Initialized local folder: ${folderName} -> ${folderPath}`
-          );
-        }
+    // Create configured folders
+    for (const [folderName, folderConfig] of Object.entries(
+      this.config.folders
+    )) {
+      const folderPath = path.join(resolvedPath, folderConfig.path);
+      await fs.ensureDir(folderPath);
+      this.logger.info(
+        `Initialized local folder: ${folderName} -> ${folderPath}`
+      );
+    }
   }
 
   /**
@@ -556,12 +600,102 @@ export class CloudUuidStorageService {
   }
 
   /**
+   * Initialize Google Cloud Storage
+   */
+  private async initializeGCSStorage(provider: any): Promise<void> {
+    const credentials = await this.credentialManager.getCredentials('gcs');
+
+    if (!credentials) {
+      throw new Error('GCS credentials not found');
+    }
+
+    const gcsCredentials = credentials as any;
+
+    // Initialize GCS Storage client
+    const storageOptions: any = {
+      projectId: gcsCredentials.projectId || provider.project_id,
+    };
+
+    // Use service account key file if provided
+    if (gcsCredentials.keyFilename) {
+      // Resolve path if relative
+      const keyPath = gcsCredentials.keyFilename.startsWith('/')
+        ? gcsCredentials.keyFilename
+        : path.resolve(process.cwd(), gcsCredentials.keyFilename);
+
+      // Verify file exists
+      if (!(await fs.pathExists(keyPath))) {
+        throw new Error(`GCS service account key file not found: ${keyPath}`);
+      }
+
+      storageOptions.keyFilename = keyPath;
+      this.logger.debug(`Using GCS service account key: ${keyPath}`);
+    } else if (gcsCredentials.credentials) {
+      // Use credentials object if provided
+      storageOptions.credentials = gcsCredentials.credentials;
+    }
+    // Otherwise, use Application Default Credentials (ADC)
+
+    this.gcsStorage = new Storage(storageOptions);
+
+    // Get bucket
+    const bucketName = provider.bucket;
+    if (!bucketName) {
+      throw new Error('GCS bucket name is required');
+    }
+
+    this.gcsBucket = this.gcsStorage.bucket(bucketName);
+
+    // Ensure bucket exists (or verify access if create_bucket is false)
+    try {
+      const [exists] = await this.gcsBucket.exists();
+      if (!exists) {
+        // Create bucket if it doesn't exist (optional, based on config)
+        if (provider.options?.create_bucket !== false) {
+          await this.gcsBucket.create({
+            location: provider.options?.location || 'US',
+            storageClass: provider.options?.storage_class || 'STANDARD',
+          });
+          this.logger.info(`Created GCS bucket: ${bucketName}`);
+        } else {
+          throw new Error(`GCS bucket '${bucketName}' does not exist`);
+        }
+      } else {
+        this.logger.info(`GCS bucket '${bucketName}' exists and is accessible`);
+      }
+    } catch (error) {
+      // If create_bucket is false and we can't check existence, try a lightweight operation instead
+      // This handles cases where the service account has object permissions but not bucket permissions
+      if (provider.options?.create_bucket === false) {
+        this.logger.warn(
+          `Could not verify GCS bucket '${bucketName}' existence (may lack storage.buckets.get permission). Will attempt to use bucket directly.`,
+          error instanceof Error ? error.message : String(error)
+        );
+        // Don't throw - assume bucket exists and try to use it
+        // The first actual operation will fail if bucket doesn't exist or is inaccessible
+      } else {
+        this.logger.error(
+          `Failed to check/create GCS bucket '${bucketName}':`,
+          error
+        );
+        throw error;
+      }
+    }
+
+    this.logger.info(
+      `Initialized GCS storage: project=${storageOptions.projectId}, bucket=${bucketName}`
+    );
+  }
+
+  /**
    * Upload a file with UUID tracking
    */
   async uploadFile(request: UploadFileRequest): Promise<UploadFileResponse> {
     // Apply concurrency limiting if configured
     if (this.concurrencyLimiter) {
-      return this.concurrencyLimiter.limitUpload(() => this._uploadFile(request));
+      return this.concurrencyLimiter.limitUpload(() =>
+        this._uploadFile(request)
+      );
     }
     return this._uploadFile(request);
   }
@@ -569,7 +703,9 @@ export class CloudUuidStorageService {
   /**
    * Internal upload implementation (called with or without concurrency limiting)
    */
-  private async _uploadFile(request: UploadFileRequest): Promise<UploadFileResponse> {
+  private async _uploadFile(
+    request: UploadFileRequest
+  ): Promise<UploadFileResponse> {
     const startTime = Date.now();
     let provider: string | undefined;
     let success = false;
@@ -623,7 +759,13 @@ export class CloudUuidStorageService {
             case 's3':
               return await this.uploadToS3(fileData!, relativePath, provider);
             case 'azure':
-              return await this.uploadToAzure(fileData!, relativePath, provider);
+              return await this.uploadToAzure(
+                fileData!,
+                relativePath,
+                provider
+              );
+            case 'gcs':
+              return await this.uploadToGCS(fileData!, relativePath, provider);
             default:
               throw new Error(`Unsupported provider type: ${provider.type}`);
           }
@@ -631,7 +773,8 @@ export class CloudUuidStorageService {
 
         // Apply timeout
         const timeout = getTimeoutForOperation('upload', this.timeoutConfig);
-        const executeWithTimeout = () => withTimeout(executeUpload, timeout, 'upload');
+        const executeWithTimeout = () =>
+          withTimeout(executeUpload, timeout, 'upload');
 
         // Apply circuit breaker if configured
         if (this.circuitBreakerManager) {
@@ -743,7 +886,10 @@ export class CloudUuidStorageService {
       // Record metrics
       if (this.metricsCollector) {
         const latency = Date.now() - startTime;
-        const errorCode = err instanceof Error && (err as any).code ? (err as any).code : 'UNKNOWN_ERROR';
+        const errorCode =
+          err instanceof Error && (err as any).code
+            ? (err as any).code
+            : 'UNKNOWN_ERROR';
         const fileSize = (fileData as MulterFile | undefined)?.size || 0;
         this.metricsCollector.recordUpload(
           false,
@@ -862,6 +1008,47 @@ export class CloudUuidStorageService {
   }
 
   /**
+   * Upload file to Google Cloud Storage
+   */
+  private async uploadToGCS(
+    fileData: MulterFile,
+    relativePath: string,
+    provider: any
+  ): Promise<string> {
+    if (!this.gcsBucket) {
+      throw new Error('GCS bucket not initialized');
+    }
+
+    const fileName = provider.prefix
+      ? `${provider.prefix}/${relativePath}`
+      : relativePath;
+
+    const uploadOperation = async () => {
+      const file = this.gcsBucket!.file(fileName);
+
+      // Upload the file
+      await file.save(fileData.buffer, {
+        metadata: {
+          contentType: fileData.mimetype,
+          metadata: {
+            originalName: fileData.originalname,
+            uploadedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      return `gs://${provider.bucket}/${fileName}`;
+    };
+
+    // Apply retry logic if retry manager is configured
+    if (this.retryManager) {
+      return this.retryManager.withRetry(uploadOperation);
+    }
+
+    return uploadOperation();
+  }
+
+  /**
    * Get file by UUID
    */
   async getFileById(id: string): Promise<StorageFile | null> {
@@ -898,7 +1085,9 @@ export class CloudUuidStorageService {
       }
 
       // Download with failover support
-      const downloadOperation = async (providerName: string): Promise<Buffer | null> => {
+      const downloadOperation = async (
+        providerName: string
+      ): Promise<Buffer | null> => {
         const provider = this.config.providers?.[providerName];
         if (!provider) {
           throw new Error(`Provider '${providerName}' not found`);
@@ -912,6 +1101,8 @@ export class CloudUuidStorageService {
               return await this.getFileContentFromS3(file, provider);
             case 'azure':
               return await this.getFileContentFromAzure(file, provider);
+            case 'gcs':
+              return await this.getFileContentFromGCS(file, provider);
             default:
               throw new Error(`Unsupported provider type: ${provider.type}`);
           }
@@ -919,7 +1110,8 @@ export class CloudUuidStorageService {
 
         // Apply timeout
         const timeout = getTimeoutForOperation('download', this.timeoutConfig);
-        const executeWithTimeout = () => withTimeout(executeDownload, timeout, 'download');
+        const executeWithTimeout = () =>
+          withTimeout(executeDownload, timeout, 'download');
 
         // Apply circuit breaker if configured
         if (this.circuitBreakerManager) {
@@ -965,7 +1157,10 @@ export class CloudUuidStorageService {
       // Record metrics
       if (this.metricsCollector) {
         const latency = Date.now() - startTime;
-        const errorCode = err instanceof Error && (err as any).code ? (err as any).code : 'UNKNOWN_ERROR';
+        const errorCode =
+          err instanceof Error && (err as any).code
+            ? (err as any).code
+            : 'UNKNOWN_ERROR';
         this.metricsCollector.recordDownload(
           false,
           0,
@@ -1107,6 +1302,47 @@ export class CloudUuidStorageService {
   }
 
   /**
+   * Get file content from Google Cloud Storage
+   */
+  private async getFileContentFromGCS(
+    file: StorageFile,
+    provider: any
+  ): Promise<Buffer | null> {
+    if (!this.gcsBucket) {
+      throw new Error('GCS bucket not initialized');
+    }
+
+    // Extract file name from provider_path (gs://bucket/filename)
+    const fileName = file.provider_path.replace(`gs://${provider.bucket}/`, '');
+
+    const downloadOperation = async () => {
+      const gcsFile = this.gcsBucket!.file(fileName);
+
+      // Check if file exists
+      const [exists] = await gcsFile.exists();
+      if (!exists) {
+        return null;
+      }
+
+      // Download file content
+      const [buffer] = await gcsFile.download();
+      return Buffer.from(buffer);
+    };
+
+    // Apply retry logic if retry manager is configured
+    if (this.retryManager) {
+      return this.retryManager.withRetry(downloadOperation);
+    }
+
+    try {
+      return await downloadOperation();
+    } catch (error) {
+      this.logger.error('Failed to download from GCS:', error);
+      return null;
+    }
+  }
+
+  /**
    * List files in a folder
    */
   async listFiles(folderName: string): Promise<StorageFile[]> {
@@ -1147,7 +1383,7 @@ export class CloudUuidStorageService {
       // Apply timeout
       const timeout = getTimeoutForOperation('list', this.timeoutConfig);
       const result = await withTimeout(listOperation, timeout, 'list');
-      
+
       success = true;
       const activeProvider = this.config.active_provider || 'local';
       provider = activeProvider;
@@ -1168,7 +1404,10 @@ export class CloudUuidStorageService {
         const latency = Date.now() - startTime;
         const activeProvider = this.config.active_provider || 'local';
         provider = activeProvider;
-        const errorCode = err instanceof Error && (err as any).code ? (err as any).code : 'UNKNOWN_ERROR';
+        const errorCode =
+          err instanceof Error && (err as any).code
+            ? (err as any).code
+            : 'UNKNOWN_ERROR';
         this.metricsCollector.recordList(false, latency, provider, errorCode);
       }
 
@@ -1182,7 +1421,9 @@ export class CloudUuidStorageService {
   async deleteFile(id: string, userId?: string): Promise<boolean> {
     // Apply concurrency limiting if configured
     if (this.concurrencyLimiter) {
-      return this.concurrencyLimiter.limitDelete(() => this._deleteFile(id, userId));
+      return this.concurrencyLimiter.limitDelete(() =>
+        this._deleteFile(id, userId)
+      );
     }
     return this._deleteFile(id, userId);
   }
@@ -1224,6 +1465,9 @@ export class CloudUuidStorageService {
             case 'azure':
               await this.deleteFromAzure(file, provider);
               break;
+            case 'gcs':
+              await this.deleteFromGCS(file, provider);
+              break;
             default:
               throw new Error(`Unsupported provider type: ${provider.type}`);
           }
@@ -1231,7 +1475,8 @@ export class CloudUuidStorageService {
 
         // Apply timeout
         const timeout = getTimeoutForOperation('delete', this.timeoutConfig);
-        const executeWithTimeout = () => withTimeout(executeDelete, timeout, 'delete');
+        const executeWithTimeout = () =>
+          withTimeout(executeDelete, timeout, 'delete');
 
         // Apply circuit breaker if configured
         if (this.circuitBreakerManager) {
@@ -1243,7 +1488,10 @@ export class CloudUuidStorageService {
       };
 
       if (this.failoverManager) {
-        await this.failoverManager.executeWithFailover(deleteOperation, 'delete');
+        await this.failoverManager.executeWithFailover(
+          deleteOperation,
+          'delete'
+        );
       } else {
         // No failover - use active provider
         const activeProvider = this.config.active_provider || 'local';
@@ -1299,7 +1547,10 @@ export class CloudUuidStorageService {
       // Record metrics
       if (this.metricsCollector) {
         const latency = Date.now() - startTime;
-        const errorCode = err instanceof Error && (err as any).code ? (err as any).code : 'UNKNOWN_ERROR';
+        const errorCode =
+          err instanceof Error && (err as any).code
+            ? (err as any).code
+            : 'UNKNOWN_ERROR';
         this.metricsCollector.recordDelete(false, latency, provider, errorCode);
       }
 
@@ -1365,6 +1616,30 @@ export class CloudUuidStorageService {
       const blockBlobClient =
         this.azureContainerClient!.getBlockBlobClient(blobName);
       await blockBlobClient.deleteIfExists();
+    };
+
+    // Apply retry logic if retry manager is configured
+    if (this.retryManager) {
+      return this.retryManager.withRetry(deleteOperation);
+    }
+
+    return deleteOperation();
+  }
+
+  /**
+   * Delete file from Google Cloud Storage
+   */
+  private async deleteFromGCS(file: StorageFile, provider: any): Promise<void> {
+    if (!this.gcsBucket) {
+      throw new Error('GCS bucket not initialized');
+    }
+
+    // Extract file name from provider_path (gs://bucket/filename)
+    const fileName = file.provider_path.replace(`gs://${provider.bucket}/`, '');
+
+    const deleteOperation = async () => {
+      const gcsFile = this.gcsBucket!.file(fileName);
+      await gcsFile.delete();
     };
 
     // Apply retry logic if retry manager is configured
@@ -1518,7 +1793,9 @@ export class CloudUuidStorageService {
 
       // Process files with concurrency control
       let completed = 0;
-      const processFile = async (file: MulterFile): Promise<BatchUploadResult> => {
+      const processFile = async (
+        file: MulterFile
+      ): Promise<BatchUploadResult> => {
         try {
           const uploadRequest: UploadFileRequest = {
             file,
@@ -1546,7 +1823,9 @@ export class CloudUuidStorageService {
               success: true,
             };
           } else {
-            const errorCode = this.extractErrorCode(result.error || 'Upload failed');
+            const errorCode = this.extractErrorCode(
+              result.error || 'Upload failed'
+            );
             return {
               file: {} as StorageFile,
               success: false,
@@ -1587,14 +1866,15 @@ export class CloudUuidStorageService {
       const failed = results.filter((r) => !r.success);
 
       // Generate error summary
-      const errorSummary = failed.length > 0 
-        ? this.generateErrorSummary(
-            failed.map(f => ({ 
-              error: f.error || 'Unknown error', 
-              errorCode: f.errorCode 
-            }))
-          ) 
-        : undefined;
+      const errorSummary =
+        failed.length > 0
+          ? this.generateErrorSummary(
+              failed.map((f) => ({
+                error: f.error || 'Unknown error',
+                errorCode: f.errorCode,
+              }))
+            )
+          : undefined;
 
       // Invalidate cache for affected folders
       if (this.cacheAdapter && affectedFolders.size > 0) {
@@ -1622,7 +1902,8 @@ export class CloudUuidStorageService {
             successful: 0,
             failed: failed.length,
             errors: failed.map((f) => ({
-              item: f.file?.original_name || f.file?.stored_filename || 'unknown',
+              item:
+                f.file?.original_name || f.file?.stored_filename || 'unknown',
               error: f.error || 'Unknown error',
               errorCode: f.errorCode,
             })),
@@ -1672,7 +1953,9 @@ export class CloudUuidStorageService {
       }
 
       let completed = 0;
-      const processDelete = async (fileId: string): Promise<BatchDeleteResult> => {
+      const processDelete = async (
+        fileId: string
+      ): Promise<BatchDeleteResult> => {
         try {
           // Get file first to track affected folders
           const file = await this.getFileById(fileId);
@@ -1688,7 +1971,9 @@ export class CloudUuidStorageService {
               completed,
               total: request.fileIds.length,
               current: file?.original_name,
-              percentage: Math.round((completed / request.fileIds.length) * 100),
+              percentage: Math.round(
+                (completed / request.fileIds.length) * 100
+              ),
             });
           }
 
@@ -1702,7 +1987,9 @@ export class CloudUuidStorageService {
               fileId,
               success: false,
               error: file ? 'Delete failed' : 'File not found',
-              errorCode: file ? 'STORAGE_DELETE_FAILED' : 'STORAGE_FILE_NOT_FOUND',
+              errorCode: file
+                ? 'STORAGE_DELETE_FAILED'
+                : 'STORAGE_FILE_NOT_FOUND',
             };
           }
         } catch (error) {
@@ -1711,7 +1998,9 @@ export class CloudUuidStorageService {
             options.onProgress({
               completed,
               total: request.fileIds.length,
-              percentage: Math.round((completed / request.fileIds.length) * 100),
+              percentage: Math.round(
+                (completed / request.fileIds.length) * 100
+              ),
             });
           }
 
@@ -1737,14 +2026,15 @@ export class CloudUuidStorageService {
       const failed = results.filter((r) => !r.success);
 
       // Generate error summary
-      const errorSummary = failed.length > 0 
-        ? this.generateErrorSummary(
-            failed.map(f => ({ 
-              error: f.error || 'Unknown error', 
-              errorCode: f.errorCode 
-            }))
-          ) 
-        : undefined;
+      const errorSummary =
+        failed.length > 0
+          ? this.generateErrorSummary(
+              failed.map((f) => ({
+                error: f.error || 'Unknown error',
+                errorCode: f.errorCode,
+              }))
+            )
+          : undefined;
 
       // Invalidate cache for affected folders
       if (this.cacheAdapter && affectedFolders.size > 0) {
@@ -1764,20 +2054,17 @@ export class CloudUuidStorageService {
 
       // If all failed, throw BatchOperationError
       if (successful.length === 0 && failed.length > 0) {
-        throw new BatchOperationError(
-          'All files failed to delete',
-          {
-            operation: 'delete',
-            total: request.fileIds.length,
-            successful: 0,
-            failed: failed.length,
-            errors: failed.map((f) => ({
-              item: f.fileId,
-              error: f.error || 'Unknown error',
-              errorCode: f.errorCode,
-            })),
-          }
-        );
+        throw new BatchOperationError('All files failed to delete', {
+          operation: 'delete',
+          total: request.fileIds.length,
+          successful: 0,
+          failed: failed.length,
+          errors: failed.map((f) => ({
+            item: f.fileId,
+            error: f.error || 'Unknown error',
+            errorCode: f.errorCode,
+          })),
+        });
       }
 
       return response;
@@ -1797,9 +2084,10 @@ export class CloudUuidStorageService {
   /**
    * Validate batch upload request
    */
-  private validateBatchUpload(
-    request: BatchUploadRequest
-  ): { valid: boolean; errors: string[] } {
+  private validateBatchUpload(request: BatchUploadRequest): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     // Check folder exists
@@ -1881,7 +2169,9 @@ export class CloudUuidStorageService {
   /**
    * Upload file from stream (for large files)
    */
-  async uploadFileStream(request: StreamUploadRequest): Promise<UploadFileResponse> {
+  async uploadFileStream(
+    request: StreamUploadRequest
+  ): Promise<UploadFileResponse> {
     try {
       if (!this.databaseService) {
         throw new Error('Database service not initialized');
@@ -1902,7 +2192,10 @@ export class CloudUuidStorageService {
 
       // Generate UUID and filename
       const fileId = uuidv4();
-      const storedFilename = this.generateStoredFilenameFromName(request.filename, fileId);
+      const storedFilename = this.generateStoredFilenameFromName(
+        request.filename,
+        fileId
+      );
       const relativePath = `${request.folder}/${storedFilename}`;
 
       // Get active provider
@@ -1919,7 +2212,10 @@ export class CloudUuidStorageService {
       // Upload to provider using stream
       switch (provider.type) {
         case 'local':
-          providerPath = await this.uploadStreamToLocal(request.stream, relativePath);
+          providerPath = await this.uploadStreamToLocal(
+            request.stream,
+            relativePath
+          );
           // Get actual file size
           const fullPath = path.join(this.getLocalStoragePath(), relativePath);
           const stats = await fs.stat(fullPath);
@@ -1930,7 +2226,9 @@ export class CloudUuidStorageService {
             request.stream,
             relativePath,
             provider,
-            request.contentType || mime.lookup(request.filename) || 'application/octet-stream',
+            request.contentType ||
+              mime.lookup(request.filename) ||
+              'application/octet-stream',
             request.options?.metadata
           );
           actualSize = request.size || 0; // S3 will set size
@@ -1940,7 +2238,9 @@ export class CloudUuidStorageService {
             request.stream,
             relativePath,
             provider,
-            request.contentType || mime.lookup(request.filename) || 'application/octet-stream',
+            request.contentType ||
+              mime.lookup(request.filename) ||
+              'application/octet-stream',
             request.options?.metadata
           );
           actualSize = request.size || 0; // Azure will set size
@@ -1958,7 +2258,10 @@ export class CloudUuidStorageService {
         relative_path: relativePath,
         provider_path: providerPath,
         size: actualSize,
-        mime_type: request.contentType || mime.lookup(request.filename) || 'application/octet-stream',
+        mime_type:
+          request.contentType ||
+          mime.lookup(request.filename) ||
+          'application/octet-stream',
         description: request.description,
         uploaded_by: request.uploaded_by,
         created_at: new Date(),
@@ -2021,7 +2324,9 @@ export class CloudUuidStorageService {
   ): Promise<Readable | null> {
     // Apply concurrency limiting if configured
     if (this.concurrencyLimiter) {
-      return this.concurrencyLimiter.limitDownload(() => this._downloadFileStream(fileId, options));
+      return this.concurrencyLimiter.limitDownload(() =>
+        this._downloadFileStream(fileId, options)
+      );
     }
     return this._downloadFileStream(fileId, options);
   }
@@ -2100,7 +2405,9 @@ export class CloudUuidStorageService {
       throw new Error('S3 client not initialized');
     }
 
-    const key = provider.prefix ? `${provider.prefix}/${relativePath}` : relativePath;
+    const key = provider.prefix
+      ? `${provider.prefix}/${relativePath}`
+      : relativePath;
 
     const command = new PutObjectCommand({
       Bucket: provider.bucket,
@@ -2133,8 +2440,11 @@ export class CloudUuidStorageService {
       throw new Error('Azure container client not initialized');
     }
 
-    const blobName = provider.prefix ? `${provider.prefix}/${relativePath}` : relativePath;
-    const blockBlobClient = this.azureContainerClient.getBlockBlobClient(blobName);
+    const blobName = provider.prefix
+      ? `${provider.prefix}/${relativePath}`
+      : relativePath;
+    const blockBlobClient =
+      this.azureContainerClient.getBlockBlobClient(blobName);
 
     // Azure SDK supports uploadStream
     await blockBlobClient.uploadStream(stream as any, undefined, undefined, {
@@ -2185,9 +2495,10 @@ export class CloudUuidStorageService {
     const command = new GetObjectCommand({
       Bucket: provider.bucket,
       Key: key,
-      Range: options?.start !== undefined || options?.end !== undefined
-        ? `bytes=${options.start || 0}-${options.end || ''}`
-        : undefined,
+      Range:
+        options?.start !== undefined || options?.end !== undefined
+          ? `bytes=${options.start || 0}-${options.end || ''}`
+          : undefined,
     });
 
     const response = await this.s3Client.send(command);
@@ -2218,11 +2529,14 @@ export class CloudUuidStorageService {
       ''
     );
 
-    const blockBlobClient = this.azureContainerClient.getBlockBlobClient(blobName);
+    const blockBlobClient =
+      this.azureContainerClient.getBlockBlobClient(blobName);
 
     const downloadResponse = await blockBlobClient.download(
       options?.start,
-      options?.end !== undefined ? (options.end - (options.start || 0) + 1) : undefined
+      options?.end !== undefined
+        ? options.end - (options.start || 0) + 1
+        : undefined
     );
 
     if (!downloadResponse.readableStreamBody) {
@@ -2236,7 +2550,10 @@ export class CloudUuidStorageService {
   /**
    * Generate stored filename from original name (for stream uploads)
    */
-  private generateStoredFilenameFromName(originalName: string, fileId: string): string {
+  private generateStoredFilenameFromName(
+    originalName: string,
+    fileId: string
+  ): string {
     const ext = path.extname(originalName);
     const baseName = path.basename(originalName, ext);
     const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_');

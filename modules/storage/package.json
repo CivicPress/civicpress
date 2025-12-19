@@ -31,6 +31,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "3.879.0",
     "@azure/storage-blob": "12.28.0",
+    "@google-cloud/storage": "^7.15.0",
     "@civicpress/core": "workspace:*",
     "fs-extra": "^11.2.0",
     "mime-types": "^2.1.35",
