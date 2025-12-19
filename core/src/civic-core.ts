@@ -251,6 +251,16 @@ export class CivicPress {
     try {
       this.logger.info('Shutting down CivicPress...');
 
+      // Shutdown cache manager first (closes file watchers)
+      const cacheManager = this.getCacheManager();
+      if (cacheManager) {
+        try {
+          await cacheManager.shutdown();
+        } catch (error) {
+          this.logger.warn('Error shutting down cache manager:', error);
+        }
+      }
+
       // Close database connection
       const db = this.container.resolve<DatabaseService>('database');
       await db.close();

@@ -163,7 +163,14 @@ const initializeStorage = async (req: AuthenticatedRequest) => {
 
     try {
       const config = await configManager.loadConfig();
-      storageService = new CloudUuidStorageService(config, systemDataDir);
+
+      // Get cache manager from CivicPress instance if available
+      const cacheManager = civicPress?.getCacheManager?.();
+      storageService = new CloudUuidStorageService(
+        config,
+        systemDataDir,
+        cacheManager
+      );
 
       // Get database service from request context (injected by API)
       databaseService = (req as any).context?.databaseService;
@@ -564,6 +571,142 @@ router.delete(
       }
     } catch (error: any) {
       return handleStorageError('delete_file', error, req, res);
+    }
+  }
+);
+
+// POST /api/v1/storage/files/batch - Batch upload files
+router.post(
+  '/files/batch',
+  requireStoragePermission('upload'),
+  upload.array('files', 50), // Max 50 files
+  body('folder').isString().notEmpty(),
+  async (req: AuthenticatedRequest, res: Response) => {
+    logApiRequest(req, {
+      operation: 'batch_upload',
+      file_count: (req.files as Express.Multer.File[])?.length || 0,
+    });
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return handleStorageValidationError(
+        'batch_upload',
+        errors.array(),
+        req,
+        res
+      );
+    }
+
+    try {
+      await initializeStorage(req);
+      const files = (req.files as Express.Multer.File[]) || [];
+      const folder = req.body.folder as string;
+      const userId = req.user?.id?.toString();
+
+      if (files.length === 0) {
+        return handleStorageValidationError(
+          'batch_upload',
+          [{ msg: 'No files provided', param: 'files' }],
+          req,
+          res
+        );
+      }
+
+      // Convert Express.Multer.File to MulterFile
+      const multerFiles = files.map((file) => ({
+        fieldname: file.fieldname,
+        originalname: file.originalname,
+        encoding: file.encoding,
+        mimetype: file.mimetype,
+        size: file.size,
+        destination: file.destination || '',
+        filename: file.filename || file.originalname,
+        path: file.path || '',
+        buffer: file.buffer,
+      }));
+
+      const result = await storageService.batchUpload(
+        {
+          files: multerFiles,
+          folder,
+          uploaded_by: userId,
+        },
+        {
+          maxConcurrency: 5, // Configurable later
+        }
+      );
+
+      return handleStorageSuccess(
+        'batch_upload',
+        {
+          successful: result.successful,
+          failed: result.failed,
+          total: result.total,
+          successfulCount: result.successfulCount,
+          failedCount: result.failedCount,
+        },
+        req,
+        res
+      );
+    } catch (error: any) {
+      return handleStorageError('batch_upload', error, req, res);
+    }
+  }
+);
+
+// DELETE /api/v1/storage/files/batch - Batch delete files
+router.delete(
+  '/files/batch',
+  requireStoragePermission('delete'),
+  body('fileIds')
+    .isArray({ min: 1, max: 100 })
+    .withMessage('fileIds must be an array with 1-100 items'),
+  body('fileIds.*').isUUID().withMessage('Each fileId must be a valid UUID'),
+  async (req: AuthenticatedRequest, res: Response) => {
+    logApiRequest(req, {
+      operation: 'batch_delete',
+      file_count: (req.body.fileIds as string[])?.length || 0,
+    });
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return handleStorageValidationError(
+        'batch_delete',
+        errors.array(),
+        req,
+        res
+      );
+    }
+
+    try {
+      await initializeStorage(req);
+      const fileIds = req.body.fileIds as string[];
+      const userId = req.user?.id?.toString();
+
+      const result = await storageService.batchDelete(
+        {
+          fileIds,
+          userId,
+        },
+        {
+          maxConcurrency: 10, // Configurable later
+        }
+      );
+
+      return handleStorageSuccess(
+        'batch_delete',
+        {
+          successful: result.successful,
+          failed: result.failed,
+          total: result.total,
+          successfulCount: result.successfulCount,
+          failedCount: result.failedCount,
+        },
+        req,
+        res
+      );
+    } catch (error: any) {
+      return handleStorageError('batch_delete', error, req, res);
     }
   }
 );

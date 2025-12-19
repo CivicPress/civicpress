@@ -54,7 +54,14 @@ async function initializeStorageServices(
 
   const configManager = new StorageConfigManager(systemDataDir);
   const config = await configManager.loadConfig();
-  const storageService = new CloudUuidStorageService(config, systemDataDir);
+
+  // Get cache manager from CivicPress instance if available
+  const cacheManager = (civic as any).getCacheManager?.();
+  const storageService = new CloudUuidStorageService(
+    config,
+    systemDataDir,
+    cacheManager
+  );
 
   // Get database service from CivicPress instance
   const databaseService = (civic as any).getDatabaseService();
@@ -79,11 +86,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--folders <folders>', 'Folders configuration (JSON string)')
     .option('--metadata <metadata>', 'Metadata configuration (JSON string)')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:config');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         // Get configuration from central config
@@ -92,7 +107,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -179,7 +194,13 @@ export default function setupStorageCommand(cli: CAC) {
             folderCount: Object.keys(config.folders).length,
           });
         }
-        await civic.shutdown();
+
+        // Explicitly exit to ensure process terminates
+        if (civic) {
+          await civic.shutdown();
+          shutdownCalled = true;
+        }
+        process.exit(0);
       } catch (error: any) {
         cliError(
           'Error managing storage configuration',
@@ -189,6 +210,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -201,11 +230,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:upload');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.file || !options.folder) {
@@ -235,7 +272,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -301,6 +338,13 @@ export default function setupStorageCommand(cli: CAC) {
               fileId: result.file.id,
             }
           );
+
+          // Explicitly exit to ensure process terminates
+          if (civic) {
+            await civic.shutdown();
+            shutdownCalled = true;
+          }
+          process.exit(0);
         } else {
           cliError(
             `Failed to upload file: ${result.error || 'Unknown error'}`,
@@ -310,7 +354,6 @@ export default function setupStorageCommand(cli: CAC) {
           );
           process.exit(1);
         }
-        await civic.shutdown();
       } catch (error: any) {
         cliError(
           'Error uploading file',
@@ -320,6 +363,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -335,11 +386,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:list');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.folder) {
@@ -358,7 +417,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -443,7 +502,12 @@ export default function setupStorageCommand(cli: CAC) {
           }
         );
 
-        await civic.shutdown();
+        // Explicitly exit to ensure process terminates
+        if (civic) {
+          await civic.shutdown();
+          shutdownCalled = true;
+        }
+        process.exit(0);
       } catch (error: any) {
         cliError(
           'Error listing files',
@@ -453,6 +517,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -466,11 +538,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:download');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.folder || !options.file) {
@@ -489,7 +569,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -559,7 +639,12 @@ export default function setupStorageCommand(cli: CAC) {
           }
         );
 
-        await civic.shutdown();
+        // Explicitly exit to ensure process terminates
+        if (civic) {
+          await civic.shutdown();
+          shutdownCalled = true;
+        }
+        process.exit(0);
       } catch (error: any) {
         cliError(
           'Error downloading file',
@@ -569,6 +654,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -581,11 +674,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:delete');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.folder || !options.file) {
@@ -604,7 +705,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -656,6 +757,13 @@ export default function setupStorageCommand(cli: CAC) {
               fileName: options.file,
             }
           );
+
+          // Explicitly exit to ensure process terminates
+          if (civic) {
+            await civic.shutdown();
+            shutdownCalled = true;
+          }
+          process.exit(0);
         } else {
           cliError(
             'Failed to delete file',
@@ -665,7 +773,6 @@ export default function setupStorageCommand(cli: CAC) {
           );
           process.exit(1);
         }
-        await civic.shutdown();
       } catch (error: any) {
         cliError(
           'Error deleting file',
@@ -675,6 +782,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -695,11 +810,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:folder:add');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.name || !options.path) {
@@ -718,7 +841,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -782,7 +905,12 @@ export default function setupStorageCommand(cli: CAC) {
           }
         );
 
-        await civic.shutdown();
+        // Explicitly exit to ensure process terminates
+        if (civic) {
+          await civic.shutdown();
+          shutdownCalled = true;
+        }
+        process.exit(0);
       } catch (error: any) {
         cliError(
           'Error adding storage folder',
@@ -792,6 +920,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -810,11 +946,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:folder:update');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.name) {
@@ -833,7 +977,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -899,7 +1043,12 @@ export default function setupStorageCommand(cli: CAC) {
           }
         );
 
-        await civic.shutdown();
+        // Explicitly exit to ensure process terminates
+        if (civic) {
+          await civic.shutdown();
+          shutdownCalled = true;
+        }
+        process.exit(0);
       } catch (error: any) {
         cliError(
           'Error updating storage folder',
@@ -909,6 +1058,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -920,11 +1077,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:folder:remove');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.name) {
@@ -943,7 +1108,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -994,7 +1159,12 @@ export default function setupStorageCommand(cli: CAC) {
           }
         );
 
-        await civic.shutdown();
+        // Explicitly exit to ensure process terminates
+        if (civic) {
+          await civic.shutdown();
+          shutdownCalled = true;
+        }
+        process.exit(0);
       } catch (error: any) {
         cliError(
           'Error removing storage folder',
@@ -1004,6 +1174,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });
@@ -1016,11 +1194,19 @@ export default function setupStorageCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
+      // If --help is present, let CAC handle it and exit 0
+      if (options.help) {
+        return;
+      }
+
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
 
       const endOperation = cliStartOperation('storage:info');
+
+      let civic: CivicPress | null = null;
+      let shutdownCalled = false;
 
       try {
         if (!options.folder || !options.file) {
@@ -1039,7 +1225,7 @@ export default function setupStorageCommand(cli: CAC) {
         const dbConfig = CentralConfigManager.getDatabaseConfig();
 
         // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
+        civic = new CivicPress({
           dataDir,
           database: dbConfig,
           logger: {
@@ -1100,7 +1286,12 @@ export default function setupStorageCommand(cli: CAC) {
           }
         );
 
-        await civic.shutdown();
+        // Explicitly exit to ensure process terminates
+        if (civic) {
+          await civic.shutdown();
+          shutdownCalled = true;
+        }
+        process.exit(0);
       } catch (error: any) {
         cliError(
           'Error getting file information',
@@ -1110,6 +1301,14 @@ export default function setupStorageCommand(cli: CAC) {
         );
         process.exit(1);
       } finally {
+        // Always shutdown, even on error (if not already called)
+        if (civic && !shutdownCalled) {
+          try {
+            await civic.shutdown();
+          } catch (shutdownError) {
+            // Ignore shutdown errors
+          }
+        }
         endOperation();
       }
     });

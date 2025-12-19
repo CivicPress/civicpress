@@ -273,6 +273,16 @@ export async function completeServiceInitialization(
     maxSize: 1000,
   });
 
+  // Register storage metadata cache
+  // Note: Configuration from storage.yml will be loaded later and applied if available
+  // For now, use sensible defaults
+  await cacheManager.registerFromConfig('storageMetadata', {
+    strategy: 'memory',
+    enabled: true,
+    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    maxSize: 1000,
+  });
+
   // Initialize cache manager
   await cacheManager.initialize();
 

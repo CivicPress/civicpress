@@ -47,6 +47,19 @@ export interface GlobalStorageSettings {
   retry_attempts: number;
   cross_provider_backup: boolean;
   backup_providers: string[];
+  max_concurrent_uploads?: number;
+  max_concurrent_downloads?: number;
+  max_concurrent_deletes?: number;
+  circuit_breaker_enabled?: boolean;
+  circuit_breaker_failure_threshold?: number;
+  circuit_breaker_timeout?: number;
+  health_check_timeout?: number;
+  upload_timeout?: number;
+  download_timeout?: number;
+  delete_timeout?: number;
+  list_timeout?: number;
+  quota_enforcement?: boolean;
+  global_quota?: string; // e.g., "10GB"
 }
 
 // Provider-specific credential interfaces
@@ -79,6 +92,7 @@ export interface StorageFolder {
   allowed_types: string[];
   max_size: string; // e.g., "10MB", "100MB"
   description?: string;
+  quota?: string; // e.g., "5GB", "0" = unlimited
 }
 
 export interface StorageMetadata {
@@ -175,4 +189,89 @@ export interface UploadFileResponse {
 export interface FileInfoWithId extends FileInfo {
   id?: string; // UUID if tracked in database
   relative_path?: string;
+}
+
+// Batch operation interfaces
+export interface BatchUploadRequest {
+  files: MulterFile[];
+  folder: string;
+  uploaded_by?: string;
+}
+
+export interface BatchUploadResult {
+  file: StorageFile;
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+}
+
+export interface BatchUploadResponse {
+  successful: BatchUploadResult[];
+  failed: BatchUploadResult[];
+  total: number;
+  successfulCount: number;
+  failedCount: number;
+  errorSummary?: {
+    byType: Record<string, number>;
+    byError: Array<{ error: string; count: number }>;
+    totalErrors: number;
+  };
+}
+
+export interface BatchDeleteRequest {
+  fileIds: string[];
+  userId?: string;
+}
+
+export interface BatchDeleteResult {
+  fileId: string;
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+}
+
+export interface BatchDeleteResponse {
+  successful: BatchDeleteResult[];
+  failed: BatchDeleteResult[];
+  total: number;
+  successfulCount: number;
+  failedCount: number;
+  errorSummary?: {
+    byType: Record<string, number>;
+    byError: Array<{ error: string; count: number }>;
+    totalErrors: number;
+  };
+}
+
+export interface BatchOperationProgress {
+  completed: number;
+  total: number;
+  current?: string; // Current file being processed
+  percentage: number;
+}
+
+// Streaming interfaces
+import type { Readable } from 'stream';
+
+export interface StreamUploadOptions {
+  threshold?: number; // Stream if file size > threshold (default: 10MB)
+  chunkSize?: number; // Chunk size for streaming (default: 5MB)
+  contentType?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface StreamDownloadOptions {
+  start?: number; // Start byte for range requests
+  end?: number; // End byte for range requests
+}
+
+export interface StreamUploadRequest {
+  stream: Readable;
+  filename: string;
+  folder: string;
+  size?: number; // Optional size hint
+  contentType?: string;
+  uploaded_by?: string;
+  description?: string;
+  options?: StreamUploadOptions;
 }
