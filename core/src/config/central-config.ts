@@ -397,6 +397,33 @@ export class CentralConfigManager {
   }
 
   /**
+   * Get modules configuration (prefers data/.civic/config.yml, then deprecated .civicrc, then defaults)
+   */
+  static getModules(): string[] {
+    const config = this.getConfig();
+    const dataDir = this.getDataDir();
+
+    // Prefer user data/.civic/config.yml
+    const userConfigPath = path.join(dataDir, '.civic', 'config.yml');
+    const userConfig = this.loadYamlIfExists(userConfigPath);
+
+    // If user config present, use it
+    if (userConfig && userConfig.modules) {
+      return Array.isArray(userConfig.modules)
+        ? userConfig.modules
+        : [userConfig.modules];
+    }
+
+    // Accept deprecated .civicrc fields as fallback
+    if (config.modules && Array.isArray(config.modules)) {
+      return config.modules;
+    }
+
+    // Default to empty array if not configured
+    return [];
+  }
+
+  /**
    * Get record types configuration (prefers data/.civic/config.yml, then defaults, then deprecated .civicrc)
    */
   static getRecordTypesConfig(): RecordTypesConfig {
