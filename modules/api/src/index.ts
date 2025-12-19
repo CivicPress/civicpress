@@ -371,6 +371,10 @@ export class CivicPressAPI {
       apiPath('storage'),
       optionalAuth(this.civicPress),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
       uuidStorageRouter
     );
     this.app.use(
@@ -388,6 +392,9 @@ export class CivicPressAPI {
       authMiddleware(this.civicPress),
       usersRouter
     );
+
+    // DEBUG: Log route setup completion
+    logger.info('[DEBUG] All routes registered successfully');
   }
 
   async start(): Promise<void> {

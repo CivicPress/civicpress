@@ -18,6 +18,7 @@ export function notFoundHandler(req: Request, res: Response): void {
       import: '/api/v1/import',
       search: '/api/v1/search',
       config: '/api/v1/config',
+      storage: '/api/v1/storage',
       system: '/api/v1/system',
       health: '/api/v1/health',
     },

@@ -4,19 +4,22 @@ import { body, param, query } from 'express-validator';
 import {
   CloudUuidStorageService,
   StorageConfigManager,
+  initializeStorageService,
+  type MulterFile,
 } from '@civicpress/storage';
-import { DatabaseService, userCan } from '@civicpress/core';
+import { userCan } from '@civicpress/core';
 import { requireStoragePermission } from '../middleware/auth.js';
 import {
   handleStorageSuccess,
   handleStorageError,
   handleStorageValidationError,
 } from '../handlers/storage-handlers.js';
-import { logApiRequest, logApiError } from '../utils/api-logger.js';
+import { logApiRequest } from '../utils/api-logger.js';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { Response } from 'express';
 import path from 'path';
+import { Buffer } from 'node:buffer';
 
 const router = Router();
 
@@ -100,105 +103,95 @@ const upload = multer({
   },
 });
 
-// Initialize storage services
-let storageService: CloudUuidStorageService;
-let configManager: StorageConfigManager;
-let databaseService: DatabaseService;
-
-// Reset storage services (for testing)
-export const resetStorageServices = () => {
-  storageService = null as any;
-  configManager = null as any;
-  databaseService = null as any;
-};
-
-// Initialize storage services (called when routes are first accessed)
-const initializeStorage = async (req: AuthenticatedRequest) => {
-  if (!storageService) {
-    // Get CivicPress instance and data directory from request context
-    const civicPress = (req as any).context?.civicPress;
-    if (!civicPress) {
-      throw new Error('CivicPress instance not available');
-    }
-
-    // Get system data directory
-    // In production: .system-data is at project root
-    // In tests: .system-data is at {dataDir}/.system-data
-    // Check project root first, then fall back to contextDataDir for tests
-    const contextDataDir = (req as any).context?.dataDir;
-    let systemDataDir: string;
-
-    // Default to project root .system-data (production)
-    const projectRootSystemData = path.join(process.cwd(), '.system-data');
-
-    // Check if we're in a test environment by checking if contextDataDir is in a temp directory
-    // or if .system-data doesn't exist at project root
-    const fs = await import('fs/promises');
-    // Only treat as test environment if:
-    // 1. contextDataDir is in /tmp/ (actual test temp directories)
-    // 2. NODE_ENV is explicitly 'test'
-    // Don't match paths just because they contain "test" in the name (like "civicpress-test")
-    const isTestEnvironment =
-      contextDataDir &&
-      (contextDataDir.includes('/tmp/') || process.env.NODE_ENV === 'test');
-
-    // In test environments, always use test directory to ensure isolation
-    if (isTestEnvironment && contextDataDir) {
-      // Test environment: use contextDataDir/.system-data (isolated per test)
-      systemDataDir = path.join(contextDataDir, '.system-data');
-    } else {
-      // Production: check if .system-data exists at project root
-      try {
-        await fs.access(projectRootSystemData);
-        // .system-data exists at project root, use it (production)
-        systemDataDir = projectRootSystemData;
-      } catch {
-        // Production but .system-data missing at root - use project root anyway
-        // (will fail with clear error if missing)
-        systemDataDir = projectRootSystemData;
-      }
-    }
-
-    configManager = new StorageConfigManager(systemDataDir);
-
-    try {
-      const config = await configManager.loadConfig();
-
-      // Get cache manager from CivicPress instance if available
-      const cacheManager = civicPress?.getCacheManager?.();
-      storageService = new CloudUuidStorageService(
-        config,
-        systemDataDir,
-        cacheManager
-      );
-
-      // Get database service from request context (injected by API)
-      databaseService = (req as any).context?.databaseService;
-      if (!databaseService) {
-        throw new Error('Database service not available');
-      }
-
-      storageService.setDatabaseService(databaseService);
-      await storageService.initialize();
-    } catch (error: any) {
-      // Log the actual error for debugging
-      logApiError('storage_initialization', error, req as any, {
-        systemDataDir,
-        configPath: configManager
-          ? (configManager as any).configPath
-          : 'unknown',
-      });
-
-      // If storage config doesn't exist, return a helpful error
-      if (error.message.includes('Storage configuration not found')) {
-        throw new Error(
-          'Storage configuration not initialized. Please run "civic init" to set up storage.'
-        );
-      }
-      // Re-throw with more context
-      throw new Error(`Failed to load storage configuration: ${error.message}`);
-    }
+/**
+ * Get storage service from DI container
+ *
+ * This helper function retrieves the storage service from the DI container
+ * and ensures it's properly initialized. This follows Pattern 2 (Service Registration)
+ * from the Module Integration Guide.
+ *
+ * @param req - Authenticated request with CivicPress instance
+ * @returns Storage service instance
+ * @throws Error if CivicPress instance or storage service is not available
+ */
+async function getStorageService(
+  req: AuthenticatedRequest
+): Promise<CloudUuidStorageService> {
+  // Get CivicPress instance from request context
+  const civicPress = (req as any).context?.civicPress || req.civicPress;
+  if (!civicPress) {
+    throw new Error('CivicPress instance not available');
   }
+
+  // Get storage service from DI container
+  // Using Pattern 2 (Service Registration) from Module Integration Guide
+  let storageService: CloudUuidStorageService;
+  try {
+    // Note: getService supports generics but TypeScript may not infer correctly
+    // Using type assertion for now
+    storageService = civicPress.getService(
+      'storage'
+    ) as CloudUuidStorageService;
+    if (!storageService) {
+      throw new Error('Storage service resolved but is null/undefined');
+    }
+  } catch (error: any) {
+    // Check if it's a ServiceNotFoundError
+    if (
+      error?.name === 'ServiceNotFoundError' ||
+      error?.constructor?.name === 'ServiceNotFoundError'
+    ) {
+      throw new Error(
+        `Storage service not found in DI container. This usually means the storage module was not registered during initialization. Original error: ${error?.message || error}`
+      );
+    }
+
+    throw new Error(
+      `Storage service not available. Storage module may not be registered in DI container. Original error: ${error?.message || error}`
+    );
+  }
+
+  // Ensure storage service is initialized (handles async config loading)
+  await initializeStorageService(storageService);
+
+  return storageService;
+}
+
+/**
+ * Get storage config manager from DI container
+ *
+ * @param req - Authenticated request with CivicPress instance
+ * @returns Storage config manager instance
+ * @throws Error if CivicPress instance or config manager is not available
+ */
+function getStorageConfigManager(
+  req: AuthenticatedRequest
+): StorageConfigManager {
+  // Get CivicPress instance from request context
+  const civicPress = (req as any).context?.civicPress || req.civicPress;
+  if (!civicPress) {
+    throw new Error('CivicPress instance not available');
+  }
+
+  // Get storage config manager from DI container
+  // Using Pattern 2 (Service Registration) from Module Integration Guide
+  try {
+    // Note: getService supports generics but TypeScript may not infer correctly
+    // Using type assertion for now
+    return civicPress.getService(
+      'storageConfigManager'
+    ) as StorageConfigManager;
+  } catch {
+    throw new Error(
+      'Storage config manager not available. Storage module may not be registered in DI container.'
+    );
+  }
+}
+
+// Reset storage services (for testing) - no longer needed but kept for backward compatibility
+export const resetStorageServices = () => {
+  // No-op: Services are now managed by DI container
+  // This function is kept for backward compatibility with tests
 };
 
 // GET /api/v1/storage/config - Get storage configuration
@@ -209,8 +202,24 @@ router.get(
     logApiRequest(req, { operation: 'get_storage_config' });
 
     try {
-      await initializeStorage(req);
-      const config = await configManager.loadConfig();
+      const configManager = getStorageConfigManager(req);
+
+      let config;
+      try {
+        config = await configManager.loadConfig();
+      } catch (error: any) {
+        // If config file doesn't exist, return default config instead of error
+        // This is expected in test environments and fresh installations
+        if (
+          error?.message?.includes('not found') ||
+          error?.message?.includes('Storage configuration not found')
+        ) {
+          config = configManager.getDefaultConfig();
+        } else {
+          // Re-throw other errors (permission issues, invalid YAML, etc.)
+          throw error;
+        }
+      }
 
       return handleStorageSuccess('get_storage_config', { config }, req, res);
     } catch (error: any) {
@@ -261,7 +270,7 @@ router.post(
     }
 
     try {
-      await initializeStorage(req);
+      const storageService = await getStorageService(req);
       const folderName = req.body.folder;
       const description = req.body.description;
       const userId = req.user?.id?.toString();
@@ -324,10 +333,125 @@ router.post(
   }
 );
 
+// GET /api/v1/storage/files/:id/info - Get file information by UUID
+// NOTE: This route must come BEFORE /files/:id to avoid route conflicts
+router.get(
+  '/files/:id/info',
+  [param('id').isUUID()],
+  async (req: AuthenticatedRequest, res: Response) => {
+    logApiRequest(req, {
+      operation: 'get_file_info',
+      file_id: req.params.id,
+    });
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return handleStorageValidationError(
+        'get_file_info',
+        errors.array(),
+        req,
+        res
+      );
+    }
+
+    try {
+      const storageService = await getStorageService(req);
+      const fileId = req.params.id;
+
+      const fileInfo = await storageService.getFileById(fileId);
+      if (!fileInfo) {
+        return handleStorageError(
+          'get_file_info',
+          new Error(`File with ID '${fileId}' not found`),
+          req,
+          res,
+          404
+        );
+      }
+
+      const configManager = getStorageConfigManager(req);
+      let config;
+      try {
+        config = await configManager.loadConfig();
+      } catch (error: any) {
+        // If config file doesn't exist, use default config
+        if (
+          error?.message?.includes('not found') ||
+          error?.message?.includes('Storage configuration not found')
+        ) {
+          config = configManager.getDefaultConfig();
+        } else {
+          throw error;
+        }
+      }
+      const folderConfig = config.folders?.[fileInfo.folder];
+      const folderAccess = folderConfig?.access ?? 'private';
+      const isPublicFolder = folderAccess === 'public';
+
+      if (!req.user) {
+        if (!isPublicFolder) {
+          res.status(401).json({
+            success: false,
+            error: {
+              message: 'Authentication required',
+              code: 'UNAUTHENTICATED',
+            },
+          });
+          return;
+        }
+      } else if (!isPublicFolder) {
+        const hasPermission = await userCan(req.user, 'storage:download', {
+          action: 'download',
+          folder: fileInfo.folder,
+        } as any);
+
+        if (!hasPermission) {
+          res.status(403).json({
+            success: false,
+            error: {
+              message: 'Permission denied: Cannot download storage resources',
+              code: 'INSUFFICIENT_PERMISSIONS',
+              required: 'storage:download',
+              user: {
+                id: req.user.id,
+                username: req.user.username,
+                role: req.user.role,
+              },
+            },
+          });
+          return;
+        }
+      }
+
+      return handleStorageSuccess(
+        'get_file_info',
+        {
+          id: fileInfo.id,
+          original_name: fileInfo.original_name,
+          stored_filename: fileInfo.stored_filename,
+          folder: fileInfo.folder,
+          relative_path: fileInfo.relative_path,
+          size: fileInfo.size,
+          mime_type: fileInfo.mime_type,
+          description: fileInfo.description,
+          uploaded_by: fileInfo.uploaded_by,
+          created_at: fileInfo.created_at,
+          updated_at: fileInfo.updated_at,
+        },
+        req,
+        res
+      );
+    } catch (error: any) {
+      return handleStorageError('get_file_info', error, req, res);
+    }
+  }
+);
+
 // GET /api/v1/storage/files/:id - Download file by UUID
+// NOTE: This route must come AFTER /files/:id/info to avoid route conflicts
 router.get(
   '/files/:id',
-  param('id').isUUID(),
+  [param('id').isUUID()],
   async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, {
       operation: 'download_file',
@@ -345,7 +469,7 @@ router.get(
     }
 
     try {
-      await initializeStorage(req);
+      const storageService = await getStorageService(req);
       const fileId = req.params.id;
 
       const fileInfo = await storageService.getFileById(fileId);
@@ -359,7 +483,21 @@ router.get(
         );
       }
 
-      const config = await configManager.loadConfig();
+      const configManager = getStorageConfigManager(req);
+      let config;
+      try {
+        config = await configManager.loadConfig();
+      } catch (error: any) {
+        // If config file doesn't exist, use default config
+        if (
+          error?.message?.includes('not found') ||
+          error?.message?.includes('Storage configuration not found')
+        ) {
+          config = configManager.getDefaultConfig();
+        } else {
+          throw error;
+        }
+      }
       const folderConfig = config.folders?.[fileInfo.folder];
       const folderAccess = folderConfig?.access ?? 'private';
       const isPublicFolder = folderAccess === 'public';
@@ -426,110 +564,11 @@ router.get(
   }
 );
 
-// GET /api/v1/storage/files/:id/info - Get file information by UUID
-router.get(
-  '/files/:id/info',
-  param('id').isUUID(),
-  async (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, {
-      operation: 'get_file_info',
-      file_id: req.params.id,
-    });
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return handleStorageValidationError(
-        'get_file_info',
-        errors.array(),
-        req,
-        res
-      );
-    }
-
-    try {
-      await initializeStorage(req);
-      const fileId = req.params.id;
-
-      const fileInfo = await storageService.getFileById(fileId);
-      if (!fileInfo) {
-        return handleStorageError(
-          'get_file_info',
-          new Error(`File with ID '${fileId}' not found`),
-          req,
-          res,
-          404
-        );
-      }
-
-      const config = await configManager.loadConfig();
-      const folderConfig = config.folders?.[fileInfo.folder];
-      const folderAccess = folderConfig?.access ?? 'private';
-      const isPublicFolder = folderAccess === 'public';
-
-      if (!req.user) {
-        if (!isPublicFolder) {
-          res.status(401).json({
-            success: false,
-            error: {
-              message: 'Authentication required',
-              code: 'UNAUTHENTICATED',
-            },
-          });
-          return;
-        }
-      } else if (!isPublicFolder) {
-        const hasPermission = await userCan(req.user, 'storage:download', {
-          action: 'download',
-          folder: fileInfo.folder,
-        } as any);
-
-        if (!hasPermission) {
-          res.status(403).json({
-            success: false,
-            error: {
-              message: 'Permission denied: Cannot download storage resources',
-              code: 'INSUFFICIENT_PERMISSIONS',
-              required: 'storage:download',
-              user: {
-                id: req.user.id,
-                username: req.user.username,
-                role: req.user.role,
-              },
-            },
-          });
-          return;
-        }
-      }
-
-      return handleStorageSuccess(
-        'get_file_info',
-        {
-          id: fileInfo.id,
-          original_name: fileInfo.original_name,
-          stored_filename: fileInfo.stored_filename,
-          folder: fileInfo.folder,
-          relative_path: fileInfo.relative_path,
-          size: fileInfo.size,
-          mime_type: fileInfo.mime_type,
-          description: fileInfo.description,
-          uploaded_by: fileInfo.uploaded_by,
-          created_at: fileInfo.created_at,
-          updated_at: fileInfo.updated_at,
-        },
-        req,
-        res
-      );
-    } catch (error: any) {
-      return handleStorageError('get_file_info', error, req, res);
-    }
-  }
-);
-
 // DELETE /api/v1/storage/files/:id - Delete file by UUID
 router.delete(
   '/files/:id',
   requireStoragePermission('delete'),
-  param('id').isUUID(),
+  [param('id').isUUID()],
   async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, {
       operation: 'delete_file',
@@ -547,7 +586,7 @@ router.delete(
     }
 
     try {
-      await initializeStorage(req);
+      const storageService = await getStorageService(req);
       const fileId = req.params.id;
       const userId = req.user?.id?.toString();
 
@@ -584,7 +623,7 @@ router.post(
   async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, {
       operation: 'batch_upload',
-      file_count: (req.files as Express.Multer.File[])?.length || 0,
+      file_count: Array.isArray(req.files) ? req.files.length : 0,
     });
 
     const errors = validationResult(req);
@@ -598,8 +637,9 @@ router.post(
     }
 
     try {
-      await initializeStorage(req);
-      const files = (req.files as Express.Multer.File[]) || [];
+      const storageService = await getStorageService(req);
+      // Type assertion for multer files array - multer provides Express.Multer.File[] type
+      const files = (Array.isArray(req.files) ? req.files : []) as any[];
       const folder = req.body.folder as string;
       const userId = req.user?.id?.toString();
 
@@ -612,8 +652,8 @@ router.post(
         );
       }
 
-      // Convert Express.Multer.File to MulterFile
-      const multerFiles = files.map((file) => ({
+      // Convert multer files to MulterFile format
+      const multerFiles: MulterFile[] = files.map((file: any) => ({
         fieldname: file.fieldname,
         originalname: file.originalname,
         encoding: file.encoding,
@@ -622,7 +662,7 @@ router.post(
         destination: file.destination || '',
         filename: file.filename || file.originalname,
         path: file.path || '',
-        buffer: file.buffer,
+        buffer: file.buffer || Buffer.alloc(0), // Ensure buffer is always defined
       }));
 
       const result = await storageService.batchUpload(
@@ -679,7 +719,7 @@ router.delete(
     }
 
     try {
-      await initializeStorage(req);
+      const storageService = await getStorageService(req);
       const fileIds = req.body.fileIds as string[];
       const userId = req.user?.id?.toString();
 
@@ -715,8 +755,7 @@ router.delete(
 router.put(
   '/files/:id',
   requireStoragePermission('manage'),
-  param('id').isUUID(),
-  body('description').optional().isString(),
+  [param('id').isUUID(), body('description').optional().isString()],
   async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, {
       operation: 'update_file',
@@ -734,7 +773,7 @@ router.put(
     }
 
     try {
-      await initializeStorage(req);
+      const storageService = await getStorageService(req);
       const fileId = req.params.id;
       const userId = req.user?.id?.toString();
 
@@ -789,7 +828,7 @@ router.get(
     }
 
     try {
-      await initializeStorage(req);
+      const storageService = await getStorageService(req);
       const folderName = req.params.folder;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 50;
