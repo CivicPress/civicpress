@@ -11,7 +11,7 @@ legacy path-based storage with a more secure and flexible approach.
 ### Core Components
 
 1. **CloudUuidStorageService** - Multi-provider storage service supporting
-   local, S3, and Azure
+   local, S3, Azure Blob Storage, and Google Cloud Storage (GCS)
 2. **Database Tracking** - UUID-based file metadata in `storage_files` table
 3. **API Endpoints** - RESTful UUID-based file operations
 4. **UI Components** - Enhanced file management interface
@@ -116,6 +116,15 @@ Authorization: Bearer {token}
 - Container-based organization
 - Hot/Cool/Archive tiers supported
 
+### Google Cloud Storage (GCS)
+
+- Google Cloud Platform integration
+- Bucket-based organization
+- Standard, Nearline, Coldline, Archive storage classes supported
+- Service account key file or Application Default Credentials (ADC)
+  authentication
+- Standard `gs://` URI scheme for provider paths
+
 ## Configuration
 
 ### Environment Variables (Preferred)
@@ -138,6 +147,13 @@ AZURE_STORAGE_CONNECTION_STRING=your_connection_string
 AZURE_STORAGE_ACCOUNT_NAME=your_account
 AZURE_STORAGE_ACCOUNT_KEY=your_key
 AZURE_CONTAINER_NAME=civicpress
+
+# GCS Configuration
+GCS_PROJECT_ID=your_project_id
+GCS_BUCKET=your-bucket-name
+GCS_SERVICE_ACCOUNT_KEY=/path/to/service-account-key.json
+# OR use Application Default Credentials (ADC)
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 ```
 
 ### Configuration File (Fallback)
@@ -167,6 +183,20 @@ providers:
     credentials:
       connection_string: your_connection_string
       account_key: your_key
+
+  gcs:
+    type: gcs
+    enabled: true
+    bucket: your-bucket-name
+    credentials:
+      project_id: your_project_id
+      service_account_key: /path/to/service-account-key.json
+      # OR use Application Default Credentials (ADC) by omitting service_account_key
+    prefix: ""
+    options:
+      location: northamerica-northeast1
+      storage_class: STANDARD
+      create_bucket: false  # Set to true to auto-create bucket if missing
 
 active_provider: local
 failover_providers:
