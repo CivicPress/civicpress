@@ -51,6 +51,8 @@ curl -X GET 'http://localhost:3000/api/v1/<endpoint>' \
 
 ## Errors
 - Standard error shape (see `docs/error-handling.md`)
+- Use domain-specific error classes (e.g., `RecordNotFoundError`, `ValidationError`)
+- Never throw generic `Error` objects
 ```json
 { "success": false, "error": { "message": "...", "code": "...", "details": {} } }
 ```
@@ -86,8 +88,15 @@ Tests: {{ testsPath || 'tests/<area>/<kebab-case-name>.spec.ts' }}
 ---
 
 ## Related
-- `docs/api.md`
-- `docs/error-handling.md`
+- `docs/architecture.md` - Complete system architecture
+- `docs/module-integration-guide.md` - Module integration patterns
+- `docs/api.md` - API reference
+- `docs/error-handling.md` - Unified error handling system
+- `docs/dependency-injection-guide.md` - DI container usage patterns
+- `docs/cache-usage-guide.md` - Caching system usage
+- `docs/specs/saga-pattern.md` - Saga Pattern specification
+- `docs/saga-pattern-usage-guide.md` - How to create and use sagas
+- `docs/architecture/decisions/` - Architecture Decision Records (ADRs)
 - `docs/notifications.md`
 - `docs/cli.md`
 

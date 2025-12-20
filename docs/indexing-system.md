@@ -20,6 +20,8 @@ record discovery and filtering.
 - **JSON Output**: Machine-readable output for API integration
 - **Index Validation**: Comprehensive validation of index integrity
 - **Statistics & Monitoring**: Detailed indexing statistics and health checks
+- **Performance Optimizations**: Cached record parsing, direct database access,
+  and optimized sync operations
 
 ### CLI Commands
 
@@ -466,32 +468,44 @@ jobs:
 1. **Missing Required Fields**:
 
    ```bash
+
+   ```
+
 # Check for missing fields
-   civic index --validate
+
+civic index --validate
 
 # Fix missing fields in frontmatter
+
 # Add title, type, status to YAML frontmatter
-   ```
+
+````
 
 2. **Orphaned Files**:
 
-   ```bash
+```bash
 # Find orphaned files
-   civic index --validate
+civic index --validate
 
 # Remove orphaned index entries
 # Or restore missing files
-   ```
+````
 
 3. **Index Corruption**:
 
    ```bash
+
+   ```
+
 # Rebuild all indexes
-   civic index --rebuild
+
+civic index --rebuild
 
 # Validate after rebuild
-   civic index --validate
-   ```
+
+civic index --validate
+
+````
 
 ### Debug Mode
 
@@ -501,11 +515,12 @@ export CIVIC_DEBUG=indexing
 
 # Run with verbose output
 civic index --rebuild --verbose
-```
+````
 
 ## Related Documentation
 
-- [Indexing Schedules](indexing-schedules.md) - Strategies for scheduling indexing operations
+- [Indexing Schedules](indexing-schedules.md) - Strategies for scheduling
+  indexing operations
 - [Authentication System](auth-system.md)
 - [API Documentation](api.md)
 - [CLI Commands](cli.md)

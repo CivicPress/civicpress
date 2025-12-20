@@ -1,6 +1,10 @@
 // Export main CivicPress class
 export { CivicPress } from './civic-core.js';
+export type { CivicPressConfig } from './civic-core.js';
 export { CreateRecordRequest, UpdateRecordRequest } from './civic-core.js';
+
+// Export diagnostic tools
+export * from './diagnostics/index.js';
 
 // Export record management
 export { RecordManager, RecordData } from './records/record-manager.js';
@@ -17,10 +21,8 @@ export {
   listRecordFilesSync,
   parseRecordRelativePath,
 } from './utils/record-paths.js';
-export type {
-  ValidationError,
-  ValidationResult,
-} from './records/record-validator.js';
+export type { ValidationResult } from './records/record-validator.js';
+// Note: ValidationError is now exported from errors/index.ts
 
 // Export geography types and utilities
 export {
@@ -76,13 +78,12 @@ export type {
   GeographyFormData,
   GeographyFormErrors,
   GeographyPreviewData,
-  GeographyError,
-  GeographyValidationError,
-  GeographyNotFoundError,
   ColorMapping,
   IconMapping,
   IconConfig,
 } from './types/geography.js';
+// Note: GeographyError, GeographyValidationError, GeographyNotFoundError
+// are now exported from errors/domain-errors.ts (new unified error system)
 
 // Export database services
 export { DatabaseService } from './database/database-service.js';
@@ -127,6 +128,31 @@ export { WorkflowConfigManager } from './config/workflow-config.js';
 export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
+// Export unified cache system
+export * from './cache/index.js';
+
+// Export DI container (for module integration)
+export { ServiceContainer } from './di/container.js';
+export type { ServiceContainer as IServiceContainer } from './di/container.js';
+
+export {
+  TemplateService,
+  TemplateCache,
+  TemplateValidator,
+} from './templates/index.js';
+export type {
+  TemplateResponse,
+  TemplateId,
+  TemplateFilters,
+  TemplateListResponse,
+  CreateTemplateRequest,
+  UpdateTemplateRequest,
+  TemplatePreviewResponse,
+  ValidationResult as TemplateValidationResult,
+  ITemplateService,
+  TemplateServiceOptions,
+  TemplateCacheOptions,
+} from './templates/index.js';
 export {
   coreSuccess,
   coreError,
@@ -138,6 +164,48 @@ export {
   coreErrorRaw,
   coreStartOperation,
 } from './utils/core-output.js';
+
+// Export error handling system
+export {
+  CivicPressError,
+  ValidationError,
+  NotFoundError,
+  UnauthorizedError,
+  ForbiddenError,
+  ConflictError,
+  DatabaseError,
+  FileSystemError,
+  InternalError,
+} from './errors/index.js';
+
+export {
+  RecordNotFoundError,
+  RecordValidationError,
+  RecordConflictError,
+  TemplateNotFoundError,
+  TemplateExistsError,
+  TemplateValidationError,
+  TemplateInvalidError,
+  TemplateSystemError,
+  GeographyNotFoundError,
+  GeographyValidationError,
+  AuthenticationFailedError,
+  AuthorizationFailedError,
+  SessionExpiredError,
+  GitError,
+  GitConflictError,
+  WorkflowError,
+  WorkflowTransitionError,
+} from './errors/domain-errors.js';
+
+export {
+  isCivicPressError,
+  getErrorCode,
+  getStatusCode,
+  getCorrelationId,
+  normalizeError,
+  reportError,
+} from './errors/utils.js';
 export { AuditLogger } from './audit/audit-logger.js';
 export { DocumentNumberGenerator } from './utils/document-number-generator.js';
 export { ComplianceFieldHelpers } from './utils/compliance-helpers.js';
@@ -203,6 +271,11 @@ export type {
   CivicIndexEntry,
   IndexingOptions,
 } from './indexing/indexing-service.js';
+
+// Export security services
+export { SecretsManager } from './security/secrets.js';
+export { CsrfProtection } from './security/csrf.js';
+export type { CsrfToken } from './security/csrf.js';
 
 // Export notification services
 export {

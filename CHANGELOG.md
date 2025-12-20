@@ -10,6 +10,70 @@ and this project adheres to
 
 <!-- markdownlint-disable MD024 -->
 
+## [0.2.0] - 2025-01-30
+
+### Added
+
+- **Architecture Diagrams**: Comprehensive visual documentation with Mermaid
+  diagrams
+  - Service dependency diagram showing DI container structure
+  - Record creation data flow diagram with Saga pattern
+  - Error handling flow diagram
+  - Module interaction diagram
+  - Security system architecture diagram
+  - Saga pattern execution flow diagram
+  - Caching strategy flow diagram
+  - All diagrams available in `docs/architecture-diagrams.md`
+
+- **Security System**: Production-ready secrets management and CSRF protection
+  - SecretsManager with HKDF-SHA256 key derivation from single root secret
+  - Scoped key derivation (session, API, CSRF, webhook, JWT, email verification)
+  - CSRF Protection service with token generation and validation
+  - CSRF middleware for API routes with smart bypass logic
+  - UI composable (`useCsrf`) for seamless frontend integration
+  - Comprehensive test coverage and documentation
+
+### Changed
+
+- **Version**: Updated to v0.2.0 - Core Maturity and Stability milestone
+  complete
+- **Documentation**: Moved architecture diagrams to dedicated file for better
+  organization
+- **Architecture Analysis**: Updated comprehensive analysis document with all
+  completed features
+
+### Completed v0.2.x Roadmap Goals
+
+All v0.2.x "Core Maturity and Stability" goals have been completed:
+
+- ✅ **Search Performance**: Search V2 implemented with FTS5, advanced ranking,
+  and typo tolerance
+- ✅ **Schema Validation**: Comprehensive JSON Schema validation with AJV and
+  business rules
+- ✅ **Storage Abstraction**: Enhanced with Google Cloud Storage, failover,
+  retry, circuit breaker
+- ✅ **CLI Improvements**: Diagnostics with `--fix` flag, validation commands,
+  comprehensive tooling
+- ✅ **Error Handling**: Unified error handling system with type-safe hierarchy
+  and correlation IDs
+- ✅ **UI Polish**: Page-based pagination, improved search UX, sort options API
+- ✅ **Architecture Documentation**: Comprehensive architecture.md with 1,600+
+  lines, ADRs, and diagrams
+
+### Technical Improvements
+
+- **Saga Pattern**: All saga steps now compensatable, including hook emission
+- **Error Handling**: Complete error normalization and layer-specific handlers
+- **Caching**: Unified caching layer with multiple strategies and metrics
+- **Module Integration**: Storage module fully integrated with DI container
+- **Documentation**: Visual architecture diagrams and comprehensive guides
+
+---
+
+## [Unreleased]
+
+<!-- markdownlint-disable MD024 -->
+
 ### Added
 
 - **Unpublished Changes Badge**: Added visual indicator for records with

@@ -5,13 +5,21 @@ import EditorRelations from './EditorRelations.vue';
 import EditorActivity from './EditorActivity.vue';
 import GeographyLinkForm from '~/components/GeographyLinkForm.vue';
 import GeographySelector from '~/components/GeographySelector.vue';
+import RecordPreview from '~/components/RecordPreview.vue';
 import { useRecordTypes } from '~/composables/useRecordTypes';
 import { useRecordStatuses } from '~/composables/useRecordStatuses';
+import { useTemplates } from '~/composables/useTemplates';
 import { useAuthStore } from '~/stores/auth';
 
 const { t } = useI18n();
 const { getRecordTypeLabel } = useRecordTypes();
 const { recordStatusOptions, fetchRecordStatuses } = useRecordStatuses();
+const {
+  getTemplateOptions,
+  fetchTemplate,
+  previewTemplate,
+  loading: templatesLoading,
+} = useTemplates();
 
 interface Props {
   recordId?: string;
@@ -63,6 +71,7 @@ const emit = defineEmits<{
   'update:status': [status: string]; // Legal status (stored in YAML + DB)
   'update:workflowState': [workflowState: string]; // Internal editorial status (DB-only, never in YAML)
   'update:tags': [tags: string[]];
+  'load-template': [templateId: string, content: string];
   close: [];
 }>();
 
@@ -146,13 +155,142 @@ const selectedWorkflowState = computed({
   },
 });
 
+// Template selection state
+const templateOptions = ref<
+  Array<{ label: string; value: string; description?: string; icon?: string }>
+>([]);
+const selectedTemplateId = ref<string | undefined>(undefined);
+const showTemplatePreview = ref(false);
+const templatePreviewContent = ref<string>('');
+const templatePreviewLoading = ref(false);
+
+// Selected template as object (for USelectMenu)
+const selectedTemplate = computed({
+  get: () => {
+    if (!selectedTemplateId.value) return undefined;
+    return templateOptions.value.find(
+      (opt) => opt.value === selectedTemplateId.value
+    );
+  },
+  set: (
+    value:
+      | { label: string; value: string; description?: string; icon?: string }
+      | undefined
+  ) => {
+    selectedTemplateId.value = value ? value.value : undefined;
+  },
+});
+
+// Watch record type changes to load templates
+watch(
+  () => props.recordType,
+  async (newType) => {
+    if (newType && !props.isEditing) {
+      // Only show templates for new records
+      try {
+        templateOptions.value = await getTemplateOptions(newType);
+        // Select first template by default if available
+        if (templateOptions.value.length > 0 && !selectedTemplateId.value) {
+          const firstTemplate = templateOptions.value[0];
+          if (firstTemplate) {
+            selectedTemplateId.value = firstTemplate.value;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load templates:', error);
+        templateOptions.value = [];
+      }
+    } else {
+      templateOptions.value = [];
+      selectedTemplateId.value = undefined;
+    }
+  },
+  { immediate: true }
+);
+
+// Load template and emit to parent
+const handleLoadTemplate = async () => {
+  if (!selectedTemplateId.value) return;
+
+  templatePreviewLoading.value = true;
+  try {
+    const template = await fetchTemplate(selectedTemplateId.value);
+    if (template) {
+      // Use preview API to get rendered content with smart defaults
+      const authStore = useAuthStore();
+      const preview = await previewTemplate(selectedTemplateId.value, {
+        title: props.title || '',
+        user: authStore.user?.username || '',
+        timestamp: new Date().toISOString(),
+        date: new Date().toISOString().split('T')[0],
+        type: props.recordType || '',
+        status: props.status || 'draft',
+        author: authStore.user?.username || '',
+      });
+
+      emit('load-template', selectedTemplateId.value, preview.rendered);
+      selectedTemplateId.value = undefined;
+      showTemplatePreview.value = false;
+    }
+  } catch (error) {
+    console.error('Failed to load template:', error);
+  } finally {
+    templatePreviewLoading.value = false;
+  }
+};
+
+// Preview template
+const handlePreviewTemplate = async () => {
+  if (!selectedTemplateId.value) return;
+
+  templatePreviewLoading.value = true;
+  showTemplatePreview.value = true;
+  templatePreviewContent.value = ''; // Clear previous content
+
+  try {
+    const authStore = useAuthStore();
+    const preview = await previewTemplate(selectedTemplateId.value, {
+      title: props.title || '',
+      user: authStore.user?.username || '',
+      timestamp: new Date().toISOString(),
+      date: new Date().toISOString().split('T')[0],
+      type: props.recordType || '',
+      status: props.status || 'draft',
+      author: authStore.user?.username || '',
+    });
+
+    if (preview && preview.rendered) {
+      templatePreviewContent.value = preview.rendered;
+    } else {
+      throw new Error('Invalid preview response: missing rendered content');
+    }
+  } catch (error: any) {
+    console.error('Failed to preview template:', error);
+    const errorMessage =
+      error?.data?.error?.message ||
+      error?.response?.data?.error?.message ||
+      error?.message ||
+      t('records.templatePreviewError') ||
+      'Error loading template preview';
+    // Show error in a user-friendly format
+    templatePreviewContent.value = `## Error\n\n${errorMessage}\n\nPlease check:\n- The template exists and is valid\n- You have permission to view templates\n- The API is accessible`;
+  } finally {
+    templatePreviewLoading.value = false;
+  }
+};
+
 // Fetch types and statuses on mount
 onMounted(async () => {
   await fetchRecordTypes();
   await fetchRecordStatuses();
 });
 
-const openSections = ref<string[]>(['details', 'attachments']);
+// Open template section by default for new records, details and attachments for all
+const openSections = ref<string[]>(
+  props.isEditing
+    ? ['details', 'attachments']
+    : ['template', 'details', 'attachments']
+);
 
 // Date formatting
 const formatDateTime = (dateString: string) => {
@@ -263,7 +401,9 @@ const fetchFrontmatterYaml = async (force = false) => {
       throw new Error(`Failed to fetch: ${response.statusText}`);
     }
 
-    rawYaml.value = await response.text();
+    const yamlText = await response.text();
+    // Remove leading/trailing whitespace from the YAML content
+    rawYaml.value = yamlText.trim();
   } catch (err: any) {
     yamlError.value = err.message || 'Failed to load frontmatter YAML';
     rawYaml.value = `Error: ${yamlError.value}`;
@@ -278,45 +418,61 @@ defineExpose({
   refreshYaml: () => fetchFrontmatterYaml(true),
 });
 
-const accordionItems = computed(() => [
-  {
-    label: t('records.editor.details'),
-    value: 'details',
-    icon: 'i-lucide-info',
-  },
-  {
-    label:
-      props.attachedFiles.length <= 1
-        ? t('records.attachments.titleSingular')
-        : t('records.attachments.title'),
-    value: 'attachments',
-    icon: 'i-lucide-paperclip',
-    count: props.attachedFiles.length,
-  },
-  {
-    label: t('records.editor.relations'),
-    value: 'relations',
-    icon: 'i-lucide-link',
-    count:
-      props.linkedRecords.length + props.linkedGeographyFiles.length ||
-      undefined,
-  },
-  {
-    label: t('records.editor.activity'),
-    value: 'activity',
-    icon: 'i-lucide-history',
-  },
-  {
-    label: t('records.editor.technicalDetails'),
-    value: 'technical',
-    icon: 'i-lucide-settings',
-  },
-  {
-    label: t('records.editor.rawYaml'),
-    value: 'raw-yaml',
-    icon: 'i-lucide-code',
-  },
-]);
+const accordionItems = computed(() => {
+  const items = [];
+
+  // Add template section first (only for new records)
+  if (!props.isEditing) {
+    items.push({
+      label: t('records.templates.title'),
+      value: 'template',
+      icon: 'i-lucide-file-text',
+    });
+  }
+
+  // Add other sections
+  items.push(
+    {
+      label: t('records.editor.details'),
+      value: 'details',
+      icon: 'i-lucide-info',
+    },
+    {
+      label:
+        props.attachedFiles.length <= 1
+          ? t('records.attachments.titleSingular')
+          : t('records.attachments.title'),
+      value: 'attachments',
+      icon: 'i-lucide-paperclip',
+      count: props.attachedFiles.length,
+    },
+    {
+      label: t('records.editor.relations'),
+      value: 'relations',
+      icon: 'i-lucide-link',
+      count:
+        props.linkedRecords.length + props.linkedGeographyFiles.length ||
+        undefined,
+    },
+    {
+      label: t('records.editor.activity'),
+      value: 'activity',
+      icon: 'i-lucide-history',
+    },
+    {
+      label: t('records.editor.technicalDetails'),
+      value: 'technical',
+      icon: 'i-lucide-settings',
+    },
+    {
+      label: t('records.editor.rawYaml'),
+      value: 'raw-yaml',
+      icon: 'i-lucide-code',
+    }
+  );
+
+  return items;
+});
 </script>
 
 <template>
@@ -376,8 +532,79 @@ const accordionItems = computed(() => [
 
         <template #content="{ item }">
           <div class="pl-4 pr-4 pb-4 pt-3">
+            <!-- Template Section (only for new records) -->
+            <div v-if="item.value === 'template'" class="space-y-4">
+              <div v-if="recordType && templateOptions.length > 0">
+                <label
+                  class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
+                >
+                  {{ t('records.selectTemplate') }}
+                </label>
+                <div class="space-y-2">
+                  <USelectMenu
+                    v-model="selectedTemplate"
+                    :items="templateOptions"
+                    :disabled="disabled || templatesLoading"
+                    :loading="templatesLoading"
+                    :placeholder="t('records.selectTemplate')"
+                    class="w-full"
+                    size="sm"
+                    searchable
+                  />
+                  <div v-if="selectedTemplate" class="flex gap-2">
+                    <UButton
+                      icon="i-lucide-eye"
+                      variant="outline"
+                      size="xs"
+                      :disabled="
+                        disabled || templatePreviewLoading || !selectedTemplate
+                      "
+                      :loading="templatePreviewLoading"
+                      @click="handlePreviewTemplate"
+                      class="flex-1 justify-center"
+                    >
+                      {{ t('records.previewTemplate') }}
+                    </UButton>
+                    <UButton
+                      icon="i-lucide-file-text"
+                      color="primary"
+                      size="xs"
+                      :disabled="disabled || templatePreviewLoading"
+                      :loading="templatePreviewLoading"
+                      @click="handleLoadTemplate"
+                      class="flex-1 justify-center"
+                    >
+                      {{ t('records.templates.loadTemplate') }}
+                    </UButton>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else-if="!recordType"
+                class="text-center py-4 text-gray-500 dark:text-gray-400"
+              >
+                <p class="text-xs">
+                  {{
+                    t('records.selectTypeFirst') ||
+                    'Please select a record type first to see available templates'
+                  }}
+                </p>
+              </div>
+              <div
+                v-else
+                class="text-center py-4 text-gray-500 dark:text-gray-400"
+              >
+                <p class="text-xs">
+                  {{
+                    t('records.noTemplatesAvailable') ||
+                    'No templates available for this record type'
+                  }}
+                </p>
+              </div>
+            </div>
+
             <!-- Details Section -->
-            <div v-if="item.value === 'details'" class="space-y-4">
+            <div v-else-if="item.value === 'details'" class="space-y-4">
               <div>
                 <label
                   class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
@@ -596,8 +823,7 @@ const accordionItems = computed(() => [
                   :class="{
                     'text-red-600 dark:text-red-400': yamlError,
                   }"
-                >
-                  {{
+                  >{{
                     rawYaml ||
                     (props.recordId
                       ? t('common.noData')
@@ -613,6 +839,64 @@ const accordionItems = computed(() => [
         </template>
       </UAccordion>
     </div>
+
+    <!-- Template Preview Modal -->
+    <UModal
+      v-model:open="showTemplatePreview"
+      :title="t('records.templatePreview')"
+      :description="
+        t('records.templatePreviewDescription') ||
+        'Preview how the selected template will look with your current form data'
+      "
+      :ui="{
+        content:
+          'w-[calc(100vw-2rem)] max-w-4xl rounded-lg shadow-lg ring ring-default',
+      }"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <div
+            v-if="templatePreviewLoading"
+            class="flex items-center justify-center py-8"
+          >
+            <UIcon
+              name="i-lucide-loader-2"
+              class="w-6 h-6 animate-spin text-gray-500"
+            />
+            <span class="ml-2 text-sm text-gray-500">
+              {{ t('records.loadingTemplate') }}
+            </span>
+          </div>
+          <div
+            v-else-if="templatePreviewContent"
+            class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto"
+          >
+            <RecordPreview :content="templatePreviewContent" :wrap="true" />
+          </div>
+          <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
+            <p class="text-sm">
+              {{
+                t('records.noPreviewContent') || 'No preview content available'
+              }}
+            </p>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton variant="ghost" @click="showTemplatePreview = false">
+            {{ t('common.cancel') }}
+          </UButton>
+          <UButton
+            color="primary"
+            :disabled="!selectedTemplateId || templatePreviewLoading"
+            @click="handleLoadTemplate"
+          >
+            {{ t('records.templates.loadTemplate') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 

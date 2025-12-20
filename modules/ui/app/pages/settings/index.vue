@@ -66,6 +66,12 @@ const settingsItems = computed<NavigationMenuItem[]>(() => {
       to: '/settings/notifications',
       description: t('settings.notificationsDescription'),
     });
+    items.push({
+      label: t('settings.diagnosticsNav'),
+      icon: 'i-lucide-stethoscope',
+      to: '/settings/diagnostics',
+      description: t('settings.diagnosticsDescription'),
+    });
   }
 
   return items;

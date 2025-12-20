@@ -47,7 +47,8 @@ describe('Search Sort Query Generation', () => {
 
       sortOptions.forEach((sort) => {
         const orderBy = buildSearchOrderBy(sort);
-        expect(orderBy).toMatch(/ORDER BY.*kind.*ASC/i);
+        // The kind priority uses a CASE statement, so check for kind in the CASE or the pattern
+        expect(orderBy).toMatch(/ORDER BY[\s\S]*kind[\s\S]*ASC/i);
       });
     });
 

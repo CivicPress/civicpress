@@ -1,7 +1,16 @@
-export default defineNuxtPlugin((nuxtApp) => {
+export default defineNuxtPlugin(async (nuxtApp) => {
+  // Initialize CSRF token on plugin load (client-side only)
+  if (process.client) {
+    const { ensureCsrfToken } = useCsrf();
+    // Fetch CSRF token asynchronously (don't block plugin initialization)
+    ensureCsrfToken().catch((error) => {
+      console.warn('Failed to initialize CSRF token:', error);
+    });
+  }
+
   const civicApi = $fetch.create({
     baseURL: useRuntimeConfig().public.civicApiUrl,
-    onRequest({ request, options }) {
+    async onRequest({ request, options }) {
       // Skip authorization for public endpoints only
       const url = typeof request === 'string' ? request : request.toString();
       const isPublicEndpoint =
@@ -9,34 +18,61 @@ export default defineNuxtPlugin((nuxtApp) => {
         url.includes('/api/v1/auth/password') ||
         url.includes('/api/v1/health') ||
         url.includes('/api/v1/info') ||
-        url.includes('/api/v1/docs');
+        url.includes('/api/v1/docs') ||
+        url.includes('/api/v1/auth/csrf-token'); // CSRF endpoint is public
 
-      if (!isPublicEndpoint) {
-        // Get auth store to check if user is logged in
-        const authStore = useAuthStore();
+      // Get headers object and normalize to plain object
+      const headers = options.headers as any;
+      const headersObj: Record<string, string> = {};
 
-        if (authStore.isAuthenticated && authStore.token) {
-          // Add authorization header - use any to avoid TypeScript issues
-          const headers = options.headers as any;
-          if (Array.isArray(headers)) {
-            headers.push(['Authorization', `Bearer ${authStore.token}`]);
-          } else if (headers instanceof Headers) {
-            headers.set('Authorization', `Bearer ${authStore.token}`);
-          } else {
-            if (!headers) {
-              options.headers = {} as any;
-            }
-            (options.headers as any)['Authorization'] =
-              `Bearer ${authStore.token}`;
+      // Convert headers to object format
+      if (Array.isArray(headers)) {
+        Object.assign(headersObj, Object.fromEntries(headers));
+      } else if (headers instanceof Headers) {
+        headers.forEach((value, key) => {
+          headersObj[key] = value;
+        });
+      } else if (headers && typeof headers === 'object') {
+        Object.assign(headersObj, headers);
+      }
+
+      // Add CSRF token for state-changing methods (even if Bearer token bypasses it)
+      // This ensures consistency and future-proofing for cookie-based sessions
+      if (!isPublicEndpoint && process.client) {
+        const method = (options.method as string) || 'GET';
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
+          const { getCsrfToken, ensureCsrfToken } = useCsrf();
+          let csrfToken = getCsrfToken();
+
+          // If no token, try to fetch one (non-blocking)
+          if (!csrfToken) {
+            csrfToken = await ensureCsrfToken();
+          }
+
+          if (csrfToken) {
+            headersObj['X-CSRF-Token'] = csrfToken;
           }
         }
       }
+
+      // Add authorization header for authenticated requests
+      if (!isPublicEndpoint) {
+        const authStore = useAuthStore();
+
+        if (authStore.isAuthenticated && authStore.token) {
+          headersObj['Authorization'] = `Bearer ${authStore.token}`;
+        }
+      }
+
+      // Update headers (use 'as any' to handle type compatibility)
+      options.headers = headersObj as any;
     },
     async onResponseError({ request, options, response, error }) {
       // Enhanced error handling with automatic user feedback
       const { handleError } = useErrorHandler();
 
       // Create error object with status and response data
+      // Include correlation ID and error code if present
       const apiError = {
         status: response.status,
         statusText: response.statusText,
@@ -46,6 +82,10 @@ export default defineNuxtPlugin((nuxtApp) => {
           response._data?.error?.message ||
           response.statusText ||
           'Request failed',
+        // Include correlation ID and error code for tracing
+        correlationId: response._data?.error?.correlationId,
+        errorCode: response._data?.error?.code,
+        requestId: response._data?.requestId,
       };
 
       // Determine if the request attempted authenticated access

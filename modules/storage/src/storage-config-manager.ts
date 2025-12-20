@@ -19,6 +19,14 @@ export class StorageConfigManager {
         type: 'local',
         path: 'storage',
       },
+      active_provider: 'local',
+      providers: {
+        local: {
+          type: 'local',
+          enabled: true,
+          path: 'storage',
+        },
+      },
       folders: {
         public: {
           path: 'public',

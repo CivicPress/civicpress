@@ -1348,14 +1348,10 @@ export function createExtendedSampleRecords(config: TestConfig) {
       content: '# New Park Proposal\n\nBuilding a community park.',
       metadata: {
         author: 'Jane Smith',
-        created: '2025-08-01',
-        tags: ['parks', 'community', 'recreation'],
-        budget: 50000,
-      },
-      metadata: {
-        author: 'Jane Smith',
         authorName: 'Jane Smith',
         created: '2025-08-01T00:00:00Z',
+        tags: ['parks', 'community', 'recreation'],
+        budget: 50000,
       },
     },
     {

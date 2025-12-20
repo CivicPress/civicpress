@@ -3,12 +3,28 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { coreError, coreInfo, coreDebug } from '../utils/core-output.js';
 
+/**
+ * Transaction handle for managing database transactions
+ */
+export interface Transaction {
+  /** Transaction ID for tracking */
+  id: string;
+  /** Whether transaction is active */
+  isActive: boolean;
+}
+
 export interface DatabaseAdapter {
   connect(): Promise<void>;
   query(sql: string, params?: any[]): Promise<any[]>;
   execute(sql: string, params?: any[]): Promise<any>;
   close(): Promise<void>;
   initialize(): Promise<void>;
+  /** Begin a transaction */
+  beginTransaction(): Promise<Transaction>;
+  /** Commit a transaction */
+  commitTransaction(transaction: Transaction): Promise<void>;
+  /** Rollback a transaction */
+  rollbackTransaction(transaction: Transaction): Promise<void>;
 }
 
 export interface DatabaseConfig {
@@ -24,6 +40,7 @@ export interface DatabaseConfig {
 export class SQLiteAdapter implements DatabaseAdapter {
   private db: sqlite3.Database | null = null;
   private config: DatabaseConfig;
+  private activeTransactions: Map<string, boolean> = new Map();
 
   constructor(config: DatabaseConfig) {
     this.config = config;
@@ -246,6 +263,34 @@ export class SQLiteAdapter implements DatabaseAdapter {
         expires_at DATETIME,
         FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
       )`,
+
+      // Saga states table for saga pattern persistence and recovery
+      `CREATE TABLE IF NOT EXISTS saga_states (
+        id TEXT PRIMARY KEY,
+        saga_type TEXT NOT NULL,
+        saga_version TEXT,
+        context TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'executing', 'completed', 'failed', 'compensating', 'compensated')),
+        current_step INTEGER DEFAULT 0,
+        step_results TEXT NOT NULL DEFAULT '[]',
+        started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        error TEXT,
+        compensation_status TEXT CHECK (compensation_status IN ('pending', 'executing', 'completed', 'failed', 'partial')),
+        compensation_completed_at DATETIME,
+        compensation_error TEXT,
+        idempotency_key TEXT UNIQUE,
+        correlation_id TEXT NOT NULL
+      )`,
+
+      // Saga resource locks for concurrency control
+      `CREATE TABLE IF NOT EXISTS saga_resource_locks (
+        resource_key TEXT PRIMARY KEY,
+        saga_id TEXT NOT NULL,
+        acquired_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME NOT NULL,
+        FOREIGN KEY (saga_id) REFERENCES saga_states(id) ON DELETE CASCADE
+      )`,
     ];
 
     for (const table of tables) {
@@ -274,6 +319,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
         operation: 'database:initialize',
       });
     }
+
+    // Create indexes for saga tables
+    await this.createSagaIndexes();
 
     // Add attached_files column to existing records table if it doesn't exist
     try {
@@ -519,7 +567,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         SET auth_provider = 'password', email_verified = TRUE 
         WHERE password_hash IS NOT NULL AND auth_provider IS NULL
       `);
-      coreInfo('✓ Updated existing password users with auth_provider', {
+      coreInfo('Updated existing password users with auth_provider', {
         operation: 'database:initialize',
       });
     } catch (error) {
@@ -536,6 +584,54 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     // Create indexes for sort performance
     await this.createSortIndexes();
+  }
+
+  /**
+   * Create indexes for saga tables
+   */
+  private async createSagaIndexes(): Promise<void> {
+    const indexes = [
+      {
+        name: 'idx_saga_status',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_saga_status ON saga_states(status)',
+        description: 'Index for saga status queries',
+      },
+      {
+        name: 'idx_saga_type',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_saga_type ON saga_states(saga_type)',
+        description: 'Index for saga type queries',
+      },
+      {
+        name: 'idx_idempotency_key',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_idempotency_key ON saga_states(idempotency_key)',
+        description: 'Index for idempotency key lookups',
+      },
+      {
+        name: 'idx_correlation_id',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_correlation_id ON saga_states(correlation_id)',
+        description: 'Index for correlation ID lookups',
+      },
+      {
+        name: 'idx_expires_at',
+        sql: 'CREATE INDEX IF NOT EXISTS idx_expires_at ON saga_resource_locks(expires_at)',
+        description: 'Index for lock expiration queries',
+      },
+    ];
+
+    for (const index of indexes) {
+      try {
+        await this.execute(index.sql);
+        coreDebug(`Created saga index ${index.name} for ${index.description}`, {
+          operation: 'database:initialize',
+        });
+      } catch (error: any) {
+        // Index might already exist, log but don't fail
+        coreDebug(
+          `Saga index ${index.name} already exists or creation failed: ${error.message}`,
+          { operation: 'database:initialize' }
+        );
+      }
+    }
   }
 
   /**
@@ -682,6 +778,75 @@ export class SQLiteAdapter implements DatabaseAdapter {
       // System will fall back to LIKE queries if needed
     }
   }
+
+  async beginTransaction(): Promise<Transaction> {
+    if (!this.db) {
+      throw new Error('Database not connected');
+    }
+
+    const transactionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    return new Promise((resolve, reject) => {
+      this.db!.run('BEGIN TRANSACTION', (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          this.activeTransactions.set(transactionId, true);
+          resolve({
+            id: transactionId,
+            isActive: true,
+          });
+        }
+      });
+    });
+  }
+
+  async commitTransaction(transaction: Transaction): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not connected');
+    }
+
+    if (!this.activeTransactions.has(transaction.id)) {
+      throw new Error(`Transaction ${transaction.id} is not active`);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db!.run('COMMIT', (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          this.activeTransactions.delete(transaction.id);
+          resolve();
+        }
+      });
+    });
+  }
+
+  async rollbackTransaction(transaction: Transaction): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not connected');
+    }
+
+    if (!this.activeTransactions.has(transaction.id)) {
+      // Transaction might already be rolled back, log warning but don't fail
+      coreDebug(
+        `Transaction ${transaction.id} is not active, may already be rolled back`,
+        { operation: 'database:rollback' }
+      );
+      return;
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db!.run('ROLLBACK', (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          this.activeTransactions.delete(transaction.id);
+          resolve();
+        }
+      });
+    });
+  }
 }
 
 // Placeholder for PostgreSQL adapter (future implementation)
@@ -720,6 +885,24 @@ export class PostgresAdapter implements DatabaseAdapter {
   }
 
   async initialize(): Promise<void> {
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
+  }
+
+  async beginTransaction(): Promise<Transaction> {
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
+  }
+
+  async commitTransaction(_transaction: Transaction): Promise<void> {
+    throw new Error(
+      'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
+    );
+  }
+
+  async rollbackTransaction(_transaction: Transaction): Promise<void> {
     throw new Error(
       'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
     );

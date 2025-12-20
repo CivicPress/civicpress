@@ -9,6 +9,7 @@ import {
   EmailValidationResult,
 } from './email-validation-service.js';
 import { coreDebug } from '../utils/core-output.js';
+import { SecretsManager } from '../security/secrets.js';
 
 const logger = new Logger();
 
@@ -48,12 +49,27 @@ export class AuthService {
   private oauthManager: OAuthProviderManager;
   private roleManager: RoleManager;
   private emailValidationService: EmailValidationService;
+  private secretsManager?: SecretsManager;
 
   constructor(db: DatabaseService, dataDir: string) {
     this.db = db;
     this.oauthManager = new OAuthProviderManager();
     this.roleManager = new RoleManager(dataDir);
     this.emailValidationService = new EmailValidationService(db);
+  }
+
+  /**
+   * Initialize secrets manager for token signing
+   */
+  initializeSecrets(secretsManager: SecretsManager): void {
+    this.secretsManager = secretsManager;
+  }
+
+  /**
+   * Initialize email validation service secrets
+   */
+  initializeEmailValidationSecrets(secretsManager: SecretsManager): void {
+    this.emailValidationService.initializeSecrets(secretsManager);
   }
 
   /**
@@ -142,8 +158,18 @@ export class AuthService {
     name: string,
     expiresAt?: Date
   ): Promise<{ key: string; apiKey: ApiKey }> {
-    // Generate a secure API key
+    // Generate random key
     const key = this.generateSecureToken();
+
+    // Sign key if secrets manager available
+    let finalKey = key;
+    if (this.secretsManager) {
+      const signingKey = this.secretsManager.getApiKeySigningKey();
+      const signature = this.secretsManager.sign(key, signingKey);
+      finalKey = `${key}.${signature}`;
+    }
+
+    // Hash for database storage (always use raw key)
     const keyHash = this.hashToken(key);
 
     await this.db.createApiKey(userId, keyHash, name, expiresAt);
@@ -171,12 +197,31 @@ export class AuthService {
       },
     };
 
-    return { key, apiKey };
+    return { key: finalKey, apiKey };
   }
 
   async validateApiKey(key: string): Promise<AuthUser | null> {
     try {
-      const keyHash = this.hashToken(key);
+      let keyToHash = key;
+
+      // If key is signed, verify and extract raw key
+      if (this.secretsManager && key.includes('.')) {
+        const parts = key.split('.');
+        if (parts.length === 2) {
+          const [rawKey, signature] = parts;
+          const signingKey = this.secretsManager.getApiKeySigningKey();
+
+          if (this.secretsManager.verify(rawKey, signature, signingKey)) {
+            keyToHash = rawKey;
+          } else {
+            // Invalid signature
+            return null;
+          }
+        }
+      }
+
+      // Hash and lookup in database
+      const keyHash = this.hashToken(keyToHash);
       const apiKey = await this.db.getApiKeyByHash(keyHash);
 
       if (!apiKey) {
@@ -212,7 +257,18 @@ export class AuthService {
     userId: number,
     expiresInHours: number = 24
   ): Promise<{ token: string; session: Session }> {
+    // Generate random token
     const token = this.generateSecureToken();
+
+    // Sign token if secrets manager available
+    let finalToken = token;
+    if (this.secretsManager) {
+      const signingKey = this.secretsManager.getSessionSigningKey();
+      const signature = this.secretsManager.sign(token, signingKey);
+      finalToken = `${token}.${signature}`;
+    }
+
+    // Hash for database storage (always use raw token for hashing)
     const tokenHash = this.hashToken(token);
     const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
 
@@ -238,12 +294,31 @@ export class AuthService {
       },
     };
 
-    return { token, session };
+    return { token: finalToken, session };
   }
 
   async validateSession(token: string): Promise<AuthUser | null> {
     try {
-      const tokenHash = this.hashToken(token);
+      let tokenToHash = token;
+
+      // If token is signed, verify and extract raw token
+      if (this.secretsManager && token.includes('.')) {
+        const parts = token.split('.');
+        if (parts.length === 2) {
+          const [rawToken, signature] = parts;
+          const signingKey = this.secretsManager.getSessionSigningKey();
+
+          if (this.secretsManager.verify(rawToken, signature, signingKey)) {
+            tokenToHash = rawToken;
+          } else {
+            // Invalid signature
+            return null;
+          }
+        }
+      }
+
+      // Hash and lookup in database (using raw token)
+      const tokenHash = this.hashToken(tokenToHash);
       const session = await this.db.getSessionByToken(tokenHash);
 
       if (!session) {

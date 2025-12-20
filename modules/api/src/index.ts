@@ -25,6 +25,7 @@ import { workflowsRouter } from './routes/workflows.js';
 import { createIndexingRouter } from './routes/indexing.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createStatusRouter } from './routes/status.js';
+import { createDiagnoseRouter } from './routes/diagnose.js';
 import docsRouter from './routes/docs.js';
 import { createValidationRouter } from './routes/validation.js';
 import { createDiffRouter } from './routes/diff.js';
@@ -42,6 +43,7 @@ import infoRouter from './routes/info.js';
 import configRouter from './routes/config.js';
 import systemRouter from './routes/system.js';
 import { createGeographyRouter } from './routes/geography.js';
+import { createCacheRouter } from './routes/cache.js';
 import { API_PREFIX, apiPath } from './constants.js';
 
 // Import middleware
@@ -58,6 +60,7 @@ import {
   createDatabaseContextMiddleware,
 } from './middleware/logging.js';
 import { authMiddleware, optionalAuth } from './middleware/auth.js';
+import { csrfMiddleware } from './middleware/csrf.js';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -128,7 +131,7 @@ export class CivicPressAPI {
       // Load database config from central config
       logger.info('Loading database config...');
       const dbConfig = CentralConfigManager.getDatabaseConfig();
-      logger.info('Database config loaded:', dbConfig);
+      logger.info('Database config loaded');
 
       // Initialize CivicPress core
       logger.info('Creating CivicPress instance...');
@@ -139,7 +142,7 @@ export class CivicPressAPI {
 
       logger.info('Initializing CivicPress core...');
       await this.civicPress.initialize();
-      logger.info('CivicPress core initialized');
+      // Core initialization message logged at core level (civic-core.ts)
 
       // Auto-index records on startup (optional)
       const enableAutoIndexing = process.env.ENABLE_AUTO_INDEXING === 'true';
@@ -152,7 +155,7 @@ export class CivicPressAPI {
               syncDatabase: true,
               conflictResolution: 'file-wins',
             });
-            logger.info('Auto-indexing completed successfully');
+            logger.info('Auto-indexing completed');
           } else {
             logger.warn('IndexingService not available for auto-indexing');
           }
@@ -179,7 +182,7 @@ export class CivicPressAPI {
       this.app.use(notFoundHandler);
       this.app.use(errorHandler);
 
-      logger.info('CivicPress API initialized successfully');
+      logger.info('CivicPress API initialized');
     } catch (error) {
       logger.error('Failed to initialize CivicPress API:', error);
       throw error;
@@ -251,7 +254,12 @@ export class CivicPressAPI {
     );
 
     // Public routes that should be accessible to guests
-    this.app.use(apiPath('records'), createRecordsRouter(recordsService));
+    // Records router handles auth internally, but CSRF applies to browser requests
+    this.app.use(
+      apiPath('records'),
+      csrfMiddleware(this.civicPress),
+      createRecordsRouter(recordsService)
+    );
     this.app.use(
       apiPath('geography'),
       optionalAuth(this.civicPress),
@@ -271,6 +279,27 @@ export class CivicPressAPI {
       searchRouter
     );
     this.app.use(apiPath('status'), createStatusRouter());
+
+    // Cache metrics (requires auth)
+    this.app.use(
+      apiPath('cache'),
+      authMiddleware(this.civicPress),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      createCacheRouter(this.civicPress.getCacheManager())
+    );
+
+    this.app.use(
+      apiPath('diagnose'),
+      authMiddleware(this.civicPress),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      createDiagnoseRouter()
+    );
     this.app.use(apiPath('validation'), createValidationRouter());
     this.app.use(
       apiPath('config'),
@@ -278,6 +307,8 @@ export class CivicPressAPI {
         (req as any).civicPress = this.civicPress;
         next();
       },
+      // Config router has its own auth middleware, CSRF applies to browser requests
+      csrfMiddleware(this.civicPress),
       configRouter
     );
     this.app.use(apiPath('system'), systemRouter);
@@ -348,6 +379,10 @@ export class CivicPressAPI {
       apiPath('storage'),
       optionalAuth(this.civicPress),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
       uuidStorageRouter
     );
     this.app.use(
@@ -363,8 +398,11 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('users'),
       authMiddleware(this.civicPress),
+      csrfMiddleware(this.civicPress),
       usersRouter
     );
+
+    logger.info('Routes registered');
   }
 
   async start(): Promise<void> {
@@ -438,7 +476,7 @@ if (isMainModule) {
     .initialize(dataDir)
     .then(() => api.start())
     .then(() => {
-      logger.info('CivicPress API server started successfully');
+      logger.info('CivicPress API server started');
     })
     .catch((error) => {
       logger.error('Failed to start CivicPress API server:', error);

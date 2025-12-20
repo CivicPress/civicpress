@@ -13,8 +13,25 @@ export default defineConfig({
     }),
   ],
   test: {
+
     globals: true,
     environment: 'node',
+    // Limit how many worker processes Vitest uses
+    // Use forks instead of threads for API tests that use process.chdir()
+    // Limited to prevent CPU overload when debugging tests
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: false,
+        // Limit concurrent forks to prevent CPU overload
+        isolate: true,
+      },
+    },
+    // Also reduce how many test files run concurrently to prevent too many processes
+    fileParallelism: 1, // Reduced from 2 to prevent too many forks
+
+    // Also reduce how many test files run concurrently
+    fileParallelism: 2,
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
       '~': join(__dirname, 'modules', 'ui', 'app'),
@@ -23,7 +40,13 @@ export default defineConfig({
     // ONLY run CivicPress tests, exclude everything else
     include: [
       'tests/**/*.test.ts',        // Our test files
-      'tests/**/*.spec.ts'         // Alternative test naming
+      'tests/**/*.spec.ts',        // Alternative test naming
+      'core/src/**/__tests__/**/*.test.ts',  // Core unit tests
+      'core/src/**/__tests__/**/*.spec.ts',  // Core unit tests (spec naming)
+      'cli/src/**/__tests__/**/*.test.ts',   // CLI unit tests
+      'cli/src/**/__tests__/**/*.spec.ts',   // CLI unit tests (spec naming)
+      'modules/api/src/**/__tests__/**/*.test.ts',  // API unit tests
+      'modules/api/src/**/__tests__/**/*.spec.ts'  // API unit tests (spec naming)
     ],
     exclude: [
       '**/node_modules/**',        // Skip all dependency tests

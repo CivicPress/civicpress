@@ -70,12 +70,80 @@ Always respond in this order:
   automatically.
 - Always include operation context in output calls.
 - See `docs/centralized-output-patterns.md` for complete patterns.
+
+- **⚠️ CRITICAL - Dependency Injection**: All new services MUST be registered in
+  the DI container
+  - Register services in `core/src/civic-core-services.ts` using
+    `registerCivicPressServices()`
+  - Access services via `civicPress.getService<T>()` or getter methods
+  - Never use `new ServiceName()` directly in CivicPress or other services
+  - Use `createTestContainer()` or `createMockContainer()` for tests
+  - See `docs/dependency-injection-guide.md` for patterns
+
+- **⚠️ CRITICAL - Error Handling**: All errors MUST use the unified error
+  handling system
+  - Use domain-specific error classes extending `CivicPressError` (e.g.,
+    `RecordNotFoundError`, `ValidationError`)
+  - Never throw generic `Error` objects
+  - Always include error codes for programmatic handling
+  - Errors automatically include correlation IDs for tracing
+  - See `docs/error-handling.md` for complete patterns
+
+- **⚠️ CRITICAL - Saga Pattern**: All multi-step operations spanning storage
+  boundaries MUST use the Saga Pattern
+  - Operations involving DB + Git, DB + File system + Git, or cross-boundary
+    operations must use sagas
+  - Never execute multi-step operations directly; always use `SagaExecutor` with
+    a saga
+  - All saga steps must extend `BaseSagaStep` and implement compensation logic
+  - Use existing sagas (`PublishDraftSaga`, `CreateRecordSaga`,
+    `UpdateRecordSaga`, `ArchiveRecordSaga`) as reference
+  - Register saga-related services in DI container
+  - See `docs/specs/saga-pattern.md` and `docs/saga-pattern-usage-guide.md` for
+    complete patterns
+- **⚠️ CRITICAL - Unified Caching Layer**: All caching MUST use the Unified
+  Caching Layer
+  - Never create custom cache implementations (Map, Set, etc.); always use
+    `UnifiedCacheManager`
+  - Register all caches in `completeServiceInitialization()` in
+    `core/src/civic-core-services.ts`
+  - Access caches via `civicPress.getCacheManager().getCache<T>(name)`
+  - Use `MemoryCache` for TTL-based caching, `FileWatcherCache` for file-based
+    content
+  - All caches automatically track metrics (hits, misses, hit rate, memory
+    usage)
+  - See `docs/specs/unified-caching-layer.md` and `docs/cache-usage-guide.md`
+    for complete patterns
+- **⚠️ CRITICAL - Storage System**: All storage operations MUST follow
+  established storage patterns
+  - Use `CloudUuidStorageService` for all storage operations (automatically
+    provides retry, failover, circuit breaker, health checks, timeouts)
+  - Use `StorageMetadataCacheAdapter` for list operations (caching)
+  - Use `batchUpload()` and `batchDelete()` for multiple files
+  - Use `uploadFileStream()` and `downloadFileStream()` for large files (>10MB)
+  - Use storage-specific error classes extending `CivicPressError` (see
+    `modules/storage/src/errors/storage-errors.ts`)
+  - Register all storage services in DI container via
+    `registerStorageServices()` in `modules/storage/src/storage-services.ts`
+  - See `docs/specs/storage.md` and `docs/uuid-storage-system.md` for complete
+    patterns
+
+- **⚠️ CRITICAL - Module Integration**: All modules MUST follow module
+  integration patterns
+  - Modules depend on `@civicpress/core` for types and utilities
+  - Use `Logger` from core (never `console.log`)
+  - Use `CivicPressError` hierarchy for errors (never generic `Error`)
+  - Document integration pattern used (Pattern 1, 2, or 3)
+  - Document core services used
+  - See `docs/module-integration-guide.md` for complete patterns
 - Do not patch `dist/` outputs post‑build; fix source instead.
 - API/UI use hot reload; don't instruct manual restarts during dev.
 - CLI uses CAC; ensure `--help/-h` works and every command supports `--json` and
   `--silent` (tests rely on this).
 - Tests: use shared setup/fixtures; never touch the real
   `.system-data/civic.db`. Use isolated test data and temp dirs.
+- **Test file organization**: Unit tests in `__tests__` folders co-located with
+  source; integration/E2E tests in root `tests/` directory.
 - Data layout: `data/records/` for user records; `data/.civic/` for system
   configs; never commit user data.
 - DB base path lives under `.system-data` and is configured via `.civicsrc`.

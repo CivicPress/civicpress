@@ -34,11 +34,14 @@ organized by category and implementation status.
 
 ### Planned
 
-| Specification                     | Status  | Description                                  |
-| --------------------------------- | ------- | -------------------------------------------- |
-| [Plugin System](specs/plugins.md) | Planned | Extensible architecture for custom modules   |
-| [Federation](specs/federation.md) | Planned | Multi-node synchronization and data sharing  |
-| [Audit System](specs/audit.md)    | Planned | Comprehensive change tracking and compliance |
+| Specification                                           | Status      | Description                                                        |
+| ------------------------------------------------------- | ----------- | ------------------------------------------------------------------ |
+| [Dependency Injection](specs/dependency-injection.md)   | Implemented | Service container and dependency management                        |
+| [Saga Pattern](specs/saga-pattern.md)                   | Implemented | Multi-step operation orchestration with proper failure handling    |
+| [Unified Caching Layer](specs/unified-caching-layer.md) | Implemented | Unified caching abstraction with consistent strategies and metrics |
+| [Plugin System](specs/plugins.md)                       | Planned     | Extensible architecture for custom modules                         |
+| [Federation](specs/federation.md)                       | Planned     | Multi-node synchronization and data sharing                        |
+| [Audit System](specs/audit.md)                          | Planned     | Comprehensive change tracking and compliance                       |
 
 ## Civic Modules
 

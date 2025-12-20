@@ -1,9 +1,10 @@
 # CivicPress Project Status
 
-**Last Updated**: November 2025  
+**Last Updated**: January 2025  
+**Current Version**: v0.2.0 (Alpha)  
 **Overall Status**: Stable & Production-Ready  
-**Test Coverage**: 600+ tests passing (including 85+ security tests)  
-**Implementation**: 90% complete
+**Test Coverage**: 1167+ tests passing (including 85+ security tests)  
+**Implementation**: Core maturity complete (v0.2.x goals achieved)
 
 **Website:** [civicpress.io](https://civicpress.io) | **Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
@@ -42,8 +43,13 @@ ready for development and testing.
   internal `.md` links to in-app routes for seamless navigation
 - **Validation**: Config-driven validation with dynamic type/status checking
 - **RecordParser**: Central parsing/serialization ensuring format consistency
-- **Templates**: Template system for record creation with confirmation modal
-  (all updated to new format)
+- **Templates**: Complete template management system with API, service layer,
+  caching, and security
+  - Full CRUD API endpoints for template management
+  - Template service layer with file watching and cache invalidation
+  - Security hardening (path traversal prevention, variable sanitization)
+  - UI integration with template selection, preview, and loading
+  - Comprehensive unit tests and API usage documentation
 - **Geography Data**: Spatial data support with SRID, coordinates, and
   attachments
 - **File Attachments**: Link existing files to records with categorization
@@ -76,6 +82,23 @@ ready for development and testing.
 - **Development Server**: Hot reload for API and UI development
 - **Documentation**: Comprehensive guides and specifications
 - **Storage Module**: File management system with API and CLI
+- **Diagnostic Tools**: Comprehensive system diagnostics with auto-fix
+  - `civic diagnose` command with component-specific checks (database, search,
+    config, filesystem, system)
+  - `--fix` flag provides automated repair for fixable issues
+  - Auto-fix capabilities with backup creation and rollback support
+  - Centralized output system (all commands support `--json`, `--silent`)
+- **Sort Options API**: Database-level sorting with kind priority
+  - Sort parameter on `/api/v1/records` and `/api/v1/search` endpoints
+  - Supports `updated_desc`, `created_desc`, `title_asc`, `title_desc`,
+    `relevance`
+  - Database indexes for optimal sort performance
+- **Unified Error Handling**: Type-safe error system with correlation IDs
+  - Error hierarchy with domain-specific error types
+  - Automatic error recognition in API layer
+  - Correlation ID tracking for debugging
+  - Enhanced UI error handling with dev mode visibility
+  - Comprehensive test coverage (1048+ tests passing)
 
 ### In Progress
 
@@ -115,6 +138,61 @@ ready for development and testing.
 - Admin dashboard - In Progress
 
 ### Recently Completed Features
+
+#### **Google Cloud Storage (GCS) Provider Support (January 2025)**
+
+- **Status**: Fully Implemented and Production-Ready
+- **Complete GCS Integration**: Full support for Google Cloud Storage as a
+  storage provider
+  - Service account key file authentication
+  - Application Default Credentials (ADC) support
+  - Standard `gs://` URI scheme for provider paths
+  - Bucket creation and existence checking
+  - Graceful handling when service account lacks bucket.get permission
+- **Integration**: Fully integrated with existing storage infrastructure
+  - Failover system support (automatic switching to backup providers)
+  - Retry logic with exponential backoff
+  - Circuit breaker pattern for fault tolerance
+  - Comprehensive metrics collection
+  - Health check monitoring
+- **Configuration**: Complete configuration support via `storage.yml`
+  - Project ID and bucket configuration
+  - Location and storage class options
+  - Optional bucket auto-creation
+- **Testing**: Successfully tested with real GCS bucket and service account
+- **Documentation**: Updated storage system documentation with GCS examples
+
+#### **Diagnostic & Repair System (January 2025)**
+
+- **Status**: Fully Implemented
+- **Diagnostic Command**: `civic diagnose` with component-specific checks
+  - Database diagnostics (integrity, schema, indexes, FTS5)
+  - Search diagnostics (index sync, performance, cache)
+  - Configuration diagnostics (validation, migration status)
+  - Filesystem diagnostics (file integrity, Git health)
+  - System diagnostics (memory, CPU, disk space)
+- **Auto-Fix Capabilities**: `--fix` flag provides automated repair
+  - Database: Missing indexes, FTS5 rebuild, VACUUM, schema fixes
+  - Search: Index rebuild, cache clearing, synchronization
+  - Config: YAML syntax fixes (limited)
+  - Filesystem: Directory structure, permissions
+  - Backup creation before fixes with rollback support
+- **Centralized Output**: All diagnostic output uses centralized functions
+  - Respects `--json` and `--silent` flags
+  - Consistent formatting across all commands
+
+#### **Sort Options API (January 2025)**
+
+- **Status**: Fully Implemented
+- **API Endpoints**: Sort parameter added to records and search endpoints
+  - `/api/v1/records`: `updated_desc`, `created_desc`, `title_asc`, `title_desc`
+  - `/api/v1/search`: `relevance`, `updated_desc`, `created_desc`, `title_asc`,
+    `title_desc`
+- **Database Implementation**: Database-level sorting with kind priority
+  - Kind priority always primary sort (root > chapter > other)
+  - User sort is secondary within same kind priority
+  - Database indexes created for optimal performance
+  - Comprehensive test coverage
 
 #### **Internationalization (i18n) System (December 2025)**
 
@@ -221,15 +299,22 @@ ready for development and testing.
 - **Inline Editing**: Edit descriptions and categories directly in the record
   view
 
-#### **UUID Storage System (August 2025)**
+#### **UUID Storage System (August 2025, Enhanced January 2025)**
 
 - **Unique Identifiers**: UUID-based file tracking and management
-- **Multi-Provider**: Support for local, S3, and Azure Blob storage
+- **Multi-Provider**: Support for local, S3, Azure Blob Storage, and Google
+  Cloud Storage (GCS)
 - **Enhanced UI**: FileBrowser, FileUpload, and MediaPlayer components
 - **API Endpoints**: New `/api/v1/storage/files/*` UUID-based operations
 - **Database Integration**: Complete file metadata tracking
 - **Documentation**: Comprehensive system documentation
 - **Test Coverage**: Full API test suite for UUID operations
+- **GCS Support (January 2025)**: Complete Google Cloud Storage integration
+  - Service account key and Application Default Credentials support
+  - Standard `gs://` URI scheme for provider paths
+  - Integrated with failover, retry, circuit breaker, and metrics systems
+  - Graceful handling of permission limitations (bucket.get vs object
+    operations)
 
 #### **Configuration Management System (July 2025)**
 

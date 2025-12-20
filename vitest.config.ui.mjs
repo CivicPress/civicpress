@@ -17,6 +17,17 @@ export default defineConfig({
   ],
   test: {
     globals: true,
+        // Limit how many worker threads Vitest uses
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        maxThreads: 2,     // try 1–4; start with 2
+        minThreads: 1,
+      },
+    },
+    // Also reduce how many test files run concurrently
+    fileParallelism: 2,
+    
     environment: 'happy-dom',
     setupFiles: ['./tests/ui/setup.ts'],
     alias: {

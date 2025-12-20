@@ -177,6 +177,25 @@ The following commands have been updated to use the new logging system:
 - **Manual Validation Required**: CLI must be tested manually
 - **Environment Dependent**: Real functionality depends on proper setup
 
+## 📁 Test File Organization Convention
+
+**Decision**: Use two patterns based on test type  
+**Rationale**: Clear separation between unit tests and integration/e2e tests
+
+**Patterns**:
+
+- **Unit Tests**: Co-locate with source using `__tests__` folders
+  - Example: `core/src/diagnostics/__tests__/system-checker.test.ts`
+  - Benefits: Easy to find, maintain, keep tests close to code
+  - Use for: Testing individual functions, classes, or modules in isolation
+- **Integration/E2E Tests**: Place in root `tests/` directory
+  - Example: `tests/api/records.test.ts`, `tests/cli/export.test.ts`
+  - Benefits: Clear separation, tests multiple components together
+  - Use for: Testing API endpoints, CLI commands, cross-module interactions
+
+**Configuration**: Both patterns are configured in `vitest.config.mjs` and will
+be discovered automatically
+
 ## 🔮 Future Testing Considerations
 
 ### Option 1: Unit Tests (Medium Complexity)

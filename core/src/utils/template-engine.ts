@@ -329,10 +329,12 @@ export class TemplateEngine {
     // Process partials first
     content = this.processPartials(content, processedVariables);
 
-    // Replace variables in content
+    // Replace variables in content (with sanitization to prevent code injection)
     for (const [key, value] of Object.entries(processedVariables)) {
       const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-      content = content.replace(regex, String(value || ''));
+      // Sanitize variable values to prevent script injection
+      const sanitizedValue = this.sanitizeVariableValue(String(value || ''));
+      content = content.replace(regex, sanitizedValue);
     }
 
     // Process conditional blocks
@@ -1113,5 +1115,40 @@ export class TemplateEngine {
     );
     const match = content.match(sectionRegex);
     return match ? match[1] : null;
+  }
+
+  /**
+   * Sanitize variable value to prevent code injection
+   *
+   * Removes potentially dangerous patterns from variable substitutions:
+   * - Script tags
+   * - JavaScript event handlers
+   * - JavaScript protocol URLs
+   *
+   * @param value Raw variable value
+   * @returns Sanitized value safe for template substitution
+   */
+  private sanitizeVariableValue(value: string): string {
+    if (!value) return '';
+
+    // Remove script tags
+    let sanitized = value.replace(
+      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+      ''
+    );
+
+    // Remove iframe tags
+    sanitized = sanitized.replace(
+      /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,
+      ''
+    );
+
+    // Remove JavaScript protocol
+    sanitized = sanitized.replace(/javascript:/gi, '');
+
+    // Remove event handlers (onclick, onerror, etc.)
+    sanitized = sanitized.replace(/on\w+\s*=/gi, '');
+
+    return sanitized;
   }
 }

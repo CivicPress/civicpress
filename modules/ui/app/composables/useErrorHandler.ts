@@ -5,13 +5,18 @@
  * logging, and user feedback.
  */
 
-import { extractErrorMessage } from '~/utils/api-response';
+import {
+  extractErrorMessage,
+  extractCorrelationId,
+  extractErrorCode,
+} from '~/utils/api-response';
 
 export interface ErrorOptions {
   title?: string;
   showToast?: boolean;
   logToConsole?: boolean;
   fallbackMessage?: string;
+  showCorrelationId?: boolean; // Show correlation ID in dev mode
 }
 
 export function useErrorHandler() {
@@ -27,21 +32,42 @@ export function useErrorHandler() {
       showToast = true,
       logToConsole = true,
       fallbackMessage = 'An unexpected error occurred',
+      showCorrelationId = process.env.NODE_ENV === 'development',
     } = options;
 
-    // Extract error message
+    // Extract error details
     const errorMessage = extractErrorMessage(error, fallbackMessage);
+    const correlationId = extractCorrelationId(error);
+    const errorCode = extractErrorCode(error);
 
     // Log to console if enabled
     if (logToConsole) {
-      console.error(`[${title}]`, errorMessage, error);
+      const logData: any = {
+        message: errorMessage,
+        error,
+      };
+
+      if (correlationId) {
+        logData.correlationId = correlationId;
+      }
+      if (errorCode) {
+        logData.errorCode = errorCode;
+      }
+
+      console.error(`[${title}]`, errorMessage, logData);
+    }
+
+    // Build toast description with optional correlation ID
+    let toastDescription = errorMessage;
+    if (showCorrelationId && correlationId) {
+      toastDescription = `${errorMessage}\n\nCorrelation ID: ${correlationId}`;
     }
 
     // Show toast notification if enabled
     if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
-        description: errorMessage,
+        description: toastDescription,
         color: 'error',
         icon: 'i-lucide-alert-circle',
         timeout: 5000,
@@ -59,6 +85,7 @@ export function useErrorHandler() {
       title = 'Connection Error',
       showToast = true,
       logToConsole = true,
+      showCorrelationId = process.env.NODE_ENV === 'development',
     } = options;
 
     const isNetworkError =
@@ -70,14 +97,35 @@ export function useErrorHandler() {
       ? 'Unable to connect to the server. Please check your internet connection.'
       : extractErrorMessage(error, 'Connection failed');
 
+    const correlationId = extractCorrelationId(error);
+    const errorCode = extractErrorCode(error);
+
     if (logToConsole) {
-      console.error(`[${title}]`, message, error);
+      const logData: any = {
+        message,
+        error,
+      };
+
+      if (correlationId) {
+        logData.correlationId = correlationId;
+      }
+      if (errorCode) {
+        logData.errorCode = errorCode;
+      }
+
+      console.error(`[${title}]`, message, logData);
+    }
+
+    // Build toast description with optional correlation ID
+    let toastDescription = message;
+    if (showCorrelationId && correlationId) {
+      toastDescription = `${message}\n\nCorrelation ID: ${correlationId}`;
     }
 
     if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
-        description: message,
+        description: toastDescription,
         color: 'error',
         icon: 'i-lucide-wifi-off',
         timeout: 8000,
@@ -95,6 +143,7 @@ export function useErrorHandler() {
       title = 'Validation Error',
       showToast = true,
       logToConsole = true,
+      showCorrelationId = process.env.NODE_ENV === 'development',
     } = options;
 
     let message = 'Please check your input and try again.';
@@ -113,14 +162,35 @@ export function useErrorHandler() {
       message = extractErrorMessage(error, message);
     }
 
+    const correlationId = extractCorrelationId(error);
+    const errorCode = extractErrorCode(error);
+
     if (logToConsole) {
-      console.warn(`[${title}]`, message, error);
+      const logData: any = {
+        message,
+        error,
+      };
+
+      if (correlationId) {
+        logData.correlationId = correlationId;
+      }
+      if (errorCode) {
+        logData.errorCode = errorCode;
+      }
+
+      console.warn(`[${title}]`, message, logData);
+    }
+
+    // Build toast description with optional correlation ID
+    let toastDescription = message;
+    if (showCorrelationId && correlationId) {
+      toastDescription = `${message}\n\nCorrelation ID: ${correlationId}`;
     }
 
     if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
-        description: message,
+        description: toastDescription,
         color: 'primary',
         icon: 'i-lucide-alert-triangle',
         timeout: 6000,
@@ -138,18 +208,39 @@ export function useErrorHandler() {
       title = 'Authentication Error',
       showToast = true,
       logToConsole = true,
+      showCorrelationId = process.env.NODE_ENV === 'development',
     } = options;
 
     const message = extractErrorMessage(error, 'Authentication failed');
+    const correlationId = extractCorrelationId(error);
+    const errorCode = extractErrorCode(error);
 
     if (logToConsole) {
-      console.error(`[${title}]`, message, error);
+      const logData: any = {
+        message,
+        error,
+      };
+
+      if (correlationId) {
+        logData.correlationId = correlationId;
+      }
+      if (errorCode) {
+        logData.errorCode = errorCode;
+      }
+
+      console.error(`[${title}]`, message, logData);
+    }
+
+    // Build toast description with optional correlation ID
+    let toastDescription = message;
+    if (showCorrelationId && correlationId) {
+      toastDescription = `${message}\n\nCorrelation ID: ${correlationId}`;
     }
 
     if (showToast && $toast && typeof $toast.add === 'function') {
       $toast.add({
         title,
-        description: message,
+        description: toastDescription,
         color: 'error',
         icon: 'i-lucide-shield-alert',
         timeout: 5000,

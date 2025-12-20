@@ -82,10 +82,7 @@ export function createHistoryRouter() {
         });
 
         // Get Git engine from CivicPress
-        const gitEngine = civicPress.gitEngine;
-        if (!gitEngine) {
-          throw new Error('Git engine not available');
-        }
+        const gitEngine = civicPress.getGitEngine();
 
         // Get commit history - get all commits first, then filter and paginate
         const historyLimit = parseInt(limit as string) || 10;
@@ -247,10 +244,7 @@ export function createHistoryRouter() {
         });
 
         // Get Git engine from CivicPress
-        const gitEngine = civicPress.gitEngine;
-        if (!gitEngine) {
-          throw new Error('Git engine not available');
-        }
+        const gitEngine = civicPress.getGitEngine();
 
         // Get commit history for specific record - get all commits first, then filter and paginate
         const historyLimit = parseInt(limit as string) || 10;

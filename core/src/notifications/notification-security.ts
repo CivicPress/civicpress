@@ -1,3 +1,5 @@
+import { SecretsManager } from '../security/secrets.js';
+
 export interface SecurityValidationResult {
   valid: boolean;
   errors: string[];
@@ -5,12 +7,20 @@ export interface SecurityValidationResult {
 }
 
 export class NotificationSecurity {
+  private secretsManager?: SecretsManager;
   private piiPatterns: RegExp[] = [
     /\b\d{3}-\d{2}-\d{4}\b/g, // SSN
     /\b\d{4}-\d{4}-\d{4}-\d{4}\b/g, // Credit card
     /\b\d{10,11}\b/g, // Phone numbers
     /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, // Email addresses
   ];
+
+  /**
+   * Initialize with secrets manager for webhook signature validation
+   */
+  initializeSecrets(secretsManager: SecretsManager): void {
+    this.secretsManager = secretsManager;
+  }
 
   /**
    * Validate notification request
@@ -165,15 +175,44 @@ export class NotificationSecurity {
   }
 
   /**
-   * Validate webhook signature
+   * Validate webhook signature using HMAC-SHA256
+   *
+   * @param payload - The webhook payload (raw string)
+   * @param signature - The signature from the webhook header (hex-encoded)
+   * @returns true if signature is valid, false otherwise
    */
-  validateWebhookSignature(
-    payload: string,
-    signature: string,
-    secret: string
-  ): boolean {
-    // In production, implement proper HMAC validation
-    // For now, just return true
-    return true;
+  validateWebhookSignature(payload: string, signature: string): boolean {
+    if (!this.secretsManager) {
+      // If secrets manager is not initialized, reject signature validation
+      // This ensures signatures are required when secrets are configured
+      return false;
+    }
+
+    if (!signature) {
+      return false;
+    }
+
+    try {
+      const signingKey = this.secretsManager.getWebhookSigningKey();
+      return this.secretsManager.verify(payload, signature, signingKey);
+    } catch (error) {
+      // Invalid signature format or verification error
+      return false;
+    }
+  }
+
+  /**
+   * Generate webhook signature for outgoing webhooks
+   *
+   * @param payload - The webhook payload (raw string)
+   * @returns Hex-encoded HMAC-SHA256 signature
+   */
+  generateWebhookSignature(payload: string): string {
+    if (!this.secretsManager) {
+      throw new Error('Secrets manager not initialized');
+    }
+
+    const signingKey = this.secretsManager.getWebhookSigningKey();
+    return this.secretsManager.sign(payload, signingKey);
   }
 }

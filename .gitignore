@@ -18,6 +18,10 @@ build/
 .cache/
 .nyc_output/
 
+# Nuxt build artifacts
+.nuxt/
+.output/
+
 # Compiled JavaScript files
 *.js
 *.js.map
@@ -38,7 +42,8 @@ build/
 # CivicPress Public Data (separate Git repository)
 # data/ folder has its own Git repository and should not be tracked here
 data/
-storage/
+# Only ignore storage/ at root (runtime files), not modules/storage/ (source code)
+/storage/
 exports/backups/
 
 # pnpm

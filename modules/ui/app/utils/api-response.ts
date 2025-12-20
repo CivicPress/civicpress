@@ -10,11 +10,14 @@ export interface ApiResponse<T = any> {
   data: T;
   error?: {
     message: string;
+    code?: string;
     details?: any[];
+    correlationId?: string;
   };
   timestamp?: string;
   path?: string;
   method?: string;
+  requestId?: string;
 }
 
 /**
@@ -118,4 +121,56 @@ export function extractErrorMessage(
   }
 
   return defaultMessage;
+}
+
+/**
+ * Extracts correlation ID from API error response
+ * @param response - The API response
+ * @returns The correlation ID if present, undefined otherwise
+ */
+export function extractCorrelationId(response: any): string | undefined {
+  if (response && typeof response === 'object') {
+    // Try to get correlation ID from response.error
+    if ('error' in response && response.error?.correlationId) {
+      return response.error.correlationId;
+    }
+
+    // Try to get correlation ID from response.data.error
+    if ('data' in response && response.data?.error?.correlationId) {
+      return response.data.error.correlationId;
+    }
+
+    // Try to get correlation ID from response.correlationId
+    if ('correlationId' in response) {
+      return response.correlationId;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Extracts error code from API error response
+ * @param response - The API response
+ * @returns The error code if present, undefined otherwise
+ */
+export function extractErrorCode(response: any): string | undefined {
+  if (response && typeof response === 'object') {
+    // Try to get error code from response.error
+    if ('error' in response && response.error?.code) {
+      return response.error.code;
+    }
+
+    // Try to get error code from response.data.error
+    if ('data' in response && response.data?.error?.code) {
+      return response.data.error.code;
+    }
+
+    // Try to get error code from response.code
+    if ('code' in response) {
+      return response.code;
+    }
+  }
+
+  return undefined;
 }

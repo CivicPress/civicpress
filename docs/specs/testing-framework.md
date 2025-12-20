@@ -14,10 +14,10 @@ deprecated: false sunset_date: null additions:
 - security
 - performance
 - and accessibility testing compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'plugins.md: >=1.5.0'
- - 'auth.md: >=1.2.0'
- - 'permissions.md: >=1.1.0' authors:
+  'null' dependencies:
+- 'plugins.md: >=1.5.0'
+- 'auth.md: >=1.2.0'
+- 'permissions.md: >=1.1.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
 - Ada Lovelace
 - Irène Joliot-Curie
@@ -56,35 +56,70 @@ Out of Scope:
 
 ## Inputs & Outputs
 
-| Input | Description |
+| Input                    | Description                               |
 | ------------------------ | ----------------------------------------- |
-| Source code | CivicPress modules and components to test |
-| Test configurations | Testing framework settings and rules |
-| Test data | Mock data and test fixtures |
-| Test scenarios | User workflows and edge cases |
-| Performance requirements | Load and stress testing parameters |
+| Source code              | CivicPress modules and components to test |
+| Test configurations      | Testing framework settings and rules      |
+| Test data                | Mock data and test fixtures               |
+| Test scenarios           | User workflows and edge cases             |
+| Performance requirements | Load and stress testing parameters        |
 
-| Output | Description |
+| Output               | Description                           |
 | -------------------- | ------------------------------------- |
-| Test results | Pass/fail status and detailed reports |
-| Coverage reports | Code coverage metrics and analysis |
-| Performance metrics | Response times and throughput data |
-| Security assessments | Vulnerability and compliance reports |
-| Quality metrics | Code quality and reliability scores |
+| Test results         | Pass/fail status and detailed reports |
+| Coverage reports     | Code coverage metrics and analysis    |
+| Performance metrics  | Response times and throughput data    |
+| Security assessments | Vulnerability and compliance reports  |
+| Quality metrics      | Code quality and reliability scores   |
 
 ---
 
 ## File/Folder Location
 
+**Test Organization Convention:**
+
+CivicPress uses two patterns for test file organization:
+
+1. **Unit Tests** (co-located with source):
+   - Place in `__tests__` folders next to source code
+   - Example: `core/src/diagnostics/__tests__/system-checker.test.ts`
+   - Benefits: Easy to find, maintain, keep tests close to code
+   - Use for: Testing individual functions, classes, or modules in isolation
+
+2. **Integration/E2E Tests** (separate directory):
+   - Place in root `tests/` directory organized by type
+   - Example: `tests/api/records.test.ts`, `tests/cli/export.test.ts`
+   - Benefits: Clear separation, tests multiple components together
+   - Use for: Testing API endpoints, CLI commands, cross-module interactions
+
+**Directory Structure:**
+
 ```
+# Unit tests (co-located with source)
+core/src/
+├── diagnostics/
+│   ├── __tests__/
+│   │   ├── system-checker.test.ts
+│   │   └── database-checker.test.ts
+│   └── system-checker.ts
+├── database/
+│   ├── __tests__/
+│   │   └── sort-query.test.ts
+│   └── database-service.ts
+
+# Integration/E2E tests (separate directory)
 tests/
-├── unit/ # Unit tests
-│ ├── auth/
-│ ├── permissions/
-│ ├── plugins/
-│ └── utils/
-├── integration/ # Integration tests
-│ ├── api/
+├── api/ # API integration tests
+│ ├── records.test.ts
+│ ├── search.test.ts
+│ └── auth.test.ts
+├── cli/ # CLI integration tests
+│ ├── export.test.ts
+│ └── config.test.ts
+├── core/ # Core integration tests
+│ ├── config-discovery.test.ts
+│ └── workflow-config.test.ts
+├── integration/ # Cross-module integration tests
 │ ├── database/
 │ ├── workflows/
 │ └── modules/
@@ -92,19 +127,6 @@ tests/
 │ ├── user-journeys/
 │ ├── accessibility/
 │ └── cross-browser/
-├── security/ # Security tests
-│ ├── authentication/
-│ ├── authorization/
-│ ├── input-validation/
-│ └── data-protection/
-├── performance/ # Performance tests
-│ ├── load-tests/
-│ ├── stress-tests/
-│ └── benchmark-tests/
-├── accessibility/ # Accessibility tests
-│ ├── wcag-compliance/
-│ ├── screen-reader/
-│ └── keyboard-navigation/
 ├── utils/ # Testing utilities
 │ ├── civicpress-test-utils.ts
 │ ├── mock-apis.ts
@@ -487,14 +509,14 @@ export class IntegrationFrameworkTests {
 
 ### Testing Layers
 
-| Layer | Purpose | Tools | Coverage Target |
+| Layer             | Purpose                              | Tools               | Coverage Target |
 | ----------------- | ------------------------------------ | ------------------- | --------------- |
-| **Unit** | Test individual functions/components | Jest, Vitest | 80%+ |
-| **Integration** | Test module interactions | Jest, Supertest | 60%+ |
-| **E2E** | Test complete user workflows | Playwright, Cypress | 40%+ |
-| **Security** | Test security vulnerabilities | OWASP ZAP, Jest | 90%+ |
-| **Performance** | Test performance under load | Artillery, k6 | 50%+ |
-| **Accessibility** | Test WCAG compliance | axe-core, Jest | 100% |
+| **Unit**          | Test individual functions/components | Jest, Vitest        | 80%+            |
+| **Integration**   | Test module interactions             | Jest, Supertest     | 60%+            |
+| **E2E**           | Test complete user workflows         | Playwright, Cypress | 40%+            |
+| **Security**      | Test security vulnerabilities        | OWASP ZAP, Jest     | 90%+            |
+| **Performance**   | Test performance under load          | Artillery, k6       | 50%+            |
+| **Accessibility** | Test WCAG compliance                 | axe-core, Jest      | 100%            |
 
 ---
 

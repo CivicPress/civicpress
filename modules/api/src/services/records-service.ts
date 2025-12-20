@@ -1670,7 +1670,7 @@ export class RecordsService {
     user: any,
     targetStatus?: string
   ): Promise<any> {
-    // Get draft
+    // Get draft to validate it exists and check permissions
     const draft = await this.db.getDraft(id);
     if (!draft) {
       throw new Error(`Draft not found: ${id}`);
@@ -1688,82 +1688,17 @@ export class RecordsService {
       );
     }
 
-    // Use target status or draft's current status
-    const finalStatus = targetStatus || draft.status;
+    // Use saga to publish draft (handles all steps: DB, file, Git, cleanup, indexing, hooks)
+    const record = await this.recordManager.publishDraft(
+      id,
+      user,
+      targetStatus,
+      undefined, // sagaExecutor - will be created if not provided
+      this.civicPress.getIndexingService(), // indexingService
+      `publish-${id}-${Date.now()}` // correlationId
+    );
 
-    // Check if record already exists in records table
-    const existingRecord = await this.db.getRecord(id);
-    let record: any;
-
-    if (existingRecord) {
-      // Record exists: UPDATE it (publishing changes to existing published record)
-      // Map draft fields to UpdateRecordRequest format
-      // Note: type is not included in UpdateRecordRequest - record type shouldn't change after creation
-      const updateRequest: UpdateRecordRequest = {
-        title: draft.title,
-        content: draft.markdown_body, // Map markdown_body → content
-        metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
-        status: finalStatus, // Legal status (stored in YAML + DB)
-        workflowState: undefined, // Clear editorial state for published records
-        geography: draft.geography ? JSON.parse(draft.geography) : undefined,
-        attachedFiles: draft.attached_files
-          ? JSON.parse(draft.attached_files)
-          : undefined,
-        linkedRecords: draft.linked_records
-          ? JSON.parse(draft.linked_records)
-          : undefined,
-        linkedGeographyFiles: draft.linked_geography_files
-          ? JSON.parse(draft.linked_geography_files)
-          : undefined,
-      };
-
-      // Update existing record (this will update file via updateRecordFile())
-      const updatedRecord = await this.recordManager.updateRecord(
-        id,
-        updateRequest,
-        user
-      );
-
-      if (!updatedRecord) {
-        throw new Error(`Failed to update record ${id}`);
-      }
-
-      record = updatedRecord;
-    } else {
-      // Record doesn't exist: CREATE it (publishing new record)
-      // Map draft fields to CreateRecordRequest format
-      const createRequest: CreateRecordRequest = {
-        title: draft.title,
-        type: draft.type,
-        content: draft.markdown_body,
-        metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
-        geography: draft.geography ? JSON.parse(draft.geography) : undefined,
-        attachedFiles: draft.attached_files
-          ? JSON.parse(draft.attached_files)
-          : undefined,
-        linkedRecords: draft.linked_records
-          ? JSON.parse(draft.linked_records)
-          : undefined,
-        linkedGeographyFiles: draft.linked_geography_files
-          ? JSON.parse(draft.linked_geography_files)
-          : undefined,
-        status: finalStatus, // Legal status (stored in YAML + DB)
-        workflowState: undefined, // Clear editorial state for published records
-        createdAt: draft.created_at, // Preserve draft's created_at for new records
-        updatedAt: new Date().toISOString(), // Set to current time when publishing
-      };
-
-      // Create new record (this will create file via createRecordFile())
-      record = await this.recordManager.createRecordWithId(
-        id,
-        createRequest,
-        user
-      );
-    }
-
-    // Delete draft after successful publish (same for both UPDATE and CREATE)
-    await this.db.deleteDraft(id);
-
+    // Return formatted response
     return {
       id: record.id,
       title: record.title,

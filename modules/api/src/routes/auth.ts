@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, CsrfProtection } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -7,6 +7,21 @@ import {
 } from '../utils/api-logger.js';
 
 const router = Router();
+
+/**
+ * GET /api/v1/auth/csrf-token
+ * Get CSRF token for form submissions
+ * This endpoint is accessible without authentication for initial page load
+ */
+router.get('/csrf-token', (req, res) => {
+  const civicPress = (req as any).civicPress as CivicPress;
+  const secretsManager = civicPress.getSecretsManager();
+  const csrfProtection = new CsrfProtection(secretsManager);
+
+  const token = csrfProtection.getTokenForResponse();
+
+  sendSuccess({ token }, req, res, { operation: 'get_csrf_token' });
+});
 
 /**
  * POST /api/auth/login

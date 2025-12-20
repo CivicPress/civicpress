@@ -330,6 +330,78 @@ endpoints:
     desc: List files in folder with UUID metadata
     status: stable
 
+  # Storage Batch Operations (December 2025)
+  - id: storage:batch:upload
+    method: POST
+    path: /api/v1/storage/files/batch
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Batch upload multiple files with concurrency control
+    status: stable
+
+  - id: storage:batch:delete
+    method: DELETE
+    path: /api/v1/storage/files/batch
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Batch delete multiple files by UUID
+    status: stable
+
+  # Storage Management & Observability (December 2025)
+  - id: storage:health
+    method: GET
+    path: /api/v1/storage/health
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Check storage provider health status
+    status: stable
+
+  - id: storage:health:provider
+    method: GET
+    path: /api/v1/storage/health/:provider
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Check specific provider health
+    status: stable
+
+  - id: storage:metrics
+    method: GET
+    path: /api/v1/storage/metrics
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Get storage operation metrics (counts, latency, errors)
+    status: stable
+
+  - id: storage:metrics:reset
+    method: POST
+    path: /api/v1/storage/metrics/reset
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Reset storage metrics (admin only)
+    status: stable
+
+  - id: storage:usage
+    method: GET
+    path: /api/v1/storage/usage
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Get storage usage report (total, by folder, by provider)
+    status: stable
+
+  - id: storage:usage:folder
+    method: GET
+    path: /api/v1/storage/usage/:folder
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Get storage usage for specific folder
+    status: stable
+
+  - id: storage:cleanup:report
+    method: GET
+    path: /api/v1/storage/cleanup
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Get orphaned file cleanup report (admin only)
+    status: stable
+
+  - id: storage:cleanup:apply
+    method: POST
+    path: /api/v1/storage/cleanup
+    file: modules/api/src/routes/uuid-storage.ts
+    desc: Apply orphaned file cleanup (admin only)
+    status: stable
+
   - id: config:metadata
     method: GET
     path: /api/v1/config/metadata/:type
@@ -462,6 +534,20 @@ endpoints:
     path: /api/v1/templates/:id
     file: modules/api/src/routes/templates.ts
     desc: Delete template
+    status: stable
+
+  - id: templates:preview
+    method: POST
+    path: /api/v1/templates/:id/preview
+    file: modules/api/src/routes/templates.ts
+    desc: Preview template with variable substitution
+    status: stable
+
+  - id: templates:validate
+    method: POST
+    path: /api/v1/templates/:id/validate
+    file: modules/api/src/routes/templates.ts
+    desc: Validate template structure and inheritance
     status: stable
 
   - id: workflows:list

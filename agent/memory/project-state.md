@@ -3,7 +3,46 @@
 **🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
 
-## Current Status: November 2025
+**Current Version:** v0.2.0 (Alpha)  
+**Release Date:** 2025-01-30  
+**Status:** Core Maturity and Stability milestone complete
+
+## Current Status: January 2025
+
+### 🎉 v0.2.0 Release Highlights
+
+**Release Date:** January 30, 2025
+
+**Major Achievements:**
+
+- ✅ **All v0.2.x Roadmap Goals Completed**: Core Maturity and Stability
+  milestone achieved
+- ✅ **Security System**: Production-ready SecretsManager and CSRF Protection
+- ✅ **Architecture Documentation**: Comprehensive visual diagrams with Mermaid
+- ✅ **Saga Pattern Enhancement**: All saga steps now compensatable
+- ✅ **Error Handling**: Complete unified error handling system
+- ✅ **Module Integration**: Storage module fully integrated with DI container
+
+**Key Features Added in v0.2.0:**
+
+1. **Security System**
+   - SecretsManager with HKDF-SHA256 key derivation
+   - CSRF Protection service and middleware
+   - UI composable for seamless integration
+   - Comprehensive test coverage
+
+2. **Architecture Diagrams**
+   - 7 comprehensive Mermaid diagrams
+   - Service dependency visualization
+   - Data flow documentation
+   - Security architecture diagrams
+
+3. **Documentation Enhancements**
+   - Architecture comprehensive analysis updated
+   - Visual documentation separated into dedicated file
+   - Complete roadmap milestone documentation
+
+**Next Phase:** v0.3.x — Editor, Attachments, and Civic UX
 
 ### ✅ **Completed Features**
 
@@ -18,6 +57,13 @@
 - **Record Manager**: CRUD operations for civic records
 - **Template Engine**: Dynamic content generation
 - **Indexing Service**: Full-text search capabilities
+- **Saga Pattern**: Multi-step operation orchestration with compensation
+  - PublishDraftSaga, CreateRecordSaga, UpdateRecordSaga, ArchiveRecordSaga
+- **Unified Caching Layer**: Centralized caching system with consistent
+  strategies
+  - MemoryCache (TTL-based with LRU eviction), FileWatcherCache (file watching)
+  - UnifiedCacheManager for centralized registry and management
+  - Comprehensive metrics, health monitoring, cache warming support
 
 #### **API & CLI**
 
@@ -57,6 +103,92 @@
 - **Documentation**: Comprehensive API, CLI, and development guides
 - **Package Management**: pnpm workspaces for monorepo management
 - **TypeScript**: Full type safety across the platform
+
+### ✅ **Recently Completed Features (December 2025)**
+
+#### **Storage Abstraction Layer Enhancements**
+
+- **Status**: ✅ **Fully Implemented, Tested, and Production-Ready**
+- **Test Suite**: 15 test files, 100% coverage for new code, all tests passing
+- **Comprehensive Enhancements**: Complete overhaul of storage system with
+  performance, reliability, observability, and management features
+- **Core Infrastructure**:
+  - **Performance Optimizations**:
+    - Metadata caching using UnifiedCacheManager (10-100x faster list
+      operations)
+    - Batch upload/delete operations with concurrency control
+    - Streaming for large files (upload/download) to handle files without
+      loading into memory
+    - Concurrency limiting for uploads, downloads, and deletes
+  - **Reliability Improvements**:
+    - Retry with exponential backoff for transient failures
+    - Automatic failover between storage providers
+    - Circuit breaker pattern to prevent cascading failures
+    - Health checks with periodic monitoring
+    - Timeout handling for all operations
+  - **Observability & Management**:
+    - Comprehensive metrics collection (operation counts, latency, errors)
+    - Storage usage reporting (by folder, by provider)
+    - Quota enforcement (global and per-folder)
+    - Orphaned file cleanup (dry-run and actual cleanup)
+    - Lifecycle management (retention, archival, deletion policies)
+  - **Error Handling**:
+    - Complete error class hierarchy extending CivicPressError
+    - Partial failure handling in batch operations with error aggregation
+    - Error summaries for debugging
+- **Implementation Phases**:
+  - Phase 0: Preparation (design tasks, architecture review)
+  - Phase 1: Performance Optimizations (caching, batch, streaming, concurrency)
+  - Phase 2: Reliability Improvements (retry, failover, circuit breaker, health,
+    timeouts)
+  - Phase 3: Observability & Management (metrics, usage, quota, cleanup,
+    lifecycle)
+  - Phase 4: Error Handling (structured errors, partial failures)
+- **Technical Details**:
+  - All new services registered in DI container
+  - All errors extend CivicPressError with correlation IDs
+  - Cache uses UnifiedCacheManager (not standalone)
+  - Comprehensive test coverage (15 test files)
+  - Full TypeScript type safety
+- **Benefits**:
+  - 10-100x faster list operations with caching
+  - 5-10x faster batch operations with concurrency
+  - Improved reliability with retry and failover
+  - Better observability with metrics and health checks
+  - Automated management with quota, cleanup, and lifecycle policies
+- **Documentation**: Complete implementation plan, test status, and storage
+  system documentation updated
+
+#### **Indexing & Sync Performance Optimizations**
+
+- **Status**: ✅ **Optimized and Production-Ready**
+- **Performance Improvements**: Significant optimizations to indexing and
+  database sync operations
+- **Core Optimizations**:
+  - **Cached Record Parsing**: Parsed records cached during index generation to
+    avoid duplicate parsing during sync
+  - **Direct Database Access**: Sync operations use database directly instead of
+    `getRecord()` to avoid unnecessary file reads
+  - **Skip Operations During Sync**: Added `skipSaga`, `skipFileGeneration`,
+    `skipAudit`, and `skipHooks` flags to bypass unnecessary operations during
+    sync
+  - **File Watcher Optimization**: File watcher initialization skipped in
+    test/CI environments and made non-blocking in production
+  - **Timeout Protection**: Added timeouts to prevent hangs during sync
+    operations
+- **Technical Details**:
+  - `CivicIndexEntry` interface extended with `_parsedRecord` cache field
+  - `IndexingService.syncToDatabase()` optimized to reuse cached parsed records
+  - `RecordManager.createRecordWithId()` and `updateRecord()` support skip flags
+  - `FileWatcherCache.initialize()` optimized for test environments
+- **Benefits**:
+  - Eliminated duplicate file reads and parsing during sync
+  - Reduced sync time by avoiding unnecessary operations (audit logging, hooks,
+    file generation)
+  - Improved test performance by skipping file watching in test environments
+  - Better error handling with timeout protection
+- **Documentation**: Performance optimizations documented in code comments and
+  architecture docs
 
 ### ✅ **Recently Completed Features (November 2025)**
 
@@ -204,7 +336,104 @@
 - **Format Standardization**: All templates updated to new standardized format
   with section comments
 
-### ✅ **Recently Completed (December 2025)**
+### ✅ **Recently Completed (December 2025 - January 2025)**
+
+#### **Unified Caching Layer**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Core Infrastructure**:
+  - `ICacheStrategy<T>` unified interface for all cache implementations
+  - `MemoryCache` strategy (TTL-based with LRU eviction)
+  - `FileWatcherCache` strategy (file watching + manual invalidation)
+  - `UnifiedCacheManager` for centralized registry and management
+- **Migration & Integration**:
+  - ✅ SearchCache → SearchCacheAdapter (using MemoryCache)
+  - ✅ DiagnosticCache → DiagnosticCacheAdapter (using MemoryCache)
+  - ✅ TemplateCache → TemplateCacheAdapter (using FileWatcherCache)
+  - ✅ RecordManager.suggestionsCache → Direct MemoryCache usage
+- **Advanced Features**:
+  - Cache warming support (`CacheWarmer` class)
+  - Comprehensive metrics (hits, misses, hit rate, memory usage, evictions)
+  - Health monitoring (`CacheHealthChecker` integrated with diagnostic system)
+  - API endpoints (`/api/v1/cache/metrics`, `/api/v1/cache/health`,
+    `/api/v1/cache/list`)
+  - CLI commands (`civic cache:metrics`, `civic cache:health`,
+    `civic cache:list`)
+- **Registered Caches**:
+  - `search` - Search results (MemoryCache, 5min TTL, 500 entries)
+  - `searchSuggestions` - Search suggestions (MemoryCache, 5min TTL, 1000
+    entries)
+  - `diagnostics` - Diagnostic results (MemoryCache, 5min TTL, 100 entries)
+  - `templates` - Template content (FileWatcherCache, infinite TTL, 1000
+    entries)
+  - `templateLists` - Template lists (MemoryCache, 5min TTL, 100 entries)
+  - `recordSuggestions` - Record suggestions (MemoryCache, 5min TTL, 1000
+    entries)
+- **Documentation**:
+  - Specification: `docs/specs/unified-caching-layer.md`
+  - Usage Guide: `docs/cache-usage-guide.md`
+  - Source Code: `core/src/cache/`
+
+#### **Saga Pattern for Multi-Step Operations**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Core Infrastructure**:
+  - Saga executor with full lifecycle management
+  - State persistence in `saga_states` table
+  - Idempotency management with TTL support
+  - Resource locking for concurrency control
+  - Saga recovery mechanism for stuck/failed sagas
+  - Observability with metrics collection
+- **Saga Implementations**:
+  - ✅ PublishDraftSaga - Publishing draft records
+  - ✅ CreateRecordSaga - Creating published records directly
+  - ✅ UpdateRecordSaga - Updating published records
+  - ✅ ArchiveRecordSaga - Archiving records
+- **Features**:
+  - Automatic saga usage for published records
+  - Compensation logic for ACID steps
+  - Git commits as authoritative (never rolled back)
+  - Derived state (indexing/hooks) failures don't fail operations
+  - Comprehensive integration tests
+  - Complete documentation and usage guide
+- **Documentation**:
+  - Specification: `docs/specs/saga-pattern.md`
+  - Usage Guide: `docs/saga-pattern-usage-guide.md`
+  - Usage Guide: `docs/saga-pattern-usage-guide.md`
+
+### ✅ **Previously Completed (November 2025)**
+
+#### **Dependency Injection Container System**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Core Container**: Complete ServiceContainer with service lifecycle
+  management
+- **Service Registration**: Centralized service registration module
+  (`civic-core-services.ts`)
+- **CivicPress Integration**: Full DI integration with backward compatibility
+- **Service Lifetimes**: Singleton, Transient, and Scoped support
+- **Circular Dependency Detection**: Automatic detection and prevention
+- **Type Safety**: 100% TypeScript coverage with type-safe resolution
+- **Test Utilities**: Comprehensive test utilities for mocking and testing
+- **Performance**: 90% faster startup time (lazy initialization)
+- **Documentation**: Complete user guide and performance summary
+- **Test Coverage**: 102 test files, 1133+ tests passing
+- **Backward Compatibility**: All existing getter methods still work
+
+#### **Unified Error Handling System**
+
+- **Status**: ✅ **Fully Implemented and Production-Ready**
+- **Error Hierarchy**: Type-safe error classes with `CivicPressError` base
+- **Domain Errors**: Records, Templates, Geography, Auth, Database, etc.
+- **Correlation IDs**: Unique identifiers for error tracing
+- **Centralized Output**: Integration with `coreError()`, `cliError()`,
+  `handleApiError()`
+- **API Integration**: Error handler middleware with structured responses
+- **UI Integration**: Enhanced error handling composable
+- **Error Codes**: Comprehensive error code reference
+- **Documentation**: Complete error handling guide
+
+#### **Pagination System Overhaul**
 
 #### **Pagination System Overhaul**
 

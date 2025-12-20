@@ -1037,6 +1037,41 @@ const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
 const editorContainerRef = ref<HTMLDivElement | null>(null);
 const sidebarRef = ref<InstanceType<typeof RecordSidebar> | null>(null);
 
+// Handle template loading
+const handleLoadTemplate = async (templateId: string, content: string) => {
+  // Confirm before loading template (will overwrite existing content)
+  if (form.markdownBody && form.markdownBody.trim()) {
+    const confirmed = confirm(
+      t('records.confirmLoadTemplate') ||
+        'Loading a template will replace your current content. Continue?'
+    );
+    if (!confirmed) return;
+  }
+
+  // Extract title if first line is H1
+  const lines = content.split('\n');
+  const firstLine = lines[0]?.trim();
+  if (firstLine?.startsWith('# ')) {
+    form.title = firstLine.substring(2).trim();
+    // Remove first line and any following blank lines
+    let startIndex = 1;
+    while (startIndex < lines.length && lines[startIndex]?.trim() === '') {
+      startIndex++;
+    }
+    form.markdownBody = lines.slice(startIndex).join('\n');
+  } else {
+    form.markdownBody = content;
+  }
+
+  toast.add({
+    title: t('records.templateLoaded') || 'Template loaded',
+    description:
+      t('records.templateLoadedDesc') ||
+      'Template content has been loaded into the editor',
+    color: 'primary',
+  });
+};
+
 // Expose for parent components
 defineExpose({
   form,
@@ -1243,6 +1278,7 @@ defineExpose({
           @update:status="form.status = $event"
           @update:workflow-state="form.workflowState = $event"
           @update:tags="form.tags = $event"
+          @load-template="handleLoadTemplate"
           @close="showSidebar = false"
         />
       </div>

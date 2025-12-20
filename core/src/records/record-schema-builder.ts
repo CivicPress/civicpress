@@ -30,7 +30,10 @@ const schemaCache = new Map<string, any>();
 /**
  * Registered plugin schemas (registered at runtime)
  */
-const pluginSchemas = new Map<string, { schema: any; appliesTo: (recordType: string) => boolean }>();
+const pluginSchemas = new Map<
+  string,
+  { schema: any; appliesTo: (recordType: string) => boolean }
+>();
 
 /**
  * RecordSchemaBuilder - Builds dynamic JSON schemas for record validation
@@ -46,7 +49,9 @@ export class RecordSchemaBuilder {
       return JSON.parse(schemaContent);
     } catch (error) {
       logger.error('Failed to load base schema', error);
-      throw new Error(`Failed to load base schema from ${schemaPath}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to load base schema from ${schemaPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -66,7 +71,7 @@ export class RecordSchemaBuilder {
     } = {}
   ): any {
     const cacheKey = `${recordType || 'base'}-${JSON.stringify(options)}`;
-    
+
     // Check cache first
     if (schemaCache.has(cacheKey)) {
       return schemaCache.get(cacheKey);
@@ -75,7 +80,7 @@ export class RecordSchemaBuilder {
     try {
       // Start with base schema
       const schema = this.getBaseSchema();
-      
+
       // Inject dynamic enums for type and status
       this.injectDynamicEnums(schema);
 
@@ -96,7 +101,7 @@ export class RecordSchemaBuilder {
 
       // Cache the built schema
       schemaCache.set(cacheKey, schema);
-      
+
       return schema;
     } catch (error) {
       logger.error('Failed to build schema', error);
@@ -112,7 +117,7 @@ export class RecordSchemaBuilder {
       // Inject valid record types
       const recordTypes = CentralConfigManager.getRecordTypesConfig();
       const typeEnum = Object.keys(recordTypes);
-      
+
       if (schema.properties?.type) {
         schema.properties.type.enum = typeEnum;
       }
@@ -120,12 +125,15 @@ export class RecordSchemaBuilder {
       // Inject valid record statuses
       const recordStatuses = CentralConfigManager.getRecordStatusesConfig();
       const statusEnum = Object.keys(recordStatuses);
-      
+
       if (schema.properties?.status) {
         schema.properties.status.enum = statusEnum;
       }
     } catch (error) {
-      logger.warn('Failed to inject dynamic enums, using schema defaults', error);
+      logger.warn(
+        'Failed to inject dynamic enums, using schema defaults',
+        error
+      );
       // Schema will use its default validation if config loading fails
     }
   }
@@ -154,7 +162,9 @@ export class RecordSchemaBuilder {
       });
     } catch (error) {
       // Type-specific schema doesn't exist, that's okay
-      logger.debug(`No type-specific schema found for ${recordType}, using base schema only`);
+      logger.debug(
+        `No type-specific schema found for ${recordType}, using base schema only`
+      );
     }
   }
 
@@ -163,12 +173,14 @@ export class RecordSchemaBuilder {
    */
   private static mergeModuleExtensions(schema: any, recordType?: string): void {
     try {
-      const config = CentralConfigManager.getConfig();
-      const modules = config.modules || [];
+      const modules = CentralConfigManager.getModules();
 
       for (const moduleName of modules) {
         // Check if this record type should use this module's schema
-        if (recordType && !this.shouldApplyModuleSchema(moduleName, recordType)) {
+        if (
+          recordType &&
+          !this.shouldApplyModuleSchema(moduleName, recordType)
+        ) {
           continue;
         }
 
@@ -201,15 +213,24 @@ export class RecordSchemaBuilder {
 
   /**
    * Determine if a module schema should be applied to a record type
-   * 
+   *
    * For example, legal-register applies to bylaw, ordinance, policy, etc.
    */
-  private static shouldApplyModuleSchema(moduleName: string, recordType: string): boolean {
+  private static shouldApplyModuleSchema(
+    moduleName: string,
+    recordType: string
+  ): boolean {
     // legal-register applies to legal document types
     if (moduleName === 'legal-register') {
-      return ['bylaw', 'ordinance', 'policy', 'proclamation', 'resolution'].includes(recordType);
+      return [
+        'bylaw',
+        'ordinance',
+        'policy',
+        'proclamation',
+        'resolution',
+      ].includes(recordType);
     }
-    
+
     // Add other module logic here as needed
     return false;
   }
@@ -245,7 +266,7 @@ export class RecordSchemaBuilder {
 
   /**
    * Register a plugin schema extension
-   * 
+   *
    * @param pluginName - Name of the plugin
    * @param schema - JSON Schema object to merge
    * @param appliesTo - Function that determines if schema applies to a record type
@@ -263,7 +284,7 @@ export class RecordSchemaBuilder {
 
   /**
    * Unregister a plugin schema extension
-   * 
+   *
    * @param pluginName - Name of the plugin to unregister
    */
   static unregisterPluginSchema(pluginName: string): void {
@@ -292,4 +313,3 @@ export class RecordSchemaBuilder {
     };
   }
 }
-

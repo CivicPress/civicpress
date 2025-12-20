@@ -60,7 +60,8 @@ describe('Sort Query Generation', () => {
       sortOptions.forEach((sort) => {
         // Kind priority should always be first in ORDER BY
         const orderBy = `ORDER BY ${getKindPrioritySQL()} ASC, ${getUserSortSQL(sort)}`;
-        expect(orderBy).toMatch(/ORDER BY.*kind.*ASC/i);
+        // The kind priority uses a CASE statement, so check for kind in the CASE or the pattern
+        expect(orderBy).toMatch(/ORDER BY[\s\S]*kind[\s\S]*ASC/i);
       });
     });
   });

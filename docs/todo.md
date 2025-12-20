@@ -45,6 +45,31 @@
   - Removed sort dropdown from UI (was misleading - only sorted current page)
   - Simplified RecordList component logic
   - Cleaner separation of concerns (API handles sorting, UI handles display)
+- **Templates API Implementation**: Complete template management system
+  - Full CRUD API endpoints for template management
+  - Template service layer with caching and file watching
+- **Unified Error Handling System**: Complete error handling architecture
+  - Type-safe error hierarchy with correlation IDs
+  - Core services migrated to new error types
+  - API layer automatic error recognition
+  - UI layer correlation ID support
+  - Comprehensive test coverage
+  - Security hardening (path traversal prevention, variable sanitization)
+  - UI integration with template selection and preview
+  - Comprehensive unit tests and documentation
+- **Sort Options API**: Complete database-level sorting implementation
+  - Sort parameter added to `/api/v1/records` and `/api/v1/search` endpoints
+  - Supports `updated_desc`, `created_desc`, `title_asc`, `title_desc`,
+    `relevance`
+  - Kind priority always primary sort, user sort secondary
+  - Database indexes created for sort performance
+  - Comprehensive test coverage
+- **Diagnostic & Repair System**: Comprehensive diagnostic tools with auto-fix
+  - `civic diagnose` command with component-specific checks
+  - `--fix` flag provides repair functionality for fixable issues
+  - Database, search, config, filesystem, and system diagnostics
+  - Auto-fix capabilities with backup creation and rollback support
+  - Centralized output migration complete (all console.log replaced)
 - **Documentation Cleanup**: Removed outdated analysis and test planning
   documents
   - Merged architecture documents into single source of truth
@@ -53,44 +78,25 @@
 
 ### Immediate Tasks (Next 1-2 weeks)
 
-#### Sort Options Feature (Removed from UI - TODO: API/DB Implementation)
+#### Sort Options Feature ✅ COMPLETED
 
-- [ ] **Implement sort options at API/DB level**
-  - **Status**: ⏳ Planned
-  - **Context**: Sort dropdown removed from UI because it only sorted current
-    page (misleading UX)
-  - **Requirements**:
-    - Add `sort` parameter to `/api/v1/records` and `/api/v1/search` endpoints
-    - Implement database-level sorting in queries (ORDER BY clauses)
-    - Ensure kind priority remains primary sort, user sort is secondary
-    - Support sort options: `updated_desc`, `created_desc`, `title_asc`,
-      `title_desc`, `relevance`
-    - **Search Results Relevance**:
-      - For search: `relevance` uses existing relevance scoring system
-      - Relevance scores include: BM25 score, field match weights (title 10x,
-        tags 5x, content 1x), recency score
-      - These scores are already calculated in `sqlite-search-service.ts` and
-        returned in `_search.relevance_score`
-      - Sort by relevance should use these scores:
-        `ORDER BY kind_priority ASC, relevance_score DESC`
-    - **List Results Relevance**:
-      - For listings (non-search): `relevance` maintains default API order (kind
-        priority + created_at DESC)
-    - **User Sort Options**:
-      - `updated_desc`:
-        `ORDER BY kind_priority ASC, updated_at DESC, created_at DESC`
-      - `created_desc`: `ORDER BY kind_priority ASC, created_at DESC` (same as
-        default)
-      - `title_asc`: `ORDER BY kind_priority ASC, title ASC, created_at DESC`
-      - `title_desc`: `ORDER BY kind_priority ASC, title DESC, created_at DESC`
-  - **Database Implementation**:
-    - Add CASE statement in ORDER BY for user sort options
-    - Ensure kind_priority is always first in ORDER BY (primary sort)
-    - User sort becomes secondary sort within same kind priority
-    - For search: Include relevance_score in ORDER BY when sort='relevance'
-  - **Estimated Effort**: 3-4 hours
-  - **Note**: Sort dropdown removed from UI (completed), pending API/DB
-    implementation
+- [x] **Implement sort options at API/DB level** - Complete
+  - **Status**: ✅ Fully implemented
+  - **Implementation**: Database-level sorting implemented with kind priority as
+    primary sort
+  - **Features**:
+    - `sort` parameter added to `/api/v1/records` and `/api/v1/search` endpoints
+    - Database-level sorting in queries (ORDER BY clauses with CASE statements)
+    - Kind priority always remains primary sort, user sort is secondary
+    - Sort options supported:
+      - Records endpoint: `updated_desc`, `created_desc`, `title_asc`,
+        `title_desc`
+      - Search endpoint: `relevance`, `updated_desc`, `created_desc`,
+        `title_asc`, `title_desc`
+    - Database indexes created for sort performance
+    - Tests added for sort query generation
+  - **Reference**: `core/src/database/database-service.ts`,
+    `core/src/search/sqlite-search-service.ts`
 
 ### Immediate Tasks (Next 1-2 weeks)
 
@@ -235,20 +241,18 @@ V2)
 
 #### Templates API Implementation
 
-- [ ] **Implement Templates API endpoints**
-  - **Current Status**: API endpoints exist but are stubbed (return empty
-    arrays/mock data)
-  - **Files**: `modules/api/src/routes/templates.ts` (all endpoints return
-    placeholders)
-  - **UI Integration**: `modules/ui/app/composables/useTemplates.ts` has TODOs
-    to use API
-  - **Priority**: Medium - affects template functionality
-  - **Action**: Implement actual template loading from `data/.civic/templates/`
-    directory
-  - **Action**: Update UI to fetch templates from API instead of hardcoded
-    defaults
-  - **Reference**: `core/src/utils/template-engine.ts` has file system loading
-    logic
+- [x] **Implement Templates API endpoints** ✅ **COMPLETED**
+  - **Status**: Fully implemented and production-ready
+  - **Service Layer**: `TemplateService` with CRUD operations, caching, and
+    validation
+  - **API Endpoints**: All 7 endpoints implemented (`GET`, `POST`, `PUT`,
+    `DELETE`, `POST /preview`, `POST /validate`)
+  - **UI Integration**: `useTemplates` composable fully integrated with API
+  - **Security**: Path traversal prevention, variable sanitization, file system
+    permission checks
+  - **Caching**: In-memory cache with file watching for automatic invalidation
+  - **Tests**: Comprehensive unit tests for service, cache, and validator
+  - **Documentation**: Complete API usage guide and specifications
 
 #### Configuration Export/Import
 

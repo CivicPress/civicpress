@@ -52,6 +52,10 @@ providers:
       project_id: ''
       service_account_key: ''
     prefix: ''
+    options:
+      location: us-central1
+      storage_class: STANDARD
+      create_bucket: false
 
 # Active Provider and Failover
 active_provider: local
