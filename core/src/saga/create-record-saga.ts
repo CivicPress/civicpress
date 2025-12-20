@@ -457,11 +457,11 @@ class QueueIndexingStep extends BaseSagaStep<CreateRecordContext, void> {
 }
 
 /**
- * Step 5: Emit hooks (Derived - fire and forget)
+ * Step 5: Emit hooks (Compensatable - emits compensating hook on rollback)
  */
 class EmitHooksStep extends BaseSagaStep<CreateRecordContext, RecordData> {
   name = 'EmitHooks';
-  isCompensatable = false; // Derived state
+  isCompensatable = true; // Can emit compensating hook
   timeout = 5000; // 5 seconds
 
   constructor(private hooks: HookSystem) {
@@ -496,6 +496,40 @@ class EmitHooksStep extends BaseSagaStep<CreateRecordContext, RecordData> {
 
     // Return the record (saga result)
     return context.record;
+  }
+
+  async compensate(
+    context: CreateRecordContext,
+    result: RecordData
+  ): Promise<void> {
+    // Emit compensating hook to notify system of rollback
+    // Hook handlers can decide how to handle the compensation
+    if (result) {
+      try {
+        await this.hooks.emit('record:created:reverted', {
+          record: result,
+          user: context.user,
+          action: 'create:revert',
+          reason: 'saga_compensation',
+        });
+        coreDebug(
+          `Compensated: Emitted record:created:reverted hook for record ${result.id}`,
+          {
+            recordId: result.id,
+            correlationId: context.correlationId,
+          }
+        );
+      } catch (error) {
+        // Don't fail compensation for hook errors
+        coreDebug(
+          `Hook compensation emission failed (non-critical): record:created:reverted`,
+          {
+            recordId: result.id,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
+    }
   }
 }
 

@@ -3,8 +3,9 @@
 _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha to a stable, production-ready civic infrastructure platform._
 
-**Current Version:** v0.1.4 (Alpha)  
-**Status:** Early development, preparing for pilot collaborations
+**Current Version:** v0.2.0 (Alpha)  
+**Status:** Core maturity complete, preparing for v0.3.x editor and UX
+enhancements
 
 ---
 
@@ -76,9 +77,11 @@ Each phase includes objectives and expected deliverables.
 
 ---
 
-# 3. v0.2.x — Core Maturity and Stability
+# 3. v0.2.x — Core Maturity and Stability ✅ COMPLETE
 
 **Focus:** Indexing, search, architecture cleanup, reliability improvements.
+
+**Status:** ✅ **All goals completed in v0.2.0 (2025-01-30)**
 
 ### Goals
 
@@ -98,17 +101,19 @@ Each phase includes objectives and expected deliverables.
 - Polish UI navigation and list views ✅ (Page-based pagination, improved search
   UX, sort options API implemented)
 - Add basic documentation for architecture ✅ (Comprehensive architecture.md
-  with 1,600+ lines, ADRs, and related documentation)
+  with 1,600+ lines, ADRs, visual diagrams, and related documentation)
 
 **Note:** Basic storage abstraction (local, S3, Azure) is already implemented
-(v0.1.x). This phase focuses on enhancements and additional providers.
+(v0.1.x). This phase focused on enhancements and additional providers.
 
-### Deliverables
+### Deliverables ✅
 
-- Stable API responses
-- Reliable local storage and backup
-- Improved demo dataset tooling
-- Indexed civic records (searchable by metadata and content)
+- ✅ Stable API responses
+- ✅ Reliable local storage and backup
+- ✅ Improved demo dataset tooling
+- ✅ Indexed civic records (searchable by metadata and content)
+- ✅ Production-ready security system (SecretsManager, CSRF Protection)
+- ✅ Comprehensive architecture documentation with visual diagrams
 
 ---
 

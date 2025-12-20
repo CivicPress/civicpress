@@ -1175,15 +1175,28 @@ functions that can be tested in isolation and called by CLI, API, or UI.
 
 **Module Integration**:
 
-The Storage module uses **Pattern 3: Independent Initialization**:
+The Storage module uses **Pattern 2: Service Registration** (DI Container):
 
-- Depends on `@civicpress/core` for types and utilities
-- Initializes `CloudUuidStorageService` per-request in API routes
-- Uses core error types and logging utilities
-- Configuration loaded from `.system-data/storage.yml`
+- **Registered in DI Container**: Storage services are registered during core
+  initialization
+- **Service Keys**:
+  - `storage` - `CloudUuidStorageService` (singleton, lazy initialization)
+  - `storageConfigManager` - `StorageConfigManager` (singleton)
+- **Dependencies**: Uses `Logger`, `UnifiedCacheManager`, and `DatabaseService`
+  from core
+- **Lazy Initialization**: Service is created synchronously but initialized
+  asynchronously on first use
+- **Configuration**: Loaded from `.system-data/storage.yml` via
+  `StorageConfigManager`
+- **Access Pattern**: Services accessed via `civicPress.getService('storage')`
+  or `civicPress.getService('storageConfigManager')`
 
-**Future Enhancement**: Consider registering storage service in DI container for
-unified service access.
+**Registration Flow**:
+
+1. Core calls `registerStorageServices()` during service registration
+2. Storage module registers services in DI container
+3. API routes access storage service via DI container
+4. Service initializes lazily on first use with actual config
 
 **Reference**: `docs/module-integration-guide.md`, `docs/uuid-storage-system.md`
 

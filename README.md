@@ -152,8 +152,8 @@ This instance showcases a complete sample dataset — including public records,
 geography layers, meeting minutes, and fully accessible API endpoints — offering
 a hands‑on look at how CivicPress structures and publishes civic information.
 
-**Current status:** v0.1.4 (Alpha). Suitable for demos and pilots with support,
-not yet for unsupervised production use.
+**Current status:** v0.2.0 (Alpha). Core maturity complete, suitable for demos
+and pilots with support, not yet for unsupervised production use.
 
 ---
 

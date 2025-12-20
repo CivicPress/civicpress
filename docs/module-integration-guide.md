@@ -178,8 +178,8 @@ router.post('/files', async (req, res) => {
 
 ## Storage Module Integration (Current Implementation)
 
-The Storage module is a complete example of Pattern 3 (Independent
-Initialization).
+The Storage module is a complete example of **Pattern 2 (Service Registration)**
+with lazy initialization.
 
 ### Architecture
 
@@ -200,49 +200,76 @@ modules/storage/
 1. **Core Dependency**: Uses `@civicpress/core` for:
    - `Logger` - Logging utilities
    - `UnifiedCacheManager` - Cache integration
+   - `DatabaseService` - Database operations
    - `CivicPressError` - Error types
+   - `ServiceContainer` - DI container for service registration
 
-2. **API Integration**: Initialized per-request in API routes:
+2. **DI Container Registration**: Services registered during core
+   initialization:
 
    ```typescript
-   // modules/api/src/routes/uuid-storage.ts
-   async function initializeStorage(req: AuthenticatedRequest) {
-     // Load config and initialize service
+   // In core/src/civic-core-services.ts
+   if (storageModule?.registerStorageServices) {
+     storageModule.registerStorageServices(container, config);
+   }
+
+   // In modules/storage/src/storage-services.ts
+   export function registerStorageServices(
+     container: ServiceContainer,
+     config: CivicPressConfig
+   ): void {
+     // Register 'storageConfigManager' (singleton)
+     container.singleton('storageConfigManager', () => {
+       return new StorageConfigManager(systemDataDir);
+     });
+
+     // Register 'storage' (singleton, lazy initialization)
+     container.singleton('storage', (c) => {
+       const cacheManager = c.resolve<UnifiedCacheManager>('cacheManager');
+       const db = c.resolve<DatabaseService>('database');
+       const configManager = c.resolve<StorageConfigManager>('storageConfigManager');
+
+       const storageService = new CloudUuidStorageService(
+         configManager.getDefaultConfig(),
+         systemDataDir,
+         cacheManager
+       );
+       storageService.setDatabaseService(db);
+       return storageService; // Lazy init on first use
+     });
    }
    ```
 
-3. **Configuration**: Uses `.system-data/storage.yml` for configuration
+3. **API Integration**: Services accessed via DI container:
 
-4. **Database**: Uses core `DatabaseService` for file metadata tracking
+   ```typescript
+   // modules/api/src/routes/uuid-storage.ts
+   async function getStorageService(req: AuthenticatedRequest) {
+     const civicPress = req.civicPress;
+     // Get from DI container (Pattern 2)
+     const storageService = civicPress.getService('storage');
+     // Lazy initialization on first use
+     await initializeStorageService(storageService);
+     return storageService;
+   }
+   ```
 
-### Current Limitations
+4. **Configuration**: Uses `.system-data/storage.yml` for configuration via
+   `StorageConfigManager`
 
-- Not registered in DI container
-- Initialized per-request (could be optimized)
-- No unified service access pattern
+5. **Database**: Uses core `DatabaseService` for file metadata tracking
 
-### Future Enhancements
+6. **Lazy Initialization**: Service is created synchronously but initialized
+   asynchronously on first use to handle async config loading
 
-Consider registering storage service in DI container:
+### Current Implementation
 
-```typescript
-// Future: In core/src/civic-core-services.ts
-container.singleton('storage', async (c) => {
-  const config = c.resolve<CivicPressConfig>('config');
-  const logger = c.resolve<Logger>('logger');
-  const db = c.resolve<DatabaseService>('database');
-
-  const storageConfig = await loadStorageConfig();
-  const storageService = new CloudUuidStorageService(
-    storageConfig,
-    config.dataDir,
-    logger,
-    db
-  );
-  await storageService.initialize();
-  return storageService;
-});
-```
+- ✅ **Registered in DI Container**: Services available via
+  `civicPress.getService('storage')`
+- ✅ **Unified Service Access**: Consistent with other core services
+- ✅ **Lazy Initialization**: Handles async config loading gracefully
+- ✅ **Optional Module**: Gracefully handles cases where storage module is not
+  available
 
 ## Module Development Guidelines
 

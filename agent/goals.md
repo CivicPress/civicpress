@@ -3,6 +3,10 @@
 **🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
 
+**Current Version:** v0.2.0 (Alpha)  
+**Release Date:** 2025-01-30  
+**Status:** Core Maturity and Stability milestone complete
+
 ## ✅ Completed Foundation (100% Complete)
 
 - ✅ **Complete Core Platform**: All major services implemented and functional

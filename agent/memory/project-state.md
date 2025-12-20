@@ -3,7 +3,46 @@
 **🌐 Website:** [civicpress.io](https://civicpress.io) | **📧 Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
 
-## Current Status: December 2025
+**Current Version:** v0.2.0 (Alpha)  
+**Release Date:** 2025-01-30  
+**Status:** Core Maturity and Stability milestone complete
+
+## Current Status: January 2025
+
+### 🎉 v0.2.0 Release Highlights
+
+**Release Date:** January 30, 2025
+
+**Major Achievements:**
+
+- ✅ **All v0.2.x Roadmap Goals Completed**: Core Maturity and Stability
+  milestone achieved
+- ✅ **Security System**: Production-ready SecretsManager and CSRF Protection
+- ✅ **Architecture Documentation**: Comprehensive visual diagrams with Mermaid
+- ✅ **Saga Pattern Enhancement**: All saga steps now compensatable
+- ✅ **Error Handling**: Complete unified error handling system
+- ✅ **Module Integration**: Storage module fully integrated with DI container
+
+**Key Features Added in v0.2.0:**
+
+1. **Security System**
+   - SecretsManager with HKDF-SHA256 key derivation
+   - CSRF Protection service and middleware
+   - UI composable for seamless integration
+   - Comprehensive test coverage
+
+2. **Architecture Diagrams**
+   - 7 comprehensive Mermaid diagrams
+   - Service dependency visualization
+   - Data flow documentation
+   - Security architecture diagrams
+
+3. **Documentation Enhancements**
+   - Architecture comprehensive analysis updated
+   - Visual documentation separated into dedicated file
+   - Complete roadmap milestone documentation
+
+**Next Phase:** v0.3.x — Editor, Attachments, and Civic UX
 
 ### ✅ **Completed Features**
 
