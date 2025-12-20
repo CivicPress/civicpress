@@ -32,6 +32,7 @@ import {
   SagaExecutor,
 } from './saga/index.js';
 import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
+import { SecretsManager } from './security/secrets.js';
 
 /**
  * Register all CivicPress services in the dependency injection container
@@ -50,6 +51,14 @@ export function registerCivicPressServices(
 
   // Configure core output with logger options
   coreOutput.setOptions(loggerOptions);
+
+  // Step 1.5: Register secrets manager (must be early, before auth services)
+  container.singleton('secretsManager', (c) => {
+    const config = c.resolve<CivicPressConfig>('config');
+    const secretsManager = SecretsManager.getInstance(config.dataDir);
+    // Note: initialize() will be called in completeServiceInitialization
+    return secretsManager;
+  });
 
   // Step 2: Prepare database configuration
   let dbConfig = config.database;
@@ -200,6 +209,20 @@ export async function completeServiceInitialization(
   container: ServiceContainer,
   civicPress: CivicPress
 ): Promise<void> {
+  // Initialize secrets manager first (before other services that depend on it)
+  const secretsManager = container.resolve<SecretsManager>('secretsManager');
+  await secretsManager.initialize();
+
+  // Initialize secrets in auth services
+  const authService = container.resolve<AuthService>('auth');
+  authService.initializeSecrets(secretsManager);
+  authService.initializeEmailValidationSecrets(secretsManager);
+
+  // Initialize secrets in notification service
+  const notificationService =
+    container.resolve<NotificationService>('notification');
+  notificationService.initializeSecrets(secretsManager);
+
   // Set up indexing service with CivicPress instance
   const indexingService = new IndexingService(
     civicPress,

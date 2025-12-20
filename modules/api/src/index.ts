@@ -60,6 +60,7 @@ import {
   createDatabaseContextMiddleware,
 } from './middleware/logging.js';
 import { authMiddleware, optionalAuth } from './middleware/auth.js';
+import { csrfMiddleware } from './middleware/csrf.js';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -253,7 +254,12 @@ export class CivicPressAPI {
     );
 
     // Public routes that should be accessible to guests
-    this.app.use(apiPath('records'), createRecordsRouter(recordsService));
+    // Records router handles auth internally, but CSRF applies to browser requests
+    this.app.use(
+      apiPath('records'),
+      csrfMiddleware(this.civicPress),
+      createRecordsRouter(recordsService)
+    );
     this.app.use(
       apiPath('geography'),
       optionalAuth(this.civicPress),
@@ -301,6 +307,8 @@ export class CivicPressAPI {
         (req as any).civicPress = this.civicPress;
         next();
       },
+      // Config router has its own auth middleware, CSRF applies to browser requests
+      csrfMiddleware(this.civicPress),
       configRouter
     );
     this.app.use(apiPath('system'), systemRouter);
@@ -390,6 +398,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('users'),
       authMiddleware(this.civicPress),
+      csrfMiddleware(this.civicPress),
       usersRouter
     );
 

@@ -21,3 +21,8 @@ database:
     file: './.system-data/civic.db'
 created: '2025-01-01T00:00:00.000Z'
 
+# Secrets are managed separately:
+# - Set CIVICPRESS_SECRET environment variable for production, OR
+# - Secret will be auto-generated in .system-data/secrets.yml for development
+# See docs/secrets-management.md for details
+

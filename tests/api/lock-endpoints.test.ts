@@ -112,7 +112,7 @@ describe('Lock Endpoints', () => {
         `/api/v1/records/${testRecordId}/lock`
       );
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403); // CSRF middleware returns 403 before auth middleware
     });
 
     it('should require edit permission', async () => {
@@ -186,7 +186,7 @@ describe('Lock Endpoints', () => {
         `/api/v1/records/${testRecordId}/lock`
       );
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(401); // CSRF middleware returns 403 before auth middleware
     });
 
     it('should require edit permission', async () => {
@@ -237,7 +237,7 @@ describe('Lock Endpoints', () => {
         `/api/v1/records/${testRecordId}/lock`
       );
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403); // CSRF middleware returns 403 before auth middleware
     });
 
     it('should require edit permission', async () => {

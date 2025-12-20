@@ -4,6 +4,7 @@ import { Logger } from '../utils/logger.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { NotificationConfig } from '../notifications/notification-config.js';
 import { coreError, coreDebug } from '../utils/core-output.js';
+import { SecretsManager } from '../security/secrets.js';
 
 const logger = new Logger();
 
@@ -34,6 +35,7 @@ export class EmailValidationService {
   private db: DatabaseService;
   private tokenExpiryHours: number = 24; // 24 hours for email verification
   private notificationService: NotificationService;
+  private secretsManager?: SecretsManager;
 
   constructor(db: DatabaseService) {
     this.db = db;
@@ -43,6 +45,15 @@ export class EmailValidationService {
     // Register email channel and templates
     this.registerEmailChannel();
     this.registerEmailTemplates();
+  }
+
+  /**
+   * Initialize secrets manager for token signing
+   */
+  initializeSecrets(secretsManager: SecretsManager): void {
+    this.secretsManager = secretsManager;
+    // Also initialize secrets in notification service used by email validation
+    this.notificationService.initializeSecrets(secretsManager);
   }
 
   /**
@@ -238,7 +249,20 @@ export class EmailValidationService {
     type: 'initial' | 'change'
   ): Promise<string> {
     try {
+      // Generate random token
       const token = this.generateVerificationToken();
+
+      // Sign token if secrets manager available
+      let finalToken = token;
+      if (this.secretsManager) {
+        const signingKey = this.secretsManager.getTokenSigningKey();
+        const signature = this.secretsManager.sign(token, signingKey);
+        finalToken = `${token}.${signature}`;
+      }
+
+      // Store raw token hash in database
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + this.tokenExpiryHours);
 
@@ -248,16 +272,17 @@ export class EmailValidationService {
         [userId, type]
       );
 
-      // Create new verification token
+      // Create new verification token (store hash, not raw token)
       await this.db.execute(
         'INSERT INTO email_verifications (user_id, email, token, type, expires_at) VALUES (?, ?, ?, ?, ?)',
-        [userId, email, token, type, expiresAt.toISOString()]
+        [userId, email, tokenHash, type, expiresAt.toISOString()]
       );
 
       // Send verification email (if email channel is enabled)
       const action =
         type === 'initial' ? 'verify-email' : 'confirm-email-change';
-      const verificationUrl = `${this.getBaseUrl()}/settings/profile?action=${action}&token=${token}`;
+      // Use finalToken (signed if available) in the URL
+      const verificationUrl = `${this.getBaseUrl()}/settings/profile?action=${action}&token=${finalToken}`;
       const templateName =
         type === 'initial' ? 'email_verification' : 'email_change_verification';
 
@@ -268,7 +293,7 @@ export class EmailValidationService {
           template: templateName,
           data: {
             verification_url: verificationUrl,
-            token: token,
+            token: finalToken, // Use signed token in email data
             expires_at: expiresAt.toISOString(),
           },
         });
@@ -284,7 +309,7 @@ export class EmailValidationService {
         );
       }
 
-      return token;
+      return finalToken; // Return signed token to caller
     } catch (error) {
       logger.error('Error creating email verification token:', error);
       throw new Error('Failed to create email verification token');
@@ -296,9 +321,33 @@ export class EmailValidationService {
    */
   async verifyToken(token: string): Promise<EmailVerificationToken | null> {
     try {
+      let tokenToHash = token;
+
+      // If token is signed, verify and extract raw token
+      if (this.secretsManager && token.includes('.')) {
+        const parts = token.split('.');
+        if (parts.length === 2) {
+          const [rawToken, signature] = parts;
+          const signingKey = this.secretsManager.getTokenSigningKey();
+
+          if (this.secretsManager.verify(rawToken, signature, signingKey)) {
+            tokenToHash = rawToken;
+          } else {
+            // Invalid signature
+            return null;
+          }
+        }
+      }
+
+      // Hash and lookup in database
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(tokenToHash)
+        .digest('hex');
+
       const result = await this.db.query(
         'SELECT * FROM email_verifications WHERE token = ? AND expires_at > datetime("now")',
-        [token]
+        [tokenHash]
       );
 
       if (result.length === 0) {

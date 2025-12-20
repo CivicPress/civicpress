@@ -55,6 +55,8 @@ router.get('/link-categories', async (req, res) => {
  *
  * Request body (optional):
  * - content: string - YAML content to validate. If provided, validates this content instead of the saved file.
+ *
+ * Note: This endpoint is public and CSRF is skipped for it (see csrf middleware)
  */
 router.post(
   '/:type/validate',

@@ -21,6 +21,7 @@ import {
   registerCivicPressServices,
   completeServiceInitialization,
 } from './civic-core-services.js';
+import { SecretsManager } from './security/secrets.js';
 
 export interface CivicPressConfig {
   dataDir: string;
@@ -364,6 +365,10 @@ export class CivicPress {
         this.container.resolve<UnifiedCacheManager>('cacheManager');
     }
     return this._cacheManager;
+  }
+
+  getSecretsManager(): SecretsManager {
+    return this.container.resolve<SecretsManager>('secretsManager');
   }
 
   /**

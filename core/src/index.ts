@@ -272,6 +272,11 @@ export type {
   IndexingOptions,
 } from './indexing/indexing-service.js';
 
+// Export security services
+export { SecretsManager } from './security/secrets.js';
+export { CsrfProtection } from './security/csrf.js';
+export type { CsrfToken } from './security/csrf.js';
+
 // Export notification services
 export {
   NotificationService,
