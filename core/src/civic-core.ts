@@ -240,7 +240,7 @@ export class CivicPress {
       const hooks = this.container.resolve<HookSystem>('hooks');
       await hooks.initialize();
 
-      this.logger.info('CivicPress initialized successfully');
+      this.logger.info('CivicPress initialized');
     } catch (error) {
       this.logger.error('Failed to initialize CivicPress:', error);
       throw error;

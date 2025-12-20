@@ -130,7 +130,7 @@ export class CivicPressAPI {
       // Load database config from central config
       logger.info('Loading database config...');
       const dbConfig = CentralConfigManager.getDatabaseConfig();
-      logger.info('Database config loaded:', dbConfig);
+      logger.info('Database config loaded');
 
       // Initialize CivicPress core
       logger.info('Creating CivicPress instance...');
@@ -141,7 +141,7 @@ export class CivicPressAPI {
 
       logger.info('Initializing CivicPress core...');
       await this.civicPress.initialize();
-      logger.info('CivicPress core initialized');
+      // Core initialization message logged at core level (civic-core.ts)
 
       // Auto-index records on startup (optional)
       const enableAutoIndexing = process.env.ENABLE_AUTO_INDEXING === 'true';
@@ -154,7 +154,7 @@ export class CivicPressAPI {
               syncDatabase: true,
               conflictResolution: 'file-wins',
             });
-            logger.info('Auto-indexing completed successfully');
+            logger.info('Auto-indexing completed');
           } else {
             logger.warn('IndexingService not available for auto-indexing');
           }
@@ -181,7 +181,7 @@ export class CivicPressAPI {
       this.app.use(notFoundHandler);
       this.app.use(errorHandler);
 
-      logger.info('CivicPress API initialized successfully');
+      logger.info('CivicPress API initialized');
     } catch (error) {
       logger.error('Failed to initialize CivicPress API:', error);
       throw error;
@@ -393,8 +393,7 @@ export class CivicPressAPI {
       usersRouter
     );
 
-    // DEBUG: Log route setup completion
-    logger.info('[DEBUG] All routes registered successfully');
+    logger.info('Routes registered');
   }
 
   async start(): Promise<void> {
@@ -468,7 +467,7 @@ if (isMainModule) {
     .initialize(dataDir)
     .then(() => api.start())
     .then(() => {
-      logger.info('CivicPress API server started successfully');
+      logger.info('CivicPress API server started');
     })
     .catch((error) => {
       logger.error('Failed to start CivicPress API server:', error);

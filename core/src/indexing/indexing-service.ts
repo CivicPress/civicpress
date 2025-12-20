@@ -386,8 +386,8 @@ export class IndexingService {
     const recordManager = this.civicPress.getRecordManager();
     const logger = new Logger();
 
-    logger.info('🔄 Syncing indexed records to database...');
-    logger.info(`📊 Found ${index.entries.length} records to sync`);
+    logger.info('Syncing indexed records to database...');
+    logger.info(`Found ${index.entries.length} records to sync`);
 
     let syncedCount = 0;
     let skippedCount = 0;
@@ -436,7 +436,7 @@ export class IndexingService {
           // Record doesn't exist - create it
           await this.createRecordFromFile(entry, recordManager, recordId);
           syncedCount++;
-          logger.info(`✅ Created record: ${entry.title}`);
+          logger.info(`Created record: ${entry.title}`);
         } else {
           // Record exists - handle conflict
           const shouldUpdate = await this.shouldUpdateRecord(
@@ -453,10 +453,10 @@ export class IndexingService {
               recordManager
             );
             syncedCount++;
-            logger.info(`🔄 Updated record: ${entry.title}`);
+            logger.info(`Updated record: ${entry.title}`);
           } else {
             skippedCount++;
-            logger.info(`⏭️  Skipped record: ${entry.title}`);
+            logger.info(`Skipped record: ${entry.title}`);
           }
         }
       } catch (error) {
@@ -475,7 +475,7 @@ export class IndexingService {
     }
 
     logger.info(
-      `📊 Sync complete: ${syncedCount} synced, ${skippedCount} skipped, ${conflictCount} conflicts`
+      `Sync complete: ${syncedCount} synced, ${skippedCount} skipped, ${conflictCount} conflicts`
     );
   }
 

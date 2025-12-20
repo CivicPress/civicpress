@@ -567,7 +567,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         SET auth_provider = 'password', email_verified = TRUE 
         WHERE password_hash IS NOT NULL AND auth_provider IS NULL
       `);
-      coreInfo('✓ Updated existing password users with auth_provider', {
+      coreInfo('Updated existing password users with auth_provider', {
         operation: 'database:initialize',
       });
     } catch (error) {

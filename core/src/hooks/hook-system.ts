@@ -78,14 +78,7 @@ export class HookSystem {
       // Set up default hooks
       this.registerDefaultHooks();
 
-      coreSuccess(
-        { hooks: this.getRegisteredHooks() },
-        'Hook system initialized successfully',
-        {
-          operation: 'hook system initialization',
-          registeredHooks: this.getRegisteredHooks(),
-        }
-      );
+      // Success logged via lifecycle operation (coreStartOperation/endOperation)
 
       endOperation();
     } catch (error) {

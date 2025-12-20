@@ -79,10 +79,7 @@ export class DatabaseService {
       await this.adapter.connect();
       await this.adapter.initialize();
       this.isConnected = true;
-      // Suppress database messages in test environment
-      if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
-        this.logger.info('Database initialized successfully');
-      }
+      // Database initialization message logged at higher level (civic-core.ts)
     } catch (error) {
       this.logger.error('Failed to initialize database:', error);
       throw error;

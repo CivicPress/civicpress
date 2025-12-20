@@ -69,18 +69,13 @@ export class CoreOutput {
     }
 
     // Human-readable output
-    if (message) {
+    // Only log message if no lifecycle operation is tracking this (avoid duplicates)
+    // Lifecycle operations (coreStartOperation) already log completion with ✅
+    if (message && !meta?.operation) {
       this.logger.success(message);
     }
 
-    if (meta?.operation) {
-      this.logger.info(`Core operation completed: ${meta.operation}`, {
-        operation: meta.operation,
-        duration: meta.duration,
-        context: meta.context,
-        ...meta,
-      });
-    }
+    // Don't log "Core operation completed" - lifecycle operations already handle this
   }
 
   // Error output with structured formatting
@@ -151,13 +146,13 @@ export class CoreOutput {
   startOperation(operation: string): () => void {
     const startTime = Date.now();
 
-    this.logger.info(`🔄 Starting: ${operation}`, {
+    this.logger.info(`Starting: ${operation}`, {
       operation,
     });
 
     return () => {
       const duration = Date.now() - startTime;
-      this.logger.info(`✅ Completed: ${operation}`, {
+      this.logger.info(`Finished: ${operation}`, {
         operation,
         duration,
       });
