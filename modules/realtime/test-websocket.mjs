@@ -13,14 +13,26 @@ import WebSocket from 'ws';
 
 const RECORD_ID = process.env.RECORD_ID || process.argv[2] || 'test-record-123';
 const TOKEN = process.env.TOKEN || process.argv[3] || 'test-token';
-const WS_URL = `ws://localhost:3001/realtime/records/${RECORD_ID}?token=${TOKEN}`;
+const USE_HEADER = process.env.USE_HEADER === 'true';
+
+// Use secure header authentication (recommended for Node.js clients)
+// For browser clients, use subprotocol: new WebSocket(url, ['auth.' + token])
+const WS_URL = `ws://localhost:3001/realtime/records/${RECORD_ID}`;
 
 console.log('🔌 Connecting to realtime server...');
 console.log(`   URL: ${WS_URL}`);
 console.log(`   Record ID: ${RECORD_ID}`);
+console.log(`   Auth method: ${USE_HEADER ? 'Authorization header (secure)' : 'Subprotocol (secure)'}`);
 console.log('');
 
-const ws = new WebSocket(WS_URL);
+// Use Authorization header for Node.js clients (most secure)
+const ws = USE_HEADER
+  ? new WebSocket(WS_URL, {
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+      },
+    })
+  : new WebSocket(WS_URL, [`auth.${TOKEN}`]); // Subprotocol method (browser-compatible)
 
 ws.on('open', () => {
   console.log('✅ Connected to realtime server');

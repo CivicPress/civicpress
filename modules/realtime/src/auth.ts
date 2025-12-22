@@ -92,27 +92,57 @@ export async function authenticateConnection(
 
 /**
  * Extract token from WebSocket connection
+ *
+ * Priority order (most secure first):
+ * 1. Authorization header (Bearer token) - for Node.js clients
+ * 2. Subprotocol header (Sec-WebSocket-Protocol) - for browser clients
+ * 3. Query string - deprecated, kept for backward compatibility
+ *
+ * @param url - WebSocket URL
+ * @param headers - Request headers
+ * @param protocols - WebSocket subprotocols (from Sec-WebSocket-Protocol header)
+ * @returns Token string or null if not found
  */
 export function extractToken(
   url: string,
-  headers?: Record<string, string>
-): string | null {
-  // Try query string first
-  const urlObj = new URL(url, 'http://localhost');
-  const tokenFromQuery = urlObj.searchParams.get('token');
-  if (tokenFromQuery) {
-    return tokenFromQuery;
-  }
-
-  // Try Authorization header
+  headers?: Record<string, string>,
+  protocols?: string[]
+): { token: string | null; method: 'header' | 'subprotocol' | 'query' | null } {
+  // 1. Try Authorization header first (most secure, for Node.js clients)
   if (headers) {
     const authHeader = headers.authorization || headers.Authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      return authHeader.substring(7);
+      return { token: authHeader.substring(7), method: 'header' };
     }
   }
 
-  return null;
+  // 2. Try subprotocol (browser-compatible, secure)
+  // Format: "auth.<token>" or just the token if it's the only protocol
+  if (protocols && protocols.length > 0) {
+    for (const protocol of protocols) {
+      if (protocol.startsWith('auth.')) {
+        return { token: protocol.substring(5), method: 'subprotocol' };
+      }
+      // If it's a long string that looks like a token, use it
+      // Tokens are typically long base64-like strings
+      if (
+        protocol.length > 20 &&
+        !protocol.includes('/') &&
+        !protocol.includes(' ')
+      ) {
+        return { token: protocol, method: 'subprotocol' };
+      }
+    }
+  }
+
+  // 3. Try query string (deprecated, less secure - kept for backward compatibility)
+  const urlObj = new URL(url, 'http://localhost');
+  const tokenFromQuery = urlObj.searchParams.get('token');
+  if (tokenFromQuery) {
+    return { token: tokenFromQuery, method: 'query' };
+  }
+
+  return { token: null, method: null };
 }
 
 /**

@@ -79,8 +79,11 @@ civicPress
     console.log('✅ CivicPress initialized');
     console.log('✅ Realtime WebSocket server should be running on port 3001');
     console.log('');
-    console.log('📡 Connect to: ws://localhost:3001/realtime/records/:recordId?token=:token');
-    console.log('   Or: ws://localhost:3001/realtime/record/:recordId?token=:token');
+    console.log('📡 Connect to: ws://localhost:3001/realtime/records/:recordId');
+    console.log('   Secure methods (recommended):');
+    console.log('   - Subprotocol: new WebSocket(url, [`auth.${token}`])');
+    console.log('   - Header: new WebSocket(url, { headers: { Authorization: `Bearer ${token}` } })');
+    console.log('   Deprecated: ?token=... (query string - kept for backward compatibility)');
     console.log('');
     console.log('Press Ctrl+C to stop...');
     console.log('');

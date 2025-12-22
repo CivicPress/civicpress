@@ -223,12 +223,19 @@ export class RealtimeServer {
 
     this.server.on('connection', (ws: WebSocket, req) => {
       // Convert IncomingMessage to our expected format
+      // Extract subprotocols from the request (for browser clients)
+      // The 'sec-websocket-protocol' header contains comma-separated protocols
+      const protocols = req.headers['sec-websocket-protocol']
+        ? req.headers['sec-websocket-protocol'].split(',').map((p) => p.trim())
+        : undefined;
+
       const reqData = {
         url: req.url,
         socket: req.socket
           ? { remoteAddress: req.socket.remoteAddress }
           : undefined,
         headers: req.headers as Record<string, string>,
+        protocols,
       };
       this.handleConnection(ws, reqData);
     });
@@ -277,6 +284,7 @@ export class RealtimeServer {
       url?: string;
       socket?: { remoteAddress?: string };
       headers?: Record<string, string>;
+      protocols?: string[];
     }
   ): Promise<void> {
     const clientId = this.generateClientId();
@@ -295,12 +303,29 @@ export class RealtimeServer {
 
       // Extract token and room info
       const url = req.url || '';
-      const token = extractToken(url, req.headers);
-      if (!token) {
+      const tokenResult = extractToken(url, req.headers, req.protocols);
+
+      // Log warning if using deprecated query string method
+      if (tokenResult.method === 'query') {
+        this.logger.warn(
+          'WebSocket authentication using deprecated query string method',
+          {
+            operation: 'realtime:auth:deprecated',
+            clientId,
+            ip: clientIp,
+            recommendation:
+              'Use Authorization header (Node.js) or subprotocol (browser) instead',
+          }
+        );
+      }
+
+      if (!tokenResult.token) {
         this.sendError(ws, new AuthenticationFailedError());
         ws.close();
         return;
       }
+
+      const token = tokenResult.token;
 
       // Parse room ID
       const roomInfo = parseRoomId(url);

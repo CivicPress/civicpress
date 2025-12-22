@@ -98,7 +98,20 @@ node modules/realtime/test-websocket.mjs
 ```javascript
 const token = 'your-token';
 const recordId = 'your-record-id';
-const ws = new WebSocket(`ws://localhost:3001/realtime/records/${recordId}?token=${token}`);
+
+// SECURE: Use subprotocol (browser-compatible, recommended)
+const ws = new WebSocket(
+  `ws://localhost:3001/realtime/records/${recordId}`,
+  [`auth.${token}`] // Subprotocol method - token not in URL
+);
+
+// Alternative: Use Authorization header (Node.js clients only)
+// const ws = new WebSocket(`ws://localhost:3001/realtime/records/${recordId}`, {
+//   headers: { Authorization: `Bearer ${token}` }
+// });
+
+// DEPRECATED: Query string (kept for backward compatibility, less secure)
+// const ws = new WebSocket(`ws://localhost:3001/realtime/records/${recordId}?token=${token}`);
 
 ws.onopen = () => console.log('Connected!');
 ws.onmessage = (e) => console.log('Message:', JSON.parse(e.data));

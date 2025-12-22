@@ -88,15 +88,21 @@ See `ARCHITECTURE.md` and `DEVELOPMENT.md` for detailed explanations.
 ### WebSocket Connection
 
 ```typescript
-// Connect to a record room
-const ws = new WebSocket('ws://localhost:3001/realtime/records/abc123?token=<jwt-token>');
+// SECURE: Use subprotocol (browser-compatible, recommended)
+const ws = new WebSocket(
+  'ws://localhost:3001/realtime/records/abc123',
+  [`auth.${token}`] // Token in subprotocol, not in URL
+);
 
-// Or with header authentication
+// SECURE: Use Authorization header (Node.js clients only)
 const ws = new WebSocket('ws://localhost:3001/realtime/records/abc123', {
   headers: {
     'Authorization': 'Bearer <jwt-token>'
   }
 });
+
+// DEPRECATED: Query string (kept for backward compatibility, less secure)
+// const ws = new WebSocket('ws://localhost:3001/realtime/records/abc123?token=<jwt-token>');
 ```
 
 ### Message Types
