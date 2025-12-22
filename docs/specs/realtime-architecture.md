@@ -2,13 +2,20 @@
 
 ---
 
-version: 1.0.0 status: draft created: '2025-12-04' updated: '2025-12-04'
+version: 1.1.0 status: draft created: '2025-12-04' updated: '2025-01-30'
 deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - WebSocket-based realtime service architecture
 - yjs document collaboration system
 - Presence tracking and room management
-- Snapshot persistence strategy fixes: [] migration_guide: null compatibility:
+- Snapshot persistence strategy
+- Module integration (service registration, DI container)
+- Configuration management
+- Error handling hierarchy
+- Initialization and lifecycle management
+- Hook system integration
+- Logging patterns
+- Room type extension mechanism fixes: [] migration_guide: null compatibility:
   min_civicpress: '1.0.0' max_civicpress: null dependencies:
 - 'editor-spec-v3.md: >=1.0.0'
 - 'api.md: >=1.0.0'
@@ -101,6 +108,453 @@ tests/
   ├── yjs-room.test.ts # Room management tests
   └── snapshot.test.ts # Snapshot tests
 ```
+
+## Module Integration
+
+The realtime module integrates with CivicPress core using **Pattern 2 (Service
+Registration)** from the Module Integration Guide, following the same pattern as
+the Storage module.
+
+### Service Registration
+
+Services are registered in the CivicPress DI container during core
+initialization:
+
+**File**: `modules/realtime/src/realtime-services.ts`
+
+```typescript
+import {
+  ServiceContainer,
+  CivicPressConfig,
+  Logger,
+  HookSystem,
+  AuthService,
+  DatabaseService,
+} from '@civicpress/core';
+import { RealtimeServer } from './realtime-server.js';
+import { RoomManager } from './rooms/room-manager.js';
+import { RealtimeConfigManager } from './realtime-config-manager.js';
+
+export function registerRealtimeServices(
+  container: ServiceContainer,
+  config: CivicPressConfig
+): void {
+  const systemDataDir = config.dataDir || '.system-data';
+
+  // Register 'realtimeConfigManager' (singleton)
+  container.singleton('realtimeConfigManager', () => {
+    return new RealtimeConfigManager(systemDataDir);
+  });
+
+  // Register 'realtimeServer' (singleton)
+  container.singleton('realtimeServer', (c) => {
+    const logger = c.resolve<Logger>('logger');
+    const hookSystem = c.resolve<HookSystem>('hooks');
+    const authService = c.resolve<AuthService>('auth');
+    const configManager = c.resolve<RealtimeConfigManager>('realtimeConfigManager');
+
+    return new RealtimeServer(
+      logger,
+      hookSystem,
+      authService,
+      configManager,
+      config
+    );
+  });
+
+  // Register 'realtimeRoomManager' (singleton)
+  container.singleton('realtimeRoomManager', (c) => {
+    const logger = c.resolve<Logger>('logger');
+    const server = c.resolve<RealtimeServer>('realtimeServer');
+    return new RoomManager(logger, server);
+  });
+}
+```
+
+**Integration Point**: In `core/src/civic-core-services.ts`:
+
+```typescript
+// Register realtime module services if available
+try {
+  const realtimeModule = await import('@civicpress/realtime/realtime-services');
+  if (realtimeModule?.registerRealtimeServices) {
+    realtimeModule.registerRealtimeServices(container, config);
+  }
+} catch (error) {
+  // Module not available - optional module
+  logger.debug('Realtime module not available');
+}
+```
+
+### Core Service Dependencies
+
+The realtime module depends on the following core services:
+
+| Service               | Purpose                                 | Required    |
+| --------------------- | --------------------------------------- | ----------- |
+| `Logger`              | Logging utilities                       | ✅ Yes      |
+| `HookSystem`          | Event emission for workflow integration | ✅ Yes      |
+| `AuthService`         | Authentication validation               | ✅ Yes      |
+| `DatabaseService`     | Snapshot storage (if using database)    | ⚠️ Optional |
+| `UnifiedCacheManager` | Caching (if needed)                     | ⚠️ Optional |
+
+**Service Resolution**: Services are resolved from the DI container using the
+standard pattern:
+
+```typescript
+const logger = container.resolve<Logger>('logger');
+const hookSystem = container.resolve<HookSystem>('hooks');
+const authService = container.resolve<AuthService>('auth');
+```
+
+### Service Access Pattern
+
+Services are accessed via the DI container:
+
+```typescript
+// In API routes or other modules
+const realtimeServer = civicPress.getService<RealtimeServer>('realtimeServer');
+const roomManager = civicPress.getService<RoomManager>('realtimeRoomManager');
+```
+
+## Configuration
+
+The realtime module uses a configuration file for deployment-specific settings.
+
+### Configuration File
+
+**Location**: `.system-data/realtime.yml`
+
+**Structure**:
+
+```yaml
+realtime:
+  enabled: true
+  port: 3001
+  host: '0.0.0.0'
+  path: '/realtime'
+
+  rooms:
+    max_rooms: 100
+    cleanup_timeout: 3600  # seconds
+
+  snapshots:
+    enabled: true
+    interval: 300  # seconds
+    max_updates: 100
+    storage: 'database'  # 'database' or 'filesystem'
+
+  rate_limiting:
+    messages_per_second: 10
+    connections_per_ip: 100
+    connections_per_user: 10
+```
+
+### Configuration Loading
+
+Uses `RealtimeConfigManager` pattern similar to `StorageConfigManager`:
+
+```typescript
+// modules/realtime/src/realtime-config-manager.ts
+export class RealtimeConfigManager {
+  private configPath: string;
+  private logger: Logger;
+  private defaultConfig: RealtimeConfig;
+
+  constructor(basePath: string = '.system-data') {
+    this.configPath = path.join(basePath, 'realtime.yml');
+    this.logger = new Logger();
+    this.defaultConfig = { /* defaults */ };
+  }
+
+  async loadConfig(): Promise<RealtimeConfig> {
+    // Load from file, merge with defaults
+  }
+
+  getDefaultConfig(): RealtimeConfig {
+    return this.defaultConfig;
+  }
+}
+```
+
+**Configuration Access**: Configuration is loaded via the registered
+`realtimeConfigManager` service:
+
+```typescript
+const configManager = container.resolve<RealtimeConfigManager>('realtimeConfigManager');
+const config = await configManager.loadConfig();
+```
+
+## Error Handling
+
+All realtime errors extend the CivicPress error hierarchy for consistent error
+handling.
+
+### Error Hierarchy
+
+```typescript
+// modules/realtime/src/errors/realtime-errors.ts
+import {
+  CivicPressError,
+  NotFoundError,
+  ValidationError,
+  UnauthorizedError,
+} from '@civicpress/core/errors';
+
+export class RealtimeError extends CivicPressError {
+  code = 'REALTIME_ERROR';
+  statusCode = 500;
+}
+
+export class RoomNotFoundError extends NotFoundError {
+  code = 'ROOM_NOT_FOUND';
+
+  constructor(roomId: string, context?: Record<string, any>) {
+    super(`Room '${roomId}' not found`, { roomId, ...context });
+  }
+}
+
+export class ConnectionLimitExceededError extends ValidationError {
+  code = 'CONNECTION_LIMIT_EXCEEDED';
+  statusCode = 429;
+
+  constructor(limit: number, context?: Record<string, any>) {
+    super(`Connection limit exceeded: ${limit}`, { limit, ...context });
+  }
+}
+
+export class InvalidYjsUpdateError extends ValidationError {
+  code = 'INVALID_YJS_UPDATE';
+
+  constructor(message: string, context?: Record<string, any>) {
+    super(`Invalid yjs update: ${message}`, context);
+  }
+}
+
+export class AuthenticationFailedError extends UnauthorizedError {
+  code = 'AUTH_FAILED';
+
+  constructor(context?: Record<string, any>) {
+    super('Authentication failed', context);
+  }
+}
+
+export class PermissionDeniedError extends UnauthorizedError {
+  code = 'PERMISSION_DENIED';
+
+  constructor(resource: string, context?: Record<string, any>) {
+    super(`Permission denied for resource: ${resource}`, { resource, ...context });
+  }
+}
+```
+
+### Error Response Format
+
+Errors follow the unified CivicPress error format:
+
+```json
+{
+  "error": {
+    "code": "ROOM_NOT_FOUND",
+    "message": "Room 'record:abc123' not found",
+    "statusCode": 404,
+    "correlationId": "abc-123-def",
+    "context": {
+      "roomId": "record:abc123"
+    }
+  }
+}
+```
+
+## Initialization & Lifecycle
+
+The realtime module follows a clear initialization and shutdown lifecycle.
+
+### Module Initialization
+
+Initialization sequence:
+
+1. **Service Registration** (synchronous)
+   - Services registered in DI container during core initialization
+   - Configuration manager created
+   - Server and room manager instances created (not yet started)
+
+2. **Service Initialization** (asynchronous)
+
+   ```typescript
+   export class RealtimeServer {
+     async initialize(): Promise<void> {
+       // 1. Load configuration
+       const config = await this.configManager.loadConfig();
+
+       // 2. Validate configuration
+       this.validateConfig(config);
+
+       // 3. Start WebSocket server
+       await this.startServer(config);
+
+       // 4. Register room types
+       this.registerRoomTypes();
+
+       // 5. Setup health checks
+       this.setupHealthChecks();
+
+       // 6. Register hooks
+       this.registerHooks();
+
+       this.logger.info('Realtime server initialized', {
+         port: config.port,
+         path: config.path,
+       });
+     }
+   }
+   ```
+
+3. **Initialization Order**
+   - Core services initialized first (database, auth, hooks)
+   - Realtime services initialized after core services
+   - WebSocket server started last
+
+### Graceful Shutdown
+
+Shutdown procedure:
+
+```typescript
+export class RealtimeServer {
+  async shutdown(): Promise<void> {
+    this.logger.info('Shutting down realtime server...');
+
+    // 1. Stop accepting new connections
+    this.server.close();
+
+    // 2. Close existing connections gracefully
+    await this.closeAllConnections();
+
+    // 3. Save pending snapshots
+    await this.savePendingSnapshots();
+
+    // 4. Cleanup rooms
+    await this.cleanupRooms();
+
+    // 5. Close server
+    await this.closeServer();
+
+    this.logger.info('Realtime server shut down');
+  }
+}
+```
+
+**Shutdown Triggers**:
+
+- Platform shutdown signal (SIGTERM, SIGINT)
+- Explicit shutdown call from core
+- Error conditions requiring restart
+
+## Hook System Integration
+
+The realtime module emits hook events for workflow integration and event-driven
+features.
+
+### Hook Events Emitted
+
+| Event                          | Description         | Payload                                |
+| ------------------------------ | ------------------- | -------------------------------------- |
+| `realtime:room:created`        | Room created        | `{ roomId, roomType, createdBy }`      |
+| `realtime:room:destroyed`      | Room destroyed      | `{ roomId, reason }`                   |
+| `realtime:client:connected`    | Client connected    | `{ clientId, roomId, userId }`         |
+| `realtime:client:disconnected` | Client disconnected | `{ clientId, roomId, userId, reason }` |
+| `realtime:snapshot:saved`      | Snapshot saved      | `{ roomId, snapshotId, timestamp }`    |
+
+### Hook Event Structure
+
+```typescript
+// Example: realtime:room:created
+{
+  event: 'realtime:room:created',
+  timestamp: 1701705600000,
+  data: {
+    roomId: 'record:abc123',
+    roomType: 'record',
+    createdBy: 'user-id-123',
+  },
+  correlationId: 'abc-123-def',
+}
+```
+
+### Hook Registration
+
+```typescript
+export class RealtimeServer {
+  private registerHooks(): void {
+    this.hookSystem.on('realtime:room:created', async (event) => {
+      // Emit to workflow engine
+      await this.workflowEngine.trigger('onRoomCreated', event.data);
+    });
+  }
+}
+```
+
+### Workflow Integration
+
+Hooks enable workflow automation:
+
+```yaml
+# .civic/workflows/realtime-workflows.yml
+workflows:
+  - name: on_room_created
+    trigger: realtime:room:created
+    actions:
+      - log_room_activity
+      - notify_participants
+```
+
+## Logging Patterns
+
+The realtime module uses the core `Logger` service for consistent logging.
+
+### Logging Usage
+
+```typescript
+import { Logger } from '@civicpress/core';
+
+export class RealtimeServer {
+  constructor(private logger: Logger) {}
+
+  async handleConnection(clientId: string, roomId: string) {
+    this.logger.info('Client connected', {
+      clientId,
+      roomId,
+      operation: 'realtime:connection',
+      timestamp: Date.now(),
+    });
+  }
+
+  async handleError(error: Error, context: Record<string, any>) {
+    this.logger.error('Realtime error', {
+      error: error.message,
+      stack: error.stack,
+      ...context,
+      operation: 'realtime:error',
+    });
+  }
+}
+```
+
+### Log Levels
+
+- **`info`**: Connection events, room lifecycle, normal operations
+- **`warn`**: Rate limit warnings, performance warnings, non-critical errors
+- **`error`**: Connection failures, authentication failures, critical errors
+- **`debug`**: Detailed message flow, state transitions (verbose mode only)
+
+### Structured Logging
+
+All logs include:
+
+- Operation identifier (`operation: 'realtime:...'`)
+- Contextual data (roomId, clientId, userId, etc.)
+- Timestamps
+- Correlation IDs (when available)
 
 ## Design Principles
 
@@ -420,10 +874,48 @@ interface BaseMessage {
   - Creating a new record does not create a room until the record is saved and
     has an ID
 
-The system should allow future room types, for example:
+### Room Type Extension
 
-- `consultation:<id>`
-- `dashboard:<id>`
+The system supports extensible room types through a registration pattern:
+
+```typescript
+// Register new room type
+roomManager.registerRoomType('device', DeviceRoom);
+roomManager.registerRoomType('consultation', ConsultationRoom);
+```
+
+**Built-in Room Types**:
+
+- `record:<recordId>` - Collaborative editing (default)
+- `device:<deviceId>` - Broadcast box devices (future)
+- `consultation:<id>` - Consultations (future)
+- `dashboard:<id>` - Live dashboards (future)
+
+**Room Type Factory Pattern**:
+
+```typescript
+interface RoomFactory {
+  createRoom(roomId: string, config: RoomConfig): Room;
+  supportsRoomType(roomType: string): boolean;
+}
+
+class RoomManager {
+  private factories: Map<string, RoomFactory> = new Map();
+
+  registerRoomType(type: string, factory: RoomFactory): void {
+    this.factories.set(type, factory);
+  }
+
+  createRoom(roomId: string): Room {
+    const [type] = roomId.split(':');
+    const factory = this.factories.get(type);
+    if (!factory) {
+      throw new RoomNotFoundError(roomId);
+    }
+    return factory.createRoom(roomId, this.config);
+  }
+}
+```
 
 ### Document State
 
@@ -550,24 +1042,24 @@ On reconnect:
 
 For v3 initial implementation, snapshotting can be basic and tuned later.
 
-## Error Handling
+## Error Handling Details
 
 ### Connection Errors
 
 - **Authentication failures**:
   - Close connection immediately
-  - Send error message:
+  - Send error message using `AuthenticationFailedError`:
     `{"type": "control", "event": "error", "error": {"code": "AUTH_FAILED"}}`
-  - Log failure for security monitoring
+  - Log failure for security monitoring using `Logger.error()`
 - **Permission failures**:
-  - Close connection with permission error
+  - Close connection with `PermissionDeniedError`
   - Provide clear error message to user
   - Allow read-only connection if policy permits
 
 ### Sync Errors
 
 - **Invalid yjs updates**:
-  - Log error with update details
+  - Log error with `InvalidYjsUpdateError`
   - Ignore invalid update (don't broadcast)
   - Request full state sync if corruption detected
 - **Version conflicts**:
@@ -580,7 +1072,7 @@ For v3 initial implementation, snapshotting can be basic and tuned later.
 - **Snapshot load failures**:
   - Fallback to loading record from API
   - Convert Markdown → yjs as initial state
-  - Log error for debugging
+  - Log error for debugging using `Logger.error()`
 - **Snapshot save failures**:
   - Retry with exponential backoff
   - Don't block editing if save fails
@@ -589,6 +1081,7 @@ For v3 initial implementation, snapshotting can be basic and tuned later.
 ### Rate Limiting Errors
 
 - **Too many messages**:
+  - Throw `ConnectionLimitExceededError`
   - Throttle client messages (max 10/second)
   - Send warning:
     `{"type": "control", "event": "notice", "notice": {"level": "warning", "message": "Rate limit approaching"}}`
@@ -751,16 +1244,22 @@ reassurance about stability.
 - Can be enabled via configuration:
 
   ```yaml
-  # .civic/realtime.yml
+  # .system-data/realtime.yml
   realtime:
     enabled: true
     port: 3001
     host: '0.0.0.0'
+    path: '/realtime'
     snapshot:
       enabled: true
       interval: 300  # seconds
       max_updates: 100
+      storage: 'database'  # or 'filesystem'
   ```
+
+**Note**: Configuration file location is `.system-data/realtime.yml` (not
+`.civic/realtime.yml`) to follow CivicPress pattern of system data in
+`.system-data/` directory.
 
 ### Upgrading from Single-Node to Multi-Node
 
@@ -771,7 +1270,7 @@ reassurance about stability.
 - **Configuration updates**:
 
   ```yaml
-  # .civic/realtime.yml
+  # .system-data/realtime.yml
   realtime:
     redis:
       enabled: true
@@ -848,6 +1347,95 @@ extensions without major redesign.
 These questions can be refined in future revisions of this spec once early
 pilots provide more operational feedback.
 
+## Database Integration
+
+### Snapshot Storage
+
+Snapshots can be stored in either database or filesystem:
+
+**Database Storage** (recommended):
+
+- Stored in `realtime_snapshots` table
+- Enables querying and indexing
+- Better for multi-node deployments
+- Schema:
+
+  ```sql
+  CREATE TABLE realtime_snapshots (
+    id TEXT PRIMARY KEY,
+    room_id TEXT NOT NULL,
+    snapshot_data BLOB NOT NULL,
+    version INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+  );
+  ```
+
+**Filesystem Storage** (alternative):
+
+- Stored in `.system-data/realtime/snapshots/`
+- Simpler for single-node deployments
+- File naming: `{roomId}-{version}-{timestamp}.snapshot`
+
+**Configuration**:
+
+```yaml
+realtime:
+  snapshots:
+    storage: 'database'  # or 'filesystem'
+```
+
+## API Integration Pattern
+
+The realtime module calls API endpoints for snapshot management and record
+access.
+
+### Internal API Calls
+
+Realtime service makes HTTP calls to API endpoints:
+
+```typescript
+// Load snapshot from API
+const response = await fetch(`http://localhost:3000/api/v1/records/${recordId}/collab-snapshot`, {
+  headers: {
+    'Authorization': `Bearer ${internalServiceToken}`,
+  },
+});
+
+// Save snapshot to API
+await fetch(`http://localhost:3000/api/v1/records/${recordId}/collab-snapshot`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${internalServiceToken}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ snapshot: snapshotData }),
+});
+```
+
+### Service Account Authentication
+
+Realtime uses internal service account for API calls:
+
+```typescript
+// Generate internal token for service-to-service calls
+const internalToken = await authService.generateServiceToken({
+  service: 'realtime',
+  permissions: ['records:read', 'records:write'],
+});
+```
+
+### API Endpoints Used
+
+| Endpoint                              | Method | Purpose                |
+| ------------------------------------- | ------ | ---------------------- |
+| `/api/v1/records/:id/collab-snapshot` | GET    | Load snapshot          |
+| `/api/v1/records/:id/collab-snapshot` | POST   | Save snapshot          |
+| `/api/v1/records/:id`                 | GET    | Load record (fallback) |
+| `/api/v1/auth/me`                     | GET    | Validate user token    |
+
 ## History
 
 - Created: 2025-12-04 — Initial specification for realtime service architecture
+- Updated: 2025-01-30 — Added module integration sections (service registration,
+  configuration, error handling, lifecycle, hooks, logging)

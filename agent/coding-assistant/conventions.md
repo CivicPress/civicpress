@@ -507,28 +507,244 @@ registerStorageServices(container, config);
 - All new configuration options must be validated
 - Use metadata format for configuration fields when applicable
 
-## Module Integration
+## Module Development
 
-- **⚠️ CRITICAL**: All modules must follow established integration patterns
-- **Core Dependency**: Modules depend on `@civicpress/core` for types and
-  utilities
-- **Service Registration**: Consider DI container registration for module
-  services
-- **Error Handling**: Use core error types (`CivicPressError`, domain-specific
-  errors)
-- **Logging**: Use `Logger` from core for consistent logging
-- **Pattern Selection**: Choose appropriate integration pattern based on module
-  needs
-- **Reference**: See `docs/module-integration-guide.md` for complete patterns
+- **⚠️ CRITICAL**: All new modules MUST follow the complete module development
+  process
+- **Specification First**: Create complete module specification before
+  implementation
+- **Service Registration**: All modules MUST register services in DI container
+  (Pattern 2)
+- **Error Handling**: All modules MUST use unified error handling system
+- **Configuration**: All modules MUST use configuration management pattern
+- **Lifecycle**: All modules MUST implement initialization and shutdown
+- **Documentation**: All modules MUST document integration points
+- **Reference**: See `docs/module-integration-guide.md` and
+  `docs/specs/module-spec-template.md`
 
-**Integration Patterns:**
+### Module Development Process
+
+### Step 1: Create Specification
+
+1. Copy `docs/specs/module-spec-template.md`
+2. Fill in all sections marked with `[TODO]`
+3. Ensure all integration sections are complete:
+   - Module Integration
+   - Service Registration
+   - Configuration Management
+   - Error Handling
+   - Initialization & Lifecycle
+   - Core Service Dependencies
+   - Hook System Integration
+   - Logging Patterns
+4. Review against `docs/specs/realtime-module-integration-checklist.md`
+5. Get specification approved before implementation
+
+### Step 2: Service Registration
+
+All modules MUST register services using Pattern 2 (Service Registration):
+
+```typescript
+// modules/[module-name]/src/[module-name]-services.ts
+import {
+  ServiceContainer,
+  CivicPressConfig,
+  Logger,
+} from '@civicpress/core';
+
+export function register[ModuleName]Services(
+  container: ServiceContainer,
+  config: CivicPressConfig
+): void {
+  const systemDataDir = config.dataDir || '.system-data';
+
+  // Register config manager (singleton)
+  container.singleton('[moduleName]ConfigManager', () => {
+    return new [ConfigManager](systemDataDir);
+  });
+
+  // Register main service (singleton)
+  container.singleton('[moduleName]Service', (c) => {
+    const logger = c.resolve<Logger>('logger');
+    const configManager = c.resolve<[ConfigManager]>('[moduleName]ConfigManager');
+    return new [MainService](logger, configManager, config);
+  });
+}
+```
+
+**Integration Point**: In `core/src/civic-core-services.ts`:
+
+```typescript
+// Register [module-name] module services if available
+try {
+  const [moduleName]Module = await import('@civicpress/[module-name]/[module-name]-services');
+  if ([moduleName]Module?.register[ModuleName]Services) {
+    [moduleName]Module.register[ModuleName]Services(container, config);
+  }
+} catch (error) {
+  // Module not available - optional module
+  logger.debug('[Module-name] module not available');
+}
+```
+
+### Step 3: Configuration Management
+
+All modules MUST use configuration management pattern:
+
+```typescript
+// modules/[module-name]/src/[module-name]-config-manager.ts
+export class [ConfigManager] {
+  private configPath: string;
+  private logger: Logger;
+  private defaultConfig: [ModuleConfig];
+
+  constructor(basePath: string = '.system-data') {
+    this.configPath = path.join(basePath, '[module-name].yml');
+    this.logger = new Logger();
+    this.defaultConfig = { /* defaults */ };
+  }
+
+  async loadConfig(): Promise<[ModuleConfig]> {
+    // Load from file, merge with defaults
+  }
+
+  getDefaultConfig(): [ModuleConfig] {
+    return this.defaultConfig;
+  }
+}
+```
+
+**Configuration File**: `.system-data/[module-name].yml`
+
+### Step 4: Error Handling
+
+All modules MUST define error hierarchy:
+
+```typescript
+// modules/[module-name]/src/errors/[module-name]-errors.ts
+import {
+  CivicPressError,
+  NotFoundError,
+  ValidationError,
+} from '@civicpress/core/errors';
+
+export class [ModuleName]Error extends CivicPressError {
+  code = '[MODULE_NAME]_ERROR';
+  statusCode = 500;
+}
+
+export class [Specific]NotFoundError extends NotFoundError {
+  code = '[SPECIFIC]_NOT_FOUND';
+
+  constructor([id]: string, context?: Record<string, any>) {
+    super(`[Specific] '[${id}]' not found`, { [id], ...context });
+  }
+}
+```
+
+### Step 5: Initialization & Lifecycle
+
+All modules MUST implement initialization and shutdown:
+
+```typescript
+export class [MainService] {
+  async initialize(): Promise<void> {
+    // 1. Load configuration
+    // 2. Validate configuration
+    // 3. Initialize service
+    // 4. Register hooks (if applicable)
+    // 5. Setup health checks
+  }
+
+  async shutdown(): Promise<void> {
+    // 1. Stop accepting new requests
+    // 2. Complete in-flight operations
+    // 3. Cleanup resources
+    // 4. Close connections
+  }
+}
+```
+
+### Step 6: Core Service Dependencies
+
+All modules MUST document core service dependencies:
+
+| Service          | Purpose           | Required |
+| ---------------- | ----------------- | -------- |
+| `Logger`         | Logging utilities | ✅ Yes   |
+| `[OtherService]` | [Purpose]         | [Yes/No] |
+
+### Step 7: Hook System Integration
+
+All modules that emit events MUST document hooks:
+
+```typescript
+// Hook events emitted
+- '[module-name]:[event]' - [Description]
+```
+
+### Step 8: Logging Patterns
+
+All modules MUST use `Logger` from core:
+
+```typescript
+import { Logger } from '@civicpress/core';
+
+class [MainService] {
+  constructor(private logger: Logger) {}
+
+  async [operation]() {
+    this.logger.info('[Operation description]', {
+      [contextKey]: [contextValue],
+      operation: '[module-name]:[operation]',
+    });
+  }
+}
+```
+
+### Module Development Checklist
+
+**Before Implementation:**
+
+- [ ] Complete module specification created
+- [ ] All integration sections documented
+- [ ] Service registration pattern defined
+- [ ] Configuration structure defined
+- [ ] Error hierarchy defined
+- [ ] Initialization/shutdown procedures defined
+- [ ] Core service dependencies documented
+- [ ] Hook events documented (if applicable)
+- [ ] Logging patterns defined
+
+**During Implementation:**
+
+- [ ] Services registered in DI container
+- [ ] Configuration manager implemented
+- [ ] Error classes extend `CivicPressError`
+- [ ] Initialization/shutdown implemented
+- [ ] Uses `Logger` from core (not console.log)
+- [ ] Hook events emitted (if applicable)
+- [ ] Tests written for all components
+- [ ] Documentation updated
+
+**After Implementation:**
+
+- [ ] Module integration tested
+- [ ] Configuration loading tested
+- [ ] Error handling tested
+- [ ] Lifecycle management tested
+- [ ] Hook integration tested (if applicable)
+- [ ] Documentation complete
+- [ ] Code review completed
+
+### Module Integration Patterns
 
 1. **Pattern 1: Direct Core Dependency** - Simple modules using core
-   types/utilities
+   types/utilities (minimal integration)
 2. **Pattern 2: Service Registration** - Modules registering services in DI
-   container (future)
+   container (preferred for new modules)
 3. **Pattern 3: Independent Initialization** - Modules initializing services
-   independently (current storage pattern)
+   independently (legacy pattern, avoid for new modules)
 
 **❌ Don't:**
 
@@ -542,6 +758,9 @@ console.log('Module operation complete');
 
 // Module throwing generic errors
 throw new Error('Module error');
+
+// Module without service registration
+// Services created ad-hoc without DI container
 ```
 
 **✅ Do:**
@@ -550,29 +769,37 @@ throw new Error('Module error');
 // Module using core types and utilities
 import { Logger, CivicPressError } from '@civicpress/core';
 
-class MyModuleService {
-  constructor(private logger: Logger) {}
-
-  async doSomething() {
-    this.logger.info('Module operation started');
-    // ... operation
-  }
+// Module with service registration
+export function registerMyModuleServices(
+  container: ServiceContainer,
+  config: CivicPressConfig
+): void {
+  container.singleton('myModuleService', (c) => {
+    const logger = c.resolve<Logger>('logger');
+    return new MyModuleService(logger, config);
+  });
 }
 
 // Module using core error types
 import { ValidationError } from '@civicpress/core/errors';
 throw new ValidationError('Invalid module data', { field: 'value' });
+
+// Module using Logger
+this.logger.info('Module operation started', { operation: 'my-module:operation' });
 ```
 
-**Module Development Checklist:**
+### Reference Implementations
 
-- ✅ Uses `@civicpress/core` for types and utilities
-- ✅ Uses `Logger` from core (not console.log)
-- ✅ Uses `CivicPressError` hierarchy for errors
-- ✅ Documents integration pattern used
-- ✅ Documents core services used
-- ✅ Documents configuration requirements
-- ✅ Follows established patterns from existing modules
+- **Storage Module** (`modules/storage/`) - Complete implementation example
+  - Service registration pattern
+  - Configuration management
+  - Error handling
+  - DI container integration
+
+- **Realtime Module Spec** (`docs/specs/realtime-architecture.md`) - Complete
+  specification example
+  - All integration sections documented
+  - Ready to use as template
 
 **Reference**: See `docs/module-integration-guide.md` for complete module
 integration patterns and examples

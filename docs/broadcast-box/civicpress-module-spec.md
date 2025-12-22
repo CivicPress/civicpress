@@ -154,24 +154,22 @@ modules/broadcast-box/
 
 #### 1. WebSocket Server
 
-**Option A: Extend `modules/realtime`**
+**Decision**: **Extend `modules/realtime`** with device rooms.
 
-- Reuse existing WebSocket infrastructure
-- Add device-specific room types: `device:<deviceId>`
-- Share connection management, authentication, scaling
-
-**Option B: Separate `modules/broadcast-box/websocket`**
-
-- Independent WebSocket server
-- Dedicated to device communication
-- Can share libraries but separate concerns
-
-**Recommendation**: **Option A** - Extend `modules/realtime` with device rooms.
-This provides:
+The broadcast-box module uses the same WebSocket infrastructure as other
+realtime features (collaborative editing, messaging, etc.). This provides:
 
 - Shared infrastructure (auth, scaling, monitoring)
-- Consistent patterns
-- Easier maintenance
+- Consistent patterns across all realtime features
+- Easier maintenance and unified connection management
+- Room type: `device:<deviceId>` for device-specific connections
+
+**Implementation**: The `modules/realtime` server will support multiple room
+types:
+
+- `record:<recordId>` - Collaborative editing rooms
+- `device:<deviceId>` - Broadcast box device rooms
+- Future: `consultation:<id>`, `dashboard:<id>`, etc.
 
 #### 2. Database Integration
 
@@ -181,34 +179,35 @@ This provides:
 -- Devices table
 CREATE TABLE broadcast_devices (
   id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL DEFAULT 'default', -- Reserved for future multi-tenancy (Phase 7+)
   device_uuid TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   room_location TEXT,
   status TEXT NOT NULL, -- 'enrolled', 'active', 'suspended', 'revoked'
-  capabilities JSONB, -- {video_sources: [...], audio_sources: [...]}
-  config JSONB, -- Device configuration
+  capabilities TEXT NOT NULL, -- JSON string (SQLite-compatible)
+  config TEXT, -- JSON string (SQLite-compatible)
   last_seen_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id)
+  updated_at TIMESTAMP NOT NULL
+  -- Note: organization_id foreign key will be added when multi-tenancy is implemented
 );
 
 -- Recording sessions table
 CREATE TABLE broadcast_sessions (
   id TEXT PRIMARY KEY,
   device_id TEXT NOT NULL,
-  civicpress_session_id TEXT NOT NULL, -- Links to CivicPress session record
+  civicpress_session_id TEXT NOT NULL, -- Links to CivicPress session record (records.id)
   status TEXT NOT NULL, -- 'pending', 'recording', 'stopping', 'encoding', 'uploading', 'complete', 'failed'
   started_at TIMESTAMP,
   stopped_at TIMESTAMP,
   completed_at TIMESTAMP,
   error TEXT,
-  metadata JSONB,
+  metadata TEXT, -- JSON string (SQLite-compatible)
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL,
-  FOREIGN KEY (device_id) REFERENCES broadcast_devices(id),
-  FOREIGN KEY (civicpress_session_id) REFERENCES sessions(id)
+  FOREIGN KEY (device_id) REFERENCES broadcast_devices(id) ON DELETE CASCADE
+  -- Note: civicpress_session_id references records.id but foreign key constraint
+  -- may not exist depending on CivicPress database schema
 );
 
 -- Upload jobs table
@@ -273,10 +272,29 @@ CREATE INDEX idx_broadcast_device_events_device ON broadcast_device_events(devic
 
 #### 5. Workflow Integration
 
-**Integrates with `modules/workflows`**:
+**Integrates with CivicPress Workflow Engine**:
 
-- Triggers: `onSessionCreated`, `onSessionStart`, `onSessionEnd`
-- Actions: `startRecording`, `stopRecording`, `processUpload`
+The broadcast-box module extends the workflow engine with new rules and
+features:
+
+- **Workflow Triggers**: Emitted via HookSystem
+  - `onSessionCreated` - When CivicPress session record is created
+  - `onSessionStart` - When session status changes to "live"
+  - `onSessionEnd` - When session status changes to "ended"
+  - `onRecordingComplete` - When recording upload completes
+  - `onBroadcastSessionStatusChanged` - When broadcast-box session status
+    changes (see Session Status Lifecycle section)
+  - `onDeviceConnected` - When device connects to WebSocket
+  - `onDeviceDisconnected` - When device disconnects
+
+- **Workflow Actions**: Available in workflow scripts
+  - `broadcast_box.start_recording` - Start recording on device
+  - `broadcast_box.stop_recording` - Stop recording
+  - `broadcast_box.process_upload` - Process uploaded recording
+  - `broadcast_box.link_media` - Link media to session record
+
+- **Workflow Rules**: Extend `data/.civic/workflows.yml` with broadcast-box
+  specific rules
 
 ---
 
@@ -382,10 +400,13 @@ interface UploadJob {
 
 ### Connection Endpoint
 
+The broadcast-box module uses the same WebSocket server as other realtime
+features (`modules/realtime`).
+
 **URL Format**:
 
 ```
-wss://<host>/realtime/devices/:deviceId?token=<jwt-token>
+wss://<host>/realtime/devices/:deviceId?token=<device-jwt-token>
 ```
 
 **Alternative** (Header-based auth):
@@ -393,8 +414,12 @@ wss://<host>/realtime/devices/:deviceId?token=<jwt-token>
 ```
 wss://<host>/realtime/devices/:deviceId
 Headers:
-  Authorization: Bearer <jwt-token>
+  Authorization: Bearer <device-jwt-token>
 ```
+
+**Note**: Device authentication uses separate JWT tokens (not user tokens).
+Tokens are issued during device enrollment and validated by the realtime
+server's authentication layer.
 
 ### Connection Lifecycle
 
@@ -1048,15 +1073,46 @@ Triggered when session status changes to "ended".
 
 Triggered when recording upload completes.
 
-**Action**: Link media to session record, trigger transcription.
+**Action**: Link media to session record using hybrid approach, trigger
+transcription.
 
 ```typescript
 {
-  type: 'session.link_media',
+  type: 'broadcast_box.link_recording',
   sessionId: '{{session.id}}',
-  mediaPath: '{{upload.storageLocation}}'
+  recordingFileId: '{{upload.storageFileId}}',  // UUID from storage system
+  metadata: {
+    originalName: '{{upload.fileName}}',
+    description: 'Session recording'
+  }
 }
 ```
+
+**Implementation**: Calls `linkRecordingToSession()` which:
+
+1. Stores UUID in `media.recording` field
+2. Adds entry to `attached_files` array with category "recording"
+3. Ensures both fields stay in sync
+
+#### `onBroadcastSessionStatusChanged`
+
+Triggered when broadcast-box session status changes.
+
+**Action**: Map technical status to business status via workflow.
+
+```typescript
+{
+  type: 'broadcast-box:session:status_changed',
+  broadcastSessionId: '{{broadcastSession.id}}',
+  civicpressSessionId: '{{session.id}}',
+  previousStatus: 'pending',
+  newStatus: 'recording',
+  timestamp: '2025-01-30T14:00:00Z'
+}
+```
+
+**Implementation**: Workflow script decides if business status should change
+(see Session Status Lifecycle section below).
 
 ### Workflow Actions
 
@@ -1105,39 +1161,203 @@ Process uploaded recording (transcription, etc.).
 
 3. **Link to Session**
    - Creates artifact record
-   - Links to CivicPress session record
+   - Links to CivicPress session record using hybrid approach:
+     - Stores UUID in `media.recording` field (quick access)
+     - Adds entry to `attached_files` array with category "recording" (rich
+       metadata)
    - Updates session metadata
 
 ### Storage Manager Integration
 
 ```typescript
 // Upload handling
-import { StorageManager } from '@civicpress/storage';
+import { CloudUuidStorageService } from '@civicpress/storage';
+import { RecordManager } from '@civicpress/core';
 
 async function processUpload(upload: UploadJob) {
-  // Store file
-  const storageLocation = await StorageManager.store({
-    file: upload.filePath,
+  // Use UUID-based storage service
+  const storageService = container.resolve<CloudUuidStorageService>('storage');
+  const recordManager = container.resolve<RecordManager>('recordManager');
+
+  // Store file using stream upload for large files
+  const result = await storageService.uploadFileStream({
+    stream: uploadStream,
     filename: upload.fileName,
-    mimeType: upload.mimeType,
-    metadata: {
-      sessionId: upload.sessionId,
-      deviceId: upload.deviceId,
-      hash: upload.fileHash
+    folder: 'sessions', // Store in sessions folder
+    contentType: upload.mimeType,
+    size: upload.fileSize,
+    description: `Recording for session ${upload.sessionId}`,
+    uploaded_by: 'broadcast-box-system'
+  });
+
+  // Link to session record using hybrid approach
+  await linkRecordingToSession(
+    upload.civicpressSessionId,
+    result.data.id, // UUID from storage system
+    {
+      originalName: upload.fileName,
+      description: `Session recording - ${upload.fileName}`,
+      size: upload.fileSize
     }
-  });
+  );
 
-  // Link to session record
-  await linkMediaToSession(upload.sessionId, {
-    type: 'video',
-    path: storageLocation,
-    hash: upload.fileHash,
-    size: upload.fileSize
-  });
+  return result.data.id;
+}
 
-  return storageLocation;
+/**
+ * Link recording to session record using hybrid approach:
+ * - Store UUID in media.recording (quick access)
+ * - Add entry to attached_files with category "recording" (rich metadata)
+ */
+async function linkRecordingToSession(
+  sessionId: string,
+  recordingFileId: string,
+  metadata: {
+    originalName: string;
+    description?: string;
+    size?: number;
+  }
+): Promise<void> {
+  // Get session record
+  const session = await recordManager.getRecord(sessionId);
+  if (!session) {
+    throw new Error(`Session ${sessionId} not found`);
+  }
+
+  // Update media.recording with UUID
+  const updatedMetadata = {
+    ...session.metadata,
+    media: {
+      ...session.metadata?.media,
+      recording: recordingFileId // UUID for quick access
+    }
+  };
+
+  // Add to attached_files with category
+  const existingAttachments = session.attachedFiles || [];
+  const recordingAttachment = {
+    id: recordingFileId, // Same UUID
+    path: `sessions/${recordingFileId}.mp4`, // Will be resolved from storage_files
+    original_name: metadata.originalName,
+    description: metadata.description || 'Session recording',
+    category: {
+      value: 'recording',
+      label: 'Recording',
+      description: 'Session recording'
+    }
+  };
+
+  // Check if recording already exists (replace if exists)
+  const hasRecording = existingAttachments.some(
+    f => f.id === recordingFileId ||
+         (f.category && typeof f.category === 'object' && f.category.value === 'recording')
+  );
+
+  const updatedAttachments = hasRecording
+    ? existingAttachments.map(f => {
+        const isRecording = f.id === recordingFileId ||
+          (f.category && typeof f.category === 'object' && f.category.value === 'recording');
+        return isRecording ? recordingAttachment : f;
+      })
+    : [...existingAttachments, recordingAttachment];
+
+  // Update record
+  await recordManager.updateRecord(sessionId, {
+    metadata: updatedMetadata,
+    attachedFiles: updatedAttachments
+  });
 }
 ```
+
+### Upload Chunking Strategy
+
+**Decision**: Handle chunked uploads in local storage or temporary folder before
+final upload.
+
+**Flow**:
+
+1. **Chunk Reception**: Receive chunks via
+   `/api/v1/broadcast-box/uploads/:id/chunks`
+2. **Temporary Storage**: Store chunks in temporary directory (e.g.,
+   `.system-data/tmp/uploads/:uploadId/`)
+3. **Reassembly**: Reassemble chunks into complete file
+4. **Hash Verification**: Verify file hash matches expected hash
+5. **Final Upload**: Upload complete file to Storage Manager using
+   `uploadFileStream()`
+6. **Link to Session**: Link recording to session record using hybrid approach
+   (see below)
+7. **Cleanup**: Remove temporary chunks after successful upload
+
+**Benefits**:
+
+- Allows resumable uploads (track which chunks received)
+- Validates integrity before final storage
+- Handles network interruptions gracefully
+- Uses existing Storage Manager for final storage
+
+### Session Media Field Structure
+
+**Decision**: **Hybrid Approach** - Store recording UUID in both
+`media.recording` and `attached_files`.
+
+**Rationale**:
+
+- **Quick Access**: `media.recording` provides direct UUID lookup for common use
+  cases
+- **Rich Metadata**: `attached_files` provides full metadata (description,
+  category, original name)
+- **UI Integration**: Works with FileBrowser and attachment management
+  components
+- **Backward Compatible**: Aligns with existing `media` schema
+- **Future Flexibility**: Supports multiple recordings via `attached_files`
+
+**Structure**:
+
+```json
+{
+  "media": {
+    "recording": "123e4567-e89b-12d3-a456-426614174000"  // UUID for quick access
+  },
+  "attached_files": [
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174000",     // Same UUID
+      "path": "sessions/recording.123e4567.mp4",
+      "original_name": "council-meeting-2025-01-30.mp4",
+      "description": "Full recording of council meeting",
+      "category": {
+        "value": "recording",
+        "label": "Recording",
+        "description": "Session recording"
+      }
+    }
+  ]
+}
+```
+
+**Access Patterns**:
+
+```typescript
+// Quick access (common use case)
+const recordingId = session.metadata?.media?.recording;
+if (recordingId) {
+  const fileUrl = `/api/v1/storage/files/${recordingId}`;
+}
+
+// Rich metadata access (UI, details)
+const recording = session.attachedFiles?.find(
+  f => f.category?.value === 'recording'
+);
+if (recording) {
+  // Access: recording.description, recording.original_name, etc.
+  const fileUrl = `/api/v1/storage/files/${recording.id}`;
+}
+```
+
+**Implementation**: See `linkRecordingToSession()` function in Storage Manager
+Integration section above.
+
+**Note**: Both fields must contain the same UUID. The implementation ensures
+they stay in sync.
 
 ---
 
@@ -1251,13 +1471,345 @@ broadcast_box:
 
 ---
 
+## Service Registration & DI Container
+
+### Service Registration Pattern
+
+All broadcast-box services are registered in the CivicPress DI container
+following the standard module pattern:
+
+**File**: `modules/broadcast-box/src/broadcast-box-services.ts`
+
+```typescript
+import { ServiceContainer, CivicPressConfig } from '@civicpress/core';
+import { DeviceManager } from './services/device-manager.js';
+import { SessionController } from './services/session-controller.js';
+import { UploadProcessor } from './services/upload-processor.js';
+
+export function registerBroadcastBoxServices(
+  container: ServiceContainer,
+  config: CivicPressConfig
+): void {
+  // Register DeviceManager (depends on DatabaseService)
+  container.singleton('broadcastBox.deviceManager', (c) => {
+    const db = c.resolve<DatabaseService>('database');
+    const logger = c.resolve<Logger>('logger');
+    return new DeviceManager(db, logger);
+  });
+
+  // Register SessionController (depends on DeviceManager, DatabaseService)
+  container.singleton('broadcastBox.sessionController', (c) => {
+    const deviceManager = c.resolve<DeviceManager>('broadcastBox.deviceManager');
+    const db = c.resolve<DatabaseService>('database');
+    const logger = c.resolve<Logger>('logger');
+    return new SessionController(deviceManager, db, logger);
+  });
+
+  // Register UploadProcessor (depends on StorageService, DatabaseService)
+  container.singleton('broadcastBox.uploadProcessor', (c) => {
+    const storage = c.resolve<CloudUuidStorageService>('storage');
+    const db = c.resolve<DatabaseService>('database');
+    const logger = c.resolve<Logger>('logger');
+    return new UploadProcessor(storage, db, logger);
+  });
+}
+```
+
+**Integration**: Call `registerBroadcastBoxServices()` during CivicPress
+initialization, similar to `registerStorageServices()`.
+
+---
+
+## Error Handling
+
+### Error Hierarchy
+
+All broadcast-box errors extend from `CivicPressError` following the unified
+error handling pattern:
+
+**File**: `modules/broadcast-box/src/errors/broadcast-box-errors.ts`
+
+```typescript
+import {
+  CivicPressError,
+  NotFoundError,
+  ValidationError,
+  ConflictError,
+  InternalError
+} from '@civicpress/core/errors';
+
+// Domain-specific errors
+export class DeviceNotFoundError extends NotFoundError {
+  code = 'DEVICE_NOT_FOUND';
+  constructor(deviceId: string, context?: Record<string, any>) {
+    super(`Device '${deviceId}' not found`, { deviceId, ...context });
+  }
+}
+
+export class SessionAlreadyActiveError extends ConflictError {
+  code = 'SESSION_ALREADY_ACTIVE';
+  constructor(deviceId: string, context?: Record<string, any>) {
+    super(`Device '${deviceId}' already has an active session`, { deviceId, ...context });
+  }
+}
+
+export class DeviceNotConnectedError extends InternalError {
+  code = 'DEVICE_NOT_CONNECTED';
+  constructor(deviceId: string, context?: Record<string, any>) {
+    super(`Device '${deviceId}' is not connected`, { deviceId, ...context });
+  }
+}
+
+export class UploadValidationError extends ValidationError {
+  code = 'UPLOAD_VALIDATION_ERROR';
+  constructor(message: string, context?: Record<string, any>) {
+    super(message, context);
+  }
+}
+```
+
+**Usage**:
+
+```typescript
+import { DeviceNotFoundError } from './errors/broadcast-box-errors.js';
+
+if (!device) {
+  throw new DeviceNotFoundError(deviceId, { operation: 'getDevice' });
+}
+```
+
+**Integration**: API layer automatically recognizes `CivicPressError` instances
+and formats responses with correlation IDs.
+
+---
+
+## Session Status Lifecycle
+
+### Status Separation
+
+**Key Principle**: Keep technical and business statuses separate.
+
+- **Broadcast-Box Status** (Technical): Tracks recording/upload pipeline state
+  - Location: `broadcast_sessions.status`
+  - Statuses: `pending`, `recording`, `stopping`, `encoding`, `uploading`,
+    `complete`, `failed`
+  - Purpose: Internal operational tracking
+
+- **Session Record Status** (Business): Tracks meeting/session business state
+  - Location: `records.status` (for session type records)
+  - Statuses: `draft`, `scheduled`, `live`, `ended`, `archived`, etc.
+  - Purpose: Business logic, workflow, permissions
+
+### Event-Driven Status Mapping
+
+**Architecture**: Event-driven status synchronization via workflow engine.
+
+```
+Broadcast-Box Status Change
+    ↓
+Emit Hook Event
+    ↓
+Workflow Engine Processes Event
+    ↓
+Workflow Decides Business Status Change
+    ↓
+Update Session Record Status (if needed)
+```
+
+### Status Mapping Strategy
+
+**Meaningful Events** (sync to business status):
+
+- `recording` → `live` (when recording starts, session is live)
+- `complete` → `ended` (when recording complete, session ended)
+- `failed` → No change (error doesn't change business state)
+
+**Internal Events** (don't sync):
+
+- `pending`, `stopping`, `encoding`, `uploading` → No change (internal states)
+
+### Implementation
+
+#### 1. Hook Event Emission
+
+When broadcast-box session status changes, emit hook event:
+
+```typescript
+// In session-controller.ts
+async function updateBroadcastSessionStatus(
+  sessionId: string,
+  newStatus: SessionStatus
+): Promise<void> {
+  const session = await this.getSession(sessionId);
+  const previousStatus = session.status;
+
+  // Update database
+  await this.db.updateBroadcastSession(sessionId, {
+    status: newStatus,
+    updated_at: new Date()
+  });
+
+  // Emit hook event for workflow processing
+  await this.hookSystem.emit('broadcast-box:session:status_changed', {
+    broadcastSessionId: sessionId,
+    civicpressSessionId: session.civicpressSessionId,
+    previousStatus,
+    newStatus,
+    timestamp: new Date().toISOString()
+  });
+
+  // Always update session record metadata (for reference)
+  await this.updateSessionRecordMetadata(
+    session.civicpressSessionId,
+    {
+      broadcastSessionStatus: newStatus,
+      broadcastSessionStatusUpdatedAt: new Date().toISOString(),
+      broadcastSessionId: sessionId
+    }
+  );
+}
+```
+
+#### 2. Workflow Script (Municipality Customizable)
+
+**File**: `data/.civic/workflows/onBroadcastSessionStatusChanged.js`
+
+```javascript
+module.exports = async ({
+  broadcastSessionId,
+  civicpressSessionId,
+  previousStatus,
+  newStatus,
+  context
+}) => {
+  const civic = context.civic;
+
+  // Get session record
+  const session = await civic.getRecord(civicpressSessionId);
+  if (!session) {
+    console.warn(`Session record ${civicpressSessionId} not found`);
+    return;
+  }
+
+  // Map technical status to business status
+  const statusMapping = {
+    'recording': 'live',      // Recording started → session is live
+    'complete': 'ended',      // Recording complete → session ended
+    'failed': null            // Failed → keep current status
+  };
+
+  const targetBusinessStatus = statusMapping[newStatus];
+
+  // Only update if mapping exists and status is different
+  if (targetBusinessStatus && session.status !== targetBusinessStatus) {
+    // Validate transition using workflow engine
+    const canTransition = await civic.canTransitionStatus(
+      session.status,
+      targetBusinessStatus,
+      context.user?.role || 'system'
+    );
+
+    if (canTransition) {
+      // Update session record status
+      await civic.updateRecord(civicpressSessionId, {
+        status: targetBusinessStatus,
+        metadata: {
+          ...session.metadata,
+          broadcastSessionStatus: newStatus,
+          broadcastSessionStatusUpdatedAt: new Date().toISOString()
+        }
+      });
+    }
+  }
+};
+```
+
+#### 3. Status Tracking in Metadata
+
+Store broadcast-box status in session record metadata for reference:
+
+```json
+{
+  "metadata": {
+    "broadcastSessionStatus": "recording",
+    "broadcastSessionStatusUpdatedAt": "2025-01-30T14:00:00Z",
+    "broadcastSessionId": "broadcast-session-uuid"
+  }
+}
+```
+
+### Status Transition Matrix
+
+| Broadcast-Box Status | Business Status Change | Workflow Action             | Notes                               |
+| -------------------- | ---------------------- | --------------------------- | ----------------------------------- |
+| `pending`            | None                   | None                        | Internal state, no sync             |
+| `recording`          | → `live`               | Update if not already live  | Recording started = session live    |
+| `stopping`           | None                   | None                        | Internal state, no sync             |
+| `encoding`           | None                   | None                        | Internal state, no sync             |
+| `uploading`          | None                   | None                        | Internal state, no sync             |
+| `complete`           | → `ended`              | Update if not already ended | Recording done = session ended      |
+| `failed`             | None                   | Log error                   | Error doesn't change business state |
+
+### Advanced Scenarios
+
+#### Manual Status Override
+
+**Situation**: Clerk manually changes session status to `ended` before recording
+completes.
+
+**Behavior**:
+
+- Broadcast-box continues recording/uploading
+- Business status remains `ended` (manual override respected)
+- When broadcast-box completes, workflow checks current status
+- If already `ended`, no change (respects manual override)
+
+#### Recording Starts Before Session Scheduled
+
+**Situation**: Recording starts but session status is still `scheduled`.
+
+**Behavior**:
+
+- Workflow validates transition: `scheduled` → `live`
+- If valid, updates to `live`
+- If invalid (workflow rules prevent), logs warning, keeps `scheduled`
+- Broadcast-box status stored in metadata for reference
+
+#### Multiple Recordings
+
+**Situation**: Session has multiple recordings (different devices/angles).
+
+**Behavior**:
+
+- Each broadcast-session tracks its own status
+- Business status reflects overall session state
+- Workflow can use "any recording active" → `live`
+- Workflow can use "all recordings complete" → `ended`
+
+### Benefits
+
+- ✅ **Separation of Concerns**: Technical and business status separate
+- ✅ **Flexibility**: Municipalities customize via workflow scripts
+- ✅ **Auditability**: All status changes logged via hooks
+- ✅ **Reliability**: Workflow validates transitions
+- ✅ **Respects Manual Overrides**: Clerk changes take precedence
+
+---
+
 ## Security & Permissions
 
 ### Authentication
 
-- Devices authenticate via JWT token (from enrollment)
-- Token validated on WebSocket connection
+**Device Authentication**: Separate authentication system for devices (not
+users).
+
+- Devices authenticate via device-specific JWT token (issued during enrollment)
+- Token validated on WebSocket connection by `modules/realtime` auth layer
 - Token stored securely on device
+- Device tokens have different lifetime and scope than user tokens
+
+**User Authentication**: Users accessing broadcast-box APIs use standard user
+authentication.
 
 ### Authorization
 
@@ -1281,6 +1833,7 @@ broadcast_box:
 - Connection limits: Max 10 concurrent connections per device
 - Input validation: All commands validated before processing
 - Audit logging: All device actions logged
+- Device token rotation: Tokens can be rotated/revoked
 
 ---
 

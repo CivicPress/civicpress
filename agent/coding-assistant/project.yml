@@ -22,6 +22,20 @@ non_negotiables:
     and cache-usage-guide.md).
   - All modules MUST follow module integration patterns (see
     module-integration-guide.md).
+  - All new modules MUST create complete specification before implementation
+    (see module-spec-template.md).
+  - All new modules MUST register services in DI container using Pattern 2 (see
+    module-integration-guide.md).
+  - All new modules MUST implement configuration management (see
+    module-integration-guide.md).
+  - All new modules MUST define error hierarchy extending CivicPressError (see
+    error-handling.md).
+  - All new modules MUST implement initialization and shutdown lifecycle (see
+    module-integration-guide.md).
+  - All new modules MUST document core service dependencies (see
+    module-integration-guide.md).
+  - All new modules MUST use Logger from core (not console.log) (see
+    conventions.md).
   - ? All storage operations MUST follow established storage patterns (see
       storage.md and uuid-storage-system.md)
     : use CloudUuidStorageService with retry, failover, circuit breaker, health
