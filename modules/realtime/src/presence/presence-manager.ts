@@ -5,6 +5,7 @@
  */
 
 import type { Logger } from '@civicpress/core';
+import { coreInfo } from '@civicpress/core';
 import type { PresenceData } from '../types/realtime.types.js';
 import { MessageType, PresenceEvent } from '../types/messages.js';
 
@@ -56,7 +57,7 @@ export class PresenceManager {
 
     this.presence.set(userId, state);
 
-    this.logger.info('User presence added', {
+    coreInfo('User presence added', {
       operation: 'realtime:presence:added',
       userId,
       username,
@@ -75,7 +76,7 @@ export class PresenceManager {
   removePresence(userId: string): void {
     this.presence.delete(userId);
 
-    this.logger.info('User presence removed', {
+    coreInfo('User presence removed', {
       operation: 'realtime:presence:removed',
       userId,
     });
@@ -156,7 +157,7 @@ export class PresenceManager {
     for (const [userId, state] of this.presence.entries()) {
       if (now - state.lastActivity > threshold) {
         this.presence.delete(userId);
-        this.logger.info('Removed idle user presence', {
+        coreInfo('Removed idle user presence', {
           operation: 'realtime:presence:cleanup',
           userId,
         });

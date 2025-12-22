@@ -6,6 +6,7 @@
 
 import type { AuthService, AuthUser } from '@civicpress/core';
 import type { Logger } from '@civicpress/core';
+import { coreWarn, coreInfo, isCivicPressError } from '@civicpress/core';
 import {
   AuthenticationFailedError,
   PermissionDeniedError,
@@ -32,7 +33,7 @@ export async function authenticateConnection(
   // Validate token
   const user = await authService.validateSession(token);
   if (!user) {
-    logger.warn('WebSocket authentication failed: invalid token', {
+    coreWarn('WebSocket authentication failed: invalid token', {
       operation: 'realtime:auth',
     });
     throw new AuthenticationFailedError();
@@ -41,7 +42,7 @@ export async function authenticateConnection(
   // Check if record exists
   const record = await recordManager.getRecord(recordId);
   if (!record) {
-    logger.warn('WebSocket connection failed: record not found', {
+    coreWarn('WebSocket connection failed: record not found', {
       operation: 'realtime:auth',
       userId: user.id,
       recordId,
@@ -65,7 +66,7 @@ export async function authenticateConnection(
   });
 
   if (!canView) {
-    logger.warn('WebSocket permission denied: no view access', {
+    coreWarn('WebSocket permission denied: no view access', {
       operation: 'realtime:auth',
       userId: user.id,
       recordId,
@@ -73,7 +74,7 @@ export async function authenticateConnection(
     throw new PermissionDeniedError(recordId, { userId: user.id, recordId });
   }
 
-  logger.info('WebSocket connection authenticated', {
+  coreInfo('WebSocket connection authenticated', {
     operation: 'realtime:auth',
     userId: user.id,
     username: user.username,

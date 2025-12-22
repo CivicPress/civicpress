@@ -8,7 +8,12 @@
 import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'yaml';
-import { Logger } from '@civicpress/core';
+import {
+  Logger,
+  coreInfo,
+  coreError,
+  isCivicPressError,
+} from '@civicpress/core';
 import type { RealtimeConfig } from './types/realtime.types.js';
 
 export class RealtimeConfigManager {
@@ -51,17 +56,21 @@ export class RealtimeConfigManager {
     try {
       if (await fs.pathExists(this.configPath)) {
         const configContent = await fs.readFile(this.configPath, 'utf8');
-        const loadedConfig = yaml.parse(
-          configContent
-        ) as Partial<RealtimeConfig>;
+        const parsed = yaml.parse(configContent) as {
+          realtime?: Partial<RealtimeConfig>;
+        };
+
+        // Extract realtime config from nested structure
+        const loadedConfig =
+          parsed.realtime || (parsed as Partial<RealtimeConfig>);
 
         // Merge with defaults to ensure all required fields exist
         const mergedConfig = this.mergeWithDefaults(loadedConfig);
 
-        this.logger.info(
-          'Realtime configuration loaded from:',
-          this.configPath
-        );
+        coreInfo('Realtime configuration loaded', {
+          operation: 'realtime:config:loaded',
+          path: this.configPath,
+        });
         return mergedConfig;
       } else {
         // Don't auto-create config files - let the CLI init handle this
@@ -70,7 +79,19 @@ export class RealtimeConfigManager {
         );
       }
     } catch (error) {
-      this.logger.error('Failed to load realtime configuration:', error);
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_CONFIG_LOAD_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:config:load:error',
+          path: this.configPath,
+        }
+      );
       throw error;
     }
   }
@@ -88,8 +109,17 @@ export class RealtimeConfigManager {
   private mergeWithDefaults(
     loadedConfig: Partial<RealtimeConfig>
   ): RealtimeConfig {
+    // Handle YAML parsing - convert string booleans to actual booleans
+    let enabled = this.defaultConfig.enabled;
+    if (loadedConfig.enabled !== undefined) {
+      enabled =
+        typeof loadedConfig.enabled === 'string'
+          ? loadedConfig.enabled === 'true' || loadedConfig.enabled === 'True'
+          : Boolean(loadedConfig.enabled);
+    }
+
     return {
-      enabled: loadedConfig.enabled ?? this.defaultConfig.enabled,
+      enabled,
       port: loadedConfig.port ?? this.defaultConfig.port,
       host: loadedConfig.host ?? this.defaultConfig.host,
       path: loadedConfig.path ?? this.defaultConfig.path,
@@ -142,6 +172,14 @@ export class RealtimeConfigManager {
 
     if (config.rate_limiting.messages_per_second < 1) {
       throw new Error('messages_per_second must be at least 1');
+    }
+
+    if (config.rate_limiting.connections_per_ip < 1) {
+      throw new Error('connections_per_ip must be at least 1');
+    }
+
+    if (config.rate_limiting.connections_per_user < 1) {
+      throw new Error('connections_per_user must be at least 1');
     }
 
     if (config.snapshots.interval < 0) {

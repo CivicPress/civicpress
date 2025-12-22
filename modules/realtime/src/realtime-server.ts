@@ -13,6 +13,14 @@ import type {
   DatabaseService,
 } from '@civicpress/core';
 import type { CivicPressConfig } from '@civicpress/core';
+import {
+  coreError,
+  coreInfo,
+  coreWarn,
+  coreSuccess,
+  coreDebug,
+  isCivicPressError,
+} from '@civicpress/core';
 import type { RealtimeConfig } from './types/realtime.types.js';
 import { RealtimeConfigManager } from './realtime-config-manager.js';
 import { RoomManager } from './rooms/room-manager.js';
@@ -56,6 +64,11 @@ export class RealtimeServer {
   private realtimeConfig: RealtimeConfig | null = null;
   private initialized: boolean = false;
   private snapshotInterval: NodeJS.Timeout | null = null;
+  // Message rate limiting: clientId -> { count: number, resetTime: number }
+  private messageRateLimits: Map<
+    string,
+    { count: number; resetTime: number; warned: boolean }
+  > = new Map();
 
   constructor(
     logger: Logger,
@@ -101,7 +114,7 @@ export class RealtimeServer {
       return;
     }
 
-    this.logger.info('Initializing realtime server...', {
+    coreInfo('Initializing realtime server...', {
       operation: 'realtime:server:initialize',
     });
 
@@ -112,14 +125,14 @@ export class RealtimeServer {
     } catch (error) {
       // Use default config if file doesn't exist
       this.realtimeConfig = this.configManager.getDefaultConfig();
-      this.logger.warn('Using default realtime configuration', {
+      coreWarn('Using default realtime configuration', {
         operation: 'realtime:server:initialize',
       });
     }
 
     // Check if enabled
     if (!this.realtimeConfig.enabled) {
-      this.logger.info('Realtime server disabled in configuration', {
+      coreInfo('Realtime server disabled in configuration', {
         operation: 'realtime:server:initialize',
       });
       return;
@@ -164,11 +177,18 @@ export class RealtimeServer {
     await this.startServer();
 
     this.initialized = true;
-    this.logger.info('Realtime server initialized', {
-      operation: 'realtime:server:initialized',
-      port: this.realtimeConfig.port,
-      path: this.realtimeConfig.path,
-    });
+    coreSuccess(
+      {
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      },
+      'Realtime server initialized',
+      {
+        operation: 'realtime:server:initialized',
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      }
+    );
   }
 
   /**
@@ -179,7 +199,7 @@ export class RealtimeServer {
       throw new Error('Configuration not loaded');
     }
 
-    this.logger.info('Starting WebSocket server...', {
+    coreInfo('Starting WebSocket server...', {
       operation: 'realtime:server:start',
       port: this.realtimeConfig.port,
       host: this.realtimeConfig.host,
@@ -202,7 +222,7 @@ export class RealtimeServer {
           const path = this.realtimeConfig!.path;
           const isValid = url.startsWith(path);
           if (!isValid) {
-            this.logger.warn('WebSocket connection rejected: invalid path', {
+            coreWarn('WebSocket connection rejected: invalid path', {
               operation: 'realtime:server:verifyClient',
               url,
               expectedPath: path,
@@ -212,12 +232,18 @@ export class RealtimeServer {
         },
       });
     } catch (error) {
-      this.logger.error('Failed to create WebSocket server', {
-        operation: 'realtime:server:create:error',
-        error: error instanceof Error ? error.message : String(error),
-        port: this.realtimeConfig.port,
-        host: this.realtimeConfig.host,
-      });
+      coreError(
+        error instanceof Error ? error : new Error(String(error)),
+        'REALTIME_SERVER_CREATE_ERROR',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          port: this.realtimeConfig.port,
+          host: this.realtimeConfig.host,
+        },
+        {
+          operation: 'realtime:server:create:error',
+        }
+      );
       throw error;
     }
 
@@ -241,10 +267,14 @@ export class RealtimeServer {
     });
 
     this.server.on('error', (error: Error) => {
-      this.logger.error('WebSocket server error', {
-        operation: 'realtime:server:error',
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error ? error : new Error(String(error)),
+        'REALTIME_SERVER_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:error',
+        }
+      );
     });
 
     // Verify server is actually listening
@@ -257,7 +287,7 @@ export class RealtimeServer {
         typeof address === 'object' && address
           ? address.port
           : this.realtimeConfig.port;
-      this.logger.info('WebSocket server listening', {
+      coreInfo('WebSocket server listening', {
         operation: 'realtime:server:listening',
         port: actualPort,
         host:
@@ -268,11 +298,18 @@ export class RealtimeServer {
       });
     });
 
-    this.logger.info('WebSocket server started', {
-      operation: 'realtime:server:started',
-      port: this.realtimeConfig.port,
-      path: this.realtimeConfig.path,
-    });
+    coreSuccess(
+      {
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      },
+      'WebSocket server started',
+      {
+        operation: 'realtime:server:started',
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      }
+    );
   }
 
   /**
@@ -290,7 +327,7 @@ export class RealtimeServer {
     const clientId = this.generateClientId();
     const clientIp = req.socket?.remoteAddress || 'unknown';
 
-    this.logger.info('WebSocket connection attempt', {
+    coreDebug('WebSocket connection attempt', {
       operation: 'realtime:server:connection:attempt',
       clientId,
       url: req.url,
@@ -307,7 +344,7 @@ export class RealtimeServer {
 
       // Log warning if using deprecated query string method
       if (tokenResult.method === 'query') {
-        this.logger.warn(
+        coreWarn(
           'WebSocket authentication using deprecated query string method',
           {
             operation: 'realtime:auth:deprecated',
@@ -433,18 +470,26 @@ export class RealtimeServer {
         timestamp: Date.now(),
       });
 
-      this.logger.info('Client connected', {
+      coreInfo('Client connected', {
         operation: 'realtime:server:client:connected',
         clientId,
         userId: auth.user.id,
         roomId: `${roomInfo.roomType}:${roomInfo.roomId}`,
       });
     } catch (error) {
-      this.logger.error('Connection handling failed', {
-        operation: 'realtime:server:connection:error',
-        clientId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_CONNECTION_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:connection:error',
+          clientId,
+        }
+      );
 
       const errorToSend =
         error instanceof Error ? error : new Error('Connection failed');
@@ -467,10 +512,51 @@ export class RealtimeServer {
       try {
         const message: RealtimeMessage = JSON.parse(data.toString());
 
-        // Handle ping/pong
+        // Handle ping/pong (exempt from rate limiting)
         if (message.type === MessageType.PING) {
           this.sendPong(ws);
           return;
+        }
+
+        // Check message rate limit for other message types
+        const rateLimitResult = this.checkMessageRateLimit(clientId);
+        if (!rateLimitResult.allowed) {
+          coreWarn('Message rate limit exceeded', {
+            operation: 'realtime:server:rate_limit',
+            clientId,
+            userId: auth.user.id,
+            limit: this.realtimeConfig?.rate_limiting.messages_per_second || 10,
+          });
+          this.sendError(
+            ws,
+            new Error(
+              `Rate limit exceeded: ${this.realtimeConfig?.rate_limiting.messages_per_second || 10} messages per second`
+            )
+          );
+          // Close connection on violation
+          ws.close(1008, 'Rate limit exceeded');
+          return;
+        }
+
+        // Send warning if approaching limit (80% threshold)
+        if (
+          rateLimitResult.warning &&
+          !this.messageRateLimits.get(clientId)?.warned
+        ) {
+          const limit =
+            this.realtimeConfig?.rate_limiting.messages_per_second || 10;
+          this.sendError(ws, {
+            type: 'control',
+            event: 'notice',
+            notice: {
+              level: 'warning',
+              message: `Approaching rate limit: ${rateLimitResult.remaining} messages remaining per second`,
+            },
+          } as any);
+          const rateLimit = this.messageRateLimits.get(clientId);
+          if (rateLimit) {
+            rateLimit.warned = true;
+          }
         }
 
         // Handle sync messages (yjs updates)
@@ -523,11 +609,19 @@ export class RealtimeServer {
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        this.logger.error('Message handling failed', {
-          operation: 'realtime:server:message:error',
-          clientId,
-          error: errorMessage,
-        });
+        coreError(
+          error instanceof Error && isCivicPressError(error)
+            ? error
+            : error instanceof Error
+              ? error
+              : new Error(errorMessage),
+          isCivicPressError(error) ? undefined : 'REALTIME_MESSAGE_ERROR',
+          { error: errorMessage },
+          {
+            operation: 'realtime:server:message:error',
+            clientId,
+          }
+        );
       }
     });
   }
@@ -568,6 +662,9 @@ export class RealtimeServer {
     this.connections.delete(clientId);
     this.clientToUser.delete(clientId);
 
+    // Cleanup message rate limit tracking
+    this.messageRateLimits.delete(clientId);
+
     // Cleanup connection counts
     // TODO: Track IP and user for cleanup
 
@@ -577,7 +674,7 @@ export class RealtimeServer {
       if (this.snapshotManager && room instanceof YjsRoom) {
         this.createRoomSnapshot(room).catch((error) => {
           // Log as warning instead of error - snapshot failures shouldn't block disconnection
-          this.logger.warn('Failed to create final snapshot on disconnect', {
+          coreWarn('Failed to create final snapshot on disconnect', {
             operation: 'realtime:server:disconnect:snapshot:error',
             roomId: room.roomId,
             error: error instanceof Error ? error.message : String(error),
@@ -594,7 +691,7 @@ export class RealtimeServer {
       timestamp: Date.now(),
     });
 
-    this.logger.info('Client disconnected', {
+    coreInfo('Client disconnected', {
       operation: 'realtime:server:client:disconnected',
       clientId,
       userId: userInfo?.userId,
@@ -637,6 +734,45 @@ export class RealtimeServer {
   }
 
   /**
+   * Check message rate limit for a client
+   * Returns whether message is allowed and remaining count
+   */
+  private checkMessageRateLimit(clientId: string): {
+    allowed: boolean;
+    remaining: number;
+    warning: boolean;
+  } {
+    if (!this.realtimeConfig) {
+      return { allowed: true, remaining: Infinity, warning: false };
+    }
+
+    const limit = this.realtimeConfig.rate_limiting.messages_per_second;
+    const now = Date.now();
+
+    let rateLimit = this.messageRateLimits.get(clientId);
+
+    // Initialize or reset if window expired
+    if (!rateLimit || rateLimit.resetTime <= now) {
+      rateLimit = {
+        count: 0,
+        resetTime: now + 1000, // 1 second window
+        warned: false,
+      };
+      this.messageRateLimits.set(clientId, rateLimit);
+    }
+
+    const remaining = Math.max(0, limit - rateLimit.count);
+    const allowed = remaining > 0;
+    const warning = remaining <= Math.ceil(limit * 0.2); // Warn at 20% remaining
+
+    if (allowed) {
+      rateLimit.count++;
+    }
+
+    return { allowed, remaining, warning };
+  }
+
+  /**
    * Track connection
    */
   private trackConnection(ip: string, userId: number, clientId: string): void {
@@ -649,6 +785,13 @@ export class RealtimeServer {
       this.userConnections.set(userId, new Set());
     }
     this.userConnections.get(userId)!.add(clientId);
+
+    // Initialize message rate limit tracking
+    this.messageRateLimits.set(clientId, {
+      count: 0,
+      resetTime: Date.now() + 1000, // 1 second window
+      warned: false,
+    });
   }
 
   /**
@@ -716,11 +859,19 @@ export class RealtimeServer {
    */
   emitHook(event: string, data: any): void {
     this.hookSystem.emit(event, data).catch((error) => {
-      this.logger.error('Hook emission failed', {
-        operation: 'realtime:server:hook:error',
-        event,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_HOOK_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:hook:error',
+          event,
+        }
+      );
     });
   }
 
@@ -734,7 +885,7 @@ export class RealtimeServer {
         const snapshot = await this.snapshotManager.loadSnapshot(room.roomId);
         if (snapshot) {
           this.snapshotManager.applySnapshot(room.getYjsDoc(), snapshot);
-          this.logger.info('Room initialized from snapshot', {
+          coreInfo('Room initialized from snapshot', {
             operation: 'realtime:server:room:initialized',
             roomId: room.roomId,
             source: 'snapshot',
@@ -746,18 +897,26 @@ export class RealtimeServer {
       // Fallback to loading from record
       if (this.recordManager) {
         await room.initialize(recordId);
-        this.logger.info('Room initialized from record', {
+        coreInfo('Room initialized from record', {
           operation: 'realtime:server:room:initialized',
           roomId: room.roomId,
           source: 'record',
         });
       }
     } catch (error) {
-      this.logger.error('Failed to initialize room', {
-        operation: 'realtime:server:room:initialize:error',
-        roomId: room.roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_ROOM_INIT_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:room:initialize:error',
+          roomId: room.roomId,
+        }
+      );
       // Continue with empty document
     }
   }
@@ -778,11 +937,15 @@ export class RealtimeServer {
         try {
           ws.send(JSON.stringify(message));
         } catch (error) {
-          this.logger.error('Failed to send message to client', {
-            operation: 'realtime:server:broadcast:error',
-            clientId: participant.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
+          coreError(
+            error instanceof Error ? error : new Error(String(error)),
+            'REALTIME_SEND_ERROR',
+            { error: error instanceof Error ? error.message : String(error) },
+            {
+              operation: 'realtime:server:broadcast:error',
+              clientId: participant.id,
+            }
+          );
         }
       }
     }
@@ -807,7 +970,7 @@ export class RealtimeServer {
         error?.message?.includes('no such table') ||
         error?.message?.includes('does not exist')
       ) {
-        this.logger.info('Creating realtime_snapshots table...', {
+        coreInfo('Creating realtime_snapshots table...', {
           operation: 'realtime:server:migration',
         });
 
@@ -832,11 +995,11 @@ export class RealtimeServer {
             ON realtime_snapshots(created_at)
           `);
 
-          this.logger.info('realtime_snapshots table created', {
+          coreSuccess({}, 'realtime_snapshots table created', {
             operation: 'realtime:server:migration',
           });
         } catch (createError: any) {
-          this.logger.warn(
+          coreWarn(
             'Failed to create realtime_snapshots table, snapshots will be disabled',
             {
               operation: 'realtime:server:migration:error',
@@ -853,7 +1016,7 @@ export class RealtimeServer {
         }
       } else {
         // Other error, log it but don't disable snapshots
-        this.logger.warn('Error checking realtime_snapshots table', {
+        coreWarn('Error checking realtime_snapshots table', {
           operation: 'realtime:server:migration:check:error',
           error: error instanceof Error ? error.message : String(error),
         });
@@ -887,11 +1050,19 @@ export class RealtimeServer {
         timestamp: snapshot.timestamp,
       });
     } catch (error) {
-      this.logger.error('Failed to create room snapshot', {
-        operation: 'realtime:server:snapshot:error',
-        roomId: room.roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_SNAPSHOT_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:snapshot:error',
+          roomId: room.roomId,
+        }
+      );
     }
   }
 
@@ -917,10 +1088,103 @@ export class RealtimeServer {
   }
 
   /**
+   * Get health status and metrics
+   */
+  getHealthStatus(): {
+    status: 'healthy' | 'unhealthy';
+    server: {
+      listening: boolean;
+      port: number | null;
+      host: string | null;
+    };
+    connections: {
+      total: number;
+      perUser: number;
+      perIP: number;
+    };
+    rooms: {
+      total: number;
+      maxRooms: number;
+    };
+    memory?: {
+      heapUsed: number;
+      heapTotal: number;
+      external: number;
+    };
+    rateLimiting: {
+      activeClients: number;
+      messagesPerSecond: number;
+    };
+  } {
+    const address = this.server?.address();
+    const port =
+      typeof address === 'object' && address
+        ? address.port
+        : this.realtimeConfig?.port || null;
+    const host =
+      typeof address === 'object' && address
+        ? address.address
+        : this.realtimeConfig?.host || null;
+
+    // Calculate unique IPs and users
+    const uniqueIPs = this.connectionCounts.size;
+    const uniqueUsers = this.userConnections.size;
+
+    // Get room count
+    const roomCount = this.roomManager?.getRoomCount() || 0;
+    const maxRooms = this.realtimeConfig?.rooms.max_rooms || 100;
+
+    // Get memory usage if available
+    let memory:
+      | { heapUsed: number; heapTotal: number; external: number }
+      | undefined;
+    if (typeof process.memoryUsage === 'function') {
+      const mem = process.memoryUsage();
+      memory = {
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal,
+        external: mem.external || 0,
+      };
+    }
+
+    // Determine overall status
+    const isListening = this.server !== null && this.initialized;
+    const isHealthy =
+      isListening &&
+      roomCount < maxRooms &&
+      this.connections.size <
+        (this.realtimeConfig?.rate_limiting.connections_per_ip || 100) * 10; // Reasonable upper bound
+
+    return {
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      server: {
+        listening: isListening,
+        port,
+        host,
+      },
+      connections: {
+        total: this.connections.size,
+        perUser: uniqueUsers,
+        perIP: uniqueIPs,
+      },
+      rooms: {
+        total: roomCount,
+        maxRooms,
+      },
+      memory,
+      rateLimiting: {
+        activeClients: this.messageRateLimits.size,
+        messagesPerSecond:
+          this.realtimeConfig?.rate_limiting.messages_per_second || 10,
+      },
+    };
+  }
+
+  /**
    * Shutdown the realtime server
    */
   async shutdown(): Promise<void> {
-    this.logger.info('Shutting down realtime server...', {
+    coreInfo('Shutting down realtime server...', {
       operation: 'realtime:server:shutdown',
     });
 
@@ -945,6 +1209,7 @@ export class RealtimeServer {
       ws.close();
     }
     this.connections.clear();
+    this.messageRateLimits.clear();
 
     // Cleanup rooms
     if (this.roomManager) {
@@ -965,7 +1230,7 @@ export class RealtimeServer {
     }
 
     this.initialized = false;
-    this.logger.info('Realtime server shut down', {
+    coreSuccess({}, 'Realtime server shut down', {
       operation: 'realtime:server:shutdown:complete',
     });
   }

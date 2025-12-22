@@ -5,6 +5,13 @@
  */
 
 import type { Logger, RecordManager, RecordData } from '@civicpress/core';
+import {
+  coreInfo,
+  coreWarn,
+  coreError,
+  coreDebug,
+  isCivicPressError,
+} from '@civicpress/core';
 import type { RealtimeServer } from '../realtime-server.js';
 import type {
   RoomConfig,
@@ -54,7 +61,7 @@ export class YjsRoom implements Room {
       this.handleYjsUpdate(update, origin);
     });
 
-    this.logger.info('YjsRoom created', {
+    coreInfo('YjsRoom created', {
       operation: 'realtime:yjs-room:created',
       roomId,
     });
@@ -85,21 +92,21 @@ export class YjsRoom implements Room {
         if (record && record.content) {
           // Convert Markdown to yjs
           this.loadFromMarkdown(record.content);
-          this.logger.info('YjsRoom initialized with record content', {
+          coreInfo('YjsRoom initialized with record content', {
             operation: 'realtime:yjs-room:initialized',
             roomId: this.roomId,
             recordId: actualRecordId,
           });
         } else {
           // Empty document
-          this.logger.info('YjsRoom initialized with empty document', {
+          coreInfo('YjsRoom initialized with empty document', {
             operation: 'realtime:yjs-room:initialized',
             roomId: this.roomId,
           });
         }
       } else {
         // No record manager - start with empty document
-        this.logger.warn('YjsRoom initialized without record manager', {
+        coreWarn('YjsRoom initialized without record manager', {
           operation: 'realtime:yjs-room:initialized',
           roomId: this.roomId,
         });
@@ -107,11 +114,19 @@ export class YjsRoom implements Room {
 
       this.initialized = true;
     } catch (error) {
-      this.logger.error('Failed to initialize YjsRoom', {
-        operation: 'realtime:yjs-room:initialize:error',
-        roomId: this.roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_YJS_ROOM_INIT_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:yjs-room:initialize:error',
+          roomId: this.roomId,
+        }
+      );
       // Continue with empty document
       this.initialized = true;
     }
@@ -145,7 +160,7 @@ export class YjsRoom implements Room {
     this.clients.set(clientId, connection);
     this.lastActivity = Date.now();
 
-    this.logger.info('Client added to room', {
+    coreInfo('Client added to room', {
       operation: 'realtime:room:client:added',
       roomId: this.roomId,
       clientId,
@@ -160,7 +175,7 @@ export class YjsRoom implements Room {
     this.clients.delete(clientId);
     this.lastActivity = Date.now();
 
-    this.logger.info('Client removed from room', {
+    coreInfo('Client removed from room', {
       operation: 'realtime:room:client:removed',
       roomId: this.roomId,
       clientId,
@@ -222,19 +237,27 @@ export class YjsRoom implements Room {
       this.updateCount++;
       this.lastActivity = Date.now();
 
-      this.logger.debug('Yjs update applied', {
+      coreDebug('Yjs update applied', {
         operation: 'realtime:yjs-room:update:applied',
         roomId: this.roomId,
         clientId,
         version: this.version,
       });
     } catch (error) {
-      this.logger.error('Failed to apply yjs update', {
-        operation: 'realtime:yjs-room:update:error',
-        roomId: this.roomId,
-        clientId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_YJS_UPDATE_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:yjs-room:update:error',
+          roomId: this.roomId,
+          clientId,
+        }
+      );
       throw new InvalidYjsUpdateError(
         error instanceof Error ? error.message : 'Unknown error',
         { roomId: this.roomId, clientId }
@@ -301,7 +324,7 @@ export class YjsRoom implements Room {
     // Clear clients
     this.clients.clear();
 
-    this.logger.info('YjsRoom destroyed', {
+    coreInfo('YjsRoom destroyed', {
       operation: 'realtime:yjs-room:destroyed',
       roomId: this.roomId,
     });

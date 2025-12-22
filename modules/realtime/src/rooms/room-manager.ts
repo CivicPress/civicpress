@@ -5,6 +5,7 @@
  */
 
 import type { Logger } from '@civicpress/core';
+import { coreInfo } from '@civicpress/core';
 import type { RealtimeServer } from '../realtime-server.js';
 import type { RoomConfig, RoomState } from '../types/realtime.types.js';
 import { RoomNotFoundError } from '../errors/realtime-errors.js';
@@ -61,7 +62,7 @@ export class RoomManager {
    */
   registerRoomType(type: string, factory: RoomFactory): void {
     this.factories.set(type, factory);
-    this.logger.info(`Registered room type: ${type}`, {
+    coreInfo(`Registered room type: ${type}`, {
       operation: 'realtime:room:register',
     });
   }
@@ -96,7 +97,7 @@ export class RoomManager {
     const room = factory.createRoom(roomId, roomConfig);
     this.rooms.set(roomId, room);
 
-    this.logger.info('Room created', {
+    coreInfo('Room created', {
       operation: 'realtime:room:created',
       roomId,
       roomType,
@@ -120,6 +121,13 @@ export class RoomManager {
   }
 
   /**
+   * Get total room count
+   */
+  getRoomCount(): number {
+    return this.rooms.size;
+  }
+
+  /**
    * Remove a room
    */
   async removeRoom(roomId: string): Promise<void> {
@@ -131,7 +139,7 @@ export class RoomManager {
     await room.destroy();
     this.rooms.delete(roomId);
 
-    this.logger.info('Room destroyed', {
+    coreInfo('Room destroyed', {
       operation: 'realtime:room:destroyed',
       roomId,
     });
@@ -161,7 +169,7 @@ export class RoomManager {
     }
 
     if (roomsToRemove.length > 0) {
-      this.logger.info(`Cleaned up ${roomsToRemove.length} empty rooms`, {
+      coreInfo(`Cleaned up ${roomsToRemove.length} empty rooms`, {
         operation: 'realtime:room:cleanup',
       });
     }
@@ -172,12 +180,5 @@ export class RoomManager {
    */
   getAllRooms(): Room[] {
     return Array.from(this.rooms.values());
-  }
-
-  /**
-   * Get room count
-   */
-  getRoomCount(): number {
-    return this.rooms.size;
   }
 }

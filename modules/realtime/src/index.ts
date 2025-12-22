@@ -27,6 +27,12 @@ export type {
   PresenceData,
 } from './types/realtime.types.js';
 
+// Export health status type
+import type { RealtimeServer } from './realtime-server.js';
+export type RealtimeHealthStatus = ReturnType<
+  RealtimeServer['getHealthStatus']
+>;
+
 export type {
   RealtimeMessage,
   SyncMessage,

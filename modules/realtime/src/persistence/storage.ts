@@ -5,6 +5,7 @@
  */
 
 import type { Logger, DatabaseService } from '@civicpress/core';
+import { coreError, isCivicPressError } from '@civicpress/core';
 import type { Snapshot } from './snapshots.js';
 import fs from 'fs-extra';
 import path from 'path';
@@ -46,11 +47,21 @@ export class DatabaseSnapshotStorage implements SnapshotStorage {
         timestamp: row.created_at,
       };
     } catch (error) {
-      this.logger.error('Failed to load snapshot from database', {
-        operation: 'realtime:snapshot:storage:load:error',
-        roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:load:error',
+          roomId,
+        }
+      );
       throw error;
     }
   }
@@ -69,11 +80,21 @@ export class DatabaseSnapshotStorage implements SnapshotStorage {
         ]
       );
     } catch (error) {
-      this.logger.error('Failed to save snapshot to database', {
-        operation: 'realtime:snapshot:storage:save:error',
-        roomId: snapshot.roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_SAVE_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:save:error',
+          roomId: snapshot.roomId,
+        }
+      );
       throw error;
     }
   }
@@ -84,11 +105,21 @@ export class DatabaseSnapshotStorage implements SnapshotStorage {
         roomId,
       ]);
     } catch (error) {
-      this.logger.error('Failed to delete snapshot from database', {
-        operation: 'realtime:snapshot:storage:delete:error',
-        roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_DELETE_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:delete:error',
+          roomId,
+        }
+      );
       throw error;
     }
   }
@@ -140,11 +171,21 @@ export class FilesystemSnapshotStorage implements SnapshotStorage {
         timestamp,
       };
     } catch (error) {
-      this.logger.error('Failed to load snapshot from filesystem', {
-        operation: 'realtime:snapshot:storage:load:error',
-        roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:load:error',
+          roomId,
+        }
+      );
       throw error;
     }
   }
@@ -159,11 +200,21 @@ export class FilesystemSnapshotStorage implements SnapshotStorage {
 
       await fs.writeFile(filePath, Buffer.from(snapshot.yjsState));
     } catch (error) {
-      this.logger.error('Failed to save snapshot to filesystem', {
-        operation: 'realtime:snapshot:storage:save:error',
-        roomId: snapshot.roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_SAVE_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:save:error',
+          roomId: snapshot.roomId,
+        }
+      );
       throw error;
     }
   }
@@ -175,11 +226,21 @@ export class FilesystemSnapshotStorage implements SnapshotStorage {
         await fs.remove(snapshotDir);
       }
     } catch (error) {
-      this.logger.error('Failed to delete snapshot from filesystem', {
-        operation: 'realtime:snapshot:storage:delete:error',
-        roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_DELETE_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:delete:error',
+          roomId,
+        }
+      );
       throw error;
     }
   }

@@ -5,6 +5,13 @@
  */
 
 import type { Logger } from '@civicpress/core';
+import {
+  coreDebug,
+  coreWarn,
+  coreInfo,
+  coreError,
+  isCivicPressError,
+} from '@civicpress/core';
 import type { SnapshotMetadata } from '../types/realtime.types.js';
 import { SnapshotStorage } from './storage.js';
 import * as Y from 'yjs';
@@ -40,7 +47,7 @@ export class SnapshotManager {
 
     this.snapshots.set(roomId, snapshot);
 
-    this.logger.debug('Snapshot created', {
+    coreDebug('Snapshot created', {
       operation: 'realtime:snapshot:created',
       roomId,
       version,
@@ -57,7 +64,7 @@ export class SnapshotManager {
     // Try memory first
     const memorySnapshot = this.snapshots.get(roomId);
     if (memorySnapshot) {
-      this.logger.debug('Snapshot loaded from memory', {
+      coreDebug('Snapshot loaded from memory', {
         operation: 'realtime:snapshot:loaded',
         roomId,
         source: 'memory',
@@ -71,7 +78,7 @@ export class SnapshotManager {
       if (storedSnapshot) {
         // Cache in memory
         this.snapshots.set(roomId, storedSnapshot);
-        this.logger.debug('Snapshot loaded from storage', {
+        coreDebug('Snapshot loaded from storage', {
           operation: 'realtime:snapshot:loaded',
           roomId,
           source: 'storage',
@@ -79,7 +86,7 @@ export class SnapshotManager {
         return storedSnapshot;
       }
     } catch (error) {
-      this.logger.warn('Failed to load snapshot from storage', {
+      coreWarn('Failed to load snapshot from storage', {
         operation: 'realtime:snapshot:load:error',
         roomId,
         error: error instanceof Error ? error.message : String(error),
@@ -100,18 +107,26 @@ export class SnapshotManager {
       // Keep in memory
       this.snapshots.set(snapshot.roomId, snapshot);
 
-      this.logger.info('Snapshot saved', {
+      coreInfo('Snapshot saved', {
         operation: 'realtime:snapshot:saved',
         roomId: snapshot.roomId,
         version: snapshot.version,
         size: snapshot.yjsState.length,
       });
     } catch (error) {
-      this.logger.error('Failed to save snapshot', {
-        operation: 'realtime:snapshot:save:error',
-        roomId: snapshot.roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_SNAPSHOT_SAVE_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:save:error',
+          roomId: snapshot.roomId,
+        }
+      );
       throw error;
     }
   }
@@ -122,17 +137,25 @@ export class SnapshotManager {
   applySnapshot(yjsDoc: Y.Doc, snapshot: Snapshot): void {
     try {
       Y.applyUpdate(yjsDoc, snapshot.yjsState);
-      this.logger.info('Snapshot applied to yjs document', {
+      coreInfo('Snapshot applied to yjs document', {
         operation: 'realtime:snapshot:applied',
         roomId: snapshot.roomId,
         version: snapshot.version,
       });
     } catch (error) {
-      this.logger.error('Failed to apply snapshot', {
-        operation: 'realtime:snapshot:apply:error',
-        roomId: snapshot.roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_SNAPSHOT_APPLY_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:apply:error',
+          roomId: snapshot.roomId,
+        }
+      );
       throw error;
     }
   }
@@ -144,7 +167,7 @@ export class SnapshotManager {
     this.snapshots.delete(roomId);
     await this.storage.deleteSnapshot(roomId);
 
-    this.logger.info('Snapshot deleted', {
+    coreInfo('Snapshot deleted', {
       operation: 'realtime:snapshot:deleted',
       roomId,
     });
@@ -169,7 +192,7 @@ export class SnapshotManager {
     }
 
     if (roomsToDelete.length > 0) {
-      this.logger.info(`Cleaned up ${roomsToDelete.length} old snapshots`, {
+      coreInfo(`Cleaned up ${roomsToDelete.length} old snapshots`, {
         operation: 'realtime:snapshot:cleanup',
       });
     }
