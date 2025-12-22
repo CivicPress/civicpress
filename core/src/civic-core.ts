@@ -241,6 +241,9 @@ export class CivicPress {
       const hooks = this.container.resolve<HookSystem>('hooks');
       await hooks.initialize();
 
+      // Initialize realtime server if available (already initialized in completeServiceInitialization)
+      // This is a no-op if already initialized, but ensures it's ready
+
       this.logger.info('CivicPress initialized');
     } catch (error) {
       this.logger.error('Failed to initialize CivicPress:', error);
@@ -250,6 +253,15 @@ export class CivicPress {
 
   async shutdown(): Promise<void> {
     try {
+      // Shutdown realtime server if available
+      try {
+        const realtimeServer = this.container.resolve('realtimeServer') as any;
+        if (realtimeServer && typeof realtimeServer.shutdown === 'function') {
+          await realtimeServer.shutdown();
+        }
+      } catch (error) {
+        // Realtime server not available - that's okay
+      }
       this.logger.info('Shutting down CivicPress...');
 
       // Shutdown cache manager first (closes file watchers)

@@ -1,0 +1,52 @@
+{
+  "name": "@civicpress/realtime",
+  "version": "1.0.0",
+  "description": "CivicPress Realtime Module - WebSocket-based collaborative editing and presence",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./realtime-services": {
+      "types": "./dist/realtime-services.d.ts",
+      "import": "./dist/realtime-services.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "civicpress",
+    "realtime",
+    "websocket",
+    "collaboration",
+    "yjs"
+  ],
+  "author": "CivicPress Team",
+  "license": "MIT",
+  "dependencies": {
+    "@civicpress/core": "workspace:*",
+    "ws": "^8.18.0",
+    "yjs": "^13.6.10",
+    "y-protocols": "^1.0.6"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "@typescript-eslint/eslint-plugin": "^8.36.0",
+    "@typescript-eslint/parser": "^8.36.0",
+    "eslint": "^9.30.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
+    "yaml": "^2.6.1"
+  },
+  "packageManager": "pnpm@10.12.4"
+}
