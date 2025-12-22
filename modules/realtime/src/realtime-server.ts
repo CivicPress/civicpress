@@ -34,7 +34,7 @@ import {
   DatabaseSnapshotStorage,
   FilesystemSnapshotStorage,
 } from './persistence/storage.js';
-import type { YjsRoom } from './rooms/yjs-room.js';
+import { YjsRoom } from './rooms/yjs-room.js';
 
 export class RealtimeServer {
   private logger: Logger;
@@ -133,6 +133,14 @@ export class RealtimeServer {
 
     // Initialize snapshot manager
     if (this.realtimeConfig.snapshots.enabled) {
+      // Ensure database table exists if using database storage
+      if (
+        this.realtimeConfig.snapshots.storage === 'database' &&
+        this.databaseService
+      ) {
+        await this.ensureSnapshotTable();
+      }
+
       const snapshotStorage =
         this.realtimeConfig.snapshots.storage === 'database' &&
         this.databaseService
@@ -171,20 +179,85 @@ export class RealtimeServer {
       throw new Error('Configuration not loaded');
     }
 
-    this.server = new WebSocketServer({
+    this.logger.info('Starting WebSocket server...', {
+      operation: 'realtime:server:start',
       port: this.realtimeConfig.port,
       host: this.realtimeConfig.host,
       path: this.realtimeConfig.path,
     });
 
+    try {
+      // Note: We don't use the 'path' option here because ws library requires exact match
+      // Instead, we handle path routing in handleConnection() via parseRoomId()
+      this.server = new WebSocketServer({
+        port: this.realtimeConfig.port,
+        host: this.realtimeConfig.host,
+        // Use verifyClient to ensure path starts with /realtime
+        verifyClient: (info: {
+          origin: string;
+          secure: boolean;
+          req: { url?: string };
+        }): boolean => {
+          const url = info.req.url || '';
+          const path = this.realtimeConfig!.path;
+          const isValid = url.startsWith(path);
+          if (!isValid) {
+            this.logger.warn('WebSocket connection rejected: invalid path', {
+              operation: 'realtime:server:verifyClient',
+              url,
+              expectedPath: path,
+            });
+          }
+          return isValid;
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to create WebSocket server', {
+        operation: 'realtime:server:create:error',
+        error: error instanceof Error ? error.message : String(error),
+        port: this.realtimeConfig.port,
+        host: this.realtimeConfig.host,
+      });
+      throw error;
+    }
+
     this.server.on('connection', (ws: WebSocket, req) => {
-      this.handleConnection(ws, req);
+      // Convert IncomingMessage to our expected format
+      const reqData = {
+        url: req.url,
+        socket: req.socket
+          ? { remoteAddress: req.socket.remoteAddress }
+          : undefined,
+        headers: req.headers as Record<string, string>,
+      };
+      this.handleConnection(ws, reqData);
     });
 
     this.server.on('error', (error: Error) => {
       this.logger.error('WebSocket server error', {
         operation: 'realtime:server:error',
         error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    // Verify server is actually listening
+    this.server.on('listening', () => {
+      if (!this.realtimeConfig) {
+        return;
+      }
+      const address = this.server?.address();
+      const actualPort =
+        typeof address === 'object' && address
+          ? address.port
+          : this.realtimeConfig.port;
+      this.logger.info('WebSocket server listening', {
+        operation: 'realtime:server:listening',
+        port: actualPort,
+        host:
+          typeof address === 'object' && address
+            ? address.address
+            : this.realtimeConfig.host,
+        path: this.realtimeConfig.path,
       });
     });
 
@@ -208,6 +281,13 @@ export class RealtimeServer {
   ): Promise<void> {
     const clientId = this.generateClientId();
     const clientIp = req.socket?.remoteAddress || 'unknown';
+
+    this.logger.info('WebSocket connection attempt', {
+      operation: 'realtime:server:connection:attempt',
+      clientId,
+      url: req.url,
+      ip: clientIp,
+    });
 
     try {
       // Check connection limits
@@ -262,7 +342,8 @@ export class RealtimeServer {
       ) as YjsRoom;
 
       // Initialize room if needed (load from record or snapshot)
-      if (!room.getState().yjsState || room.getState().yjsState.length === 0) {
+      const roomState = room.getState();
+      if (!roomState.yjsState || roomState.yjsState.length === 0) {
         await this.initializeRoom(room, roomInfo.roomId);
       }
 
@@ -467,10 +548,11 @@ export class RealtimeServer {
 
     // Check if room should be destroyed
     if (room.getClientCount() === 0) {
-      // Save final snapshot before cleanup
+      // Save final snapshot before cleanup (non-blocking)
       if (this.snapshotManager && room instanceof YjsRoom) {
         this.createRoomSnapshot(room).catch((error) => {
-          this.logger.error('Failed to create final snapshot', {
+          // Log as warning instead of error - snapshot failures shouldn't block disconnection
+          this.logger.warn('Failed to create final snapshot on disconnect', {
             operation: 'realtime:server:disconnect:snapshot:error',
             roomId: room.roomId,
             error: error instanceof Error ? error.message : String(error),
@@ -677,6 +759,79 @@ export class RealtimeServer {
             error: error instanceof Error ? error.message : String(error),
           });
         }
+      }
+    }
+  }
+
+  /**
+   * Ensure snapshot table exists in database
+   */
+  private async ensureSnapshotTable(): Promise<void> {
+    if (!this.databaseService) {
+      return;
+    }
+
+    try {
+      // Check if table exists by trying to query it
+      await this.databaseService.query(
+        'SELECT 1 FROM realtime_snapshots LIMIT 1'
+      );
+    } catch (error: any) {
+      // Table doesn't exist, create it
+      if (
+        error?.message?.includes('no such table') ||
+        error?.message?.includes('does not exist')
+      ) {
+        this.logger.info('Creating realtime_snapshots table...', {
+          operation: 'realtime:server:migration',
+        });
+
+        try {
+          await this.databaseService.query(`
+            CREATE TABLE IF NOT EXISTS realtime_snapshots (
+              id TEXT PRIMARY KEY,
+              room_id TEXT NOT NULL,
+              snapshot_data BLOB NOT NULL,
+              version INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            )
+          `);
+
+          await this.databaseService.query(`
+            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_room_id 
+            ON realtime_snapshots(room_id)
+          `);
+
+          await this.databaseService.query(`
+            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_created_at 
+            ON realtime_snapshots(created_at)
+          `);
+
+          this.logger.info('realtime_snapshots table created', {
+            operation: 'realtime:server:migration',
+          });
+        } catch (createError: any) {
+          this.logger.warn(
+            'Failed to create realtime_snapshots table, snapshots will be disabled',
+            {
+              operation: 'realtime:server:migration:error',
+              error:
+                createError instanceof Error
+                  ? createError.message
+                  : String(createError),
+            }
+          );
+          // Disable snapshots if table creation fails
+          if (this.realtimeConfig) {
+            this.realtimeConfig.snapshots.enabled = false;
+          }
+        }
+      } else {
+        // Other error, log it but don't disable snapshots
+        this.logger.warn('Error checking realtime_snapshots table', {
+          operation: 'realtime:server:migration:check:error',
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   }

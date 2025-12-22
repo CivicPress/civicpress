@@ -41,13 +41,19 @@ export class RoomManager {
    * Register default room types
    */
   private registerDefaultRoomTypes(): void {
-    // Register record room type
-    this.registerRoomType('record', {
+    // Factory for record rooms (supports both 'record' and 'records')
+    const recordRoomFactory: RoomFactory = {
       createRoom: (roomId: string, config: RoomConfig) => {
         return new YjsRoom(roomId, config, this.logger, this.server);
       },
-      supportsRoomType: (roomType: string) => roomType === 'record',
-    });
+      supportsRoomType: (roomType: string) =>
+        roomType === 'record' || roomType === 'records',
+    };
+
+    // Register both 'record' (singular) and 'records' (plural) room types
+    // This allows URLs like /realtime/records/:recordId to work
+    this.registerRoomType('record', recordRoomFactory);
+    this.registerRoomType('records', recordRoomFactory);
   }
 
   /**

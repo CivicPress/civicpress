@@ -36,14 +36,14 @@ export class AwarenessManager {
    * Set local awareness state
    */
   setLocalState(state: AwarenessState): void {
-    this.awareness.set(this.clientId, state);
+    this.awareness.set(this.clientId.toString(), state);
   }
 
   /**
    * Get local awareness state
    */
   getLocalState(): AwarenessState | undefined {
-    return this.awareness.get(this.clientId);
+    return this.awareness.get(this.clientId.toString());
   }
 
   /**
@@ -61,7 +61,7 @@ export class AwarenessManager {
    * Remove local awareness state
    */
   removeLocalState(): void {
-    this.awareness.delete(this.clientId);
+    this.awareness.delete(this.clientId.toString());
   }
 
   /**

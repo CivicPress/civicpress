@@ -53,13 +53,13 @@ export async function authenticateConnection(
     });
   }
 
-  // Check user permissions
-  const canView = await authService.roleManager.userCan(user, 'records:view', {
+  // Check user permissions (use public userCan method instead of private roleManager)
+  const canView = await authService.userCan(user, 'records:view', {
     recordType: record.type,
     action: 'view',
   });
 
-  const canEdit = await authService.roleManager.userCan(user, 'records:edit', {
+  const canEdit = await authService.userCan(user, 'records:edit', {
     recordType: record.type,
     action: 'edit',
   });

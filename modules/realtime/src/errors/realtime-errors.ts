@@ -9,7 +9,7 @@ import {
   NotFoundError,
   ValidationError,
   UnauthorizedError,
-} from '@civicpress/core/errors';
+} from '@civicpress/core';
 
 export class RealtimeError extends CivicPressError {
   code = 'REALTIME_ERROR';
@@ -24,7 +24,13 @@ export class RoomNotFoundError extends NotFoundError {
   code = 'ROOM_NOT_FOUND';
 
   constructor(roomId: string, context?: Record<string, any>) {
-    super(`Room '${roomId}' not found`, { roomId, ...context });
+    super(`Room '${roomId}' not found`, roomId);
+    // Store additional context in the error's context property
+    if (context) {
+      this.context = { roomId, ...context };
+    } else {
+      this.context = { roomId };
+    }
   }
 }
 
@@ -49,7 +55,10 @@ export class AuthenticationFailedError extends UnauthorizedError {
   code = 'AUTH_FAILED';
 
   constructor(context?: Record<string, any>) {
-    super('Authentication failed', context);
+    super('Authentication failed');
+    if (context) {
+      this.context = context;
+    }
   }
 }
 
@@ -57,9 +66,7 @@ export class PermissionDeniedError extends UnauthorizedError {
   code = 'PERMISSION_DENIED';
 
   constructor(resource: string, context?: Record<string, any>) {
-    super(`Permission denied for resource: ${resource}`, {
-      resource,
-      ...context,
-    });
+    super(`Permission denied for resource: ${resource}`);
+    this.context = { resource, ...context };
   }
 }

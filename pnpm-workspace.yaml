@@ -9,5 +9,6 @@ packages:
   - modules/api
   - modules/ui
   - modules/legal-register
+  - modules/realtime
   - modules/storage
   # - modules/serve (Astro frontend removed)

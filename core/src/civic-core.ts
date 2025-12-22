@@ -253,14 +253,33 @@ export class CivicPress {
 
   async shutdown(): Promise<void> {
     try {
-      // Shutdown realtime server if available
-      try {
-        const realtimeServer = this.container.resolve('realtimeServer') as any;
-        if (realtimeServer && typeof realtimeServer.shutdown === 'function') {
-          await realtimeServer.shutdown();
+      // Shutdown realtime server if available and enabled
+      // Only attempt shutdown if realtime was explicitly enabled (to avoid unnecessary service lookups)
+      const realtimeEnabled = process.env.CIVIC_REALTIME_ENABLED === 'true';
+      if (realtimeEnabled) {
+        try {
+          const realtimeServer = this.container.resolve(
+            'realtimeServer'
+          ) as any;
+          if (realtimeServer && typeof realtimeServer.shutdown === 'function') {
+            await realtimeServer.shutdown();
+          }
+        } catch (error: any) {
+          // Realtime server not available - that's okay, it's optional
+          if (
+            error?.code === 'SERVICE_NOT_FOUND' ||
+            error?.message?.includes('not found') ||
+            error?.message?.includes('Service')
+          ) {
+            // Expected - service not registered
+          } else {
+            // Other error - log it
+            this.logger.warn(
+              'Realtime server shutdown failed:',
+              error?.message || error
+            );
+          }
         }
-      } catch (error) {
-        // Realtime server not available - that's okay
       }
       this.logger.info('Shutting down CivicPress...');
 

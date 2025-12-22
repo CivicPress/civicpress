@@ -63,6 +63,26 @@ Services are registered in the DI container:
 - `realtimeServer` - WebSocket server
 - `realtimeRoomManager` - Room manager
 
+## Architecture Notes
+
+**Independent Services**: The API server and realtime module are **independent
+services** that run separately by default. They both require **CivicPress
+core**, but they don't require each other.
+
+- **API Server**: REST API on port 3000 (requires core, realtime disabled by
+  default)
+- **Realtime Module**: WebSocket on port 3001 (requires core, runs standalone)
+- **UI**: Frontend on port 3030 (connects to API)
+
+**Default Development Setup:**
+
+- **Separated** (recommended): `pnpm run dev` - starts all 3 services separately
+- **Individual**: `pnpm run dev:api`, `pnpm run dev:realtime`, `pnpm run dev:ui`
+- **Bundled** (optional): `pnpm run dev:api:with-realtime` - API + realtime
+  together
+
+See `ARCHITECTURE.md` and `DEVELOPMENT.md` for detailed explanations.
+
 ## Usage
 
 ### WebSocket Connection
