@@ -110,6 +110,22 @@ cliError('Error occurred', 'ERROR_CODE', { error }, 'my-command');
 
 ## Testing
 
+### Test Execution Rules
+
+**⚠️ CRITICAL**: All test execution MUST follow the rules in
+`test-execution-rules.md`:
+
+- **Resource Limits**: Never bypass `maxWorkers` limits (prevents system
+  crashes)
+- **Single Test Execution**: Use `pnpm run test:single <file>` for focused
+  testing
+- **Cache Management**: Run `pnpm run cleanup` before troubleshooting test
+  issues
+- **Never Modify Limits**: Resource limits are set to prevent crashes
+
+**Reference**: See `agent/coding-assistant/test-execution-rules.md` for complete
+test execution guidelines.
+
 ### Test File Organization
 
 - **Unit Tests**: Place in `__tests__` folders co-located with source code

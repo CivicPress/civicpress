@@ -36,6 +36,10 @@ non_negotiables:
     module-integration-guide.md).
   - All new modules MUST use Logger from core (not console.log) (see
     conventions.md).
+  - ? All test execution MUST follow test execution rules (see
+      test-execution-rules.md)
+    : use resource-limited commands, run single tests during development, clean
+      caches when tests fail, never modify resource limits.
   - ? All storage operations MUST follow established storage patterns (see
       storage.md and uuid-storage-system.md)
     : use CloudUuidStorageService with retry, failover, circuit breaker, health

@@ -13,7 +13,6 @@ export default defineConfig({
     }),
   ],
   test: {
-
     globals: true,
     environment: 'node',
     // Limit how many worker processes Vitest uses
@@ -27,8 +26,14 @@ export default defineConfig({
         isolate: true,
       },
     },
+    // CRITICAL: Resource limits to prevent system crashes
+    // Maximum 2 worker processes to limit CPU usage
+    maxWorkers: 2,
+    minWorkers: 1,
     // Reduce how many test files run concurrently to prevent too many processes
     fileParallelism: 1,
+    // Limit concurrent tests within a file to prevent memory spikes
+    maxConcurrency: 1,
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
       '~': join(__dirname, 'modules', 'ui', 'app'),
