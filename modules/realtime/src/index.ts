@@ -6,6 +6,7 @@
 
 export { RealtimeServer } from './realtime-server.js';
 export { RoomManager } from './rooms/room-manager.js';
+export type { Room, RoomFactory } from './rooms/room-manager.js';
 export { YjsRoom } from './rooms/yjs-room.js';
 export { RealtimeConfigManager } from './realtime-config-manager.js';
 export { registerRealtimeServices } from './realtime-services.js';

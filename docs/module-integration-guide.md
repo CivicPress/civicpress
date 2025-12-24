@@ -689,10 +689,9 @@ modules/realtime/
 
 ### Current Status
 
-- ⚠️ **Spec Incomplete**: Missing module integration sections
-- ⚠️ **Not Yet Implemented**: Planned for v3 editor
+- ✅ **Implementation Complete**: Fully implemented and tested
 - ✅ **Architecture Defined**: See `docs/specs/realtime-architecture.md`
-- ⚠️ **Gaps Identified**: See `docs/specs/realtime-architecture-GAPS.md`
+- ✅ **Integration Complete**: Fully integrated with DI container
 
 ### Lessons for Module Development
 
@@ -704,6 +703,74 @@ modules/realtime/
    `CivicPressError`
 5. **Configuration Management**: Use config manager pattern for module settings
 6. **Lifecycle Management**: Document initialization and shutdown procedures
+
+## Broadcast Box Module Integration ✅ (Implemented)
+
+The Broadcast Box module follows **Pattern 2 (Service Registration)** similar to
+the Realtime module, extending it with device room types for remote device
+control.
+
+### Architecture
+
+```
+modules/broadcast-box/
+├── src/
+│   ├── broadcast-box-services.ts  # Service registration
+│   ├── rooms/
+│   │   └── device-room.ts         # Device room implementation
+│   ├── services/
+│   │   ├── device-manager.ts      # Device management
+│   │   ├── device-auth.ts         # Device authentication
+│   │   ├── session-controller.ts  # Session control
+│   │   └── upload-processor.ts    # File upload handling
+│   ├── api/
+│   │   ├── devices.ts             # Device API endpoints
+│   │   ├── sessions.ts             # Session API endpoints
+│   │   └── uploads.ts             # Upload API endpoints
+│   ├── websocket/
+│   │   ├── protocol.ts            # WebSocket protocol
+│   │   ├── command-handlers.ts    # Command handling
+│   │   └── event-handlers.ts      # Event handling
+│   └── workflows/
+│       ├── triggers.ts            # Workflow triggers
+│       └── actions.ts             # Workflow actions
+```
+
+### Integration Points
+
+1. **Service Registration**: All services registered in DI container via
+   `registerBroadcastBoxServices()`:
+
+   ```typescript
+   // In core/src/civic-core-services.ts
+   if (broadcastBoxModule?.registerBroadcastBoxServices) {
+     broadcastBoxModule.registerBroadcastBoxServices(container, config);
+   }
+   ```
+
+2. **Realtime Integration**: Extends realtime module with device room type:
+
+   ```typescript
+   // In modules/broadcast-box/src/broadcast-box-services.ts
+   const roomManager = container.resolve<RoomManager>('realtimeRoomManager');
+   const deviceRoomFactory = createDeviceRoomFactory(logger, realtimeServer);
+   roomManager.registerRoomType('device', deviceRoomFactory);
+   ```
+
+3. **Storage Integration**: Uses UUID storage service for file uploads
+
+4. **Workflow Integration**: Registers triggers and actions with workflow engine
+
+5. **API Integration**: REST endpoints registered via
+   `registerBroadcastBoxApiRoutes()`
+
+### Current Status
+
+- ✅ **Core Integration Complete**: Phase 7 complete (78 tests passing)
+- ✅ **Test Coverage**: 62 unit, 10 integration, 3 API, 3 other tests
+- ✅ **Integration**: Fully integrated with DI container, realtime, storage, and
+  workflow modules
+- 📋 **UI Components**: Phase 8 (device management, recording controls)
 
 ## Related Documentation
 
