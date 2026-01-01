@@ -181,13 +181,14 @@ export class DeviceAuthService {
   }
 
   /**
-   * Sign token payload with secret
+   * Sign token payload with secret using HMAC-SHA256
    */
   private async signToken(payload: string, secret: string): Promise<string> {
-    // Simple HMAC-like signature using bcrypt
-    // In production, use proper HMAC-SHA256 or similar
-    const hash = await bcrypt.hash(payload + secret, 10);
-    return Buffer.from(hash).toString('base64url').substring(0, 32);
+    // Use Node.js crypto for HMAC-SHA256 (deterministic, unlike bcrypt)
+    const crypto = await import('crypto');
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(payload);
+    return hmac.digest('base64url');
   }
 
   /**

@@ -26,9 +26,12 @@ import { RealtimeConfigManager } from './realtime-config-manager.js';
 import { RoomManager } from './rooms/room-manager.js';
 import {
   authenticateConnection,
+  authenticateDeviceConnection,
+  authenticateUserObservingDevice,
   extractToken,
   parseRoomId,
   type AuthenticatedConnection,
+  type AuthenticatedDeviceConnection,
 } from './auth.js';
 import {
   AuthenticationFailedError,
@@ -61,6 +64,12 @@ export class RealtimeServer {
   private userConnections: Map<number, Set<string>> = new Map(); // userId -> clientIds
   private clientToUser: Map<string, { userId: number; username: string }> =
     new Map();
+  // Device connection tracking (separate from user tracking)
+  private deviceConnections: Map<string, Set<string>> = new Map(); // deviceId -> clientIds
+  private clientToDevice: Map<
+    string,
+    { deviceId: string; deviceUuid: string; organizationId: string }
+  > = new Map();
   private realtimeConfig: RealtimeConfig | null = null;
   private initialized: boolean = false;
   private snapshotInterval: NodeJS.Timeout | null = null;
@@ -69,6 +78,9 @@ export class RealtimeServer {
     string,
     { count: number; resetTime: number; warned: boolean }
   > = new Map();
+  // Optional device authentication dependencies (for Broadcast Box support)
+  private deviceAuthService: any | null = null; // DeviceAuthService - avoiding circular dependency
+  private deviceManager: any | null = null; // DeviceManager - avoiding circular dependency
 
   constructor(
     logger: Logger,
@@ -104,6 +116,18 @@ export class RealtimeServer {
    */
   setRoomManager(roomManager: RoomManager): void {
     this.roomManager = roomManager;
+  }
+
+  /**
+   * Set device authentication dependencies (called by DI container)
+   * These are optional and only needed if device rooms are used (e.g., Broadcast Box)
+   */
+  setDeviceAuthDependencies(deviceAuthService: any, deviceManager: any): void {
+    this.deviceAuthService = deviceAuthService;
+    this.deviceManager = deviceManager;
+    coreInfo('Device authentication dependencies set for realtime server', {
+      operation: 'realtime:server:device-auth:configured',
+    });
   }
 
   /**
@@ -357,6 +381,12 @@ export class RealtimeServer {
       }
 
       if (!tokenResult.token) {
+        coreWarn('WebSocket connection rejected: no token provided', {
+          operation: 'realtime:server:connection:no-token',
+          clientId,
+          url: req.url,
+          ip: clientIp,
+        });
         this.sendError(ws, new AuthenticationFailedError());
         ws.close();
         return;
@@ -367,115 +397,90 @@ export class RealtimeServer {
       // Parse room ID
       const roomInfo = parseRoomId(url);
       if (!roomInfo) {
+        coreWarn('Invalid room URL format', {
+          operation: 'realtime:server:connection:invalid-url',
+          clientId,
+          url,
+        });
         this.sendError(ws, new Error('Invalid room URL format'));
         ws.close();
         return;
       }
 
-      // Authenticate
-      if (!this.recordManager) {
-        this.sendError(ws, new Error('Record manager not initialized'));
-        ws.close();
-        return;
-      }
-
-      const auth = await authenticateConnection(
-        token,
-        roomInfo.roomId,
-        this.authService,
-        this.recordManager,
-        this.logger
-      );
-
-      // Track connection
-      this.connections.set(clientId, ws);
-      this.trackConnection(clientIp, auth.user.id, clientId);
-
-      // Get or create room
-      if (!this.roomManager) {
-        throw new Error('Room manager not initialized');
-      }
-
       const fullRoomId = `${roomInfo.roomType}:${roomInfo.roomId}`;
-      const room = this.roomManager.getOrCreateRoom(
+
+      coreInfo('Routing WebSocket connection', {
+        operation: 'realtime:server:connection:routing',
+        clientId,
+        roomType: roomInfo.roomType,
+        roomId: roomInfo.roomId,
         fullRoomId,
-        roomInfo.roomType,
-        {}
-      ) as YjsRoom;
+      });
 
-      // Initialize room if needed (load from record or snapshot)
-      const roomState = room.getState();
-      if (!roomState.yjsState || roomState.yjsState.length === 0) {
-        await this.initializeRoom(room, roomInfo.roomId);
+      // Route to device or user authentication based on room type
+      if (roomInfo.roomType === 'device') {
+        // Try device authentication first (for Broadcast Box devices)
+        // If that fails, try user authentication (for users observing device rooms)
+        try {
+          coreInfo('Attempting device authentication', {
+            operation: 'realtime:server:connection:device-auth:attempt',
+            clientId,
+            deviceUuid: roomInfo.roomId,
+          });
+          await this.handleDeviceConnection(
+            ws,
+            clientId,
+            clientIp,
+            token,
+            roomInfo.roomId,
+            fullRoomId
+          );
+        } catch (deviceAuthError: any) {
+          // If device authentication fails, try user authentication
+          // This allows users to observe device rooms
+          if (
+            deviceAuthError?.code === 'AUTH_FAILED' ||
+            deviceAuthError?.message?.includes('authentication') ||
+            deviceAuthError?.message?.includes('not available')
+          ) {
+            coreInfo(
+              'Device auth failed, trying user authentication for device observation',
+              {
+                operation:
+                  'realtime:server:connection:user-device-auth:attempt',
+                clientId,
+                deviceUuid: roomInfo.roomId,
+              }
+            );
+            await this.handleUserObservingDevice(
+              ws,
+              clientId,
+              clientIp,
+              token,
+              roomInfo.roomId,
+              fullRoomId
+            );
+          } else {
+            // Re-throw if it's not an authentication error
+            throw deviceAuthError;
+          }
+        }
+      } else {
+        // User authentication flow (for record rooms)
+        coreDebug('Routing to user authentication', {
+          operation: 'realtime:server:connection:user-auth',
+          clientId,
+          recordId: roomInfo.roomId,
+        });
+        await this.handleUserConnection(
+          ws,
+          clientId,
+          clientIp,
+          token,
+          roomInfo,
+          fullRoomId
+        );
       }
-
-      // Set record manager in room if it's a YjsRoom
-      if (this.recordManager && 'setRecordManager' in room) {
-        (room as YjsRoom).setRecordManager(this.recordManager);
-      }
-
-      // Add presence
-      const presence = this.presenceManager.addPresence(
-        auth.user.id.toString(),
-        auth.user.username || auth.user.name || 'Unknown'
-      );
-
-      // Add client to room
-      const clientConnection = {
-        id: clientId,
-        userId: auth.user.id.toString(),
-        username: auth.user.username || auth.user.name || 'Unknown',
-        role: auth.user.role,
-        roomId: fullRoomId,
-        connectedAt: Date.now(),
-        lastActivity: Date.now(),
-        permissions: auth.permissions,
-      };
-      room.addClient(clientId, clientConnection);
-
-      // Track client to user mapping
-      this.clientToUser.set(clientId, {
-        userId: auth.user.id,
-        username: auth.user.username || auth.user.name || 'Unknown',
-      });
-
-      // Send room state
-      this.sendRoomState(ws, room);
-
-      // Send presence joined message
-      this.broadcastToRoom(
-        room,
-        this.presenceManager.createPresenceMessage(
-          PresenceEvent.JOINED,
-          auth.user.id.toString(),
-          presence.username,
-          presence.color
-        ),
-        clientId
-      );
-
-      // Setup message handlers
-      this.setupMessageHandlers(ws, clientId, room, auth);
-
-      // Setup disconnect handler
-      ws.on('close', () => {
-        this.handleDisconnect(clientId, room);
-      });
-
-      // Emit hook event
-      this.emitHook('realtime:client:connected', {
-        clientId,
-        userId: auth.user.id,
-        roomId: `${roomInfo.roomType}:${roomInfo.roomId}`,
-        timestamp: Date.now(),
-      });
-
-      coreInfo('Client connected', {
-        operation: 'realtime:server:client:connected',
-        clientId,
-        userId: auth.user.id,
-        roomId: `${roomInfo.roomType}:${roomInfo.roomId}`,
-      });
     } catch (error) {
       coreError(
         error instanceof Error && isCivicPressError(error)
@@ -497,6 +502,553 @@ export class RealtimeServer {
 
       ws.close();
     }
+  }
+
+  /**
+   * Handle device WebSocket connection
+   */
+  private async handleDeviceConnection(
+    ws: WebSocket,
+    clientId: string,
+    clientIp: string,
+    token: string,
+    deviceUuid: string,
+    fullRoomId: string
+  ): Promise<void> {
+    // Verify device authentication dependencies are available
+    if (!this.deviceAuthService || !this.deviceManager) {
+      coreWarn(
+        'Device connection attempted but device authentication not configured',
+        {
+          operation: 'realtime:server:device-connection:not-configured',
+          clientId,
+          deviceUuid,
+          hasDeviceAuthService: !!this.deviceAuthService,
+          hasDeviceManager: !!this.deviceManager,
+        }
+      );
+      this.sendError(ws, new Error('Device authentication not available'));
+      ws.close();
+      return;
+    }
+
+    coreDebug('Processing device connection', {
+      operation: 'realtime:server:device-connection:processing',
+      clientId,
+      deviceUuid,
+      tokenLength: token.length,
+      tokenPreview: token.substring(0, 20) + '...',
+    });
+
+    // Authenticate device
+    const deviceAuth = await authenticateDeviceConnection(
+      token,
+      deviceUuid,
+      this.deviceAuthService,
+      this.deviceManager,
+      this.logger
+    );
+
+    // Track connection
+    this.connections.set(clientId, ws);
+    this.trackDeviceConnection(clientIp, deviceAuth.deviceId, clientId);
+
+    // Get or create room
+    if (!this.roomManager) {
+      throw new Error('Room manager not initialized');
+    }
+
+    const room = this.roomManager.getOrCreateRoom(fullRoomId, 'device', {});
+
+    // Add client to room
+    const clientConnection = {
+      id: clientId,
+      deviceId: deviceAuth.deviceId,
+      deviceUuid: deviceAuth.deviceUuid,
+      roomId: fullRoomId,
+      connectedAt: Date.now(),
+      lastActivity: Date.now(),
+    };
+    room.addClient(clientId, clientConnection);
+
+    // Track client to device mapping
+    this.clientToDevice.set(clientId, {
+      deviceId: deviceAuth.deviceId,
+      deviceUuid: deviceAuth.deviceUuid,
+      organizationId: deviceAuth.organizationId,
+    });
+
+    // Send connection acknowledgment (device rooms don't use presence/room state)
+    ws.send(
+      JSON.stringify({
+        type: 'control',
+        event: 'connection.ack',
+        deviceId: deviceAuth.deviceId,
+        roomId: fullRoomId,
+      })
+    );
+
+    // Setup message handlers for device (simplified - no yjs, no presence)
+    this.setupDeviceMessageHandlers(ws, clientId, room, deviceAuth);
+
+    // Setup disconnect handler
+    ws.on('close', () => {
+      this.handleDeviceDisconnect(clientId, room);
+    });
+
+    // Broadcast device connection event to all clients in the room (including observers)
+    this.broadcastToRoom(
+      room,
+      {
+        type: 'control',
+        event: 'device.connected',
+        deviceId: deviceAuth.deviceId,
+        deviceUuid: deviceAuth.deviceUuid,
+        timestamp: Date.now(),
+      },
+      clientId // Exclude the device itself
+    );
+
+    // Emit hook event
+    this.emitHook('realtime:device:connected', {
+      clientId,
+      deviceId: deviceAuth.deviceId,
+      deviceUuid: deviceAuth.deviceUuid,
+      roomId: fullRoomId,
+      timestamp: Date.now(),
+    });
+
+    coreInfo('Device connected', {
+      operation: 'realtime:server:device:connected',
+      clientId,
+      deviceId: deviceAuth.deviceId,
+      deviceUuid: deviceAuth.deviceUuid,
+      roomId: fullRoomId,
+    });
+  }
+
+  /**
+   * Handle user observing device room (read-only access)
+   */
+  private async handleUserObservingDevice(
+    ws: WebSocket,
+    clientId: string,
+    clientIp: string,
+    token: string,
+    deviceUuid: string,
+    fullRoomId: string
+  ): Promise<void> {
+    // Verify device manager is available
+    if (!this.deviceManager) {
+      this.sendError(ws, new Error('Device manager not initialized'));
+      ws.close();
+      return;
+    }
+
+    // Authenticate user
+    const auth = await authenticateUserObservingDevice(
+      token,
+      deviceUuid,
+      this.authService,
+      this.deviceManager,
+      this.logger
+    );
+
+    // Track connection
+    this.connections.set(clientId, ws);
+    this.trackConnection(clientIp, auth.user.id, clientId);
+
+    // Get or create room
+    if (!this.roomManager) {
+      throw new Error('Room manager not initialized');
+    }
+
+    const room = this.roomManager.getOrCreateRoom(fullRoomId, 'device', {});
+
+    // Add client to room as observer
+    const clientConnection = {
+      id: clientId,
+      userId: auth.user.id.toString(),
+      username: auth.user.username || auth.user.name || 'Unknown',
+      role: auth.user.role,
+      roomId: fullRoomId,
+      connectedAt: Date.now(),
+      lastActivity: Date.now(),
+      permissions: auth.permissions,
+      observer: true, // Mark as observer (read-only)
+    };
+    room.addClient(clientId, clientConnection);
+
+    // Track client to user mapping
+    this.clientToUser.set(clientId, {
+      userId: auth.user.id,
+      username: auth.user.username || auth.user.name || 'Unknown',
+    });
+
+    // Send connection acknowledgment
+    ws.send(
+      JSON.stringify({
+        type: 'control',
+        event: 'connection.ack',
+        deviceUuid,
+        roomId: fullRoomId,
+        observer: true,
+      })
+    );
+
+    // Check if device is currently connected and notify observer
+    // deviceConnections is keyed by deviceId (database ID), not deviceUuid
+    // Get the device to find its deviceId
+    try {
+      const device = await this.deviceManager.getDeviceByUuid(deviceUuid);
+      if (device) {
+        const deviceClients = this.deviceConnections.get(device.id.toString());
+        if (deviceClients && deviceClients.size > 0) {
+          // Device is connected, notify the observer
+          ws.send(
+            JSON.stringify({
+              type: 'control',
+              event: 'device.connected',
+              deviceId: device.id,
+              deviceUuid,
+              timestamp: Date.now(),
+            })
+          );
+        }
+      }
+    } catch (error) {
+      // Device lookup failed - that's okay, just don't send initial status
+      coreDebug('Could not check device connection status for observer', {
+        operation: 'realtime:server:user-device:status-check',
+        deviceUuid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Setup message handlers (read-only, only receive messages)
+    this.setupObserverMessageHandlers(ws, clientId, room, auth);
+
+    // Setup disconnect handler
+    ws.on('close', () => {
+      this.handleDisconnect(clientId, room);
+    });
+
+    coreInfo('User observing device room connected', {
+      operation: 'realtime:server:user-device:connected',
+      clientId,
+      userId: auth.user.id,
+      deviceUuid,
+      roomId: fullRoomId,
+    });
+  }
+
+  /**
+   * Setup message handlers for user observers (read-only)
+   */
+  private setupObserverMessageHandlers(
+    ws: WebSocket,
+    clientId: string,
+    room: any,
+    auth: AuthenticatedConnection
+  ): void {
+    ws.on('message', async (data: Buffer) => {
+      try {
+        const message: RealtimeMessage = JSON.parse(data.toString());
+
+        // Handle ping/pong (exempt from rate limiting)
+        if (message.type === MessageType.PING) {
+          this.sendPong(ws);
+          return;
+        }
+
+        // Observers are read-only - they can only receive messages
+        // No need to handle other message types
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        coreError(
+          error instanceof Error && isCivicPressError(error)
+            ? error
+            : error instanceof Error
+              ? error
+              : new Error(errorMessage),
+          isCivicPressError(error) ? undefined : 'REALTIME_MESSAGE_ERROR',
+          { error: errorMessage },
+          {
+            operation: 'realtime:server:message:error:observer',
+            clientId,
+          }
+        );
+      }
+    });
+  }
+
+  /**
+   * Handle user WebSocket connection (existing flow)
+   */
+  private async handleUserConnection(
+    ws: WebSocket,
+    clientId: string,
+    clientIp: string,
+    token: string,
+    roomInfo: { roomType: string; roomId: string },
+    fullRoomId: string
+  ): Promise<void> {
+    // Authenticate
+    if (!this.recordManager) {
+      this.sendError(ws, new Error('Record manager not initialized'));
+      ws.close();
+      return;
+    }
+
+    const auth = await authenticateConnection(
+      token,
+      roomInfo.roomId,
+      this.authService,
+      this.recordManager,
+      this.logger
+    );
+
+    // Track connection
+    this.connections.set(clientId, ws);
+    this.trackConnection(clientIp, auth.user.id, clientId);
+
+    // Get or create room
+    if (!this.roomManager) {
+      throw new Error('Room manager not initialized');
+    }
+
+    const room = this.roomManager.getOrCreateRoom(
+      fullRoomId,
+      roomInfo.roomType,
+      {}
+    ) as YjsRoom;
+
+    // Initialize room if needed (load from record or snapshot)
+    const roomState = room.getState();
+    if (!roomState.yjsState || roomState.yjsState.length === 0) {
+      await this.initializeRoom(room, roomInfo.roomId);
+    }
+
+    // Set record manager in room if it's a YjsRoom
+    if (this.recordManager && 'setRecordManager' in room) {
+      (room as YjsRoom).setRecordManager(this.recordManager);
+    }
+
+    // Add presence
+    const presence = this.presenceManager.addPresence(
+      auth.user.id.toString(),
+      auth.user.username || auth.user.name || 'Unknown'
+    );
+
+    // Add client to room
+    const clientConnection = {
+      id: clientId,
+      userId: auth.user.id.toString(),
+      username: auth.user.username || auth.user.name || 'Unknown',
+      role: auth.user.role,
+      roomId: fullRoomId,
+      connectedAt: Date.now(),
+      lastActivity: Date.now(),
+      permissions: auth.permissions,
+    };
+    room.addClient(clientId, clientConnection);
+
+    // Track client to user mapping
+    this.clientToUser.set(clientId, {
+      userId: auth.user.id,
+      username: auth.user.username || auth.user.name || 'Unknown',
+    });
+
+    // Send room state
+    this.sendRoomState(ws, room);
+
+    // Send presence joined message
+    this.broadcastToRoom(
+      room,
+      this.presenceManager.createPresenceMessage(
+        PresenceEvent.JOINED,
+        auth.user.id.toString(),
+        presence.username,
+        presence.color
+      ),
+      clientId
+    );
+
+    // Setup message handlers
+    this.setupMessageHandlers(ws, clientId, room, auth);
+
+    // Setup disconnect handler
+    ws.on('close', () => {
+      this.handleDisconnect(clientId, room);
+    });
+
+    // Emit hook event
+    this.emitHook('realtime:client:connected', {
+      clientId,
+      userId: auth.user.id,
+      roomId: `${roomInfo.roomType}:${roomInfo.roomId}`,
+      timestamp: Date.now(),
+    });
+
+    coreInfo('Client connected', {
+      operation: 'realtime:server:client:connected',
+      clientId,
+      userId: auth.user.id,
+      roomId: `${roomInfo.roomType}:${roomInfo.roomId}`,
+    });
+  }
+
+  /**
+   * Setup message handlers for device WebSocket connections
+   * Devices don't use yjs or presence, so this is simplified
+   */
+  private setupDeviceMessageHandlers(
+    ws: WebSocket,
+    clientId: string,
+    room: any,
+    deviceAuth: AuthenticatedDeviceConnection
+  ): void {
+    ws.on('message', async (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString());
+
+        // Handle ping/pong (exempt from rate limiting)
+        if (message.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong' }));
+          return;
+        }
+
+        // Check message rate limit
+        const rateLimitResult = this.checkMessageRateLimit(clientId);
+        if (!rateLimitResult.allowed) {
+          coreWarn('Message rate limit exceeded for device', {
+            operation: 'realtime:server:rate_limit:device',
+            clientId,
+            deviceId: deviceAuth.deviceId,
+            limit: this.realtimeConfig?.rate_limiting.messages_per_second || 10,
+          });
+          this.sendError(
+            ws,
+            new Error(
+              `Rate limit exceeded: ${this.realtimeConfig?.rate_limiting.messages_per_second || 10} messages per second`
+            )
+          );
+          ws.close(1008, 'Rate limit exceeded');
+          return;
+        }
+
+        // Broadcast message to other clients in the room
+        this.broadcastToRoom(room, message, clientId);
+
+        // Update last activity
+        const deviceInfo = this.clientToDevice.get(clientId);
+        if (deviceInfo) {
+          // Update room's last activity if room supports it
+          if (typeof room.updateActivity === 'function') {
+            room.updateActivity();
+          }
+        }
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        coreError(
+          error instanceof Error && isCivicPressError(error)
+            ? error
+            : error instanceof Error
+              ? error
+              : new Error(errorMessage),
+          isCivicPressError(error) ? undefined : 'REALTIME_MESSAGE_ERROR',
+          { error: errorMessage },
+          {
+            operation: 'realtime:server:message:error:device',
+            clientId,
+            deviceId: deviceAuth.deviceId,
+          }
+        );
+      }
+    });
+  }
+
+  /**
+   * Handle device disconnect
+   */
+  private handleDeviceDisconnect(clientId: string, room: any): void {
+    const deviceInfo = this.clientToDevice.get(clientId);
+
+    // Remove client from room
+    room.removeClient(clientId);
+
+    // Remove connection tracking
+    this.connections.delete(clientId);
+    if (deviceInfo) {
+      this.clientToDevice.delete(clientId);
+
+      // Remove from device connections map
+      const deviceClients = this.deviceConnections.get(deviceInfo.deviceId);
+      if (deviceClients) {
+        deviceClients.delete(clientId);
+        if (deviceClients.size === 0) {
+          this.deviceConnections.delete(deviceInfo.deviceId);
+        }
+      }
+    }
+
+    // Cleanup message rate limit tracking
+    this.messageRateLimits.delete(clientId);
+
+    // Broadcast device disconnection event to all clients in the room (including observers)
+    if (deviceInfo) {
+      this.broadcastToRoom(room, {
+        type: 'control',
+        event: 'device.disconnected',
+        deviceId: deviceInfo.deviceId,
+        deviceUuid: deviceInfo.deviceUuid,
+        timestamp: Date.now(),
+      });
+    }
+
+    // Emit hook event
+    this.emitHook('realtime:device:disconnected', {
+      clientId,
+      deviceId: deviceInfo?.deviceId,
+      deviceUuid: deviceInfo?.deviceUuid,
+      roomId: room.roomId,
+      timestamp: Date.now(),
+    });
+
+    coreInfo('Device disconnected', {
+      operation: 'realtime:server:device:disconnected',
+      clientId,
+      deviceId: deviceInfo?.deviceId,
+      deviceUuid: deviceInfo?.deviceUuid,
+    });
+  }
+
+  /**
+   * Track device connection (separate from user tracking)
+   */
+  private trackDeviceConnection(
+    ip: string,
+    deviceId: string,
+    clientId: string
+  ): void {
+    // Track IP (shared with user connections)
+    const ipCount = this.connectionCounts.get(ip) || 0;
+    this.connectionCounts.set(ip, ipCount + 1);
+
+    // Track device
+    if (!this.deviceConnections.has(deviceId)) {
+      this.deviceConnections.set(deviceId, new Set());
+    }
+    this.deviceConnections.get(deviceId)!.add(clientId);
+
+    // Initialize message rate limit tracking
+    this.messageRateLimits.set(clientId, {
+      count: 0,
+      resetTime: Date.now() + 1000, // 1 second window
+      warned: false,
+    });
   }
 
   /**
@@ -627,7 +1179,7 @@ export class RealtimeServer {
   }
 
   /**
-   * Handle client disconnect
+   * Handle user client disconnect (existing flow)
    */
   private handleDisconnect(clientId: string, room: any): void {
     // Get user info before cleanup

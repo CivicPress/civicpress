@@ -9,6 +9,7 @@ import ConnectionStatusIndicator from '~/components/broadcast-box/ConnectionStat
 import SessionStatusBadge from '~/components/broadcast-box/SessionStatusBadge.vue';
 import DeviceConfigurationForm from '~/components/broadcast-box/DeviceConfigurationForm.vue';
 import { useRecordUtils } from '~/composables/useRecordUtils';
+import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
 
 const { formatDate } = useRecordUtils();
 
@@ -53,7 +54,40 @@ const canManageDevices = computed(() => {
   return authStore.hasPermission('broadcast-box:admin');
 });
 
+// Use real-time connection status composable
+const deviceUuidRef = computed(() => device.value?.deviceUuid || null);
+const {
+  status: connectionStatus,
+  isConnected,
+  subscribe,
+  unsubscribe,
+} = useDeviceConnectionStatus(null); // Don't auto-subscribe, we'll do it manually
+
+// Subscribe when device is loaded
+watch(
+  () => device.value?.deviceUuid,
+  (deviceUuid) => {
+    if (deviceUuid) {
+      subscribe(deviceUuid);
+    }
+  },
+  { immediate: true }
+);
+
+// Unsubscribe on unmount
+onUnmounted(() => {
+  if (device.value?.deviceUuid) {
+    unsubscribe(device.value.deviceUuid);
+  }
+});
+
 const isDeviceConnected = computed(() => {
+  // Use real-time connection status if available, otherwise fall back to lastSeenAt
+  if (connectionStatus.value.connected !== undefined) {
+    return connectionStatus.value.connected;
+  }
+
+  // Fallback to lastSeenAt check
   if (!device.value || device.value.status !== 'active') {
     return false;
   }
@@ -294,7 +328,9 @@ onMounted(() => {
                   <DeviceStatusBadge :status="device.status" />
                   <ConnectionStatusIndicator
                     :connected="isDeviceConnected"
-                    :last-seen-at="device.lastSeenAt"
+                    :last-seen-at="
+                      connectionStatus.lastSeenAt || device.lastSeenAt
+                    "
                     :show-label="true"
                   />
                 </div>

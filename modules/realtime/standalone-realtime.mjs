@@ -73,8 +73,34 @@ let isInitialized = false;
 
 civicPress
   .initialize()
-  .then(() => {
+  .then(async () => {
     isInitialized = true;
+    
+    // After initialization, ensure broadcast-box device authentication dependencies are set
+    // This is needed because the realtime server might be initialized before broadcast-box services
+    try {
+      // Access the container directly (it's a private property, but we need it)
+      const container = civicPress.container || civicPress.getService('container');
+      if (container) {
+        const realtimeServer = container.resolve('realtimeServer');
+        const deviceAuth = container.resolve('broadcastBoxDeviceAuth');
+        const deviceManager = container.resolve('broadcastBoxDeviceManager');
+        
+        if (realtimeServer && deviceAuth && deviceManager && typeof realtimeServer.setDeviceAuthDependencies === 'function') {
+          realtimeServer.setDeviceAuthDependencies(deviceAuth, deviceManager);
+          console.log('✅ Broadcast Box device authentication dependencies set on realtime server');
+        } else {
+          console.log('ℹ️  Broadcast Box module not available (optional)');
+        }
+      }
+    } catch (error) {
+      // Broadcast-box module not available - that's okay, it's optional
+      // Only log if verbose mode or if it's not a "service not found" error
+      if (error?.code !== 'SERVICE_NOT_FOUND' && error?.message?.includes('not found')) {
+        console.log('ℹ️  Broadcast Box module not available (optional)');
+      }
+    }
+    
     console.log('');
     console.log('✅ CivicPress initialized');
     console.log('✅ Realtime WebSocket server should be running on port 3001');

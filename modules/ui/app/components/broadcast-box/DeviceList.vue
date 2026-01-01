@@ -63,7 +63,9 @@
             }}</span>
             <ConnectionStatusIndicator
               :connected="isDeviceConnected(device)"
-              :last-seen-at="device.lastSeenAt"
+              :last-seen-at="
+                statuses.get(device.deviceUuid)?.lastSeenAt || device.lastSeenAt
+              "
             />
           </div>
 
@@ -137,6 +139,7 @@ import DeviceStatusBadge from './DeviceStatusBadge.vue';
 import ConnectionStatusIndicator from './ConnectionStatusIndicator.vue';
 import { useAuthStore } from '~/stores/auth';
 import { useRecordUtils } from '~/composables/useRecordUtils';
+import { useDeviceConnectionStatuses } from '~/composables/useDeviceConnectionStatus';
 
 const props = defineProps<{
   devices: BroadcastDevice[];
@@ -160,8 +163,19 @@ const canManageDevices = computed(() => {
   return role === 'admin';
 });
 
-// Check if device is connected (simple heuristic: active status and recent lastSeen)
+// Use real-time connection status for all devices
+const deviceUuids = computed(() => props.devices.map((d) => d.deviceUuid));
+const { statuses } = useDeviceConnectionStatuses(deviceUuids);
+
+// Check if device is connected (uses real-time status if available)
 const isDeviceConnected = (device: BroadcastDevice): boolean => {
+  // Use real-time status if available
+  const realtimeStatus = statuses.value.get(device.deviceUuid);
+  if (realtimeStatus && realtimeStatus.connected !== undefined) {
+    return realtimeStatus.connected;
+  }
+
+  // Fallback to lastSeenAt check
   if (device.status !== 'active') {
     return false;
   }

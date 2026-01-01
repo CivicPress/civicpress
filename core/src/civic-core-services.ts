@@ -469,13 +469,18 @@ export async function completeServiceInitialization(
       // Initialize realtime server if available
       // Note: This must happen after all services are registered
       // Only initialize if we successfully registered services
+      // Note: We DON'T initialize here - we'll do it after broadcast-box services are registered
+      // so that device authentication dependencies can be set before initialization
+      // The realtime server will be initialized later in the initialization flow
       try {
+        // Just verify it's registered, don't initialize yet
         const realtimeServer = container.resolve('realtimeServer') as any;
         if (realtimeServer && typeof realtimeServer.initialize === 'function') {
-          await realtimeServer.initialize();
           const logger = container.resolve<Logger>('logger');
           if (logger.isVerbose()) {
-            logger.debug('Realtime server initialized successfully');
+            logger.debug(
+              'Realtime server registered (will initialize after broadcast-box services)'
+            );
           }
         }
       } catch (error: any) {
@@ -610,6 +615,42 @@ export async function completeServiceInitialization(
         'Broadcast Box registration error stack:',
         error.stack
       );
+    }
+  }
+
+  // Initialize realtime server AFTER broadcast-box services are registered
+  // This allows broadcast-box to set device authentication dependencies before initialization
+  if (realtimeEnabled) {
+    try {
+      const realtimeServer = container.resolve('realtimeServer') as any;
+      if (realtimeServer && typeof realtimeServer.initialize === 'function') {
+        await realtimeServer.initialize();
+        const logger = container.resolve<Logger>('logger');
+        if (logger.isVerbose()) {
+          logger.debug(
+            'Realtime server initialized successfully (after broadcast-box registration)'
+          );
+        }
+      }
+    } catch (error: any) {
+      // Realtime server not available or initialization failed
+      const logger = container.resolve<Logger>('logger');
+      if (
+        error?.code === 'SERVICE_NOT_FOUND' ||
+        error?.message?.includes('not found') ||
+        error?.message?.includes('Service')
+      ) {
+        // Service not registered - that's okay, module is optional
+        if (logger.isVerbose()) {
+          logger.debug('Realtime server not registered (module optional)');
+        }
+      } else {
+        // Other error - log it
+        logger.warn(
+          'Realtime server initialization failed:',
+          error?.message || error
+        );
+      }
     }
   }
 

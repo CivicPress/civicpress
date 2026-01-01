@@ -346,14 +346,19 @@ export async function registerBroadcastBoxServices(
   // Register EnrollmentCleanupService and start it
   try {
     // Import cleanup service - use dynamic import to handle both src and dist
-    // @ts-ignore - TypeScript may not resolve new files until rebuild
-    const { EnrollmentCleanupService } = await import(
-      '../services/enrollment-cleanup.js'
-    );
-    // @ts-ignore - TypeScript may not resolve new files until rebuild
-    const { EnrollmentCodeModel } = await import(
-      '../models/enrollment-code.js'
-    );
+    // These imports work at runtime but TypeScript can't resolve them at compile time
+    const cleanupPath = '../services/enrollment-cleanup.js';
+    const codeModelPath = '../models/enrollment-code.js';
+
+    const cleanupModule = (await import(cleanupPath)) as {
+      EnrollmentCleanupService: any;
+    };
+    const codeModelModule = (await import(codeModelPath)) as {
+      EnrollmentCodeModel: any;
+    };
+
+    const { EnrollmentCleanupService } = cleanupModule;
+    const { EnrollmentCodeModel } = codeModelModule;
 
     const enrollmentCodeModel = new EnrollmentCodeModel(db, logger);
     const cleanupService = new EnrollmentCleanupService(
@@ -440,5 +445,96 @@ export async function registerBroadcastBoxServices(
         error: e?.message || 'unknown',
       }
     );
+  }
+
+  // Set device authentication dependencies on realtime server after all services are registered
+  // This must be done after DeviceAuthService and DeviceManager are registered
+  // CRITICAL: This must happen BEFORE the realtime server is initialized
+  // (The realtime server initialization is delayed until after broadcast-box registration)
+  try {
+    console.log(
+      '🔧 [BROADCAST-BOX] Setting device authentication dependencies on realtime server'
+    );
+    logger.info(
+      'Setting device authentication dependencies on realtime server',
+      {
+        operation: 'broadcast-box:services:device-auth:setting',
+      }
+    );
+
+    const realtimeServer = container.resolve<any>('realtimeServer');
+    const deviceAuth = container.resolve<any>('broadcastBoxDeviceAuth');
+    const deviceManager = container.resolve<DeviceManager>(
+      'broadcastBoxDeviceManager'
+    );
+
+    logger.info('Resolved dependencies for device authentication', {
+      operation: 'broadcast-box:services:device-auth:resolved',
+      hasRealtimeServer: !!realtimeServer,
+      hasDeviceAuth: !!deviceAuth,
+      hasDeviceManager: !!deviceManager,
+      realtimeServerType: realtimeServer ? typeof realtimeServer : 'null',
+      hasSetMethod: realtimeServer
+        ? typeof realtimeServer.setDeviceAuthDependencies
+        : 'n/a',
+    });
+
+    if (!realtimeServer) {
+      logger.warn(
+        'Cannot set device authentication dependencies: realtime server not available',
+        {
+          operation: 'broadcast-box:services:device-auth:failed',
+          reason: 'realtime server not resolved from container',
+        }
+      );
+    } else if (typeof realtimeServer.setDeviceAuthDependencies !== 'function') {
+      logger.warn(
+        'Cannot set device authentication dependencies: method not found',
+        {
+          operation: 'broadcast-box:services:device-auth:failed',
+          reason:
+            'setDeviceAuthDependencies method not found on realtime server',
+          realtimeServerMethods: Object.getOwnPropertyNames(
+            Object.getPrototypeOf(realtimeServer)
+          ),
+        }
+      );
+    } else if (!deviceAuth) {
+      logger.warn(
+        'Cannot set device authentication dependencies: deviceAuth not available',
+        {
+          operation: 'broadcast-box:services:device-auth:failed',
+          reason: 'broadcastBoxDeviceAuth not resolved from container',
+        }
+      );
+    } else if (!deviceManager) {
+      logger.warn(
+        'Cannot set device authentication dependencies: deviceManager not available',
+        {
+          operation: 'broadcast-box:services:device-auth:failed',
+          reason: 'broadcastBoxDeviceManager not resolved from container',
+        }
+      );
+    } else {
+      realtimeServer.setDeviceAuthDependencies(deviceAuth, deviceManager);
+      console.log(
+        '✅✅✅ [BROADCAST-BOX] Device authentication dependencies SET on realtime server'
+      );
+      logger.info(
+        '✅ Device authentication dependencies set on realtime server',
+        {
+          operation: 'broadcast-box:services:device-auth:configured',
+        }
+      );
+    }
+  } catch (e: any) {
+    // Realtime server or device services not available - that's okay
+    // This is expected if realtime module is not loaded
+    logger.error('Failed to set device authentication dependencies', {
+      operation: 'broadcast-box:services:device-auth:error',
+      error: e?.message || 'unknown',
+      errorStack: e?.stack,
+      errorName: e?.name,
+    });
   }
 }
