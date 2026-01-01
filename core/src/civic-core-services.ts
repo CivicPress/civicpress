@@ -506,6 +506,113 @@ export async function completeServiceInitialization(
     }
   } // End of realtimeEnabled check
 
+  // Register broadcast-box module services (optional)
+  // Note: Broadcast-box module is optional - registration will be skipped if module is not available
+  // We use dynamic import here since this function is async and can handle ES modules properly
+  const broadcastBoxLogger = container.resolve<Logger>('logger');
+  const broadcastBoxConfig = container.resolve<CivicPressConfig>('config');
+  broadcastBoxLogger.info(
+    'Attempting to register Broadcast Box module services...'
+  );
+  try {
+    let broadcastBoxModule: any = null;
+    let importError: any = null;
+    try {
+      broadcastBoxModule = await import('@civicpress/broadcast-box' as string);
+      broadcastBoxLogger.info(
+        'Broadcast Box module imported successfully via package name'
+      );
+    } catch (e1: any) {
+      broadcastBoxLogger.info(
+        `Broadcast Box package import failed, trying path import: ${e1?.message || 'unknown'}`
+      );
+      const path = await import('path');
+      const { pathToFileURL } = await import('url');
+      const broadcastBoxPath = path.resolve(
+        process.cwd(),
+        'modules/broadcast-box/dist/index.js'
+      );
+      try {
+        const broadcastBoxUrl = pathToFileURL(broadcastBoxPath).href;
+        broadcastBoxModule = await import(broadcastBoxUrl);
+        importError = null;
+        broadcastBoxLogger.info(
+          `Broadcast Box module imported successfully via path: ${broadcastBoxPath}`
+        );
+      } catch (e2: any) {
+        broadcastBoxLogger.warn(
+          `Broadcast Box fallback import failed: ${e2?.message || e2}`
+        );
+        broadcastBoxLogger.warn(
+          `Broadcast Box path attempted: ${broadcastBoxPath}`
+        );
+        importError = e1;
+        broadcastBoxModule = null;
+      }
+    }
+
+    if (broadcastBoxModule) {
+      broadcastBoxLogger.info(
+        `Broadcast Box module loaded. Available exports: ${Object.keys(broadcastBoxModule).join(', ')}`
+      );
+    }
+
+    if (broadcastBoxModule?.registerBroadcastBoxServices) {
+      broadcastBoxLogger.info('Calling registerBroadcastBoxServices...');
+      try {
+        await broadcastBoxModule.registerBroadcastBoxServices(
+          container,
+          broadcastBoxConfig
+        );
+        broadcastBoxLogger.info(
+          'Broadcast Box module services registered successfully'
+        );
+      } catch (regError: any) {
+        broadcastBoxLogger.error(
+          `Failed to register Broadcast Box services: ${regError?.message || 'unknown error'}`,
+          regError
+        );
+        if (regError?.stack) {
+          broadcastBoxLogger.error('Registration error stack:', regError.stack);
+        }
+      }
+    } else {
+      if (importError) {
+        broadcastBoxLogger.warn(
+          `Broadcast Box module import failed: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+        );
+        if (importError?.stack) {
+          broadcastBoxLogger.warn(
+            'Broadcast Box import stack:',
+            importError.stack
+          );
+        }
+      } else if (broadcastBoxModule) {
+        broadcastBoxLogger.warn(
+          'Broadcast Box module imported but registerBroadcastBoxServices function not found'
+        );
+        broadcastBoxLogger.warn(
+          `Available exports: ${Object.keys(broadcastBoxModule).join(', ')}`
+        );
+      } else {
+        broadcastBoxLogger.warn(
+          'Broadcast Box module not imported and no import error recorded'
+        );
+      }
+    }
+  } catch (error: any) {
+    // Broadcast Box module not available - that's okay, it's optional
+    broadcastBoxLogger.warn(
+      `Broadcast Box module registration failed with error: ${error?.message || 'unknown'}`
+    );
+    if (error?.stack) {
+      broadcastBoxLogger.warn(
+        'Broadcast Box registration error stack:',
+        error.stack
+      );
+    }
+  }
+
   // Register all caches with UnifiedCacheManager
   const cacheManager = container.resolve<UnifiedCacheManager>('cacheManager');
   const config = container.resolve<CivicPressConfig>('config');

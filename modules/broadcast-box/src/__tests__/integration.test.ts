@@ -47,8 +47,9 @@ describe('Broadcast Box Integration', () => {
     } as any;
 
     mockSecretsManager = {
-      getSecret: vi.fn().mockResolvedValue(null),
-      setSecret: vi.fn().mockResolvedValue(undefined),
+      deriveKey: vi
+        .fn()
+        .mockReturnValue(Buffer.from('test-secret-key', 'utf-8')),
     };
 
     mockRoomManager = {

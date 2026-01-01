@@ -27,6 +27,7 @@ import { RoomManager } from '../rooms/room-manager.js';
 import { YjsRoom } from '../rooms/yjs-room.js';
 import * as Y from 'yjs';
 import { MessageType, PresenceEvent, ControlEvent } from '../types/messages.js';
+import * as bcrypt from 'bcrypt';
 
 interface TestClient {
   ws: WebSocket;
@@ -160,25 +161,26 @@ describe('Realtime Module Integration', () => {
     // Trigger config load by calling a method that requires it
     await roleManager.getAvailableRoles();
 
-    // Create test users
-    const user1 = await authService.createUser({
+    // Create test users with password hashes
+    const passwordHash = await bcrypt.hash('password123', 12);
+    const user1 = await authService.createUserWithPassword({
       username: 'user1',
       email: 'user1@test.com',
-      password: 'password123',
+      passwordHash,
       name: 'User 1',
       role: 'admin',
     });
-    const user2 = await authService.createUser({
+    const user2 = await authService.createUserWithPassword({
       username: 'user2',
       email: 'user2@test.com',
-      password: 'password123',
+      passwordHash,
       name: 'User 2',
       role: 'admin',
     });
-    const user3 = await authService.createUser({
+    const user3 = await authService.createUserWithPassword({
       username: 'user3',
       email: 'user3@test.com',
-      password: 'password123',
+      passwordHash,
       name: 'User 3',
       role: 'admin',
     });

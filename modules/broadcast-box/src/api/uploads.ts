@@ -9,7 +9,7 @@ import { body, param, query, validationResult } from 'express-validator';
 import type { Logger } from '@civicpress/core';
 import multer from 'multer';
 import type { UploadProcessor } from '../services/upload-processor.js';
-import type { CreateUploadRequest } from '../types/index.js';
+import type { CreateUploadRequest, UploadStatus } from '../types/index.js';
 
 // Type for authenticated requests
 interface AuthenticatedRequest extends Request {
@@ -333,7 +333,17 @@ export function createUploadsRouter(
         const filters = {
           sessionId: req.query.sessionId as string | undefined,
           deviceId: req.query.deviceId as string | undefined,
-          status: req.query.status as string | undefined,
+          status:
+            (req.query.status as UploadStatus | undefined) &&
+            [
+              'pending',
+              'uploading',
+              'processing',
+              'complete',
+              'failed',
+            ].includes(req.query.status as string)
+              ? (req.query.status as UploadStatus)
+              : undefined,
           limit: req.query.limit
             ? parseInt(req.query.limit as string)
             : undefined,

@@ -63,12 +63,17 @@ export class EventHandlerRegistry {
     try {
       await handler(event, context);
     } catch (error) {
-      coreError('Event handler error', {
-        operation: 'broadcast-box:event:error',
-        eventType: event.event,
-        deviceId: context.deviceId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        'Event handler error',
+        'broadcast-box:event:error',
+        error instanceof Error ? error.message : String(error),
+        {
+          operation: 'broadcast-box:event:error',
+          eventType: event.event,
+          deviceId: context.deviceId,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
     }
   }
 
@@ -91,6 +96,27 @@ export function createDefaultEventHandlers(
   // Register device.connected handler
   registry.registerHandler('device.connected', async (event, context) => {
     const { deviceId, version, capabilities } = event.payload;
+
+    // Check if device needs activation (enrolled but not active)
+    // Note: Activation is also handled in DeviceConnectionTracker.registerConnection,
+    // but we check here as well for redundancy
+    try {
+      const device = await context.deviceManager.getDevice(context.deviceId);
+      if (device && device.status === 'enrolled') {
+        await context.deviceManager.activateDevice(context.deviceId);
+        coreInfo('Device activated via device.connected event', {
+          operation: 'broadcast-box:event:device-activated',
+          deviceId: context.deviceId,
+        });
+      }
+    } catch (error) {
+      // Log but don't fail the event processing
+      coreWarn('Failed to activate device in device.connected handler', {
+        operation: 'broadcast-box:event:activation-error',
+        deviceId: context.deviceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     // Log device connection event
     await context.deviceEventModel.create({
@@ -326,21 +352,37 @@ export function createDefaultEventHandlers(
       },
     });
 
+    const errorCode =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? (error as any).code
+        : undefined;
+    const errorMessage =
+      typeof error === 'object' && error !== null && 'message' in error
+        ? (error as any).message
+        : typeof error === 'string'
+          ? error
+          : String(error);
+
     if (severity === 'critical' || severity === 'error') {
-      coreError('Device error event processed', {
-        operation: 'broadcast-box:event:device-error',
-        deviceId: context.deviceId,
-        severity,
-        errorCode: error?.code,
-        errorMessage: error?.message,
-      });
+      coreError(
+        'Device error event processed',
+        'broadcast-box:event:device-error',
+        errorMessage,
+        {
+          operation: 'broadcast-box:event:device-error',
+          deviceId: context.deviceId,
+          severity,
+          errorCode,
+          errorMessage,
+        }
+      );
     } else {
       coreWarn('Device warning event processed', {
         operation: 'broadcast-box:event:device-warning',
         deviceId: context.deviceId,
         severity,
-        errorCode: error?.code,
-        errorMessage: error?.message,
+        errorCode,
+        errorMessage,
       });
     }
   });

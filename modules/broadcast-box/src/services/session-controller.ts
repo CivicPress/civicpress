@@ -27,7 +27,7 @@ export class SessionController {
   constructor(
     private deviceManager: DeviceManager,
     private connectionTracker: DeviceConnectionTracker,
-    private roomManager: RoomManager,
+    private roomManager: RoomManager | null,
     private protocol: ProtocolHandler,
     private recordManager: RecordManager,
     private logger: Logger
@@ -110,6 +110,11 @@ export class SessionController {
     });
 
     // Get device room and send command
+    if (!this.roomManager) {
+      throw new Error(
+        'RoomManager not available - realtime module required for session control'
+      );
+    }
     const room = this.roomManager.getRoom(`device:${request.deviceId}`);
     if (room) {
       room.broadcast(command);
@@ -171,6 +176,11 @@ export class SessionController {
     });
 
     // Get device room and send command
+    if (!this.roomManager) {
+      throw new Error(
+        'RoomManager not available - realtime module required for session control'
+      );
+    }
     const room = this.roomManager.getRoom(`device:${session.deviceId}`);
     if (room) {
       room.broadcast(command);

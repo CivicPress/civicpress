@@ -94,6 +94,12 @@ export class BroadcastBoxWorkflowActions {
 
       // Verify device exists and is active
       const device = await this.deviceManager.getDevice(context.deviceId);
+      if (!device) {
+        return {
+          success: false,
+          error: `Device ${context.deviceId} not found`,
+        };
+      }
       if (device.status !== 'active') {
         return {
           success: false,

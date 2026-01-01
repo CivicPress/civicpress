@@ -68,12 +68,17 @@ export class CommandHandlerRegistry {
       const ack = await handler(command, context);
       return ack;
     } catch (error) {
-      coreError('Command handler error', {
-        operation: 'broadcast-box:command:error',
-        action: command.action,
-        deviceId: context.deviceId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        'Command handler error',
+        'broadcast-box:command:error',
+        error instanceof Error ? error.message : String(error),
+        {
+          operation: 'broadcast-box:command:error',
+          action: command.action,
+          deviceId: context.deviceId,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
 
       return context.protocol.createAck(
         command.id,

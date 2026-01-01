@@ -6,6 +6,7 @@ import EditorActivity from './EditorActivity.vue';
 import GeographyLinkForm from '~/components/GeographyLinkForm.vue';
 import GeographySelector from '~/components/GeographySelector.vue';
 import RecordPreview from '~/components/RecordPreview.vue';
+import BroadcastBoxControls from '~/components/broadcast-box/BroadcastBoxControls.vue';
 import { useRecordTypes } from '~/composables/useRecordTypes';
 import { useRecordStatuses } from '~/composables/useRecordStatuses';
 import { useTemplates } from '~/composables/useTemplates';
@@ -765,6 +766,13 @@ const accordionItems = computed(() => {
             <EditorActivity
               v-else-if="item.value === 'activity'"
               :record-id="recordId"
+            />
+
+            <!-- Broadcast Box Controls (only for session records) -->
+            <BroadcastBoxControls
+              v-else-if="item.value === 'broadcast-box'"
+              :record-id="recordId"
+              :metadata="metadata"
             />
 
             <!-- Technical Details Section -->

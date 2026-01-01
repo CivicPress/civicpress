@@ -24,24 +24,33 @@ export class BroadcastBoxWorkflowTriggers {
    */
   registerTriggers(): void {
     // Register onSessionCreated trigger
-    this.hookSystem.on('session:created', async (data: any) => {
-      await this.onSessionCreated(data);
-    });
+    this.hookSystem.registerHook(
+      'session:created',
+      async (data: any, context: any) => {
+        await this.onSessionCreated(data);
+      }
+    );
 
     // Register onSessionStart trigger
-    this.hookSystem.on('session:started', async (data: any) => {
-      await this.onSessionStart(data);
-    });
+    this.hookSystem.registerHook(
+      'session:started',
+      async (data: any, context: any) => {
+        await this.onSessionStart(data);
+      }
+    );
 
     // Register onSessionEnd trigger
-    this.hookSystem.on('session:ended', async (data: any) => {
-      await this.onSessionEnd(data);
-    });
+    this.hookSystem.registerHook(
+      'session:ended',
+      async (data: any, context: any) => {
+        await this.onSessionEnd(data);
+      }
+    );
 
     // Register onRecordingComplete trigger
-    this.hookSystem.on(
+    this.hookSystem.registerHook(
       'broadcast-box:recording:complete',
-      async (data: any) => {
+      async (data: any, context: any) => {
         await this.onRecordingComplete(data);
       }
     );
@@ -83,6 +92,14 @@ export class BroadcastBoxWorkflowTriggers {
     // Verify device exists and is active
     try {
       const device = await this.deviceManager.getDevice(deviceId);
+      if (!device) {
+        this.logger.warn('Auto-record device not found', {
+          operation: 'broadcast-box:workflows:auto-record-device-not-found',
+          sessionId: data.record.id,
+          deviceId,
+        });
+        return;
+      }
       if (device.status !== 'active') {
         this.logger.warn('Auto-record device is not active', {
           operation: 'broadcast-box:workflows:auto-record-device-inactive',

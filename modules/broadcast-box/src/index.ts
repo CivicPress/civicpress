@@ -12,3 +12,7 @@ export * from './services/device-auth.js';
 export * from './services/device-connection-tracker.js';
 export * from './api/index.js';
 export * from './websocket/index.js';
+
+// Explicitly export the registration function for dynamic imports
+export { registerBroadcastBoxServices } from './broadcast-box-services.js';
+export { registerBroadcastBoxRoutes } from './api/index.js';

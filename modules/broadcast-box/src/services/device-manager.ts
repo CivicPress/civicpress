@@ -7,8 +7,10 @@
 import type { Logger, DatabaseService } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import { DeviceModel } from '../models/device.js';
 import { DeviceEventModel } from '../models/device-event.js';
+import { EnrollmentCodeModel } from '../models/enrollment-code.js';
 import type {
   BroadcastDevice,
   DeviceStatus,
@@ -21,6 +23,10 @@ import type {
 export class DeviceManager {
   private deviceModel: DeviceModel;
   private deviceEventModel: DeviceEventModel;
+  private enrollmentCodeModel: EnrollmentCodeModel;
+
+  // Enrollment code expiration (15 minutes)
+  private readonly ENROLLMENT_EXPIRY_MINUTES = 15;
 
   constructor(
     private db: DatabaseService,
@@ -28,6 +34,7 @@ export class DeviceManager {
   ) {
     this.deviceModel = new DeviceModel(db, logger);
     this.deviceEventModel = new DeviceEventModel(db, logger);
+    this.enrollmentCodeModel = new EnrollmentCodeModel(db, logger);
   }
 
   /**
@@ -38,30 +45,54 @@ export class DeviceManager {
     name: string;
     roomLocation?: string;
     organizationId?: string;
+    createdByUserId?: number | null;
+    ipAddress?: string | null;
   }): Promise<{
     deviceUuid: string;
     enrollmentCode: string;
+    expiresAt: Date;
   }> {
     // Generate device UUID (this is what the device will use to identify itself)
     const deviceUuid = uuidv4();
 
     // Generate enrollment code (short-lived code for initial registration)
-    // Format: 8-character alphanumeric code
+    // Format: 12-character alphanumeric code (grouped as XXXX-XXXX-XXXX)
     const enrollmentCode = this.generateEnrollmentCode();
 
-    // Store enrollment code temporarily (in memory or database)
-    // For now, we'll just return it - the device must register immediately
-    // In production, you might want to store this in a temporary table with expiration
+    // Hash the enrollment code before storing
+    const bcrypt = await import('bcrypt');
+    const saltRounds = 12;
+    const enrollmentCodeHash = await bcrypt.hash(enrollmentCode, saltRounds);
+
+    // Calculate expiration time (15 minutes from now)
+    const expiresAt = new Date();
+    expiresAt.setMinutes(
+      expiresAt.getMinutes() + this.ENROLLMENT_EXPIRY_MINUTES
+    );
+
+    // Store enrollment code in database
+    const enrollmentId = uuidv4();
+    await this.enrollmentCodeModel.create({
+      id: enrollmentId,
+      deviceUuid,
+      enrollmentCodeHash,
+      expiresAt,
+      createdByUserId: data.createdByUserId || null,
+      ipAddress: data.ipAddress || null,
+    });
 
     coreInfo('Device enrolled', {
       operation: 'broadcast-box:device:enrolled',
       deviceUuid,
+      enrollmentId,
       name: data.name,
+      expiresAt: expiresAt.toISOString(),
     });
 
     return {
       deviceUuid,
       enrollmentCode,
+      expiresAt,
     };
   }
 
@@ -69,19 +100,216 @@ export class DeviceManager {
    * Register a device (first connection after enrollment)
    */
   async registerDevice(
-    data: CreateDeviceRequest & { enrollmentCode: string }
+    data: CreateDeviceRequest & {
+      enrollmentCode: string;
+      registrationIp?: string | null;
+    }
   ): Promise<BroadcastDevice> {
-    // Validate enrollment code (in production, check against stored enrollment codes)
-    // For now, we'll accept any enrollment code during development
-    // TODO: Implement enrollment code validation
+    // Validate enrollment code
+    // First, find the enrollment code by device UUID
+    this.logger.debug('Looking up enrollment code for device', {
+      operation: 'broadcast-box:device:registration:lookup',
+      deviceUuid: data.deviceUuid,
+      enrollmentCodeLength: data.enrollmentCode?.length || 0,
+      enrollmentCodeFormat: data.enrollmentCode?.substring(0, 20) || 'empty',
+    });
 
-    // Check if device UUID already exists
-    const existing = await this.deviceModel.getByDeviceUuid(data.deviceUuid);
-    if (existing) {
-      throw new Error(`Device with UUID ${data.deviceUuid} already registered`);
+    const enrollmentCode = await this.enrollmentCodeModel.findByDeviceUuid(
+      data.deviceUuid
+    );
+
+    if (!enrollmentCode) {
+      this.logger.warn(
+        'Device registration failed: enrollment code not found for device UUID',
+        {
+          operation: 'broadcast-box:device:registration:invalid-code',
+          deviceUuid: data.deviceUuid,
+          registrationIp: data.registrationIp || 'unknown',
+          note: 'No enrollment code found in database for this device UUID. Make sure you enrolled the device first.',
+        }
+      );
+      throw new Error('Invalid enrollment code');
     }
 
-    // Create device record
+    this.logger.debug('Enrollment code found', {
+      operation: 'broadcast-box:device:registration:code-found',
+      enrollmentCodeId: enrollmentCode.id,
+      deviceUuid: enrollmentCode.deviceUuid,
+      expiresAt: enrollmentCode.expiresAt.toISOString(),
+      usedAt: enrollmentCode.usedAt?.toISOString() || null,
+    });
+
+    // Check if code is expired
+    if (this.enrollmentCodeModel.isExpired(enrollmentCode)) {
+      coreWarn('Device registration failed: enrollment code expired', {
+        operation: 'broadcast-box:device:registration:expired',
+        deviceUuid: data.deviceUuid,
+        expiresAt: enrollmentCode.expiresAt.toISOString(),
+        registrationIp: data.registrationIp || 'unknown',
+      });
+      throw new Error('Enrollment code expired');
+    }
+
+    // Verify device UUID matches
+    if (enrollmentCode.deviceUuid !== data.deviceUuid) {
+      coreWarn('Device registration failed: device UUID mismatch', {
+        operation: 'broadcast-box:device:registration:uuid-mismatch',
+        expectedUuid: enrollmentCode.deviceUuid,
+        providedUuid: data.deviceUuid,
+        registrationIp: data.registrationIp || 'unknown',
+      });
+      throw new Error('Device UUID mismatch');
+    }
+
+    // Check if device UUID already exists FIRST (before hash verification)
+    // This allows idempotent re-registration without requiring hash verification
+    const existing = await this.deviceModel.getByDeviceUuid(data.deviceUuid);
+
+    this.logger.debug('Device lookup result', {
+      operation: 'broadcast-box:device:registration:device-lookup',
+      deviceUuid: data.deviceUuid,
+      deviceExists: !!existing,
+      deviceId: existing?.id,
+      deviceStatus: existing?.status,
+      enrollmentCodeUsed: this.enrollmentCodeModel.isUsed(enrollmentCode),
+      enrollmentCodeExpired: this.enrollmentCodeModel.isExpired(enrollmentCode),
+      enrollmentCodeUsedAt: enrollmentCode.usedAt?.toISOString() || null,
+      enrollmentCodeExpiresAt: enrollmentCode.expiresAt.toISOString(),
+    });
+
+    if (existing) {
+      // Device already exists - verify the enrollment code is valid for re-registration
+      // Normalize the enrollment code (remove any whitespace, ensure uppercase)
+      const normalizedCode = data.enrollmentCode.trim().toUpperCase();
+
+      // Verify the enrollment code matches the stored hash
+      const bcrypt = await import('bcrypt');
+      const isValid = await bcrypt.compare(
+        normalizedCode,
+        enrollmentCode.enrollmentCodeHash
+      );
+
+      if (!isValid) {
+        this.logger.warn(
+          'Re-registration attempt with invalid enrollment code',
+          {
+            operation: 'broadcast-box:device:registration:invalid-code-reuse',
+            deviceId: existing.id,
+            deviceUuid: existing.deviceUuid,
+            registrationIp: data.registrationIp || 'unknown',
+            enrollmentCodeId: enrollmentCode.id,
+            enrollmentCodeCreatedAt: enrollmentCode.createdAt.toISOString(),
+            enrollmentCodeExpiresAt: enrollmentCode.expiresAt.toISOString(),
+            enrollmentCodeUsed: this.enrollmentCodeModel.isUsed(enrollmentCode),
+            providedCodeLength: normalizedCode.length,
+            note: 'The provided enrollment code does not match the stored hash. This could mean: (1) You are using an old code that was regenerated, (2) The code is for a different device, or (3) There is a typo in the code.',
+          }
+        );
+        throw new Error('Invalid enrollment code');
+      }
+
+      // Check if enrollment code is expired
+      if (this.enrollmentCodeModel.isExpired(enrollmentCode)) {
+        coreWarn('Re-registration attempt with expired enrollment code', {
+          operation: 'broadcast-box:device:registration:expired-code-reuse',
+          deviceId: existing.id,
+          deviceUuid: existing.deviceUuid,
+          expiresAt: enrollmentCode.expiresAt.toISOString(),
+          registrationIp: data.registrationIp || 'unknown',
+        });
+        throw new Error('Enrollment code expired');
+      }
+
+      // Code is valid and not expired - allow re-registration
+      // This handles both:
+      // 1. Re-registration with a previously used code (idempotent)
+      // 2. Re-registration with a newly generated code (regeneration scenario)
+
+      // Mark the code as used if it hasn't been used yet
+      if (!this.enrollmentCodeModel.isUsed(enrollmentCode)) {
+        try {
+          await this.enrollmentCodeModel.markAsUsed(
+            enrollmentCode.id,
+            data.registrationIp || null
+          );
+        } catch (markError: any) {
+          // If marking as used fails, log but don't fail registration (non-critical)
+          this.logger.warn(
+            'Failed to mark enrollment code as used during re-registration (non-critical)',
+            {
+              operation:
+                'broadcast-box:device:registration:mark-used-failed-re-registration',
+              enrollmentCodeId: enrollmentCode.id,
+              deviceId: existing.id,
+              error:
+                markError instanceof Error
+                  ? markError.message
+                  : String(markError),
+            }
+          );
+        }
+      }
+
+      coreInfo('Device re-registration with valid enrollment code', {
+        operation: 'broadcast-box:device:registration:re-registration',
+        deviceId: existing.id,
+        deviceUuid: existing.deviceUuid,
+        status: existing.status,
+        codeWasUsed: this.enrollmentCodeModel.isUsed(enrollmentCode),
+        note: 'Generating new token for existing device',
+      });
+      return existing;
+    }
+
+    // For NEW device registrations, verify the provided enrollment code matches the stored hash
+    // Normalize the enrollment code (remove any whitespace, ensure uppercase)
+    const normalizedCode = data.enrollmentCode.trim().toUpperCase();
+
+    this.logger.debug('Comparing enrollment code for new device registration', {
+      operation: 'broadcast-box:device:registration:code-compare',
+      providedCodeLength: normalizedCode.length,
+      providedCodeFormat: normalizedCode.substring(0, 20),
+      hashLength: enrollmentCode.enrollmentCodeHash.length,
+    });
+
+    const bcrypt = await import('bcrypt');
+    const isValid = await bcrypt.compare(
+      normalizedCode,
+      enrollmentCode.enrollmentCodeHash
+    );
+
+    if (!isValid) {
+      this.logger.warn(
+        'Device registration failed: enrollment code hash mismatch',
+        {
+          operation: 'broadcast-box:device:registration:hash-mismatch',
+          deviceUuid: data.deviceUuid,
+          registrationIp: data.registrationIp || 'unknown',
+          providedCodeLength: normalizedCode.length,
+          note: 'The provided enrollment code does not match the stored hash. Check that you are using the correct code from the enrollment step.',
+        }
+      );
+      throw new Error('Invalid enrollment code');
+    }
+
+    this.logger.debug('Enrollment code hash verified successfully', {
+      operation: 'broadcast-box:device:registration:code-verified',
+    });
+
+    // Now check if code is already used (only if device doesn't exist)
+    // This prevents reusing a code that was used for a different device
+    if (this.enrollmentCodeModel.isUsed(enrollmentCode)) {
+      coreWarn('Device registration failed: enrollment code already used', {
+        operation: 'broadcast-box:device:registration:already-used',
+        deviceUuid: data.deviceUuid,
+        usedAt: enrollmentCode.usedAt?.toISOString(),
+        registrationIp: data.registrationIp || 'unknown',
+        note: 'This enrollment code was already used. Generate a new enrollment code.',
+      });
+      throw new Error('Enrollment code already used');
+    }
+
+    // Create device record FIRST
     const deviceId = uuidv4();
     const device: Omit<BroadcastDevice, 'createdAt' | 'updatedAt'> = {
       id: deviceId,
@@ -99,7 +327,35 @@ export class DeviceManager {
       config: data.config || {},
     };
 
-    const created = await this.deviceModel.create(device);
+    let created: BroadcastDevice;
+    try {
+      created = await this.deviceModel.create(device);
+    } catch (createError: any) {
+      // If device creation fails, enrollment code remains unused and can be retried
+      throw createError;
+    }
+
+    // Only mark enrollment code as used AFTER device is successfully created
+    // This ensures the code can be reused if device creation fails
+    try {
+      await this.enrollmentCodeModel.markAsUsed(
+        enrollmentCode.id,
+        data.registrationIp || null
+      );
+    } catch (markError: any) {
+      // If marking as used fails, log but don't fail registration (device is already created)
+      // This is a non-critical operation - the device is registered
+      this.logger.warn(
+        'Failed to mark enrollment code as used (non-critical)',
+        {
+          operation: 'broadcast-box:device:registration:mark-used-failed',
+          enrollmentCodeId: enrollmentCode.id,
+          deviceId: created.id,
+          error:
+            markError instanceof Error ? markError.message : String(markError),
+        }
+      );
+    }
 
     // Log device registration event
     await this.deviceEventModel.create({
@@ -109,6 +365,7 @@ export class DeviceManager {
       eventData: {
         name: created.name,
         roomLocation: created.roomLocation,
+        enrollmentCodeId: enrollmentCode.id,
       },
     });
 
@@ -116,6 +373,7 @@ export class DeviceManager {
       operation: 'broadcast-box:device:registered',
       deviceId: created.id,
       deviceUuid: created.deviceUuid,
+      enrollmentCodeId: enrollmentCode.id,
     });
 
     return created;
@@ -123,6 +381,7 @@ export class DeviceManager {
 
   /**
    * Activate a device (change status from 'enrolled' to 'active')
+   * Only activates if enrollment code is still valid (not expired)
    */
   async activateDevice(deviceId: string): Promise<BroadcastDevice> {
     const device = await this.deviceModel.getById(deviceId);
@@ -136,6 +395,36 @@ export class DeviceManager {
       );
     }
 
+    // Verify enrollment code is still valid (not expired) at activation time
+    // This ensures devices connect within the validity window
+    const enrollmentCode = await this.enrollmentCodeModel.findByDeviceUuid(
+      device.deviceUuid
+    );
+    if (enrollmentCode) {
+      if (this.enrollmentCodeModel.isExpired(enrollmentCode)) {
+        coreWarn('Device activation failed: enrollment code expired', {
+          operation: 'broadcast-box:device:activation:expired',
+          deviceId,
+          deviceUuid: device.deviceUuid,
+          expiresAt: enrollmentCode.expiresAt.toISOString(),
+        });
+        throw new Error(
+          'Enrollment code expired. Device must connect within the validity window.'
+        );
+      }
+    } else {
+      // Enrollment code not found - this shouldn't happen for registered devices
+      // but we'll allow activation to proceed (device was already registered)
+      this.logger.warn(
+        'Enrollment code not found during activation (non-critical)',
+        {
+          operation: 'broadcast-box:device:activation:code-not-found',
+          deviceId,
+          deviceUuid: device.deviceUuid,
+        }
+      );
+    }
+
     const updated = await this.deviceModel.update(deviceId, {
       status: 'active',
     });
@@ -145,12 +434,17 @@ export class DeviceManager {
       id: uuidv4(),
       deviceId: updated.id,
       eventType: 'device.activated',
-      eventData: {},
+      eventData: {
+        enrollmentCodeExpiresAt:
+          enrollmentCode?.expiresAt.toISOString() || null,
+        activatedAt: new Date().toISOString(),
+      },
     });
 
     coreInfo('Device activated', {
       operation: 'broadcast-box:device:activated',
       deviceId: updated.id,
+      deviceUuid: updated.deviceUuid,
     });
 
     return updated;
@@ -304,14 +598,179 @@ export class DeviceManager {
   }
 
   /**
-   * Generate enrollment code (8-character alphanumeric)
+   * Get enrollment code status for a device
+   * Returns status information (not the actual code, which is hashed)
+   */
+  async getEnrollmentCodeStatus(deviceUuid: string): Promise<{
+    exists: boolean;
+    isExpired: boolean;
+    isUsed: boolean;
+    expiresAt: Date | null;
+    createdAt: Date | null;
+    usedAt: Date | null;
+  }> {
+    const enrollmentCode =
+      await this.enrollmentCodeModel.findByDeviceUuid(deviceUuid);
+
+    if (!enrollmentCode) {
+      return {
+        exists: false,
+        isExpired: false,
+        isUsed: false,
+        expiresAt: null,
+        createdAt: null,
+        usedAt: null,
+      };
+    }
+
+    return {
+      exists: true,
+      isExpired: this.enrollmentCodeModel.isExpired(enrollmentCode),
+      isUsed: this.enrollmentCodeModel.isUsed(enrollmentCode),
+      expiresAt: enrollmentCode.expiresAt,
+      createdAt: enrollmentCode.createdAt,
+      usedAt: enrollmentCode.usedAt,
+    };
+  }
+
+  /**
+   * Regenerate enrollment code for an existing device
+   * This invalidates any previous unused codes for the device
+   */
+  async regenerateEnrollmentCode(
+    deviceId: string,
+    data: {
+      createdByUserId?: number | null;
+      ipAddress?: string | null;
+    }
+  ): Promise<{
+    deviceUuid: string;
+    enrollmentCode: string;
+    expiresAt: Date;
+  }> {
+    // Get the device to ensure it exists and get its UUID
+    const device = await this.deviceModel.getById(deviceId);
+    if (!device) {
+      throw new Error(`Device with ID ${deviceId} not found`);
+    }
+
+    // Delete any existing enrollment codes for this device
+    // (The database has a UNIQUE constraint on device_uuid, so we must delete all codes)
+    const deletedCount = await this.enrollmentCodeModel.deleteAllByDeviceUuid(
+      device.deviceUuid
+    );
+    coreInfo('Deleted existing enrollment codes before regeneration', {
+      operation: 'broadcast-box:device:enrollment:delete-before-regenerate',
+      deviceId,
+      deviceUuid: device.deviceUuid,
+      deletedCount,
+    });
+
+    // Verify deletion succeeded by checking if any codes still exist
+    const existingCode = await this.enrollmentCodeModel.findByDeviceUuid(
+      device.deviceUuid
+    );
+    if (existingCode) {
+      coreWarn(
+        'Enrollment code still exists after deletion attempt, retrying delete',
+        {
+          operation: 'broadcast-box:device:enrollment:delete-retry',
+          deviceId,
+          deviceUuid: device.deviceUuid,
+          existingCodeId: existingCode.id,
+        }
+      );
+      // Retry deletion
+      await this.enrollmentCodeModel.deleteAllByDeviceUuid(device.deviceUuid);
+
+      // Verify again
+      const stillExists = await this.enrollmentCodeModel.findByDeviceUuid(
+        device.deviceUuid
+      );
+      if (stillExists) {
+        throw new Error(
+          `Failed to delete existing enrollment code for device ${device.deviceUuid}. ` +
+            `Code ${stillExists.id} still exists after deletion attempt.`
+        );
+      }
+    }
+
+    // Generate new enrollment code
+    const enrollmentCode = this.generateEnrollmentCode();
+
+    // Hash the enrollment code before storing
+    const bcrypt = await import('bcrypt');
+    const saltRounds = 12;
+    const enrollmentCodeHash = await bcrypt.hash(enrollmentCode, saltRounds);
+
+    // Calculate expiration time (15 minutes from now)
+    const expiresAt = new Date();
+    expiresAt.setMinutes(
+      expiresAt.getMinutes() + this.ENROLLMENT_EXPIRY_MINUTES
+    );
+
+    // Store enrollment code in database
+    const enrollmentId = uuidv4();
+    try {
+      await this.enrollmentCodeModel.create({
+        id: enrollmentId,
+        deviceUuid: device.deviceUuid,
+        enrollmentCodeHash,
+        expiresAt,
+        createdByUserId: data.createdByUserId || null,
+        ipAddress: data.ipAddress || null,
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('UNIQUE constraint')
+      ) {
+        // Check if a code was created by another process
+        const conflictingCode = await this.enrollmentCodeModel.findByDeviceUuid(
+          device.deviceUuid
+        );
+        throw new Error(
+          `UNIQUE constraint violation: An enrollment code already exists for device ${device.deviceUuid}. ` +
+            `This may indicate a race condition. Existing code ID: ${conflictingCode?.id || 'unknown'}`
+        );
+      }
+      throw error;
+    }
+
+    coreInfo('Enrollment code regenerated for existing device', {
+      operation: 'broadcast-box:device:enrollment:regenerated',
+      deviceId,
+      deviceUuid: device.deviceUuid,
+      enrollmentId,
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    return {
+      deviceUuid: device.deviceUuid,
+      enrollmentCode,
+      expiresAt,
+    };
+  }
+
+  /**
+   * Generate enrollment code (12-character alphanumeric, grouped as XXXX-XXXX-XXXX)
+   * Uses cryptographically secure random generation
    */
   private generateEnrollmentCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars
+    // Exclude confusing characters: 0, O, I, l
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const codeLength = 12;
+
+    // Use crypto.randomBytes for secure random generation
+    const randomBytes = crypto.randomBytes(codeLength);
     let code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+
+    for (let i = 0; i < codeLength; i++) {
+      const randomIndex = randomBytes[i] % chars.length;
+      code += chars[randomIndex];
     }
-    return code;
+
+    // Format as XXXX-XXXX-XXXX for readability
+    return `${code.substring(0, 4)}-${code.substring(4, 8)}-${code.substring(8, 12)}`;
   }
 }

@@ -78,10 +78,15 @@ export class ProtocolHandler {
           };
       }
     } catch (error) {
-      coreError('Failed to parse WebSocket message', {
-        operation: 'broadcast-box:protocol:parse-error',
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        'Failed to parse WebSocket message',
+        'broadcast-box:protocol:parse-error',
+        error instanceof Error ? error.message : String(error),
+        {
+          operation: 'broadcast-box:protocol:parse-error',
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
       return null;
     }
   }

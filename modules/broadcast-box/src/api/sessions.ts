@@ -18,7 +18,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 import type { SessionController } from '../services/session-controller.js';
-import type { StartSessionRequest } from '../types/index.js';
+import type { StartSessionRequest, SessionStatus } from '../types/index.js';
 
 export function createSessionsRouter(
   sessionController: SessionController,
@@ -250,7 +250,19 @@ export function createSessionsRouter(
           civicpressSessionId: req.query.civicpressSessionId as
             | string
             | undefined,
-          status: req.query.status as string | undefined,
+          status:
+            (req.query.status as SessionStatus | undefined) &&
+            [
+              'pending',
+              'recording',
+              'stopping',
+              'encoding',
+              'uploading',
+              'complete',
+              'failed',
+            ].includes(req.query.status as string)
+              ? (req.query.status as SessionStatus)
+              : undefined,
           limit: req.query.limit
             ? parseInt(req.query.limit as string)
             : undefined,

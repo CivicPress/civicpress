@@ -44,6 +44,10 @@ export class DeviceConnectionTracker {
   ): Promise<void> {
     const now = new Date();
 
+    // Check if this is the first connection (device is enrolled but not active)
+    const device = await this.deviceManager.getDevice(deviceId);
+    const isFirstConnection = device && device.status === 'enrolled';
+
     const connectionState: DeviceConnectionState = {
       deviceId,
       connected: true,
@@ -59,6 +63,26 @@ export class DeviceConnectionTracker {
     this.connections.set(deviceId, connectionState);
     this.clientToDevice.set(clientId, deviceId);
 
+    // Activate device on first connection (if enrolled)
+    if (isFirstConnection) {
+      try {
+        await this.deviceManager.activateDevice(deviceId);
+        coreInfo('Device activated on first connection', {
+          operation: 'broadcast-box:connection:activated',
+          deviceId,
+          clientId,
+        });
+      } catch (error) {
+        coreWarn('Failed to activate device on first connection', {
+          operation: 'broadcast-box:connection:activation-failed',
+          deviceId,
+          clientId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue with connection registration even if activation fails
+      }
+    }
+
     // Update device last seen
     await this.deviceManager.updateLastSeen(deviceId);
 
@@ -71,6 +95,7 @@ export class DeviceConnectionTracker {
         clientId,
         endpoint,
         connectedAt: now.toISOString(),
+        activated: isFirstConnection,
       },
     });
 
@@ -78,6 +103,7 @@ export class DeviceConnectionTracker {
       operation: 'broadcast-box:connection:registered',
       deviceId,
       clientId,
+      activated: isFirstConnection,
     });
   }
 

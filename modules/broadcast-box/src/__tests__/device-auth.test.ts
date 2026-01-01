@@ -20,8 +20,9 @@ describe('DeviceAuthService', () => {
     } as any;
 
     mockSecretsManager = {
-      getSecret: vi.fn(),
-      setSecret: vi.fn(),
+      deriveKey: vi
+        .fn()
+        .mockReturnValue(Buffer.from('test-secret-key', 'utf-8')),
     } as any;
 
     deviceAuth = new DeviceAuthService(mockLogger, mockSecretsManager);
@@ -33,8 +34,9 @@ describe('DeviceAuthService', () => {
       const deviceUuid = 'device-uuid';
       const organizationId = 'default';
 
-      mockSecretsManager.getSecret = vi.fn().mockResolvedValue('test-secret');
-      mockSecretsManager.setSecret = vi.fn().mockResolvedValue(undefined);
+      mockSecretsManager.deriveKey = vi
+        .fn()
+        .mockReturnValue(Buffer.from('test-secret-key', 'utf-8'));
 
       const result = await deviceAuth.generateToken({
         deviceId,
@@ -50,35 +52,18 @@ describe('DeviceAuthService', () => {
 
   describe('validateToken', () => {
     it('should validate a valid token', async () => {
-      // Mock secret manager to return a consistent secret
-      let storedSecret: string | null = null;
-      mockSecretsManager.getSecret = vi
-        .fn()
-        .mockImplementation(async (key: string) => {
-          if (key === 'broadcast-box-device-token-secret') {
-            return storedSecret;
-          }
-          return null;
-        });
-      mockSecretsManager.setSecret = vi
-        .fn()
-        .mockImplementation(async (key: string, secret: string) => {
-          if (key === 'broadcast-box-device-token-secret') {
-            storedSecret = secret;
-          }
-        });
+      // Mock secret manager to return a consistent derived key
+      const testKey = Buffer.from('test-secret-key-for-validation', 'utf-8');
+      mockSecretsManager.deriveKey = vi.fn().mockReturnValue(testKey);
 
-      // First generate a token (this will create and store a secret)
+      // First generate a token
       const tokenResult = await deviceAuth.generateToken({
         deviceId: 'device-id',
         deviceUuid: 'device-uuid',
         organizationId: 'default',
       });
 
-      // Reset the mock to use the stored secret
-      mockSecretsManager.getSecret = vi.fn().mockResolvedValue(storedSecret);
-
-      // Then validate it
+      // Then validate it (should use the same derived key)
       const result = await deviceAuth.validateToken(tokenResult.token);
 
       expect(result).toBeDefined();
@@ -99,33 +84,16 @@ describe('DeviceAuthService', () => {
 
   describe('refreshToken', () => {
     it('should refresh a valid token', async () => {
-      // Mock secret manager to return a consistent secret
-      let storedSecret: string | null = null;
-      mockSecretsManager.getSecret = vi
-        .fn()
-        .mockImplementation(async (key: string) => {
-          if (key === 'broadcast-box-device-token-secret') {
-            return storedSecret;
-          }
-          return null;
-        });
-      mockSecretsManager.setSecret = vi
-        .fn()
-        .mockImplementation(async (key: string, secret: string) => {
-          if (key === 'broadcast-box-device-token-secret') {
-            storedSecret = secret;
-          }
-        });
+      // Mock secret manager to return a consistent derived key
+      const testKey = Buffer.from('test-secret-key-for-refresh', 'utf-8');
+      mockSecretsManager.deriveKey = vi.fn().mockReturnValue(testKey);
 
-      // First generate a token (this will create and store a secret)
+      // First generate a token
       const oldTokenResult = await deviceAuth.generateToken({
         deviceId: 'device-id',
         deviceUuid: 'device-uuid',
         organizationId: 'default',
       });
-
-      // Reset the mock to use the stored secret
-      mockSecretsManager.getSecret = vi.fn().mockResolvedValue(storedSecret);
 
       // Then refresh it
       const newTokenResult = await deviceAuth.refreshToken(

@@ -73,6 +73,38 @@ export class CivicPressAPI {
     this.app = express();
 
     // Custom middleware to catch JSON parse errors (must be first, outside setupMiddleware)
+    // Add raw body logging for debugging
+    this.app.use(
+      (
+        req: express.Request,
+        res: express.Response,
+        next: express.NextFunction
+      ) => {
+        if (
+          req.method === 'POST' &&
+          req.path.includes('/broadcast-box/devices/enroll')
+        ) {
+          let rawBody = '';
+          req.on('data', (chunk) => {
+            rawBody += chunk.toString();
+          });
+          req.on('end', () => {
+            console.log('=== RAW REQUEST BODY ===');
+            console.log('Path:', req.path);
+            console.log('Content-Type:', req.get('Content-Type'));
+            console.log('Raw body length:', rawBody.length);
+            console.log(
+              'Raw body (first 500 chars):',
+              rawBody.substring(0, 500)
+            );
+            console.log('Raw body (full):', rawBody);
+            console.log('========================');
+          });
+        }
+        next();
+      }
+    );
+
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(
       (
@@ -82,6 +114,11 @@ export class CivicPressAPI {
         next: express.NextFunction
       ) => {
         if (err instanceof SyntaxError && 'body' in err) {
+          console.error('=== JSON PARSE ERROR ===');
+          console.error('Error:', err.message);
+          console.error('Path:', req.path);
+          console.error('Content-Type:', req.get('Content-Type'));
+          console.error('========================');
           (err as any).statusCode = 400;
           (err as any).message = 'Malformed JSON';
           return errorHandler(err, req, res, next);
@@ -170,7 +207,7 @@ export class CivicPressAPI {
 
       // Setup routes after CivicPress is initialized
       logger.info('Setting up routes...');
-      this.setupRoutes();
+      await this.setupRoutes();
 
       // Load auth configuration
       logger.info('Loading auth configuration...');
@@ -208,7 +245,7 @@ export class CivicPressAPI {
     return null;
   }
 
-  private setupRoutes(): void {
+  private async setupRoutes(): Promise<void> {
     if (!this.civicPress) {
       throw new Error('CivicPress not initialized');
     }
@@ -216,6 +253,92 @@ export class CivicPressAPI {
     // Create service instances
     const recordsService = new RecordsService(this.civicPress);
     const geographyManager = new GeographyManager(this.dataDir);
+
+    // Try to import Broadcast Box API routes (optional module)
+    let registerBroadcastBoxRoutes: any = null;
+    try {
+      let broadcastBoxModule: any = null;
+      let importError: any = null;
+      try {
+        broadcastBoxModule = await import(
+          '@civicpress/broadcast-box' as string
+        );
+        logger.info(
+          'Broadcast Box module imported successfully via package name'
+        );
+      } catch (e1: any) {
+        // Fallback: try direct path import (similar to realtime module)
+        const path = await import('path');
+        const { pathToFileURL } = await import('url');
+        // In development, try source code first, then fall back to dist
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        const broadcastBoxPath = path.resolve(
+          process.cwd(),
+          isDevelopment
+            ? 'modules/broadcast-box/src/index.ts'
+            : 'modules/broadcast-box/dist/index.js'
+        );
+        try {
+          const broadcastBoxUrl = pathToFileURL(broadcastBoxPath).href;
+          broadcastBoxModule = await import(broadcastBoxUrl);
+          importError = null;
+          logger.info(
+            `Broadcast Box module imported successfully via path: ${broadcastBoxPath}`
+          );
+        } catch (e2: any) {
+          // If source import failed in dev, try dist as fallback
+          if (isDevelopment) {
+            const distPath = path.resolve(
+              process.cwd(),
+              'modules/broadcast-box/dist/index.js'
+            );
+            try {
+              const distUrl = pathToFileURL(distPath).href;
+              broadcastBoxModule = await import(distUrl);
+              importError = null;
+              logger.info(
+                `Broadcast Box module imported from dist (source failed): ${distPath}`
+              );
+            } catch (e3: any) {
+              importError = e1;
+              broadcastBoxModule = null;
+              logger.warn(
+                `Broadcast Box module import failed (package: ${e1?.message || 'unknown'}, source: ${e2?.message || 'unknown'}, dist: ${e3?.message || 'unknown'})`
+              );
+            }
+          } else {
+            importError = e1;
+            broadcastBoxModule = null;
+            logger.warn(
+              `Broadcast Box module import failed (package: ${e1?.message || 'unknown'}, path: ${e2?.message || 'unknown'})`
+            );
+          }
+        }
+      }
+
+      if (broadcastBoxModule?.registerBroadcastBoxRoutes) {
+        registerBroadcastBoxRoutes =
+          broadcastBoxModule.registerBroadcastBoxRoutes;
+        logger.info('Broadcast Box registerBroadcastBoxRoutes function found');
+      } else if (importError) {
+        // Module not available - that's okay, it's optional
+        logger.warn(
+          `Broadcast Box module not available: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+        );
+      } else if (broadcastBoxModule) {
+        logger.warn(
+          'Broadcast Box module imported but registerBroadcastBoxRoutes not found'
+        );
+        logger.warn(
+          `Available exports: ${Object.keys(broadcastBoxModule).join(', ')}`
+        );
+      }
+    } catch (error: any) {
+      // Broadcast Box module not available - that's okay, it's optional
+      logger.warn(
+        `Broadcast Box module import failed: ${error?.message || 'unknown error'}`
+      );
+    }
 
     // Health check (no auth required)
     this.app.use(apiPath('health'), healthRouter);
@@ -401,6 +524,96 @@ export class CivicPressAPI {
       csrfMiddleware(this.civicPress),
       usersRouter
     );
+
+    // Broadcast Box API routes (optional - only if module is available)
+    if (registerBroadcastBoxRoutes) {
+      logger.info(
+        'Broadcast Box route registration function available, attempting to register routes...'
+      );
+      const broadcastBoxLogger = this.civicPress['logger'] as Logger;
+      try {
+        // Get Broadcast Box services from DI container
+        // These services may not exist if the module isn't registered, so we catch errors
+        let deviceManager: any;
+        let deviceAuth: any;
+        let connectionTracker: any;
+        let sessionController: any;
+        let uploadProcessor: any;
+
+        try {
+          // Try to get services one by one to see which ones are missing
+          try {
+            deviceManager = this.civicPress.getService(
+              'broadcastBoxDeviceManager'
+            );
+            broadcastBoxLogger.info('✅ broadcastBoxDeviceManager found');
+          } catch (e: any) {
+            broadcastBoxLogger.warn(
+              `❌ broadcastBoxDeviceManager not found: ${e?.message || 'unknown'}`
+            );
+            throw e;
+          }
+          try {
+            deviceAuth = this.civicPress.getService('broadcastBoxDeviceAuth');
+            broadcastBoxLogger.info('✅ broadcastBoxDeviceAuth found');
+          } catch (e: any) {
+            broadcastBoxLogger.warn(
+              `❌ broadcastBoxDeviceAuth not found: ${e?.message || 'unknown'}`
+            );
+            throw e;
+          }
+          connectionTracker = this.civicPress.getService(
+            'broadcastBoxConnectionTracker'
+          );
+          sessionController = this.civicPress.getService(
+            'broadcastBoxSessionController'
+          );
+          uploadProcessor = this.civicPress.getService(
+            'broadcastBoxUploadProcessor'
+          );
+        } catch (serviceError: any) {
+          // Services not found - Broadcast Box module may not be registered
+          // Check if it's a ServiceNotFoundError or just a general error
+          if (
+            serviceError?.name === 'ServiceNotFoundError' ||
+            serviceError?.constructor?.name === 'ServiceNotFoundError' ||
+            serviceError?.message?.includes('Service not found')
+          ) {
+            broadcastBoxLogger.warn(
+              'Broadcast Box services not registered, skipping API route registration'
+            );
+          } else {
+            broadcastBoxLogger.warn(
+              `Broadcast Box services error: ${serviceError?.message || 'unknown error'}`
+            );
+          }
+          return; // Skip route registration
+        }
+
+        if (deviceManager && deviceAuth && broadcastBoxLogger) {
+          await registerBroadcastBoxRoutes(
+            this.app,
+            deviceManager,
+            deviceAuth,
+            broadcastBoxLogger,
+            authMiddleware(this.civicPress),
+            connectionTracker,
+            sessionController,
+            uploadProcessor
+          );
+          broadcastBoxLogger.info('Broadcast Box API routes registered');
+        } else {
+          broadcastBoxLogger.warn(
+            'Broadcast Box services not available, skipping route registration'
+          );
+        }
+      } catch (error: any) {
+        // Broadcast Box module not available or services not registered - that's okay
+        logger.warn(
+          `Broadcast Box API routes not registered: ${error?.message || 'services not available'}`
+        );
+      }
+    }
 
     logger.info('Routes registered');
   }

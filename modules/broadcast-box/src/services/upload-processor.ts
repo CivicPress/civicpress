@@ -16,6 +16,7 @@ import type {
   UploadStatus,
   CreateUploadRequest,
 } from '../types/index.js';
+// @ts-ignore - @civicpress/storage may not be available in all environments
 import type { CloudUuidStorageService } from '@civicpress/storage';
 
 export class UploadProcessor {
@@ -39,10 +40,15 @@ export class UploadProcessor {
     try {
       await fs.mkdir(this.uploadsDir, { recursive: true });
     } catch (error) {
-      coreError('Failed to create uploads directory', {
-        operation: 'broadcast-box:upload:init-error',
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        'Failed to create uploads directory',
+        'broadcast-box:upload:init-error',
+        error instanceof Error ? error.message : String(error),
+        {
+          operation: 'broadcast-box:upload:init-error',
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
       throw error;
     }
   }

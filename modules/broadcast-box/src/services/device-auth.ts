@@ -131,10 +131,15 @@ export class DeviceAuthService {
 
       return payload;
     } catch (error) {
-      coreError('Error validating device token', {
-        operation: 'broadcast-box:device-auth:validation-error',
-        error: error instanceof Error ? error.message : String(error),
-      });
+      coreError(
+        'Error validating device token',
+        'broadcast-box:device-auth:validation-error',
+        error instanceof Error ? error.message : String(error),
+        {
+          operation: 'broadcast-box:device-auth:validation-error',
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
       return null;
     }
   }
@@ -158,35 +163,21 @@ export class DeviceAuthService {
 
   /**
    * Get secret for token signing
+   * Uses SecretsManager's deriveKey to get a scoped key for device tokens
    */
   private async getSecret(): Promise<string> {
     if (this.secretsManager) {
-      try {
-        const secret = await this.secretsManager.getSecret(
-          this.TOKEN_SECRET_KEY
-        );
-        if (secret) {
-          return secret;
-        }
-      } catch (error) {
-        // Secret doesn't exist yet, will create it below
-      }
-
-      // Generate and store new secret
-      const newSecret = this.generateSecret();
-      await this.secretsManager.setSecret(this.TOKEN_SECRET_KEY, newSecret);
-      return newSecret;
+      // Use deriveKey to get a scoped key for device tokens
+      // This ensures each scope has its own derived key from the root secret
+      const keyBuffer = this.secretsManager.deriveKey(
+        'broadcast-box',
+        'device-token'
+      );
+      return keyBuffer.toString('hex');
     }
 
     // Fallback: use default secret (not secure for production)
     return 'default-device-token-secret-change-in-production';
-  }
-
-  /**
-   * Generate a random secret
-   */
-  private generateSecret(): string {
-    return bcrypt.genSaltSync(16);
   }
 
   /**
