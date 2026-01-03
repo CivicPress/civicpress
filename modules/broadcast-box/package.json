@@ -18,7 +18,6 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",

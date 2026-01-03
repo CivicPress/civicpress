@@ -95,7 +95,66 @@ export function createDefaultEventHandlers(
 
   // Register device.connected handler
   registry.registerHandler('device.connected', async (event, context) => {
-    const { deviceId, version, capabilities } = event.payload;
+    // Support both protocol format (nested eventType/eventData) and current format (flat payload)
+    let eventData: any;
+    let version: string | undefined;
+    let capabilities: any;
+    let sources: any;
+    let configuration: any;
+
+    if (event.payload.eventType === 'device.connected' && event.payload.eventData) {
+      // Protocol format: nested structure
+      eventData = event.payload.eventData;
+      version = eventData.version;
+      capabilities = eventData.capabilities;
+      sources = eventData.sources;
+      configuration = eventData.configuration;
+    } else {
+      // Current format: flat structure
+      eventData = event.payload;
+      version = event.payload.version;
+      capabilities = event.payload.capabilities;
+      sources = event.payload.sources;
+      configuration = event.payload.configuration;
+    }
+
+    // Update device capabilities with detailed source information if available
+    if (sources) {
+      try {
+        const device = await context.deviceManager.getDevice(context.deviceId);
+        if (device) {
+          // Extract source names from detailed source objects for backward compatibility
+          const videoSourceNames = sources.video?.map((s: any) => s.name || s.path || `Source ${s.id}`) || [];
+          const audioSourceNames = sources.audio?.map((s: any) => s.name || `Source ${s.id}`) || [];
+
+          // Update device capabilities with both detailed objects and string arrays
+          const updatedCapabilities = {
+            ...device.capabilities,
+            videoSources: videoSourceNames.length > 0 ? videoSourceNames : device.capabilities.videoSources,
+            audioSources: audioSourceNames.length > 0 ? audioSourceNames : device.capabilities.audioSources,
+            videoSourceObjects: sources.video || device.capabilities.videoSourceObjects,
+            audioSourceObjects: sources.audio || device.capabilities.audioSourceObjects,
+          };
+
+          // Update device if capabilities changed
+          if (JSON.stringify(updatedCapabilities) !== JSON.stringify(device.capabilities)) {
+            await context.deviceManager.updateDevice(context.deviceId, {
+              capabilities: updatedCapabilities as any,
+            });
+            coreInfo('Device capabilities updated from device.connected event', {
+              operation: 'broadcast-box:event:capabilities-updated',
+              deviceId: context.deviceId,
+            });
+          }
+        }
+      } catch (error) {
+        coreWarn('Failed to update device capabilities from device.connected event', {
+          operation: 'broadcast-box:event:capabilities-update-error',
+          deviceId: context.deviceId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     // Check if device needs activation (enrolled but not active)
     // Note: Activation is also handled in DeviceConnectionTracker.registerConnection,
@@ -126,6 +185,8 @@ export function createDefaultEventHandlers(
       eventData: {
         version,
         capabilities,
+        sources,
+        configuration,
         connectedAt: new Date().toISOString(),
       },
     });
@@ -134,6 +195,7 @@ export function createDefaultEventHandlers(
       operation: 'broadcast-box:event:device-connected',
       deviceId: context.deviceId,
       version,
+      hasDetailedSources: !!(sources?.video || sources?.audio),
     });
   });
 
@@ -265,7 +327,8 @@ export function createDefaultEventHandlers(
 
   // Register health.update handler
   registry.registerHandler('health.update', async (event, context) => {
-    const { health } = event.payload;
+    // Support both protocol format and current format
+    const health = event.payload.health || event.payload.eventData?.health || event.payload;
 
     // Log health update event
     await context.deviceEventModel.create({
@@ -282,6 +345,114 @@ export function createDefaultEventHandlers(
       operation: 'broadcast-box:event:health-update',
       deviceId: context.deviceId,
       healthScore: health?.score,
+    });
+  });
+
+  // Register status event handler (device sends type="status" with payload)
+  registry.registerHandler('status', async (event, context) => {
+    // Device format: payload contains health, capabilities, state, session_id directly
+    const payload = event.payload.eventData || event.payload;
+
+    // Update device state from payload.state and payload.session_id
+    if (payload.state !== undefined) {
+      const deviceState = payload.state === 'idle' ? 'idle' : 
+                         payload.state === 'recording' ? 'recording' :
+                         payload.state === 'encoding' ? 'encoding' :
+                         payload.state === 'uploading' ? 'uploading' : 'idle';
+      
+      context.connectionTracker.updateDeviceState(context.deviceId, {
+        status: deviceState as any,
+        activeSessionId: payload.session_id || undefined,
+      });
+    }
+
+    // Update health if provided (device sends: health.score, health.cpu_usage, health.memory_usage, health.disk_usage)
+    if (payload.health) {
+      const health = {
+        score: payload.health.score ?? 100,
+        status: (payload.health.score ?? 100) >= 80 ? 'healthy' as const : 
+                (payload.health.score ?? 100) >= 50 ? 'degraded' as const : 'unhealthy' as const,
+        metrics: {
+          // Map device format (cpu_usage) to internal format (cpuPercent)
+          cpuPercent: payload.health.cpu_usage ?? payload.health.cpuPercent ?? 0,
+          memoryPercent: payload.health.memory_usage ?? payload.health.memoryPercent ?? 0,
+          diskPercent: payload.health.disk_usage ?? payload.health.diskPercent ?? 0,
+        },
+        networkConnected: payload.health.network_connected ?? payload.health.networkConnected ?? true,
+      };
+
+      // Update connection state with health
+      context.connectionTracker.updateDeviceState(context.deviceId, {
+        health,
+      } as any);
+    }
+
+    // Update capabilities if provided (device sends: capabilities.video_sources, capabilities.audio_sources, capabilities.pip, capabilities.hardware_encoding)
+    if (payload.capabilities) {
+      try {
+        const device = await context.deviceManager.getDevice(context.deviceId);
+        if (device) {
+          const videoSources = payload.capabilities.video_sources || payload.capabilities.videoSources || [];
+          const audioSources = payload.capabilities.audio_sources || payload.capabilities.audioSources || [];
+          const pipSupported = payload.capabilities.pip !== undefined ? payload.capabilities.pip : 
+                               payload.capabilities.pipSupported !== undefined ? payload.capabilities.pipSupported : 
+                               device.capabilities?.pipSupported;
+          const hardwareEncoding = payload.capabilities.hardware_encoding !== undefined ? payload.capabilities.hardware_encoding :
+                                  payload.capabilities.hardwareEncoding !== undefined ? payload.capabilities.hardwareEncoding :
+                                  device.capabilities?.hardwareEncoding;
+
+          const updatedCapabilities = {
+            ...device.capabilities,
+            videoSources: videoSources.length > 0 ? videoSources : device.capabilities?.videoSources || [],
+            audioSources: audioSources.length > 0 ? audioSources : device.capabilities?.audioSources || [],
+            pipSupported: pipSupported !== undefined ? pipSupported : device.capabilities?.pipSupported,
+            hardwareEncoding: hardwareEncoding !== undefined ? hardwareEncoding : device.capabilities?.hardwareEncoding,
+            // Preserve existing source objects if they exist
+            videoSourceObjects: device.capabilities?.videoSourceObjects || [],
+            audioSourceObjects: device.capabilities?.audioSourceObjects || [],
+          };
+
+          await context.deviceManager.updateDevice(context.deviceId, {
+            capabilities: updatedCapabilities as any,
+          });
+
+          coreInfo('Device capabilities updated from status', {
+            operation: 'broadcast-box:event:status-capabilities-updated',
+            deviceId: context.deviceId,
+            videoSourcesCount: videoSources.length,
+            audioSourcesCount: audioSources.length,
+            pipSupported,
+            hardwareEncoding,
+          });
+        }
+      } catch (error) {
+        coreWarn('Failed to update device capabilities from status event', {
+          operation: 'broadcast-box:event:status-capabilities-update-error',
+          deviceId: context.deviceId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // Log status event
+    await context.deviceEventModel.create({
+      id: uuidv4(),
+      deviceId: context.deviceId,
+      eventType: 'status',
+      eventData: {
+        state: payload.state,
+        session_id: payload.session_id,
+        health: payload.health,
+        capabilities: payload.capabilities,
+        timestamp: payload.timestamp || new Date().toISOString(),
+      },
+    });
+
+    coreInfo('Status event processed', {
+      operation: 'broadcast-box:event:status',
+      deviceId: context.deviceId,
+      state: payload.state,
+      healthScore: payload.health?.score,
     });
   });
 

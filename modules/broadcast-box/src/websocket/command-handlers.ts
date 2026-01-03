@@ -7,8 +7,10 @@
 import type { Logger } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
 import type { CommandMessage, AckMessage } from '../types/index.js';
+import { BroadcastBoxErrorCode, getErrorMessage } from '../types/errors.js';
 import type { ProtocolHandler } from './protocol.js';
 import type { DeviceConnectionTracker } from '../services/device-connection-tracker.js';
+import type { DeviceManager } from '../services/device-manager.js';
 import type { Room } from '@civicpress/realtime';
 
 export interface CommandHandlerContext {
@@ -16,6 +18,7 @@ export interface CommandHandlerContext {
   clientId: string;
   room: Room;
   connectionTracker: DeviceConnectionTracker;
+  deviceManager: DeviceManager;
   protocol: ProtocolHandler;
   logger: Logger;
 }
@@ -112,7 +115,21 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'Missing required fields: sessionId or civicpressSessionId'
+        'Missing required fields: sessionId or civicpressSessionId',
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+    
+    // Check if device is already recording
+    const connectionState = context.connectionTracker.getConnectionState(context.deviceId);
+    if (connectionState?.state?.status === 'recording') {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        getErrorMessage(BroadcastBoxErrorCode.SESSION_ALREADY_ACTIVE),
+        undefined,
+        BroadcastBoxErrorCode.SESSION_ALREADY_ACTIVE
       );
     }
 
@@ -212,6 +229,257 @@ export function createDefaultCommandHandlers(
 
     return context.protocol.createAck(command.id, true);
   });
+
+  // Register switch_source handler
+  registry.registerHandler('switch_source', async (command, context) => {
+    // Support both protocol format (sourceType + sourceId) and current format (videoSource/audioSource)
+    const { sourceType, sourceId, videoSource, audioSource } = command.payload;
+
+    // Get device to validate capabilities
+    const device = await context.deviceManager.getDevice(context.deviceId);
+    if (!device) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
+        undefined,
+        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+      );
+    }
+
+    // Protocol format: sourceType + sourceId
+    if (sourceType && sourceId !== undefined) {
+      let isValid = false;
+      let sourceName: string | undefined;
+
+      if (sourceType === 'video') {
+        // Check if source ID exists in videoSourceObjects
+        const videoSourceObj = device.capabilities.videoSourceObjects?.find(
+          (s) => s.id === sourceId
+        );
+        if (videoSourceObj) {
+          isValid = true;
+          sourceName = videoSourceObj.name;
+          // Check availability
+          if (!videoSourceObj.available) {
+            return context.protocol.createAck(
+              command.id,
+              false,
+              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
+              undefined,
+              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+            );
+          }
+        } else {
+          return context.protocol.createAck(
+            command.id,
+            false,
+            getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
+            undefined,
+            BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+          );
+        }
+      } else if (sourceType === 'audio') {
+        const audioSourceObj = device.capabilities.audioSourceObjects?.find(
+          (s) => s.id === sourceId
+        );
+        if (audioSourceObj) {
+          isValid = true;
+          sourceName = audioSourceObj.name;
+          if (!audioSourceObj.available) {
+            return context.protocol.createAck(
+              command.id,
+              false,
+              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
+              undefined,
+              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+            );
+          }
+        } else {
+          return context.protocol.createAck(
+            command.id,
+            false,
+            getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
+            undefined,
+            BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+          );
+        }
+      } else if (sourceType === 'pip') {
+        // PiP source switching (future enhancement)
+        return context.protocol.createAck(
+          command.id,
+          false,
+          'PiP source switching not yet implemented',
+          undefined,
+          BroadcastBoxErrorCode.INVALID_CONFIG
+        );
+      }
+
+      if (isValid) {
+        coreInfo('Switch source command processed (protocol format)', {
+          operation: 'broadcast-box:command:switch-source',
+          deviceId: context.deviceId,
+          sourceType,
+          sourceId,
+          sourceName,
+        });
+
+        return context.protocol.createAck(command.id, true, undefined, {
+          sourceType,
+          sourceId,
+          sourceName,
+        });
+      }
+    }
+
+    // Current format: videoSource/audioSource (string names or numeric IDs)
+    // At least one source must be provided
+    if (!videoSource && !audioSource) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        'At least one source (videoSource or audioSource) must be provided',
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+
+    // Validate video source (supports both string names and numeric IDs)
+    if (videoSource !== undefined) {
+      const isNumericId = typeof videoSource === 'number';
+      let isValid = false;
+
+      if (isNumericId) {
+        // Check numeric ID in videoSourceObjects
+        const videoSourceObj = device.capabilities.videoSourceObjects?.find(
+          (s) => s.id === videoSource
+        );
+        if (videoSourceObj) {
+          isValid = true;
+          if (!videoSourceObj.available) {
+            return context.protocol.createAck(
+              command.id,
+              false,
+              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
+              undefined,
+              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+            );
+          }
+        }
+      } else {
+        // Check string name in videoSources array
+        isValid = device.capabilities.videoSources.includes(videoSource as string);
+      }
+
+      if (!isValid) {
+        return context.protocol.createAck(
+          command.id,
+          false,
+          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
+          undefined,
+          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+        );
+      }
+    }
+
+    // Validate audio source (supports both string names and numeric IDs)
+    if (audioSource !== undefined) {
+      const isNumericId = typeof audioSource === 'number';
+      let isValid = false;
+
+      if (isNumericId) {
+        const audioSourceObj = device.capabilities.audioSourceObjects?.find(
+          (s) => s.id === audioSource
+        );
+        if (audioSourceObj) {
+          isValid = true;
+          if (!audioSourceObj.available) {
+            return context.protocol.createAck(
+              command.id,
+              false,
+              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
+              undefined,
+              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+            );
+          }
+        }
+      } else {
+        isValid = device.capabilities.audioSources.includes(audioSource as string);
+      }
+
+      if (!isValid) {
+        return context.protocol.createAck(
+          command.id,
+          false,
+          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
+          undefined,
+          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+        );
+      }
+    }
+
+    coreInfo('Switch source command processed', {
+      operation: 'broadcast-box:command:switch-source',
+      deviceId: context.deviceId,
+      videoSource,
+      audioSource,
+    });
+
+    // Return current active sources (device will handle the actual switch)
+    return context.protocol.createAck(command.id, true, undefined, {
+      videoSource: videoSource || device.config.defaultVideoSource,
+      audioSource: audioSource || device.config.defaultAudioSource,
+    });
+  });
+
+  // Register list_sources handler (also support get_sources for protocol compatibility)
+  const listSourcesHandler = async (command: CommandMessage, context: CommandHandlerContext) => {
+    // Get device to retrieve capabilities
+    const device = await context.deviceManager.getDevice(context.deviceId);
+    if (!device) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
+        undefined,
+        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+      );
+    }
+
+    coreInfo('List sources command processed', {
+      operation: 'broadcast-box:command:list-sources',
+      deviceId: context.deviceId,
+    });
+
+    // Return detailed source objects if available, otherwise fall back to string arrays
+    return context.protocol.createAck(command.id, true, undefined, {
+      // Protocol format: detailed source objects
+      video: device.capabilities.videoSourceObjects || 
+        device.capabilities.videoSources.map((name, idx) => ({
+          id: idx,
+          name,
+          available: true, // Assume available if we don't have detailed info
+        })),
+      audio: device.capabilities.audioSourceObjects || 
+        device.capabilities.audioSources.map((name, idx) => ({
+          id: idx,
+          name,
+          available: true,
+        })),
+      // Legacy format: string arrays (for backward compatibility)
+      videoSources: device.capabilities.videoSources || [],
+      audioSources: device.capabilities.audioSources || [],
+      // Current active sources
+      currentVideoSource: device.config.defaultVideoSource,
+      currentAudioSource: device.config.defaultAudioSource,
+      currentVideoSourceId: device.config.defaultVideoSourceId,
+      currentAudioSourceId: device.config.defaultAudioSourceId,
+    });
+  };
+
+  registry.registerHandler('list_sources', listSourcesHandler);
+  // Also register get_sources for protocol compatibility
+  registry.registerHandler('get_sources', listSourcesHandler);
 
   return registry;
 }

@@ -486,6 +486,10 @@ export class DeviceManager {
       updateData.config = { ...device.config, ...updates.config };
     }
 
+    if (updates.capabilities !== undefined) {
+      updateData.capabilities = { ...device.capabilities, ...updates.capabilities };
+    }
+
     const updated = await this.deviceModel.update(deviceId, updateData);
 
     // Log update event

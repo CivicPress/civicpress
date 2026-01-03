@@ -147,11 +147,31 @@ export default defineNuxtPlugin(async (nuxtApp) => {
           break;
 
         case 500:
-          // Server error - show generic error
-          handleError(apiError, {
-            title: 'Server Error',
-            showToast: true,
-          });
+          // Server error - check if it's a "device not connected" or "timeout" error
+          // These are handled by useDeviceCommands composable, so don't show duplicate toast
+          const errorMessage = apiError.message || apiError.data?.error?.message || '';
+          const isDeviceNotConnectedError =
+            errorMessage.includes('not connected') ||
+            (errorMessage.includes('Device') && errorMessage.includes('not connected'));
+          const isTimeoutError = 
+            errorMessage.includes('timeout') || 
+            errorMessage.includes('Command timeout');
+          
+          if (isDeviceNotConnectedError || isTimeoutError) {
+            // Don't show toast - useDeviceCommands will handle it
+            // Only log to console for debugging
+            handleError(apiError, {
+              title: 'Server Error',
+              showToast: false, // Suppress toast for device not connected/timeout errors
+              logToConsole: false, // Also suppress console log to reduce noise
+            });
+          } else {
+            // Show toast for other server errors
+            handleError(apiError, {
+              title: 'Server Error',
+              showToast: true,
+            });
+          }
           break;
 
         default:

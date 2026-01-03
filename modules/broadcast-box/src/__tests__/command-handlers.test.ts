@@ -148,6 +148,19 @@ describe('createDefaultCommandHandlers', () => {
           state: { status: 'idle' },
         }),
       },
+      deviceManager: {
+        getDevice: vi.fn().mockResolvedValue({
+          id: 'device-id',
+          capabilities: {
+            videoSources: ['HDMI1', 'HDMI2', 'USB'],
+            audioSources: ['HDMI1', 'USB', 'LineIn'],
+          },
+          config: {
+            defaultVideoSource: 'HDMI1',
+            defaultAudioSource: 'HDMI1',
+          },
+        }),
+      },
       protocol: {
         createAck: vi
           .fn()
@@ -248,5 +261,61 @@ describe('createDefaultCommandHandlers', () => {
     expect(mockContext.connectionTracker.updateHeartbeat).toHaveBeenCalledWith(
       'device-id'
     );
+  });
+
+  it('should register switch_source handler', async () => {
+    const command: CommandMessage = {
+      type: 'command',
+      id: 'cmd-id',
+      timestamp: new Date().toISOString(),
+      action: 'switch_source',
+      payload: {
+        videoSource: 'HDMI2',
+        audioSource: 'USB',
+      },
+    };
+
+    const result = await registry.handleCommand(command, mockContext);
+
+    expect(result?.success).toBe(true);
+    expect(result?.payload).toBeDefined();
+    expect(result?.payload.videoSource).toBe('HDMI2');
+    expect(result?.payload.audioSource).toBe('USB');
+    expect(mockContext.deviceManager.getDevice).toHaveBeenCalledWith('device-id');
+  });
+
+  it('should reject switch_source with invalid video source', async () => {
+    const command: CommandMessage = {
+      type: 'command',
+      id: 'cmd-id',
+      timestamp: new Date().toISOString(),
+      action: 'switch_source',
+      payload: {
+        videoSource: 'INVALID',
+      },
+    };
+
+    const result = await registry.handleCommand(command, mockContext);
+
+    expect(result?.success).toBe(false);
+    expect(result?.error).toContain('Invalid video source');
+  });
+
+  it('should register list_sources handler', async () => {
+    const command: CommandMessage = {
+      type: 'command',
+      id: 'cmd-id',
+      timestamp: new Date().toISOString(),
+      action: 'list_sources',
+      payload: {},
+    };
+
+    const result = await registry.handleCommand(command, mockContext);
+
+    expect(result?.success).toBe(true);
+    expect(result?.payload).toBeDefined();
+    expect(result?.payload.videoSources).toEqual(['HDMI1', 'HDMI2', 'USB']);
+    expect(result?.payload.audioSources).toEqual(['HDMI1', 'USB', 'LineIn']);
+    expect(mockContext.deviceManager.getDevice).toHaveBeenCalledWith('device-id');
   });
 });

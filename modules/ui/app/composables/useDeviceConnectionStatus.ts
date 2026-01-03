@@ -15,16 +15,25 @@ export interface DeviceConnectionStatus {
   sessionId?: string | null;
   health?: {
     score: number;
-    cpu_usage: number;
-    memory_usage: number;
-    disk_usage: number;
-    network_connected: boolean;
+    status?: 'healthy' | 'degraded' | 'unhealthy';
+    metrics: {
+      cpuPercent: number;
+      memoryPercent: number;
+      diskPercent: number;
+    };
   };
 }
 
 const deviceStatuses = ref<Map<string, DeviceConnectionStatus>>(new Map());
 const activeConnections = ref<Map<string, WebSocket>>(new Map());
+const connectingDevices = ref<Set<string>>(new Set()); // Track devices currently connecting
+const connectionRetries = ref<Map<string, number>>(new Map()); // Track retry counts
 const config = useRuntimeConfig();
+
+// Maximum retry attempts before giving up
+const MAX_RETRY_ATTEMPTS = 3;
+// Delay between retries (exponential backoff: 1s, 2s, 4s)
+const RETRY_DELAYS = [1000, 2000, 4000];
 
 /**
  * Get realtime server WebSocket URL
@@ -44,8 +53,26 @@ async function connectToDeviceRoom(
   deviceUuid: string
 ): Promise<WebSocket | null> {
   // Check if already connected
-  if (activeConnections.value.has(deviceUuid)) {
-    return activeConnections.value.get(deviceUuid) || null;
+  const existingConnection = activeConnections.value.get(deviceUuid);
+  if (existingConnection && existingConnection.readyState === WebSocket.OPEN) {
+    return existingConnection;
+  }
+
+  // Check if already connecting (prevent duplicate connection attempts)
+  if (connectingDevices.value.has(deviceUuid)) {
+    console.log(
+      `[DeviceConnectionStatus] Already connecting to device room: ${deviceUuid}`
+    );
+    return null;
+  }
+
+  // Check retry count
+  const retryCount = connectionRetries.value.get(deviceUuid) || 0;
+  if (retryCount >= MAX_RETRY_ATTEMPTS) {
+    console.warn(
+      `[DeviceConnectionStatus] Max retry attempts reached for device ${deviceUuid}, giving up`
+    );
+    return null;
   }
 
   const authStore = useAuthStore();
@@ -55,6 +82,9 @@ async function connectToDeviceRoom(
     );
     return null;
   }
+
+  // Mark as connecting
+  connectingDevices.value.add(deviceUuid);
 
   const token = authStore.token; // TypeScript now knows this is string (not null)
   const realtimeUrl = getRealtimeUrl();
@@ -71,12 +101,22 @@ async function connectToDeviceRoom(
           `[DeviceConnectionStatus] Connected to device room: ${deviceUuid}`
         );
         activeConnections.value.set(deviceUuid, ws);
+        connectingDevices.value.delete(deviceUuid);
+        connectionRetries.value.delete(deviceUuid); // Reset retry count on success
         resolve(ws);
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+
+          // Debug: log all messages to help diagnose issues
+          console.log(
+            `[DeviceConnectionStatus] Message received for ${deviceUuid}:`,
+            message.type,
+            message.event || message.action || 'no event/action',
+            message
+          );
 
           // Handle connection acknowledgment
           // Note: This only means the observer connected, not that the device is connected
@@ -90,15 +130,53 @@ async function connectToDeviceRoom(
             // Don't set connected=true here - wait for device.connected event
           }
 
-          // Handle device status messages
+          // Helper function to extract and map health data
+          const extractHealthData = (payload: any) => {
+            if (!payload?.health) return undefined;
+            const deviceHealth = payload.health;
+            return {
+              score: deviceHealth.score ?? 100,
+              status: deviceHealth.status || 'healthy',
+              metrics: {
+                cpuPercent: deviceHealth.metrics?.cpuPercent ?? 0,
+                memoryPercent: deviceHealth.metrics?.memoryPercent ?? 0,
+                diskPercent: deviceHealth.metrics?.diskPercent ?? 0,
+              },
+            };
+          };
+
+          // Handle device status messages (response to get_status command)
           if (message.type === 'status') {
             const payload = message.payload;
+            const health = extractHealthData(payload);
+            console.log(
+              `[DeviceConnectionStatus] Status message received for ${deviceUuid}:`,
+              { health, state: payload?.state }
+            );
             updateDeviceStatus(deviceUuid, {
               connected: true,
               lastSeenAt: message.timestamp || new Date().toISOString(),
               state: payload?.state || 'idle',
-              sessionId: payload?.session_id || null,
-              health: payload?.health,
+              sessionId: payload?.session_id || payload?.active_session?.session_id || null,
+              health,
+            });
+          }
+
+          // Handle health.update events
+          if (
+            message.type === 'event' &&
+            message.event === 'health.update'
+          ) {
+            const payload = message.payload;
+            const health = extractHealthData(payload);
+            console.log(
+              `[DeviceConnectionStatus] Health update received for ${deviceUuid}:`,
+              health
+            );
+            updateDeviceStatus(deviceUuid, {
+              connected: true,
+              lastSeenAt: message.timestamp || new Date().toISOString(),
+              health,
             });
           }
 
@@ -126,7 +204,9 @@ async function connectToDeviceRoom(
         } catch (error) {
           console.error(
             '[DeviceConnectionStatus] Error parsing message:',
-            error
+            error,
+            'Raw message:',
+            event.data
           );
         }
       };
@@ -137,22 +217,59 @@ async function connectToDeviceRoom(
           error
         );
         activeConnections.value.delete(deviceUuid);
+        connectingDevices.value.delete(deviceUuid);
         updateDeviceStatus(deviceUuid, { connected: false });
+        
+        // Increment retry count
+        const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
+        connectionRetries.value.set(deviceUuid, currentRetries + 1);
+        
         reject(error);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         console.log(
-          `[DeviceConnectionStatus] Disconnected from device room: ${deviceUuid}`
+          `[DeviceConnectionStatus] Disconnected from device room: ${deviceUuid}`,
+          `Code: ${event.code}, Reason: ${event.reason || 'none'}`
         );
         activeConnections.value.delete(deviceUuid);
+        connectingDevices.value.delete(deviceUuid);
         updateDeviceStatus(deviceUuid, { connected: false });
+        
+        // Only retry if it wasn't a clean close (code 1000) and we haven't exceeded max retries
+        const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
+        if (event.code !== 1000 && currentRetries < MAX_RETRY_ATTEMPTS) {
+          const retryDelay = RETRY_DELAYS[currentRetries] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+          console.log(
+            `[DeviceConnectionStatus] Will retry connection to ${deviceUuid} in ${retryDelay}ms (attempt ${currentRetries + 1}/${MAX_RETRY_ATTEMPTS})`
+          );
+          
+          // Retry after delay (but don't block - let the promise resolve/reject)
+          setTimeout(() => {
+            // Only retry if still not connected and not already connecting
+            if (!activeConnections.value.has(deviceUuid) && !connectingDevices.value.has(deviceUuid)) {
+              connectToDeviceRoom(deviceUuid).catch((err) => {
+                console.error(`[DeviceConnectionStatus] Retry failed for ${deviceUuid}:`, err);
+              });
+            }
+          }, retryDelay);
+        } else if (currentRetries >= MAX_RETRY_ATTEMPTS) {
+          console.warn(
+            `[DeviceConnectionStatus] Max retry attempts reached for ${deviceUuid}, giving up`
+          );
+        }
       };
     } catch (error) {
       console.error(
         `[DeviceConnectionStatus] Failed to create WebSocket for device ${deviceUuid}:`,
         error
       );
+      connectingDevices.value.delete(deviceUuid);
+      
+      // Increment retry count
+      const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
+      connectionRetries.value.set(deviceUuid, currentRetries + 1);
+      
       reject(error);
     }
   });
@@ -160,13 +277,43 @@ async function connectToDeviceRoom(
 
 /**
  * Update device status
+ * Only updates if values actually changed to prevent unnecessary reactivity
  */
 function updateDeviceStatus(
   deviceUuid: string,
   updates: Partial<DeviceConnectionStatus>
 ): void {
   const current = deviceStatuses.value.get(deviceUuid) || { connected: false };
-  deviceStatuses.value.set(deviceUuid, { ...current, ...updates });
+  
+  // Check if any values actually changed (prevent unnecessary object recreation)
+  let hasChanges = false;
+  for (const [key, value] of Object.entries(updates)) {
+    const currentValue = (current as any)[key];
+    // Deep comparison for nested objects (like health)
+    if (key === 'health' && value) {
+      const currentHealth = currentValue as any;
+      const newHealth = value as any;
+      if (
+        !currentHealth ||
+        currentHealth.score !== newHealth.score ||
+        currentHealth.status !== newHealth.status ||
+        currentHealth.metrics?.cpuPercent !== newHealth.metrics?.cpuPercent ||
+        currentHealth.metrics?.memoryPercent !== newHealth.metrics?.memoryPercent ||
+        currentHealth.metrics?.diskPercent !== newHealth.metrics?.diskPercent
+      ) {
+        hasChanges = true;
+        break;
+      }
+    } else if (currentValue !== value) {
+      hasChanges = true;
+      break;
+    }
+  }
+  
+  // Only update if values actually changed
+  if (hasChanges) {
+    deviceStatuses.value.set(deviceUuid, { ...current, ...updates });
+  }
 }
 
 /**
@@ -175,10 +322,13 @@ function updateDeviceStatus(
 function disconnectFromDeviceRoom(deviceUuid: string): void {
   const ws = activeConnections.value.get(deviceUuid);
   if (ws) {
-    ws.close();
+    ws.close(1000, 'Client disconnecting'); // Clean close
     activeConnections.value.delete(deviceUuid);
     deviceStatuses.value.delete(deviceUuid);
   }
+  // Also clear connecting state and retry count
+  connectingDevices.value.delete(deviceUuid);
+  connectionRetries.value.delete(deviceUuid);
 }
 
 /**

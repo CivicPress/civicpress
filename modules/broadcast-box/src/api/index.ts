@@ -8,6 +8,7 @@ import type { Logger } from '@civicpress/core';
 import type { DeviceManager } from '../services/device-manager.js';
 import type { DeviceAuthService } from '../services/device-auth.js';
 import type { DeviceConnectionTracker } from '../services/device-connection-tracker.js';
+import type { DeviceCommandService } from '../services/device-command-service.js';
 import type { SessionController } from '../services/session-controller.js';
 import type { UploadProcessor } from '../services/upload-processor.js';
 import { createDevicesRouter } from './devices.js';
@@ -35,6 +36,7 @@ export async function registerBroadcastBoxRoutes(
   logger: Logger,
   authMiddleware?: any,
   connectionTracker?: DeviceConnectionTracker,
+  deviceCommandService?: DeviceCommandService,
   sessionController?: SessionController,
   uploadProcessor?: UploadProcessor
 ): Promise<void> {
@@ -46,7 +48,8 @@ export async function registerBroadcastBoxRoutes(
     deviceAuth,
     logger,
     connectionTracker,
-    rateLimiter
+    rateLimiter,
+    deviceCommandService
   );
 
   // Device registration endpoint (POST /) should be public - device uses enrollment code for auth

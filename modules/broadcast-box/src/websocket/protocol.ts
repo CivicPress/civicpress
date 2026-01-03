@@ -69,6 +69,13 @@ export class ProtocolHandler {
             message: message as BaseMessage,
             isValid: true,
           };
+        case 'status':
+          // Status messages are valid as-is (device sends type: "status" with payload)
+          return {
+            type: 'status',
+            message: message as BaseMessage,
+            isValid: true,
+          };
         default:
           return {
             type: message.type,
@@ -188,7 +195,8 @@ export class ProtocolHandler {
     commandId: string,
     success: boolean,
     error?: string,
-    payload?: any
+    payload?: any,
+    errorCode?: string
   ): AckMessage {
     return {
       type: 'ack',
@@ -197,6 +205,7 @@ export class ProtocolHandler {
       commandId,
       success,
       error,
+      errorCode,
       payload,
     };
   }

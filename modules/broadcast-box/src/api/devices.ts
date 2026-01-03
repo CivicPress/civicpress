@@ -19,6 +19,7 @@ interface AuthenticatedRequest extends Request {
 import { DeviceManager } from '../services/device-manager.js';
 import { DeviceAuthService } from '../services/device-auth.js';
 import type { DeviceConnectionTracker } from '../services/device-connection-tracker.js';
+import type { DeviceCommandService } from '../services/device-command-service.js';
 import type { DeviceRegistrationRateLimiter } from '../middleware/rate-limiter.js';
 import type {
   CreateDeviceRequest,
@@ -47,7 +48,8 @@ export function createDevicesRouter(
   deviceAuth: DeviceAuthService,
   logger: Logger,
   connectionTracker?: DeviceConnectionTracker,
-  rateLimiter?: DeviceRegistrationRateLimiter
+  rateLimiter?: DeviceRegistrationRateLimiter,
+  deviceCommandService?: DeviceCommandService
 ): Router {
   const router = Router();
 
@@ -148,7 +150,15 @@ export function createDevicesRouter(
         // Check permissions
         // TODO: Add permission check for broadcast-box:devices:view
 
-        const device = await deviceManager.getDevice(req.params.id);
+        // Try to find device by UUID first (most common case)
+        // If that fails, try by database ID (for backward compatibility)
+        // The URL parameter could be either a device UUID or a database ID
+        let device = await deviceManager.getDeviceByUuid(req.params.id);
+        
+        // If not found by UUID, try by database ID
+        if (!device) {
+          device = await deviceManager.getDevice(req.params.id);
+        }
 
         if (!device) {
           return res.status(404).json({
@@ -544,6 +554,21 @@ export function createDevicesRouter(
         // Check permissions
         // TODO: Add permission check for broadcast-box:devices:update
 
+        // Try to find device by UUID first, then by database ID
+        let device = await deviceManager.getDeviceByUuid(req.params.id);
+        if (!device) {
+          device = await deviceManager.getDevice(req.params.id);
+        }
+        
+        if (!device) {
+          return res.status(404).json({
+            success: false,
+            error: {
+              message: 'Device not found',
+            },
+          });
+        }
+
         const updateRequest: UpdateDeviceRequest = {
           name: req.body.name,
           roomLocation: req.body.roomLocation,
@@ -551,14 +576,14 @@ export function createDevicesRouter(
           status: req.body.status,
         };
 
-        const device = await deviceManager.updateDevice(
-          req.params.id,
+        const updatedDevice = await deviceManager.updateDevice(
+          device.id, // Use database ID for update
           updateRequest
         );
 
         res.json({
           success: true,
-          device,
+          device: updatedDevice,
         });
       } catch (error) {
         logger.error('Error updating device', {
@@ -609,7 +634,22 @@ export function createDevicesRouter(
         // Check permissions
         // TODO: Add permission check for broadcast-box:devices:delete
 
-        await deviceManager.revokeDevice(req.params.id);
+        // Try to find device by UUID first, then by database ID
+        let device = await deviceManager.getDeviceByUuid(req.params.id);
+        if (!device) {
+          device = await deviceManager.getDevice(req.params.id);
+        }
+        
+        if (!device) {
+          return res.status(404).json({
+            success: false,
+            error: {
+              message: 'Device not found',
+            },
+          });
+        }
+
+        await deviceManager.revokeDevice(device.id); // Use database ID for revoke
 
         res.json({
           success: true,
@@ -664,6 +704,21 @@ export function createDevicesRouter(
         // Check permissions
         // TODO: Add permission check for broadcast-box:devices:enroll
 
+        // Try to find device by UUID first, then by database ID
+        let device = await deviceManager.getDeviceByUuid(req.params.id);
+        if (!device) {
+          device = await deviceManager.getDevice(req.params.id);
+        }
+        
+        if (!device) {
+          return res.status(404).json({
+            success: false,
+            error: {
+              message: 'Device not found',
+            },
+          });
+        }
+
         // Get client IP and user ID (if authenticated)
         const ipAddress = getClientIp(req);
         const userId = (req as AuthenticatedRequest).user?.id || null;
@@ -682,7 +737,8 @@ export function createDevicesRouter(
             'regenerateEnrollmentCode method not found on deviceManager',
             {
               operation: 'broadcast-box:api:devices:regenerate-enroll',
-              deviceId: req.params.id,
+              deviceId: device.id,
+              deviceUuid: device.deviceUuid,
               deviceManagerType: deviceManager.constructor.name,
               availableMethods: availableMethods,
               hasEnrollDevice: typeof deviceManager.enrollDevice === 'function',
@@ -705,7 +761,7 @@ export function createDevicesRouter(
         }
 
         const enrollment = await deviceManager.regenerateEnrollmentCode(
-          req.params.id,
+          device.id, // Use database ID for regenerate
           {
             createdByUserId: userId,
             ipAddress,
@@ -752,6 +808,149 @@ export function createDevicesRouter(
   );
 
   /**
+   * POST /api/v1/broadcast-box/devices/:id/command
+   * Execute a command on a device
+   */
+  router.post(
+    '/:id/command',
+    [
+      param('id').isUUID().withMessage('Device ID must be a valid UUID'),
+      body('action')
+        .isString()
+        .notEmpty()
+        .withMessage('Command action is required'),
+      body('payload').optional().isObject().withMessage('Payload must be an object'),
+    ],
+    // TODO: Add authMiddleware from @civicpress/api
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              message: 'Validation failed',
+              details: errors.array(),
+            },
+          });
+        }
+
+        // Check permissions
+        // TODO: Add permission check for broadcast-box:devices:control
+
+        // Check if DeviceCommandService is available
+        if (!deviceCommandService) {
+          return res.status(503).json({
+            success: false,
+            error: {
+              message: 'Device command service not available',
+            },
+          });
+        }
+
+        // Validate device exists
+        // Try to find device by UUID first (most common case)
+        // If that fails, try by database ID (for backward compatibility)
+        let device = await deviceManager.getDeviceByUuid(req.params.id);
+        
+        // If not found by UUID, try by database ID
+        if (!device) {
+          device = await deviceManager.getDevice(req.params.id);
+        }
+        
+        if (!device) {
+          return res.status(404).json({
+            success: false,
+            error: {
+              message: 'Device not found',
+            },
+          });
+        }
+        
+        // Use device UUID for command execution (DeviceCommandService expects UUID)
+        const deviceUuid = device.deviceUuid;
+
+        // Validate action is one of allowed actions
+        const allowedActions = [
+          'switch_source',
+          'update_config',
+          'get_status',
+          'list_sources',
+          'start_session',
+          'stop_session',
+        ];
+        if (!allowedActions.includes(req.body.action)) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              message: `Invalid action: ${req.body.action}. Allowed actions: ${allowedActions.join(', ')}`,
+            },
+          });
+        }
+
+        // Extract user info for command source
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({
+            success: false,
+            error: {
+              message: 'Authentication required',
+            },
+          });
+        }
+
+        // Execute command
+        // Use device UUID for command execution (DeviceCommandService expects UUID)
+        const commandResponse = await deviceCommandService.executeCommand({
+          deviceId: deviceUuid, // Use device UUID, not the URL parameter
+          action: req.body.action,
+          payload: req.body.payload || {},
+          source: {
+            type: 'user',
+            userId,
+            metadata: {
+              ip: getClientIp(req),
+              userAgent: req.headers['user-agent'],
+            },
+          },
+        });
+
+        // Return response
+        if (commandResponse.success) {
+          res.json({
+            success: true,
+            commandId: commandResponse.commandId,
+            ack: commandResponse.ack,
+            timestamp: commandResponse.timestamp.toISOString(),
+          });
+        } else {
+          res.status(500).json({
+            success: false,
+            error: {
+              message: commandResponse.error || 'Command execution failed',
+            },
+            commandId: commandResponse.commandId,
+            timestamp: commandResponse.timestamp.toISOString(),
+          });
+        }
+      } catch (error) {
+        logger.error('Error executing device command', {
+          operation: 'broadcast-box:api:devices:command',
+          deviceId: req.params.id,
+          action: req.body?.action,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        res.status(500).json({
+          success: false,
+          error: {
+            message: 'Failed to execute device command',
+          },
+        });
+      }
+    }
+  );
+
+  /**
    * GET /api/v1/broadcast-box/devices/:id/health
    * Get device health status
    */
@@ -775,7 +974,14 @@ export function createDevicesRouter(
         // Check permissions
         // TODO: Add permission check for broadcast-box:devices:view
 
-        const device = await deviceManager.getDevice(req.params.id);
+        // Try to find device by UUID first (most common case)
+        // If that fails, try by database ID (for backward compatibility)
+        let device = await deviceManager.getDeviceByUuid(req.params.id);
+        
+        // If not found by UUID, try by database ID
+        if (!device) {
+          device = await deviceManager.getDevice(req.params.id);
+        }
 
         if (!device) {
           return res.status(404).json({
@@ -795,9 +1001,7 @@ export function createDevicesRouter(
               deviceId: device.id,
             });
             // Refresh device data after activation
-            const refreshedDevice = await deviceManager.getDevice(
-              req.params.id
-            );
+            const refreshedDevice = await deviceManager.getDevice(device.id);
             if (refreshedDevice) {
               device.status = refreshedDevice.status;
             }

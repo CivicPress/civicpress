@@ -237,11 +237,26 @@ export const useBroadcastBox = () => {
       return null;
     } catch (error: any) {
       console.error('Failed to get device:', error);
-      toast.add({
-        title: t('broadcastBox.errors.getDevice'),
-        description: error.message || t('broadcastBox.errors.generic'),
-        color: 'error',
-      });
+      
+      // Check if it's a 404 (device not found)
+      const isNotFound = error.status === 404 || 
+        error.message?.includes('not found') ||
+        error.message?.includes('Device not found');
+      
+      if (isNotFound) {
+        toast.add({
+          title: t('broadcastBox.errors.deviceNotFound') || 'Device Not Found',
+          description: t('broadcastBox.errors.deviceNotFoundDesc') || 
+            'The device you are looking for does not exist or has been removed.',
+          color: 'error',
+        });
+      } else {
+        toast.add({
+          title: t('broadcastBox.errors.getDevice'),
+          description: error.message || t('broadcastBox.errors.generic'),
+          color: 'error',
+        });
+      }
       throw error;
     }
   };
@@ -374,7 +389,15 @@ export const useBroadcastBox = () => {
       }
       return null;
     } catch (error: any) {
-      console.error('Failed to get device health:', error);
+      // Silently fail for health endpoint - device might not be connected
+      // Only log if it's not a 404 (device not found)
+      const isNotFound = error.status === 404 || 
+        error.message?.includes('not found') ||
+        error.message?.includes('Device not found');
+      
+      if (!isNotFound) {
+        console.error('Failed to get device health:', error);
+      }
       return null;
     }
   };

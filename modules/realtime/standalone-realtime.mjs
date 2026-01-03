@@ -85,10 +85,24 @@ civicPress
         const realtimeServer = container.resolve('realtimeServer');
         const deviceAuth = container.resolve('broadcastBoxDeviceAuth');
         const deviceManager = container.resolve('broadcastBoxDeviceManager');
+        const connectionTracker = container.resolve('broadcastBoxConnectionTracker');
+        const deviceCommandService = container.resolve('broadcastBoxDeviceCommandService');
         
-        if (realtimeServer && deviceAuth && deviceManager && typeof realtimeServer.setDeviceAuthDependencies === 'function') {
-          realtimeServer.setDeviceAuthDependencies(deviceAuth, deviceManager);
-          console.log('✅ Broadcast Box device authentication dependencies set on realtime server');
+        if (realtimeServer && deviceAuth && deviceManager) {
+          if (typeof realtimeServer.setDeviceAuthDependencies === 'function') {
+            realtimeServer.setDeviceAuthDependencies(deviceAuth, deviceManager);
+            console.log('✅ Broadcast Box device authentication dependencies set on realtime server');
+          }
+          
+          if (connectionTracker && typeof realtimeServer.setDeviceConnectionTracker === 'function') {
+            realtimeServer.setDeviceConnectionTracker(connectionTracker);
+            console.log('✅ Broadcast Box device connection tracker set on realtime server');
+          }
+          
+          if (deviceCommandService && typeof realtimeServer.setDeviceCommandService === 'function') {
+            realtimeServer.setDeviceCommandService(deviceCommandService);
+            console.log('✅ Broadcast Box device command service set on realtime server');
+          }
         } else {
           console.log('ℹ️  Broadcast Box module not available (optional)');
         }

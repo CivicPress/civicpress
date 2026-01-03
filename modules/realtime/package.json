@@ -19,7 +19,6 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "dev:watch": "pnpm run build && concurrently -n \"BUILD,SERVER\" -c \"yellow,cyan\" \"tsc --watch\" \"nodemon --watch dist --ext js,mjs --delay 3 --ignore 'dist/**/*.d.ts' --ignore 'dist/**/*.map' --exec 'node standalone-realtime.mjs'\"",
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",

@@ -23,6 +23,7 @@ import { createDeviceRoomFactory } from './rooms/device-room.js';
 import { DeviceManager } from './services/device-manager.js';
 import { DeviceAuthService } from './services/device-auth.js';
 import { DeviceConnectionTracker } from './services/device-connection-tracker.js';
+import { DeviceCommandService } from './services/device-command-service.js';
 import { SessionController } from './services/session-controller.js';
 import { UploadProcessor } from './services/upload-processor.js';
 import { DeviceEventModel } from './models/device-event.js';
@@ -279,6 +280,55 @@ export async function registerBroadcastBoxServices(
     return new ProtocolHandler(logger);
   });
 
+  // Register DeviceCommandService as singleton
+  // Note: RoomManager resolution uses lazy evaluation to handle initialization order
+  container.singleton(
+    'broadcastBoxDeviceCommandService',
+    (c: ServiceContainer) => {
+      const logger = c.resolve<Logger>('logger');
+      const protocol = c.resolve<ProtocolHandler>('broadcastBoxProtocol');
+      const connectionTracker = c.resolve<DeviceConnectionTracker>(
+        'broadcastBoxConnectionTracker'
+      );
+      const deviceManager = c.resolve<DeviceManager>(
+        'broadcastBoxDeviceManager'
+      );
+      // Get database service to create DeviceEventModel
+      const db = c.resolve<DatabaseService>('database');
+      const deviceEventModel = new DeviceEventModel(db, logger);
+
+      // RoomManager is optional - try to resolve it, but allow it to be null
+      let roomManager: RoomManager | null = null;
+      try {
+        roomManager = c.resolve<RoomManager>('realtimeRoomManager');
+        logger.info('RoomManager resolved successfully for DeviceCommandService', {
+          operation: 'broadcast-box:services:device-command-service:room-manager-resolved',
+        });
+      } catch (e: any) {
+        // RoomManager not available - this is a critical issue for device commands
+        // In unified architecture, realtime should always be available if module is loaded
+        logger.error(
+          'RoomManager not available for DeviceCommandService - device commands will fail',
+          {
+            operation: 'broadcast-box:services:device-command-service:room-manager-unavailable',
+            error: e?.message || 'unknown',
+            errorCode: e?.code,
+            note: 'CRITICAL: DeviceCommandService requires RoomManager to send commands. Ensure realtime module is built and available.',
+          }
+        );
+      }
+
+      return new DeviceCommandService(
+        roomManager,
+        protocol,
+        connectionTracker,
+        deviceEventModel,
+        deviceManager,
+        logger
+      );
+    }
+  );
+
   // Register SessionController as singleton
   container.singleton(
     'broadcastBoxSessionController',
@@ -462,79 +512,182 @@ export async function registerBroadcastBoxServices(
       }
     );
 
-    const realtimeServer = container.resolve<any>('realtimeServer');
-    const deviceAuth = container.resolve<any>('broadcastBoxDeviceAuth');
-    const deviceManager = container.resolve<DeviceManager>(
-      'broadcastBoxDeviceManager'
-    );
+    // Unified architecture: Always try to set dependencies if realtime server is available
+    // No flag check needed - if realtime module is loaded, use it
+    let realtimeServer: any = null;
+    try {
+      realtimeServer = container.resolve<any>('realtimeServer');
+    } catch (resolveError: any) {
+      // Service not found - that's okay, realtime module might not be loaded
+      if (
+        resolveError?.code === 'SERVICE_NOT_FOUND' ||
+        resolveError?.message?.includes('not found') ||
+        resolveError?.message?.includes('Service')
+      ) {
+        logger.debug(
+          'Realtime server not registered - skipping device authentication dependencies setup',
+          {
+            operation: 'broadcast-box:services:device-auth:skipped',
+            reason: 'realtime server not registered (module optional)',
+          }
+        );
+        // Exit early - don't try to set dependencies
+        realtimeServer = null;
+      } else {
+        // Unexpected error - rethrow
+        throw resolveError;
+      }
+    }
 
-    logger.info('Resolved dependencies for device authentication', {
-      operation: 'broadcast-box:services:device-auth:resolved',
-      hasRealtimeServer: !!realtimeServer,
-      hasDeviceAuth: !!deviceAuth,
-      hasDeviceManager: !!deviceManager,
-      realtimeServerType: realtimeServer ? typeof realtimeServer : 'null',
-      hasSetMethod: realtimeServer
-        ? typeof realtimeServer.setDeviceAuthDependencies
-        : 'n/a',
-    });
+    // Only proceed if realtime server is available
+    if (realtimeServer) {
+        const deviceAuth = container.resolve<any>('broadcastBoxDeviceAuth');
+        const deviceManager = container.resolve<DeviceManager>(
+          'broadcastBoxDeviceManager'
+        );
 
-    if (!realtimeServer) {
-      logger.warn(
-        'Cannot set device authentication dependencies: realtime server not available',
-        {
-          operation: 'broadcast-box:services:device-auth:failed',
-          reason: 'realtime server not resolved from container',
+        logger.info('Resolved dependencies for device authentication', {
+          operation: 'broadcast-box:services:device-auth:resolved',
+          hasRealtimeServer: !!realtimeServer,
+          hasDeviceAuth: !!deviceAuth,
+          hasDeviceManager: !!deviceManager,
+          realtimeServerType: realtimeServer ? typeof realtimeServer : 'null',
+          hasSetMethod: realtimeServer
+            ? typeof realtimeServer.setDeviceAuthDependencies
+            : 'n/a',
+        });
+
+        if (typeof realtimeServer.setDeviceAuthDependencies !== 'function') {
+          logger.warn(
+            'Cannot set device authentication dependencies: method not found',
+            {
+              operation: 'broadcast-box:services:device-auth:failed',
+              reason:
+                'setDeviceAuthDependencies method not found on realtime server',
+              realtimeServerMethods: Object.getOwnPropertyNames(
+                Object.getPrototypeOf(realtimeServer)
+              ),
+            }
+          );
+        } else if (!deviceAuth) {
+          logger.warn(
+            'Cannot set device authentication dependencies: deviceAuth not available',
+            {
+              operation: 'broadcast-box:services:device-auth:failed',
+              reason: 'broadcastBoxDeviceAuth not resolved from container',
+            }
+          );
+        } else if (!deviceManager) {
+          logger.warn(
+            'Cannot set device authentication dependencies: deviceManager not available',
+            {
+              operation: 'broadcast-box:services:device-auth:failed',
+              reason: 'broadcastBoxDeviceManager not resolved from container',
+            }
+          );
+        } else {
+          realtimeServer.setDeviceAuthDependencies(deviceAuth, deviceManager);
+          console.log(
+            '✅✅✅ [BROADCAST-BOX] Device authentication dependencies SET on realtime server'
+          );
+          logger.info(
+            '✅ Device authentication dependencies set on realtime server',
+            {
+              operation: 'broadcast-box:services:device-auth:configured',
+            }
+          );
         }
-      );
-    } else if (typeof realtimeServer.setDeviceAuthDependencies !== 'function') {
-      logger.warn(
-        'Cannot set device authentication dependencies: method not found',
-        {
-          operation: 'broadcast-box:services:device-auth:failed',
-          reason:
-            'setDeviceAuthDependencies method not found on realtime server',
-          realtimeServerMethods: Object.getOwnPropertyNames(
-            Object.getPrototypeOf(realtimeServer)
-          ),
-        }
-      );
-    } else if (!deviceAuth) {
-      logger.warn(
-        'Cannot set device authentication dependencies: deviceAuth not available',
-        {
-          operation: 'broadcast-box:services:device-auth:failed',
-          reason: 'broadcastBoxDeviceAuth not resolved from container',
-        }
-      );
-    } else if (!deviceManager) {
-      logger.warn(
-        'Cannot set device authentication dependencies: deviceManager not available',
-        {
-          operation: 'broadcast-box:services:device-auth:failed',
-          reason: 'broadcastBoxDeviceManager not resolved from container',
-        }
-      );
+      }
+  } catch (e: any) {
+    // Only log as error if it's an unexpected error
+    // SERVICE_NOT_FOUND errors are expected and already handled above
+    if (
+      e?.code !== 'SERVICE_NOT_FOUND' &&
+      !e?.message?.includes('not found') &&
+      !e?.message?.includes('Service')
+    ) {
+      logger.error('Failed to set device authentication dependencies', {
+        operation: 'broadcast-box:services:device-auth:error',
+        error: e?.message || 'unknown',
+        errorStack: e?.stack,
+        errorName: e?.name,
+      });
     } else {
-      realtimeServer.setDeviceAuthDependencies(deviceAuth, deviceManager);
-      console.log(
-        '✅✅✅ [BROADCAST-BOX] Device authentication dependencies SET on realtime server'
-      );
-      logger.info(
-        '✅ Device authentication dependencies set on realtime server',
+      // Expected error - log as debug
+      logger.debug(
+        'Device authentication dependencies not set (realtime server not available)',
         {
-          operation: 'broadcast-box:services:device-auth:configured',
+          operation: 'broadcast-box:services:device-auth:skipped',
+          reason: e?.message || 'service not found',
         }
       );
     }
+  }
+
+  // Set device command service on realtime server after all services are registered
+  // This allows the realtime server to route ack messages to DeviceCommandService
+  try {
+    const realtimeServer = container.resolve<any>('realtimeServer');
+    const deviceCommandService = container.resolve<any>(
+      'broadcastBoxDeviceCommandService'
+    );
+
+    if (realtimeServer && deviceCommandService) {
+      if (typeof realtimeServer.setDeviceCommandService === 'function') {
+        realtimeServer.setDeviceCommandService(deviceCommandService);
+        logger.info('Device command service set on realtime server', {
+          operation: 'broadcast-box:services:device-command-service:configured',
+        });
+      } else {
+        logger.warn(
+          'Cannot set device command service: method not found on realtime server',
+          {
+            operation: 'broadcast-box:services:device-command-service:failed',
+            reason: 'setDeviceCommandService method not found',
+          }
+        );
+      }
+    }
   } catch (e: any) {
-    // Realtime server or device services not available - that's okay
+    // Realtime server or device command service not available - that's okay
     // This is expected if realtime module is not loaded
-    logger.error('Failed to set device authentication dependencies', {
-      operation: 'broadcast-box:services:device-auth:error',
+    logger.debug('Device command service not set (realtime server may not be available)', {
+      operation: 'broadcast-box:services:device-command-service:not-set',
       error: e?.message || 'unknown',
-      errorStack: e?.stack,
-      errorName: e?.name,
+    });
+  }
+
+  // Set device connection tracker on realtime server after all services are registered
+  // This allows the realtime server to register/unregister device connections
+  // which is used by DeviceCommandService to check if devices are connected
+  try {
+    const realtimeServer = container.resolve<any>('realtimeServer');
+    const connectionTracker = container.resolve<any>(
+      'broadcastBoxConnectionTracker'
+    );
+
+    if (realtimeServer && connectionTracker) {
+      if (typeof realtimeServer.setDeviceConnectionTracker === 'function') {
+        realtimeServer.setDeviceConnectionTracker(connectionTracker);
+        logger.info('Device connection tracker set on realtime server', {
+          operation: 'broadcast-box:services:device-connection-tracker:configured',
+        });
+      } else {
+        logger.warn(
+          'Cannot set device connection tracker: method not found on realtime server',
+          {
+            operation: 'broadcast-box:services:device-connection-tracker:failed',
+            reason: 'setDeviceConnectionTracker method not found',
+          }
+        );
+      }
+    }
+  } catch (e: any) {
+    // Realtime server or connection tracker not available - that's okay
+    // This is expected if realtime module is not loaded
+    logger.debug('Device connection tracker not set (realtime server may not be available)', {
+      operation: 'broadcast-box:services:device-connection-tracker:not-set',
+      error: e?.message || 'unknown',
     });
   }
 }

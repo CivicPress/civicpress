@@ -8,6 +8,9 @@ import DeviceStatusBadge from '~/components/broadcast-box/DeviceStatusBadge.vue'
 import ConnectionStatusIndicator from '~/components/broadcast-box/ConnectionStatusIndicator.vue';
 import SessionStatusBadge from '~/components/broadcast-box/SessionStatusBadge.vue';
 import DeviceConfigurationForm from '~/components/broadcast-box/DeviceConfigurationForm.vue';
+import DeviceSourceControl from '~/components/broadcast-box/DeviceSourceControl.vue';
+import DeviceConfigControl from '~/components/broadcast-box/DeviceConfigControl.vue';
+import DeviceStatusControl from '~/components/broadcast-box/DeviceStatusControl.vue';
 import { useRecordUtils } from '~/composables/useRecordUtils';
 import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
 
@@ -63,47 +66,140 @@ const {
   unsubscribe,
 } = useDeviceConnectionStatus(null); // Don't auto-subscribe, we'll do it manually
 
-// Subscribe when device is loaded
+// Define isDeviceConnected before it's used in watches
+// Use a stable computed that only changes when the actual boolean value changes
+// Memoize the result to prevent unnecessary re-evaluations
+let lastConnectedValue: boolean | null = null;
+const isDeviceConnected = computed(() => {
+  // Use real-time connection status if available, otherwise fall back to lastSeenAt
+  const wsConnected = connectionStatus.value.connected;
+  let result: boolean;
+  
+  if (wsConnected !== undefined) {
+    result = wsConnected;
+  } else {
+    // Fallback to lastSeenAt check
+    if (!device.value || device.value.status !== 'active') {
+      result = false;
+    } else if (!device.value.lastSeenAt) {
+      result = false;
+    } else {
+      const lastSeen = new Date(device.value.lastSeenAt);
+      const now = new Date();
+      const diffMinutes = (now.getTime() - lastSeen.getTime()) / 1000 / 60;
+      result = diffMinutes < 5;
+    }
+  }
+  
+  // Only update lastConnectedValue if it actually changed
+  if (lastConnectedValue !== result) {
+    lastConnectedValue = result;
+  }
+  
+  return result;
+});
+
+// Subscribe when device is loaded (only once per UUID change)
+let lastSubscribedUuid: string | null = null;
 watch(
   () => device.value?.deviceUuid,
   (deviceUuid) => {
-    if (deviceUuid) {
+    // Only subscribe if UUID actually changed (not just device object reassigned)
+    if (deviceUuid && deviceUuid !== lastSubscribedUuid) {
+      lastSubscribedUuid = deviceUuid;
       subscribe(deviceUuid);
     }
   },
   { immediate: true }
 );
 
-// Unsubscribe on unmount
-onUnmounted(() => {
-  if (device.value?.deviceUuid) {
-    unsubscribe(device.value.deviceUuid);
+// Don't auto-refresh device data - rely on WebSocket updates for real-time data
+// Only refresh:
+// 1. On initial mount
+// 2. When user explicitly refreshes (via DeviceStatusControl)
+// 3. After config changes
+// 4. Periodically for sessions (every 5 minutes, very infrequent)
+let sessionsRefreshInterval: NodeJS.Timeout | null = null;
+
+// Set up a very infrequent refresh for sessions only (every 5 minutes)
+// Health and capabilities come from WebSocket, so we don't need to refresh those
+watch(
+  () => device.value?.deviceUuid,
+  (deviceUuid) => {
+    // Clear existing interval
+    if (sessionsRefreshInterval) {
+      clearInterval(sessionsRefreshInterval);
+      sessionsRefreshInterval = null;
+    }
+    
+    // Only set up interval if device is loaded
+    if (deviceUuid) {
+      // Refresh sessions every 5 minutes (very infrequent, only for sessions)
+      sessionsRefreshInterval = setInterval(() => {
+        if (device.value) {
+          // Only refresh sessions, not the entire device
+          listSessions({ deviceId }).then((sessionsData) => {
+            sessions.value = sessionsData;
+          }).catch(() => {
+            // Silently fail - sessions are not critical
+          });
+        }
+      }, 300000); // 5 minutes
+    }
+  },
+  { immediate: true }
+);
+
+// Cleanup is now handled in the onUnmounted hook below
+
+// Use real-time health data from WebSocket, fallback to API data
+const realtimeHealth = computed(() => {
+  if (connectionStatus.value.health) {
+    // Use WebSocket health data (real-time)
+    return {
+      score: connectionStatus.value.health.score,
+      status: connectionStatus.value.health.status || 'healthy',
+      metrics: {
+        cpuPercent: connectionStatus.value.health.metrics.cpuPercent,
+        memoryPercent: connectionStatus.value.health.metrics.memoryPercent,
+        diskPercent: connectionStatus.value.health.metrics.diskPercent,
+      },
+    };
   }
+  // Fallback to API health data
+  return health.value;
 });
 
-const isDeviceConnected = computed(() => {
-  // Use real-time connection status if available, otherwise fall back to lastSeenAt
-  if (connectionStatus.value.connected !== undefined) {
-    return connectionStatus.value.connected;
+// Debounce loadDevice to prevent multiple rapid calls from WebSocket updates
+let loadDeviceTimeout: NodeJS.Timeout | null = null;
+let isLoadDeviceInProgress = false;
+const LOAD_DEVICE_DEBOUNCE_MS = 2000; // Don't reload more than once every 2 seconds
+
+const loadDevice = async (force = false) => {
+  // If already loading, skip unless forced
+  if (isLoadDeviceInProgress && !force) {
+    return;
   }
 
-  // Fallback to lastSeenAt check
-  if (!device.value || device.value.status !== 'active') {
-    return false;
+  // Clear any pending debounced call
+  if (loadDeviceTimeout) {
+    clearTimeout(loadDeviceTimeout);
+    loadDeviceTimeout = null;
   }
 
-  if (!device.value.lastSeenAt) {
-    return false;
+  // Debounce: if not forced, wait a bit before loading
+  if (!force) {
+    loadDeviceTimeout = setTimeout(() => {
+      loadDeviceTimeout = null;
+      loadDevice(true);
+    }, LOAD_DEVICE_DEBOUNCE_MS);
+    return;
   }
 
-  const lastSeen = new Date(device.value.lastSeenAt);
-  const now = new Date();
-  const diffMinutes = (now.getTime() - lastSeen.getTime()) / 1000 / 60;
-
-  return diffMinutes < 5;
-});
-
-const loadDevice = async () => {
+  // Preserve scroll position before loading (only on client side)
+  const scrollPosition = process.client ? (window.scrollY || document.documentElement.scrollTop) : 0;
+  
+  isLoadDeviceInProgress = true;
   loading.value = true;
   error.value = '';
 
@@ -111,18 +207,71 @@ const loadDevice = async () => {
     const [deviceResponse, healthData, sessionsData] = await Promise.all([
       getDevice(deviceId),
       getDeviceHealth(deviceId),
-      listSessions({ deviceId }),
+      listSessions({ deviceId }).catch(() => []), // Don't fail if sessions fail
     ]);
 
     if (deviceResponse) {
-      device.value = deviceResponse.device;
+      // Only update if device doesn't exist or if properties actually changed
+      // This prevents unnecessary reactivity triggers and scroll resets
+      if (!device.value) {
+        device.value = deviceResponse.device;
+      } else {
+        // Deep compare and only update changed properties to minimize reactivity
+        const newDevice = deviceResponse.device;
+        const currentDevice = device.value;
+        
+        // Check if any significant properties changed
+        const hasChanges = 
+          currentDevice.name !== newDevice.name ||
+          currentDevice.status !== newDevice.status ||
+          currentDevice.lastSeenAt !== newDevice.lastSeenAt ||
+          JSON.stringify(currentDevice.capabilities) !== JSON.stringify(newDevice.capabilities) ||
+          JSON.stringify(currentDevice.config) !== JSON.stringify(newDevice.config);
+        
+        // Only update if there are actual changes
+        if (hasChanges) {
+          // Use Object.assign but wrap in nextTick to batch reactivity updates
+          await nextTick();
+          Object.assign(device.value, newDevice);
+        }
+      }
       enrollmentCodeStatus.value = deviceResponse.enrollmentCode || null;
+    } else {
+      // Device not found - set error and redirect after delay
+      error.value = t('broadcastBox.errors.deviceNotFound') || 'Device not found';
+      setTimeout(() => {
+        navigateTo('/settings/broadcast-box');
+      }, 3000); // Redirect after 3 seconds
+      return;
     }
     health.value = healthData;
     sessions.value = sessionsData;
+    
+    // Restore scroll position after update (use nextTick to ensure DOM is updated)
+    if (process.client && scrollPosition > 0) {
+      await nextTick();
+      // Use requestAnimationFrame to ensure browser has finished rendering
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollPosition, behavior: 'instant' });
+      });
+    }
   } catch (err: any) {
-    error.value = err.message || t('broadcastBox.errors.loadFailed');
+    // Check if it's a 404 (device not found)
+    const isNotFound = err.status === 404 || 
+      err.message?.includes('not found') ||
+      err.message?.includes('Device not found');
+    
+    if (isNotFound) {
+      error.value = t('broadcastBox.errors.deviceNotFound') || 'Device not found';
+      // Redirect to device list after showing error
+      setTimeout(() => {
+        navigateTo('/settings/broadcast-box');
+      }, 3000);
+    } else {
+      error.value = err.message || t('broadcastBox.errors.loadFailed');
+    }
   } finally {
+    isLoadDeviceInProgress = false;
     loading.value = false;
   }
 };
@@ -144,7 +293,8 @@ const handleRevoke = async () => {
 
 const handleConfigSuccess = () => {
   showConfigForm.value = false;
-  loadDevice();
+  // Force reload after config change (bypass debounce)
+  loadDevice(true);
 };
 
 const handleRegenerateEnrollmentCode = async () => {
@@ -263,7 +413,23 @@ const breadcrumbItems = computed(() => [
 
 onMounted(() => {
   if (canManageDevices.value) {
-    loadDevice();
+    // Force load on mount (bypass debounce)
+    loadDevice(true);
+  }
+});
+
+// Cleanup debounce timeout on unmount
+onUnmounted(() => {
+  if (loadDeviceTimeout) {
+    clearTimeout(loadDeviceTimeout);
+    loadDeviceTimeout = null;
+  }
+  if (sessionsRefreshInterval) {
+    clearInterval(sessionsRefreshInterval);
+    sessionsRefreshInterval = null;
+  }
+  if (device.value?.deviceUuid) {
+    unsubscribe(device.value.deviceUuid);
   }
 });
 </script>
@@ -630,42 +796,208 @@ onMounted(() => {
             </div>
           </UCard>
 
-          <!-- Device Health -->
-          <UCard v-if="health">
+          <!-- Device Capabilities -->
+          <UCard v-if="device">
             <template #header>
               <h2 class="text-lg font-semibold">
-                {{ t('broadcastBox.deviceHealth') }}
+                {{ t('broadcastBox.deviceCapabilities') }}
               </h2>
             </template>
 
+            <div class="space-y-6">
+              <!-- Video Sources -->
+              <div>
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
+                >
+                  {{ t('broadcastBox.videoSources') }}
+                </label>
+                <div class="space-y-2">
+                  <div
+                    v-for="source in device.capabilities?.videoSources || []"
+                    :key="source"
+                    class="flex items-center justify-between p-2 rounded-lg"
+                    :class="{
+                      'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800':
+                        device.config?.defaultVideoSource === source,
+                      'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700':
+                        device.config?.defaultVideoSource !== source,
+                    }"
+                  >
+                    <div class="flex items-center gap-2">
+                      <UIcon
+                        name="i-lucide-video"
+                        class="w-4 h-4 text-gray-500"
+                      />
+                      <span class="text-sm font-medium">{{ source }}</span>
+                    </div>
+                    <UBadge
+                      v-if="device.config?.defaultVideoSource === source"
+                      color="primary"
+                      variant="soft"
+                      size="xs"
+                    >
+                      {{ t('broadcastBox.active') }}
+                    </UBadge>
+                  </div>
+                  <p
+                    v-if="!device.capabilities?.videoSources?.length"
+                    class="text-sm text-gray-500"
+                  >
+                    {{ t('broadcastBox.noVideoSources') }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Audio Sources -->
+              <div>
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
+                >
+                  {{ t('broadcastBox.audioSources') }}
+                </label>
+                <div class="space-y-2">
+                  <div
+                    v-for="source in device.capabilities?.audioSources || []"
+                    :key="source"
+                    class="flex items-center justify-between p-2 rounded-lg"
+                    :class="{
+                      'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800':
+                        device.config?.defaultAudioSource === source,
+                      'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700':
+                        device.config?.defaultAudioSource !== source,
+                    }"
+                  >
+                    <div class="flex items-center gap-2">
+                      <UIcon
+                        name="i-lucide-mic"
+                        class="w-4 h-4 text-gray-500"
+                      />
+                      <span class="text-sm font-medium">{{ source }}</span>
+                    </div>
+                    <UBadge
+                      v-if="device.config?.defaultAudioSource === source"
+                      color="primary"
+                      variant="soft"
+                      size="xs"
+                    >
+                      {{ t('broadcastBox.active') }}
+                    </UBadge>
+                  </div>
+                  <p
+                    v-if="!device.capabilities?.audioSources?.length"
+                    class="text-sm text-gray-500"
+                  >
+                    {{ t('broadcastBox.noAudioSources') }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Other Capabilities -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                <div>
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                  >
+                    {{ t('broadcastBox.maxResolution') }}
+                  </label>
+                  <p class="text-sm font-semibold">
+                    {{ device.capabilities?.maxResolution || 'N/A' }}
+                  </p>
+                </div>
+                <div>
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                  >
+                    {{ t('broadcastBox.pipSupport') }}
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <UBadge
+                      :color="device.capabilities?.pipSupported ? 'primary' : 'neutral'"
+                      variant="soft"
+                      size="sm"
+                    >
+                      {{
+                        device.capabilities?.pipSupported
+                          ? t('broadcastBox.supported')
+                          : t('broadcastBox.notSupported')
+                      }}
+                    </UBadge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </UCard>
+
+          <!-- Device Control Cards -->
+          <div v-if="isDeviceConnected" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Source Control -->
+            <DeviceSourceControl
+              :device="device"
+              :is-device-connected="isDeviceConnected"
+            />
+
+            <!-- Configuration Control -->
+            <DeviceConfigControl
+              :device="device"
+              :is-device-connected="isDeviceConnected"
+              @updated="loadDevice"
+            />
+          </div>
+
+          <!-- Status Control -->
+          <DeviceStatusControl
+            :device="device"
+            :is-device-connected="isDeviceConnected"
+            :connection-status="connectionStatus"
+            @refreshed="loadDevice"
+          />
+
+          <!-- Device Health -->
+          <UCard v-if="realtimeHealth">
+            <template #header>
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold">
+                  {{ t('broadcastBox.deviceHealth') }}
+                </h2>
+                <UBadge
+                  v-if="connectionStatus.health"
+                  color="primary"
+                  variant="soft"
+                  size="xs"
+                >
+                  {{ t('broadcastBox.live') || 'Live' }}
+                </UBadge>
+              </div>
+            </template>
+
             <div class="space-y-4">
-              <div v-if="health.score !== undefined">
-                <div class="flex items-center justify-between mb-2">
+              <div v-if="realtimeHealth.score !== undefined">
+                <div class="flex items-center justify-between">
                   <span class="text-sm font-medium">{{
                     t('broadcastBox.healthScore')
                   }}</span>
                   <span
                     class="text-lg font-semibold"
                     :class="{
-                      'text-green-600': health.score >= 80,
+                      'text-green-600': realtimeHealth.score >= 80,
                       'text-yellow-600':
-                        health.score >= 50 && health.score < 80,
-                      'text-red-600': health.score < 50,
+                        realtimeHealth.score >= 50 && realtimeHealth.score < 80,
+                      'text-red-600': realtimeHealth.score < 50,
                     }"
                   >
-                    {{ health.score }}%
+                    {{ realtimeHealth.score }}%
                   </span>
                 </div>
-                <UProgress :value="health.score" />
               </div>
 
-              <div v-if="health.metrics" class="grid grid-cols-3 gap-4">
+              <div v-if="realtimeHealth.metrics" class="grid grid-cols-3 gap-4">
                 <div>
                   <label class="text-xs text-gray-600 dark:text-gray-400">
                     {{ t('broadcastBox.cpu') }}
                   </label>
                   <p class="text-sm font-semibold">
-                    {{ health.metrics.cpuPercent || 0 }}%
+                    {{ realtimeHealth.metrics.cpuPercent || 0 }}%
                   </p>
                 </div>
                 <div>
@@ -673,7 +1005,7 @@ onMounted(() => {
                     {{ t('broadcastBox.memory') }}
                   </label>
                   <p class="text-sm font-semibold">
-                    {{ health.metrics.memoryPercent || 0 }}%
+                    {{ realtimeHealth.metrics.memoryPercent || 0 }}%
                   </p>
                 </div>
                 <div>
@@ -681,7 +1013,7 @@ onMounted(() => {
                     {{ t('broadcastBox.disk') }}
                   </label>
                   <p class="text-sm font-semibold">
-                    {{ health.metrics.diskPercent || 0 }}%
+                    {{ realtimeHealth.metrics.diskPercent || 0 }}%
                   </p>
                 </div>
               </div>

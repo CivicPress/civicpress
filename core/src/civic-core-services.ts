@@ -350,23 +350,10 @@ export async function completeServiceInitialization(
 
   // Register realtime module services if available
   // Note: Realtime module is optional - registration will be skipped if module is not available
-  // Must be explicitly enabled via CIVIC_REALTIME_ENABLED=true environment variable
-  // This allows API and realtime to run independently for better debugging
-  // When disabled (default), we skip the import attempt entirely to avoid file watching issues
-  const realtimeEnabled = process.env.CIVIC_REALTIME_ENABLED === 'true';
-
-  if (!realtimeEnabled) {
-    const logger = container.resolve<Logger>('logger');
-    if (logger.isVerbose()) {
-      logger.debug(
-        'Realtime module disabled (set CIVIC_REALTIME_ENABLED=true to enable) - skipping import attempt'
-      );
-    }
-    // Skip all realtime-related code when disabled to ensure complete independence
-    // This prevents file watchers from monitoring realtime module files
-  } else {
-    // We use dynamic import here since this function is async and can handle ES modules properly
-    try {
+  // Unified architecture: Always try to load realtime if module is available (no flag required)
+  // This simplifies the architecture and removes state synchronization issues
+  // We use dynamic import here since this function is async and can handle ES modules properly
+  try {
       // Try to import realtime services registration
       // Use a try-catch around the import to handle cases where the module is not available
       // Type assertion is needed because realtime module is optional and may not be in core's dependencies
@@ -509,7 +496,6 @@ export async function completeServiceInitialization(
       // This is expected in environments where realtime module is not installed
       // We silently skip registration (no error logging needed)
     }
-  } // End of realtimeEnabled check
 
   // Register broadcast-box module services (optional)
   // Note: Broadcast-box module is optional - registration will be skipped if module is not available
@@ -620,19 +606,15 @@ export async function completeServiceInitialization(
 
   // Initialize realtime server AFTER broadcast-box services are registered
   // This allows broadcast-box to set device authentication dependencies before initialization
-  if (realtimeEnabled) {
-    try {
-      const realtimeServer = container.resolve('realtimeServer') as any;
-      if (realtimeServer && typeof realtimeServer.initialize === 'function') {
-        await realtimeServer.initialize();
-        const logger = container.resolve<Logger>('logger');
-        if (logger.isVerbose()) {
-          logger.debug(
-            'Realtime server initialized successfully (after broadcast-box registration)'
-          );
-        }
-      }
-    } catch (error: any) {
+  // Unified architecture: Always initialize if realtime server is registered (no flag check)
+  try {
+    const realtimeServer = container.resolve('realtimeServer') as any;
+    if (realtimeServer && typeof realtimeServer.initialize === 'function') {
+      await realtimeServer.initialize();
+      const logger = container.resolve<Logger>('logger');
+      logger.info('Realtime server initialized successfully (unified architecture)');
+    }
+  } catch (error: any) {
       // Realtime server not available or initialization failed
       const logger = container.resolve<Logger>('logger');
       if (
@@ -652,7 +634,6 @@ export async function completeServiceInitialization(
         );
       }
     }
-  }
 
   // Register all caches with UnifiedCacheManager
   const cacheManager = container.resolve<UnifiedCacheManager>('cacheManager');

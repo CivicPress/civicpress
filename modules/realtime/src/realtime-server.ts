@@ -81,6 +81,8 @@ export class RealtimeServer {
   // Optional device authentication dependencies (for Broadcast Box support)
   private deviceAuthService: any | null = null; // DeviceAuthService - avoiding circular dependency
   private deviceManager: any | null = null; // DeviceManager - avoiding circular dependency
+  private deviceCommandService: any | null = null; // DeviceCommandService - avoiding circular dependency
+  private deviceConnectionTracker: any | null = null; // DeviceConnectionTracker - avoiding circular dependency
 
   constructor(
     logger: Logger,
@@ -127,6 +129,28 @@ export class RealtimeServer {
     this.deviceManager = deviceManager;
     coreInfo('Device authentication dependencies set for realtime server', {
       operation: 'realtime:server:device-auth:configured',
+    });
+  }
+
+  /**
+   * Set device command service (called by DI container)
+   * This is optional and only needed if device command execution is used (e.g., Broadcast Box)
+   */
+  setDeviceCommandService(deviceCommandService: any): void {
+    this.deviceCommandService = deviceCommandService;
+    coreInfo('Device command service set for realtime server', {
+      operation: 'realtime:server:device-command-service:configured',
+    });
+  }
+
+  /**
+   * Set device connection tracker (called by DI container)
+   * This is optional and only needed if device connection tracking is used (e.g., Broadcast Box)
+   */
+  setDeviceConnectionTracker(connectionTracker: any): void {
+    this.deviceConnectionTracker = connectionTracker;
+    coreInfo('Device connection tracker set for realtime server', {
+      operation: 'realtime:server:device-connection-tracker:configured',
     });
   }
 
@@ -553,6 +577,43 @@ export class RealtimeServer {
     this.connections.set(clientId, ws);
     this.trackDeviceConnection(clientIp, deviceAuth.deviceId, clientId);
 
+    // Register connection in DeviceConnectionTracker (if available)
+    // This is used by DeviceCommandService to check if device is connected
+    // Convert deviceId to string (connection tracker expects string)
+    const deviceIdString = String(deviceAuth.deviceId);
+    
+    if (this.deviceConnectionTracker) {
+      try {
+        await this.deviceConnectionTracker.registerConnection(
+          deviceIdString, // database ID as string
+          clientId,
+          'cloud' // TODO: determine endpoint type (cloud vs local)
+        );
+        coreInfo('Device connection registered in tracker', {
+          operation: 'realtime:server:device-connection:tracker-registered',
+          deviceId: deviceIdString,
+          deviceUuid: deviceAuth.deviceUuid,
+          clientId,
+        });
+      } catch (error) {
+        coreWarn('Failed to register device connection in tracker', {
+          operation: 'realtime:server:device-connection:tracker-error',
+          deviceId: deviceIdString,
+          deviceUuid: deviceAuth.deviceUuid,
+          clientId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue with connection even if tracker registration fails
+      }
+    } else {
+      coreWarn('Device connection tracker not available - connection not registered', {
+        operation: 'realtime:server:device-connection:tracker-not-available',
+        deviceId: deviceIdString,
+        deviceUuid: deviceAuth.deviceUuid,
+        clientId,
+      });
+    }
+
     // Get or create room
     if (!this.roomManager) {
       throw new Error('Room manager not initialized');
@@ -938,7 +999,81 @@ export class RealtimeServer {
           return;
         }
 
-        // Broadcast message to other clients in the room
+        // Handle ack messages - route to DeviceCommandService before broadcasting
+        if (message.type === 'ack' && this.deviceCommandService) {
+          try {
+            // DeviceCommandService will resolve pending command promises
+            if (typeof this.deviceCommandService.handleAckResponse === 'function') {
+              this.deviceCommandService.handleAckResponse(message);
+            }
+          } catch (error) {
+            coreWarn('Failed to handle ack response in DeviceCommandService', {
+              operation: 'realtime:server:device:ack-handler-error',
+              clientId,
+              deviceId: deviceAuth.deviceId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            // Continue with broadcast even if ack handling fails
+          }
+        }
+
+        // Handle status messages - process through Broadcast Box event handlers before broadcasting
+        // Status messages contain device health, capabilities, state, and session info
+        if (message.type === 'status' && message.payload && this.deviceManager) {
+          try {
+            // Process status message through Broadcast Box event handlers
+            // This will update device capabilities, health, and state
+            const payload = message.payload;
+            
+            // Update device capabilities if provided
+            if (payload.capabilities && this.deviceManager) {
+              try {
+                const device = await this.deviceManager.getDevice(deviceAuth.deviceId);
+                if (device) {
+                  const videoSources = payload.capabilities.video_sources || payload.capabilities.videoSources || [];
+                  const audioSources = payload.capabilities.audio_sources || payload.capabilities.audioSources || [];
+                  const pipSupported = payload.capabilities.pip !== undefined ? payload.capabilities.pip : 
+                                     payload.capabilities.pipSupported !== undefined ? payload.capabilities.pipSupported : 
+                                     device.capabilities?.pipSupported;
+                  const hardwareEncoding = payload.capabilities.hardware_encoding !== undefined ? payload.capabilities.hardware_encoding :
+                                          payload.capabilities.hardwareEncoding !== undefined ? payload.capabilities.hardwareEncoding :
+                                          device.capabilities?.hardwareEncoding;
+
+                  const updatedCapabilities = {
+                    ...device.capabilities,
+                    videoSources: videoSources.length > 0 ? videoSources : device.capabilities?.videoSources || [],
+                    audioSources: audioSources.length > 0 ? audioSources : device.capabilities?.audioSources || [],
+                    pipSupported: pipSupported !== undefined ? pipSupported : device.capabilities?.pipSupported,
+                    hardwareEncoding: hardwareEncoding !== undefined ? hardwareEncoding : device.capabilities?.hardwareEncoding,
+                    // Preserve existing source objects if they exist
+                    videoSourceObjects: device.capabilities?.videoSourceObjects || [],
+                    audioSourceObjects: device.capabilities?.audioSourceObjects || [],
+                  };
+
+                  await this.deviceManager.updateDevice(deviceAuth.deviceId, {
+                    capabilities: updatedCapabilities as any,
+                  });
+                }
+              } catch (error) {
+                coreWarn('Failed to update device capabilities from status', {
+                  operation: 'realtime:server:device:status-capabilities-error',
+                  deviceId: deviceAuth.deviceId,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+          } catch (error) {
+            // Log but don't fail - status processing is optional
+            coreWarn('Failed to process status message (non-critical)', {
+              operation: 'realtime:server:device:status-handler-error',
+              clientId,
+              deviceId: deviceAuth.deviceId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
+        // Broadcast message to other clients in the room (including observers)
         this.broadcastToRoom(room, message, clientId);
 
         // Update last activity
@@ -975,6 +1110,33 @@ export class RealtimeServer {
    */
   private handleDeviceDisconnect(clientId: string, room: any): void {
     const deviceInfo = this.clientToDevice.get(clientId);
+
+    // Unregister connection in DeviceConnectionTracker (if available)
+    if (this.deviceConnectionTracker && deviceInfo) {
+      try {
+        // Convert deviceId to string (connection tracker expects string)
+        const deviceIdString = String(deviceInfo.deviceId);
+        this.deviceConnectionTracker.unregisterConnection(
+          deviceIdString, // database ID as string
+          clientId
+        );
+        coreDebug('Device connection unregistered from tracker', {
+          operation: 'realtime:server:device-disconnect:tracker-unregistered',
+          deviceId: deviceIdString,
+          deviceUuid: deviceInfo.deviceUuid,
+          clientId,
+        });
+      } catch (error) {
+        coreWarn('Failed to unregister device connection from tracker', {
+          operation: 'realtime:server:device-disconnect:tracker-error',
+          deviceId: deviceInfo.deviceId,
+          deviceUuid: deviceInfo.deviceUuid,
+          clientId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue with disconnection even if tracker unregistration fails
+      }
+    }
 
     // Remove client from room
     room.removeClient(clientId);

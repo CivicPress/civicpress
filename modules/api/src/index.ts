@@ -537,6 +537,7 @@ export class CivicPressAPI {
         let deviceManager: any;
         let deviceAuth: any;
         let connectionTracker: any;
+        let deviceCommandService: any;
         let sessionController: any;
         let uploadProcessor: any;
 
@@ -565,6 +566,17 @@ export class CivicPressAPI {
           connectionTracker = this.civicPress.getService(
             'broadcastBoxConnectionTracker'
           );
+          try {
+            deviceCommandService = this.civicPress.getService(
+              'broadcastBoxDeviceCommandService'
+            );
+            broadcastBoxLogger.info('✅ broadcastBoxDeviceCommandService found');
+          } catch (e: any) {
+            // DeviceCommandService is optional - log but don't fail
+            broadcastBoxLogger.debug(
+              `DeviceCommandService not found: ${e?.message || 'unknown'}`
+            );
+          }
           sessionController = this.civicPress.getService(
             'broadcastBoxSessionController'
           );
@@ -598,6 +610,7 @@ export class CivicPressAPI {
             broadcastBoxLogger,
             authMiddleware(this.civicPress),
             connectionTracker,
+            deviceCommandService,
             sessionController,
             uploadProcessor
           );
