@@ -29,7 +29,6 @@
             :disabled="loading || !isDeviceConnected"
             :loading="loading"
             :placeholder="t('broadcastBox.selectVideoSource')"
-            @update:model-value="handleVideoSourceChange"
           />
         </UFormField>
       </div>
@@ -46,7 +45,6 @@
             :disabled="loading || !isDeviceConnected"
             :loading="loading"
             :placeholder="t('broadcastBox.selectAudioSource')"
-            @update:model-value="handleAudioSourceChange"
           />
         </UFormField>
       </div>
@@ -80,6 +78,7 @@
 <script setup lang="ts">
 import type { BroadcastDevice } from '~/composables/useBroadcastBox';
 import { useDeviceCommands } from '~/composables/useDeviceCommands';
+import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps<{
@@ -88,6 +87,29 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
+
+// Get real-time connection status for active sources
+// useDeviceConnectionStatus expects string | null, not a computed ref
+const deviceUuidForStatus = computed(() => props.device.deviceUuid);
+const {
+  status: connectionStatus,
+  subscribe,
+  unsubscribe,
+} = useDeviceConnectionStatus(null);
+
+// Subscribe to device status when component mounts
+onMounted(() => {
+  if (deviceUuidForStatus.value) {
+    subscribe(deviceUuidForStatus.value);
+  }
+});
+
+// Unsubscribe when component unmounts
+onUnmounted(() => {
+  if (deviceUuidForStatus.value) {
+    unsubscribe(deviceUuidForStatus.value);
+  }
+});
 
 // Get device UUID for commands
 const deviceUuid = computed(() => props.device.deviceUuid);
@@ -105,9 +127,44 @@ const audioSources = computed(() => {
   return props.device.capabilities?.audioSources || [];
 });
 
-// Current active sources from device config
-const currentVideoSource = computed(() => props.device.config?.defaultVideoSource);
-const currentAudioSource = computed(() => props.device.config?.defaultAudioSource);
+// Current active sources - prefer real-time from WebSocket, fallback to device config
+const currentVideoSource = computed(() => {
+  // Use real-time active source identifier if available
+  const activeVideo =
+    connectionStatus.value.activeSources?.video ||
+    props.device.activeSources?.video;
+  if (activeVideo) {
+    return activeVideo.identifier;
+  }
+  // Fallback to device config
+  return props.device.config?.defaultVideoSource;
+});
+
+const currentAudioSource = computed(() => {
+  // Use real-time active source identifier if available
+  const activeAudio =
+    connectionStatus.value.activeSources?.audio ||
+    props.device.activeSources?.audio;
+  if (activeAudio) {
+    return activeAudio.identifier;
+  }
+  // Fallback to device config
+  return props.device.config?.defaultAudioSource;
+});
+
+// Helper to check if a source is currently active
+const isSourceActive = (
+  sourceIdentifier: string,
+  sourceType: 'video' | 'audio'
+) => {
+  const activeSource =
+    sourceType === 'video'
+      ? connectionStatus.value.activeSources?.video ||
+        props.device.activeSources?.video
+      : connectionStatus.value.activeSources?.audio ||
+        props.device.activeSources?.audio;
+  return activeSource?.identifier === sourceIdentifier;
+};
 
 // Selected sources (for switching)
 // Use undefined instead of null to match USelectMenu's expected type
@@ -117,11 +174,15 @@ const selectedAudioSource = ref<string | undefined>(currentAudioSource.value);
 // Update selected sources when device config changes
 // Only update if values actually changed (not just object reference)
 watch(
-  () => [currentVideoSource.value, currentAudioSource.value] as [string | undefined, string | undefined],
+  () =>
+    [currentVideoSource.value, currentAudioSource.value] as [
+      string | undefined,
+      string | undefined,
+    ],
   ([newVideo, newAudio], oldValue) => {
     // Handle first run (oldValue is undefined) or when old values exist
     const [oldVideo, oldAudio] = oldValue || [undefined, undefined];
-    
+
     // Only update if values actually changed
     if (newVideo !== oldVideo) {
       selectedVideoSource.value = newVideo;
@@ -141,42 +202,19 @@ const hasChanges = computed(() => {
   );
 });
 
-// Handle video source change (debounce switch)
-let videoSourceTimeout: NodeJS.Timeout | null = null;
-const handleVideoSourceChange = () => {
-  if (videoSourceTimeout) {
-    clearTimeout(videoSourceTimeout);
-  }
-  // Auto-switch after 500ms of no changes
-  videoSourceTimeout = setTimeout(() => {
-    if (hasChanges.value) {
-      handleSwitch();
-    }
-  }, 500);
-};
-
-// Handle audio source change (debounce switch)
-let audioSourceTimeout: NodeJS.Timeout | null = null;
-const handleAudioSourceChange = () => {
-  if (audioSourceTimeout) {
-    clearTimeout(audioSourceTimeout);
-  }
-  // Auto-switch after 500ms of no changes
-  audioSourceTimeout = setTimeout(() => {
-    if (hasChanges.value) {
-      handleSwitch();
-    }
-  }, 500);
-};
-
-// Switch sources
+// Switch sources (only called when button is clicked)
 const handleSwitch = async () => {
   if (!hasChanges.value || !props.isDeviceConnected) {
     return;
   }
 
   try {
-    await switchSource(selectedVideoSource.value || undefined, selectedAudioSource.value || undefined);
+    // Pass device object so switchSource can convert identifiers to numeric IDs
+    await switchSource(
+      selectedVideoSource.value || undefined,
+      selectedAudioSource.value || undefined,
+      props.device
+    );
     // Sources will be updated when device data is refreshed
   } catch (error) {
     // Error already handled in composable
@@ -184,4 +222,3 @@ const handleSwitch = async () => {
   }
 };
 </script>
-

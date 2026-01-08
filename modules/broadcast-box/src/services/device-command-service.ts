@@ -5,12 +5,16 @@
  * Supports commands from UI, API, workflows, and future scheduler.
  */
 
-import type { Logger } from '@civicpress/core';
+import type { Logger, ServiceContainer } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
 import { v4 as uuidv4 } from 'uuid';
 import type { RoomManager } from '@civicpress/realtime';
 import type { ProtocolHandler } from '../websocket/protocol.js';
-import type { CommandMessage, AckMessage, DeviceConfig } from '../types/index.js';
+import type {
+  CommandMessage,
+  AckMessage,
+  DeviceConfig,
+} from '../types/index.js';
 import type { DeviceManager } from './device-manager.js';
 import type { DeviceConnectionTracker } from './device-connection-tracker.js';
 import type { DeviceEventModel } from '../models/device-event.js';
@@ -70,19 +74,65 @@ export class DeviceCommandService {
     }
   > = new Map();
 
+  // Lazy-loaded RoomManager (resolved on first use)
+  private _roomManager: RoomManager | null = null;
+  private _roomManagerResolved: boolean = false;
+
   constructor(
-    private roomManager: RoomManager | null,
     private protocol: ProtocolHandler,
     private connectionTracker: DeviceConnectionTracker,
     private deviceEventModel: DeviceEventModel,
     private deviceManager: DeviceManager,
-    private logger: Logger
+    private logger: Logger,
+    private container: ServiceContainer | null = null
   ) {}
+
+  /**
+   * Get RoomManager, resolving it lazily on first use
+   * This allows realtime server to initialize after service registration
+   */
+  private getRoomManager(): RoomManager | null {
+    if (this._roomManagerResolved) {
+      return this._roomManager;
+    }
+
+    this._roomManagerResolved = true;
+
+    if (!this.container) {
+      this.logger.warn(
+        'Container not available for lazy RoomManager resolution'
+      );
+      return null;
+    }
+
+    try {
+      this._roomManager = this.container.resolve<RoomManager>(
+        'realtimeRoomManager'
+      );
+      this.logger.info('RoomManager resolved successfully (lazy)', {
+        operation:
+          'broadcast-box:services:device-command-service:room-manager-resolved',
+      });
+      return this._roomManager;
+    } catch (e: any) {
+      this.logger.error(
+        'RoomManager not available for DeviceCommandService - device commands will fail',
+        {
+          operation:
+            'broadcast-box:services:device-command-service:room-manager-unavailable',
+          error: e?.message || 'unknown',
+          errorCode: e?.code,
+          note: 'CRITICAL: DeviceCommandService requires RoomManager to send commands. Ensure realtime module is built and realtime server is initialized.',
+        }
+      );
+      return null;
+    }
+  }
 
   /**
    * Execute a command on a device
    * Unified entry point for all command sources
-   * 
+   *
    * @param request - Command request. deviceId can be either UUID or database ID.
    *                  For room lookup, UUID is used. For connection checking, database ID is used.
    */
@@ -97,16 +147,16 @@ export class DeviceCommandService {
       // Convert deviceId (could be UUID or database ID) to database ID for connection checking
       // Device rooms use UUID, but connection tracker uses database ID (which is also a UUID string)
       let device = await this.deviceManager.getDeviceByUuid(request.deviceId);
-      
+
       // If not found by UUID, try by database ID (for backward compatibility)
       if (!device) {
         device = await this.deviceManager.getDevice(request.deviceId);
       }
-      
+
       if (!device) {
         throw new Error(`Device not found: ${request.deviceId}`);
       }
-      
+
       // Use device.id (database primary key, which is a UUID string) for connection checking
       const deviceDatabaseId = String(device.id); // Ensure string format
 
@@ -115,8 +165,9 @@ export class DeviceCommandService {
       if (!isConnected) {
         // Log for debugging - include all relevant IDs
         const connectedDevices = this.connectionTracker.getConnectedDevices();
-        const connectionState = this.connectionTracker.getConnectionState(deviceDatabaseId);
-        
+        const connectionState =
+          this.connectionTracker.getConnectionState(deviceDatabaseId);
+
         this.logger.warn('Device connection check failed', {
           operation: 'broadcast-box:command:device-not-connected',
           requestDeviceId: request.deviceId,
@@ -124,11 +175,13 @@ export class DeviceCommandService {
           deviceDatabaseId,
           deviceIdType: typeof device.id,
           isConnected,
-          connectionState: connectionState ? {
-            connected: connectionState.connected,
-            clientId: connectionState.clientId,
-            lastHeartbeat: connectionState.lastHeartbeat?.toISOString(),
-          } : null,
+          connectionState: connectionState
+            ? {
+                connected: connectionState.connected,
+                clientId: connectionState.clientId,
+                lastHeartbeat: connectionState.lastHeartbeat?.toISOString(),
+              }
+            : null,
           connectedDevices,
           connectedDevicesCount: connectedDevices.length,
         });
@@ -173,7 +226,9 @@ export class DeviceCommandService {
       // Try to get database ID for logging (may fail if device not found)
       let deviceDatabaseId = request.deviceId;
       try {
-        const device = await this.deviceManager.getDeviceByUuid(request.deviceId);
+        const device = await this.deviceManager.getDeviceByUuid(
+          request.deviceId
+        );
         if (device) {
           deviceDatabaseId = device.id.toString();
         }
@@ -220,14 +275,15 @@ export class DeviceCommandService {
     command: CommandMessage,
     timeout: number
   ): Promise<AckMessage> {
-    if (!this.roomManager) {
+    const roomManager = this.getRoomManager();
+    if (!roomManager) {
       throw new Error(
         'RoomManager not available - realtime module required for device commands'
       );
     }
 
     // Get device room
-    const room = this.roomManager.getRoom(`device:${deviceId}`);
+    const room = roomManager.getRoom(`device:${deviceId}`);
     if (!room) {
       throw new Error(`Device room not found: device:${deviceId}`);
     }
@@ -238,13 +294,21 @@ export class DeviceCommandService {
       const timeoutHandle = setTimeout(() => {
         this.pendingCommands.delete(command.id);
         reject(
-          new Error(
-            `Command timeout after ${timeout}ms: ${command.action}`
-          )
+          new Error(`Command timeout after ${timeout}ms: ${command.action}`)
         );
       }, timeout);
 
-      // Store promise resolvers
+      // Store promise resolvers using command.id as key
+      // Debug: log what we're storing
+      coreInfo('Storing pending command', {
+        operation: 'broadcast-box:command:store-pending',
+        commandId: command.id,
+        commandIdType: typeof command.id,
+        action: command.action,
+        commandKeys: Object.keys(command),
+        commandFull: JSON.stringify(command),
+      });
+
       this.pendingCommands.set(command.id, {
         resolve: (ack: AckMessage) => {
           clearTimeout(timeoutHandle);
@@ -267,6 +331,7 @@ export class DeviceCommandService {
           deviceId,
           action: command.action,
           commandId: command.id,
+          storedCommandIds: Array.from(this.pendingCommands.keys()),
         });
       } catch (error) {
         clearTimeout(timeoutHandle);
@@ -281,19 +346,30 @@ export class DeviceCommandService {
    * Called by WebSocket message handler when ack is received
    */
   handleAckResponse(ack: AckMessage): void {
+    // Debug: log all pending command IDs and the received ack
+    const pendingCommandIds = Array.from(this.pendingCommands.keys());
+    coreInfo('Handling ack response', {
+      operation: 'broadcast-box:command:ack-received',
+      ackCommandId: ack.commandId,
+      pendingCommandIds,
+      pendingCount: this.pendingCommands.size,
+      ackSuccess: ack.success,
+    });
+
     const pending = this.pendingCommands.get(ack.commandId);
     if (pending) {
       if (ack.success) {
         pending.resolve(ack);
       } else {
-        pending.reject(
-          new Error(ack.error || 'Command failed on device')
-        );
+        pending.reject(new Error(ack.error || 'Command failed on device'));
       }
     } else {
       coreWarn('Received ack for unknown command', {
         operation: 'broadcast-box:command:unknown-ack',
         commandId: ack.commandId,
+        pendingCommandIds,
+        pendingCount: this.pendingCommands.size,
+        ackMessage: JSON.stringify(ack),
       });
     }
   }
@@ -436,4 +512,3 @@ export class DeviceCommandService {
     });
   }
 }
-

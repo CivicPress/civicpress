@@ -120,9 +120,11 @@ export function createDefaultCommandHandlers(
         BroadcastBoxErrorCode.INVALID_CONFIG
       );
     }
-    
+
     // Check if device is already recording
-    const connectionState = context.connectionTracker.getConnectionState(context.deviceId);
+    const connectionState = context.connectionTracker.getConnectionState(
+      context.deviceId
+    );
     if (connectionState?.state?.status === 'recording') {
       return context.protocol.createAck(
         command.id,
@@ -368,7 +370,9 @@ export function createDefaultCommandHandlers(
         }
       } else {
         // Check string name in videoSources array
-        isValid = device.capabilities.videoSources.includes(videoSource as string);
+        isValid = device.capabilities.videoSources.includes(
+          videoSource as string
+        );
       }
 
       if (!isValid) {
@@ -404,7 +408,9 @@ export function createDefaultCommandHandlers(
           }
         }
       } else {
-        isValid = device.capabilities.audioSources.includes(audioSource as string);
+        isValid = device.capabilities.audioSources.includes(
+          audioSource as string
+        );
       }
 
       if (!isValid) {
@@ -433,7 +439,10 @@ export function createDefaultCommandHandlers(
   });
 
   // Register list_sources handler (also support get_sources for protocol compatibility)
-  const listSourcesHandler = async (command: CommandMessage, context: CommandHandlerContext) => {
+  const listSourcesHandler = async (
+    command: CommandMessage,
+    context: CommandHandlerContext
+  ) => {
     // Get device to retrieve capabilities
     const device = await context.deviceManager.getDevice(context.deviceId);
     if (!device) {
@@ -454,13 +463,15 @@ export function createDefaultCommandHandlers(
     // Return detailed source objects if available, otherwise fall back to string arrays
     return context.protocol.createAck(command.id, true, undefined, {
       // Protocol format: detailed source objects
-      video: device.capabilities.videoSourceObjects || 
+      video:
+        device.capabilities.videoSourceObjects ||
         device.capabilities.videoSources.map((name, idx) => ({
           id: idx,
           name,
           available: true, // Assume available if we don't have detailed info
         })),
-      audio: device.capabilities.audioSourceObjects || 
+      audio:
+        device.capabilities.audioSourceObjects ||
         device.capabilities.audioSources.map((name, idx) => ({
           id: idx,
           name,
@@ -480,6 +491,231 @@ export function createDefaultCommandHandlers(
   registry.registerHandler('list_sources', listSourcesHandler);
   // Also register get_sources for protocol compatibility
   registry.registerHandler('get_sources', listSourcesHandler);
+
+  // Register set_pip handler (also support configure_pip for protocol compatibility)
+  const setPipHandler = async (
+    command: CommandMessage,
+    context: CommandHandlerContext
+  ) => {
+    const { mainSource, pipSource, pipPosition, pipSize } = command.payload;
+
+    // Get device to validate capabilities
+    const device = await context.deviceManager.getDevice(context.deviceId);
+    if (!device) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
+        undefined,
+        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+      );
+    }
+
+    // Check if device supports PiP
+    if (!device.capabilities.pipSupported) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        getErrorMessage(BroadcastBoxErrorCode.PIP_NOT_SUPPORTED),
+        undefined,
+        BroadcastBoxErrorCode.PIP_NOT_SUPPORTED
+      );
+    }
+
+    // Validate mainSource is provided
+    if (!mainSource) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        'mainSource is required',
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+
+    // Helper to validate and convert source identifier to numeric ID
+    const validateAndConvertSource = (
+      sourceIdentifier: string | number | null | undefined,
+      sourceName: string
+    ): { id: number; identifier: string } | null => {
+      if (sourceIdentifier === null || sourceIdentifier === undefined) {
+        return null;
+      }
+
+      const isNumericId = typeof sourceIdentifier === 'number';
+      let sourceId: number | undefined;
+      let sourceObj: any;
+
+      if (isNumericId) {
+        sourceId = sourceIdentifier;
+        sourceObj = device.capabilities.videoSourceObjects?.find(
+          (s) => s.id === sourceId
+        );
+      } else {
+        // String identifier - find in videoSourceObjects
+        sourceObj = device.capabilities.videoSourceObjects?.find(
+          (s) =>
+            s.identifier === sourceIdentifier ||
+            s.identifier?.toLowerCase() === sourceIdentifier.toLowerCase() ||
+            s.name === sourceIdentifier ||
+            s.name?.toLowerCase() === sourceIdentifier.toLowerCase()
+        );
+        if (sourceObj) {
+          sourceId = sourceObj.id;
+        } else {
+          // Try to find in string array and use index
+          const index = device.capabilities.videoSources?.findIndex(
+            (s) =>
+              s === sourceIdentifier ||
+              s.toLowerCase() === sourceIdentifier.toLowerCase()
+          );
+          if (index >= 0) {
+            sourceId = index;
+            sourceObj = { id: index, identifier: sourceIdentifier };
+          }
+        }
+      }
+
+      if (!sourceObj && sourceId !== undefined) {
+        // Try to find by numeric ID if we have one
+        sourceObj = device.capabilities.videoSourceObjects?.find(
+          (s) => s.id === sourceId
+        );
+      }
+
+      if (!sourceObj || sourceId === undefined) {
+        throw new Error(
+          `${sourceName} "${sourceIdentifier}" not found in device capabilities`
+        );
+      }
+
+      // Check availability if field exists
+      if (sourceObj.available === false) {
+        throw new Error(`${sourceName} "${sourceIdentifier}" is not available`);
+      }
+
+      return {
+        id: sourceId,
+        identifier:
+          sourceObj.identifier || sourceObj.name || String(sourceIdentifier),
+      };
+    };
+
+    // Validate and convert mainSource
+    let mainSourceInfo: { id: number; identifier: string };
+    try {
+      const validated = validateAndConvertSource(mainSource, 'mainSource');
+      if (!validated) {
+        return context.protocol.createAck(
+          command.id,
+          false,
+          'mainSource is required',
+          undefined,
+          BroadcastBoxErrorCode.INVALID_CONFIG
+        );
+      }
+      mainSourceInfo = validated;
+    } catch (error: any) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        error.message || 'Invalid mainSource',
+        undefined,
+        BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+      );
+    }
+
+    // Validate and convert pipSource (if not null)
+    let pipSourceInfo: { id: number; identifier: string } | null = null;
+    if (pipSource !== null && pipSource !== undefined) {
+      try {
+        const validated = validateAndConvertSource(pipSource, 'pipSource');
+        if (validated) {
+          // Ensure pipSource is different from mainSource
+          if (validated.id === mainSourceInfo.id) {
+            return context.protocol.createAck(
+              command.id,
+              false,
+              'pipSource must be different from mainSource',
+              undefined,
+              BroadcastBoxErrorCode.INVALID_CONFIG
+            );
+          }
+          pipSourceInfo = validated;
+        }
+      } catch (error: any) {
+        return context.protocol.createAck(
+          command.id,
+          false,
+          error.message || 'Invalid pipSource',
+          undefined,
+          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+        );
+      }
+    }
+
+    // Validate pipPosition
+    const validPositions = [
+      'top_left',
+      'top_right',
+      'bottom_left',
+      'bottom_right',
+      'center',
+    ];
+    const position = pipPosition || 'top_right'; // Default
+    if (!validPositions.includes(position)) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        `Invalid pipPosition: ${position}. Must be one of: ${validPositions.join(', ')}`,
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+
+    // Validate pipSize
+    const defaultSize = { width: 320, height: 240 };
+    let size = pipSize || defaultSize;
+    if (
+      size.width <= 0 ||
+      size.height <= 0 ||
+      !Number.isInteger(size.width) ||
+      !Number.isInteger(size.height)
+    ) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        'pipSize width and height must be positive integers',
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+
+    coreInfo('Set PiP command processed', {
+      operation: 'broadcast-box:command:set-pip',
+      deviceId: context.deviceId,
+      mainSource: mainSourceInfo.identifier,
+      mainSourceId: mainSourceInfo.id,
+      pipSource: pipSourceInfo?.identifier || null,
+      pipSourceId: pipSourceInfo?.id || null,
+      position,
+      size,
+    });
+
+    // Return success with configured values
+    return context.protocol.createAck(command.id, true, undefined, {
+      mainSource: mainSourceInfo.identifier,
+      mainSourceId: mainSourceInfo.id,
+      pipSource: pipSourceInfo?.identifier || null,
+      pipSourceId: pipSourceInfo?.id || null,
+      pipPosition: position,
+      pipSize: size,
+      enabled: pipSourceInfo !== null,
+    });
+  };
+
+  registry.registerHandler('set_pip', setPipHandler);
+  registry.registerHandler('configure_pip', setPipHandler); // Alias
 
   return registry;
 }

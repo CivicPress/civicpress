@@ -581,7 +581,7 @@ export class RealtimeServer {
     // This is used by DeviceCommandService to check if device is connected
     // Convert deviceId to string (connection tracker expects string)
     const deviceIdString = String(deviceAuth.deviceId);
-    
+
     if (this.deviceConnectionTracker) {
       try {
         await this.deviceConnectionTracker.registerConnection(
@@ -606,12 +606,15 @@ export class RealtimeServer {
         // Continue with connection even if tracker registration fails
       }
     } else {
-      coreWarn('Device connection tracker not available - connection not registered', {
-        operation: 'realtime:server:device-connection:tracker-not-available',
-        deviceId: deviceIdString,
-        deviceUuid: deviceAuth.deviceUuid,
-        clientId,
-      });
+      coreWarn(
+        'Device connection tracker not available - connection not registered',
+        {
+          operation: 'realtime:server:device-connection:tracker-not-available',
+          deviceId: deviceIdString,
+          deviceUuid: deviceAuth.deviceUuid,
+          clientId,
+        }
+      );
     }
 
     // Get or create room
@@ -1002,9 +1005,37 @@ export class RealtimeServer {
         // Handle ack messages - route to DeviceCommandService before broadcasting
         if (message.type === 'ack' && this.deviceCommandService) {
           try {
+            // Device sends ack in this format:
+            // { type: "ack", id: "...", commandId: "...", timestamp: "...", status: "success"|"error", payload: {...}, error: {...} }
+            // We need to convert to: { type: "ack", commandId: "...", success: boolean, error: string, errorCode: string, payload: {...} }
+
+            let ackMessage: any = {
+              type: 'ack',
+              id: message.id,
+              timestamp: message.timestamp,
+              commandId: message.commandId,
+              // Convert status to success boolean
+              success: message.status === 'success',
+              // Extract error message and code
+              error: message.error?.message || message.error,
+              errorCode: message.error?.code || message.errorCode,
+              payload: message.payload,
+            };
+
+            // Debug: log conversion
+            coreInfo('Ack message converted', {
+              operation: 'realtime:server:device:ack-converted',
+              originalStatus: message.status,
+              convertedSuccess: ackMessage.success,
+              commandId: ackMessage.commandId,
+              hasError: !!ackMessage.error,
+            });
+
             // DeviceCommandService will resolve pending command promises
-            if (typeof this.deviceCommandService.handleAckResponse === 'function') {
-              this.deviceCommandService.handleAckResponse(message);
+            if (
+              typeof this.deviceCommandService.handleAckResponse === 'function'
+            ) {
+              this.deviceCommandService.handleAckResponse(ackMessage);
             }
           } catch (error) {
             coreWarn('Failed to handle ack response in DeviceCommandService', {
@@ -1019,35 +1050,67 @@ export class RealtimeServer {
 
         // Handle status messages - process through Broadcast Box event handlers before broadcasting
         // Status messages contain device health, capabilities, state, and session info
-        if (message.type === 'status' && message.payload && this.deviceManager) {
+        if (
+          message.type === 'status' &&
+          message.payload &&
+          this.deviceManager
+        ) {
           try {
             // Process status message through Broadcast Box event handlers
             // This will update device capabilities, health, and state
             const payload = message.payload;
-            
+
             // Update device capabilities if provided
             if (payload.capabilities && this.deviceManager) {
               try {
-                const device = await this.deviceManager.getDevice(deviceAuth.deviceId);
+                const device = await this.deviceManager.getDevice(
+                  deviceAuth.deviceId
+                );
                 if (device) {
-                  const videoSources = payload.capabilities.video_sources || payload.capabilities.videoSources || [];
-                  const audioSources = payload.capabilities.audio_sources || payload.capabilities.audioSources || [];
-                  const pipSupported = payload.capabilities.pip !== undefined ? payload.capabilities.pip : 
-                                     payload.capabilities.pipSupported !== undefined ? payload.capabilities.pipSupported : 
-                                     device.capabilities?.pipSupported;
-                  const hardwareEncoding = payload.capabilities.hardware_encoding !== undefined ? payload.capabilities.hardware_encoding :
-                                          payload.capabilities.hardwareEncoding !== undefined ? payload.capabilities.hardwareEncoding :
-                                          device.capabilities?.hardwareEncoding;
+                  const videoSources =
+                    payload.capabilities.video_sources ||
+                    payload.capabilities.videoSources ||
+                    [];
+                  const audioSources =
+                    payload.capabilities.audio_sources ||
+                    payload.capabilities.audioSources ||
+                    [];
+                  const pipSupported =
+                    payload.capabilities.pip !== undefined
+                      ? payload.capabilities.pip
+                      : payload.capabilities.pipSupported !== undefined
+                        ? payload.capabilities.pipSupported
+                        : device.capabilities?.pipSupported;
+                  const hardwareEncoding =
+                    payload.capabilities.hardware_encoding !== undefined
+                      ? payload.capabilities.hardware_encoding
+                      : payload.capabilities.hardwareEncoding !== undefined
+                        ? payload.capabilities.hardwareEncoding
+                        : device.capabilities?.hardwareEncoding;
 
                   const updatedCapabilities = {
                     ...device.capabilities,
-                    videoSources: videoSources.length > 0 ? videoSources : device.capabilities?.videoSources || [],
-                    audioSources: audioSources.length > 0 ? audioSources : device.capabilities?.audioSources || [],
-                    pipSupported: pipSupported !== undefined ? pipSupported : device.capabilities?.pipSupported,
-                    hardwareEncoding: hardwareEncoding !== undefined ? hardwareEncoding : device.capabilities?.hardwareEncoding,
+                    videoSources:
+                      videoSources.length > 0
+                        ? videoSources
+                        : device.capabilities?.videoSources || [],
+                    audioSources:
+                      audioSources.length > 0
+                        ? audioSources
+                        : device.capabilities?.audioSources || [],
+                    pipSupported:
+                      pipSupported !== undefined
+                        ? pipSupported
+                        : device.capabilities?.pipSupported,
+                    hardwareEncoding:
+                      hardwareEncoding !== undefined
+                        ? hardwareEncoding
+                        : device.capabilities?.hardwareEncoding,
                     // Preserve existing source objects if they exist
-                    videoSourceObjects: device.capabilities?.videoSourceObjects || [],
-                    audioSourceObjects: device.capabilities?.audioSourceObjects || [],
+                    videoSourceObjects:
+                      device.capabilities?.videoSourceObjects || [],
+                    audioSourceObjects:
+                      device.capabilities?.audioSourceObjects || [],
                   };
 
                   await this.deviceManager.updateDevice(deviceAuth.deviceId, {

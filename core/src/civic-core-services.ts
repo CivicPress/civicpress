@@ -353,149 +353,181 @@ export async function completeServiceInitialization(
   // Unified architecture: Always try to load realtime if module is available (no flag required)
   // This simplifies the architecture and removes state synchronization issues
   // We use dynamic import here since this function is async and can handle ES modules properly
+  const realtimeLogger = container.resolve<Logger>('logger');
+  realtimeLogger.info('Attempting to register realtime module services...', {
+    operation: 'civic-core:realtime:registration-start',
+  });
   try {
-      // Try to import realtime services registration
-      // Use a try-catch around the import to handle cases where the module is not available
-      // Type assertion is needed because realtime module is optional and may not be in core's dependencies
-      let realtimeModule: any = null;
-      let importError: any = null;
+    // Try to import realtime services registration
+    // Use a try-catch around the import to handle cases where the module is not available
+    // Type assertion is needed because realtime module is optional and may not be in core's dependencies
+    let realtimeModule: any = null;
+    let importError: any = null;
+    try {
+      // Import from main package (realtime-services is re-exported from index)
+      // Using type assertion to handle optional module (not in core's dependencies)
+      // Try both package name and relative path for better compatibility
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       try {
-        // Import from main package (realtime-services is re-exported from index)
-        // Using type assertion to handle optional module (not in core's dependencies)
-        // Try both package name and relative path for better compatibility
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        realtimeModule = await import(
+          '@civicpress/realtime/realtime-services' as string
+        );
+      } catch (e1: any) {
+        const logger = container.resolve<Logger>('logger');
+        logger.info('Realtime package import failed, trying path import', {
+          operation: 'civic-core:realtime:package-import-failed',
+          error: e1?.message || String(e1),
+          errorCode: e1?.code,
+        });
+        // Fallback to file:// URL import if package import fails
+        // This helps in test environments where module resolution might differ
+        const path = await import('path');
+        const { pathToFileURL } = await import('url');
+
+        // Use process.cwd() to find realtime module
+        // This works reliably in both test and production environments
+        const realtimePath = path.resolve(
+          process.cwd(),
+          'modules/realtime/dist/realtime-services.js'
+        );
+
+        // Convert to file:// URL for ES module import
         try {
-          realtimeModule = await import(
-            '@civicpress/realtime/realtime-services' as string
-          );
-        } catch (e1: any) {
-          // Fallback to file:// URL import if package import fails
-          // This helps in test environments where module resolution might differ
-          const path = await import('path');
-          const { pathToFileURL } = await import('url');
-
-          // Use process.cwd() to find realtime module
-          // This works reliably in both test and production environments
-          const realtimePath = path.resolve(
-            process.cwd(),
-            'modules/realtime/dist/realtime-services.js'
-          );
-
-          // Convert to file:// URL for ES module import
-          try {
-            const realtimeUrl = pathToFileURL(realtimePath).href;
-            realtimeModule = await import(realtimeUrl);
-            // Fallback succeeded - exit early, don't let outer catch interfere
-            importError = null;
-          } catch (e2: any) {
-            // File path import also failed - realtime module not available
-            const logger = container.resolve<Logger>('logger');
-            if (process.env.NODE_ENV === 'test') {
-              logger.warn(`Fallback import failed: ${e2?.message || e2}`);
-              logger.warn(`Realtime path attempted: ${realtimePath}`);
-            }
-            // Both imports failed - set error for outer catch
-            importError = e1;
-            realtimeModule = null;
-          }
-        }
-      } catch (err: any) {
-        // Only set error if not already set by inner catch
-        if (!importError) {
-          importError = err;
-        }
-        // Only set realtimeModule to null if it wasn't set by fallback
-        if (!realtimeModule) {
-          // Module not found - this is expected in some environments
-          // Check if it's a module not found error vs other errors
-          if (
-            err?.code === 'ERR_MODULE_NOT_FOUND' ||
-            err?.message?.includes('Cannot find module') ||
-            err?.message?.includes('Cannot find package')
-          ) {
-            // Expected - realtime module not available
-            realtimeModule = null;
-          } else {
-            // Unexpected error - log it for debugging
-            const logger = container.resolve<Logger>('logger');
-            logger.warn(
-              'Realtime module import failed (non-standard error):',
-              err?.message || err
-            );
-            realtimeModule = null;
-          }
+          const realtimeUrl = pathToFileURL(realtimePath).href;
+          realtimeModule = await import(realtimeUrl);
+          // Fallback succeeded - exit early, don't let outer catch interfere
+          importError = null;
+        } catch (e2: any) {
+          // File path import also failed - realtime module not available
+          const logger = container.resolve<Logger>('logger');
+          logger.info('Realtime module path import failed, trying fallback', {
+            operation: 'civic-core:realtime:path-import-failed',
+            path: realtimePath,
+            error: e2?.message || String(e2),
+            errorCode: e2?.code,
+          });
+          // Both imports failed - set error for outer catch
+          importError = e1;
+          realtimeModule = null;
         }
       }
+    } catch (err: any) {
+      // Only set error if not already set by inner catch
+      if (!importError) {
+        importError = err;
+      }
+      // Only set realtimeModule to null if it wasn't set by fallback
+      if (!realtimeModule) {
+        // Module not found - this is expected in some environments
+        // Check if it's a module not found error vs other errors
+        if (
+          err?.code === 'ERR_MODULE_NOT_FOUND' ||
+          err?.message?.includes('Cannot find module') ||
+          err?.message?.includes('Cannot find package')
+        ) {
+          // Expected - realtime module not available
+          realtimeModule = null;
+        } else {
+          // Unexpected error - log it for debugging
+          const logger = container.resolve<Logger>('logger');
+          logger.warn(
+            'Realtime module import failed (non-standard error):',
+            err?.message || err
+          );
+          realtimeModule = null;
+        }
+      }
+    }
 
-      if (realtimeModule?.registerRealtimeServices) {
-        const config = container.resolve<CivicPressConfig>('config');
-        realtimeModule.registerRealtimeServices(container, config);
+    const logger = container.resolve<Logger>('logger');
+    if (realtimeModule?.registerRealtimeServices) {
+      const config = container.resolve<CivicPressConfig>('config');
+      realtimeModule.registerRealtimeServices(container, config);
+      logger.info('Realtime services registered successfully', {
+        operation: 'civic-core:realtime:services-registered',
+      });
+    } else if (importError) {
+      // Only log if we actually tried to import and it failed
+      // This helps debug test failures
+      // Always log in test environment to help debug
+      if (process.env.NODE_ENV === 'test') {
+        logger.warn(
+          `Realtime module import failed: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+        );
+        if (importError?.stack) {
+          logger.warn('Realtime import stack:', importError.stack);
+        }
+      } else {
+        // Log at info level so it's visible (not just verbose)
+        logger.info('Realtime module not available', {
+          operation: 'civic-core:realtime:module-not-available',
+          errorCode: importError?.code || 'unknown',
+          errorMessage: importError?.message || 'no message',
+          note: 'This is expected if the realtime module is not built or not available',
+        });
+      }
+    } else {
+      // No error, but also no registerRealtimeServices - module loaded but wrong structure
+      logger.warn(
+        'Realtime module loaded but registerRealtimeServices not found',
+        {
+          operation: 'civic-core:realtime:invalid-module',
+          hasModule: !!realtimeModule,
+          exports: realtimeModule ? Object.keys(realtimeModule) : [],
+        }
+      );
+    }
+
+    // Initialize realtime server if available
+    // Note: This must happen after all services are registered
+    // Only initialize if we successfully registered services
+    // Note: We DON'T initialize here - we'll do it after broadcast-box services are registered
+    // so that device authentication dependencies can be set before initialization
+    // The realtime server will be initialized later in the initialization flow
+    try {
+      // Just verify it's registered, don't initialize yet
+      const realtimeServer = container.resolve('realtimeServer') as any;
+      if (realtimeServer && typeof realtimeServer.initialize === 'function') {
         const logger = container.resolve<Logger>('logger');
         if (logger.isVerbose()) {
-          logger.debug('Realtime services registered successfully');
-        }
-      } else if (importError) {
-        // Only log if we actually tried to import and it failed
-        // This helps debug test failures
-        const logger = container.resolve<Logger>('logger');
-        // Always log in test environment to help debug
-        if (process.env.NODE_ENV === 'test') {
-          logger.warn(
-            `Realtime module import failed: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
-          );
-          if (importError?.stack) {
-            logger.warn('Realtime import stack:', importError.stack);
-          }
-        } else if (logger.isVerbose()) {
           logger.debug(
-            `Realtime module not available: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+            'Realtime server registered (will initialize after broadcast-box services)'
           );
         }
       }
-
-      // Initialize realtime server if available
-      // Note: This must happen after all services are registered
-      // Only initialize if we successfully registered services
-      // Note: We DON'T initialize here - we'll do it after broadcast-box services are registered
-      // so that device authentication dependencies can be set before initialization
-      // The realtime server will be initialized later in the initialization flow
-      try {
-        // Just verify it's registered, don't initialize yet
-        const realtimeServer = container.resolve('realtimeServer') as any;
-        if (realtimeServer && typeof realtimeServer.initialize === 'function') {
-          const logger = container.resolve<Logger>('logger');
-          if (logger.isVerbose()) {
-            logger.debug(
-              'Realtime server registered (will initialize after broadcast-box services)'
-            );
-          }
+    } catch (error: any) {
+      // Realtime server not available or initialization failed
+      // This is expected if module is not installed or disabled
+      const logger = container.resolve<Logger>('logger');
+      if (
+        error?.code === 'SERVICE_NOT_FOUND' ||
+        error?.message?.includes('not found') ||
+        error?.message?.includes('Service')
+      ) {
+        // Service not registered - that's okay, module is optional
+        if (logger.isVerbose()) {
+          logger.debug('Realtime server not registered (module optional)');
         }
-      } catch (error: any) {
-        // Realtime server not available or initialization failed
-        // This is expected if module is not installed or disabled
-        const logger = container.resolve<Logger>('logger');
-        if (
-          error?.code === 'SERVICE_NOT_FOUND' ||
-          error?.message?.includes('not found') ||
-          error?.message?.includes('Service')
-        ) {
-          // Service not registered - that's okay, module is optional
-          if (logger.isVerbose()) {
-            logger.debug('Realtime server not registered (module optional)');
-          }
-        } else {
-          // Other error - log it
-          logger.warn(
-            'Realtime server initialization failed:',
-            error?.message || error
-          );
-        }
+      } else {
+        // Other error - log it
+        logger.warn(
+          'Realtime server initialization failed:',
+          error?.message || error
+        );
       }
-    } catch (error) {
-      // Realtime module not available - that's okay, it's optional
-      // This is expected in environments where realtime module is not installed
-      // We silently skip registration (no error logging needed)
     }
+  } catch (error) {
+    // Realtime module not available - that's okay, it's optional
+    // This is expected in environments where realtime module is not installed
+    // Log at info level so we can see what happened
+    const logger = container.resolve<Logger>('logger');
+    logger.info('Realtime module registration block failed', {
+      operation: 'civic-core:realtime:registration-block-error',
+      error: error instanceof Error ? error.message : String(error),
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      note: 'This may indicate the realtime module is not available or there was an error during import',
+    });
+  }
 
   // Register broadcast-box module services (optional)
   // Note: Broadcast-box module is optional - registration will be skipped if module is not available
@@ -607,38 +639,58 @@ export async function completeServiceInitialization(
   // Initialize realtime server AFTER broadcast-box services are registered
   // This allows broadcast-box to set device authentication dependencies before initialization
   // Unified architecture: Always initialize if realtime server is registered (no flag check)
+  const initLogger = container.resolve<Logger>('logger');
   try {
     const realtimeServer = container.resolve('realtimeServer') as any;
     if (realtimeServer && typeof realtimeServer.initialize === 'function') {
+      initLogger.info('Attempting to initialize realtime server...', {
+        operation: 'civic-core:realtime:initialization:start',
+      });
       await realtimeServer.initialize();
-      const logger = container.resolve<Logger>('logger');
-      logger.info('Realtime server initialized successfully (unified architecture)');
+      initLogger.info(
+        'Realtime server initialized successfully (unified architecture)',
+        {
+          operation: 'civic-core:realtime:initialization:success',
+        }
+      );
+    } else {
+      initLogger.warn(
+        'Realtime server found but initialize() method not available',
+        {
+          operation: 'civic-core:realtime:initialization:no-method',
+          hasServer: !!realtimeServer,
+          hasInitialize:
+            realtimeServer && typeof realtimeServer.initialize === 'function',
+        }
+      );
     }
   } catch (error: any) {
-      // Realtime server not available or initialization failed
-      const logger = container.resolve<Logger>('logger');
-      if (
-        error?.code === 'SERVICE_NOT_FOUND' ||
-        error?.message?.includes('not found') ||
-        error?.message?.includes('Service')
-      ) {
-        // Service not registered - that's okay, module is optional
-        if (logger.isVerbose()) {
-          logger.debug('Realtime server not registered (module optional)');
-        }
-      } else {
-        // Other error - log it
-        logger.warn(
-          'Realtime server initialization failed:',
-          error?.message || error
-        );
-      }
+    // Realtime server not available or initialization failed
+    if (
+      error?.code === 'SERVICE_NOT_FOUND' ||
+      error?.message?.includes('not found') ||
+      error?.message?.includes('Service')
+    ) {
+      // Service not registered - that's okay, module is optional
+      initLogger.debug('Realtime server not registered (module optional)', {
+        operation: 'civic-core:realtime:initialization:not-registered',
+        error: error?.message || 'unknown',
+      });
+    } else {
+      // Other error - log it with full details
+      initLogger.error('Realtime server initialization failed', {
+        operation: 'civic-core:realtime:initialization:error',
+        error: error?.message || String(error),
+        errorCode: error?.code,
+        stack: error?.stack,
+      });
     }
+  }
 
   // Register all caches with UnifiedCacheManager
   const cacheManager = container.resolve<UnifiedCacheManager>('cacheManager');
   const config = container.resolve<CivicPressConfig>('config');
-  const logger = container.resolve<Logger>('logger');
+  const cacheLogger = container.resolve<Logger>('logger');
 
   // Register search caches
   await cacheManager.registerFromConfig('search', {
@@ -706,5 +758,5 @@ export async function completeServiceInitialization(
   // Initialize cache manager
   await cacheManager.initialize();
 
-  logger.debug('Unified cache manager initialized with all caches');
+  cacheLogger.debug('Unified cache manager initialized with all caches');
 }

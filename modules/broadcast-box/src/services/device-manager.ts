@@ -16,6 +16,8 @@ import type {
   DeviceStatus,
   DeviceCapabilities,
   DeviceConfig,
+  ActiveSources,
+  PiPConfiguration,
   CreateDeviceRequest,
   UpdateDeviceRequest,
 } from '../types/index.js';
@@ -139,17 +141,6 @@ export class DeviceManager {
       usedAt: enrollmentCode.usedAt?.toISOString() || null,
     });
 
-    // Check if code is expired
-    if (this.enrollmentCodeModel.isExpired(enrollmentCode)) {
-      coreWarn('Device registration failed: enrollment code expired', {
-        operation: 'broadcast-box:device:registration:expired',
-        deviceUuid: data.deviceUuid,
-        expiresAt: enrollmentCode.expiresAt.toISOString(),
-        registrationIp: data.registrationIp || 'unknown',
-      });
-      throw new Error('Enrollment code expired');
-    }
-
     // Verify device UUID matches
     if (enrollmentCode.deviceUuid !== data.deviceUuid) {
       coreWarn('Device registration failed: device UUID mismatch', {
@@ -161,8 +152,8 @@ export class DeviceManager {
       throw new Error('Device UUID mismatch');
     }
 
-    // Check if device UUID already exists FIRST (before hash verification)
-    // This allows idempotent re-registration without requiring hash verification
+    // Check if device UUID already exists FIRST (before expiration check)
+    // This allows recovery for existing devices even with expired codes
     const existing = await this.deviceModel.getByDeviceUuid(data.deviceUuid);
 
     this.logger.debug('Device lookup result', {
@@ -179,6 +170,7 @@ export class DeviceManager {
 
     if (existing) {
       // Device already exists - verify the enrollment code is valid for re-registration
+      // For existing devices, we allow expired codes (recovery path) but still validate the hash
       // Normalize the enrollment code (remove any whitespace, ensure uppercase)
       const normalizedCode = data.enrollmentCode.trim().toUpperCase();
 
@@ -208,22 +200,30 @@ export class DeviceManager {
         throw new Error('Invalid enrollment code');
       }
 
-      // Check if enrollment code is expired
-      if (this.enrollmentCodeModel.isExpired(enrollmentCode)) {
-        coreWarn('Re-registration attempt with expired enrollment code', {
-          operation: 'broadcast-box:device:registration:expired-code-reuse',
-          deviceId: existing.id,
-          deviceUuid: existing.deviceUuid,
-          expiresAt: enrollmentCode.expiresAt.toISOString(),
-          registrationIp: data.registrationIp || 'unknown',
-        });
-        throw new Error('Enrollment code expired');
+      // For existing devices, we allow expired codes (recovery mechanism)
+      // This allows devices to re-register and get a new token even if their enrollment code expired
+      const isExpired = this.enrollmentCodeModel.isExpired(enrollmentCode);
+      if (isExpired) {
+        coreInfo(
+          'Re-registration with expired enrollment code (recovery path)',
+          {
+            operation:
+              'broadcast-box:device:registration:expired-code-recovery',
+            deviceId: existing.id,
+            deviceUuid: existing.deviceUuid,
+            expiresAt: enrollmentCode.expiresAt.toISOString(),
+            registrationIp: data.registrationIp || 'unknown',
+            note: 'Allowing re-registration for existing device with expired code. This is a recovery mechanism for devices that lost their token.',
+          }
+        );
       }
 
-      // Code is valid and not expired - allow re-registration
-      // This handles both:
-      // 1. Re-registration with a previously used code (idempotent)
-      // 2. Re-registration with a newly generated code (regeneration scenario)
+      // Code is valid (hash matches) - allow re-registration
+      // This handles:
+      // 1. Re-registration with a valid (non-expired) code
+      // 2. Re-registration with an expired code (recovery path for existing devices)
+      // 3. Re-registration with a previously used code (idempotent)
+      // 4. Re-registration with a newly generated code (regeneration scenario)
 
       // Mark the code as used if it hasn't been used yet
       if (!this.enrollmentCodeModel.isUsed(enrollmentCode)) {
@@ -256,9 +256,25 @@ export class DeviceManager {
         deviceUuid: existing.deviceUuid,
         status: existing.status,
         codeWasUsed: this.enrollmentCodeModel.isUsed(enrollmentCode),
-        note: 'Generating new token for existing device',
+        codeExpired: isExpired,
+        note: isExpired
+          ? 'Generating new token for existing device (recovery with expired code)'
+          : 'Generating new token for existing device',
       });
       return existing;
+    }
+
+    // For NEW device registrations, enforce expiration check strictly
+    // New devices must register within the 15-minute validity window
+    if (this.enrollmentCodeModel.isExpired(enrollmentCode)) {
+      coreWarn('Device registration failed: enrollment code expired', {
+        operation: 'broadcast-box:device:registration:expired',
+        deviceUuid: data.deviceUuid,
+        expiresAt: enrollmentCode.expiresAt.toISOString(),
+        registrationIp: data.registrationIp || 'unknown',
+        note: 'New device registration requires a valid (non-expired) enrollment code. Please generate a new enrollment code.',
+      });
+      throw new Error('Enrollment code expired');
     }
 
     // For NEW device registrations, verify the provided enrollment code matches the stored hash
@@ -468,6 +484,8 @@ export class DeviceManager {
       status: DeviceStatus;
       capabilities: DeviceCapabilities;
       config: DeviceConfig;
+      activeSources: ActiveSources;
+      pipConfig: PiPConfiguration;
     }> = {};
 
     if (updates.name !== undefined) {
@@ -487,7 +505,18 @@ export class DeviceManager {
     }
 
     if (updates.capabilities !== undefined) {
-      updateData.capabilities = { ...device.capabilities, ...updates.capabilities };
+      updateData.capabilities = {
+        ...device.capabilities,
+        ...updates.capabilities,
+      };
+    }
+
+    if (updates.activeSources !== undefined) {
+      updateData.activeSources = updates.activeSources;
+    }
+
+    if (updates.pipConfig !== undefined) {
+      updateData.pipConfig = updates.pipConfig;
     }
 
     const updated = await this.deviceModel.update(deviceId, updateData);

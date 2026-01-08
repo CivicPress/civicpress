@@ -161,12 +161,9 @@ modules/broadcast-box/
       features)
 - [ ] Component tests (unit tests for UI components)
 - [ ] E2E tests (complete workflows)
-
-### 📋 Next Steps
-
-- Phase 2: Device Management (enrollment, registration, API endpoints)
-- Phase 3: WebSocket Protocol & Command Handling
-- Phase 4: Session Control
+- [ ] Status message protocol integration (completed - needs documentation
+      update)
+- [ ] PiP configuration commands (completed - needs documentation update)
 
 ---
 

@@ -154,7 +154,7 @@ export function createDevicesRouter(
         // If that fails, try by database ID (for backward compatibility)
         // The URL parameter could be either a device UUID or a database ID
         let device = await deviceManager.getDeviceByUuid(req.params.id);
-        
+
         // If not found by UUID, try by database ID
         if (!device) {
           device = await deviceManager.getDevice(req.params.id);
@@ -559,7 +559,7 @@ export function createDevicesRouter(
         if (!device) {
           device = await deviceManager.getDevice(req.params.id);
         }
-        
+
         if (!device) {
           return res.status(404).json({
             success: false,
@@ -639,7 +639,7 @@ export function createDevicesRouter(
         if (!device) {
           device = await deviceManager.getDevice(req.params.id);
         }
-        
+
         if (!device) {
           return res.status(404).json({
             success: false,
@@ -709,7 +709,7 @@ export function createDevicesRouter(
         if (!device) {
           device = await deviceManager.getDevice(req.params.id);
         }
-        
+
         if (!device) {
           return res.status(404).json({
             success: false,
@@ -819,7 +819,10 @@ export function createDevicesRouter(
         .isString()
         .notEmpty()
         .withMessage('Command action is required'),
-      body('payload').optional().isObject().withMessage('Payload must be an object'),
+      body('payload')
+        .optional()
+        .isObject()
+        .withMessage('Payload must be an object'),
     ],
     // TODO: Add authMiddleware from @civicpress/api
     async (req: AuthenticatedRequest, res: Response) => {
@@ -852,12 +855,12 @@ export function createDevicesRouter(
         // Try to find device by UUID first (most common case)
         // If that fails, try by database ID (for backward compatibility)
         let device = await deviceManager.getDeviceByUuid(req.params.id);
-        
+
         // If not found by UUID, try by database ID
         if (!device) {
           device = await deviceManager.getDevice(req.params.id);
         }
-        
+
         if (!device) {
           return res.status(404).json({
             success: false,
@@ -866,13 +869,15 @@ export function createDevicesRouter(
             },
           });
         }
-        
+
         // Use device UUID for command execution (DeviceCommandService expects UUID)
         const deviceUuid = device.deviceUuid;
 
         // Validate action is one of allowed actions
         const allowedActions = [
           'switch_source',
+          'set_pip',
+          'configure_pip',
           'update_config',
           'get_status',
           'list_sources',
@@ -977,7 +982,7 @@ export function createDevicesRouter(
         // Try to find device by UUID first (most common case)
         // If that fails, try by database ID (for backward compatibility)
         let device = await deviceManager.getDeviceByUuid(req.params.id);
-        
+
         // If not found by UUID, try by database ID
         if (!device) {
           device = await deviceManager.getDevice(req.params.id);

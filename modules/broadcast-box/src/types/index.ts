@@ -18,6 +18,8 @@ export interface BroadcastDevice {
   status: DeviceStatus;
   capabilities: DeviceCapabilities;
   config: DeviceConfig;
+  activeSources?: ActiveSources; // Currently active sources from status messages
+  pipConfig?: PiPConfiguration; // Current PiP configuration from status messages
   lastSeenAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -26,7 +28,29 @@ export interface BroadcastDevice {
 export type DeviceStatus = 'enrolled' | 'active' | 'suspended' | 'revoked';
 
 /**
- * Video source device information
+ * Source information from status message protocol
+ * Matches the protocol's active_sources structure
+ */
+export interface SourceInfo {
+  id: number; // Numeric source ID (0, 1, 2, ...)
+  identifier: string; // String identifier ("hdmi1", "hdmi2", "usb_camera", etc.)
+  name?: string; // Human-readable name
+  path?: string; // Device path (e.g., "/dev/video0")
+  resolution?: [number, number]; // [width, height] for video sources
+  framerate?: number; // FPS for video sources
+  available?: boolean; // Whether source is currently available
+}
+
+/**
+ * Active sources from status message
+ */
+export interface ActiveSources {
+  video: SourceInfo | null; // Currently active video source
+  audio: SourceInfo | null; // Currently active audio source
+}
+
+/**
+ * Video source device information (legacy, for capabilities)
  */
 export interface VideoSource {
   id: number; // Numeric device ID (from protocol)
@@ -38,7 +62,7 @@ export interface VideoSource {
 }
 
 /**
- * Audio source device information
+ * Audio source device information (legacy, for capabilities)
  */
 export interface AudioSource {
   id: number; // Numeric device ID (from protocol)
@@ -52,15 +76,17 @@ export interface DeviceCapabilities {
   // Legacy: String arrays for backward compatibility
   videoSources: string[];
   audioSources: string[];
-  
+
   // New: Detailed source objects (from protocol)
-  videoSourceObjects?: VideoSource[];
-  audioSourceObjects?: AudioSource[];
-  
+  // Use SourceInfo instead of VideoSource/AudioSource to support identifier field
+  videoSourceObjects?: SourceInfo[];
+  audioSourceObjects?: SourceInfo[];
+
   pipSupported: boolean;
   maxResolution: string;
   maxFramerate?: number; // Maximum framerate supported
   encodingPresets?: EncodingPreset[]; // Available encoding presets
+  hardwareEncoding?: boolean; // Hardware encoding support (from status messages)
 }
 
 /**
@@ -78,14 +104,14 @@ export interface DeviceConfig {
   // Legacy: String source names
   defaultVideoSource?: string;
   defaultAudioSource?: string;
-  
+
   // New: Numeric source IDs (from protocol)
   defaultVideoSourceId?: number;
   defaultAudioSourceId?: number;
-  
+
   qualityPreset?: 'low' | 'standard' | 'high';
   autoStart?: boolean;
-  
+
   // Advanced configuration options (from protocol)
   qualityPresets?: {
     low?: EncodingPresetConfig;
@@ -134,6 +160,7 @@ export interface DeviceHealth {
     cpuPercent: number;
     diskPercent: number;
   };
+  networkConnected?: boolean; // Network connectivity status from status messages
 }
 
 // ============================================================================
@@ -167,15 +194,38 @@ export interface SessionMetadata {
   // Legacy: String source names
   videoSource?: string;
   audioSource?: string;
-  
+
   // New: Numeric source IDs (from protocol)
   videoSourceId?: number;
   audioSourceId?: number;
-  
+
   quality?: string;
   pip?: PiPConfig;
 }
 
+/**
+ * Picture-in-Picture configuration from status message protocol
+ * Matches the protocol's pip structure
+ */
+export interface PiPConfiguration {
+  enabled: boolean; // Whether PiP is currently active
+  pipSource: SourceInfo | null; // PiP source (null if disabled)
+  mainSource: SourceInfo | null; // Main source (null if no active video source)
+  position:
+    | 'top_left'
+    | 'top_right'
+    | 'bottom_left'
+    | 'bottom_right'
+    | 'center';
+  size: {
+    width: number; // PiP window width in pixels
+    height: number; // PiP window height in pixels
+  };
+}
+
+/**
+ * Legacy PiP config (for session metadata)
+ */
 export interface PiPConfig {
   enabled: boolean;
   main: string;
@@ -253,14 +303,14 @@ export interface EventPayload {
   // Protocol format: nested event_type and event_data
   eventType?: string;
   eventData?: any;
-  
+
   // Current format: flat fields
   sessionId?: string;
   status?: string;
   health?: DeviceHealth;
   progress?: number;
   error?: string;
-  
+
   // device.connected event data
   deviceId?: string;
   version?: string;
@@ -271,7 +321,7 @@ export interface EventPayload {
   };
   capabilities?: DeviceCapabilities;
   configuration?: any;
-  
+
   // status event data
   session?: {
     state?: string;
@@ -299,7 +349,7 @@ export interface EventPayload {
     state?: string;
     endpoint?: string;
   };
-  
+
   [key: string]: any;
 }
 
@@ -330,6 +380,8 @@ export interface UpdateDeviceRequest {
   roomLocation?: string;
   config?: DeviceConfig;
   capabilities?: DeviceCapabilities; // Allow updating capabilities (e.g., from device.connected event)
+  activeSources?: ActiveSources; // Update active sources from status messages
+  pipConfig?: PiPConfiguration; // Update PiP configuration from status messages
   status?: DeviceStatus;
 }
 

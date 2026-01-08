@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "concurrently -n \"REALTIME,BROADCAST-BOX,API\" -c \"yellow,cyan,blue\" --prefix \"[{name}]\" \"cd ../realtime && pnpm run build && tsc --watch\" \"cd ../broadcast-box && pnpm run build && tsc --watch\" \"tsx --watch src/index.ts\"",
+    "dev": "concurrently -n \"REALTIME,BROADCAST-BOX,API\" -c \"yellow,cyan,blue\" --prefix \"[{name}]\" \"cd ../realtime && pnpm run build && tsc --watch --preserveWatchOutput\" \"cd ../broadcast-box && pnpm run build && tsc --watch --preserveWatchOutput\" \"sleep 2 && tsx --watch src/index.ts\"",
     "start": "node dist/index.js",
     "test": "vitest",
     "test:run": "vitest run",

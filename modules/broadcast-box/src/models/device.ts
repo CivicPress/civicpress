@@ -10,6 +10,8 @@ import type {
   DeviceStatus,
   DeviceCapabilities,
   DeviceConfig,
+  ActiveSources,
+  PiPConfiguration,
 } from '../types/index.js';
 
 export class DeviceModel {
@@ -31,8 +33,9 @@ export class DeviceModel {
     await this.db.getAdapter().execute(
       `INSERT INTO broadcast_devices (
         id, organization_id, device_uuid, name, room_location,
-        status, capabilities, config, last_seen_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        status, capabilities, config, active_sources, pip_config,
+        last_seen_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         device.id,
         device.organizationId,
@@ -42,6 +45,8 @@ export class DeviceModel {
         device.status,
         JSON.stringify(device.capabilities),
         device.config ? JSON.stringify(device.config) : null,
+        device.activeSources ? JSON.stringify(device.activeSources) : null,
+        device.pipConfig ? JSON.stringify(device.pipConfig) : null,
         device.lastSeenAt ? device.lastSeenAt.toISOString() : null,
         createdAt.toISOString(),
         updatedAt.toISOString(),
@@ -136,6 +141,8 @@ export class DeviceModel {
       status: DeviceStatus;
       capabilities: DeviceCapabilities;
       config: DeviceConfig;
+      activeSources: ActiveSources;
+      pipConfig: PiPConfiguration;
       lastSeenAt: Date;
     }>
   ): Promise<BroadcastDevice> {
@@ -165,6 +172,18 @@ export class DeviceModel {
     if (updates.config !== undefined) {
       setClauses.push('config = ?');
       params.push(updates.config ? JSON.stringify(updates.config) : null);
+    }
+
+    if (updates.activeSources !== undefined) {
+      setClauses.push('active_sources = ?');
+      params.push(
+        updates.activeSources ? JSON.stringify(updates.activeSources) : null
+      );
+    }
+
+    if (updates.pipConfig !== undefined) {
+      setClauses.push('pip_config = ?');
+      params.push(updates.pipConfig ? JSON.stringify(updates.pipConfig) : null);
     }
 
     if (updates.lastSeenAt !== undefined) {
@@ -222,6 +241,10 @@ export class DeviceModel {
       status: row.status as DeviceStatus,
       capabilities: JSON.parse(row.capabilities),
       config: row.config ? JSON.parse(row.config) : {},
+      activeSources: row.active_sources
+        ? JSON.parse(row.active_sources)
+        : undefined,
+      pipConfig: row.pip_config ? JSON.parse(row.pip_config) : undefined,
       lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

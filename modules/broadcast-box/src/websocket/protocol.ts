@@ -15,8 +15,8 @@ import type {
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ParsedMessage {
-  type: 'command' | 'event' | 'ack' | 'heartbeat';
-  message: CommandMessage | EventMessage | AckMessage | BaseMessage;
+  type: 'command' | 'event' | 'ack' | 'heartbeat' | 'status';
+  message: CommandMessage | EventMessage | AckMessage | BaseMessage; // BaseMessage covers status messages
   isValid: boolean;
   error?: string;
 }

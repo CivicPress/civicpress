@@ -4,7 +4,7 @@
  * Periodically removes expired enrollment codes from the database
  */
 
-import type { Logger, DatabaseService } from '@civicpress/core';
+import type { Logger } from '@civicpress/core';
 import { coreInfo } from '@civicpress/core';
 import { EnrollmentCodeModel } from '../models/enrollment-code.js';
 

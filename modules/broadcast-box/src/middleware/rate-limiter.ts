@@ -183,14 +183,15 @@ export class DeviceRegistrationRateLimiter {
           retryAfter,
         });
 
-        res.status(429).json({
+        res.status(429);
+        res.setHeader('Retry-After', String(retryAfter));
+        res.json({
           success: false,
           error: {
             message: 'Too many registration attempts. Please try again later.',
             code: 'RATE_LIMIT_EXCEEDED',
           },
         });
-        res.setHeader('Retry-After', String(retryAfter));
         return;
       }
 
@@ -208,7 +209,9 @@ export class DeviceRegistrationRateLimiter {
             retryAfter,
           });
 
-          res.status(429).json({
+          res.status(429);
+          res.setHeader('Retry-After', String(retryAfter));
+          res.json({
             success: false,
             error: {
               message:
@@ -216,7 +219,6 @@ export class DeviceRegistrationRateLimiter {
               code: 'RATE_LIMIT_EXCEEDED',
             },
           });
-          res.setHeader('Retry-After', String(retryAfter));
           return;
         }
       }

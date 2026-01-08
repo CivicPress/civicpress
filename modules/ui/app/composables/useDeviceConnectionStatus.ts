@@ -7,6 +7,11 @@
 
 import { ref, computed, onUnmounted, watch, type Ref } from 'vue';
 import { useAuthStore } from '~/stores/auth';
+import type {
+  SourceInfo,
+  ActiveSources,
+  PiPConfiguration,
+} from './broadcast-box-types';
 
 export interface DeviceConnectionStatus {
   connected: boolean;
@@ -21,7 +26,10 @@ export interface DeviceConnectionStatus {
       memoryPercent: number;
       diskPercent: number;
     };
+    networkConnected?: boolean; // Network connectivity status
   };
+  activeSources?: ActiveSources; // Currently active sources
+  pip?: PiPConfiguration; // Current PiP configuration
 }
 
 const deviceStatuses = ref<Map<string, DeviceConnectionStatus>>(new Map());
@@ -142,6 +150,10 @@ async function connectToDeviceRoom(
                 memoryPercent: deviceHealth.metrics?.memoryPercent ?? 0,
                 diskPercent: deviceHealth.metrics?.diskPercent ?? 0,
               },
+              networkConnected:
+                deviceHealth.network_connected ??
+                deviceHealth.networkConnected ??
+                true,
             };
           };
 
@@ -149,24 +161,75 @@ async function connectToDeviceRoom(
           if (message.type === 'status') {
             const payload = message.payload;
             const health = extractHealthData(payload);
+
+            // Extract active sources
+            const activeSources: ActiveSources | undefined =
+              payload.active_sources
+                ? {
+                    video: payload.active_sources.video || null,
+                    audio: payload.active_sources.audio || null,
+                  }
+                : undefined;
+
+            // Extract PiP configuration
+            const pip: PiPConfiguration | undefined = payload.pip
+              ? {
+                  enabled: payload.pip.enabled || false,
+                  pipSource: payload.pip.pip_source || null,
+                  mainSource: payload.pip.main_source || null,
+                  position: payload.pip.position || 'top_right',
+                  size: payload.pip.size || { width: 320, height: 240 },
+                }
+              : undefined;
+
+            // Map state: "capturing" → "recording" to match internal state enum
+            let deviceState:
+              | 'idle'
+              | 'recording'
+              | 'encoding'
+              | 'uploading'
+              | undefined;
+            if (payload?.state) {
+              deviceState =
+                payload.state === 'idle'
+                  ? 'idle'
+                  : payload.state === 'capturing'
+                    ? 'recording' // Map capturing → recording
+                    : payload.state === 'recording'
+                      ? 'recording'
+                      : payload.state === 'encoding'
+                        ? 'encoding'
+                        : payload.state === 'uploading'
+                          ? 'uploading'
+                          : undefined;
+            }
+
             console.log(
               `[DeviceConnectionStatus] Status message received for ${deviceUuid}:`,
-              { health, state: payload?.state }
+              {
+                health,
+                state: deviceState,
+                hasActiveSources: !!activeSources,
+                hasPiP: !!pip,
+              }
             );
+
             updateDeviceStatus(deviceUuid, {
               connected: true,
               lastSeenAt: message.timestamp || new Date().toISOString(),
-              state: payload?.state || 'idle',
-              sessionId: payload?.session_id || payload?.active_session?.session_id || null,
+              state: deviceState || 'idle',
+              sessionId:
+                payload?.session_id ||
+                payload?.active_session?.session_id ||
+                null,
               health,
+              activeSources,
+              pip,
             });
           }
 
           // Handle health.update events
-          if (
-            message.type === 'event' &&
-            message.event === 'health.update'
-          ) {
+          if (message.type === 'event' && message.event === 'health.update') {
             const payload = message.payload;
             const health = extractHealthData(payload);
             console.log(
@@ -219,11 +282,11 @@ async function connectToDeviceRoom(
         activeConnections.value.delete(deviceUuid);
         connectingDevices.value.delete(deviceUuid);
         updateDeviceStatus(deviceUuid, { connected: false });
-        
+
         // Increment retry count
         const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
         connectionRetries.value.set(deviceUuid, currentRetries + 1);
-        
+
         reject(error);
       };
 
@@ -235,21 +298,29 @@ async function connectToDeviceRoom(
         activeConnections.value.delete(deviceUuid);
         connectingDevices.value.delete(deviceUuid);
         updateDeviceStatus(deviceUuid, { connected: false });
-        
+
         // Only retry if it wasn't a clean close (code 1000) and we haven't exceeded max retries
         const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
         if (event.code !== 1000 && currentRetries < MAX_RETRY_ATTEMPTS) {
-          const retryDelay = RETRY_DELAYS[currentRetries] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+          const retryDelay =
+            RETRY_DELAYS[currentRetries] ||
+            RETRY_DELAYS[RETRY_DELAYS.length - 1];
           console.log(
             `[DeviceConnectionStatus] Will retry connection to ${deviceUuid} in ${retryDelay}ms (attempt ${currentRetries + 1}/${MAX_RETRY_ATTEMPTS})`
           );
-          
+
           // Retry after delay (but don't block - let the promise resolve/reject)
           setTimeout(() => {
             // Only retry if still not connected and not already connecting
-            if (!activeConnections.value.has(deviceUuid) && !connectingDevices.value.has(deviceUuid)) {
+            if (
+              !activeConnections.value.has(deviceUuid) &&
+              !connectingDevices.value.has(deviceUuid)
+            ) {
               connectToDeviceRoom(deviceUuid).catch((err) => {
-                console.error(`[DeviceConnectionStatus] Retry failed for ${deviceUuid}:`, err);
+                console.error(
+                  `[DeviceConnectionStatus] Retry failed for ${deviceUuid}:`,
+                  err
+                );
               });
             }
           }, retryDelay);
@@ -265,11 +336,11 @@ async function connectToDeviceRoom(
         error
       );
       connectingDevices.value.delete(deviceUuid);
-      
+
       // Increment retry count
       const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
       connectionRetries.value.set(deviceUuid, currentRetries + 1);
-      
+
       reject(error);
     }
   });
@@ -284,12 +355,12 @@ function updateDeviceStatus(
   updates: Partial<DeviceConnectionStatus>
 ): void {
   const current = deviceStatuses.value.get(deviceUuid) || { connected: false };
-  
+
   // Check if any values actually changed (prevent unnecessary object recreation)
   let hasChanges = false;
   for (const [key, value] of Object.entries(updates)) {
     const currentValue = (current as any)[key];
-    // Deep comparison for nested objects (like health)
+    // Deep comparison for nested objects (like health, activeSources, pip)
     if (key === 'health' && value) {
       const currentHealth = currentValue as any;
       const newHealth = value as any;
@@ -298,8 +369,40 @@ function updateDeviceStatus(
         currentHealth.score !== newHealth.score ||
         currentHealth.status !== newHealth.status ||
         currentHealth.metrics?.cpuPercent !== newHealth.metrics?.cpuPercent ||
-        currentHealth.metrics?.memoryPercent !== newHealth.metrics?.memoryPercent ||
-        currentHealth.metrics?.diskPercent !== newHealth.metrics?.diskPercent
+        currentHealth.metrics?.memoryPercent !==
+          newHealth.metrics?.memoryPercent ||
+        currentHealth.metrics?.diskPercent !== newHealth.metrics?.diskPercent ||
+        currentHealth.networkConnected !== newHealth.networkConnected
+      ) {
+        hasChanges = true;
+        break;
+      }
+    } else if (key === 'activeSources' && value) {
+      // Deep comparison for activeSources
+      const currentActive = currentValue as ActiveSources | undefined;
+      const newActive = value as ActiveSources;
+      if (
+        !currentActive ||
+        JSON.stringify(currentActive.video) !==
+          JSON.stringify(newActive.video) ||
+        JSON.stringify(currentActive.audio) !== JSON.stringify(newActive.audio)
+      ) {
+        hasChanges = true;
+        break;
+      }
+    } else if (key === 'pip' && value) {
+      // Deep comparison for pip configuration
+      const currentPip = currentValue as PiPConfiguration | undefined;
+      const newPip = value as PiPConfiguration;
+      if (
+        !currentPip ||
+        currentPip.enabled !== newPip.enabled ||
+        currentPip.position !== newPip.position ||
+        JSON.stringify(currentPip.pipSource) !==
+          JSON.stringify(newPip.pipSource) ||
+        JSON.stringify(currentPip.mainSource) !==
+          JSON.stringify(newPip.mainSource) ||
+        JSON.stringify(currentPip.size) !== JSON.stringify(newPip.size)
       ) {
         hasChanges = true;
         break;
@@ -309,7 +412,7 @@ function updateDeviceStatus(
       break;
     }
   }
-  
+
   // Only update if values actually changed
   if (hasChanges) {
     deviceStatuses.value.set(deviceUuid, { ...current, ...updates });

@@ -27,6 +27,19 @@ export interface CommandSource {
   audioSource?: string;
 }
 
+export interface SetPipOptions {
+  position?:
+    | 'top_left'
+    | 'top_right'
+    | 'bottom_left'
+    | 'bottom_right'
+    | 'center';
+  size?: {
+    width: number;
+    height: number;
+  };
+}
+
 export interface DeviceConfig {
   defaultVideoSource?: string;
   defaultAudioSource?: string;
@@ -104,16 +117,18 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
       const isNotConnectedError =
         err.message?.includes('not connected') ||
         err.message?.includes('Device')?.includes('not connected');
-      
+
       let errorMessage = err.message || t('broadcastBox.errors.commandFailed');
       let errorTitle = t('broadcastBox.errors.commandFailed');
-      
+
       if (isNotConnectedError) {
-        errorTitle = t('broadcastBox.errors.deviceNotConnected') || 'Device Not Connected';
-        errorMessage = t('broadcastBox.errors.deviceNotConnectedDesc') || 
+        errorTitle =
+          t('broadcastBox.errors.deviceNotConnected') || 'Device Not Connected';
+        errorMessage =
+          t('broadcastBox.errors.deviceNotConnectedDesc') ||
           'The device must be connected via WebSocket to receive commands. Please ensure the device is online and connected.';
       }
-      
+
       error.value = errorMessage;
       toast.add({
         title: errorTitle,
@@ -128,10 +143,32 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
 
   /**
    * Switch video/audio source on device
+   *
+   * @param videoSource - Video source identifier (string) or numeric ID
+   * @param audioSource - Audio source identifier (string) or numeric ID
+   * @param device - Optional device object to look up numeric IDs from source objects or active sources
    */
   const switchSource = async (
-    videoSource?: string,
-    audioSource?: string
+    videoSource?: string | number,
+    audioSource?: string | number,
+    device?: {
+      capabilities?: {
+        videoSourceObjects?: Array<{
+          id: number;
+          identifier?: string;
+          name?: string;
+        }>;
+        audioSourceObjects?: Array<{
+          id: number;
+          identifier?: string;
+          name?: string;
+        }>;
+      };
+      activeSources?: {
+        video?: { id: number; identifier?: string; name?: string } | null;
+        audio?: { id: number; identifier?: string; name?: string } | null;
+      };
+    }
   ): Promise<CommandResponse> => {
     if (!videoSource && !audioSource) {
       const err = new Error(
@@ -141,10 +178,341 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
       throw err;
     }
 
+    // Convert string identifiers to numeric IDs
+    // The command expects numeric IDs: { "videoSource": 2 }
+    let videoSourceId: number | undefined;
+    let audioSourceId: number | undefined;
+
+    // Helper to find numeric ID for a source identifier
+    const findSourceId = async (
+      sourceIdentifier: string | number,
+      sourceType: 'video' | 'audio'
+    ): Promise<number | undefined> => {
+      if (typeof sourceIdentifier === 'number') {
+        return sourceIdentifier;
+      }
+
+      // Helper to extract identifier from name (e.g., "HDMI Capture Device 2" -> "hdmi2")
+      const extractIdentifierFromName = (name: string): string | null => {
+        if (!name) return null;
+        const lowerName = name.toLowerCase();
+
+        // Try to extract "hdmi1", "hdmi2", etc. from names like "HDMI Capture Device 1"
+        const hdmiMatch = lowerName.match(/hdmi.*?(\d+)/);
+        if (hdmiMatch) {
+          return `hdmi${hdmiMatch[1]}`;
+        }
+
+        // Try to extract "usb_camera", "usb webcam", etc.
+        if (
+          lowerName.includes('usb') &&
+          (lowerName.includes('camera') || lowerName.includes('webcam'))
+        ) {
+          return 'usb_camera';
+        }
+
+        // Try to match common patterns
+        if (lowerName.includes('capture')) {
+          const captureMatch = lowerName.match(/(\w+).*?(\d+)/);
+          if (captureMatch) {
+            return `${captureMatch[1]}${captureMatch[2]}`.toLowerCase();
+          }
+        }
+
+        return null;
+      };
+
+      // Try source objects from device capabilities first
+      const sourceObjects =
+        sourceType === 'video'
+          ? device?.capabilities?.videoSourceObjects
+          : device?.capabilities?.audioSourceObjects;
+
+      if (sourceObjects) {
+        // Match by identifier first, then by name (some sources might use name instead)
+        // list_sources returns objects with 'name' when created from string arrays
+        let sourceObj = sourceObjects.find(
+          (s: any) =>
+            (s.identifier && s.identifier === sourceIdentifier) ||
+            (s.identifier &&
+              s.identifier.toLowerCase() === sourceIdentifier.toLowerCase()) ||
+            (s.name && s.name === sourceIdentifier) ||
+            (s.name && s.name.toLowerCase() === sourceIdentifier.toLowerCase())
+        );
+
+        // If not found, try to match by extracting identifier from name
+        if (!sourceObj) {
+          sourceObj = sourceObjects.find((s: any) => {
+            if (!s.name) return false;
+            const extractedId = extractIdentifierFromName(s.name);
+            return (
+              extractedId &&
+              (extractedId === sourceIdentifier ||
+                extractedId.toLowerCase() === sourceIdentifier.toLowerCase())
+            );
+          });
+        }
+
+        if (sourceObj) {
+          return sourceObj.id;
+        }
+      }
+
+      // Try active sources (if this is the currently active source)
+      const activeSource =
+        sourceType === 'video'
+          ? device?.activeSources?.video
+          : device?.activeSources?.audio;
+
+      if (activeSource) {
+        // Check both identifier and extracted identifier from name
+        if (activeSource.identifier === sourceIdentifier) {
+          return activeSource.id;
+        }
+        if (activeSource.name) {
+          const extractedId = extractIdentifierFromName(activeSource.name);
+          if (
+            extractedId === sourceIdentifier ||
+            extractedId?.toLowerCase() === sourceIdentifier.toLowerCase()
+          ) {
+            return activeSource.id;
+          }
+        }
+      }
+
+      // Fallback: try to fetch source objects via list_sources command
+      // This is a last resort if device.connected event hasn't populated them yet
+      if (deviceId.value) {
+        try {
+          console.log(
+            `[switchSource] Fetching source objects via list_sources for ${sourceType} source "${sourceIdentifier}"`
+          );
+
+          const response = (await $civicApi(
+            `/api/v1/broadcast-box/devices/${deviceId.value}/command`,
+            {
+              method: 'POST',
+              body: {
+                action: 'list_sources',
+                payload: {},
+              },
+            }
+          )) as any;
+
+          console.log(`[switchSource] list_sources response:`, {
+            success: response.success,
+            ackSuccess: response.ack?.success,
+            hasPayload: !!response.ack?.payload,
+            payloadKeys: response.ack?.payload
+              ? Object.keys(response.ack.payload)
+              : [],
+            payload: response.ack?.payload,
+          });
+
+          if (
+            response.success &&
+            response.ack?.success &&
+            response.ack?.payload
+          ) {
+            // list_sources returns video/audio arrays with source objects
+            // Check both 'video'/'audio' keys and 'videoSources'/'audioSources' keys
+            let sourceArray: any[] | undefined;
+
+            if (sourceType === 'video') {
+              sourceArray =
+                response.ack.payload.video ||
+                response.ack.payload.videoSources ||
+                response.ack.payload.videoSourceObjects ||
+                [];
+            } else {
+              sourceArray =
+                response.ack.payload.audio ||
+                response.ack.payload.audioSources ||
+                response.ack.payload.audioSourceObjects ||
+                [];
+            }
+
+            console.log(`[switchSource] Found ${sourceType} source array:`, {
+              arrayLength: sourceArray?.length || 0,
+              sources: sourceArray,
+              lookingFor: sourceIdentifier,
+            });
+
+            if (Array.isArray(sourceArray) && sourceArray.length > 0) {
+              // Helper to extract identifier from name (e.g., "HDMI Capture Device 2" -> "hdmi2")
+              const extractIdentifierFromName = (
+                name: string
+              ): string | null => {
+                if (!name) return null;
+                const lowerName = name.toLowerCase();
+
+                // Try to extract "hdmi1", "hdmi2", etc. from names like "HDMI Capture Device 1"
+                const hdmiMatch = lowerName.match(/hdmi.*?(\d+)/);
+                if (hdmiMatch) {
+                  return `hdmi${hdmiMatch[1]}`;
+                }
+
+                // Try to extract "usb_camera", "usb webcam", etc.
+                if (
+                  lowerName.includes('usb') &&
+                  (lowerName.includes('camera') || lowerName.includes('webcam'))
+                ) {
+                  return 'usb_camera';
+                }
+
+                // Try to match common patterns
+                if (lowerName.includes('capture')) {
+                  const captureMatch = lowerName.match(/(\w+).*?(\d+)/);
+                  if (captureMatch) {
+                    return `${captureMatch[1]}${captureMatch[2]}`.toLowerCase();
+                  }
+                }
+
+                return null;
+              };
+
+              // Try exact matches first
+              let sourceObj = sourceArray.find(
+                (s: any) =>
+                  (s.identifier && s.identifier === sourceIdentifier) ||
+                  (s.identifier &&
+                    s.identifier.toLowerCase() ===
+                      sourceIdentifier.toLowerCase()) ||
+                  (s.name && s.name === sourceIdentifier) ||
+                  (s.name &&
+                    s.name.toLowerCase() === sourceIdentifier.toLowerCase())
+              );
+
+              // If not found, try to match by extracting identifier from name
+              if (!sourceObj) {
+                sourceObj = sourceArray.find((s: any) => {
+                  if (!s.name) return false;
+                  const extractedId = extractIdentifierFromName(s.name);
+                  return (
+                    extractedId &&
+                    (extractedId === sourceIdentifier ||
+                      extractedId.toLowerCase() ===
+                        sourceIdentifier.toLowerCase())
+                  );
+                });
+              }
+
+              console.log(`[switchSource] Source object match:`, {
+                found: !!sourceObj,
+                sourceObj,
+                lookingFor: sourceIdentifier,
+                extractedIds: sourceArray.map((s: any) => ({
+                  id: s.id,
+                  name: s.name,
+                  identifier: s.identifier,
+                  extracted: extractIdentifierFromName(s.name || ''),
+                })),
+              });
+
+              if (sourceObj) {
+                // If source object has explicit ID, use it
+                if (typeof sourceObj.id === 'number') {
+                  console.log(
+                    `[switchSource] Found numeric ID: ${sourceObj.id}`
+                  );
+                  return sourceObj.id;
+                }
+                // If no ID but we found the object, use the array index
+                const index = sourceArray.indexOf(sourceObj);
+                if (index >= 0) {
+                  console.log(
+                    `[switchSource] Using array index as ID: ${index}`
+                  );
+                  return index;
+                }
+              }
+
+              // Fallback: try to find by array index if identifier is numeric string
+              // This handles cases where the identifier is "0", "1", "2", etc.
+              const numericIndex = parseInt(sourceIdentifier, 10);
+              if (
+                !isNaN(numericIndex) &&
+                numericIndex >= 0 &&
+                numericIndex < sourceArray.length
+              ) {
+                console.log(
+                  `[switchSource] Using numeric index: ${numericIndex}`
+                );
+                return numericIndex;
+              }
+
+              // Log what we got vs what we're looking for
+              console.warn(
+                `[switchSource] Could not find source "${sourceIdentifier}" in array:`,
+                sourceArray
+              );
+            } else {
+              console.warn(
+                `[switchSource] Source array is empty or not an array:`,
+                sourceArray
+              );
+            }
+          } else {
+            console.warn(`[switchSource] list_sources command failed:`, {
+              success: response.success,
+              ackSuccess: response.ack?.success,
+              error: response.error || response.ack?.error,
+            });
+          }
+        } catch (err) {
+          // Log the error for debugging
+          console.error(
+            'Failed to fetch source objects via list_sources:',
+            err
+          );
+        }
+      } else {
+        console.warn(
+          `[switchSource] No deviceId available for list_sources fallback`
+        );
+      }
+
+      return undefined;
+    };
+
+    // Convert video source
+    if (videoSource !== undefined) {
+      videoSourceId = await findSourceId(videoSource, 'video');
+      if (videoSourceId === undefined && typeof videoSource === 'string') {
+        // Last resort: try to parse identifier as number if it's numeric
+        const numericId = parseInt(videoSource, 10);
+        if (!isNaN(numericId) && videoSource === String(numericId)) {
+          videoSourceId = numericId;
+        } else {
+          throw new Error(
+            `Unable to find numeric ID for video source "${videoSource}". ` +
+              `Device may not have source objects available. Please ensure the device is connected and has sent its capabilities.`
+          );
+        }
+      }
+    }
+
+    // Convert audio source
+    if (audioSource !== undefined) {
+      audioSourceId = await findSourceId(audioSource, 'audio');
+      if (audioSourceId === undefined && typeof audioSource === 'string') {
+        // Last resort: try to parse identifier as number if it's numeric
+        const numericId = parseInt(audioSource, 10);
+        if (!isNaN(numericId) && audioSource === String(numericId)) {
+          audioSourceId = numericId;
+        } else {
+          throw new Error(
+            `Unable to find numeric ID for audio source "${audioSource}". ` +
+              `Device may not have source objects available. Please ensure the device is connected and has sent its capabilities.`
+          );
+        }
+      }
+    }
+
     try {
       const response = await sendCommand('switch_source', {
-        videoSource,
-        audioSource,
+        videoSource: videoSourceId,
+        audioSource: audioSourceId,
       });
 
       if (response.success && response.ack?.success) {
@@ -245,16 +613,301 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
       // We'll fallback to device capabilities
       const errorMessage = err.message || err.data?.error?.message || '';
       const isNotConnectedError = errorMessage.includes('not connected');
-      const isTimeoutError = errorMessage.includes('timeout') || errorMessage.includes('Command timeout');
-      
+      const isTimeoutError =
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('Command timeout');
+
       // Only log unexpected errors (not connection or timeout errors)
       if (!isNotConnectedError && !isTimeoutError) {
         console.warn('Failed to list sources (unexpected error):', err);
       }
-      
+
       return null;
     } finally {
       loading.value = false;
+    }
+  };
+
+  /**
+   * Set Picture-in-Picture configuration
+   *
+   * @param mainSource - Main video source identifier (string) or numeric ID
+   * @param pipSource - PiP video source identifier (string) or numeric ID, or null to disable
+   * @param options - Optional position and size configuration
+   * @param device - Optional device object to look up numeric IDs from source objects
+   */
+  const setPip = async (
+    mainSource: string | number,
+    pipSource?: string | number | null,
+    options?: SetPipOptions,
+    device?: {
+      capabilities?: {
+        videoSourceObjects?: Array<{
+          id: number;
+          identifier?: string;
+          name?: string;
+        }>;
+        audioSourceObjects?: Array<{
+          id: number;
+          identifier?: string;
+          name?: string;
+        }>;
+      };
+      activeSources?: {
+        video?: { id: number; identifier?: string; name?: string } | null;
+        audio?: { id: number; identifier?: string; name?: string } | null;
+      };
+    }
+  ): Promise<CommandResponse> => {
+    if (!mainSource) {
+      const err = new Error('mainSource is required');
+      error.value = err.message;
+      throw err;
+    }
+
+    // Reuse the findSourceId helper from switchSource
+    const findSourceId = async (
+      sourceIdentifier: string | number,
+      sourceType: 'video' | 'audio'
+    ): Promise<number | undefined> => {
+      if (typeof sourceIdentifier === 'number') {
+        return sourceIdentifier;
+      }
+
+      // Helper to extract identifier from name (e.g., "HDMI Capture Device 2" -> "hdmi2")
+      const extractIdentifierFromName = (name: string): string | null => {
+        if (!name) return null;
+        const lowerName = name.toLowerCase();
+
+        // Try to extract "hdmi1", "hdmi2", etc. from names like "HDMI Capture Device 1"
+        const hdmiMatch = lowerName.match(/hdmi.*?(\d+)/);
+        if (hdmiMatch) {
+          return `hdmi${hdmiMatch[1]}`;
+        }
+
+        // Try to extract "usb_camera", "usb webcam", etc.
+        if (
+          lowerName.includes('usb') &&
+          (lowerName.includes('camera') || lowerName.includes('webcam'))
+        ) {
+          return 'usb_camera';
+        }
+
+        // Try to match common patterns
+        if (lowerName.includes('capture')) {
+          const captureMatch = lowerName.match(/(\w+).*?(\d+)/);
+          if (captureMatch) {
+            return `${captureMatch[1]}${captureMatch[2]}`.toLowerCase();
+          }
+        }
+
+        return null;
+      };
+
+      // Try source objects from device capabilities first
+      const sourceObjects =
+        sourceType === 'video'
+          ? device?.capabilities?.videoSourceObjects
+          : device?.capabilities?.audioSourceObjects;
+
+      if (sourceObjects) {
+        // Match by identifier first, then by name (some sources might use name instead)
+        // list_sources returns objects with 'name' when created from string arrays
+        let sourceObj = sourceObjects.find(
+          (s: any) =>
+            (s.identifier && s.identifier === sourceIdentifier) ||
+            (s.identifier &&
+              s.identifier.toLowerCase() === sourceIdentifier.toLowerCase()) ||
+            (s.name && s.name === sourceIdentifier) ||
+            (s.name && s.name.toLowerCase() === sourceIdentifier.toLowerCase())
+        );
+
+        // If not found, try to match by extracting identifier from name
+        if (!sourceObj) {
+          sourceObj = sourceObjects.find((s: any) => {
+            if (!s.name) return false;
+            const extractedId = extractIdentifierFromName(s.name);
+            return (
+              extractedId &&
+              (extractedId === sourceIdentifier ||
+                extractedId.toLowerCase() === sourceIdentifier.toLowerCase())
+            );
+          });
+        }
+
+        if (sourceObj) {
+          return sourceObj.id;
+        }
+      }
+
+      // Try active sources (if this is the currently active source)
+      const activeSource =
+        sourceType === 'video'
+          ? device?.activeSources?.video
+          : device?.activeSources?.audio;
+
+      if (activeSource) {
+        // Check both identifier and extracted identifier from name
+        if (activeSource.identifier === sourceIdentifier) {
+          return activeSource.id;
+        }
+        if (activeSource.name) {
+          const extractedId = extractIdentifierFromName(activeSource.name);
+          if (
+            extractedId === sourceIdentifier ||
+            extractedId?.toLowerCase() === sourceIdentifier.toLowerCase()
+          ) {
+            return activeSource.id;
+          }
+        }
+      }
+
+      // Fallback: try to fetch source objects via list_sources command
+      // This is a last resort if device.connected event hasn't populated them yet
+      if (deviceId.value) {
+        try {
+          const response = (await $civicApi(
+            `/api/v1/broadcast-box/devices/${deviceId.value}/command`,
+            {
+              method: 'POST',
+              body: {
+                action: 'list_sources',
+                payload: {},
+              },
+            }
+          )) as any;
+
+          if (
+            response.success &&
+            response.ack?.success &&
+            response.ack?.payload
+          ) {
+            // list_sources returns video/audio arrays with source objects
+            // Check both 'video'/'audio' keys and 'videoSources'/'audioSources' keys
+            let sourceArray: any[] | undefined;
+
+            if (sourceType === 'video') {
+              sourceArray =
+                response.ack.payload.video ||
+                response.ack.payload.videoSources ||
+                response.ack.payload.videoSourceObjects ||
+                [];
+            } else {
+              sourceArray =
+                response.ack.payload.audio ||
+                response.ack.payload.audioSources ||
+                response.ack.payload.audioSourceObjects ||
+                [];
+            }
+
+            if (Array.isArray(sourceArray) && sourceArray.length > 0) {
+              // list_sources returns objects with 'name' field when created from string arrays
+              // Try to find by name first (most common), then by identifier
+              const sourceObj = sourceArray.find(
+                (s: any) =>
+                  (s.name && s.name === sourceIdentifier) ||
+                  (s.name &&
+                    s.name.toLowerCase() === sourceIdentifier.toLowerCase()) ||
+                  (s.identifier && s.identifier === sourceIdentifier) ||
+                  (s.identifier &&
+                    s.identifier.toLowerCase() ===
+                      sourceIdentifier.toLowerCase())
+              );
+
+              if (sourceObj) {
+                // If source object has explicit ID, use it
+                if (typeof sourceObj.id === 'number') {
+                  return sourceObj.id;
+                }
+                // If no ID but we found the object, use the array index
+                const index = sourceArray.indexOf(sourceObj);
+                if (index >= 0) {
+                  return index;
+                }
+              }
+
+              // Fallback: try to find by array index if identifier is numeric string
+              // This handles cases where the identifier is "0", "1", "2", etc.
+              const numericIndex = parseInt(sourceIdentifier, 10);
+              if (
+                !isNaN(numericIndex) &&
+                numericIndex >= 0 &&
+                numericIndex < sourceArray.length
+              ) {
+                return numericIndex;
+              }
+            }
+          }
+        } catch (err) {
+          // Silently fail - list_sources might not be available or might timeout
+        }
+      }
+
+      return undefined;
+    };
+
+    // Validate sources exist (but send string identifiers to device)
+    // The device expects string identifiers, not numeric IDs
+    const mainSourceId = await findSourceId(mainSource, 'video');
+    if (mainSourceId === undefined) {
+      throw new Error(
+        `Unable to find main source "${mainSource}". ` +
+          `Device may not have source objects available. Please ensure the device is connected and has sent its capabilities.`
+      );
+    }
+
+    // Validate pipSource exists and is different from mainSource (if not null)
+    if (pipSource !== null && pipSource !== undefined) {
+      const pipSourceId = await findSourceId(pipSource, 'video');
+      if (pipSourceId === undefined) {
+        throw new Error(
+          `Unable to find PiP source "${pipSource}". ` +
+            `Device may not have source objects available. Please ensure the device is connected and has sent its capabilities.`
+        );
+      }
+
+      // Ensure pipSource is different from mainSource
+      if (pipSourceId === mainSourceId) {
+        throw new Error('PiP source must be different from main source');
+      }
+    }
+
+    // Build payload with string identifiers (device expects strings, not numeric IDs)
+    const payload: any = {
+      mainSource:
+        typeof mainSource === 'string' ? mainSource : String(mainSource),
+    };
+
+    if (pipSource !== null && pipSource !== undefined) {
+      payload.pipSource =
+        typeof pipSource === 'string' ? pipSource : String(pipSource);
+    } else {
+      payload.pipSource = null;
+    }
+
+    // Apply defaults if not provided
+    if (options?.position) {
+      payload.pipPosition = options.position;
+    }
+    if (options?.size) {
+      payload.pipSize = options.size;
+    }
+
+    try {
+      const response = await sendCommand('set_pip', payload);
+
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.pipConfigured'),
+          description: t('broadcastBox.success.pipConfiguredDesc'),
+          color: 'primary',
+        });
+      }
+
+      return response;
+    } catch (err: any) {
+      // Error already handled in sendCommand
+      throw err;
     }
   };
 
@@ -262,6 +915,7 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
     // Methods
     sendCommand,
     switchSource,
+    setPip,
     updateConfig,
     getStatus,
     listSources,
@@ -271,4 +925,3 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
     lastResponse,
   };
 }
-

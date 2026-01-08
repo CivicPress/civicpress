@@ -5,6 +5,12 @@
  * sessions, and uploads.
  */
 
+import type {
+  SourceInfo,
+  ActiveSources,
+  PiPConfiguration,
+} from './broadcast-box-types';
+
 export interface BroadcastDevice {
   id: string;
   organizationId: string;
@@ -15,10 +21,15 @@ export interface BroadcastDevice {
   capabilities: {
     videoSources: string[];
     audioSources: string[];
+    videoSourceObjects?: SourceInfo[]; // Source objects with numeric IDs
+    audioSourceObjects?: SourceInfo[]; // Source objects with numeric IDs
     pipSupported: boolean;
     maxResolution: string;
   };
   config: Record<string, any>;
+  activeSources?: ActiveSources; // Currently active sources from status messages
+  pipConfig?: PiPConfiguration; // Current PiP configuration from status messages (API field name)
+  pip?: PiPConfiguration; // Alias for pipConfig (for consistency with connectionStatus)
   lastSeenAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -237,16 +248,18 @@ export const useBroadcastBox = () => {
       return null;
     } catch (error: any) {
       console.error('Failed to get device:', error);
-      
+
       // Check if it's a 404 (device not found)
-      const isNotFound = error.status === 404 || 
+      const isNotFound =
+        error.status === 404 ||
         error.message?.includes('not found') ||
         error.message?.includes('Device not found');
-      
+
       if (isNotFound) {
         toast.add({
           title: t('broadcastBox.errors.deviceNotFound') || 'Device Not Found',
-          description: t('broadcastBox.errors.deviceNotFoundDesc') || 
+          description:
+            t('broadcastBox.errors.deviceNotFoundDesc') ||
             'The device you are looking for does not exist or has been removed.',
           color: 'error',
         });
@@ -391,10 +404,11 @@ export const useBroadcastBox = () => {
     } catch (error: any) {
       // Silently fail for health endpoint - device might not be connected
       // Only log if it's not a 404 (device not found)
-      const isNotFound = error.status === 404 || 
+      const isNotFound =
+        error.status === 404 ||
         error.message?.includes('not found') ||
         error.message?.includes('Device not found');
-      
+
       if (!isNotFound) {
         console.error('Failed to get device health:', error);
       }

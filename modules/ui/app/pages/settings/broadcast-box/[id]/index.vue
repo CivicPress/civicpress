@@ -9,12 +9,24 @@ import ConnectionStatusIndicator from '~/components/broadcast-box/ConnectionStat
 import SessionStatusBadge from '~/components/broadcast-box/SessionStatusBadge.vue';
 import DeviceConfigurationForm from '~/components/broadcast-box/DeviceConfigurationForm.vue';
 import DeviceSourceControl from '~/components/broadcast-box/DeviceSourceControl.vue';
+import DevicePiPControl from '~/components/broadcast-box/DevicePiPControl.vue';
 import DeviceConfigControl from '~/components/broadcast-box/DeviceConfigControl.vue';
 import DeviceStatusControl from '~/components/broadcast-box/DeviceStatusControl.vue';
 import { useRecordUtils } from '~/composables/useRecordUtils';
 import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
 
 const { formatDate } = useRecordUtils();
+
+// Helper function to format PiP position
+const formatPipPosition = (position: string | undefined): string => {
+  if (!position) return '';
+  const key = `broadcastBox.pipPosition${position
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('')}`;
+  const translated = t(key);
+  return translated !== key ? translated : position;
+};
 
 definePageMeta({
   middleware: ['require-auth'],
@@ -74,7 +86,7 @@ const isDeviceConnected = computed(() => {
   // Use real-time connection status if available, otherwise fall back to lastSeenAt
   const wsConnected = connectionStatus.value.connected;
   let result: boolean;
-  
+
   if (wsConnected !== undefined) {
     result = wsConnected;
   } else {
@@ -90,12 +102,12 @@ const isDeviceConnected = computed(() => {
       result = diffMinutes < 5;
     }
   }
-  
+
   // Only update lastConnectedValue if it actually changed
   if (lastConnectedValue !== result) {
     lastConnectedValue = result;
   }
-  
+
   return result;
 });
 
@@ -131,18 +143,20 @@ watch(
       clearInterval(sessionsRefreshInterval);
       sessionsRefreshInterval = null;
     }
-    
+
     // Only set up interval if device is loaded
     if (deviceUuid) {
       // Refresh sessions every 5 minutes (very infrequent, only for sessions)
       sessionsRefreshInterval = setInterval(() => {
         if (device.value) {
           // Only refresh sessions, not the entire device
-          listSessions({ deviceId }).then((sessionsData) => {
-            sessions.value = sessionsData;
-          }).catch(() => {
-            // Silently fail - sessions are not critical
-          });
+          listSessions({ deviceId })
+            .then((sessionsData) => {
+              sessions.value = sessionsData;
+            })
+            .catch(() => {
+              // Silently fail - sessions are not critical
+            });
         }
       }, 300000); // 5 minutes
     }
@@ -197,8 +211,10 @@ const loadDevice = async (force = false) => {
   }
 
   // Preserve scroll position before loading (only on client side)
-  const scrollPosition = process.client ? (window.scrollY || document.documentElement.scrollTop) : 0;
-  
+  const scrollPosition = process.client
+    ? window.scrollY || document.documentElement.scrollTop
+    : 0;
+
   isLoadDeviceInProgress = true;
   loading.value = true;
   error.value = '';
@@ -211,23 +227,35 @@ const loadDevice = async (force = false) => {
     ]);
 
     if (deviceResponse) {
+      // Map pipConfig to pip for consistency with connectionStatus
+      const deviceData = { ...deviceResponse.device };
+      if (deviceData.pipConfig && !deviceData.pip) {
+        deviceData.pip = deviceData.pipConfig;
+      }
+
       // Only update if device doesn't exist or if properties actually changed
       // This prevents unnecessary reactivity triggers and scroll resets
       if (!device.value) {
-        device.value = deviceResponse.device;
+        device.value = deviceData;
       } else {
         // Deep compare and only update changed properties to minimize reactivity
-        const newDevice = deviceResponse.device;
+        const newDevice = deviceData;
         const currentDevice = device.value;
-        
+
         // Check if any significant properties changed
-        const hasChanges = 
+        const hasChanges =
           currentDevice.name !== newDevice.name ||
           currentDevice.status !== newDevice.status ||
           currentDevice.lastSeenAt !== newDevice.lastSeenAt ||
-          JSON.stringify(currentDevice.capabilities) !== JSON.stringify(newDevice.capabilities) ||
-          JSON.stringify(currentDevice.config) !== JSON.stringify(newDevice.config);
-        
+          JSON.stringify(currentDevice.capabilities) !==
+            JSON.stringify(newDevice.capabilities) ||
+          JSON.stringify(currentDevice.config) !==
+            JSON.stringify(newDevice.config) ||
+          JSON.stringify(currentDevice.activeSources) !==
+            JSON.stringify(newDevice.activeSources) ||
+          JSON.stringify(currentDevice.pip || currentDevice.pipConfig) !==
+            JSON.stringify(newDevice.pip || newDevice.pipConfig);
+
         // Only update if there are actual changes
         if (hasChanges) {
           // Use Object.assign but wrap in nextTick to batch reactivity updates
@@ -238,7 +266,8 @@ const loadDevice = async (force = false) => {
       enrollmentCodeStatus.value = deviceResponse.enrollmentCode || null;
     } else {
       // Device not found - set error and redirect after delay
-      error.value = t('broadcastBox.errors.deviceNotFound') || 'Device not found';
+      error.value =
+        t('broadcastBox.errors.deviceNotFound') || 'Device not found';
       setTimeout(() => {
         navigateTo('/settings/broadcast-box');
       }, 3000); // Redirect after 3 seconds
@@ -246,7 +275,7 @@ const loadDevice = async (force = false) => {
     }
     health.value = healthData;
     sessions.value = sessionsData;
-    
+
     // Restore scroll position after update (use nextTick to ensure DOM is updated)
     if (process.client && scrollPosition > 0) {
       await nextTick();
@@ -257,12 +286,14 @@ const loadDevice = async (force = false) => {
     }
   } catch (err: any) {
     // Check if it's a 404 (device not found)
-    const isNotFound = err.status === 404 || 
+    const isNotFound =
+      err.status === 404 ||
       err.message?.includes('not found') ||
       err.message?.includes('Device not found');
-    
+
     if (isNotFound) {
-      error.value = t('broadcastBox.errors.deviceNotFound') || 'Device not found';
+      error.value =
+        t('broadcastBox.errors.deviceNotFound') || 'Device not found';
       // Redirect to device list after showing error
       setTimeout(() => {
         navigateTo('/settings/broadcast-box');
@@ -913,7 +944,11 @@ onUnmounted(() => {
                   </label>
                   <div class="flex items-center gap-2">
                     <UBadge
-                      :color="device.capabilities?.pipSupported ? 'primary' : 'neutral'"
+                      :color="
+                        device.capabilities?.pipSupported
+                          ? 'primary'
+                          : 'neutral'
+                      "
                       variant="soft"
                       size="sm"
                     >
@@ -930,7 +965,10 @@ onUnmounted(() => {
           </UCard>
 
           <!-- Device Control Cards -->
-          <div v-if="isDeviceConnected" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div
+            v-if="isDeviceConnected"
+            class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
             <!-- Source Control -->
             <DeviceSourceControl
               :device="device"
@@ -1017,8 +1055,379 @@ onUnmounted(() => {
                   </p>
                 </div>
               </div>
+
+              <!-- Network Connectivity -->
+              <div
+                v-if="
+                  connectionStatus.health?.networkConnected !== undefined ||
+                  realtimeHealth.networkConnected !== undefined
+                "
+                class="pt-4 border-t"
+              >
+                <div class="flex items-center justify-between">
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t('broadcastBox.networkConnectivity') || 'Network' }}
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <UIcon
+                      :name="
+                        (connectionStatus.health?.networkConnected ??
+                        realtimeHealth.networkConnected)
+                          ? 'i-lucide-wifi'
+                          : 'i-lucide-wifi-off'
+                      "
+                      :class="
+                        (connectionStatus.health?.networkConnected ??
+                        realtimeHealth.networkConnected)
+                          ? 'w-5 h-5 text-green-600'
+                          : 'w-5 h-5 text-red-600'
+                      "
+                    />
+                    <UBadge
+                      :color="
+                        (connectionStatus.health?.networkConnected ??
+                        realtimeHealth.networkConnected)
+                          ? 'primary'
+                          : 'error'
+                      "
+                      variant="soft"
+                      size="sm"
+                    >
+                      {{
+                        (connectionStatus.health?.networkConnected ??
+                        realtimeHealth.networkConnected)
+                          ? t('broadcastBox.connected') || 'Connected'
+                          : t('broadcastBox.disconnected') || 'Disconnected'
+                      }}
+                    </UBadge>
+                  </div>
+                </div>
+              </div>
             </div>
           </UCard>
+
+          <!-- Active Sources -->
+          <UCard
+            v-if="
+              connectionStatus.activeSources?.video ||
+              connectionStatus.activeSources?.audio ||
+              device?.activeSources?.video ||
+              device?.activeSources?.audio
+            "
+          >
+            <template #header>
+              <h2 class="text-lg font-semibold">
+                {{ t('broadcastBox.activeSources') }}
+              </h2>
+            </template>
+            <div class="space-y-4">
+              <!-- Active Video Source -->
+              <div
+                v-if="
+                  connectionStatus.activeSources?.video ||
+                  device?.activeSources?.video
+                "
+              >
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.activeVideoSource') }}
+                </label>
+                <div class="flex items-center gap-2">
+                  <UBadge color="primary" variant="soft" size="lg">
+                    {{
+                      (
+                        connectionStatus.activeSources?.video ||
+                        device?.activeSources?.video
+                      )?.identifier || 'Unknown'
+                    }}
+                  </UBadge>
+                  <span
+                    v-if="
+                      (
+                        connectionStatus.activeSources?.video ||
+                        device?.activeSources?.video
+                      )?.name
+                    "
+                    class="text-sm text-gray-600 dark:text-gray-400"
+                  >
+                    {{
+                      (
+                        connectionStatus.activeSources?.video ||
+                        device?.activeSources?.video
+                      )?.name
+                    }}
+                  </span>
+                </div>
+                <div
+                  v-if="
+                    (
+                      connectionStatus.activeSources?.video ||
+                      device?.activeSources?.video
+                    )?.resolution
+                  "
+                  class="text-xs text-gray-500 mt-1"
+                >
+                  {{
+                    (
+                      connectionStatus.activeSources?.video ||
+                      device?.activeSources?.video
+                    )?.resolution?.[0]
+                  }}x{{
+                    (
+                      connectionStatus.activeSources?.video ||
+                      device?.activeSources?.video
+                    )?.resolution?.[1]
+                  }}
+                  <span
+                    v-if="
+                      (
+                        connectionStatus.activeSources?.video ||
+                        device?.activeSources?.video
+                      )?.framerate
+                    "
+                  >
+                    @
+                    {{
+                      (
+                        connectionStatus.activeSources?.video ||
+                        device?.activeSources?.video
+                      )?.framerate
+                    }}
+                    fps
+                  </span>
+                </div>
+              </div>
+              <UAlert
+                v-else
+                color="neutral"
+                variant="soft"
+                :title="t('broadcastBox.noActiveVideoSource')"
+                icon="i-lucide-video-off"
+              />
+
+              <!-- Active Audio Source -->
+              <div
+                v-if="
+                  connectionStatus.activeSources?.audio ||
+                  device?.activeSources?.audio
+                "
+              >
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.activeAudioSource') }}
+                </label>
+                <div class="flex items-center gap-2">
+                  <UBadge color="primary" variant="soft" size="lg">
+                    {{
+                      (
+                        connectionStatus.activeSources?.audio ||
+                        device?.activeSources?.audio
+                      )?.identifier || 'Unknown'
+                    }}
+                  </UBadge>
+                  <span
+                    v-if="
+                      (
+                        connectionStatus.activeSources?.audio ||
+                        device?.activeSources?.audio
+                      )?.name
+                    "
+                    class="text-sm text-gray-600 dark:text-gray-400"
+                  >
+                    {{
+                      (
+                        connectionStatus.activeSources?.audio ||
+                        device?.activeSources?.audio
+                      )?.name
+                    }}
+                  </span>
+                </div>
+              </div>
+              <UAlert
+                v-else
+                color="neutral"
+                variant="soft"
+                :title="t('broadcastBox.noActiveAudioSource')"
+                icon="i-lucide-mic-off"
+              />
+            </div>
+          </UCard>
+
+          <!-- PiP Configuration -->
+          <UCard
+            v-if="
+              connectionStatus.pip?.enabled ||
+              device?.pip?.enabled ||
+              (connectionStatus.pip &&
+                connectionStatus.pip.enabled === false) ||
+              (device?.pip && device.pip.enabled === false)
+            "
+          >
+            <template #header>
+              <h2 class="text-lg font-semibold">
+                {{ t('broadcastBox.pipConfiguration') }}
+              </h2>
+            </template>
+            <div class="space-y-4">
+              <!-- PiP Status -->
+              <div>
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.pipStatus') }}
+                </label>
+                <UBadge
+                  :color="
+                    connectionStatus.pip?.enabled || device?.pip?.enabled
+                      ? 'primary'
+                      : 'neutral'
+                  "
+                  variant="soft"
+                  size="sm"
+                >
+                  {{
+                    connectionStatus.pip?.enabled || device?.pip?.enabled
+                      ? t('broadcastBox.enabled')
+                      : t('broadcastBox.disabled')
+                  }}
+                </UBadge>
+              </div>
+
+              <!-- Main Source -->
+              <div
+                v-if="
+                  (connectionStatus.pip?.mainSource ||
+                    device?.pip?.mainSource) &&
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                "
+              >
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.pipMainSource') }}
+                </label>
+                <div class="flex items-center gap-2">
+                  <UBadge color="primary" variant="subtle" size="sm">
+                    {{
+                      (
+                        connectionStatus.pip?.mainSource ||
+                        device?.pip?.mainSource
+                      )?.identifier || 'Unknown'
+                    }}
+                  </UBadge>
+                  <span
+                    v-if="
+                      (
+                        connectionStatus.pip?.mainSource ||
+                        device?.pip?.mainSource
+                      )?.name
+                    "
+                    class="text-sm text-gray-600 dark:text-gray-400"
+                  >
+                    {{
+                      (
+                        connectionStatus.pip?.mainSource ||
+                        device?.pip?.mainSource
+                      )?.name
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- PiP Source -->
+              <div
+                v-if="
+                  (connectionStatus.pip?.pipSource || device?.pip?.pipSource) &&
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                "
+              >
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.pipSource') }}
+                </label>
+                <div class="flex items-center gap-2">
+                  <UBadge color="primary" variant="subtle" size="sm">
+                    {{
+                      (
+                        connectionStatus.pip?.pipSource ||
+                        device?.pip?.pipSource
+                      )?.identifier || 'Unknown'
+                    }}
+                  </UBadge>
+                  <span
+                    v-if="
+                      (
+                        connectionStatus.pip?.pipSource ||
+                        device?.pip?.pipSource
+                      )?.name
+                    "
+                    class="text-sm text-gray-600 dark:text-gray-400"
+                  >
+                    {{
+                      (
+                        connectionStatus.pip?.pipSource ||
+                        device?.pip?.pipSource
+                      )?.name
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Position -->
+              <div
+                v-if="
+                  (connectionStatus.pip?.position || device?.pip?.position) &&
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                "
+              >
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.pipPosition') }}
+                </label>
+                <p class="text-sm font-semibold">
+                  {{
+                    formatPipPosition(
+                      connectionStatus.pip?.position || device?.pip?.position
+                    )
+                  }}
+                </p>
+              </div>
+
+              <!-- Size -->
+              <div
+                v-if="
+                  (connectionStatus.pip?.size || device?.pip?.size) &&
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                "
+              >
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.pipSize') }}
+                </label>
+                <p class="text-sm font-semibold">
+                  {{
+                    (connectionStatus.pip?.size || device?.pip?.size)?.width
+                  }}x{{
+                    (connectionStatus.pip?.size || device?.pip?.size)?.height
+                  }}
+                </p>
+              </div>
+            </div>
+          </UCard>
+
+          <!-- PiP Control (if device supports PiP) -->
+          <DevicePiPControl
+            v-if="device?.capabilities?.pipSupported"
+            :device="device"
+            :is-device-connected="isDeviceConnected"
+          />
 
           <!-- Recent Sessions -->
           <UCard>
