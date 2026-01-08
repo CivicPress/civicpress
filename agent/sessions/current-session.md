@@ -1,124 +1,175 @@
-# 💾 Memory Update - 2025-01-27
+# 💾 Memory Update - 2025-01-31
 
 ## 📊 **Current Status**
 
-**Focus**: Record Editor UI Refinement & Simplified Button System
+**Focus**: Broadcast Box Module - Status Protocol Integration, PiP Commands, and
+Cleanup
 
 ### ✅ **Major Accomplishments**
 
-#### **1. Record Editor UI Refinement**
+#### **1. Status Message Protocol Integration**
 
-- **Title Bar Improvements**:
-  - Full-width title input with larger font size (`text-xl`)
-  - Standard UInput styling with rounded corners
-  - Proper padding and focus states
-  - Removed footer from edit page for full-height content
-- **Sidebar Accordion Headers**:
-  - More compact headers with reduced padding (`py-1.5`)
-  - Default hover color (no hover effect)
-  - Better icon and chevron alignment
-  - Pluralized accordion titles based on count
-- **Editor + Preview Styling**:
-  - Removed card wrappers for flat document look
-  - Simple border divider between editor and preview
-  - Consistent background with main content area
-  - Fixed double scrollbar issue
-  - Enabled word wrap (`EditorView.lineWrapping`) to remove horizontal scrollbar
+- **Active Sources Extraction**:
+  - Extract active video/audio sources from device status messages
+  - Store active sources in database as JSON (migration 003)
+  - Display active sources in device detail UI
+  - Real-time updates via WebSocket
+- **PiP Configuration Extraction**:
+  - Extract PiP configuration from status messages
+  - Store PiP config in database as JSON (migration 003)
+  - Display PiP configuration in device detail UI
+  - Real-time updates when PiP state changes
+- **Network Connectivity Tracking**:
+  - Extract network_connected status from health data
+  - Display network connectivity indicator in UI
+  - Real-time updates via WebSocket
 
-#### **2. Simplified Button System**
+#### **2. PiP Configuration Commands**
 
-- **Single Split-Button Design**:
-  - Replaced two buttons (Save Draft + Publish) with single "Save changes"
-    split-button
-  - Contextual dropdown menu with state-aware actions
-  - Always shows "Save changes" as default action
-- **Dropdown Menu Structure**:
-  - Save changes (always visible)
-  - Publish now (for drafts)
-  - Unpublish to draft (for published records)
-  - Archive record (when allowed)
-  - Individual status transition items
-- **Confirmation Modals**:
-  - Publish confirmation (updated)
-  - Unpublish confirmation (new)
-  - Archive confirmation (new)
-  - Delete confirmation (moved from More menu)
-- **More Menu Enhanced**:
-  - View history
-  - Duplicate record
-  - Export as Markdown
-  - Delete record
+- **Command Handlers**:
+  - `set_pip` command handler with full validation
+  - `configure_pip` alias for protocol compatibility
+  - Source identifier to numeric ID conversion
+  - Default values for position (top_right) and size (320x240)
+  - Error handling for unsupported devices
+- **UI Component**:
+  - `DevicePiPControl.vue` component for PiP configuration
+  - Main source selector
+  - PiP source selector (with disable option)
+  - Position selector (top_left, top_right, bottom_left, bottom_right, center)
+  - Size configuration (width/height)
+  - Real-time status display
+  - Validation and error handling
+- **Composable Integration**:
+  - `useDeviceCommands.setPip()` function
+  - Source ID conversion with robust lookup
+  - Error handling and user feedback
 
-#### **3. Additional Features**
+#### **3. Code Cleanup and Documentation**
 
-- **Status Dropdown in Details**: Added status selector similar to type dropdown
-- **Raw YAML Preview**: Added accordion item showing formatted YAML frontmatter
-- **Date/Time Display**: Added creation and last updated date/time in Details
-  section
-- **Tag Management**: Integrated UInputTags component
-- **Geography Accordion**: Moved linked geography to its own accordion item
-- **Internationalization**: All editor strings translated (English and French)
-- **Reactive Counts**: Accordion item counts update when items are added/removed
+- **Code Cleanup**:
+  - Fixed duplicate sections in README and IMPLEMENTATION-PLAN
+  - Removed unused DatabaseService import from enrollment-cleanup
+  - Consolidated shared type definitions (broadcast-box-types.ts)
+  - Fixed rate limiter header order (set status before headers)
+  - Fixed USelectMenu v-model binding with computed properties
+  - Replaced UToggle with USwitch (correct Nuxt UI component)
+- **Documentation**:
+  - Added STATUS-MESSAGE-PROTOCOL-INTEGRATION.md
+  - Added STATUS-PROTOCOL-TESTING-GUIDE.md
+  - Added PIP-CONFIGURATION-COMMAND-PLAN.md
+  - Added PREVIEW-FEATURE-INTEGRATION-PLAN.md
+  - Added CLEANUP-AND-TEST-AUDIT-REPORT.md (comprehensive audit)
+- **Test Audit**:
+  - Identified 78 tests passing (10 test files)
+  - Documented missing tests (rate limiter, device command service, API
+    endpoints)
+  - Created test implementation plan with priorities
 
 #### **4. Bug Fixes**
 
-- Fixed `UDropdown` → `UDropdownMenu` component name
-- Fixed lifecycle hooks in composables (`useRecordLock`, `useAutosave`)
-- Fixed double scrollbar in editor
-- Fixed content cutoff past line 24
-- Fixed route order conflicts (`/drafts` before `/:id`)
-- Fixed authentication flow for drafts endpoint
-- Fixed TypeScript errors for status dropdown
+- **Device Re-registration**:
+  - Fixed device re-registration with expired enrollment codes (recovery path)
+  - Implemented Option C: Allow expired codes for existing devices
+  - Maintains strict expiration for new device registrations
+- **UI Component Issues**:
+  - Fixed USelectMenu v-model binding issues with computed properties
+  - Replaced UToggle with USwitch (correct Nuxt UI component)
+  - Fixed DeviceSourceControl to require explicit save (removed auto-save)
+- **Rate Limiter**:
+  - Fixed header order (set status before headers)
+  - Prevents "Cannot set headers after they are sent" error
+
+#### **5. Type System Improvements**
+
+- **Shared Types**:
+  - Created `broadcast-box-types.ts` for shared type definitions
+  - Consolidates SourceInfo, ActiveSources, PiPConfiguration
+  - Removed duplicate type definitions and re-exports
+  - Fixed duplicate import warnings
+- **Type Updates**:
+  - Updated DeviceCapabilities with videoSourceObjects/audioSourceObjects
+  - Changed from VideoSource[]/AudioSource[] to SourceInfo[]
+  - Added status message type to protocol parser
+  - Made identifier optional in SourceInfo for backward compatibility
 
 ## 🎯 **Next Steps**
 
-1. **Testing**: Test all new button actions (unpublish, archive, duplicate,
-   export)
-2. **API Endpoints**: Verify unpublish and archive endpoints exist and work
-   correctly
-3. **History Page**: Implement history view page for records
-4. **Export Functionality**: Ensure export endpoint works or implement fallback
-5. **Polish**: Review UX flow and make any final adjustments
+1. **Preview Feature Implementation**:
+   - Implement WebRTC preview feature (integration plan ready)
+   - Add preview command handlers (preview.start, preview.stop)
+   - Create useDevicePreview composable
+   - Add DevicePreview component
+
+2. **Test Coverage**:
+   - Add rate limiter tests (security-critical)
+   - Add DeviceCommandService tests (core functionality)
+   - Add status message handler tests
+   - Expand API endpoint tests (sessions, uploads)
+   - Add EnrollmentCodeModel tests
+
+3. **Code Quality**:
+   - Address high-priority TODOs (auth/permissions)
+   - Standardize error handling patterns
+   - Extract common API error handling utilities
+
+4. **Documentation**:
+   - Archive completed implementation plans
+   - Update API reference with new endpoints
+   - Consolidate overlapping documentation
 
 ## 📁 **Key Files Modified**
 
-### Components
+### Backend
 
-- `modules/ui/app/components/editor/EditorHeader.vue` - Complete rewrite with
-  simplified button system
-- `modules/ui/app/components/editor/RecordSidebar.vue` - Added status dropdown,
-  date/time fields, improved accordion structure
-- `modules/ui/app/components/editor/MarkdownEditor.vue` - Fixed scrollbar
-  issues, enabled word wrap
-- `modules/ui/app/components/editor/PreviewPanel.vue` - Removed card wrapper for
-  flat design
-- `modules/ui/app/components/records/RecordForm.vue` - Added new event handlers
-  (unpublish, archive, duplicate, export, view-history)
-- `modules/ui/app/components/editor/EditorAttachments.vue` - Improved card
-  layout, translations
-- `modules/ui/app/components/records/LinkedRecordList.vue` - Improved card
-  layout, translations
-- `modules/ui/app/components/GeographyLinkForm.vue` - Improved card layout,
-  translations
-- `modules/ui/app/components/editor/EditorToolbar.vue` - Moved preview toggle to
-  right side
-- `modules/ui/app/pages/records/[type]/[id]/edit.vue` - Removed footer, added
-  saved event handler
+- `modules/broadcast-box/src/storage/migrations/003_add_active_sources_pip.sql` -
+  Database migration
+- `modules/broadcast-box/src/websocket/event-handlers.ts` - Status message
+  extraction
+- `modules/broadcast-box/src/websocket/command-handlers.ts` - PiP command
+  handlers
+- `modules/broadcast-box/src/websocket/protocol.ts` - Status message type
+- `modules/broadcast-box/src/types/index.ts` - Type updates
+- `modules/broadcast-box/src/types/errors.ts` - PIP_NOT_SUPPORTED error
+- `modules/broadcast-box/src/api/devices.ts` - PiP commands added to
+  allowedActions
+- `modules/broadcast-box/src/services/device-manager.ts` - Re-registration fix
+- `modules/broadcast-box/src/services/device-command-service.ts` - Lazy
+  RoomManager resolution
+- `modules/broadcast-box/src/middleware/rate-limiter.ts` - Header order fix
+- `modules/broadcast-box/src/services/enrollment-cleanup.ts` - Unused import
+  removed
+- `modules/realtime/src/realtime-server.ts` - ACK message conversion
 
-### Composables
+### Frontend
 
-- `modules/ui/app/composables/useRecordLock.ts` - Fixed lifecycle hooks
-- `modules/ui/app/composables/useAutosave.ts` - Fixed lifecycle hooks
+- `modules/ui/app/components/broadcast-box/DevicePiPControl.vue` - New component
+- `modules/ui/app/components/broadcast-box/DeviceSourceControl.vue` - Explicit
+  save
+- `modules/ui/app/composables/broadcast-box-types.ts` - Shared types
+- `modules/ui/app/composables/useDeviceCommands.ts` - setPip function, source ID
+  conversion
+- `modules/ui/app/composables/useDeviceConnectionStatus.ts` - Status message
+  handling
+- `modules/ui/app/composables/useBroadcastBox.ts` - Type updates
+- `modules/ui/app/pages/settings/broadcast-box/[id]/index.vue` - Active
+  sources/PiP display
 
-### API Routes
+### Documentation
 
-- `modules/api/src/routes/records.ts` - Added `/frontmatter` endpoint, fixed
-  route order, added auth middleware
+- `docs/broadcast-box/STATUS-MESSAGE-PROTOCOL-INTEGRATION.md` - Integration
+  analysis
+- `docs/broadcast-box/STATUS-PROTOCOL-TESTING-GUIDE.md` - Testing guide
+- `docs/broadcast-box/PIP-CONFIGURATION-COMMAND-PLAN.md` - PiP plan
+- `docs/broadcast-box/PREVIEW-FEATURE-INTEGRATION-PLAN.md` - Preview plan
+- `docs/broadcast-box/CLEANUP-AND-TEST-AUDIT-REPORT.md` - Comprehensive audit
+- `modules/broadcast-box/README.md` - Updated with recent completions
+- `docs/broadcast-box/IMPLEMENTATION-PLAN.md` - Fixed duplicates
 
 ### Translations
 
-- `modules/ui/i18n/locales/en.json` - Added all editor-related translations
-- `modules/ui/i18n/locales/fr.json` - Added all editor-related translations
+- `modules/ui/i18n/locales/en.json` - PiP and active sources translations
+- `modules/ui/i18n/locales/fr.json` - PiP and active sources translations
 
 ## 🚧 **Blockers**
 
@@ -126,10 +177,16 @@ None - All major features implemented and working.
 
 ## ✅ **Memory Updated**
 
-- Project state: `agent/memory/project-state.md` (updated below)
-- Lessons learned: `agent/memory/lessons.md` (editor UI patterns added)
-- Decisions made: `agent/memory/decisions.md` (simplified button system
-  decision)
+- Project state: `agent/memory/project-state.md` (updated with Phase 8
+  completion)
 - Current session: `agent/sessions/current-session.md` (this file)
+
+## 📝 **Commit Information**
+
+- **Commit**: `fb309e5` - feat(broadcast-box): Complete status protocol
+  integration, PiP commands, and cleanup
+- **Files Changed**: 34 files
+- **Insertions**: 6,343 lines
+- **Deletions**: 520 lines
 
 **Ready for handover** ✅
