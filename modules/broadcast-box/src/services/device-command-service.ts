@@ -54,8 +54,11 @@ export interface CommandResponse {
 
 /**
  * Default command timeout (5 seconds)
+ * Preview commands need more time for WebRTC offer creation (20 seconds)
+ * The device may take 5+ seconds to create the offer, plus network latency
  */
 const DEFAULT_COMMAND_TIMEOUT = 5000;
+const PREVIEW_COMMAND_TIMEOUT = 20000; // 20 seconds for preview.start/stop (WebRTC setup + network latency)
 
 /**
  * Device Command Service
@@ -64,13 +67,14 @@ const DEFAULT_COMMAND_TIMEOUT = 5000;
  * Handles validation, transport, response, and audit logging.
  */
 export class DeviceCommandService {
-  // Map of pending commands: commandId -> { resolve, reject, timeout }
+  // Map of pending commands: commandId -> { resolve, reject, timeout, action }
   private pendingCommands: Map<
     string,
     {
       resolve: (ack: AckMessage) => void;
       reject: (error: Error) => void;
       timeout: NodeJS.Timeout;
+      action?: string; // Track command action for processing ACK responses
     }
   > = new Map();
 
@@ -198,11 +202,18 @@ export class DeviceCommandService {
       // Log command execution (audit trail)
       await this.logCommand(request, commandId, 'pending');
 
+      // Determine timeout - preview commands need more time for WebRTC setup
+      const isPreviewCommand =
+        request.action === 'preview.start' || request.action === 'preview.stop';
+      const commandTimeout =
+        request.timeout ||
+        (isPreviewCommand ? PREVIEW_COMMAND_TIMEOUT : DEFAULT_COMMAND_TIMEOUT);
+
       // Send command via WebSocket (using UUID for room lookup)
       const ack = await this.sendCommandViaWebSocket(
         request.deviceId, // UUID for room lookup
         command,
-        request.timeout || DEFAULT_COMMAND_TIMEOUT
+        commandTimeout
       );
 
       // Log successful response (using database ID for logging)
@@ -321,18 +332,33 @@ export class DeviceCommandService {
           reject(error);
         },
         timeout: timeoutHandle,
+        action: command.action, // Store action for ACK processing
       });
 
-      // Send command
+      // Send command directly to device only (not to observers)
+      // Commands should only go to the device, not be broadcast to all clients
       try {
-        room.broadcast(command);
-        coreInfo('Command sent to device', {
-          operation: 'broadcast-box:command:sent',
-          deviceId,
-          action: command.action,
-          commandId: command.id,
-          storedCommandIds: Array.from(this.pendingCommands.keys()),
-        });
+        // Check if room has sendToDevice method (DeviceRoom implementation)
+        if (typeof (room as any).sendToDevice === 'function') {
+          const sent = (room as any).sendToDevice(command);
+          if (!sent) {
+            throw new Error(`Failed to send command to device ${deviceId}`);
+          }
+        } else {
+          // Fallback to broadcast if sendToDevice not available (shouldn't happen)
+          coreWarn(
+            'Room does not support sendToDevice, falling back to broadcast',
+            {
+              operation: 'broadcast-box:command:fallback-broadcast',
+              deviceId,
+              roomType: (room as any).roomType,
+            }
+          );
+          room.broadcast(command);
+        }
+
+        // Command will be logged in DeviceRoom.sendToDevice() when actually sent via WebSocket
+        // No need to log here - the actual send happens in DeviceRoom
       } catch (error) {
         clearTimeout(timeoutHandle);
         this.pendingCommands.delete(command.id);

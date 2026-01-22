@@ -24,6 +24,11 @@ export interface RealtimeConfig {
     connections_per_ip: number;
     connections_per_user: number;
   };
+  connection_cleanup?: {
+    enabled: boolean;
+    check_interval: number; // seconds, default: 60
+    stale_threshold: number; // seconds, default: 600 (10 minutes)
+  };
 }
 
 export interface RoomConfig {
@@ -77,4 +82,18 @@ export interface PresenceData {
     };
   };
   idle?: boolean;
+}
+
+/**
+ * Device connection metadata for quality tracking and prioritization
+ */
+export interface DeviceConnectionMetadata {
+  clientId: string;
+  deviceUuid: string;
+  deviceId: string;
+  connectedAt: number; // Timestamp when connection was established
+  lastMessageAt: number; // Timestamp of last message received from device
+  lastMessageFromServer: number; // Timestamp of last message sent to device
+  messageCount: number; // Total messages received from device
+  connectionScore: number; // Calculated quality score (higher = better)
 }

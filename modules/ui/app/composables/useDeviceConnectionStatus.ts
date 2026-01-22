@@ -30,12 +30,39 @@ export interface DeviceConnectionStatus {
   };
   activeSources?: ActiveSources; // Currently active sources
   pip?: PiPConfiguration; // Current PiP configuration
+  capabilities?: {
+    videoSources?: string[];
+    audioSources?: string[];
+    videoSourceObjects?: any[];
+    audioSourceObjects?: any[];
+    pipSupported?: boolean;
+    pipCapabilities?: {
+      supported: boolean;
+      maxSources?: number;
+      supportedPositions?: Array<
+        'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'center'
+      >;
+      minSize?: { width: number; height: number };
+      maxSize?: { width: number; height: number };
+    };
+    audioMixingCapabilities?: {
+      supported: boolean;
+      maxInputs?: number;
+    };
+    hardwareEncodingCapabilities?: {
+      supported: boolean;
+    };
+    maxResolution?: string;
+    hardwareEncoding?: boolean;
+  }; // Capabilities extracted from status messages and device.connected events
 }
 
 const deviceStatuses = ref<Map<string, DeviceConnectionStatus>>(new Map());
 const activeConnections = ref<Map<string, WebSocket>>(new Map());
 const connectingDevices = ref<Set<string>>(new Set()); // Track devices currently connecting
 const connectionRetries = ref<Map<string, number>>(new Map()); // Track retry counts
+// Reference counting: track how many components are subscribed to each device
+const connectionRefCounts = ref<Map<string, number>>(new Map());
 const config = useRuntimeConfig();
 
 // Maximum retry attempts before giving up
@@ -57,21 +84,23 @@ function getRealtimeUrl(): string {
 /**
  * Connect to a device room as an observer
  */
+// Track pending connection promises to share them across concurrent calls
+const pendingConnections = new Map<string, Promise<WebSocket | null>>();
+
 async function connectToDeviceRoom(
   deviceUuid: string
 ): Promise<WebSocket | null> {
   // Check if already connected
   const existingConnection = activeConnections.value.get(deviceUuid);
   if (existingConnection && existingConnection.readyState === WebSocket.OPEN) {
-    return existingConnection;
-  }
-
-  // Check if already connecting (prevent duplicate connection attempts)
-  if (connectingDevices.value.has(deviceUuid)) {
+    // Increment ref count for existing connection
+    const currentRefCount = connectionRefCounts.value.get(deviceUuid) || 0;
+    connectionRefCounts.value.set(deviceUuid, currentRefCount + 1);
     console.log(
-      `[DeviceConnectionStatus] Already connecting to device room: ${deviceUuid}`
+      `[DeviceConnectionStatus] Reusing existing connection for ${deviceUuid}, ref count: ${currentRefCount} -> ${currentRefCount + 1}`
     );
-    return null;
+    // Connection already exists and has message handler - don't attach another one
+    return existingConnection;
   }
 
   // Check retry count
@@ -91,14 +120,51 @@ async function connectToDeviceRoom(
     return null;
   }
 
-  // Mark as connecting
+  // CRITICAL: Check if already connecting - reuse the pending promise
+  // This MUST be the FIRST check (after auth/retry) to prevent race conditions
+  // where multiple concurrent calls all create their own promises/WebSockets
+  const pendingConnection = pendingConnections.get(deviceUuid);
+  if (pendingConnection) {
+    console.log(
+      `[DeviceConnectionStatus] Reusing pending connection promise for ${deviceUuid}`
+    );
+    // Increment ref count for pending connection
+    const currentRefCount = connectionRefCounts.value.get(deviceUuid) || 0;
+    connectionRefCounts.value.set(deviceUuid, currentRefCount + 1);
+    return pendingConnection;
+  }
+
+  // Double-check using connectingDevices Set as additional safety
+  if (connectingDevices.value.has(deviceUuid)) {
+    // This shouldn't happen if pendingConnections check worked correctly
+    console.warn(
+      `[DeviceConnectionStatus] Already connecting to device room: ${deviceUuid} (race condition detected)`
+    );
+    // Wait a tiny bit and check pendingConnections again
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const retryPendingConnection = pendingConnections.get(deviceUuid);
+    if (retryPendingConnection) {
+      return retryPendingConnection;
+    }
+    return null;
+  }
+
+  // Mark as connecting - do this BEFORE creating the promise to prevent race conditions
   connectingDevices.value.add(deviceUuid);
 
   const token = authStore.token; // TypeScript now knows this is string (not null)
   const realtimeUrl = getRealtimeUrl();
   const wsUrl = `${realtimeUrl}/realtime/devices/${deviceUuid}`;
 
-  return new Promise((resolve, reject) => {
+  // Create connection promise - we'll store it IMMEDIATELY after creation
+  // The Promise constructor runs synchronously, so this executes immediately
+  let connectionResolve: ((ws: WebSocket | null) => void) | null = null;
+  let connectionReject: ((error: any) => void) | null = null;
+
+  const connectionPromise = new Promise<WebSocket | null>((resolve, reject) => {
+    connectionResolve = resolve;
+    connectionReject = reject;
+
     try {
       // Use subprotocol for authentication (browser-compatible)
       // The realtime server extracts the token from the Sec-WebSocket-Protocol header
@@ -108,12 +174,45 @@ async function connectToDeviceRoom(
         console.log(
           `[DeviceConnectionStatus] Connected to device room: ${deviceUuid}`
         );
+
+        // Check if another connection was established first (race condition protection)
+        const existingConnection = activeConnections.value.get(deviceUuid);
+        if (
+          existingConnection &&
+          existingConnection !== ws &&
+          existingConnection.readyState === WebSocket.OPEN
+        ) {
+          // Another connection was established first, close this duplicate
+          console.warn(
+            `[DeviceConnectionStatus] Duplicate connection detected for ${deviceUuid}, closing duplicate`
+          );
+          ws.close(1000, 'Duplicate connection');
+          // Resolve with the existing connection instead of this duplicate
+          if (connectionResolve) {
+            connectionResolve(existingConnection);
+          }
+          return;
+        }
+
         activeConnections.value.set(deviceUuid, ws);
         connectingDevices.value.delete(deviceUuid);
+        // Don't delete from pendingConnections here - let finally() handle it
         connectionRetries.value.delete(deviceUuid); // Reset retry count on success
-        resolve(ws);
+
+        // Initialize ref count for new connection (starts at 1 for the component that initiated it)
+        const currentRefCount = connectionRefCounts.value.get(deviceUuid) || 0;
+        connectionRefCounts.value.set(deviceUuid, currentRefCount + 1);
+        console.log(
+          `[DeviceConnectionStatus] New connection established for ${deviceUuid}, ref count: ${currentRefCount} -> ${currentRefCount + 1}`
+        );
+
+        if (connectionResolve) {
+          connectionResolve(ws);
+        }
       };
 
+      // Set message handler once per WebSocket instance
+      // This handler will only be attached to one WebSocket per device
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
@@ -162,23 +261,228 @@ async function connectToDeviceRoom(
             const payload = message.payload;
             const health = extractHealthData(payload);
 
-            // Extract active sources
-            const activeSources: ActiveSources | undefined =
-              payload.active_sources
-                ? {
-                    video: payload.active_sources.video || null,
-                    audio: payload.active_sources.audio || null,
-                  }
-                : undefined;
+            // Extract capabilities from sources (if available)
+            // The device sends sources.video and sources.audio arrays with detailed source info
+            // We need to convert these to capabilities format for the UI
+            let capabilitiesUpdate: any = undefined;
+            let videoSourceObjects: any[] = [];
+            let audioSourceObjects: any[] = [];
 
-            // Extract PiP configuration
-            const pip: PiPConfiguration | undefined = payload.pip
+            if (payload.sources) {
+              const videoSources: string[] = [];
+              const audioSources: string[] = [];
+
+              // Extract video sources
+              if (Array.isArray(payload.sources.video)) {
+                payload.sources.video.forEach((source: any) => {
+                  if (source.identifier) {
+                    videoSources.push(source.identifier);
+                    videoSourceObjects.push({
+                      id: source.id,
+                      identifier: source.identifier,
+                      name: source.name || source.identifier,
+                      path: source.path,
+                      resolution: source.resolution,
+                    });
+                  }
+                });
+              }
+
+              // Extract audio sources
+              if (Array.isArray(payload.sources.audio)) {
+                payload.sources.audio.forEach((source: any) => {
+                  if (source.identifier) {
+                    audioSources.push(source.identifier);
+                    audioSourceObjects.push({
+                      id: source.id,
+                      identifier: source.identifier,
+                      name: source.name || source.identifier,
+                      channels: source.channels,
+                      sample_rate: source.sample_rate,
+                    });
+                  }
+                });
+              }
+
+              if (videoSources.length > 0 || audioSources.length > 0) {
+                capabilitiesUpdate = {
+                  videoSources,
+                  audioSources,
+                  videoSourceObjects,
+                  audioSourceObjects,
+                  // Preserve other capability fields if they exist
+                  pipSupported:
+                    payload.sources?.pip?.supported !== undefined
+                      ? Boolean(payload.sources.pip.supported)
+                      : payload.capabilities?.pipSupported,
+                  maxResolution: payload.capabilities?.maxResolution,
+                  hardwareEncoding:
+                    payload.resources?.healthy !== undefined ? true : undefined,
+                };
+              }
+            }
+
+            // Helper to enrich source object from source objects arrays if it only has id/identifier
+            const enrichSource = (
+              source: any,
+              sourceObjects: any[],
+              sourceType: 'video' | 'audio'
+            ): any => {
+              if (!source) return null;
+
+              // If source already has full info (name, path, etc.), use it as-is
+              if (source.name || source.path) {
+                return source;
+              }
+
+              // Otherwise, look up full source object from source objects array
+              if (source.id !== undefined && sourceObjects.length > 0) {
+                const fullSource = sourceObjects.find(
+                  (s: any) => s.id === source.id
+                );
+                if (fullSource) {
+                  // Merge: use identifier from status if provided, otherwise from source objects
+                  return {
+                    id: fullSource.id,
+                    identifier:
+                      source.identifier ||
+                      fullSource.identifier ||
+                      fullSource.name,
+                    name:
+                      fullSource.name ||
+                      source.identifier ||
+                      fullSource.identifier,
+                    path: fullSource.path,
+                    resolution: fullSource.resolution,
+                    framerate: fullSource.framerate,
+                    available: fullSource.available !== false,
+                  };
+                }
+              }
+
+              // If we have identifier but no full object, try to find by identifier
+              if (source.identifier && sourceObjects.length > 0) {
+                const fullSource = sourceObjects.find(
+                  (s: any) =>
+                    s.identifier === source.identifier ||
+                    s.name === source.identifier
+                );
+                if (fullSource) {
+                  return {
+                    id: fullSource.id,
+                    identifier: fullSource.identifier || source.identifier,
+                    name: fullSource.name || source.identifier,
+                    path: fullSource.path,
+                    resolution: fullSource.resolution,
+                    framerate: fullSource.framerate,
+                    available: fullSource.available !== false,
+                  };
+                }
+              }
+
+              // If we can't enrich, return what we have (at least id and identifier)
+              return source;
+            };
+
+            // Extract active sources.
+            // Devices may send any of these formats:
+            // - payload.active_sources (full objects)
+            // - payload.active (id + identifier only)
+            // - payload.sources.active (nested under sources, used by current Broadcast Box status payloads)
+            const activeSourcesPayload =
+              payload.active_sources ||
+              payload.active ||
+              payload.sources?.active;
+            let activeSources: ActiveSources | undefined = undefined;
+
+            if (activeSourcesPayload !== undefined) {
+              // Enrich incomplete source objects using source objects from payload.sources
+              const activeVideo = activeSourcesPayload.video
+                ? enrichSource(
+                    activeSourcesPayload.video,
+                    videoSourceObjects,
+                    'video'
+                  )
+                : null;
+
+              const activeAudio = activeSourcesPayload.audio
+                ? enrichSource(
+                    activeSourcesPayload.audio,
+                    audioSourceObjects,
+                    'audio'
+                  )
+                : null;
+
+              activeSources = {
+                video: activeVideo,
+                audio: activeAudio,
+              };
+            }
+
+            // Extract PiP configuration (new devices nest it under payload.sources.pip)
+            const pipPayload = payload.pip || payload.sources?.pip;
+            const pip: PiPConfiguration | undefined = pipPayload
               ? {
-                  enabled: payload.pip.enabled || false,
-                  pipSource: payload.pip.pip_source || null,
-                  mainSource: payload.pip.main_source || null,
-                  position: payload.pip.position || 'top_right',
-                  size: payload.pip.size || { width: 320, height: 240 },
+                  supported:
+                    pipPayload.supported !== undefined
+                      ? Boolean(pipPayload.supported)
+                      : true,
+                  enabled: pipPayload.enabled || false,
+                  pipSource: (() => {
+                    const value = pipPayload.pip_source;
+                    if (!value) return null;
+                    if (typeof value === 'string') {
+                      const match = videoSourceObjects.find(
+                        (s: any) =>
+                          s.identifier === value ||
+                          s.identifier?.toLowerCase?.() ===
+                            value.toLowerCase() ||
+                          s.name === value ||
+                          s.name?.toLowerCase?.() === value.toLowerCase()
+                      );
+                      return (
+                        match || {
+                          id: -1,
+                          identifier: value,
+                          name: value,
+                          available: true,
+                        }
+                      );
+                    }
+                    // If device sends an object, try to enrich it
+                    if (typeof value === 'object') {
+                      return enrichSource(value, videoSourceObjects, 'video');
+                    }
+                    return null;
+                  })(),
+                  mainSource: (() => {
+                    const value = pipPayload.main_source;
+                    if (!value) return null;
+                    if (typeof value === 'string') {
+                      const match = videoSourceObjects.find(
+                        (s: any) =>
+                          s.identifier === value ||
+                          s.identifier?.toLowerCase?.() ===
+                            value.toLowerCase() ||
+                          s.name === value ||
+                          s.name?.toLowerCase?.() === value.toLowerCase()
+                      );
+                      return (
+                        match || {
+                          id: -1,
+                          identifier: value,
+                          name: value,
+                          available: true,
+                        }
+                      );
+                    }
+                    if (typeof value === 'object') {
+                      return enrichSource(value, videoSourceObjects, 'video');
+                    }
+                    return null;
+                  })(),
+                  position: pipPayload.position || 'top_right',
+                  size: pipPayload.size || { width: 320, height: 240 },
                 }
               : undefined;
 
@@ -189,17 +493,18 @@ async function connectToDeviceRoom(
               | 'encoding'
               | 'uploading'
               | undefined;
-            if (payload?.state) {
+            const rawState = payload?.state || payload?.session?.state;
+            if (rawState) {
               deviceState =
-                payload.state === 'idle'
+                rawState === 'idle'
                   ? 'idle'
-                  : payload.state === 'capturing'
+                  : rawState === 'capturing'
                     ? 'recording' // Map capturing → recording
-                    : payload.state === 'recording'
+                    : rawState === 'recording'
                       ? 'recording'
-                      : payload.state === 'encoding'
+                      : rawState === 'encoding'
                         ? 'encoding'
-                        : payload.state === 'uploading'
+                        : rawState === 'uploading'
                           ? 'uploading'
                           : undefined;
             }
@@ -211,21 +516,58 @@ async function connectToDeviceRoom(
                 state: deviceState,
                 hasActiveSources: !!activeSources,
                 hasPiP: !!pip,
+                hasCapabilities: !!capabilitiesUpdate,
+                videoSourcesCount:
+                  capabilitiesUpdate?.videoSources?.length || 0,
+                audioSourcesCount:
+                  capabilitiesUpdate?.audioSources?.length || 0,
               }
             );
 
-            updateDeviceStatus(deviceUuid, {
+            // Convert timestamp to ISO string if it's a number (Unix timestamp)
+            let lastSeenAt: string;
+            if (message.timestamp) {
+              if (typeof message.timestamp === 'number') {
+                // Unix timestamp (seconds) - convert to ISO string
+                lastSeenAt = new Date(message.timestamp * 1000).toISOString();
+              } else if (typeof message.timestamp === 'string') {
+                lastSeenAt = message.timestamp;
+              } else {
+                lastSeenAt = new Date().toISOString();
+              }
+            } else {
+              lastSeenAt = new Date().toISOString();
+            }
+
+            // Build update object, only including defined values
+            const statusUpdate: Partial<DeviceConnectionStatus> = {
               connected: true,
-              lastSeenAt: message.timestamp || new Date().toISOString(),
+              lastSeenAt,
               state: deviceState || 'idle',
               sessionId:
                 payload?.session_id ||
+                payload?.session?.session_id ||
                 payload?.active_session?.session_id ||
                 null,
               health,
-              activeSources,
-              pip,
-            });
+            };
+
+            // Only update activeSources if we actually have data (don't overwrite with undefined)
+            if (activeSources !== undefined) {
+              statusUpdate.activeSources = activeSources;
+            }
+
+            // Only update pip if we have data
+            if (pip !== undefined) {
+              statusUpdate.pip = pip;
+            }
+
+            // Only update capabilities if we have data
+            if (capabilitiesUpdate !== undefined) {
+              statusUpdate.capabilities = capabilitiesUpdate;
+            }
+
+            updateDeviceStatus(deviceUuid, statusUpdate);
           }
 
           // Handle health.update events
@@ -236,22 +578,223 @@ async function connectToDeviceRoom(
               `[DeviceConnectionStatus] Health update received for ${deviceUuid}:`,
               health
             );
+            // Convert timestamp to ISO string if it's a number (Unix timestamp)
+            let lastSeenAt: string;
+            if (message.timestamp) {
+              if (typeof message.timestamp === 'number') {
+                // Unix timestamp (seconds) - convert to ISO string
+                lastSeenAt = new Date(message.timestamp * 1000).toISOString();
+              } else if (typeof message.timestamp === 'string') {
+                lastSeenAt = message.timestamp;
+              } else {
+                lastSeenAt = new Date().toISOString();
+              }
+            } else {
+              lastSeenAt = new Date().toISOString();
+            }
+
             updateDeviceStatus(deviceUuid, {
               connected: true,
-              lastSeenAt: message.timestamp || new Date().toISOString(),
+              lastSeenAt,
               health,
             });
           }
 
           // Handle device connection events
+          // Device sends: type: 'event', event: 'device.connected' with capabilities
+          // Server sends: type: 'control', event: 'device.connected' (no capabilities)
           if (
-            message.type === 'control' &&
+            (message.type === 'control' || message.type === 'event') &&
             message.event === 'device.connected'
           ) {
             console.log(
-              `[DeviceConnectionStatus] Device connected: ${deviceUuid}`
+              `[DeviceConnectionStatus] Device connected: ${deviceUuid}`,
+              message.type === 'event'
+                ? '(with capabilities)'
+                : '(server notification)'
             );
-            updateDeviceStatus(deviceUuid, { connected: true });
+
+            const statusUpdate: Partial<DeviceConnectionStatus> = {
+              connected: true,
+            };
+
+            // Extract capabilities and sources from device-sent event (type: 'event')
+            if (message.type === 'event' && message.payload) {
+              const payload = message.payload;
+              let capabilitiesUpdate: any = undefined;
+
+              // Extract structured capabilities from payload.capabilities
+              if (
+                payload.capabilities &&
+                typeof payload.capabilities === 'object'
+              ) {
+                const caps = payload.capabilities;
+                capabilitiesUpdate = { ...capabilitiesUpdate };
+
+                // PiP capabilities: object (new) or boolean (legacy)
+                const pipCap = caps.pip;
+                if (pipCap !== undefined) {
+                  if (typeof pipCap === 'object' && pipCap !== null) {
+                    capabilitiesUpdate.pipCapabilities = {
+                      supported: Boolean(pipCap.supported),
+                      maxSources:
+                        typeof pipCap.max_sources === 'number'
+                          ? pipCap.max_sources
+                          : undefined,
+                      supportedPositions: Array.isArray(
+                        pipCap.supported_positions
+                      )
+                        ? pipCap.supported_positions
+                        : undefined,
+                      minSize:
+                        pipCap.min_size &&
+                        typeof pipCap.min_size.width === 'number' &&
+                        typeof pipCap.min_size.height === 'number'
+                          ? {
+                              width: pipCap.min_size.width,
+                              height: pipCap.min_size.height,
+                            }
+                          : undefined,
+                      maxSize:
+                        pipCap.max_size &&
+                        typeof pipCap.max_size.width === 'number' &&
+                        typeof pipCap.max_size.height === 'number'
+                          ? {
+                              width: pipCap.max_size.width,
+                              height: pipCap.max_size.height,
+                            }
+                          : undefined,
+                    };
+                    capabilitiesUpdate.pipSupported = Boolean(pipCap.supported);
+                  } else if (typeof pipCap === 'boolean') {
+                    capabilitiesUpdate.pipCapabilities = { supported: pipCap };
+                    capabilitiesUpdate.pipSupported = pipCap;
+                  }
+                }
+
+                // Audio mixing capabilities
+                const audioMixingCap = caps.audio_mixing;
+                if (audioMixingCap !== undefined) {
+                  if (
+                    typeof audioMixingCap === 'object' &&
+                    audioMixingCap !== null
+                  ) {
+                    capabilitiesUpdate.audioMixingCapabilities = {
+                      supported: Boolean(audioMixingCap.supported),
+                      maxInputs:
+                        typeof audioMixingCap.max_inputs === 'number'
+                          ? audioMixingCap.max_inputs
+                          : undefined,
+                    };
+                  } else if (typeof audioMixingCap === 'boolean') {
+                    capabilitiesUpdate.audioMixingCapabilities = {
+                      supported: audioMixingCap,
+                    };
+                  }
+                }
+
+                // Hardware encoding capabilities: object (new) or boolean (legacy)
+                const hwEncCap = caps.hardware_encoding;
+                if (hwEncCap !== undefined) {
+                  if (typeof hwEncCap === 'object' && hwEncCap !== null) {
+                    capabilitiesUpdate.hardwareEncodingCapabilities = {
+                      supported: Boolean(hwEncCap.supported),
+                    };
+                    capabilitiesUpdate.hardwareEncoding = Boolean(
+                      hwEncCap.supported
+                    );
+                  } else if (typeof hwEncCap === 'boolean') {
+                    capabilitiesUpdate.hardwareEncodingCapabilities = {
+                      supported: hwEncCap,
+                    };
+                    capabilitiesUpdate.hardwareEncoding = hwEncCap;
+                  }
+                }
+              }
+
+              // Extract sources from payload.sources
+              if (payload.sources) {
+                const videoSourceObjects: any[] = [];
+                const audioSourceObjects: any[] = [];
+                const videoSources: string[] = [];
+                const audioSources: string[] = [];
+
+                // Extract video sources
+                if (Array.isArray(payload.sources.video)) {
+                  payload.sources.video.forEach((source: any) => {
+                    if (source.identifier) {
+                      videoSources.push(source.identifier);
+                    }
+                    videoSourceObjects.push({
+                      id: source.id,
+                      identifier: source.identifier,
+                      name: source.name || source.identifier,
+                      path: source.path,
+                      resolution: source.resolution,
+                      framerate: source.framerate,
+                      available: source.available !== false,
+                    });
+                  });
+                }
+
+                // Extract audio sources
+                if (Array.isArray(payload.sources.audio)) {
+                  payload.sources.audio.forEach((source: any) => {
+                    if (source.identifier) {
+                      audioSources.push(source.identifier);
+                    }
+                    audioSourceObjects.push({
+                      id: source.id,
+                      identifier: source.identifier,
+                      name: source.name || source.identifier,
+                      channels: source.channels,
+                      sample_rate: source.sample_rate,
+                      available: source.available !== false,
+                    });
+                  });
+                }
+
+                // Merge sources into capabilities
+                if (videoSources.length > 0 || audioSources.length > 0) {
+                  capabilitiesUpdate = {
+                    ...capabilitiesUpdate,
+                    videoSources:
+                      videoSources.length > 0 ? videoSources : undefined,
+                    audioSources:
+                      audioSources.length > 0 ? audioSources : undefined,
+                    videoSourceObjects:
+                      videoSourceObjects.length > 0
+                        ? videoSourceObjects
+                        : undefined,
+                    audioSourceObjects:
+                      audioSourceObjects.length > 0
+                        ? audioSourceObjects
+                        : undefined,
+                  };
+                }
+              }
+
+              // Update capabilities if we extracted any
+              if (capabilitiesUpdate !== undefined) {
+                statusUpdate.capabilities = capabilitiesUpdate;
+                console.log(
+                  `[DeviceConnectionStatus] Capabilities extracted from device.connected:`,
+                  {
+                    hasPipCapabilities: !!capabilitiesUpdate.pipCapabilities,
+                    hasAudioMixingCapabilities:
+                      !!capabilitiesUpdate.audioMixingCapabilities,
+                    hasHardwareEncodingCapabilities:
+                      !!capabilitiesUpdate.hardwareEncodingCapabilities,
+                    videoSourcesCount:
+                      capabilitiesUpdate.videoSourceObjects?.length || 0,
+                    audioSourcesCount:
+                      capabilitiesUpdate.audioSourceObjects?.length || 0,
+                  }
+                );
+              }
+            }
+
+            updateDeviceStatus(deviceUuid, statusUpdate);
           }
 
           // Handle device disconnection events
@@ -263,6 +806,32 @@ async function connectToDeviceRoom(
               `[DeviceConnectionStatus] Device disconnected: ${deviceUuid}`
             );
             updateDeviceStatus(deviceUuid, { connected: false });
+          }
+
+          // Forward preview messages to preview composable via custom event
+          if (
+            message.type === 'preview.offer' ||
+            message.type === 'preview.answer' ||
+            message.type === 'preview.ice_candidate' ||
+            (message.type === 'event' &&
+              (message.event === 'preview.started' ||
+                message.event === 'preview.stopped'))
+          ) {
+            // Emit custom event for preview composable
+            const eventName = `preview-message-${deviceUuid}`;
+            console.log(
+              `[DeviceConnectionStatus] Forwarding preview message to preview composable: ${message.type}`,
+              { deviceUuid, eventName, messageId: message.id }
+            );
+            const customEvent = new CustomEvent(eventName, {
+              detail: message,
+            });
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(customEvent);
+              console.log(
+                `[DeviceConnectionStatus] Custom event '${eventName}' dispatched for ${message.type}`
+              );
+            }
           }
         } catch (error) {
           console.error(
@@ -281,13 +850,16 @@ async function connectToDeviceRoom(
         );
         activeConnections.value.delete(deviceUuid);
         connectingDevices.value.delete(deviceUuid);
+        // Don't delete from pendingConnections here - let finally() handle it
         updateDeviceStatus(deviceUuid, { connected: false });
 
         // Increment retry count
         const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
         connectionRetries.value.set(deviceUuid, currentRetries + 1);
 
-        reject(error);
+        if (connectionReject) {
+          connectionReject(error);
+        }
       };
 
       ws.onclose = (event) => {
@@ -297,6 +869,7 @@ async function connectToDeviceRoom(
         );
         activeConnections.value.delete(deviceUuid);
         connectingDevices.value.delete(deviceUuid);
+        // Don't delete from pendingConnections here - let finally() handle it
         updateDeviceStatus(deviceUuid, { connected: false });
 
         // Only retry if it wasn't a clean close (code 1000) and we haven't exceeded max retries
@@ -341,9 +914,26 @@ async function connectToDeviceRoom(
       const currentRetries = connectionRetries.value.get(deviceUuid) || 0;
       connectionRetries.value.set(deviceUuid, currentRetries + 1);
 
-      reject(error);
+      if (connectionReject) {
+        connectionReject(error);
+      }
     }
   });
+
+  // Store the promise IMMEDIATELY (synchronously) so concurrent calls can reuse it
+  // This prevents race conditions where multiple calls all create their own promises
+  // IMPORTANT: Do this synchronously, before any async operations
+  pendingConnections.set(deviceUuid, connectionPromise);
+
+  // Clean up the promise from pending connections once it resolves/rejects
+  connectionPromise.finally(() => {
+    // Only remove if it's still the same promise (not replaced by another)
+    if (pendingConnections.get(deviceUuid) === connectionPromise) {
+      pendingConnections.delete(deviceUuid);
+    }
+  });
+
+  return connectionPromise;
 }
 
 /**
@@ -407,6 +997,28 @@ function updateDeviceStatus(
         hasChanges = true;
         break;
       }
+    } else if (key === 'capabilities' && value) {
+      // Deep comparison for capabilities
+      const currentCapabilities = currentValue as any;
+      const newCapabilities = value as any;
+      if (
+        !currentCapabilities ||
+        JSON.stringify(currentCapabilities.videoSources) !==
+          JSON.stringify(newCapabilities.videoSources) ||
+        JSON.stringify(currentCapabilities.audioSources) !==
+          JSON.stringify(newCapabilities.audioSources) ||
+        JSON.stringify(currentCapabilities.videoSourceObjects) !==
+          JSON.stringify(newCapabilities.videoSourceObjects) ||
+        JSON.stringify(currentCapabilities.audioSourceObjects) !==
+          JSON.stringify(newCapabilities.audioSourceObjects) ||
+        currentCapabilities.pipSupported !== newCapabilities.pipSupported ||
+        currentCapabilities.maxResolution !== newCapabilities.maxResolution ||
+        currentCapabilities.hardwareEncoding !==
+          newCapabilities.hardwareEncoding
+      ) {
+        hasChanges = true;
+        break;
+      }
     } else if (currentValue !== value) {
       hasChanges = true;
       break;
@@ -421,17 +1033,38 @@ function updateDeviceStatus(
 
 /**
  * Disconnect from a device room
+ * Uses reference counting - only closes connection when ref count reaches 0
  */
 function disconnectFromDeviceRoom(deviceUuid: string): void {
-  const ws = activeConnections.value.get(deviceUuid);
-  if (ws) {
-    ws.close(1000, 'Client disconnecting'); // Clean close
-    activeConnections.value.delete(deviceUuid);
-    deviceStatuses.value.delete(deviceUuid);
+  const currentRefCount = connectionRefCounts.value.get(deviceUuid) || 0;
+  const newRefCount = Math.max(0, currentRefCount - 1);
+
+  console.log(
+    `[DeviceConnectionStatus] Disconnect requested for ${deviceUuid}, ref count: ${currentRefCount} -> ${newRefCount}`
+  );
+
+  if (newRefCount === 0) {
+    // No more components using this connection, close it
+    const ws = activeConnections.value.get(deviceUuid);
+    if (ws) {
+      console.log(
+        `[DeviceConnectionStatus] Closing WebSocket for ${deviceUuid} (ref count reached 0)`
+      );
+      ws.close(1000, 'Client disconnecting'); // Clean close
+      activeConnections.value.delete(deviceUuid);
+      deviceStatuses.value.delete(deviceUuid);
+    }
+    // Also clear connecting state and retry count
+    connectingDevices.value.delete(deviceUuid);
+    connectionRetries.value.delete(deviceUuid);
+    connectionRefCounts.value.delete(deviceUuid);
+  } else {
+    // Other components still using this connection, just decrement ref count
+    connectionRefCounts.value.set(deviceUuid, newRefCount);
+    console.log(
+      `[DeviceConnectionStatus] Keeping connection open for ${deviceUuid} (${newRefCount} components still using it)`
+    );
   }
-  // Also clear connecting state and retry count
-  connectingDevices.value.delete(deviceUuid);
-  connectionRetries.value.delete(deviceUuid);
 }
 
 /**
@@ -482,11 +1115,19 @@ export function useDeviceConnectionStatus(deviceUuid?: string | null) {
     });
   }
 
+  // Get WebSocket connection for this device
+  const wsConnection = computed(() => {
+    const uuid = subscribedUuid.value || deviceUuid;
+    if (!uuid) return null;
+    return activeConnections.value.get(uuid) || null;
+  });
+
   return {
     status,
     isConnected,
     subscribe,
     unsubscribe,
+    wsConnection, // Expose WebSocket connection for preview and other features
   };
 }
 

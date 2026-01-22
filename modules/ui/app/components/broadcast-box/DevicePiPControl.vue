@@ -17,6 +17,16 @@
     </template>
 
     <div class="space-y-4">
+      <!-- Not supported -->
+      <UAlert
+        v-if="pipSupported === false"
+        color="neutral"
+        variant="soft"
+        :title="t('broadcastBox.notSupported')"
+        :description="t('broadcastBox.pipSupportDesc')"
+        icon="i-lucide-ban"
+      />
+
       <!-- Enable/Disable Toggle -->
       <UFormField
         :label="t('broadcastBox.pipStatus')"
@@ -24,7 +34,7 @@
       >
         <USwitch
           v-model="pipEnabled"
-          :disabled="loading || !isDeviceConnected"
+          :disabled="loading || !isDeviceConnected || pipSupported === false"
           @update:model-value="handlePipEnabledChange"
         />
       </UFormField>
@@ -38,7 +48,12 @@
         <USelectMenu
           v-model="selectedMainSource"
           :items="videoSources"
-          :disabled="loading || !isDeviceConnected || !pipEnabled"
+          :disabled="
+            loading ||
+            !isDeviceConnected ||
+            !pipEnabled ||
+            pipSupported === false
+          "
           :loading="loading"
           :placeholder="t('broadcastBox.selectMainSource')"
           value-attribute="value"
@@ -55,7 +70,7 @@
         <USelectMenu
           v-model="selectedPipSource"
           :items="pipSourceOptions"
-          :disabled="loading || !isDeviceConnected"
+          :disabled="loading || !isDeviceConnected || pipSupported === false"
           :loading="loading"
           :placeholder="t('broadcastBox.selectPipSource')"
         />
@@ -70,7 +85,7 @@
         <USelectMenu
           v-model="selectedPosition"
           :items="positionOptions"
-          :disabled="loading || !isDeviceConnected"
+          :disabled="loading || !isDeviceConnected || pipSupported === false"
           :loading="loading"
         />
       </UFormField>
@@ -84,9 +99,9 @@
           <UInput
             v-model.number="sizeWidth"
             type="number"
-            :disabled="loading || !isDeviceConnected"
-            :min="1"
-            :max="1920"
+            :disabled="loading || !isDeviceConnected || pipSupported === false"
+            :min="minPipSize.width"
+            :max="maxPipSize.width"
           />
         </UFormField>
         <UFormField
@@ -96,9 +111,9 @@
           <UInput
             v-model.number="sizeHeight"
             type="number"
-            :disabled="loading || !isDeviceConnected"
-            :min="1"
-            :max="1080"
+            :disabled="loading || !isDeviceConnected || pipSupported === false"
+            :min="minPipSize.height"
+            :max="maxPipSize.height"
           />
         </UFormField>
       </div>
@@ -108,7 +123,12 @@
         <UButton
           color="primary"
           :loading="loading"
-          :disabled="loading || !isDeviceConnected || !hasChanges"
+          :disabled="
+            loading ||
+            !isDeviceConnected ||
+            !hasChanges ||
+            pipSupported === false
+          "
           icon="i-lucide-settings"
           @click="handleApply"
         >
@@ -247,6 +267,35 @@ const currentPipConfig = computed(() => {
   return connectionStatus.value.pip || props.device.pip;
 });
 
+const pipCapabilities = computed(
+  () => props.device.capabilities?.pipCapabilities
+);
+
+const pipSupported = computed(() => {
+  const statusSupported = currentPipConfig.value?.supported;
+  if (statusSupported !== undefined) return statusSupported;
+  // Fallback to stored capabilities (older devices may not report supported in status)
+  return props.device.capabilities?.pipSupported ?? true;
+});
+
+const minPipSize = computed(() => {
+  return (
+    pipCapabilities.value?.minSize || {
+      width: 1,
+      height: 1,
+    }
+  );
+});
+
+const maxPipSize = computed(() => {
+  return (
+    pipCapabilities.value?.maxSize || {
+      width: 1920,
+      height: 1080,
+    }
+  );
+});
+
 // Form state
 const pipEnabled = ref(currentPipConfig.value?.enabled || false);
 const mainSourceValue = ref<string | undefined>(
@@ -317,13 +366,18 @@ const pipSourceOptions = computed(() => {
 });
 
 // Position options
-const positionOptions = computed(() => [
-  { label: t('broadcastBox.pipPositionTopLeft'), value: 'top_left' },
-  { label: t('broadcastBox.pipPositionTopRight'), value: 'top_right' },
-  { label: t('broadcastBox.pipPositionBottomLeft'), value: 'bottom_left' },
-  { label: t('broadcastBox.pipPositionBottomRight'), value: 'bottom_right' },
-  { label: t('broadcastBox.pipPositionCenter'), value: 'center' },
-]);
+const positionOptions = computed(() => {
+  const all = [
+    { label: t('broadcastBox.pipPositionTopLeft'), value: 'top_left' },
+    { label: t('broadcastBox.pipPositionTopRight'), value: 'top_right' },
+    { label: t('broadcastBox.pipPositionBottomLeft'), value: 'bottom_left' },
+    { label: t('broadcastBox.pipPositionBottomRight'), value: 'bottom_right' },
+    { label: t('broadcastBox.pipPositionCenter'), value: 'center' },
+  ];
+  const supported = pipCapabilities.value?.supportedPositions;
+  if (!supported || supported.length === 0) return all;
+  return all.filter((opt) => supported.includes(opt.value as any));
+});
 
 // Helper to format PiP position
 const formatPipPosition = (position: string | undefined): string => {
@@ -390,6 +444,11 @@ const validate = (): boolean => {
   errors.value = {};
 
   if (pipEnabled.value) {
+    if (pipSupported.value === false) {
+      errors.value.mainSource = t('broadcastBox.notSupported');
+      return false;
+    }
+
     if (!mainSourceValue.value) {
       errors.value.mainSource = t(
         'broadcastBox.pipValidationMainSourceRequired'
@@ -414,6 +473,22 @@ const validate = (): boolean => {
 
     if (sizeHeight.value <= 0 || !Number.isInteger(sizeHeight.value)) {
       errors.value.sizeHeight = t('broadcastBox.pipValidationSizePositive');
+      return false;
+    }
+
+    // Enforce capability bounds if available
+    if (
+      sizeWidth.value < minPipSize.value.width ||
+      sizeWidth.value > maxPipSize.value.width
+    ) {
+      errors.value.sizeWidth = t('broadcastBox.pipValidationSizeRequired');
+      return false;
+    }
+    if (
+      sizeHeight.value < minPipSize.value.height ||
+      sizeHeight.value > maxPipSize.value.height
+    ) {
+      errors.value.sizeHeight = t('broadcastBox.pipValidationSizeRequired');
       return false;
     }
   }

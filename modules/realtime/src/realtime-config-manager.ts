@@ -46,6 +46,11 @@ export class RealtimeConfigManager {
         connections_per_ip: 100,
         connections_per_user: 10,
       },
+      connection_cleanup: {
+        enabled: true,
+        check_interval: 60, // 1 minute
+        stale_threshold: 600, // 10 minutes
+      },
     };
   }
 
@@ -155,6 +160,20 @@ export class RealtimeConfigManager {
           loadedConfig.rate_limiting?.connections_per_user ??
           this.defaultConfig.rate_limiting.connections_per_user,
       },
+      connection_cleanup: {
+        enabled:
+          loadedConfig.connection_cleanup?.enabled ??
+          this.defaultConfig.connection_cleanup?.enabled ??
+          true,
+        check_interval:
+          loadedConfig.connection_cleanup?.check_interval ??
+          this.defaultConfig.connection_cleanup?.check_interval ??
+          60,
+        stale_threshold:
+          loadedConfig.connection_cleanup?.stale_threshold ??
+          this.defaultConfig.connection_cleanup?.stale_threshold ??
+          600,
+      },
     };
   }
 
@@ -188,6 +207,19 @@ export class RealtimeConfigManager {
 
     if (!['database', 'filesystem'].includes(config.snapshots.storage)) {
       throw new Error('snapshot storage must be "database" or "filesystem"');
+    }
+
+    if (config.connection_cleanup) {
+      if (config.connection_cleanup.check_interval < 1) {
+        throw new Error(
+          'connection_cleanup.check_interval must be at least 1 second'
+        );
+      }
+      if (config.connection_cleanup.stale_threshold < 1) {
+        throw new Error(
+          'connection_cleanup.stale_threshold must be at least 1 second'
+        );
+      }
     }
   }
 }

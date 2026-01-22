@@ -1270,6 +1270,7 @@
     "errors": {
       "loadFailed": "Échec du chargement des appareils",
       "listDevices": "Échec de la liste des appareils",
+      "listSessions": "Échec de la liste des sessions",
       "generic": "Une erreur s'est produite",
       "enrollFailed": "Échec de l'inscription de l'appareil",
       "registerDevice": "Échec de l'enregistrement de l'appareil",
@@ -1281,7 +1282,10 @@
       "invalidUuid": "Format UUID invalide",
       "enrollmentCodeRequired": "Le code d'inscription est requis",
       "regenerateEnrollmentFailed": "Échec de la régénération du code d'inscription",
+      "revokeDevice": "Échec de la révocation de l'appareil",
       "commandFailed": "Échec de l'exécution de la commande",
+      "startSession": "Échec du démarrage de la session",
+      "stopSession": "Échec de l'arrêt de la session",
       "deviceNotConnected": "Appareil Non Connecté",
       "deviceNotConnectedDesc": "L'appareil doit être connecté via WebSocket pour recevoir des commandes. Veuillez vous assurer que l'appareil est en ligne et connecté.",
       "deviceNotFound": "Appareil Non Trouvé",
@@ -1343,6 +1347,37 @@
     "oneMinuteAgo": "Il y a 1 minute",
     "minutesAgo": "Il y a {minutes} minutes",
     "viewSession": "Voir la session",
-    "startedAt": "Démarré le"
+    "startedAt": "Démarré le",
+    "preview": {
+      "title": "Aperçu en direct",
+      "start": "Démarrer l'aperçu",
+      "stop": "Arrêter l'aperçu",
+      "connecting": "Connexion...",
+      "connected": "Connecté",
+      "disconnected": "Déconnecté",
+      "failed": "Échec de la connexion",
+      "retry": "Réessayer",
+      "noStream": "Aucun flux d'aperçu disponible",
+      "webrtcNotSupported": "WebRTC Non Pris en Charge",
+      "webrtcNotSupportedDesc": "Votre navigateur ne prend pas en charge WebRTC. Veuillez utiliser un navigateur moderne pour voir l'aperçu.",
+      "audio": {
+        "enable": "Activer l’audio",
+        "disable": "Couper l’audio",
+        "noTrack": "Aucune piste audio dans le flux d’aperçu",
+        "enableFailed": "Impossible d’activer l’audio de l’aperçu"
+      },
+      "error": {
+        "startFailed": "Échec du démarrage de l'aperçu",
+        "connectionFailed": "Échec de la connexion WebRTC",
+        "iceFailed": "Échec de la connexion réseau",
+        "encoderNotAvailable": "Encodeur d'aperçu non disponible sur l'appareil"
+      },
+      "status": {
+        "disconnected": "Aperçu arrêté",
+        "connecting": "Établissement de la connexion...",
+        "connected": "Aperçu actif",
+        "failed": "Échec de la connexion"
+      }
+    }
   }
 }

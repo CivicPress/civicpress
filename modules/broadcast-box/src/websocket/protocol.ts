@@ -76,6 +76,15 @@ export class ProtocolHandler {
             message: message as BaseMessage,
             isValid: true,
           };
+        case 'preview.offer':
+        case 'preview.answer':
+        case 'preview.ice_candidate':
+          // Preview WebRTC messages are valid as-is (for routing between device and clients)
+          return {
+            type: message.type,
+            message: message as BaseMessage,
+            isValid: true,
+          };
         default:
           return {
             type: message.type,

@@ -883,6 +883,8 @@ export function createDevicesRouter(
           'list_sources',
           'start_session',
           'stop_session',
+          'preview.start',
+          'preview.stop',
         ];
         if (!allowedActions.includes(req.body.action)) {
           return res.status(400).json({

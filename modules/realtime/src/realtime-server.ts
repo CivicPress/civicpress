@@ -21,7 +21,10 @@ import {
   coreDebug,
   isCivicPressError,
 } from '@civicpress/core';
-import type { RealtimeConfig } from './types/realtime.types.js';
+import type {
+  RealtimeConfig,
+  DeviceConnectionMetadata,
+} from './types/realtime.types.js';
 import { RealtimeConfigManager } from './realtime-config-manager.js';
 import { RoomManager } from './rooms/room-manager.js';
 import {
@@ -70,9 +73,13 @@ export class RealtimeServer {
     string,
     { deviceId: string; deviceUuid: string; organizationId: string }
   > = new Map();
+  // Device connection metadata for quality tracking and prioritization
+  private deviceConnectionMetadata: Map<string, DeviceConnectionMetadata> =
+    new Map(); // clientId -> metadata
   private realtimeConfig: RealtimeConfig | null = null;
   private initialized: boolean = false;
   private snapshotInterval: NodeJS.Timeout | null = null;
+  private connectionCleanupInterval: NodeJS.Timeout | null = null;
   // Message rate limiting: clientId -> { count: number, resetTime: number }
   private messageRateLimits: Map<
     string,
@@ -219,6 +226,26 @@ export class RealtimeServer {
           this.createSnapshots();
         }, this.realtimeConfig.snapshots.interval * 1000);
       }
+    }
+
+    // Start connection cleanup job (for stale device connections)
+    if (
+      this.realtimeConfig.connection_cleanup?.enabled &&
+      this.realtimeConfig.connection_cleanup.check_interval > 0
+    ) {
+      const checkIntervalMs =
+        this.realtimeConfig.connection_cleanup.check_interval * 1000;
+      this.connectionCleanupInterval = setInterval(() => {
+        this.checkStaleConnections();
+      }, checkIntervalMs);
+
+      coreInfo('Connection cleanup job started', {
+        operation: 'realtime:server:connection-cleanup:started',
+        checkIntervalSeconds:
+          this.realtimeConfig.connection_cleanup.check_interval,
+        staleThresholdSeconds:
+          this.realtimeConfig.connection_cleanup.stale_threshold,
+      });
     }
 
     // Start WebSocket server
@@ -577,6 +604,37 @@ export class RealtimeServer {
     this.connections.set(clientId, ws);
     this.trackDeviceConnection(clientIp, deviceAuth.deviceId, clientId);
 
+    // Create connection metadata for quality tracking
+    this.createDeviceConnectionMetadata(
+      clientId,
+      deviceAuth.deviceUuid,
+      String(deviceAuth.deviceId)
+    );
+
+    // Log existing connections for the same device UUID (for observability)
+    const existingConnections = this.getDeviceConnectionsMetadata(
+      deviceAuth.deviceUuid
+    );
+    if (existingConnections.length > 1) {
+      // New connection + existing ones
+      coreWarn('Multiple connections detected for device', {
+        operation: 'realtime:server:device-connection:duplicate-detected',
+        deviceUuid: deviceAuth.deviceUuid,
+        deviceId: deviceAuth.deviceId,
+        totalConnections: existingConnections.length,
+        newClientId: clientId,
+        existingClientIds: existingConnections
+          .filter((m) => m.clientId !== clientId)
+          .map((m) => ({
+            clientId: m.clientId,
+            connectedAt: new Date(m.connectedAt).toISOString(),
+            ageMinutes: Math.round((Date.now() - m.connectedAt) / 60000),
+            messageCount: m.messageCount,
+            score: m.connectionScore,
+          })),
+      });
+    }
+
     // Register connection in DeviceConnectionTracker (if available)
     // This is used by DeviceCommandService to check if device is connected
     // Convert deviceId to string (connection tracker expects string)
@@ -817,7 +875,7 @@ export class RealtimeServer {
   ): void {
     ws.on('message', async (data: Buffer) => {
       try {
-        const message: RealtimeMessage = JSON.parse(data.toString());
+        const message: any = JSON.parse(data.toString());
 
         // Handle ping/pong (exempt from rate limiting)
         if (message.type === MessageType.PING) {
@@ -825,7 +883,81 @@ export class RealtimeServer {
           return;
         }
 
-        // Observers are read-only - they can only receive messages
+        // Handle preview WebRTC messages - observers can send these to devices
+        if (
+          message.type === 'preview.answer' ||
+          message.type === 'preview.ice_candidate'
+        ) {
+          const state = room.getState();
+
+          if (message.type === 'preview.answer') {
+            // Observing client → Device: Send answer only to device
+            for (const participant of state.participants) {
+              const participantWs = this.connections.get(participant.id);
+              if (
+                participantWs &&
+                participantWs.readyState === 1 &&
+                this.clientToDevice.has(participant.id)
+              ) {
+                try {
+                  participantWs.send(JSON.stringify(message));
+                  coreDebug(
+                    'Preview answer forwarded to device (from observer)',
+                    {
+                      operation: 'realtime:server:preview:answer-forwarded',
+                      fromClient: clientId,
+                      toDevice: participant.id,
+                    }
+                  );
+                } catch (error) {
+                  coreWarn('Failed to send preview answer from observer', {
+                    operation: 'realtime:server:preview:answer-error',
+                    deviceId: participant.id,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  });
+                }
+                break; // Only one device per room
+              }
+            }
+          } else if (message.type === 'preview.ice_candidate') {
+            // Observing client → Device: Send ICE candidate to device
+            for (const participant of state.participants) {
+              const participantWs = this.connections.get(participant.id);
+              if (
+                participantWs &&
+                participantWs.readyState === 1 &&
+                this.clientToDevice.has(participant.id)
+              ) {
+                try {
+                  participantWs.send(JSON.stringify(message));
+                  coreDebug(
+                    'Preview ICE candidate forwarded to device (from observer)',
+                    {
+                      operation: 'realtime:server:preview:ice-forwarded',
+                      fromClient: clientId,
+                      toDevice: participant.id,
+                    }
+                  );
+                } catch (error) {
+                  coreWarn(
+                    'Failed to send preview ICE candidate from observer',
+                    {
+                      operation: 'realtime:server:preview:ice-error',
+                      deviceId: participant.id,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    }
+                  );
+                }
+                break; // Only one device per room
+              }
+            }
+          }
+          return; // Don't process further
+        }
+
+        // Observers are read-only for all other message types
         // No need to handle other message types
       } catch (error: unknown) {
         const errorMessage =
@@ -983,6 +1115,9 @@ export class RealtimeServer {
           return;
         }
 
+        // Update connection metadata when message is received (skip ping/pong)
+        this.updateDeviceConnectionMetadataOnMessage(clientId);
+
         // Check message rate limit
         const rateLimitResult = this.checkMessageRateLimit(clientId);
         if (!rateLimitResult.allowed) {
@@ -1003,39 +1138,203 @@ export class RealtimeServer {
         }
 
         // Handle ack messages - route to DeviceCommandService before broadcasting
-        if (message.type === 'ack' && this.deviceCommandService) {
+        // Check if message is an ACK by type OR by presence of commandId + success fields
+        const isAckMessage =
+          message.type === 'ack' ||
+          (message.commandId &&
+            (message.success !== undefined ||
+              message.payload?.success !== undefined));
+
+        if (isAckMessage && this.deviceCommandService) {
           try {
-            // Device sends ack in this format:
-            // { type: "ack", id: "...", commandId: "...", timestamp: "...", status: "success"|"error", payload: {...}, error: {...} }
+            // Device may send ack in different formats:
+            // Format 1: { type: "ack", id: "...", commandId: "...", timestamp: "...", status: "success"|"error", payload: {...}, error: {...} }
+            // Format 2: { type: "ack", payload: { commandId: "...", success: true, result: {...}, timestamp: ... } }
+            // Format 3: { commandId: "...", success: true, result: {...} } (missing type field - handle gracefully)
             // We need to convert to: { type: "ack", commandId: "...", success: boolean, error: string, errorCode: string, payload: {...} }
+
+            // Extract commandId from either top-level or payload
+            const commandId =
+              message.commandId ||
+              message.payload?.commandId ||
+              message.payload?.command_id;
+
+            // Extract success from either status field, top-level success, or payload.success
+            let success: boolean;
+            if (message.status !== undefined) {
+              success = message.status === 'success';
+            } else if (message.success !== undefined) {
+              // Top-level success field (device may send it this way)
+              success = Boolean(message.success);
+            } else if (message.payload?.success !== undefined) {
+              success = message.payload.success;
+            } else {
+              // Default to true if not specified
+              success = true;
+            }
+
+            // Extract payload/result
+            // Handle both "result" and "payload" fields (device may use either)
+            const payload =
+              message.result ||
+              message.payload?.result ||
+              message.payload?.payload ||
+              message.payload;
 
             let ackMessage: any = {
               type: 'ack',
-              id: message.id,
-              timestamp: message.timestamp,
-              commandId: message.commandId,
-              // Convert status to success boolean
-              success: message.status === 'success',
+              id: message.id || message.payload?.id,
+              timestamp: message.timestamp || message.payload?.timestamp,
+              commandId: commandId,
+              success: success,
               // Extract error message and code
-              error: message.error?.message || message.error,
-              errorCode: message.error?.code || message.errorCode,
-              payload: message.payload,
+              error:
+                message.error?.message ||
+                message.error ||
+                message.payload?.error,
+              errorCode:
+                message.error?.code ||
+                message.errorCode ||
+                message.payload?.errorCode ||
+                message.payload?.error_code,
+              payload: payload,
             };
 
             // Debug: log conversion
             coreInfo('Ack message converted', {
               operation: 'realtime:server:device:ack-converted',
               originalStatus: message.status,
+              originalPayloadSuccess: message.payload?.success,
               convertedSuccess: ackMessage.success,
               commandId: ackMessage.commandId,
+              commandIdSource: message.commandId
+                ? 'top-level'
+                : message.payload?.commandId
+                  ? 'payload.commandId'
+                  : message.payload?.command_id
+                    ? 'payload.command_id'
+                    : 'none',
               hasError: !!ackMessage.error,
+              messageKeys: Object.keys(message),
+              payloadKeys: message.payload ? Object.keys(message.payload) : [],
             });
 
             // DeviceCommandService will resolve pending command promises
             if (
+              commandId &&
               typeof this.deviceCommandService.handleAckResponse === 'function'
             ) {
               this.deviceCommandService.handleAckResponse(ackMessage);
+            } else if (!commandId) {
+              coreWarn('Ack message missing commandId', {
+                operation: 'realtime:server:device:ack-missing-command-id',
+                message: JSON.stringify(message),
+              });
+            }
+
+            // Process switch_source ACK response to update activeSources
+            // Device sends: { result: { sources: [{ source_type: "video", source_id: 0, status: "switched" }, ...] } }
+            if (
+              ackMessage.success &&
+              ackMessage.payload &&
+              this.deviceManager
+            ) {
+              const result = ackMessage.payload.result || ackMessage.payload;
+              const sources = result?.sources;
+
+              if (Array.isArray(sources) && sources.length > 0) {
+                try {
+                  const device = await this.deviceManager.getDevice(
+                    deviceAuth.deviceId
+                  );
+                  if (device && device.capabilities) {
+                    // Build activeSources object from sources array
+                    let activeVideo: any = null;
+                    let activeAudio: any = null;
+
+                    for (const source of sources) {
+                      if (
+                        source.source_type === 'video' &&
+                        source.source_id !== undefined
+                      ) {
+                        // Find source object by ID
+                        const sourceObj =
+                          device.capabilities.videoSourceObjects?.find(
+                            (s: any) => s.id === source.source_id
+                          );
+                        if (sourceObj) {
+                          activeVideo = {
+                            id: sourceObj.id,
+                            identifier: sourceObj.identifier || sourceObj.name,
+                            name: sourceObj.name || sourceObj.identifier,
+                            path: sourceObj.path,
+                            resolution: sourceObj.resolution,
+                            framerate: sourceObj.framerate,
+                            available: sourceObj.available !== false,
+                          };
+                        }
+                      } else if (
+                        source.source_type === 'audio' &&
+                        source.source_id !== undefined
+                      ) {
+                        // Find source object by ID
+                        const sourceObj =
+                          device.capabilities.audioSourceObjects?.find(
+                            (s: any) => s.id === source.source_id
+                          );
+                        if (sourceObj) {
+                          activeAudio = {
+                            id: sourceObj.id,
+                            identifier: sourceObj.identifier || sourceObj.name,
+                            name: sourceObj.name || sourceObj.identifier,
+                            path: sourceObj.path,
+                            available: sourceObj.available !== false,
+                          };
+                        }
+                      }
+                    }
+
+                    // Update activeSources if we found any
+                    if (activeVideo || activeAudio) {
+                      await this.deviceManager.updateDevice(
+                        deviceAuth.deviceId,
+                        {
+                          activeSources: {
+                            video: activeVideo,
+                            audio: activeAudio,
+                          } as any,
+                        }
+                      );
+
+                      coreInfo(
+                        'Device active sources updated from switch_source ACK',
+                        {
+                          operation:
+                            'realtime:server:device:switch-source-ack-active-sources-updated',
+                          deviceId: deviceAuth.deviceId,
+                          commandId: commandId,
+                          hasVideoSource: !!activeVideo,
+                          hasAudioSource: !!activeAudio,
+                          videoSourceId: activeVideo?.id,
+                          audioSourceId: activeAudio?.id,
+                        }
+                      );
+                    }
+                  }
+                } catch (error) {
+                  coreWarn(
+                    'Failed to update active sources from switch_source ACK',
+                    {
+                      operation:
+                        'realtime:server:device:switch-source-ack-error',
+                      deviceId: deviceAuth.deviceId,
+                      commandId: commandId,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    }
+                  );
+                }
+              }
             }
           } catch (error) {
             coreWarn('Failed to handle ack response in DeviceCommandService', {
@@ -1113,13 +1412,475 @@ export class RealtimeServer {
                       device.capabilities?.audioSourceObjects || [],
                   };
 
-                  await this.deviceManager.updateDevice(deviceAuth.deviceId, {
-                    capabilities: updatedCapabilities as any,
-                  });
+                  // Validate and clean up device config if capabilities changed
+                  let configUpdates: any = {};
+                  const currentConfig = device.config || {};
+                  const capabilitiesChanged =
+                    JSON.stringify(updatedCapabilities) !==
+                    JSON.stringify(device.capabilities);
+
+                  // Only validate config if capabilities actually changed
+                  if (capabilitiesChanged) {
+                    // Check if defaultVideoSource is still valid
+                    if (currentConfig.defaultVideoSource) {
+                      const isValidVideoSource = videoSources.includes(
+                        currentConfig.defaultVideoSource
+                      );
+
+                      if (!isValidVideoSource) {
+                        configUpdates.defaultVideoSource = undefined;
+                        coreWarn(
+                          'Default video source no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSource: currentConfig.defaultVideoSource,
+                            availableSources: videoSources,
+                          }
+                        );
+                      }
+                    }
+
+                    // Check if defaultVideoSourceId is still valid
+                    if (currentConfig.defaultVideoSourceId !== undefined) {
+                      const videoSourceObjects =
+                        device.capabilities?.videoSourceObjects || [];
+                      const isValidVideoSourceId = videoSourceObjects.some(
+                        (s: any) => s.id === currentConfig.defaultVideoSourceId
+                      );
+
+                      if (!isValidVideoSourceId) {
+                        configUpdates.defaultVideoSourceId = undefined;
+                        coreWarn(
+                          'Default video source ID no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSourceId: currentConfig.defaultVideoSourceId,
+                          }
+                        );
+                      }
+                    }
+
+                    // Check if defaultAudioSource is still valid
+                    if (currentConfig.defaultAudioSource) {
+                      const isValidAudioSource = audioSources.includes(
+                        currentConfig.defaultAudioSource
+                      );
+
+                      if (!isValidAudioSource) {
+                        configUpdates.defaultAudioSource = undefined;
+                        coreWarn(
+                          'Default audio source no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSource: currentConfig.defaultAudioSource,
+                            availableSources: audioSources,
+                          }
+                        );
+                      }
+                    }
+
+                    // Check if defaultAudioSourceId is still valid
+                    if (currentConfig.defaultAudioSourceId !== undefined) {
+                      const audioSourceObjects =
+                        device.capabilities?.audioSourceObjects || [];
+                      const isValidAudioSourceId = audioSourceObjects.some(
+                        (s: any) => s.id === currentConfig.defaultAudioSourceId
+                      );
+
+                      if (!isValidAudioSourceId) {
+                        configUpdates.defaultAudioSourceId = undefined;
+                        coreWarn(
+                          'Default audio source ID no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSourceId: currentConfig.defaultAudioSourceId,
+                          }
+                        );
+                      }
+                    }
+                  }
+
+                  // Update device if capabilities changed or config needs cleanup
+                  const configNeedsCleanup =
+                    Object.keys(configUpdates).length > 0;
+                  const updateData: any = {};
+
+                  if (capabilitiesChanged) {
+                    updateData.capabilities = updatedCapabilities;
+                  }
+
+                  if (configNeedsCleanup) {
+                    // Merge config updates (clearing invalid values)
+                    updateData.config = {
+                      ...currentConfig,
+                      ...configUpdates,
+                    };
+                  }
+
+                  if (capabilitiesChanged || configNeedsCleanup) {
+                    await this.deviceManager.updateDevice(
+                      deviceAuth.deviceId,
+                      updateData
+                    );
+
+                    if (configNeedsCleanup) {
+                      coreInfo(
+                        'Device config cleaned up (invalid sources removed)',
+                        {
+                          operation:
+                            'realtime:server:device:status-config-cleaned',
+                          deviceId: deviceAuth.deviceId,
+                          clearedFields: Object.keys(configUpdates),
+                        }
+                      );
+                    }
+                  }
                 }
               } catch (error) {
                 coreWarn('Failed to update device capabilities from status', {
                   operation: 'realtime:server:device:status-capabilities-error',
+                  deviceId: deviceAuth.deviceId,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+
+            // Update device capabilities from payload.sources if provided (device sends sources.video and sources.audio arrays)
+            // This is the primary way devices send source information in status messages
+            if (payload.sources && this.deviceManager) {
+              try {
+                const device = await this.deviceManager.getDevice(
+                  deviceAuth.deviceId
+                );
+                if (device) {
+                  // Extract source names from detailed source objects for backward compatibility
+                  const videoSourceNames =
+                    payload.sources.video?.map(
+                      (s: any) =>
+                        s.identifier || s.name || s.path || `Source ${s.id}`
+                    ) || [];
+                  const audioSourceNames =
+                    payload.sources.audio?.map(
+                      (s: any) => s.identifier || s.name || `Source ${s.id}`
+                    ) || [];
+
+                  const updatedCapabilities = {
+                    ...device.capabilities,
+                    videoSources:
+                      videoSourceNames.length > 0
+                        ? videoSourceNames
+                        : device.capabilities?.videoSources || [],
+                    audioSources:
+                      audioSourceNames.length > 0
+                        ? audioSourceNames
+                        : device.capabilities?.audioSources || [],
+                    videoSourceObjects:
+                      payload.sources.video ||
+                      device.capabilities?.videoSourceObjects ||
+                      [],
+                    audioSourceObjects:
+                      payload.sources.audio ||
+                      device.capabilities?.audioSourceObjects ||
+                      [],
+                  };
+
+                  // Validate and clean up device config if capabilities changed
+                  let configUpdates: any = {};
+                  const currentConfig = device.config || {};
+                  const capabilitiesChanged =
+                    JSON.stringify(updatedCapabilities) !==
+                    JSON.stringify(device.capabilities);
+
+                  // Only validate config if capabilities actually changed
+                  if (capabilitiesChanged) {
+                    // Check if defaultVideoSource is still valid
+                    if (currentConfig.defaultVideoSource) {
+                      const isValidVideoSource =
+                        videoSourceNames.includes(
+                          currentConfig.defaultVideoSource
+                        ) ||
+                        payload.sources.video?.some(
+                          (s: any) =>
+                            s.identifier === currentConfig.defaultVideoSource ||
+                            s.name === currentConfig.defaultVideoSource
+                        );
+
+                      if (!isValidVideoSource) {
+                        configUpdates.defaultVideoSource = undefined;
+                        coreWarn(
+                          'Default video source no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-sources-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSource: currentConfig.defaultVideoSource,
+                            availableSources: videoSourceNames,
+                          }
+                        );
+                      }
+                    }
+
+                    // Check if defaultVideoSourceId is still valid
+                    if (currentConfig.defaultVideoSourceId !== undefined) {
+                      const isValidVideoSourceId = payload.sources.video?.some(
+                        (s: any) => s.id === currentConfig.defaultVideoSourceId
+                      );
+
+                      if (!isValidVideoSourceId) {
+                        configUpdates.defaultVideoSourceId = undefined;
+                        coreWarn(
+                          'Default video source ID no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-sources-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSourceId: currentConfig.defaultVideoSourceId,
+                            availableSourceIds:
+                              payload.sources.video?.map((s: any) => s.id) ||
+                              [],
+                          }
+                        );
+                      }
+                    }
+
+                    // Check if defaultAudioSource is still valid
+                    if (currentConfig.defaultAudioSource) {
+                      const isValidAudioSource =
+                        audioSourceNames.includes(
+                          currentConfig.defaultAudioSource
+                        ) ||
+                        payload.sources.audio?.some(
+                          (s: any) =>
+                            s.identifier === currentConfig.defaultAudioSource ||
+                            s.name === currentConfig.defaultAudioSource
+                        );
+
+                      if (!isValidAudioSource) {
+                        configUpdates.defaultAudioSource = undefined;
+                        coreWarn(
+                          'Default audio source no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-sources-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSource: currentConfig.defaultAudioSource,
+                            availableSources: audioSourceNames,
+                          }
+                        );
+                      }
+                    }
+
+                    // Check if defaultAudioSourceId is still valid
+                    if (currentConfig.defaultAudioSourceId !== undefined) {
+                      const isValidAudioSourceId = payload.sources.audio?.some(
+                        (s: any) => s.id === currentConfig.defaultAudioSourceId
+                      );
+
+                      if (!isValidAudioSourceId) {
+                        configUpdates.defaultAudioSourceId = undefined;
+                        coreWarn(
+                          'Default audio source ID no longer available, clearing from config',
+                          {
+                            operation:
+                              'realtime:server:device:status-sources-config-cleanup',
+                            deviceId: deviceAuth.deviceId,
+                            invalidSourceId: currentConfig.defaultAudioSourceId,
+                            availableSourceIds:
+                              payload.sources.audio?.map((s: any) => s.id) ||
+                              [],
+                          }
+                        );
+                      }
+                    }
+                  }
+
+                  // Update device if capabilities changed or config needs cleanup
+                  const configNeedsCleanup =
+                    Object.keys(configUpdates).length > 0;
+                  const updateData: any = {};
+
+                  if (capabilitiesChanged) {
+                    updateData.capabilities = updatedCapabilities;
+                  }
+
+                  if (configNeedsCleanup) {
+                    // Merge config updates (clearing invalid values)
+                    updateData.config = {
+                      ...currentConfig,
+                      ...configUpdates,
+                    };
+                  }
+
+                  if (capabilitiesChanged || configNeedsCleanup) {
+                    await this.deviceManager.updateDevice(
+                      deviceAuth.deviceId,
+                      updateData
+                    );
+
+                    if (capabilitiesChanged) {
+                      coreInfo(
+                        'Device capabilities updated from status (sources)',
+                        {
+                          operation:
+                            'realtime:server:device:status-sources-capabilities-updated',
+                          deviceId: deviceAuth.deviceId,
+                          videoSourcesCount: videoSourceNames.length,
+                          audioSourcesCount: audioSourceNames.length,
+                        }
+                      );
+                    }
+
+                    if (configNeedsCleanup) {
+                      coreInfo(
+                        'Device config cleaned up (invalid sources removed)',
+                        {
+                          operation:
+                            'realtime:server:device:status-sources-config-cleaned',
+                          deviceId: deviceAuth.deviceId,
+                          clearedFields: Object.keys(configUpdates),
+                        }
+                      );
+                    }
+                  }
+                }
+              } catch (error) {
+                coreWarn(
+                  'Failed to update device capabilities from status sources',
+                  {
+                    operation:
+                      'realtime:server:device:status-sources-update-error',
+                    deviceId: deviceAuth.deviceId,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  }
+                );
+              }
+            }
+
+            // Extract and store active sources from payload.active_sources, payload.active, or payload.sources.active
+            // Device may send either format: active_sources (full objects), active (id + identifier only), or sources.active (nested in sources object)
+            const activeSourcesPayload =
+              payload.active_sources ||
+              payload.active ||
+              payload.sources?.active;
+            if (activeSourcesPayload !== undefined && this.deviceManager) {
+              try {
+                const device = await this.deviceManager.getDevice(
+                  deviceAuth.deviceId
+                );
+                if (device) {
+                  // Helper to enrich source object from capabilities if it only has id/identifier
+                  const enrichSource = (
+                    source: any,
+                    sourceObjects: any[] | undefined,
+                    sourceType: 'video' | 'audio'
+                  ): any => {
+                    if (!source) return null;
+
+                    // If source already has full info (name, path, etc.), use it as-is
+                    if (source.name || source.path) {
+                      return source;
+                    }
+
+                    // Otherwise, look up full source object from capabilities
+                    if (source.id !== undefined && sourceObjects) {
+                      const fullSource = sourceObjects.find(
+                        (s: any) => s.id === source.id
+                      );
+                      if (fullSource) {
+                        // Merge: use identifier from status if provided, otherwise from capabilities
+                        return {
+                          id: fullSource.id,
+                          identifier:
+                            source.identifier ||
+                            fullSource.identifier ||
+                            fullSource.name,
+                          name:
+                            fullSource.name ||
+                            source.identifier ||
+                            fullSource.identifier,
+                          path: fullSource.path,
+                          resolution: fullSource.resolution,
+                          framerate: fullSource.framerate,
+                          available: fullSource.available !== false,
+                        };
+                      }
+                    }
+
+                    // If we have identifier but no full object, try to find by identifier
+                    if (source.identifier && sourceObjects) {
+                      const fullSource = sourceObjects.find(
+                        (s: any) =>
+                          s.identifier === source.identifier ||
+                          s.name === source.identifier
+                      );
+                      if (fullSource) {
+                        return {
+                          id: fullSource.id,
+                          identifier:
+                            fullSource.identifier || source.identifier,
+                          name: fullSource.name || source.identifier,
+                          path: fullSource.path,
+                          resolution: fullSource.resolution,
+                          framerate: fullSource.framerate,
+                          available: fullSource.available !== false,
+                        };
+                      }
+                    }
+
+                    // If we can't enrich, return what we have (at least id and identifier)
+                    return source;
+                  };
+
+                  const activeVideo = activeSourcesPayload.video
+                    ? enrichSource(
+                        activeSourcesPayload.video,
+                        device.capabilities?.videoSourceObjects,
+                        'video'
+                      )
+                    : null;
+
+                  const activeAudio = activeSourcesPayload.audio
+                    ? enrichSource(
+                        activeSourcesPayload.audio,
+                        device.capabilities?.audioSourceObjects,
+                        'audio'
+                      )
+                    : null;
+
+                  const activeSources = {
+                    video: activeVideo,
+                    audio: activeAudio,
+                  };
+
+                  await this.deviceManager.updateDevice(deviceAuth.deviceId, {
+                    activeSources: activeSources as any,
+                  });
+
+                  coreInfo('Device active sources updated from status', {
+                    operation:
+                      'realtime:server:device:status-active-sources-updated',
+                    deviceId: deviceAuth.deviceId,
+                    hasVideoSource: !!activeSources.video,
+                    hasAudioSource: !!activeSources.audio,
+                    videoSourceId: activeSources.video?.id,
+                    audioSourceId: activeSources.audio?.id,
+                    videoSourceIdentifier: activeSources.video?.identifier,
+                    audioSourceIdentifier: activeSources.audio?.identifier,
+                  });
+                }
+              } catch (error) {
+                coreWarn('Failed to update device active sources from status', {
+                  operation:
+                    'realtime:server:device:status-active-sources-update-error',
                   deviceId: deviceAuth.deviceId,
                   error: error instanceof Error ? error.message : String(error),
                 });
@@ -1136,8 +1897,158 @@ export class RealtimeServer {
           }
         }
 
-        // Broadcast message to other clients in the room (including observers)
-        this.broadcastToRoom(room, message, clientId);
+        // Handle preview WebRTC messages with special routing
+        if (
+          message.type === 'preview.offer' ||
+          message.type === 'preview.answer' ||
+          message.type === 'preview.ice_candidate'
+        ) {
+          const isDevice = this.clientToDevice.has(clientId);
+          const state = room.getState();
+
+          if (message.type === 'preview.offer' && isDevice) {
+            // Device → Observing clients: Send offer to all observing clients (users), not device
+            for (const participant of state.participants) {
+              if (participant.id === clientId) continue; // Skip device itself
+              const ws = this.connections.get(participant.id);
+              if (ws && ws.readyState === 1) {
+                // Only send to user clients (not devices)
+                if (!this.clientToDevice.has(participant.id)) {
+                  try {
+                    ws.send(JSON.stringify(message));
+                    coreDebug('Preview offer forwarded to observing client', {
+                      operation: 'realtime:server:preview:offer-forwarded',
+                      fromDevice: clientId,
+                      toClient: participant.id,
+                    });
+                  } catch (error) {
+                    coreWarn('Failed to send preview offer', {
+                      operation: 'realtime:server:preview:offer-error',
+                      clientId: participant.id,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    });
+                  }
+                }
+              }
+            }
+          } else if (message.type === 'preview.answer' && !isDevice) {
+            // Observing client → Device: Send answer only to device
+            coreInfo(
+              '📤 Observer sending preview.answer, forwarding to device',
+              {
+                operation: 'realtime:server:preview:answer-to-device',
+                fromObserver: clientId,
+                answerSdpLength: message.payload?.sdp?.length || 0,
+                participantsCount: state.participants.length,
+              }
+            );
+            for (const participant of state.participants) {
+              const ws = this.connections.get(participant.id);
+              if (
+                ws &&
+                ws.readyState === 1 &&
+                this.clientToDevice.has(participant.id)
+              ) {
+                try {
+                  ws.send(JSON.stringify(message));
+                  coreInfo(
+                    '✅ preview.answer forwarded from observer to device',
+                    {
+                      operation: 'realtime:server:preview:answer-forwarded',
+                      fromClient: clientId,
+                      toDevice: participant.id,
+                      answerSdpLength: message.payload?.sdp?.length || 0,
+                    }
+                  );
+                } catch (error) {
+                  coreWarn('❌ Failed to send preview answer to device', {
+                    operation: 'realtime:server:preview:answer-error',
+                    deviceId: participant.id,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  });
+                }
+                break; // Only one device per room
+              }
+            }
+          } else if (message.type === 'preview.ice_candidate') {
+            // Bidirectional: Route ICE candidates between device and the specific client
+            if (isDevice) {
+              // Device → Observing clients: Send to all observing clients
+              coreInfo(
+                '📥 Device sending ICE candidate, forwarding to observing clients',
+                {
+                  operation:
+                    'realtime:server:preview:ice-candidate-from-device',
+                  fromDevice: clientId,
+                  candidate: message.payload?.candidate?.substring(0, 100),
+                  participantsCount: state.participants.length,
+                }
+              );
+              for (const participant of state.participants) {
+                if (participant.id === clientId) continue;
+                const ws = this.connections.get(participant.id);
+                if (
+                  ws &&
+                  ws.readyState === 1 &&
+                  !this.clientToDevice.has(participant.id)
+                ) {
+                  try {
+                    ws.send(JSON.stringify(message));
+                    coreInfo(
+                      '✅ ICE candidate forwarded from device to observer',
+                      {
+                        operation:
+                          'realtime:server:preview:ice-candidate-forwarded',
+                        fromDevice: clientId,
+                        toObserver: participant.id,
+                      }
+                    );
+                  } catch (error) {
+                    coreWarn('Failed to send ICE candidate to client', {
+                      operation: 'realtime:server:preview:ice-candidate-error',
+                      clientId: participant.id,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    });
+                  }
+                }
+              }
+            } else {
+              // Observing client → Device: Send only to device
+              for (const participant of state.participants) {
+                const ws = this.connections.get(participant.id);
+                if (
+                  ws &&
+                  ws.readyState === 1 &&
+                  this.clientToDevice.has(participant.id)
+                ) {
+                  try {
+                    ws.send(JSON.stringify(message));
+                    coreDebug('ICE candidate forwarded to device', {
+                      operation:
+                        'realtime:server:preview:ice-candidate-forwarded',
+                      fromClient: clientId,
+                      toDevice: participant.id,
+                    });
+                  } catch (error) {
+                    coreWarn('Failed to send ICE candidate to device', {
+                      operation: 'realtime:server:preview:ice-candidate-error',
+                      deviceId: participant.id,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    });
+                  }
+                  break; // Only one device per room
+                }
+              }
+            }
+          }
+        } else {
+          // Broadcast message to other clients in the room (including observers)
+          this.broadcastToRoom(room, message, clientId);
+        }
 
         // Update last activity
         const deviceInfo = this.clientToDevice.get(clientId);
@@ -1217,6 +2128,9 @@ export class RealtimeServer {
           this.deviceConnections.delete(deviceInfo.deviceId);
         }
       }
+
+      // Remove connection metadata
+      this.removeDeviceConnectionMetadata(clientId);
     }
 
     // Cleanup message rate limit tracking
@@ -1274,6 +2188,232 @@ export class RealtimeServer {
       resetTime: Date.now() + 1000, // 1 second window
       warned: false,
     });
+  }
+
+  /**
+   * Create device connection metadata for quality tracking
+   */
+  private createDeviceConnectionMetadata(
+    clientId: string,
+    deviceUuid: string,
+    deviceId: string
+  ): DeviceConnectionMetadata {
+    const now = Date.now();
+    const metadata: DeviceConnectionMetadata = {
+      clientId,
+      deviceUuid,
+      deviceId,
+      connectedAt: now,
+      lastMessageAt: now,
+      lastMessageFromServer: 0,
+      messageCount: 0,
+      connectionScore: 1.0, // Initial score is perfect (brand new connection)
+    };
+
+    this.deviceConnectionMetadata.set(clientId, metadata);
+
+    coreDebug('Device connection metadata created', {
+      operation: 'realtime:server:device-connection-metadata:created',
+      clientId,
+      deviceUuid,
+      deviceId,
+    });
+
+    return metadata;
+  }
+
+  /**
+   * Update device connection metadata when message is received from device
+   */
+  private updateDeviceConnectionMetadataOnMessage(clientId: string): void {
+    const metadata = this.deviceConnectionMetadata.get(clientId);
+    if (!metadata) return;
+
+    const now = Date.now();
+    metadata.lastMessageAt = now;
+    metadata.messageCount++;
+    metadata.connectionScore = this.calculateConnectionScore(metadata);
+
+    coreDebug('Device connection metadata updated on message', {
+      operation:
+        'realtime:server:device-connection-metadata:updated-on-message',
+      clientId,
+      messageCount: metadata.messageCount,
+      connectionScore: metadata.connectionScore,
+    });
+  }
+
+  /**
+   * Update device connection metadata when message is sent to device
+   */
+  private updateDeviceConnectionMetadataOnSend(clientId: string): void {
+    const metadata = this.deviceConnectionMetadata.get(clientId);
+    if (!metadata) return;
+
+    metadata.lastMessageFromServer = Date.now();
+
+    coreDebug('Device connection metadata updated on send', {
+      operation: 'realtime:server:device-connection-metadata:updated-on-send',
+      clientId,
+    });
+  }
+
+  /**
+   * Calculate connection quality score
+   * Higher score = better connection (more recent, more active)
+   */
+  private calculateConnectionScore(metadata: DeviceConnectionMetadata): number {
+    const now = Date.now();
+    const ageMs = now - metadata.connectedAt;
+    const activityMs = now - metadata.lastMessageAt;
+
+    // Recent connections score higher (decay over 10 minutes = 600000ms)
+    const recencyScore = Math.max(0, 1 - ageMs / 600000);
+
+    // Active connections score higher (decay over 5 minutes = 300000ms)
+    const activityScore = Math.max(0, 1 - activityMs / 300000);
+
+    // Connections with more messages score slightly higher (log scale, capped at 1.0)
+    const volumeScore = Math.min(1, Math.log10(metadata.messageCount + 1) / 2);
+
+    // Weighted combination: 40% recency, 40% activity, 20% volume
+    return recencyScore * 0.4 + activityScore * 0.4 + volumeScore * 0.2;
+  }
+
+  /**
+   * Get device connection metadata for a clientId
+   */
+  getDeviceConnectionMetadata(
+    clientId: string
+  ): DeviceConnectionMetadata | undefined {
+    return this.deviceConnectionMetadata.get(clientId);
+  }
+
+  /**
+   * Get all connection metadata for a device UUID
+   */
+  getDeviceConnectionsMetadata(deviceUuid: string): DeviceConnectionMetadata[] {
+    const metadataList: DeviceConnectionMetadata[] = [];
+
+    for (const metadata of this.deviceConnectionMetadata.values()) {
+      if (metadata.deviceUuid === deviceUuid) {
+        // Recalculate score before returning (to ensure it's up-to-date)
+        metadata.connectionScore = this.calculateConnectionScore(metadata);
+        metadataList.push(metadata);
+      }
+    }
+
+    return metadataList;
+  }
+
+  /**
+   * Remove device connection metadata on disconnect
+   */
+  private removeDeviceConnectionMetadata(clientId: string): void {
+    const removed = this.deviceConnectionMetadata.delete(clientId);
+
+    if (removed) {
+      coreDebug('Device connection metadata removed', {
+        operation: 'realtime:server:device-connection-metadata:removed',
+        clientId,
+      });
+    }
+  }
+
+  /**
+   * Check for and close stale device connections
+   * A connection is considered stale if it has been inactive for longer than the threshold
+   * and is still in OPEN state (hasn't closed naturally)
+   */
+  private checkStaleConnections(): void {
+    if (!this.realtimeConfig?.connection_cleanup?.enabled) {
+      return;
+    }
+
+    const now = Date.now();
+    const staleThresholdMs =
+      (this.realtimeConfig.connection_cleanup.stale_threshold || 600) * 1000;
+
+    const staleConnections: Array<{
+      clientId: string;
+      deviceUuid: string;
+      inactivityMinutes: number;
+      metadata: DeviceConnectionMetadata;
+    }> = [];
+
+    // Check all device connection metadata for staleness
+    for (const [
+      clientId,
+      metadata,
+    ] of this.deviceConnectionMetadata.entries()) {
+      const ws = this.connections.get(clientId);
+      if (!ws || ws.readyState !== 1) {
+        // Connection is not OPEN, skip (it will be cleaned up naturally)
+        continue;
+      }
+
+      // Calculate inactivity: time since last message (from device or to device)
+      const lastActivity = Math.max(
+        metadata.lastMessageAt,
+        metadata.lastMessageFromServer || 0
+      );
+      const inactivityMs = now - lastActivity;
+
+      // Connection is stale if inactive for longer than threshold
+      if (inactivityMs > staleThresholdMs) {
+        staleConnections.push({
+          clientId,
+          deviceUuid: metadata.deviceUuid,
+          inactivityMinutes: Math.round(inactivityMs / 60000),
+          metadata,
+        });
+      }
+    }
+
+    // Close stale connections gracefully
+    if (staleConnections.length > 0) {
+      coreInfo('Closing stale connections', {
+        operation: 'realtime:server:connection-cleanup:closing-stale',
+        staleConnectionCount: staleConnections.length,
+        staleThresholdMinutes: Math.round(staleThresholdMs / 60000),
+      });
+
+      for (const stale of staleConnections) {
+        const ws = this.connections.get(stale.clientId);
+        if (ws && ws.readyState === 1) {
+          coreInfo('Closing stale connection', {
+            operation: 'realtime:server:connection-cleanup:close-stale',
+            clientId: stale.clientId,
+            deviceUuid: stale.deviceUuid,
+            inactivityMinutes: stale.inactivityMinutes,
+            lastMessageAt: new Date(stale.metadata.lastMessageAt).toISOString(),
+            lastMessageFromServer: stale.metadata.lastMessageFromServer
+              ? new Date(stale.metadata.lastMessageFromServer).toISOString()
+              : 'never',
+            messageCount: stale.metadata.messageCount,
+          });
+
+          // Send close frame with reason
+          // 1001 = going away (indicates connection is being closed due to inactivity)
+          try {
+            ws.close(1001, 'Connection inactive');
+          } catch (error) {
+            coreWarn('Failed to close stale connection', {
+              operation: 'realtime:server:connection-cleanup:close-error',
+              clientId: stale.clientId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+          // Cleanup will happen in handleDeviceDisconnect() when close event fires
+        }
+      }
+    } else {
+      coreDebug('No stale connections found', {
+        operation: 'realtime:server:connection-cleanup:check',
+        totalDeviceConnections: this.deviceConnectionMetadata.size,
+        staleThresholdMinutes: Math.round(staleThresholdMs / 60000),
+      });
+    }
   }
 
   /**
@@ -1969,6 +3109,15 @@ export class RealtimeServer {
     if (this.snapshotInterval) {
       clearInterval(this.snapshotInterval);
       this.snapshotInterval = null;
+    }
+
+    // Stop connection cleanup interval
+    if (this.connectionCleanupInterval) {
+      clearInterval(this.connectionCleanupInterval);
+      this.connectionCleanupInterval = null;
+      coreInfo('Connection cleanup job stopped', {
+        operation: 'realtime:server:connection-cleanup:stopped',
+      });
     }
 
     // Create final snapshots for all rooms

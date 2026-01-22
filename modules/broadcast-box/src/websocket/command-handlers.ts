@@ -717,5 +717,72 @@ export function createDefaultCommandHandlers(
   registry.registerHandler('set_pip', setPipHandler);
   registry.registerHandler('configure_pip', setPipHandler); // Alias
 
+  // Register preview.start handler
+  registry.registerHandler('preview.start', async (command, context) => {
+    const { quality } = command.payload || {};
+
+    // Optional quality parameters (default: 640x360 @ 15fps, 500 kbps)
+    const defaultQuality = {
+      width: 640,
+      height: 360,
+      framerate: 15,
+      bitrate: 500,
+    };
+
+    const previewQuality = quality
+      ? {
+          width: quality.width || defaultQuality.width,
+          height: quality.height || defaultQuality.height,
+          framerate: quality.framerate || defaultQuality.framerate,
+          bitrate: quality.bitrate || defaultQuality.bitrate,
+        }
+      : defaultQuality;
+
+    // Validate quality parameters
+    if (
+      previewQuality.width <= 0 ||
+      previewQuality.height <= 0 ||
+      previewQuality.framerate <= 0 ||
+      previewQuality.bitrate <= 0
+    ) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        'Invalid quality parameters: width, height, framerate, and bitrate must be positive numbers',
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+
+    coreInfo('Preview start command processed', {
+      operation: 'broadcast-box:command:preview-start',
+      deviceId: context.deviceId,
+      quality: previewQuality,
+    });
+
+    // Note: The device will create the WebRTC offer and send it via:
+    // 1. ACK response (in result.offer)
+    // 2. preview.offer event (for redundancy)
+    // We return success here - the actual offer will come from the device
+    return context.protocol.createAck(command.id, true, undefined, {
+      quality: previewQuality,
+      // The device will include the offer in the ACK result
+      // This is a placeholder - actual offer comes from device
+    });
+  });
+
+  // Register preview.stop handler
+  registry.registerHandler('preview.stop', async (command, context) => {
+    coreInfo('Preview stop command processed', {
+      operation: 'broadcast-box:command:preview-stop',
+      deviceId: context.deviceId,
+    });
+
+    // Return success - device will handle stopping the preview
+    return context.protocol.createAck(command.id, true, undefined, {
+      stopped: true,
+    });
+  });
+
   return registry;
 }

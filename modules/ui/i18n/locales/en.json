@@ -1266,6 +1266,7 @@
     "errors": {
       "loadFailed": "Failed to load devices",
       "listDevices": "Failed to list devices",
+      "listSessions": "Failed to list sessions",
       "generic": "An error occurred",
       "enrollFailed": "Failed to enroll device",
       "registerDevice": "Failed to register device",
@@ -1277,7 +1278,10 @@
       "invalidUuid": "Invalid UUID format",
       "enrollmentCodeRequired": "Enrollment code is required",
       "regenerateEnrollmentFailed": "Failed to regenerate enrollment code",
+      "revokeDevice": "Failed to revoke device",
       "commandFailed": "Command execution failed",
+      "startSession": "Failed to start session",
+      "stopSession": "Failed to stop session",
       "deviceNotConnected": "Device Not Connected",
       "deviceNotConnectedDesc": "The device must be connected via WebSocket to receive commands. Please ensure the device is online and connected.",
       "deviceNotFound": "Device Not Found",
@@ -1339,6 +1343,37 @@
     "oneMinuteAgo": "1 minute ago",
     "minutesAgo": "{minutes} minutes ago",
     "viewSession": "View Session",
-    "startedAt": "Started At"
+    "startedAt": "Started At",
+    "preview": {
+      "title": "Live Preview",
+      "start": "Start Preview",
+      "stop": "Stop Preview",
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "failed": "Connection Failed",
+      "retry": "Retry",
+      "noStream": "No preview stream available",
+      "webrtcNotSupported": "WebRTC Not Supported",
+      "webrtcNotSupportedDesc": "Your browser does not support WebRTC. Please use a modern browser to view the preview.",
+      "audio": {
+        "enable": "Enable audio",
+        "disable": "Mute audio",
+        "noTrack": "No audio track in preview stream",
+        "enableFailed": "Could not enable preview audio"
+      },
+      "error": {
+        "startFailed": "Failed to start preview",
+        "connectionFailed": "WebRTC connection failed",
+        "iceFailed": "Network connection failed",
+        "encoderNotAvailable": "Preview encoder not available on device"
+      },
+      "status": {
+        "disconnected": "Preview stopped",
+        "connecting": "Establishing connection...",
+        "connected": "Preview active",
+        "failed": "Connection failed"
+      }
+    }
   }
 }

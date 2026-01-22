@@ -83,10 +83,50 @@ export interface DeviceCapabilities {
   audioSourceObjects?: SourceInfo[];
 
   pipSupported: boolean;
+  /**
+   * Full PiP capability specification (from `device.connected` payload.capabilities.pip).
+   * This is richer than `pipSupported` and should be used for UI constraints.
+   */
+  pipCapabilities?: PiPCapabilities;
+
+  /**
+   * Audio mixing capability specification (from `device.connected` payload.capabilities.audio_mixing).
+   */
+  audioMixingCapabilities?: AudioMixingCapabilities;
+
+  /**
+   * Hardware encoding capability specification (from `device.connected` payload.capabilities.hardware_encoding).
+   */
+  hardwareEncodingCapabilities?: HardwareEncodingCapabilities;
+
   maxResolution: string;
   maxFramerate?: number; // Maximum framerate supported
   encodingPresets?: EncodingPreset[]; // Available encoding presets
   hardwareEncoding?: boolean; // Hardware encoding support (from status messages)
+}
+
+export interface Size2D {
+  width: number;
+  height: number;
+}
+
+export interface PiPCapabilities {
+  supported: boolean;
+  maxSources?: number;
+  supportedPositions?: Array<
+    'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'center'
+  >;
+  minSize?: Size2D;
+  maxSize?: Size2D;
+}
+
+export interface AudioMixingCapabilities {
+  supported: boolean;
+  maxInputs?: number;
+}
+
+export interface HardwareEncodingCapabilities {
+  supported: boolean;
 }
 
 /**
@@ -208,6 +248,11 @@ export interface SessionMetadata {
  * Matches the protocol's pip structure
  */
 export interface PiPConfiguration {
+  /**
+   * Whether PiP is supported on this device right now (from status `sources.pip.supported`).
+   * If missing (older devices), treat as supported.
+   */
+  supported?: boolean;
   enabled: boolean; // Whether PiP is currently active
   pipSource: SourceInfo | null; // PiP source (null if disabled)
   mainSource: SourceInfo | null; // Main source (null if no active video source)

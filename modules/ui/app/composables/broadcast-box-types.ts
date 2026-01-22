@@ -29,6 +29,11 @@ export interface ActiveSources {
  * Picture-in-Picture configuration from status message protocol
  */
 export interface PiPConfiguration {
+  /**
+   * Whether the device supports PiP right now (status `sources.pip.supported`).
+   * If missing (older devices), treat as supported.
+   */
+  supported?: boolean;
   enabled: boolean; // Whether PiP is currently active
   pipSource: SourceInfo | null; // PiP source (null if disabled)
   mainSource: SourceInfo | null; // Main source (null if no active video source)

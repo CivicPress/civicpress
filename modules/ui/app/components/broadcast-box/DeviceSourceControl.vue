@@ -29,6 +29,7 @@
             :disabled="loading || !isDeviceConnected"
             :loading="loading"
             :placeholder="t('broadcastBox.selectVideoSource')"
+            value-attribute="value"
           />
         </UFormField>
       </div>
@@ -45,6 +46,7 @@
             :disabled="loading || !isDeviceConnected"
             :loading="loading"
             :placeholder="t('broadcastBox.selectAudioSource')"
+            value-attribute="value"
           />
         </UFormField>
       </div>
@@ -78,38 +80,22 @@
 <script setup lang="ts">
 import type { BroadcastDevice } from '~/composables/useBroadcastBox';
 import { useDeviceCommands } from '~/composables/useDeviceCommands';
-import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import type { DeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
+import { computed, ref, watch, nextTick } from 'vue';
 
 const props = defineProps<{
   device: BroadcastDevice;
   isDeviceConnected: boolean;
+  connectionStatus?: DeviceConnectionStatus; // Passed from parent to share single connection
 }>();
 
 const { t } = useI18n();
 
-// Get real-time connection status for active sources
-// useDeviceConnectionStatus expects string | null, not a computed ref
-const deviceUuidForStatus = computed(() => props.device.deviceUuid);
-const {
-  status: connectionStatus,
-  subscribe,
-  unsubscribe,
-} = useDeviceConnectionStatus(null);
-
-// Subscribe to device status when component mounts
-onMounted(() => {
-  if (deviceUuidForStatus.value) {
-    subscribe(deviceUuidForStatus.value);
-  }
-});
-
-// Unsubscribe when component unmounts
-onUnmounted(() => {
-  if (deviceUuidForStatus.value) {
-    unsubscribe(deviceUuidForStatus.value);
-  }
-});
+// Use provided connection status or create a default empty one
+const connectionStatus = computed(
+  () =>
+    props.connectionStatus || ({ connected: false } as DeviceConnectionStatus)
+);
 
 // Get device UUID for commands
 const deviceUuid = computed(() => props.device.deviceUuid);
@@ -117,14 +103,47 @@ const deviceUuidRef = computed(() => deviceUuid.value);
 
 const { switchSource, loading } = useDeviceCommands(deviceUuidRef);
 
-// Use device capabilities directly - they're updated from device.connected event
-// No need to poll for sources - device broadcasts capabilities when it connects
-const videoSources = computed(() => {
-  return props.device.capabilities?.videoSources || [];
+// Get source objects if available (for better matching)
+const videoSourceObjects = computed(() => {
+  return props.device.capabilities?.videoSourceObjects || [];
 });
 
-const audioSources = computed(() => {
-  return props.device.capabilities?.audioSources || [];
+const audioSourceObjects = computed(() => {
+  return props.device.capabilities?.audioSourceObjects || [];
+});
+
+// Transform source objects into dropdown items with identifier as value and name as label
+// Fallback to string array if source objects are not available
+const videoSources = computed((): Array<{ value: string; label: string }> => {
+  const objects = videoSourceObjects.value;
+  if (objects && objects.length > 0) {
+    return objects.map((source: any) => ({
+      value: source.identifier || source.name || String(source.id),
+      label: source.name || source.identifier || `Source ${source.id}`,
+    }));
+  }
+  // Fallback to string array (legacy format)
+  const stringArray = props.device.capabilities?.videoSources || [];
+  return stringArray.map((identifier: string) => ({
+    value: identifier,
+    label: identifier,
+  }));
+});
+
+const audioSources = computed((): Array<{ value: string; label: string }> => {
+  const objects = audioSourceObjects.value;
+  if (objects && objects.length > 0) {
+    return objects.map((source: any) => ({
+      value: source.identifier || source.name || String(source.id),
+      label: source.name || source.identifier || `Source ${source.id}`,
+    }));
+  }
+  // Fallback to string array (legacy format)
+  const stringArray = props.device.capabilities?.audioSources || [];
+  return stringArray.map((identifier: string) => ({
+    value: identifier,
+    label: identifier,
+  }));
 });
 
 // Current active sources - prefer real-time from WebSocket, fallback to device config
@@ -134,7 +153,8 @@ const currentVideoSource = computed(() => {
     connectionStatus.value.activeSources?.video ||
     props.device.activeSources?.video;
   if (activeVideo) {
-    return activeVideo.identifier;
+    // Prefer identifier, fallback to name
+    return activeVideo.identifier || activeVideo.name;
   }
   // Fallback to device config
   return props.device.config?.defaultVideoSource;
@@ -146,11 +166,107 @@ const currentAudioSource = computed(() => {
     connectionStatus.value.activeSources?.audio ||
     props.device.activeSources?.audio;
   if (activeAudio) {
-    return activeAudio.identifier;
+    // Prefer identifier, fallback to name
+    return activeAudio.identifier || activeAudio.name;
   }
   // Fallback to device config
   return props.device.config?.defaultAudioSource;
 });
+
+// Helper to find a valid source value (identifier) that matches available sources
+// Tries multiple matching strategies: exact match, identifier match, name match, case-insensitive
+const findValidSource = (
+  preferredValue: string | undefined,
+  availableItems: Array<{ value: string; label: string }>,
+  sourceObjects?: any[]
+): string | undefined => {
+  if (!preferredValue || availableItems.length === 0) {
+    return undefined;
+  }
+
+  // Strategy 1: Exact match by value (identifier)
+  const exactMatch = availableItems.find(
+    (item) => item.value === preferredValue
+  );
+  if (exactMatch) {
+    return exactMatch.value;
+  }
+
+  // Strategy 2: Case-insensitive match by value
+  const caseInsensitiveMatch = availableItems.find(
+    (item) => item.value.toLowerCase() === preferredValue.toLowerCase()
+  );
+  if (caseInsensitiveMatch) {
+    return caseInsensitiveMatch.value;
+  }
+
+  // Strategy 3: Match by label (name) - find the identifier for a given name
+  const matchByLabel = availableItems.find(
+    (item) =>
+      item.label === preferredValue ||
+      item.label.toLowerCase() === preferredValue.toLowerCase()
+  );
+  if (matchByLabel) {
+    return matchByLabel.value;
+  }
+
+  // Strategy 4: Match using source objects (if available) - for backward compatibility
+  if (sourceObjects && sourceObjects.length > 0) {
+    // Try to find by identifier
+    const matchByIdentifier = sourceObjects.find(
+      (s: any) =>
+        s.identifier &&
+        (s.identifier === preferredValue ||
+          s.identifier.toLowerCase() === preferredValue.toLowerCase())
+    );
+    if (matchByIdentifier && matchByIdentifier.identifier) {
+      // Check if this identifier exists in available items
+      const item = availableItems.find(
+        (item) => item.value === matchByIdentifier.identifier
+      );
+      if (item) {
+        return item.value;
+      }
+    }
+
+    // Try to find by name
+    const matchByName = sourceObjects.find(
+      (s: any) =>
+        s.name &&
+        (s.name === preferredValue ||
+          s.name.toLowerCase() === preferredValue.toLowerCase())
+    );
+    if (matchByName && matchByName.identifier) {
+      // Check if this identifier exists in available items
+      const item = availableItems.find(
+        (item) => item.value === matchByName.identifier
+      );
+      if (item) {
+        return item.value;
+      }
+    }
+  }
+
+  // Strategy 5: Partial match (if preferredValue is an identifier like "razer_kiyo_pro"
+  // and label has "Razer Kiyo Pro", try to match by converting)
+  const normalizedPreferred = preferredValue
+    .toLowerCase()
+    .replace(/[_\s-]/g, '');
+  const partialMatch = availableItems.find((item) => {
+    const normalizedValue = item.value.toLowerCase().replace(/[_\s-]/g, '');
+    const normalizedLabel = item.label.toLowerCase().replace(/[_\s-]/g, '');
+    return (
+      normalizedValue === normalizedPreferred ||
+      normalizedLabel === normalizedPreferred
+    );
+  });
+  if (partialMatch) {
+    return partialMatch.value;
+  }
+
+  // No match found
+  return undefined;
+};
 
 // Helper to check if a source is currently active
 const isSourceActive = (
@@ -166,39 +282,148 @@ const isSourceActive = (
   return activeSource?.identifier === sourceIdentifier;
 };
 
-// Selected sources (for switching)
-// Use undefined instead of null to match USelectMenu's expected type
-const selectedVideoSource = ref<string | undefined>(currentVideoSource.value);
-const selectedAudioSource = ref<string | undefined>(currentAudioSource.value);
+// Internal refs to store the identifier values
+const selectedVideoSourceValue = ref<string | undefined>(undefined);
+const selectedAudioSourceValue = ref<string | undefined>(undefined);
 
-// Update selected sources when device config changes
-// Only update if values actually changed (not just object reference)
+// Computed properties for USelectMenu (converts between string value and object)
+const selectedVideoSource = computed({
+  get: () => {
+    if (!selectedVideoSourceValue.value) return undefined;
+    return videoSources.value.find(
+      (s) => s.value === selectedVideoSourceValue.value
+    );
+  },
+  set: (value: { value: string; label: string } | undefined) => {
+    selectedVideoSourceValue.value = value?.value;
+  },
+});
+
+const selectedAudioSource = computed({
+  get: () => {
+    if (!selectedAudioSourceValue.value) return undefined;
+    return audioSources.value.find(
+      (s) => s.value === selectedAudioSourceValue.value
+    );
+  },
+  set: (value: { value: string; label: string } | undefined) => {
+    selectedAudioSourceValue.value = value?.value;
+  },
+});
+
+// Initialize selected sources when device data is available
+const initializeSelectedSources = () => {
+  const currentVideo = currentVideoSource.value;
+  const currentAudio = currentAudioSource.value;
+  const availableVideo = videoSources.value;
+  const availableAudio = audioSources.value;
+  const videoObjects = videoSourceObjects.value;
+  const audioObjects = audioSourceObjects.value;
+
+  // Set video source if it's valid and available (returns identifier as value)
+  const validVideo = findValidSource(
+    currentVideo,
+    availableVideo,
+    videoObjects
+  );
+  if (validVideo !== undefined) {
+    selectedVideoSourceValue.value = validVideo;
+  }
+
+  // Set audio source if it's valid and available (returns identifier as value)
+  const validAudio = findValidSource(
+    currentAudio,
+    availableAudio,
+    audioObjects
+  );
+  if (validAudio !== undefined) {
+    selectedAudioSourceValue.value = validAudio;
+  }
+};
+
+// Update selected sources when device config or capabilities change
+// Watch for changes in current sources, device config, and available sources
 watch(
   () =>
-    [currentVideoSource.value, currentAudioSource.value] as [
+    [
+      currentVideoSource.value,
+      currentAudioSource.value,
+      videoSources.value,
+      audioSources.value,
+      videoSourceObjects.value,
+      audioSourceObjects.value,
+    ] as [
       string | undefined,
       string | undefined,
+      Array<{ value: string; label: string }>,
+      Array<{ value: string; label: string }>,
+      any[],
+      any[],
     ],
-  ([newVideo, newAudio], oldValue) => {
+  (
+    [
+      newVideo,
+      newAudio,
+      availableVideo,
+      availableAudio,
+      videoObjects,
+      audioObjects,
+    ],
+    oldValue
+  ) => {
     // Handle first run (oldValue is undefined) or when old values exist
     const [oldVideo, oldAudio] = oldValue || [undefined, undefined];
 
-    // Only update if values actually changed
-    if (newVideo !== oldVideo) {
-      selectedVideoSource.value = newVideo;
+    // Check if video source changed or needs validation
+    const validVideo = findValidSource(newVideo, availableVideo, videoObjects);
+    if (
+      newVideo !== oldVideo ||
+      validVideo !== selectedVideoSourceValue.value
+    ) {
+      selectedVideoSourceValue.value = validVideo;
     }
-    if (newAudio !== oldAudio) {
-      selectedAudioSource.value = newAudio;
+
+    // Check if audio source changed or needs validation
+    const validAudio = findValidSource(newAudio, availableAudio, audioObjects);
+    if (
+      newAudio !== oldAudio ||
+      validAudio !== selectedAudioSourceValue.value
+    ) {
+      selectedAudioSourceValue.value = validAudio;
     }
   },
   { immediate: true }
 );
 
+// Also initialize when component mounts and device data becomes available
+// Watch for device config, capabilities, and connection status changes
+watch(
+  () =>
+    [
+      props.device.config,
+      props.device.capabilities,
+      videoSources.value.length,
+      audioSources.value.length,
+      connectionStatus.value.activeSources,
+      props.device.activeSources,
+    ] as const,
+  () => {
+    // Only initialize if we have sources available
+    if (videoSources.value.length > 0 || audioSources.value.length > 0) {
+      // Use nextTick to ensure all reactive updates have completed
+      nextTick(() => {
+        initializeSelectedSources();
+      });
+    }
+  },
+  { immediate: true, deep: true }
+);
+
 // Check if there are changes to apply
 const hasChanges = computed(() => {
   return (
-    selectedVideoSource.value !== currentVideoSource.value ||
-    selectedAudioSource.value !== currentAudioSource.value
+    selectedVideoSourceValue.value !== currentVideoSource.value ||
+    selectedAudioSourceValue.value !== currentAudioSource.value
   );
 });
 
@@ -209,10 +434,10 @@ const handleSwitch = async () => {
   }
 
   try {
-    // Pass device object so switchSource can convert identifiers to numeric IDs
+    // Send identifiers directly (no conversion needed)
     await switchSource(
-      selectedVideoSource.value || undefined,
-      selectedAudioSource.value || undefined,
+      selectedVideoSourceValue.value || undefined,
+      selectedAudioSourceValue.value || undefined,
       props.device
     );
     // Sources will be updated when device data is refreshed

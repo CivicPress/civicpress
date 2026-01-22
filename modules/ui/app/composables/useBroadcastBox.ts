@@ -24,6 +24,23 @@ export interface BroadcastDevice {
     videoSourceObjects?: SourceInfo[]; // Source objects with numeric IDs
     audioSourceObjects?: SourceInfo[]; // Source objects with numeric IDs
     pipSupported: boolean;
+    pipCapabilities?: {
+      supported: boolean;
+      maxSources?: number;
+      supportedPositions?: Array<
+        'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'center'
+      >;
+      minSize?: { width: number; height: number };
+      maxSize?: { width: number; height: number };
+    };
+    audioMixingCapabilities?: {
+      supported: boolean;
+      maxInputs?: number;
+    };
+    hardwareEncodingCapabilities?: {
+      supported: boolean;
+    };
+    hardwareEncoding?: boolean;
     maxResolution: string;
   };
   config: Record<string, any>;

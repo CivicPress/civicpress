@@ -12,6 +12,7 @@ import DeviceSourceControl from '~/components/broadcast-box/DeviceSourceControl.
 import DevicePiPControl from '~/components/broadcast-box/DevicePiPControl.vue';
 import DeviceConfigControl from '~/components/broadcast-box/DeviceConfigControl.vue';
 import DeviceStatusControl from '~/components/broadcast-box/DeviceStatusControl.vue';
+import DevicePreview from '~/components/broadcast-box/DevicePreview.vue';
 import { useRecordUtils } from '~/composables/useRecordUtils';
 import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
 
@@ -69,13 +70,14 @@ const canManageDevices = computed(() => {
   return authStore.hasPermission('broadcast-box:admin');
 });
 
-// Use real-time connection status composable
+// Use real-time connection status composable - single instance per page
 const deviceUuidRef = computed(() => device.value?.deviceUuid || null);
 const {
   status: connectionStatus,
   isConnected,
   subscribe,
   unsubscribe,
+  wsConnection,
 } = useDeviceConnectionStatus(null); // Don't auto-subscribe, we'll do it manually
 
 // Define isDeviceConnected before it's used in watches
@@ -113,16 +115,140 @@ const isDeviceConnected = computed(() => {
 
 // Subscribe when device is loaded (only once per UUID change)
 let lastSubscribedUuid: string | null = null;
+let isComponentMounted = false; // Track if component is mounted
+let subscriptionTime: number | null = null; // Track when we last subscribed
+const MIN_SUBSCRIPTION_TIME = 1000; // Minimum time before allowing unsubscribe (1 second)
+
+// Watch for device UUID changes and subscribe when component is mounted
 watch(
   () => device.value?.deviceUuid,
   (deviceUuid) => {
     // Only subscribe if UUID actually changed (not just device object reassigned)
-    if (deviceUuid && deviceUuid !== lastSubscribedUuid) {
+    // and component is mounted
+    if (deviceUuid && deviceUuid !== lastSubscribedUuid && isComponentMounted) {
+      // Unsubscribe from previous device if any
+      if (lastSubscribedUuid && lastSubscribedUuid !== deviceUuid) {
+        unsubscribe(lastSubscribedUuid);
+      }
+
       lastSubscribedUuid = deviceUuid;
-      subscribe(deviceUuid);
+      subscriptionTime = Date.now();
+      console.log(
+        `[DeviceDetail] Subscribing to device connection status: ${deviceUuid}`
+      );
+      subscribe(deviceUuid).catch((error) => {
+        console.warn('Failed to subscribe to device connection status:', error);
+      });
+    }
+  }
+);
+
+// Track if we've refreshed device data after receiving capabilities (per device)
+let hasRefreshedAfterCapabilities = false;
+let lastRefreshedDeviceUuid: string | null | undefined = null;
+
+// Reset refresh flag when device changes
+watch(
+  () => device.value?.deviceUuid,
+  (deviceUuid) => {
+    if (deviceUuid !== lastRefreshedDeviceUuid) {
+      hasRefreshedAfterCapabilities = false;
+      lastRefreshedDeviceUuid = deviceUuid || null;
+    }
+  }
+);
+
+// Update device capabilities from connectionStatus when they're received
+watch(
+  () => connectionStatus.value,
+  (status) => {
+    if (device.value && status?.capabilities) {
+      // Merge capabilities from status into device object
+      if (!device.value.capabilities) {
+        // Initialize with default structure matching BroadcastDevice type
+        device.value.capabilities = {
+          videoSources: [],
+          audioSources: [],
+          pipSupported: false,
+          maxResolution: '',
+        };
+      }
+
+      // Check if capabilities actually changed
+      const capabilitiesChanged =
+        JSON.stringify(status.capabilities) !==
+        JSON.stringify(device.value.capabilities);
+
+      // Update video sources if available
+      if (
+        status.capabilities.videoSources &&
+        status.capabilities.videoSources.length > 0
+      ) {
+        device.value.capabilities.videoSources =
+          status.capabilities.videoSources;
+      }
+      if (status.capabilities.videoSourceObjects) {
+        device.value.capabilities.videoSourceObjects =
+          status.capabilities.videoSourceObjects;
+      }
+
+      // Update audio sources if available
+      if (
+        status.capabilities.audioSources &&
+        status.capabilities.audioSources.length > 0
+      ) {
+        device.value.capabilities.audioSources =
+          status.capabilities.audioSources;
+      }
+      if (status.capabilities.audioSourceObjects) {
+        device.value.capabilities.audioSourceObjects =
+          status.capabilities.audioSourceObjects;
+      }
+
+      // Update other capability fields
+      if (status.capabilities.pipSupported !== undefined) {
+        device.value.capabilities.pipSupported =
+          status.capabilities.pipSupported;
+      }
+      if (status.capabilities.maxResolution) {
+        device.value.capabilities.maxResolution =
+          status.capabilities.maxResolution;
+      }
+
+      // Update structured capability objects (from device.connected event)
+      if (status.capabilities.pipCapabilities) {
+        device.value.capabilities.pipCapabilities =
+          status.capabilities.pipCapabilities;
+      }
+      if (status.capabilities.audioMixingCapabilities) {
+        device.value.capabilities.audioMixingCapabilities =
+          status.capabilities.audioMixingCapabilities;
+      }
+      if (status.capabilities.hardwareEncodingCapabilities) {
+        device.value.capabilities.hardwareEncodingCapabilities =
+          status.capabilities.hardwareEncodingCapabilities;
+      }
+      // Note: hardwareEncoding boolean is also available in DeviceConnectionStatus.capabilities
+      // but is not part of BroadcastDevice.capabilities type - it's only in connectionStatus
+
+      // If capabilities changed and we haven't refreshed yet, refresh device data from API
+      // This ensures the UI shows the latest data from the database (which was updated by the backend)
+      // We only do this once to avoid unnecessary API calls
+      if (capabilitiesChanged && !hasRefreshedAfterCapabilities) {
+        hasRefreshedAfterCapabilities = true;
+        // Debounce the refresh slightly to avoid race conditions
+        setTimeout(() => {
+          loadDevice(true).catch((error) => {
+            console.warn(
+              'Failed to refresh device data after capabilities update:',
+              error
+            );
+          });
+        }, 500);
+      }
     }
   },
-  { immediate: true }
+  { deep: true }
 );
 
 // Don't auto-refresh device data - rely on WebSocket updates for real-time data
@@ -443,14 +569,36 @@ const breadcrumbItems = computed(() => [
 ]);
 
 onMounted(() => {
+  isComponentMounted = true; // Mark component as mounted
+
   if (canManageDevices.value) {
     // Force load on mount (bypass debounce)
     loadDevice(true);
+  }
+
+  // Subscribe to device connection status if device is already loaded
+  if (
+    device.value?.deviceUuid &&
+    device.value.deviceUuid !== lastSubscribedUuid
+  ) {
+    lastSubscribedUuid = device.value.deviceUuid;
+    subscriptionTime = Date.now();
+    console.log(
+      `[DeviceDetail] Subscribing to device connection status on mount: ${device.value.deviceUuid}`
+    );
+    subscribe(device.value.deviceUuid).catch((error) => {
+      console.warn(
+        'Failed to subscribe to device connection status on mount:',
+        error
+      );
+    });
   }
 });
 
 // Cleanup debounce timeout on unmount
 onUnmounted(() => {
+  isComponentMounted = false; // Mark component as unmounted to prevent new subscriptions
+
   if (loadDeviceTimeout) {
     clearTimeout(loadDeviceTimeout);
     loadDeviceTimeout = null;
@@ -459,8 +607,29 @@ onUnmounted(() => {
     clearInterval(sessionsRefreshInterval);
     sessionsRefreshInterval = null;
   }
-  if (device.value?.deviceUuid) {
-    unsubscribe(device.value.deviceUuid);
+  // Only unsubscribe if we actually subscribed to this device
+  // and enough time has passed since subscription (prevent race conditions)
+  if (
+    device.value?.deviceUuid &&
+    lastSubscribedUuid === device.value.deviceUuid
+  ) {
+    const timeSinceSubscription = subscriptionTime
+      ? Date.now() - subscriptionTime
+      : Infinity;
+
+    if (timeSinceSubscription >= MIN_SUBSCRIPTION_TIME) {
+      console.log(
+        `[DeviceDetail] Unsubscribing from device connection status: ${device.value.deviceUuid}`
+      );
+      unsubscribe(device.value.deviceUuid);
+    } else {
+      console.log(
+        `[DeviceDetail] Skipping unsubscribe (only ${timeSinceSubscription}ms since subscription)`
+      );
+      // Still clear the tracking variables
+    }
+    lastSubscribedUuid = null;
+    subscriptionTime = null;
   }
 });
 </script>
@@ -964,6 +1133,15 @@ onUnmounted(() => {
             </div>
           </UCard>
 
+          <!-- Preview Stream -->
+          <DevicePreview
+            v-if="device && isDeviceConnected"
+            :device="device"
+            :is-device-connected="isDeviceConnected"
+            :connection-status="connectionStatus"
+            :ws-connection="wsConnection"
+          />
+
           <!-- Device Control Cards -->
           <div
             v-if="isDeviceConnected"
@@ -973,6 +1151,7 @@ onUnmounted(() => {
             <DeviceSourceControl
               :device="device"
               :is-device-connected="isDeviceConnected"
+              :connection-status="connectionStatus"
             />
 
             <!-- Configuration Control -->
@@ -1260,11 +1439,10 @@ onUnmounted(() => {
           <!-- PiP Configuration -->
           <UCard
             v-if="
-              connectionStatus.pip?.enabled ||
-              device?.pip?.enabled ||
-              (connectionStatus.pip &&
-                connectionStatus.pip.enabled === false) ||
-              (device?.pip && device.pip.enabled === false)
+              // Show when we have any PiP info (including explicit supported=false)
+              connectionStatus.pip ||
+              device?.pip ||
+              device?.capabilities?.pipSupported !== undefined
             "
           >
             <template #header>
@@ -1273,6 +1451,36 @@ onUnmounted(() => {
               </h2>
             </template>
             <div class="space-y-4">
+              <!-- PiP Support Status -->
+              <div>
+                <label
+                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
+                >
+                  {{ t('broadcastBox.pipSupport') }}
+                </label>
+                <UBadge
+                  :color="
+                    (connectionStatus.pip?.supported ??
+                    device?.pip?.supported ??
+                    device?.capabilities?.pipSupported ??
+                    true)
+                      ? 'primary'
+                      : 'neutral'
+                  "
+                  variant="soft"
+                  size="sm"
+                >
+                  {{
+                    (connectionStatus.pip?.supported ??
+                    device?.pip?.supported ??
+                    device?.capabilities?.pipSupported ??
+                    true)
+                      ? t('broadcastBox.supported')
+                      : t('broadcastBox.notSupported')
+                  }}
+                </UBadge>
+              </div>
+
               <!-- PiP Status -->
               <div>
                 <label
@@ -1282,7 +1490,11 @@ onUnmounted(() => {
                 </label>
                 <UBadge
                   :color="
-                    connectionStatus.pip?.enabled || device?.pip?.enabled
+                    (connectionStatus.pip?.supported ??
+                      device?.pip?.supported ??
+                      device?.capabilities?.pipSupported ??
+                      true) &&
+                    (connectionStatus.pip?.enabled || device?.pip?.enabled)
                       ? 'primary'
                       : 'neutral'
                   "
@@ -1290,9 +1502,14 @@ onUnmounted(() => {
                   size="sm"
                 >
                   {{
-                    connectionStatus.pip?.enabled || device?.pip?.enabled
-                      ? t('broadcastBox.enabled')
-                      : t('broadcastBox.disabled')
+                    (connectionStatus.pip?.supported ??
+                    device?.pip?.supported ??
+                    device?.capabilities?.pipSupported ??
+                    true)
+                      ? connectionStatus.pip?.enabled || device?.pip?.enabled
+                        ? t('broadcastBox.enabled')
+                        : t('broadcastBox.disabled')
+                      : t('broadcastBox.notSupported')
                   }}
                 </UBadge>
               </div>
@@ -1302,7 +1519,11 @@ onUnmounted(() => {
                 v-if="
                   (connectionStatus.pip?.mainSource ||
                     device?.pip?.mainSource) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
+                  (connectionStatus.pip?.supported ??
+                    device?.pip?.supported ??
+                    device?.capabilities?.pipSupported ??
+                    true)
                 "
               >
                 <label
@@ -1342,7 +1563,11 @@ onUnmounted(() => {
               <div
                 v-if="
                   (connectionStatus.pip?.pipSource || device?.pip?.pipSource) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
+                  (connectionStatus.pip?.supported ??
+                    device?.pip?.supported ??
+                    device?.capabilities?.pipSupported ??
+                    true)
                 "
               >
                 <label
@@ -1382,7 +1607,11 @@ onUnmounted(() => {
               <div
                 v-if="
                   (connectionStatus.pip?.position || device?.pip?.position) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
+                  (connectionStatus.pip?.supported ??
+                    device?.pip?.supported ??
+                    device?.capabilities?.pipSupported ??
+                    true)
                 "
               >
                 <label
@@ -1403,7 +1632,11 @@ onUnmounted(() => {
               <div
                 v-if="
                   (connectionStatus.pip?.size || device?.pip?.size) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled)
+                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
+                  (connectionStatus.pip?.supported ??
+                    device?.pip?.supported ??
+                    device?.capabilities?.pipSupported ??
+                    true)
                 "
               >
                 <label

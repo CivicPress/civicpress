@@ -52,6 +52,56 @@ export async function registerBroadcastBoxRoutes(
     deviceCommandService
   );
 
+  // Admin endpoint to reset rate limits (for development/testing)
+  // In production, this should require proper admin authentication
+  const resetRateLimitsHandler = (req: any, res: any) => {
+    try {
+      rateLimiter.clearAll();
+      logger.info('Rate limits cleared via admin endpoint', {
+        operation: 'broadcast-box:admin:reset-rate-limits',
+        userId: req.user?.id,
+        ip: req.ip,
+      });
+      res.json({
+        success: true,
+        message: 'All rate limits have been cleared',
+      });
+    } catch (error) {
+      logger.error('Failed to clear rate limits', {
+        operation: 'broadcast-box:admin:reset-rate-limits-error',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to clear rate limits',
+          code: 'INTERNAL_ERROR',
+        },
+      });
+    }
+  };
+
+  // Register admin endpoint with or without auth (for development)
+  if (authMiddleware) {
+    app.post(
+      '/api/v1/broadcast-box/admin/reset-rate-limits',
+      authMiddleware,
+      resetRateLimitsHandler
+    );
+  } else {
+    // In development, allow without auth (WARNING: Not secure for production)
+    app.post(
+      '/api/v1/broadcast-box/admin/reset-rate-limits',
+      resetRateLimitsHandler
+    );
+    logger.warn(
+      'Rate limit reset endpoint is accessible without authentication',
+      {
+        operation: 'broadcast-box:admin:reset-rate-limits-warning',
+      }
+    );
+  }
+
   // Device registration endpoint (POST /) should be public - device uses enrollment code for auth
   // We need to register it separately before applying auth middleware
   if (authMiddleware) {

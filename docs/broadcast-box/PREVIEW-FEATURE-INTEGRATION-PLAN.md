@@ -74,9 +74,12 @@ video + PiP if enabled) and can run independently of recording sessions.
 
 **Expected Behavior**:
 
-- `preview.start` → Returns ACK with WebRTC offer in `result.offer`
+- `preview.start` → Returns ACK with success status (offer should NOT be in ACK)
 - `preview.stop` → Returns ACK with success status
-- Device should also emit `preview.offer` event separately (for redundancy)
+- Device MUST send `preview.offer` message separately via WebSocket (this is the
+  primary/preferred method)
+- **Note**: Sending the offer in both ACK and WebSocket causes duplicate
+  processing issues. Use WebSocket only.
 
 #### 1.2 Add Preview Actions to API Endpoint
 
@@ -396,13 +399,13 @@ pc.onconnectionstatechange = () => {
    ↓
 4. Device: Processes command, creates WebRTC offer
    ↓
-5. Device → Backend: ACK with offer in result
-   Device → Backend: preview.offer event (same offer)
+5. Device → Backend: ACK with success status (offer NOT in ACK)
+   Device → Backend: preview.offer message via WebSocket (primary method)
    ↓
-6. Backend → Frontend: ACK response via REST API
+6. Backend → Frontend: ACK response via REST API (no offer)
    Backend → Frontend: preview.offer message via WebSocket
    ↓
-7. Frontend: useDevicePreview receives offer (from WebSocket or ACK)
+7. Frontend: useDevicePreview receives offer from WebSocket
    ↓
 8. Frontend: Create RTCPeerConnection, set remote description (offer)
    ↓
