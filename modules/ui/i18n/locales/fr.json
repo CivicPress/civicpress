@@ -1290,7 +1290,14 @@
       "deviceNotConnectedDesc": "L'appareil doit être connecté via WebSocket pour recevoir des commandes. Veuillez vous assurer que l'appareil est en ligne et connecté.",
       "deviceNotFound": "Appareil Non Trouvé",
       "deviceNotFoundDesc": "L'appareil que vous recherchez n'existe pas ou a été supprimé.",
-      "getDevice": "Échec de la récupération de l'appareil"
+      "getDevice": "Échec de la récupération de l'appareil",
+      "startRecordingFailed": "Échec du démarrage de l'enregistrement",
+      "stopRecordingFailed": "Échec de l'arrêt de l'enregistrement",
+      "listRecordingsFailed": "Échec du chargement des enregistrements",
+      "recordingAlreadyInProgress": "Un enregistrement est déjà en cours",
+      "noVideoSource": "Aucune source vidéo disponible pour l'enregistrement",
+      "manualRecordingNotAvailable": "Enregistrement manuel non disponible",
+      "manualRecordingNotAvailableDesc": "Cet appareil ne prend pas en charge l'enregistrement manuel. Le service d'enregistrement manuel n'est pas disponible sur cet appareil."
     },
     "success": {
       "deviceEnrolled": "Appareil inscrit",
@@ -1306,7 +1313,11 @@
       "configUpdated": "Configuration mise à jour",
       "configUpdatedDesc": "La configuration de l'appareil a été mise à jour avec succès.",
       "pipConfigured": "PiP configuré",
-      "pipConfiguredDesc": "La configuration Picture-in-Picture a été mise à jour avec succès."
+      "pipConfiguredDesc": "La configuration Picture-in-Picture a été mise à jour avec succès.",
+      "recordingStarted": "Enregistrement démarré",
+      "recordingStartedDesc": "L'enregistrement manuel a été démarré avec succès.",
+      "recordingStopped": "Enregistrement arrêté",
+      "recordingStoppedDesc": "L'enregistrement manuel a été arrêté avec succès."
     },
     "sourceControl": "Contrôle des sources",
     "videoSource": "Source vidéo",
@@ -1348,6 +1359,17 @@
     "minutesAgo": "Il y a {minutes} minutes",
     "viewSession": "Voir la session",
     "startedAt": "Démarré le",
+    "manualRecording": "Enregistrement manuel",
+    "startRecording": "Démarrer l'enregistrement",
+    "stopRecording": "Arrêter l'enregistrement",
+    "recordingInProgress": "Enregistrement en cours",
+    "recordingsList": "Enregistrements",
+    "noRecordings": "Aucun enregistrement",
+    "noRecordingsDesc": "Aucun enregistrement manuel trouvé sur cet appareil.",
+    "recording": "Enregistrement",
+    "duration": "Durée",
+    "fileSize": "Taille du fichier",
+    "quality": "Qualité",
     "preview": {
       "title": "Aperçu en direct",
       "start": "Démarrer l'aperçu",

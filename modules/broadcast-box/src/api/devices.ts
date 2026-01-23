@@ -885,6 +885,9 @@ export function createDevicesRouter(
           'stop_session',
           'preview.start',
           'preview.stop',
+          'record.start',
+          'record.stop',
+          'record.list',
         ];
         if (!allowedActions.includes(req.body.action)) {
           return res.status(400).json({

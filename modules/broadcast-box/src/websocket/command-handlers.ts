@@ -784,5 +784,53 @@ export function createDefaultCommandHandlers(
     });
   });
 
+  // Register record.start handler
+  registry.registerHandler('record.start', async (command, context) => {
+    const { config } = command.payload || {};
+
+    coreInfo('Manual recording start command processed', {
+      operation: 'broadcast-box:command:record-start',
+      deviceId: context.deviceId,
+      config,
+    });
+
+    // Forward command to device - device will handle starting the recording
+    // and send back ACK with recording_id, file_path, etc.
+    // Return success - device will handle starting the recording and send ACK
+    return context.protocol.createAck(command.id, true, undefined, {
+      // Device will include recording_id, file_path, etc. in the ACK
+    });
+  });
+
+  // Register record.stop handler
+  registry.registerHandler('record.stop', async (command, context) => {
+    coreInfo('Manual recording stop command processed', {
+      operation: 'broadcast-box:command:record-stop',
+      deviceId: context.deviceId,
+    });
+
+    // Forward command to device - device will handle stopping the recording
+    // and send back ACK with final recording details
+    // Return success - device will handle stopping the recording and send ACK
+    return context.protocol.createAck(command.id, true, undefined, {
+      // Device will include recording_id, file_path, duration_seconds, file_size_bytes, etc. in the ACK
+    });
+  });
+
+  // Register record.list handler
+  registry.registerHandler('record.list', async (command, context) => {
+    coreInfo('Manual recording list command processed', {
+      operation: 'broadcast-box:command:record-list',
+      deviceId: context.deviceId,
+    });
+
+    // Forward command to device - device will handle listing recordings
+    // and send back ACK with recordings array
+    // Return success - device will handle listing recordings and send ACK
+    return context.protocol.createAck(command.id, true, undefined, {
+      // Device will include recordings array in the ACK
+    });
+  });
+
   return registry;
 }

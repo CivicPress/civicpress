@@ -55,6 +55,12 @@ export interface DeviceConnectionStatus {
     maxResolution?: string;
     hardwareEncoding?: boolean;
   }; // Capabilities extracted from status messages and device.connected events
+  manualRecording?: {
+    isRecording: boolean;
+    recordingId: string | null;
+    startedAt: string | null;
+    filePath: string | null;
+  };
 }
 
 const deviceStatuses = ref<Map<string, DeviceConnectionStatus>>(new Map());
@@ -806,6 +812,39 @@ async function connectToDeviceRoom(
               `[DeviceConnectionStatus] Device disconnected: ${deviceUuid}`
             );
             updateDeviceStatus(deviceUuid, { connected: false });
+          }
+
+          // Handle manual recording events
+          if (message.type === 'event') {
+            if (message.event === 'record.started') {
+              console.log(
+                `[DeviceConnectionStatus] Manual recording started: ${deviceUuid}`,
+                message.payload
+              );
+              const payload = message.payload;
+              updateDeviceStatus(deviceUuid, {
+                manualRecording: {
+                  isRecording: true,
+                  recordingId: payload.recording_id || null,
+                  startedAt:
+                    payload.metadata?.started_at || new Date().toISOString(),
+                  filePath: payload.metadata?.file_path || null,
+                },
+              });
+            } else if (message.event === 'record.stopped') {
+              console.log(
+                `[DeviceConnectionStatus] Manual recording stopped: ${deviceUuid}`,
+                message.payload
+              );
+              updateDeviceStatus(deviceUuid, {
+                manualRecording: {
+                  isRecording: false,
+                  recordingId: null,
+                  startedAt: null,
+                  filePath: null,
+                },
+              });
+            }
           }
 
           // Forward preview messages to preview composable via custom event

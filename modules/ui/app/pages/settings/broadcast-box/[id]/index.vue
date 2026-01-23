@@ -13,6 +13,7 @@ import DevicePiPControl from '~/components/broadcast-box/DevicePiPControl.vue';
 import DeviceConfigControl from '~/components/broadcast-box/DeviceConfigControl.vue';
 import DeviceStatusControl from '~/components/broadcast-box/DeviceStatusControl.vue';
 import DevicePreview from '~/components/broadcast-box/DevicePreview.vue';
+import DeviceManualRecording from '~/components/broadcast-box/DeviceManualRecording.vue';
 import { useRecordUtils } from '~/composables/useRecordUtils';
 import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
 
@@ -1140,6 +1141,14 @@ onUnmounted(() => {
             :is-device-connected="isDeviceConnected"
             :connection-status="connectionStatus"
             :ws-connection="wsConnection"
+          />
+
+          <!-- Manual Recording -->
+          <DeviceManualRecording
+            v-if="device"
+            :device="device"
+            :is-device-connected="isDeviceConnected"
+            :connection-status="connectionStatus"
           />
 
           <!-- Device Control Cards -->

@@ -5,7 +5,7 @@
  * via the unified command API endpoint.
  */
 
-import { ref, type Ref } from 'vue';
+import { ref, computed, type Ref, type ComputedRef } from 'vue';
 
 export interface CommandResponse {
   success: boolean;
@@ -53,7 +53,9 @@ export interface DeviceConfig {
  * @param deviceId - Device ID (UUID) as a reactive ref
  * @returns Command execution methods and reactive state
  */
-export function useDeviceCommands(deviceId: Ref<string | undefined>) {
+export function useDeviceCommands(
+  deviceId: Ref<string | undefined> | ComputedRef<string | undefined>
+) {
   const $civicApi = useNuxtApp().$civicApi;
   const toast = useToast();
   const { t } = useI18n();
@@ -585,6 +587,158 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
     }
   };
 
+  /**
+   * Start manual recording
+   *
+   * @param videoSource - Optional video source identifier
+   * @param audioSource - Optional audio source identifier
+   * @param quality - Optional quality preset (default: 'standard')
+   */
+  const startManualRecording = async (
+    videoSource?: string,
+    audioSource?: string,
+    quality: 'low' | 'standard' | 'high' = 'standard'
+  ): Promise<CommandResponse> => {
+    try {
+      const config: any = {
+        quality,
+      };
+
+      if (videoSource) {
+        config.video_source = videoSource;
+      }
+      if (audioSource) {
+        config.audio_source = audioSource;
+      }
+
+      const response = await sendCommand('record.start', {
+        config,
+      });
+
+      // Check if device doesn't support manual recording
+      if (
+        !response.success ||
+        (response.ack && !response.ack.success && response.ack.error)
+      ) {
+        const errorMessage = response.ack?.error || '';
+        if (
+          errorMessage.includes('Manual recording service not available') ||
+          errorMessage.includes('not available')
+        ) {
+          toast.add({
+            title: t('broadcastBox.errors.manualRecordingNotAvailable'),
+            description: t(
+              'broadcastBox.errors.manualRecordingNotAvailableDesc'
+            ),
+            color: 'error',
+          });
+        }
+      } else if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.recordingStarted'),
+          description: t('broadcastBox.success.recordingStartedDesc'),
+          color: 'primary',
+        });
+      }
+
+      return response;
+    } catch (err: any) {
+      // Check if error is about service not being available
+      const errorMessage = err.message || err.data?.error?.message || '';
+      if (
+        errorMessage.includes('Manual recording service not available') ||
+        errorMessage.includes('not available')
+      ) {
+        toast.add({
+          title: t('broadcastBox.errors.manualRecordingNotAvailable'),
+          description: t('broadcastBox.errors.manualRecordingNotAvailableDesc'),
+          color: 'error',
+        });
+      }
+      // Error already handled in sendCommand (for other errors)
+      throw err;
+    }
+  };
+
+  /**
+   * Stop manual recording
+   */
+  const stopManualRecording = async (): Promise<CommandResponse> => {
+    try {
+      const response = await sendCommand('record.stop', {});
+
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.recordingStopped'),
+          description: t('broadcastBox.success.recordingStoppedDesc'),
+          color: 'primary',
+        });
+      }
+
+      return response;
+    } catch (err: any) {
+      // Error already handled in sendCommand
+      throw err;
+    }
+  };
+
+  /**
+   * List manual recordings on device
+   */
+  const listManualRecordings = async (): Promise<Array<{
+    recording_id: string;
+    started_at: string;
+    stopped_at: string | null;
+    duration_seconds: number;
+    file_path: string;
+    file_size_bytes: number;
+    hash_sha256?: string;
+    video_source?: string;
+    audio_source?: string;
+    quality?: 'low' | 'standard' | 'high';
+    created_by: 'manual';
+  }> | null> => {
+    if (!deviceId.value) {
+      return null;
+    }
+
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await sendCommand('record.list', {});
+
+      if (response.success && response.ack?.success && response.ack?.payload) {
+        return response.ack.payload.recordings || [];
+      }
+
+      return [];
+    } catch (err: any) {
+      // Silently fail for list - don't show toast for expected errors
+      // This is expected when device is offline, doesn't support the command, or times out
+      const errorMessage = err.message || err.data?.error?.message || '';
+      const isNotConnectedError = errorMessage.includes('not connected');
+      const isTimeoutError =
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('Command timeout');
+      const isServiceNotAvailable =
+        errorMessage.includes('Manual recording service not available') ||
+        errorMessage.includes('not available');
+
+      // Only log unexpected errors (not connection, timeout, or service unavailable errors)
+      if (!isNotConnectedError && !isTimeoutError && !isServiceNotAvailable) {
+        console.warn(
+          'Failed to list manual recordings (unexpected error):',
+          err
+        );
+      }
+
+      return [];
+    } finally {
+      loading.value = false;
+    }
+  };
+
   return {
     // Methods
     sendCommand,
@@ -593,6 +747,9 @@ export function useDeviceCommands(deviceId: Ref<string | undefined>) {
     updateConfig,
     getStatus,
     listSources,
+    startManualRecording,
+    stopManualRecording,
+    listManualRecordings,
     // State
     loading,
     error,

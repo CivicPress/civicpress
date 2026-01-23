@@ -48,3 +48,20 @@ export interface PiPConfiguration {
     height: number; // PiP window height in pixels
   };
 }
+
+/**
+ * Manual recording metadata from device
+ */
+export interface ManualRecording {
+  recording_id: string;
+  started_at: string;
+  stopped_at: string | null;
+  duration_seconds: number;
+  file_path: string;
+  file_size_bytes: number;
+  hash_sha256?: string;
+  video_source?: string;
+  audio_source?: string;
+  quality?: 'low' | 'standard' | 'high';
+  created_by: 'manual';
+}

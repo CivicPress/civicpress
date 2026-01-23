@@ -1286,7 +1286,14 @@
       "deviceNotConnectedDesc": "The device must be connected via WebSocket to receive commands. Please ensure the device is online and connected.",
       "deviceNotFound": "Device Not Found",
       "deviceNotFoundDesc": "The device you are looking for does not exist or has been removed.",
-      "getDevice": "Failed to get device"
+      "getDevice": "Failed to get device",
+      "startRecordingFailed": "Failed to start recording",
+      "stopRecordingFailed": "Failed to stop recording",
+      "listRecordingsFailed": "Failed to load recordings",
+      "recordingAlreadyInProgress": "A recording is already in progress",
+      "noVideoSource": "No video source available for recording",
+      "manualRecordingNotAvailable": "Manual Recording Not Available",
+      "manualRecordingNotAvailableDesc": "This device does not support manual recording. The manual recording service is not available on this device."
     },
     "success": {
       "deviceEnrolled": "Device Enrolled",
@@ -1302,7 +1309,11 @@
       "configUpdated": "Configuration Updated",
       "configUpdatedDesc": "Device configuration has been successfully updated.",
       "pipConfigured": "PiP Configured",
-      "pipConfiguredDesc": "Picture-in-Picture configuration has been successfully updated."
+      "pipConfiguredDesc": "Picture-in-Picture configuration has been successfully updated.",
+      "recordingStarted": "Recording Started",
+      "recordingStartedDesc": "Manual recording has been successfully started.",
+      "recordingStopped": "Recording Stopped",
+      "recordingStoppedDesc": "Manual recording has been successfully stopped."
     },
     "sourceControl": "Source Control",
     "videoSource": "Video Source",
@@ -1344,6 +1355,17 @@
     "minutesAgo": "{minutes} minutes ago",
     "viewSession": "View Session",
     "startedAt": "Started At",
+    "manualRecording": "Manual Recording",
+    "startRecording": "Start Recording",
+    "stopRecording": "Stop Recording",
+    "recordingInProgress": "Recording in progress",
+    "recordingsList": "Recordings",
+    "noRecordings": "No recordings",
+    "noRecordingsDesc": "No manual recordings found on this device.",
+    "recording": "Recording",
+    "duration": "Duration",
+    "fileSize": "File Size",
+    "quality": "Quality",
     "preview": {
       "title": "Live Preview",
       "start": "Start Preview",
