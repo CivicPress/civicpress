@@ -20,17 +20,14 @@ numeric IDs.
   mainSource: string;              // Required: Main video source identifier (e.g., "hdmi1", "hdmi2")
   pipSource: string | null;        // Optional: PiP source identifier, null to disable
   pipPosition?: string;            // Optional: "top_left" | "top_right" | "bottom_left" | "bottom_right" | "center"
-  pipSize?: {                      // Optional: PiP window size
-    width: number;
-    height: number;
-  }
+  pipSize?: number;                 // Optional: PiP size as fraction of frame (0.05–1.0), e.g. 0.25 = 25%
 }
 ```
 
 **Defaults**:
 
 - `pipPosition`: `"top_right"`
-- `pipSize`: `{ width: 320, height: 240 }`
+- `pipSize`: `0.25` (25% of frame)
 
 ## Implementation Plan
 
@@ -53,7 +50,7 @@ numeric IDs.
 - `pipSource` must be valid video source if not null
 - `pipPosition` must be one of: `"top_left"`, `"top_right"`, `"bottom_left"`,
   `"bottom_right"`, `"center"`
-- `pipSize.width` and `pipSize.height` must be positive numbers if provided
+- `pipSize` must be a number in range 0.05–1.0 if provided (fraction of frame)
 - Both sources must exist in device capabilities
 - Both sources must be available (if `available` field exists)
 
@@ -86,7 +83,7 @@ numeric IDs.
    - Ensure `pipSource` is different from `mainSource`
 6. Apply defaults for `pipPosition` and `pipSize` if not provided
 7. Validate `pipPosition` is valid enum value
-8. Validate `pipSize` dimensions are positive numbers
+8. Validate `pipSize` is a number in range 0.05–1.0 if provided
 9. Convert source identifiers to numeric IDs
 10. Return success ack with configured values
 
@@ -112,7 +109,7 @@ const setPip = async (
   pipSource?: string | number | null,
   options?: {
     position?: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'center';
-    size?: { width: number; height: number };
+    size?: number;  // fraction of frame, 0.05–1.0, e.g. 0.25 = 25%
   },
   device?: BroadcastDevice
 ): Promise<CommandResponse>
@@ -159,7 +156,7 @@ export interface SetPipOptions {
 - Main source selector (dropdown of available video sources)
 - PiP source selector (dropdown with "None" option to disable)
 - Position selector (dropdown with 5 options)
-- Size inputs (width and height number inputs)
+- Size input (single number 0.05–1.0, e.g. 0.25 = 25%; displayed as percentage)
 - Enable/Disable toggle
 - "Apply Configuration" button
 - Real-time display of current PiP config (read-only section)
@@ -176,7 +173,7 @@ export interface SetPipOptions {
 │ Main Source: [Dropdown ▼]          │
 │ PiP Source:  [Dropdown ▼]          │
 │ Position:    [Dropdown ▼]          │
-│ Size:        [Width] x [Height]    │
+│ Size:        [0.05–1.0, e.g. 0.25 = 25%] │
 │                                     │
 │ [Apply Configuration] Button        │
 │                                     │
@@ -210,16 +207,11 @@ export interface SetPipOptions {
 
 **Changes**:
 
-- Replace or enhance existing PiP Configuration display section
-- Add `DevicePiPControl` component below the read-only display
-- Show control component when device is connected
-- Hide or disable when device is offline
-
-**Layout**:
-
-- Keep existing read-only display section
-- Add new control section below it
-- Use conditional rendering based on device connection status
+- One "Picture-in-Picture Configuration" section: `DevicePiPControl` contains
+  the editable form (toggle, sources, position, size, Apply) and a "Current
+  Configuration" summary at the bottom. There is no separate read-only card.
+- Show `DevicePiPControl` when device has PiP info (pipSupported or pip data).
+- Hide or disable when device is offline.
 
 ### Phase 4: Translation Keys
 
@@ -253,8 +245,8 @@ export interface SetPipOptions {
     "pipPositionCenter": "Center",
     "pipValidationMainSourceRequired": "Main source is required",
     "pipValidationPipSourceDifferent": "PiP source must be different from main source",
-    "pipValidationSizeRequired": "Size dimensions are required",
-    "pipValidationSizePositive": "Size dimensions must be positive numbers",
+    "pipSizeFractionDesc": "Fraction of frame (0.05–1), e.g. 0.25 = 25%",
+    "pipValidationSizeFraction": "Size must be between 0.05 and 1 (e.g. 0.25 for 25%)",
     "pipSuccess": "PiP configuration updated",
     "pipError": "Failed to update PiP configuration"
   }

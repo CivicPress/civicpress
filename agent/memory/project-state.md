@@ -547,6 +547,17 @@
   - Shared type definitions: Consolidated broadcast-box-types.ts
   - Comprehensive cleanup and test audit report
   - Preview feature integration plan (ready for implementation)
+- **Recent Additions (2026-01)**:
+  - PiP size as decimal (0.05–1): protocol/docs, backend set_pip, UI single size
+    input with % display; device page and useDeviceConnectionStatus support
+  - PiP configuration UX: one "Picture-in-Picture Configuration" section with
+    editable form (toggle, sources, position, size, Apply); duplicate read-only
+    card removed; PiP source/position/size fields always visible
+  - WebRTC/service-unavailable handling: API plugin suppresses 500/503 toast for
+    "not available"; useDeviceCommands/serviceNotAvailable toast;
+    useDevicePreview fails immediately with friendly message; i18n keys
+  - Realtime: TypeScript fix in checkConnectionLimits (unreachable block types)
+  - PIP-SIZE-DECIMAL-IMPLEMENTATION-PLAN.md added
 - **UI Components**: 12 components complete
   - DeviceList, DeviceRegistrationForm, DeviceConfigurationForm
   - DeviceStatusBadge, ConnectionStatusIndicator, SessionStatusBadge

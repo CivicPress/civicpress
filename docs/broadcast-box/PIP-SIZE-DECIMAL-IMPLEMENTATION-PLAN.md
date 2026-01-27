@@ -1,18 +1,24 @@
 # PiP Size Decimal Format – Implementation Plan
 
-**Status**: Plan only (no code changes yet)  
-**Last Updated**: 2026-01-23  
+**Status**: IMPLEMENTED (2026-01)  
+**Last Updated**: 2026-01-27  
 **Purpose**: Document where the new PiP size payload format lives, and what must
 change in the UI and backend when size is sent as decimals instead of pixels.
+
+**Implementation summary:** `pipSize` is now a single number (0.05–1.0) in
+DEVICE-MESSAGE-PROTOCOL, backend `set_pip` handler, UI types/composables,
+DevicePiPControl (single size input with % display), and device page. Legacy
+`{ width, height }` is still accepted for display/parsing where needed.
 
 ---
 
 ## 1. Where is the new payload format?
 
-**Current state:** The new “decimal” PiP size format is **not** described in the
-repo yet. All existing docs and code assume pixel size:
-`{ width: number, height: number }` in pixels (e.g.
-`{ width: 320, height: 240 }`).
+**Current state (as of implementation):** The decimal PiP size format is
+documented in `DEVICE-MESSAGE-PROTOCOL.md` and implemented end-to-end. The
+previous format was `{ width: number, height: number }` in pixels (e.g.
+`{ width: 320, height: 240 }`); that format is legacy/deprecated for new
+commands.
 
 **Where it should be documented:**
 

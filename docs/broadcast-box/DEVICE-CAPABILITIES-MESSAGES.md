@@ -62,10 +62,12 @@ device features.
   the device can handle for PiP
 - `capabilities.pip.supported_positions`: `array<string>` - List of supported
   PiP positions
-- `capabilities.pip.min_size`: `object` - Minimum PiP size supported (width,
-  height)
-- `capabilities.pip.max_size`: `object` - Maximum PiP size supported (width,
-  height)
+- `capabilities.pip.min_size`: `number` or `object` - Minimum PiP size
+  supported. Preferred: decimal fraction of frame (e.g. `0.1`). Legacy:
+  `{ width, height }` in pixels.
+- `capabilities.pip.max_size`: `number` or `object` - Maximum PiP size
+  supported. Preferred: decimal fraction (e.g. `1.0`). Legacy:
+  `{ width, height }` in pixels.
 - `capabilities.audio_mixing.supported`: `boolean` - Whether the device supports
   audio mixing
 - `capabilities.audio_mixing.max_inputs`: `integer` - Maximum number of audio
@@ -143,10 +145,7 @@ device features.
         "pip_source": null,
         "main_source": null,
         "position": "top_right",
-        "size": {
-          "width": 320,
-          "height": 240
-        }
+        "size": 0.25
       }
     }
   }
@@ -164,7 +163,9 @@ device features.
 - `sources.pip.main_source`: `string|null` - Current main source identifier
   (null if not set)
 - `sources.pip.position`: `string` - Current PiP position (e.g., "top_right")
-- `sources.pip.size`: `object` - Current PiP size configuration (width, height)
+- `sources.pip.size`: `number` or `object` - Current PiP size. Preferred:
+  decimal fraction of frame (e.g. `0.25` = 25%). Legacy: `{ width, height }` in
+  pixels.
 
 **Key Distinction:**
 
@@ -182,7 +183,7 @@ device features.
      "pip_source": null,
      "main_source": null,
      "position": "top_right",
-     "size": {"width": 320, "height": 240}
+     "size": 0.25
    }
    ```
 
@@ -195,7 +196,7 @@ device features.
      "pip_source": "hd_webcam_c615",
      "main_source": "razer_kiyo_pro",
      "position": "top_right",
-     "size": {"width": 320, "height": 240}
+     "size": 0.25
    }
    ```
 
@@ -208,7 +209,7 @@ device features.
      "pip_source": null,
      "main_source": null,
      "position": "top_right",
-     "size": {"width": 320, "height": 240}
+     "size": 0.25
    }
    ```
 
@@ -288,8 +289,8 @@ device features.
         "supported": true,
         "max_sources": 2,
         "supported_positions": ["top_left", "top_right", "bottom_left", "bottom_right", "center"],
-        "min_size": {"width": 160, "height": 120},
-        "max_size": {"width": 1920, "height": 1080}
+        "min_size": 0.1,
+        "max_size": 1.0
       }
     }
   }
@@ -311,7 +312,7 @@ device features.
         "pip_source": null,
         "main_source": null,
         "position": "top_right",
-        "size": {"width": 320, "height": 240}
+        "size": 0.25
       }
     }
   }

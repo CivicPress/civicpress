@@ -73,7 +73,7 @@ configuration via WebSocket status messages.
   "pip_source": { "id": 1, "identifier": "hdmi2" } | null,
   "main_source": { "id": 0, "identifier": "hdmi1" } | null,
   "position": "top_right",
-  "size": { "width": 320, "height": 240 }
+  "size": 0.25
 }
 ```
 
@@ -298,7 +298,7 @@ ALTER TABLE broadcast_devices ADD COLUMN pip_config TEXT;     -- JSON string
 --   "pipSource": { "id": 1, "identifier": "hdmi2", ... } | null,
 --   "mainSource": { "id": 0, "identifier": "hdmi1", ... } | null,
 --   "position": "top_right",
---   "size": { "width": 320, "height": 240 }
+--   "size": 0.25
 -- }
 ```
 
@@ -333,7 +333,7 @@ section
   - PiP source identifier and name
   - Main source identifier and name
   - Position (top_left, top_right, bottom_left, bottom_right, center)
-  - Size (width x height)
+  - Size (fraction of frame, e.g. 0.25 = 25%)
 - Visual representation (diagram or preview if possible)
 - Update in real-time when status messages arrive
 
@@ -497,7 +497,7 @@ section
   - PiP source info
   - Main source info
   - Position
-  - Size (width x height)
+  - Size (fraction of frame, e.g. 0.25 = 25%)
 - Use real-time data from `connectionStatus.value.pip`
 - Add visual representation if possible
 
