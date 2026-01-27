@@ -45,6 +45,7 @@ export function useDevicePreview(
     | ComputedRef<DeviceConnectionStatus>
 ) {
   const { sendCommand } = useDeviceCommands(deviceId);
+  const { t } = useI18n();
 
   // Use provided WebSocket connection or create a computed that returns null
   // The parent component should provide the shared connection
@@ -1270,18 +1271,30 @@ export function useDevicePreview(
         // This prevents duplicate processing which can cause "invalid state" errors
       }
     } catch (err) {
-      // Command timed out or failed, but DON'T cleanup yet
-      // The device might still send preview.offer via WebSocket
-      // Only cleanup if offer timeout expires
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to start preview';
-      console.warn(
-        '[DevicePreview] Command error but continuing to wait for offer:',
-        errorMessage
-      );
-      error.value = `Command error: ${errorMessage}. Waiting for preview offer...`;
-      // Don't set connectionState to 'failed' yet - wait for offer timeout
-      // Don't cleanup - keep listeners active to receive preview.offer
+      const errorMessage = (err as any)?.message ?? 'Failed to start preview';
+      const isServiceNotAvailable =
+        errorMessage.includes('not available') ||
+        errorMessage.includes('service not available');
+
+      if (isServiceNotAvailable) {
+        // Preview/realtime service is down - fail immediately, don't wait for offer
+        error.value =
+          t('broadcastBox.preview.error.serviceNotAvailable') ||
+          'Preview is not available for this device. The preview or realtime service may be offline.';
+        connectionState.value = 'failed';
+        cleanup();
+        console.warn(
+          '[DevicePreview] Service not available, failing preview:',
+          errorMessage
+        );
+      } else {
+        // Command timed out or other error - keep waiting for offer from device
+        console.warn(
+          '[DevicePreview] Command error but continuing to wait for offer:',
+          errorMessage
+        );
+        error.value = `Command error: ${errorMessage}. Waiting for preview offer...`;
+      }
     }
   }
 

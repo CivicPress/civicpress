@@ -1,5 +1,23 @@
 # Development Guide
 
+## ⚠️ Pre-Merge Checklist
+
+### Connection Limits Disabled for Development
+
+**IMPORTANT:** Before merging to `main`, ensure connection limits are
+re-enabled:
+
+- **File:** `modules/realtime/src/realtime-server.ts`
+- **Method:** `checkConnectionLimits()`
+- **Action:** Remove the early `return;` statement at the beginning of the
+  method
+- **Location:** Line ~2628 (look for `// TEMPORARILY DISABLED FOR DEVELOPMENT`)
+
+Connection limits are currently disabled to allow multiple device connections
+during development. This must be re-enabled before production deployment.
+
+---
+
 ## Running Services Separately
 
 You have **3 independent services** that can run in separate terminals:

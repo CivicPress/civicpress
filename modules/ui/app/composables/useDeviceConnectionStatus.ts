@@ -488,7 +488,19 @@ async function connectToDeviceRoom(
                     return null;
                   })(),
                   position: pipPayload.position || 'top_right',
-                  size: pipPayload.size || { width: 320, height: 240 },
+                  // pipSize: single number (e.g. 0.25). Legacy status may send size as { width, height }; prefer pip_size or numeric size.
+                  size: (() => {
+                    const v = pipPayload.pip_size ?? pipPayload.size;
+                    if (typeof v === 'number') return v;
+                    if (
+                      v &&
+                      typeof v === 'object' &&
+                      'width' in v &&
+                      'height' in v
+                    )
+                      return v as { width: number; height: number };
+                    return 0.25;
+                  })(),
                 }
               : undefined;
 

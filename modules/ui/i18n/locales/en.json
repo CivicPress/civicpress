@@ -1240,6 +1240,8 @@
     "pipSource": "PiP Source",
     "pipPosition": "Position",
     "pipSize": "Size",
+    "pipSizeFractionDesc": "Fraction of main frame (0.05–1), e.g. 0.25 = 25%",
+    "pipValidationSizeFraction": "Size must be between 0.05 and 1 (e.g. 0.25 for 25%)",
     "pipPositionTopLeft": "Top Left",
     "pipPositionTopRight": "Top Right",
     "pipPositionBottomLeft": "Bottom Left",
@@ -1293,7 +1295,9 @@
       "recordingAlreadyInProgress": "A recording is already in progress",
       "noVideoSource": "No video source available for recording",
       "manualRecordingNotAvailable": "Manual Recording Not Available",
-      "manualRecordingNotAvailableDesc": "This device does not support manual recording. The manual recording service is not available on this device."
+      "manualRecordingNotAvailableDesc": "This device does not support manual recording. The manual recording service is not available on this device.",
+      "serviceNotAvailable": "Service Not Available",
+      "serviceNotAvailableDesc": "The preview or command service is not available. Ensure the device is online and the realtime server is running."
     },
     "success": {
       "deviceEnrolled": "Device Enrolled",
@@ -1388,7 +1392,8 @@
         "startFailed": "Failed to start preview",
         "connectionFailed": "WebRTC connection failed",
         "iceFailed": "Network connection failed",
-        "encoderNotAvailable": "Preview encoder not available on device"
+        "encoderNotAvailable": "Preview encoder not available on device",
+        "serviceNotAvailable": "Preview is not available for this device. The preview or realtime service may be offline."
       },
       "status": {
         "disconnected": "Preview stopped",

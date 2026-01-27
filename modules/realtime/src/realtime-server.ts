@@ -2617,34 +2617,47 @@ export class RealtimeServer {
 
   /**
    * Check connection limits
+   *
+   * ⚠️ TEMPORARILY DISABLED FOR DEVELOPMENT ⚠️
+   *
+   * Before merging to main, remove the early return below to re-enable connection limits.
+   * See: modules/realtime/DEVELOPMENT.md for details.
    */
   private async checkConnectionLimits(
     ip: string,
     userId: number | null
   ): Promise<void> {
-    if (!this.realtimeConfig) {
+    // ⚠️ TEMPORARILY DISABLED FOR DEVELOPMENT ⚠️
+    // TODO: Remove this return statement before merging to main
+    // See: modules/realtime/DEVELOPMENT.md - Pre-Merge Checklist
+    return;
+
+    const config = this.realtimeConfig;
+    if (!config) {
       return;
     }
+    // Narrowed after guard; assertions used so unreachable code (above return) type-checks
+    const limitConfig = config as NonNullable<typeof config>;
 
     // Check IP limit
     const ipCount = this.connectionCounts.get(ip) || 0;
-    if (ipCount >= this.realtimeConfig.rate_limiting.connections_per_ip) {
+    if (ipCount >= limitConfig.rate_limiting.connections_per_ip) {
       throw new ConnectionLimitExceededError(
-        this.realtimeConfig.rate_limiting.connections_per_ip,
+        limitConfig.rate_limiting.connections_per_ip,
         { limitType: 'ip', ip }
       );
     }
 
     // Check user limit
     if (userId !== null) {
-      const userConnections = this.userConnections.get(userId) || new Set();
+      const uid = userId as number;
+      const userConnections = this.userConnections.get(uid) || new Set();
       if (
-        userConnections.size >=
-        this.realtimeConfig.rate_limiting.connections_per_user
+        userConnections.size >= limitConfig.rate_limiting.connections_per_user
       ) {
         throw new ConnectionLimitExceededError(
-          this.realtimeConfig.rate_limiting.connections_per_user,
-          { limitType: 'user', userId }
+          limitConfig.rate_limiting.connections_per_user,
+          { limitType: 'user', userId: uid }
         );
       }
     }

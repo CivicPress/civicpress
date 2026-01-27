@@ -30,6 +30,15 @@ const formatPipPosition = (position: string | undefined): string => {
   return translated !== key ? translated : position;
 };
 
+// Helper to format PiP size (number = "25%", legacy { width, height } = "320×240")
+const formatPipSizeDisplay = (
+  size: number | { width: number; height: number } | undefined
+): string => {
+  if (size == null) return '';
+  if (typeof size === 'number') return `${Math.round(size * 100)}%`;
+  return `${size.width}×${size.height}`;
+};
+
 definePageMeta({
   middleware: ['require-auth'],
 });
@@ -1445,228 +1454,14 @@ onUnmounted(() => {
             </div>
           </UCard>
 
-          <!-- PiP Configuration -->
-          <UCard
-            v-if="
-              // Show when we have any PiP info (including explicit supported=false)
-              connectionStatus.pip ||
-              device?.pip ||
-              device?.capabilities?.pipSupported !== undefined
-            "
-          >
-            <template #header>
-              <h2 class="text-lg font-semibold">
-                {{ t('broadcastBox.pipConfiguration') }}
-              </h2>
-            </template>
-            <div class="space-y-4">
-              <!-- PiP Support Status -->
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.pipSupport') }}
-                </label>
-                <UBadge
-                  :color="
-                    (connectionStatus.pip?.supported ??
-                    device?.pip?.supported ??
-                    device?.capabilities?.pipSupported ??
-                    true)
-                      ? 'primary'
-                      : 'neutral'
-                  "
-                  variant="soft"
-                  size="sm"
-                >
-                  {{
-                    (connectionStatus.pip?.supported ??
-                    device?.pip?.supported ??
-                    device?.capabilities?.pipSupported ??
-                    true)
-                      ? t('broadcastBox.supported')
-                      : t('broadcastBox.notSupported')
-                  }}
-                </UBadge>
-              </div>
-
-              <!-- PiP Status -->
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.pipStatus') }}
-                </label>
-                <UBadge
-                  :color="
-                    (connectionStatus.pip?.supported ??
-                      device?.pip?.supported ??
-                      device?.capabilities?.pipSupported ??
-                      true) &&
-                    (connectionStatus.pip?.enabled || device?.pip?.enabled)
-                      ? 'primary'
-                      : 'neutral'
-                  "
-                  variant="soft"
-                  size="sm"
-                >
-                  {{
-                    (connectionStatus.pip?.supported ??
-                    device?.pip?.supported ??
-                    device?.capabilities?.pipSupported ??
-                    true)
-                      ? connectionStatus.pip?.enabled || device?.pip?.enabled
-                        ? t('broadcastBox.enabled')
-                        : t('broadcastBox.disabled')
-                      : t('broadcastBox.notSupported')
-                  }}
-                </UBadge>
-              </div>
-
-              <!-- Main Source -->
-              <div
-                v-if="
-                  (connectionStatus.pip?.mainSource ||
-                    device?.pip?.mainSource) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
-                  (connectionStatus.pip?.supported ??
-                    device?.pip?.supported ??
-                    device?.capabilities?.pipSupported ??
-                    true)
-                "
-              >
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.pipMainSource') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <UBadge color="primary" variant="subtle" size="sm">
-                    {{
-                      (
-                        connectionStatus.pip?.mainSource ||
-                        device?.pip?.mainSource
-                      )?.identifier || 'Unknown'
-                    }}
-                  </UBadge>
-                  <span
-                    v-if="
-                      (
-                        connectionStatus.pip?.mainSource ||
-                        device?.pip?.mainSource
-                      )?.name
-                    "
-                    class="text-sm text-gray-600 dark:text-gray-400"
-                  >
-                    {{
-                      (
-                        connectionStatus.pip?.mainSource ||
-                        device?.pip?.mainSource
-                      )?.name
-                    }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- PiP Source -->
-              <div
-                v-if="
-                  (connectionStatus.pip?.pipSource || device?.pip?.pipSource) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
-                  (connectionStatus.pip?.supported ??
-                    device?.pip?.supported ??
-                    device?.capabilities?.pipSupported ??
-                    true)
-                "
-              >
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.pipSource') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <UBadge color="primary" variant="subtle" size="sm">
-                    {{
-                      (
-                        connectionStatus.pip?.pipSource ||
-                        device?.pip?.pipSource
-                      )?.identifier || 'Unknown'
-                    }}
-                  </UBadge>
-                  <span
-                    v-if="
-                      (
-                        connectionStatus.pip?.pipSource ||
-                        device?.pip?.pipSource
-                      )?.name
-                    "
-                    class="text-sm text-gray-600 dark:text-gray-400"
-                  >
-                    {{
-                      (
-                        connectionStatus.pip?.pipSource ||
-                        device?.pip?.pipSource
-                      )?.name
-                    }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Position -->
-              <div
-                v-if="
-                  (connectionStatus.pip?.position || device?.pip?.position) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
-                  (connectionStatus.pip?.supported ??
-                    device?.pip?.supported ??
-                    device?.capabilities?.pipSupported ??
-                    true)
-                "
-              >
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.pipPosition') }}
-                </label>
-                <p class="text-sm font-semibold">
-                  {{
-                    formatPipPosition(
-                      connectionStatus.pip?.position || device?.pip?.position
-                    )
-                  }}
-                </p>
-              </div>
-
-              <!-- Size -->
-              <div
-                v-if="
-                  (connectionStatus.pip?.size || device?.pip?.size) &&
-                  (connectionStatus.pip?.enabled || device?.pip?.enabled) &&
-                  (connectionStatus.pip?.supported ??
-                    device?.pip?.supported ??
-                    device?.capabilities?.pipSupported ??
-                    true)
-                "
-              >
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.pipSize') }}
-                </label>
-                <p class="text-sm font-semibold">
-                  {{
-                    (connectionStatus.pip?.size || device?.pip?.size)?.width
-                  }}x{{
-                    (connectionStatus.pip?.size || device?.pip?.size)?.height
-                  }}
-                </p>
-              </div>
-            </div>
-          </UCard>
-
-          <!-- PiP Control (if device supports PiP) -->
+          <!-- Picture-in-Picture Configuration (editable form and current state) -->
           <DevicePiPControl
-            v-if="device?.capabilities?.pipSupported"
+            v-if="
+              device &&
+              (device.capabilities?.pipSupported !== undefined ||
+                !!connectionStatus.pip ||
+                !!device.pip)
+            "
             :device="device"
             :is-device-connected="isDeviceConnected"
           />

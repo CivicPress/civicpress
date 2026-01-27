@@ -238,57 +238,53 @@ Configure picture-in-picture (PiP) settings. Both actions are aliases.
 ```json
 {
   "type": "command",
-  "id": "set-pip-uuid",
-  "timestamp": "2026-01-16T18:00:00.000Z",
-  "action": "set_pip",
+  "id": "cmd-131",
+  "timestamp": 1706630400.123,
   "payload": {
-    "mainSource": "hdmi1",
-    "pipSource": "hdmi2",
+    "action": "set_pip",
+    "mainSource": 0,
+    "pipSource": 1,
     "pipPosition": "top_right",
-    "pipSize": {
-      "width": 320,
-      "height": 240
-    }
+    "pipSize": 0.25
   }
 }
 ```
 
 **Payload Fields**:
 
-- `mainSource` (string | number, required): Main video source identifier
-- `pipSource` (string | number | null, optional): PiP video source identifier
-  (null to disable PiP)
+- `mainSource` (string | number, required): Main video source identifier or
+  numeric ID
+- `pipSource` (string | number | null, optional): PiP video source identifier or
+  numeric ID (null to disable PiP)
 - `pipPosition` (string, optional, default: "top_right"): Position of PiP window
   - Valid values: `"top_left"`, `"top_right"`, `"bottom_left"`,
     `"bottom_right"`, `"center"`
-- `pipSize` (object, optional, default: {width: 320, height: 240}): Size of PiP
-  window
-  - `width` (number, required): Width in pixels (must be positive integer)
-  - `height` (number, required): Height in pixels (must be positive integer)
+- `pipSize` (number, optional, default: 0.25): PiP size as a fraction of the
+  main frame. Decimal in range (0, 1], e.g. `0.25` = 25%. Replaces the previous
+  pixel-based `{ width, height }` format.
 
 **Expected ACK**:
 
 ```json
 {
   "type": "ack",
-  "id": "ack-uuid",
-  "commandId": "set-pip-uuid",
-  "timestamp": "2026-01-16T18:00:00.100Z",
-  "success": true,
   "payload": {
-    "mainSource": "hdmi1",
-    "mainSourceId": 0,
-    "pipSource": "hdmi2",
-    "pipSourceId": 1,
-    "pipPosition": "top_right",
-    "pipSize": {
-      "width": 320,
-      "height": 240
-    },
-    "enabled": true
+    "commandId": "cmd-131",
+    "success": true,
+    "result": {
+      "main_source": 0,
+      "pip_source": 1,
+      "pip_position": "top_right",
+      "pip_size": 0.25,
+      "status": "configured"
+    }
   }
 }
 ```
+
+**Note**: The device may return the result in snake_case (`main_source`,
+`pip_source`, `pip_position`, `pip_size`). The ACK payload structure may vary;
+consume `result.pip_size` (number) for the configured PiP size.
 
 ---
 

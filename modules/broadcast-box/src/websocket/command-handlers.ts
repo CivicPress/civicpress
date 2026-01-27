@@ -673,19 +673,19 @@ export function createDefaultCommandHandlers(
       );
     }
 
-    // Validate pipSize
-    const defaultSize = { width: 320, height: 240 };
-    let size = pipSize || defaultSize;
+    // Validate pipSize (single number, fraction of frame, e.g. 0.25 = 25%)
+    const defaultPipSize = 0.25;
+    const pipSizeValue = typeof pipSize === 'number' ? pipSize : defaultPipSize;
     if (
-      size.width <= 0 ||
-      size.height <= 0 ||
-      !Number.isInteger(size.width) ||
-      !Number.isInteger(size.height)
+      typeof pipSizeValue !== 'number' ||
+      pipSizeValue <= 0 ||
+      pipSizeValue > 1 ||
+      !Number.isFinite(pipSizeValue)
     ) {
       return context.protocol.createAck(
         command.id,
         false,
-        'pipSize width and height must be positive integers',
+        'pipSize must be a number in range (0, 1] (e.g. 0.25 for 25%)',
         undefined,
         BroadcastBoxErrorCode.INVALID_CONFIG
       );
@@ -699,17 +699,17 @@ export function createDefaultCommandHandlers(
       pipSource: pipSourceInfo?.identifier || null,
       pipSourceId: pipSourceInfo?.id || null,
       position,
-      size,
+      pipSize: pipSizeValue,
     });
 
-    // Return success with configured values
+    // Return success with configured values (pipSize as single number)
     return context.protocol.createAck(command.id, true, undefined, {
       mainSource: mainSourceInfo.identifier,
       mainSourceId: mainSourceInfo.id,
       pipSource: pipSourceInfo?.identifier || null,
       pipSourceId: pipSourceInfo?.id || null,
       pipPosition: position,
-      pipSize: size,
+      pipSize: pipSizeValue,
       enabled: pipSourceInfo !== null,
     });
   };

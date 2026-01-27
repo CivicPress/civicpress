@@ -3,7 +3,7 @@
     <template #header>
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">
-          {{ t('broadcastBox.pipControl') }}
+          {{ t('broadcastBox.pipConfiguration') }}
         </h2>
         <UBadge
           v-if="!isDeviceConnected"
@@ -60,9 +60,8 @@
         />
       </UFormField>
 
-      <!-- PiP Source -->
+      <!-- PiP Source (always visible so user can configure before enabling) -->
       <UFormField
-        v-if="pipEnabled"
         :label="t('broadcastBox.pipSource')"
         :description="t('broadcastBox.pipSourceDesc')"
         :error="errors.pipSource"
@@ -76,9 +75,8 @@
         />
       </UFormField>
 
-      <!-- Position -->
+      <!-- Position (always visible so user can configure before enabling) -->
       <UFormField
-        v-if="pipEnabled"
         :label="t('broadcastBox.pipPosition')"
         :description="t('broadcastBox.pipPositionDesc')"
       >
@@ -90,33 +88,27 @@
         />
       </UFormField>
 
-      <!-- Size -->
-      <div v-if="pipEnabled" class="grid grid-cols-2 gap-4">
-        <UFormField
-          :label="t('broadcastBox.pipWidth')"
-          :error="errors.sizeWidth"
-        >
+      <!-- Size (single decimal: fraction of frame, e.g. 0.25 = 25%) -->
+      <UFormField
+        :label="t('broadcastBox.pipSize')"
+        :description="t('broadcastBox.pipSizeFractionDesc')"
+        :error="errors.pipSize"
+      >
+        <div class="flex items-center gap-2">
           <UInput
-            v-model.number="sizeWidth"
+            v-model.number="pipSizeValue"
             type="number"
+            step="0.05"
+            min="0.05"
+            max="1"
             :disabled="loading || !isDeviceConnected || pipSupported === false"
-            :min="minPipSize.width"
-            :max="maxPipSize.width"
+            class="w-24"
           />
-        </UFormField>
-        <UFormField
-          :label="t('broadcastBox.pipHeight')"
-          :error="errors.sizeHeight"
-        >
-          <UInput
-            v-model.number="sizeHeight"
-            type="number"
-            :disabled="loading || !isDeviceConnected || pipSupported === false"
-            :min="minPipSize.height"
-            :max="maxPipSize.height"
-          />
-        </UFormField>
-      </div>
+          <span class="text-sm text-gray-500 dark:text-gray-400">
+            {{ Math.round((pipSizeValue || 0.25) * 100) }}%
+          </span>
+        </div>
+      </UFormField>
 
       <!-- Apply Button -->
       <div class="flex justify-end pt-2">
@@ -195,16 +187,14 @@
             </span>
           </div>
           <div
-            v-if="currentPipConfig.enabled && currentPipConfig.size"
+            v-if="currentPipConfig.enabled && currentPipConfig.size != null"
             class="flex items-center gap-2"
           >
             <span class="text-gray-600 dark:text-gray-400">
               {{ t('broadcastBox.pipSize') }}:
             </span>
             <span class="font-medium">
-              {{ currentPipConfig.size.width }}x{{
-                currentPipConfig.size.height
-              }}
+              {{ formatPipSizeDisplay(currentPipConfig.size) }}
             </span>
           </div>
         </div>
@@ -278,23 +268,18 @@ const pipSupported = computed(() => {
   return props.device.capabilities?.pipSupported ?? true;
 });
 
-const minPipSize = computed(() => {
-  return (
-    pipCapabilities.value?.minSize || {
-      width: 1,
-      height: 1,
-    }
-  );
-});
+// PiP size: single decimal (0.05–1.0). Default 0.25.
+const PIP_SIZE_MIN = 0.05;
+const PIP_SIZE_MAX = 1;
+const PIP_SIZE_DEFAULT = 0.25;
 
-const maxPipSize = computed(() => {
-  return (
-    pipCapabilities.value?.maxSize || {
-      width: 1920,
-      height: 1080,
-    }
-  );
-});
+/** Normalize pip size from config (number or legacy { width, height }) to number */
+function pipSizeAsNumber(
+  size: number | { width: number; height: number } | undefined
+): number {
+  if (typeof size === 'number' && size > 0 && size <= 1) return size;
+  return PIP_SIZE_DEFAULT;
+}
 
 // Form state
 const pipEnabled = ref(currentPipConfig.value?.enabled || false);
@@ -307,8 +292,14 @@ const pipSourceValue = ref<string | null | undefined>(
 const positionValue = ref<string>(
   currentPipConfig.value?.position || 'top_right'
 );
-const sizeWidth = ref(currentPipConfig.value?.size?.width || 320);
-const sizeHeight = ref(currentPipConfig.value?.size?.height || 240);
+const pipSizeValue = ref(
+  pipSizeAsNumber(
+    currentPipConfig.value?.size as
+      | number
+      | { width: number; height: number }
+      | undefined
+  )
+);
 
 // Computed properties for USelectMenu (expects objects, not values)
 const selectedMainSource = computed({
@@ -352,8 +343,7 @@ const selectedPosition = computed({
 const errors = ref<{
   mainSource?: string;
   pipSource?: string;
-  sizeWidth?: string;
-  sizeHeight?: string;
+  pipSize?: string;
 }>({});
 
 // PiP source options (include "None" to disable)
@@ -390,6 +380,16 @@ const formatPipPosition = (position: string | undefined): string => {
   return translated !== key ? translated : position;
 };
 
+// Helper to format PiP size for display (number = "25%", legacy object = "25% approx" or similar)
+const formatPipSizeDisplay = (
+  size: number | { width: number; height: number }
+): string => {
+  if (typeof size === 'number') {
+    return `${Math.round(size * 100)}%`;
+  }
+  return `${size.width}×${size.height}`;
+};
+
 // Update form when current config changes
 watch(
   () => currentPipConfig.value,
@@ -399,8 +399,9 @@ watch(
       mainSourceValue.value = newConfig.mainSource?.identifier;
       pipSourceValue.value = newConfig.pipSource?.identifier || null;
       positionValue.value = newConfig.position || 'top_right';
-      sizeWidth.value = newConfig.size?.width || 320;
-      sizeHeight.value = newConfig.size?.height || 240;
+      pipSizeValue.value = pipSizeAsNumber(
+        newConfig.size as number | { width: number; height: number } | undefined
+      );
     }
   },
   { deep: true }
@@ -416,12 +417,17 @@ const hasChanges = computed(() => {
   // If enabling, check if values differ
   const currentPipSource =
     currentPipConfig.value?.pipSource?.identifier || null;
+  const currentSize = pipSizeAsNumber(
+    currentPipConfig.value?.size as
+      | number
+      | { width: number; height: number }
+      | undefined
+  );
   return (
     mainSourceValue.value !== currentPipConfig.value?.mainSource?.identifier ||
     pipSourceValue.value !== currentPipSource ||
     positionValue.value !== (currentPipConfig.value?.position || 'top_right') ||
-    sizeWidth.value !== (currentPipConfig.value?.size?.width || 320) ||
-    sizeHeight.value !== (currentPipConfig.value?.size?.height || 240)
+    (pipSizeValue.value ?? PIP_SIZE_DEFAULT) !== currentSize
   );
 });
 
@@ -466,29 +472,14 @@ const validate = (): boolean => {
       return false;
     }
 
-    if (sizeWidth.value <= 0 || !Number.isInteger(sizeWidth.value)) {
-      errors.value.sizeWidth = t('broadcastBox.pipValidationSizePositive');
-      return false;
-    }
-
-    if (sizeHeight.value <= 0 || !Number.isInteger(sizeHeight.value)) {
-      errors.value.sizeHeight = t('broadcastBox.pipValidationSizePositive');
-      return false;
-    }
-
-    // Enforce capability bounds if available
+    const size = pipSizeValue.value ?? PIP_SIZE_DEFAULT;
     if (
-      sizeWidth.value < minPipSize.value.width ||
-      sizeWidth.value > maxPipSize.value.width
+      typeof size !== 'number' ||
+      !Number.isFinite(size) ||
+      size < PIP_SIZE_MIN ||
+      size > PIP_SIZE_MAX
     ) {
-      errors.value.sizeWidth = t('broadcastBox.pipValidationSizeRequired');
-      return false;
-    }
-    if (
-      sizeHeight.value < minPipSize.value.height ||
-      sizeHeight.value > maxPipSize.value.height
-    ) {
-      errors.value.sizeHeight = t('broadcastBox.pipValidationSizeRequired');
+      errors.value.pipSize = t('broadcastBox.pipValidationSizeFraction');
       return false;
     }
   }
@@ -537,10 +528,7 @@ const handleApply = async () => {
             | 'bottom_left'
             | 'bottom_right'
             | 'center',
-          size: {
-            width: sizeWidth.value,
-            height: sizeHeight.value,
-          },
+          size: pipSizeValue.value ?? PIP_SIZE_DEFAULT,
         },
         props.device
       );

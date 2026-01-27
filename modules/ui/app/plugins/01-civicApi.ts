@@ -147,23 +147,35 @@ export default defineNuxtPlugin(async (nuxtApp) => {
           break;
 
         case 500:
-          // Server error - check if it's a "device not connected" or "timeout" error
-          // These are handled by useDeviceCommands composable, so don't show duplicate toast
-          const errorMessage = apiError.message || apiError.data?.error?.message || '';
+        case 503:
+          // Server / Unavailable - check if it's a device command "expected" error
+          // These are handled by useDeviceCommands / useDevicePreview, so don't show duplicate toast
+          const errorMessage =
+            apiError.message || apiError.data?.error?.message || '';
           const isDeviceNotConnectedError =
             errorMessage.includes('not connected') ||
-            (errorMessage.includes('Device') && errorMessage.includes('not connected'));
-          const isTimeoutError = 
-            errorMessage.includes('timeout') || 
+            (errorMessage.includes('Device') &&
+              errorMessage.includes('not connected'));
+          const isTimeoutError =
+            errorMessage.includes('timeout') ||
             errorMessage.includes('Command timeout');
-          
-          if (isDeviceNotConnectedError || isTimeoutError) {
-            // Don't show toast - useDeviceCommands will handle it
-            // Only log to console for debugging
+          const isServiceNotAvailable =
+            errorMessage.includes('not available') ||
+            errorMessage.includes('service not available');
+
+          if (
+            isDeviceNotConnectedError ||
+            isTimeoutError ||
+            isServiceNotAvailable
+          ) {
+            // Don't show toast - command/preview composables will show a single friendly message
             handleError(apiError, {
-              title: 'Server Error',
-              showToast: false, // Suppress toast for device not connected/timeout errors
-              logToConsole: false, // Also suppress console log to reduce noise
+              title:
+                response.status === 503
+                  ? 'Service Unavailable'
+                  : 'Server Error',
+              showToast: false,
+              logToConsole: false,
             });
           } else {
             // Show toast for other server errors

@@ -34,10 +34,8 @@ export interface SetPipOptions {
     | 'bottom_left'
     | 'bottom_right'
     | 'center';
-  size?: {
-    width: number;
-    height: number;
-  };
+  /** PiP size as fraction of main frame (0–1), e.g. 0.25 = 25%. Sent as pipSize number to device. */
+  size?: number;
 }
 
 export interface DeviceConfig {
@@ -115,14 +113,16 @@ export function useDeviceCommands(
         throw err;
       }
     } catch (err: any) {
-      // Check if error is about device not being connected
+      // Check if error is about device not being connected or service unavailable
+      const msg = err.message ?? '';
       const isNotConnectedError =
-        err.message?.includes('not connected') ||
-        (err.message?.includes('Device') &&
-          err.message?.includes('not connected')) ||
-        err.message?.includes('Device not connected');
+        msg.includes('not connected') ||
+        (msg.includes('Device') && msg.includes('not connected')) ||
+        msg.includes('Device not connected');
+      const isServiceNotAvailable =
+        msg.includes('not available') || msg.includes('service not available');
 
-      let errorMessage = err.message || t('broadcastBox.errors.commandFailed');
+      let errorMessage = msg || t('broadcastBox.errors.commandFailed');
       let errorTitle = t('broadcastBox.errors.commandFailed');
 
       if (isNotConnectedError) {
@@ -131,6 +131,13 @@ export function useDeviceCommands(
         errorMessage =
           t('broadcastBox.errors.deviceNotConnectedDesc') ||
           'The device must be connected via WebSocket to receive commands. Please ensure the device is online and connected.';
+      } else if (isServiceNotAvailable) {
+        errorTitle =
+          t('broadcastBox.errors.serviceNotAvailable') ||
+          'Service Not Available';
+        errorMessage =
+          t('broadcastBox.errors.serviceNotAvailableDesc') ||
+          'The preview or command service is not available. Ensure the device is online and the realtime server is running.';
       }
 
       error.value = errorMessage;
@@ -565,7 +572,7 @@ export function useDeviceCommands(
     if (options?.position) {
       payload.pipPosition = options.position;
     }
-    if (options?.size) {
+    if (options?.size != null && typeof options.size === 'number') {
       payload.pipSize = options.size;
     }
 

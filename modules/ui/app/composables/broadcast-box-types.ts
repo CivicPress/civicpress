@@ -43,10 +43,8 @@ export interface PiPConfiguration {
     | 'bottom_left'
     | 'bottom_right'
     | 'center';
-  size: {
-    width: number; // PiP window width in pixels
-    height: number; // PiP window height in pixels
-  };
+  /** PiP size as fraction of main frame (0–1), e.g. 0.25 = 25%. Legacy status may send { width, height } in pixels. */
+  size: number | { width: number; height: number };
 }
 
 /**

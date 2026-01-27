@@ -1244,6 +1244,8 @@
     "pipSource": "Source PiP",
     "pipPosition": "Position",
     "pipSize": "Taille",
+    "pipSizeFractionDesc": "Fraction du cadre principal (0,05–1), ex. 0,25 = 25 %",
+    "pipValidationSizeFraction": "La taille doit être entre 0,05 et 1 (ex. 0,25 pour 25 %)",
     "pipPositionTopLeft": "En haut à gauche",
     "pipPositionTopRight": "En haut à droite",
     "pipPositionBottomLeft": "En bas à gauche",
@@ -1297,7 +1299,9 @@
       "recordingAlreadyInProgress": "Un enregistrement est déjà en cours",
       "noVideoSource": "Aucune source vidéo disponible pour l'enregistrement",
       "manualRecordingNotAvailable": "Enregistrement manuel non disponible",
-      "manualRecordingNotAvailableDesc": "Cet appareil ne prend pas en charge l'enregistrement manuel. Le service d'enregistrement manuel n'est pas disponible sur cet appareil."
+      "manualRecordingNotAvailableDesc": "Cet appareil ne prend pas en charge l'enregistrement manuel. Le service d'enregistrement manuel n'est pas disponible sur cet appareil.",
+      "serviceNotAvailable": "Service non disponible",
+      "serviceNotAvailableDesc": "Le service d'aperçu ou de commande n'est pas disponible. Vérifiez que l'appareil est en ligne et que le serveur temps réel est en cours d'exécution."
     },
     "success": {
       "deviceEnrolled": "Appareil inscrit",
@@ -1392,7 +1396,8 @@
         "startFailed": "Échec du démarrage de l'aperçu",
         "connectionFailed": "Échec de la connexion WebRTC",
         "iceFailed": "Échec de la connexion réseau",
-        "encoderNotAvailable": "Encodeur d'aperçu non disponible sur l'appareil"
+        "encoderNotAvailable": "Encodeur d'aperçu non disponible sur l'appareil",
+        "serviceNotAvailable": "L'aperçu n'est pas disponible pour cet appareil. Le service d'aperçu ou temps réel est peut-être hors ligne."
       },
       "status": {
         "disconnected": "Aperçu arrêté",
