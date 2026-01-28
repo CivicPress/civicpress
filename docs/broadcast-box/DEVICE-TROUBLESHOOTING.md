@@ -702,6 +702,29 @@ When commands aren't arriving, check server logs for:
 
 ---
 
+### Issue: "Unknown command type: sources.set" (500 from API)
+
+**Symptom**: CivicPress UI shows "Failed to set sources" and the API returns 500
+with message "Unknown command type: sources.set".
+
+**Cause**: The **device firmware** does not yet support the `sources.set`
+command. CivicPress sends the command correctly; the device receives it and
+returns an ACK with `success: false` and that error message.
+
+**Fix**:
+
+- Update the Broadcast Box **device firmware** to support the centralized source
+  configuration protocol (see `DEVICE-MESSAGE-PROTOCOL.md`):
+  - Handle command `action: "sources.set"` with payload `{ video?, audio? }`.
+  - Respond with ACK `success: true` and payload
+    `{ video, audio, status: "configured", live_switched?: boolean }`.
+  - Emit `sources.changed` event when sources are updated.
+- Until the device supports `sources.set`, the UI will continue to fail when
+  changing camera/mic or applying PiP. The old `switch_source` command is
+  deprecated; devices should implement `sources.set` instead.
+
+---
+
 ## Testing Your Device
 
 1. **Connect**: Verify WebSocket connection succeeds

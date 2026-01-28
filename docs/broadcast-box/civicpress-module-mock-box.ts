@@ -29,6 +29,12 @@ export class MockBroadcastBox {
     connected: boolean;
     recording: boolean;
     sessionId?: string;
+    streaming: boolean;
+    streamConfig: {
+      url?: string;
+      stream_key?: string;
+      platform?: string;
+    };
     health: {
       score: number;
       status: 'healthy' | 'degraded' | 'unhealthy';
@@ -56,6 +62,8 @@ export class MockBroadcastBox {
     this.state = {
       connected: false,
       recording: false,
+      streaming: false,
+      streamConfig: {},
       health: {
         score: 95,
         status: 'healthy',
@@ -191,12 +199,55 @@ export class MockBroadcastBox {
       case 'get_status':
         await this.handleGetStatus(command);
         break;
+      case 'sources.set':
+        await this.handleSourcesSet(command);
+        break;
+      case 'stream.configure':
+        await this.handleStreamConfigure(command);
+        break;
+      case 'stream.start':
+        await this.handleStreamStart(command);
+        break;
+      case 'stream.stop':
+        await this.handleStreamStop(command);
+        break;
       default:
         this.sendAck(command.id, false, {
           error: 'UNKNOWN_COMMAND',
           message: `Unknown command: ${command.action}`,
         });
     }
+  }
+
+  /**
+   * Handle sources.set command (centralized source configuration)
+   */
+  private async handleSourcesSet(command: any): Promise<void> {
+    const { video, audio } = command.payload || {};
+    if (!video && !audio) {
+      this.sendAck(command.id, false, {
+        error: 'INVALID_CONFIG',
+        message: 'At least one of video or audio must be provided',
+      });
+      return;
+    }
+    const videoSource =
+      video ?? this.config.capabilities?.videoSources?.[0] ?? 'hdmi1';
+    const audioSource =
+      audio ?? this.config.capabilities?.audioSources?.[0] ?? 'usb_audio';
+    this.sendAck(command.id, true, {
+      video: videoSource,
+      audio: audioSource,
+      status: 'configured',
+    });
+    // Optionally emit sources.changed for clients
+    this.sendEvent({
+      type: 'event',
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      event: 'sources.changed',
+      payload: { video: videoSource, audio: audioSource },
+    });
   }
 
   /**
@@ -298,6 +349,122 @@ export class MockBroadcastBox {
         },
       });
     }, 5000);
+  }
+
+  /**
+   * Handle stream.configure command (RTMP destination)
+   */
+  private async handleStreamConfigure(command: any): Promise<void> {
+    const { url, stream_key, platform } = command.payload || {};
+    if (!url || !stream_key) {
+      this.sendAck(command.id, false, {
+        error: 'INVALID_CONFIG',
+        message: 'url and stream_key are required',
+      });
+      return;
+    }
+    this.state.streamConfig = {
+      url,
+      stream_key,
+      platform: platform || 'generic',
+    };
+    this.sendAck(command.id, true, {
+      status: 'configured',
+      platform: this.state.streamConfig.platform,
+      url: this.state.streamConfig.url,
+      stream_key_set: true,
+    });
+  }
+
+  /**
+   * Handle stream.start command (start RTMP streaming)
+   */
+  private async handleStreamStart(command: any): Promise<void> {
+    if (this.state.streaming) {
+      this.sendAck(command.id, true, {
+        status: 'streaming',
+        platform: this.state.streamConfig.platform,
+        url: this.state.streamConfig.url,
+        quality: command.payload?.quality || 'standard',
+      });
+      return;
+    }
+    if (!this.state.streamConfig.url || !this.state.streamConfig.stream_key) {
+      this.sendAck(command.id, false, {
+        error: 'NOT_CONFIGURED',
+        message: 'Call stream.configure first with url and stream_key',
+      });
+      return;
+    }
+    if (this.config.simulateErrors && Math.random() < 0.1) {
+      this.sendAck(command.id, true, {
+        status: 'streaming',
+        platform: this.state.streamConfig.platform,
+        url: this.state.streamConfig.url,
+        quality: command.payload?.quality || 'standard',
+      });
+      setTimeout(() => {
+        this.sendEvent({
+          type: 'event',
+          id: uuidv4(),
+          timestamp: new Date().toISOString(),
+          event: 'streaming.rtmp.connection_failed',
+          payload: {
+            platform: this.state.streamConfig.platform,
+            error: 'Connection refused (simulated)',
+            retry_count: 0,
+          },
+        });
+      }, 500);
+      return;
+    }
+    this.state.streaming = true;
+    const quality = command.payload?.quality || 'standard';
+    const fullUrl = `${this.state.streamConfig.url}/${this.state.streamConfig.stream_key}`;
+    this.sendAck(command.id, true, {
+      status: 'streaming',
+      platform: this.state.streamConfig.platform,
+      url: fullUrl,
+      quality,
+    });
+    setTimeout(() => {
+      this.sendEvent({
+        type: 'event',
+        id: uuidv4(),
+        timestamp: new Date().toISOString(),
+        event: 'streaming.rtmp.started',
+        payload: {
+          platform: this.state.streamConfig.platform,
+          url: fullUrl,
+        },
+      });
+    }, 300);
+  }
+
+  /**
+   * Handle stream.stop command (stop RTMP streaming)
+   */
+  private async handleStreamStop(command: any): Promise<void> {
+    if (!this.state.streaming) {
+      this.sendAck(command.id, true, {
+        status: 'stopped',
+        platform: this.state.streamConfig.platform || 'generic',
+      });
+      return;
+    }
+    this.state.streaming = false;
+    const platform = this.state.streamConfig.platform || 'generic';
+    this.sendAck(command.id, true, {
+      status: 'stopped',
+      platform,
+    });
+    this.sendEvent({
+      type: 'event',
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      event: 'streaming.rtmp.stopped',
+      payload: { platform },
+    });
   }
 
   /**

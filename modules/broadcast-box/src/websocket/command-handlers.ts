@@ -920,5 +920,66 @@ export function createDefaultCommandHandlers(
     });
   });
 
+  // Register stream.configure handler (RTMP destination; persisted on device)
+  registry.registerHandler('stream.configure', async (command, context) => {
+    const { url, stream_key, platform } = command.payload || {};
+    if (!url || !stream_key) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        'url and stream_key are required',
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+    const validPlatforms = ['youtube', 'facebook', 'twitch', 'generic'];
+    const platformValue = platform ?? 'generic';
+    if (!validPlatforms.includes(platformValue)) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        `platform must be one of: ${validPlatforms.join(', ')}`,
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+    coreInfo('Stream configure command processed', {
+      operation: 'broadcast-box:command:stream-configure',
+      deviceId: context.deviceId,
+      platform: platformValue,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      status: 'configured',
+      platform: platformValue,
+      url,
+      stream_key_set: true,
+    });
+  });
+
+  // Register stream.start handler (start RTMP streaming; optional quality)
+  registry.registerHandler('stream.start', async (command, context) => {
+    const { quality } = command.payload || {};
+    coreInfo('Stream start command processed', {
+      operation: 'broadcast-box:command:stream-start',
+      deviceId: context.deviceId,
+      quality,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      status: 'streaming',
+      quality: quality ?? 'standard',
+    });
+  });
+
+  // Register stream.stop handler
+  registry.registerHandler('stream.stop', async (command, context) => {
+    coreInfo('Stream stop command processed', {
+      operation: 'broadcast-box:command:stream-stop',
+      deviceId: context.deviceId,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      status: 'stopped',
+    });
+  });
+
   return registry;
 }

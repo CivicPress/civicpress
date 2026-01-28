@@ -424,6 +424,9 @@ export class DeviceCommandService {
         config: { quality: payload?.config?.quality },
       };
     }
+    if (action === 'stream.start') {
+      return { quality: payload?.quality };
+    }
     return payload;
   }
 
@@ -515,6 +518,61 @@ export class DeviceCommandService {
       deviceId,
       action: 'sources.set',
       payload: { video: payload.video, audio: payload.audio },
+      source,
+    });
+  }
+
+  /**
+   * Configure RTMP streaming destination (url, stream key, platform). Persisted on device.
+   */
+  async configureStream(
+    deviceId: string,
+    payload: { url: string; stream_key: string; platform?: string },
+    source: CommandSource
+  ): Promise<CommandResponse> {
+    if (!payload.url || !payload.stream_key) {
+      throw new Error('url and stream_key are required for stream.configure');
+    }
+    return this.executeCommand({
+      deviceId,
+      action: 'stream.configure',
+      payload: {
+        url: payload.url,
+        stream_key: payload.stream_key,
+        platform: payload.platform ?? 'generic',
+      },
+      source,
+    });
+  }
+
+  /**
+   * Start RTMP streaming (uses saved config; optional quality).
+   */
+  async startStream(
+    deviceId: string,
+    quality: string | undefined,
+    source: CommandSource
+  ): Promise<CommandResponse> {
+    const payload = quality ? { quality } : {};
+    return this.executeCommand({
+      deviceId,
+      action: 'stream.start',
+      payload,
+      source,
+    });
+  }
+
+  /**
+   * Stop RTMP streaming.
+   */
+  async stopStream(
+    deviceId: string,
+    source: CommandSource
+  ): Promise<CommandResponse> {
+    return this.executeCommand({
+      deviceId,
+      action: 'stream.stop',
+      payload: {},
       source,
     });
   }

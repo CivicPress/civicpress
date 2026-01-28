@@ -1187,11 +1187,12 @@ export class RealtimeServer {
               timestamp: message.timestamp || message.payload?.timestamp,
               commandId: commandId,
               success: success,
-              // Extract error message and code
+              // Extract error message and code (device may send error in error, payload.error, or payload.message)
               error:
                 message.error?.message ||
                 message.error ||
-                message.payload?.error,
+                message.payload?.error ||
+                message.payload?.message,
               errorCode:
                 message.error?.code ||
                 message.errorCode ||

@@ -595,6 +595,155 @@ Stop a recording session.
 
 ---
 
+### 11. `stream.configure`
+
+Configure the RTMP streaming destination. Configuration is persisted on the
+device and used by `stream.start`.
+
+**Command**:
+
+```json
+{
+  "type": "command",
+  "id": "stream-configure-uuid",
+  "timestamp": "2026-01-16T19:00:00.000Z",
+  "action": "stream.configure",
+  "payload": {
+    "url": "rtmp://a.rtmp.youtube.com/live2",
+    "stream_key": "xxxx-xxxx-xxxx-xxxx",
+    "platform": "youtube"
+  }
+}
+```
+
+**Payload Fields**:
+
+- `url` (string, required): RTMP server URL (e.g.
+  `rtmp://a.rtmp.youtube.com/live2`)
+- `stream_key` (string, required): Stream key provided by the platform
+- `platform` (string, optional): Platform identifier: `youtube`, `facebook`,
+  `twitch`, or `generic`
+
+**Expected ACK**:
+
+```json
+{
+  "type": "ack",
+  "id": "ack-uuid",
+  "commandId": "stream-configure-uuid",
+  "timestamp": "2026-01-16T19:00:00.100Z",
+  "success": true,
+  "payload": {
+    "status": "configured",
+    "platform": "youtube",
+    "url": "rtmp://a.rtmp.youtube.com/live2",
+    "stream_key_set": true
+  }
+}
+```
+
+**Notes**:
+
+- Configuration is saved on the device and persists across restarts.
+- Call only when the user changes streaming settings (not on every session).
+- Supported platforms: `youtube`, `facebook`, `twitch`, `generic`.
+
+---
+
+### 12. `stream.start`
+
+Start RTMP streaming to the configured destination. Uses the active sources from
+`sources.set`.
+
+**Command**:
+
+```json
+{
+  "type": "command",
+  "id": "stream-start-uuid",
+  "timestamp": "2026-01-16T19:05:00.000Z",
+  "action": "stream.start",
+  "payload": {
+    "quality": "standard"
+  }
+}
+```
+
+**Payload Fields**:
+
+- `quality` (string, optional): Quality preset (e.g. `low`, `standard`, `high`,
+  `ultra`). Defaults to the device’s streaming quality setting.
+
+**Expected ACK**:
+
+```json
+{
+  "type": "ack",
+  "id": "ack-uuid",
+  "commandId": "stream-start-uuid",
+  "timestamp": "2026-01-16T19:05:00.100Z",
+  "success": true,
+  "payload": {
+    "status": "streaming",
+    "platform": "youtube",
+    "url": "rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx-xxxx-xxxx",
+    "quality": "standard"
+  }
+}
+```
+
+**Notes**:
+
+- Uses centralized video/audio sources from `sources.set`.
+- If RTMP is not configured in memory, the device loads it from saved config.
+- If FFmpeg is already running (preview/recording), it is restarted with RTMP
+  output added; otherwise FFmpeg starts with RTMP output.
+- After a successful ACK, the device typically sends a `streaming.rtmp.started`
+  event when the connection is established.
+
+---
+
+### 13. `stream.stop`
+
+Stop RTMP streaming.
+
+**Command**:
+
+```json
+{
+  "type": "command",
+  "id": "stream-stop-uuid",
+  "timestamp": "2026-01-16T19:10:00.000Z",
+  "action": "stream.stop",
+  "payload": {}
+}
+```
+
+**Expected ACK**:
+
+```json
+{
+  "type": "ack",
+  "id": "ack-uuid",
+  "commandId": "stream-stop-uuid",
+  "timestamp": "2026-01-16T19:10:00.100Z",
+  "success": true,
+  "payload": {
+    "status": "stopped",
+    "platform": "youtube"
+  }
+}
+```
+
+**Notes**:
+
+- If other outputs are active (preview, recording), FFmpeg continues without
+  RTMP.
+- If no other outputs are active, FFmpeg stops.
+- The device typically sends a `streaming.rtmp.stopped` event after stopping.
+
+---
+
 ## WebRTC Preview Messages (Bidirectional)
 
 These messages are used for WebRTC preview stream negotiation. They are
@@ -930,6 +1079,88 @@ Published when active video/audio sources are updated via `sources.set`.
 - `video` (string): Current active video source identifier (device identifier or
   `"pip"`).
 - `audio` (string): Current active audio source identifier.
+
+---
+
+### 3. `streaming.rtmp.started`
+
+Published when RTMP streaming has successfully started and the connection to the
+platform is established.
+
+**Event Message**:
+
+```json
+{
+  "type": "event",
+  "id": "event-uuid",
+  "timestamp": "2026-01-16T19:05:00.500Z",
+  "event": "streaming.rtmp.started",
+  "payload": {
+    "platform": "youtube",
+    "url": "rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx-xxxx-xxxx"
+  }
+}
+```
+
+**Payload Fields**:
+
+- `platform` (string): Platform identifier (e.g. `youtube`, `facebook`,
+  `twitch`, `generic`).
+- `url` (string): Full RTMP URL including stream key (for display only; clients
+  should not log or store the full URL with key).
+
+---
+
+### 4. `streaming.rtmp.stopped`
+
+Published when RTMP streaming has stopped.
+
+**Event Message**:
+
+```json
+{
+  "type": "event",
+  "id": "event-uuid",
+  "timestamp": "2026-01-16T19:10:00.200Z",
+  "event": "streaming.rtmp.stopped",
+  "payload": {
+    "platform": "youtube"
+  }
+}
+```
+
+**Payload Fields**:
+
+- `platform` (string): Platform identifier that was streaming.
+
+---
+
+### 5. `streaming.rtmp.connection_failed`
+
+Published when the device fails to connect to the RTMP destination (e.g. invalid
+URL, stream key, or network error).
+
+**Event Message**:
+
+```json
+{
+  "type": "event",
+  "id": "event-uuid",
+  "timestamp": "2026-01-16T19:05:01.000Z",
+  "event": "streaming.rtmp.connection_failed",
+  "payload": {
+    "platform": "youtube",
+    "error": "Connection refused",
+    "retry_count": 0
+  }
+}
+```
+
+**Payload Fields**:
+
+- `platform` (string): Platform identifier that was attempted.
+- `error` (string): Human-readable error message.
+- `retry_count` (number, optional): Number of connection retries attempted.
 
 ---
 

@@ -11,6 +11,7 @@ import DeviceConfigurationForm from '~/components/broadcast-box/DeviceConfigurat
 import DeviceSourceControl from '~/components/broadcast-box/DeviceSourceControl.vue';
 import DevicePiPControl from '~/components/broadcast-box/DevicePiPControl.vue';
 import DeviceConfigControl from '~/components/broadcast-box/DeviceConfigControl.vue';
+import DeviceStreamingControl from '~/components/broadcast-box/DeviceStreamingControl.vue';
 import DeviceStatusControl from '~/components/broadcast-box/DeviceStatusControl.vue';
 import DevicePreview from '~/components/broadcast-box/DevicePreview.vue';
 import DeviceManualRecording from '~/components/broadcast-box/DeviceManualRecording.vue';
@@ -1176,6 +1177,14 @@ onUnmounted(() => {
               :device="device"
               :is-device-connected="isDeviceConnected"
               @updated="loadDevice"
+            />
+
+            <!-- Streaming Control (RTMP) -->
+            <DeviceStreamingControl
+              v-if="device"
+              :device="device"
+              :is-device-connected="isDeviceConnected"
+              :streaming-status="connectionStatus.streaming ?? null"
             />
           </div>
 

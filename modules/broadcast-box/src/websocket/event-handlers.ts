@@ -792,6 +792,72 @@ export function createDefaultEventHandlers(
     }
   });
 
+  // Register streaming.rtmp.started handler
+  registry.registerHandler('streaming.rtmp.started', async (event, context) => {
+    const payload = event.payload?.eventData ?? event.payload;
+    coreInfo('RTMP streaming started', {
+      operation: 'broadcast-box:event:streaming-rtmp-started',
+      deviceId: context.deviceId,
+      platform: payload?.platform,
+      url: payload?.url,
+    });
+    await context.deviceEventModel.create({
+      id: uuidv4(),
+      deviceId: context.deviceId,
+      eventType: 'streaming.rtmp.started',
+      eventData: {
+        platform: payload?.platform,
+        url: payload?.url,
+        startedAt: new Date().toISOString(),
+      },
+    });
+  });
+
+  // Register streaming.rtmp.stopped handler
+  registry.registerHandler('streaming.rtmp.stopped', async (event, context) => {
+    const payload = event.payload?.eventData ?? event.payload;
+    coreInfo('RTMP streaming stopped', {
+      operation: 'broadcast-box:event:streaming-rtmp-stopped',
+      deviceId: context.deviceId,
+      platform: payload?.platform,
+    });
+    await context.deviceEventModel.create({
+      id: uuidv4(),
+      deviceId: context.deviceId,
+      eventType: 'streaming.rtmp.stopped',
+      eventData: {
+        platform: payload?.platform,
+        stoppedAt: new Date().toISOString(),
+      },
+    });
+  });
+
+  // Register streaming.rtmp.connection_failed handler
+  registry.registerHandler(
+    'streaming.rtmp.connection_failed',
+    async (event, context) => {
+      const payload = event.payload?.eventData ?? event.payload;
+      coreWarn('RTMP connection failed', {
+        operation: 'broadcast-box:event:streaming-rtmp-connection-failed',
+        deviceId: context.deviceId,
+        platform: payload?.platform,
+        error: payload?.error,
+        retry_count: payload?.retry_count,
+      });
+      await context.deviceEventModel.create({
+        id: uuidv4(),
+        deviceId: context.deviceId,
+        eventType: 'streaming.rtmp.connection_failed',
+        eventData: {
+          platform: payload?.platform,
+          error: payload?.error,
+          retry_count: payload?.retry_count,
+          failedAt: new Date().toISOString(),
+        },
+      });
+    }
+  );
+
   // Register health.update handler
   registry.registerHandler('health.update', async (event, context) => {
     // Support both protocol format and current format

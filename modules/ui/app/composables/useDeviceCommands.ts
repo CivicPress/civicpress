@@ -251,6 +251,74 @@ export function useDeviceCommands(
   };
 
   /**
+   * Configure RTMP streaming destination (url, stream key, platform). Persisted on device.
+   */
+  const configureStream = async (
+    url: string,
+    streamKey: string,
+    platform: 'youtube' | 'facebook' | 'twitch' | 'generic' = 'generic'
+  ): Promise<CommandResponse> => {
+    try {
+      const response = await sendCommand('stream.configure', {
+        url,
+        stream_key: streamKey,
+        platform,
+      });
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.configUpdated'),
+          description: t('broadcastBox.success.streamConfiguredDesc'),
+          color: 'primary',
+        });
+      }
+      return response;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  /**
+   * Start RTMP streaming (uses saved config; optional quality).
+   */
+  const startStream = async (
+    quality?: 'low' | 'standard' | 'high' | 'ultra'
+  ): Promise<CommandResponse> => {
+    try {
+      const payload = quality ? { quality } : {};
+      const response = await sendCommand('stream.start', payload);
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.streamStarted'),
+          description: t('broadcastBox.success.streamStartedDesc'),
+          color: 'primary',
+        });
+      }
+      return response;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  /**
+   * Stop RTMP streaming.
+   */
+  const stopStream = async (): Promise<CommandResponse> => {
+    try {
+      const response = await sendCommand('stream.stop', {});
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.streamStopped'),
+          description: t('broadcastBox.success.streamStoppedDesc'),
+          color: 'primary',
+        });
+      }
+      return response;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  /**
    * Update device configuration
    */
   const updateConfig = async (
@@ -778,6 +846,9 @@ export function useDeviceCommands(
     setSources,
     switchSource,
     setPip,
+    configureStream,
+    startStream,
+    stopStream,
     updateConfig,
     getStatus,
     listSources,

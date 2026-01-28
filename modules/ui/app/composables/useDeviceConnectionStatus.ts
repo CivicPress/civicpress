@@ -72,6 +72,15 @@ export interface DeviceConnectionStatus {
     startedAt: string | null;
     filePath: string | null;
   };
+  /** RTMP streaming status from streaming.rtmp.* events */
+  streaming?: {
+    active: boolean;
+    platform?: string;
+    url?: string;
+    quality?: string;
+    error?: string;
+    retryCount?: number;
+  };
 }
 
 const deviceStatuses = ref<Map<string, DeviceConnectionStatus>>(new Map());
@@ -952,6 +961,39 @@ async function connectToDeviceRoom(
                   activeSources: { video, audio },
                 });
               }
+            } else if (message.event === 'streaming.rtmp.started') {
+              const payload = message.payload ?? {};
+              updateDeviceStatus(deviceUuid, {
+                streaming: {
+                  active: true,
+                  platform: payload.platform,
+                  url: payload.url,
+                  quality: payload.quality,
+                  error: undefined,
+                  retryCount: undefined,
+                },
+              });
+            } else if (message.event === 'streaming.rtmp.stopped') {
+              const current = deviceStatuses.value.get(deviceUuid);
+              updateDeviceStatus(deviceUuid, {
+                streaming: {
+                  active: false,
+                  platform: current?.streaming?.platform,
+                  error: undefined,
+                  retryCount: undefined,
+                },
+              });
+            } else if (message.event === 'streaming.rtmp.connection_failed') {
+              const payload = message.payload ?? {};
+              const current = deviceStatuses.value.get(deviceUuid);
+              updateDeviceStatus(deviceUuid, {
+                streaming: {
+                  active: false,
+                  platform: payload.platform ?? current?.streaming?.platform,
+                  error: payload.error,
+                  retryCount: payload.retry_count ?? payload.retryCount,
+                },
+              });
             }
           }
 
@@ -1164,6 +1206,20 @@ function updateDeviceStatus(
           newCapabilities.hardwareEncoding ||
         JSON.stringify(currentCapabilities.quality) !==
           JSON.stringify(newCapabilities.quality)
+      ) {
+        hasChanges = true;
+        break;
+      }
+    } else if (key === 'streaming' && value) {
+      const currentStreaming = currentValue as any;
+      const newStreaming = value as any;
+      if (
+        !currentStreaming ||
+        currentStreaming.active !== newStreaming.active ||
+        currentStreaming.platform !== newStreaming.platform ||
+        currentStreaming.url !== newStreaming.url ||
+        currentStreaming.error !== newStreaming.error ||
+        currentStreaming.retryCount !== newStreaming.retryCount
       ) {
         hasChanges = true;
         break;
