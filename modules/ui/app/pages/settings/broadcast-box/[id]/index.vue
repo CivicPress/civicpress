@@ -172,90 +172,89 @@ watch(
 watch(
   () => connectionStatus.value,
   (status) => {
-    if (device.value && status?.capabilities) {
-      // Merge capabilities from status into device object
-      if (!device.value.capabilities) {
-        // Initialize with default structure matching BroadcastDevice type
-        device.value.capabilities = {
-          videoSources: [],
-          audioSources: [],
-          pipSupported: false,
-          maxResolution: '',
-        };
-      }
+    if (!isComponentMounted || !device.value || !status?.capabilities) {
+      return;
+    }
+    // Merge capabilities from status into device object
+    if (!device.value.capabilities) {
+      // Initialize with default structure matching BroadcastDevice type
+      device.value.capabilities = {
+        videoSources: [],
+        audioSources: [],
+        pipSupported: false,
+        maxResolution: '',
+      };
+    }
 
-      // Check if capabilities actually changed
-      const capabilitiesChanged =
-        JSON.stringify(status.capabilities) !==
-        JSON.stringify(device.value.capabilities);
+    // Check if capabilities actually changed
+    const capabilitiesChanged =
+      JSON.stringify(status.capabilities) !==
+      JSON.stringify(device.value.capabilities);
 
-      // Update video sources if available
-      if (
-        status.capabilities.videoSources &&
-        status.capabilities.videoSources.length > 0
-      ) {
-        device.value.capabilities.videoSources =
-          status.capabilities.videoSources;
-      }
-      if (status.capabilities.videoSourceObjects) {
-        device.value.capabilities.videoSourceObjects =
-          status.capabilities.videoSourceObjects;
-      }
+    // Update video sources if available
+    if (
+      status.capabilities.videoSources &&
+      status.capabilities.videoSources.length > 0
+    ) {
+      device.value.capabilities.videoSources = status.capabilities.videoSources;
+    }
+    if (status.capabilities.videoSourceObjects) {
+      device.value.capabilities.videoSourceObjects =
+        status.capabilities.videoSourceObjects;
+    }
 
-      // Update audio sources if available
-      if (
-        status.capabilities.audioSources &&
-        status.capabilities.audioSources.length > 0
-      ) {
-        device.value.capabilities.audioSources =
-          status.capabilities.audioSources;
-      }
-      if (status.capabilities.audioSourceObjects) {
-        device.value.capabilities.audioSourceObjects =
-          status.capabilities.audioSourceObjects;
-      }
+    // Update audio sources if available
+    if (
+      status.capabilities.audioSources &&
+      status.capabilities.audioSources.length > 0
+    ) {
+      device.value.capabilities.audioSources = status.capabilities.audioSources;
+    }
+    if (status.capabilities.audioSourceObjects) {
+      device.value.capabilities.audioSourceObjects =
+        status.capabilities.audioSourceObjects;
+    }
 
-      // Update other capability fields
-      if (status.capabilities.pipSupported !== undefined) {
-        device.value.capabilities.pipSupported =
-          status.capabilities.pipSupported;
-      }
-      if (status.capabilities.maxResolution) {
-        device.value.capabilities.maxResolution =
-          status.capabilities.maxResolution;
-      }
+    // Update other capability fields
+    if (status.capabilities.pipSupported !== undefined) {
+      device.value.capabilities.pipSupported = status.capabilities.pipSupported;
+    }
+    if (status.capabilities.maxResolution) {
+      device.value.capabilities.maxResolution =
+        status.capabilities.maxResolution;
+    }
 
-      // Update structured capability objects (from device.connected event)
-      if (status.capabilities.pipCapabilities) {
-        device.value.capabilities.pipCapabilities =
-          status.capabilities.pipCapabilities;
-      }
-      if (status.capabilities.audioMixingCapabilities) {
-        device.value.capabilities.audioMixingCapabilities =
-          status.capabilities.audioMixingCapabilities;
-      }
-      if (status.capabilities.hardwareEncodingCapabilities) {
-        device.value.capabilities.hardwareEncodingCapabilities =
-          status.capabilities.hardwareEncodingCapabilities;
-      }
-      // Note: hardwareEncoding boolean is also available in DeviceConnectionStatus.capabilities
-      // but is not part of BroadcastDevice.capabilities type - it's only in connectionStatus
+    // Update structured capability objects (from device.connected event)
+    if (status.capabilities.pipCapabilities) {
+      device.value.capabilities.pipCapabilities =
+        status.capabilities.pipCapabilities;
+    }
+    if (status.capabilities.audioMixingCapabilities) {
+      device.value.capabilities.audioMixingCapabilities =
+        status.capabilities.audioMixingCapabilities;
+    }
+    if (status.capabilities.hardwareEncodingCapabilities) {
+      device.value.capabilities.hardwareEncodingCapabilities =
+        status.capabilities.hardwareEncodingCapabilities;
+    }
+    // Note: hardwareEncoding boolean is also available in DeviceConnectionStatus.capabilities
+    // but is not part of BroadcastDevice.capabilities type - it's only in connectionStatus
 
-      // If capabilities changed and we haven't refreshed yet, refresh device data from API
-      // This ensures the UI shows the latest data from the database (which was updated by the backend)
-      // We only do this once to avoid unnecessary API calls
-      if (capabilitiesChanged && !hasRefreshedAfterCapabilities) {
-        hasRefreshedAfterCapabilities = true;
-        // Debounce the refresh slightly to avoid race conditions
-        setTimeout(() => {
-          loadDevice(true).catch((error) => {
-            console.warn(
-              'Failed to refresh device data after capabilities update:',
-              error
-            );
-          });
-        }, 500);
-      }
+    // If capabilities changed and we haven't refreshed yet, refresh device data from API
+    // This ensures the UI shows the latest data from the database (which was updated by the backend)
+    // We only do this once to avoid unnecessary API calls
+    if (capabilitiesChanged && !hasRefreshedAfterCapabilities) {
+      hasRefreshedAfterCapabilities = true;
+      // Debounce the refresh slightly to avoid race conditions
+      setTimeout(() => {
+        if (!isComponentMounted) return;
+        loadDevice(true).catch((error) => {
+          console.warn(
+            'Failed to refresh device data after capabilities update:',
+            error
+          );
+        });
+      }, 500);
     }
   },
   { deep: true }
@@ -284,16 +283,15 @@ watch(
     if (deviceUuid) {
       // Refresh sessions every 5 minutes (very infrequent, only for sessions)
       sessionsRefreshInterval = setInterval(() => {
-        if (device.value) {
-          // Only refresh sessions, not the entire device
-          listSessions({ deviceId })
-            .then((sessionsData) => {
-              sessions.value = sessionsData;
-            })
-            .catch(() => {
-              // Silently fail - sessions are not critical
-            });
-        }
+        if (!isComponentMounted || !device.value) return;
+        listSessions({ deviceId })
+          .then((sessionsData) => {
+            if (!isComponentMounted) return;
+            sessions.value = sessionsData;
+          })
+          .catch(() => {
+            // Silently fail - sessions are not critical
+          });
       }, 300000); // 5 minutes
     }
   },
@@ -341,6 +339,7 @@ const loadDevice = async (force = false) => {
   if (!force) {
     loadDeviceTimeout = setTimeout(() => {
       loadDeviceTimeout = null;
+      if (!isComponentMounted) return;
       loadDevice(true);
     }, LOAD_DEVICE_DEBOUNCE_MS);
     return;
@@ -361,6 +360,8 @@ const loadDevice = async (force = false) => {
       getDeviceHealth(deviceId),
       listSessions({ deviceId }).catch(() => []), // Don't fail if sessions fail
     ]);
+
+    if (!isComponentMounted) return;
 
     if (deviceResponse) {
       // Map pipConfig to pip for consistency with connectionStatus
@@ -413,10 +414,11 @@ const loadDevice = async (force = false) => {
     sessions.value = sessionsData;
 
     // Restore scroll position after update (use nextTick to ensure DOM is updated)
-    if (process.client && scrollPosition > 0) {
+    if (process.client && scrollPosition > 0 && isComponentMounted) {
       await nextTick();
-      // Use requestAnimationFrame to ensure browser has finished rendering
+      if (!isComponentMounted) return;
       requestAnimationFrame(() => {
+        if (!isComponentMounted) return;
         window.scrollTo({ top: scrollPosition, behavior: 'instant' });
       });
     }
@@ -1160,11 +1162,8 @@ onUnmounted(() => {
             :connection-status="connectionStatus"
           />
 
-          <!-- Device Control Cards -->
-          <div
-            v-if="isDeviceConnected"
-            class="grid grid-cols-1 lg:grid-cols-2 gap-6"
-          >
+          <!-- Device Control Cards (show when device is loaded; controls disabled when offline) -->
+          <div v-if="device" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Source Control -->
             <DeviceSourceControl
               :device="device"

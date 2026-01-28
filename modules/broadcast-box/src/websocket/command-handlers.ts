@@ -232,8 +232,12 @@ export function createDefaultCommandHandlers(
     return context.protocol.createAck(command.id, true);
   });
 
-  // Register switch_source handler
+  // Register switch_source handler (deprecated: use sources.set instead; kept for backward compatibility)
   registry.registerHandler('switch_source', async (command, context) => {
+    coreWarn('switch_source is deprecated, use sources.set instead', {
+      operation: 'broadcast-box:command:switch-source-deprecated',
+      deviceId: context.deviceId,
+    });
     // Support both protocol format (sourceType + sourceId) and current format (videoSource/audioSource)
     const { sourceType, sourceId, videoSource, audioSource } = command.payload;
 
@@ -435,6 +439,89 @@ export function createDefaultCommandHandlers(
     return context.protocol.createAck(command.id, true, undefined, {
       videoSource: videoSource || device.config.defaultVideoSource,
       audioSource: audioSource || device.config.defaultAudioSource,
+    });
+  });
+
+  // Register sources.set handler (primary way to set active video/audio; used by all commands)
+  registry.registerHandler('sources.set', async (command, context) => {
+    const { video, audio } = command.payload || {};
+
+    if (!video && !audio) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        'At least one of video or audio must be provided',
+        undefined,
+        BroadcastBoxErrorCode.INVALID_CONFIG
+      );
+    }
+
+    const device = await context.deviceManager.getDevice(context.deviceId);
+    if (!device) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
+        undefined,
+        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+      );
+    }
+
+    // Validate video: device identifier or "pip"
+    if (video !== undefined && video !== 'pip') {
+      const videoValid =
+        device.capabilities.videoSources?.includes(video) ||
+        device.capabilities.videoSourceObjects?.some(
+          (s) =>
+            s.identifier === video ||
+            s.identifier?.toLowerCase() === video.toLowerCase() ||
+            s.name === video ||
+            s.name?.toLowerCase() === video.toLowerCase()
+        );
+      if (!videoValid) {
+        return context.protocol.createAck(
+          command.id,
+          false,
+          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
+          undefined,
+          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+        );
+      }
+    }
+
+    // Validate audio: device identifier
+    if (audio !== undefined) {
+      const audioValid =
+        device.capabilities.audioSources?.includes(audio) ||
+        device.capabilities.audioSourceObjects?.some(
+          (s) =>
+            s.identifier === audio ||
+            s.identifier?.toLowerCase() === audio.toLowerCase() ||
+            s.name === audio ||
+            s.name?.toLowerCase() === audio.toLowerCase()
+        );
+      if (!audioValid) {
+        return context.protocol.createAck(
+          command.id,
+          false,
+          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
+          undefined,
+          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+        );
+      }
+    }
+
+    coreInfo('Sources set command processed', {
+      operation: 'broadcast-box:command:sources-set',
+      deviceId: context.deviceId,
+      video,
+      audio,
+    });
+
+    return context.protocol.createAck(command.id, true, undefined, {
+      video: video ?? device.config.defaultVideoSource,
+      audio: audio ?? device.config.defaultAudioSource,
+      status: 'configured',
     });
   });
 
@@ -716,6 +803,7 @@ export function createDefaultCommandHandlers(
 
   registry.registerHandler('set_pip', setPipHandler);
   registry.registerHandler('configure_pip', setPipHandler); // Alias
+  registry.registerHandler('pip.configure', setPipHandler); // Alias (protocol name)
 
   // Register preview.start handler
   registry.registerHandler('preview.start', async (command, context) => {

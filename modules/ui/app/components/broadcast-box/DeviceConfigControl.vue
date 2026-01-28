@@ -80,29 +80,60 @@ const deviceUuidRef = computed(() => deviceUuid.value);
 
 const { updateConfig, loading } = useDeviceCommands(deviceUuidRef);
 
-// Quality preset options
-const qualityPresets = [
-  { label: t('broadcastBox.qualityLow'), value: 'low' },
-  { label: t('broadcastBox.qualityStandard'), value: 'standard' },
-  { label: t('broadcastBox.qualityHigh'), value: 'high' },
-];
+// Quality preset label for known presets; otherwise capitalized name
+function qualityPresetLabel(name: string): string {
+  const key = name.toLowerCase();
+  if (key === 'low') return t('broadcastBox.qualityLow');
+  if (key === 'standard') return t('broadcastBox.qualityStandard');
+  if (key === 'high') return t('broadcastBox.qualityHigh');
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
 
-// Current config values
-const currentQualityPreset = computed(() => props.device.config?.qualityPreset || 'standard');
-const currentAutoStart = computed(() => props.device.config?.autoStart || false);
+// Quality preset options: from device capabilities or fallback to [low, standard, high]
+const qualityPresets = computed(() => {
+  const presets = props.device?.capabilities?.quality?.presets;
+  if (Array.isArray(presets) && presets.length > 0) {
+    return presets.map((p) => ({
+      label: qualityPresetLabel(p.name),
+      value: p.name,
+    }));
+  }
+  return [
+    { label: t('broadcastBox.qualityLow'), value: 'low' },
+    { label: t('broadcastBox.qualityStandard'), value: 'standard' },
+    { label: t('broadcastBox.qualityHigh'), value: 'high' },
+  ];
+});
+
+// Current/default preset: config if set, else capabilities.defaults.recording, else 'standard'
+const currentQualityPreset = computed(
+  () =>
+    props.device?.config?.qualityPreset ??
+    props.device?.capabilities?.quality?.defaults?.recording ??
+    'standard'
+);
+const currentAutoStart = computed(
+  () => props.device?.config?.autoStart ?? false
+);
 
 // Selected config values
 const selectedQualityPreset = ref<{ label: string; value: string } | undefined>(
-  qualityPresets.find((p) => p.value === currentQualityPreset.value) ?? qualityPresets[1] ?? undefined
+  undefined
 );
 const selectedAutoStart = ref(currentAutoStart.value);
 
-// Update selected values when device config changes
+// Sync selected quality with current preset and available options (handle e.g. "ultra" in list)
 watch(
-  () => [currentQualityPreset.value, currentAutoStart.value],
-  ([newQuality, newAutoStart]) => {
+  () => [
+    currentQualityPreset.value,
+    currentAutoStart.value,
+    qualityPresets.value,
+  ],
+  ([newQuality, newAutoStart, options]) => {
+    const opts = options as { label: string; value: string }[];
+    const match = opts.find((p) => p.value === newQuality);
     selectedQualityPreset.value =
-      qualityPresets.find((p) => p.value === newQuality) ?? qualityPresets[1] ?? undefined;
+      match ?? opts.find((p) => p.value === 'standard') ?? opts[0] ?? undefined;
     selectedAutoStart.value = newAutoStart;
   },
   { immediate: true }
@@ -124,11 +155,12 @@ const handleApply = async () => {
 
   try {
     await updateConfig({
-      qualityPreset: selectedQualityPreset.value?.value as 'low' | 'standard' | 'high',
+      qualityPreset:
+        selectedQualityPreset.value?.value ?? currentQualityPreset.value,
       autoStart: selectedAutoStart.value,
       // Preserve existing video/audio sources
-      defaultVideoSource: props.device.config?.defaultVideoSource,
-      defaultAudioSource: props.device.config?.defaultAudioSource,
+      defaultVideoSource: props.device?.config?.defaultVideoSource,
+      defaultAudioSource: props.device?.config?.defaultAudioSource,
     });
     emit('updated');
   } catch (error) {
@@ -137,4 +169,3 @@ const handleApply = async () => {
   }
 };
 </script>
-

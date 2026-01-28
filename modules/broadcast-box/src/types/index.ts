@@ -99,6 +99,11 @@ export interface DeviceCapabilities {
    */
   hardwareEncodingCapabilities?: HardwareEncodingCapabilities;
 
+  /**
+   * Quality presets and defaults (from `device.connected` payload.capabilities.quality).
+   */
+  quality?: QualityCapabilities;
+
   maxResolution: string;
   maxFramerate?: number; // Maximum framerate supported
   encodingPresets?: EncodingPreset[]; // Available encoding presets
@@ -127,6 +132,35 @@ export interface AudioMixingCapabilities {
 
 export interface HardwareEncodingCapabilities {
   supported: boolean;
+}
+
+/**
+ * Quality preset from device (capabilities.quality.presets).
+ * Stored in camelCase for consistency with other capabilities.
+ */
+export interface QualityPreset {
+  name: string;
+  videoBitrateKbps: number;
+  audioBitrateKbps: number;
+  resolution: [number, number];
+  framerate: number;
+}
+
+/**
+ * Default preset names per output type (capabilities.quality.defaults).
+ */
+export interface QualityDefaults {
+  preview?: string;
+  streaming?: string;
+  recording?: string;
+}
+
+/**
+ * Quality capability from device.connected (capabilities.quality).
+ */
+export interface QualityCapabilities {
+  presets: QualityPreset[];
+  defaults?: QualityDefaults;
 }
 
 /**

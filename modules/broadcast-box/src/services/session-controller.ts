@@ -97,13 +97,11 @@ export class SessionController {
 
     const created = await this.sessionModel.create(session);
 
-    // Send start_session command to device
+    // Send start_session command to device (sources are set via sources.set; only quality in config)
     const command = this.protocol.createCommand('start_session', {
       sessionId: created.id,
       civicpressSessionId: created.civicpressSessionId,
       config: {
-        videoSource: request.metadata?.videoSource,
-        audioSource: request.metadata?.audioSource,
         quality: request.metadata?.quality,
         pip: request.metadata?.pip,
       },

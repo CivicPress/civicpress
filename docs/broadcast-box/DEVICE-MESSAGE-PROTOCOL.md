@@ -115,6 +115,10 @@ Start a WebRTC preview stream.
 **Note**: After sending the ACK, the device should send a `preview.offer` WebRTC
 message to establish the WebRTC connection.
 
+**Centralized sources**: Video/audio sources are no longer passed in
+`preview.start`. Set active sources once via `sources.set`; they are used
+automatically by preview, record, and session commands.
+
 ---
 
 ### 2. `preview.stop`
@@ -150,7 +154,68 @@ Stop the WebRTC preview stream.
 
 ---
 
-### 3. `switch_source`
+### 3. `sources.set`
+
+Set active video/audio sources globally. This is the **primary** way to
+configure sources. Sources persist across sessions and are used automatically by
+`preview.start`, `record.start`, and `start_session`.
+
+**Command**:
+
+```json
+{
+  "type": "command",
+  "id": "sources-set-uuid",
+  "timestamp": "2026-01-16T18:00:00.000Z",
+  "action": "sources.set",
+  "payload": {
+    "video": "razer_kiyo_pro",
+    "audio": "razer_kiyo_pro"
+  }
+}
+```
+
+**Payload Fields** (at least one required):
+
+- `video` (string, optional): Device identifier (e.g. `"hdmi1"`,
+  `"razer_kiyo_pro"`) or `"pip"` to use the configured PiP layout as video
+  source.
+- `audio` (string, optional): Device identifier for audio source.
+
+**Expected ACK**:
+
+```json
+{
+  "type": "ack",
+  "id": "ack-uuid",
+  "commandId": "sources-set-uuid",
+  "timestamp": "2026-01-16T18:00:00.100Z",
+  "success": true,
+  "payload": {
+    "video": "razer_kiyo_pro",
+    "audio": "razer_kiyo_pro",
+    "status": "configured",
+    "live_switched": true
+  }
+}
+```
+
+- `live_switched` (boolean, optional): `true` if FFmpeg was restarted because
+  capture was active; otherwise omit or `false`.
+
+**Notes**:
+
+- Sources persist across sessions. If `sources.set` is called while capturing,
+  FFmpeg automatically restarts with the new sources.
+- Setting `video` to `"pip"` uses the configured PiP layout as the video source
+  (call `set_pip` / `pip.configure` first).
+
+---
+
+### 4. `switch_source` (deprecated)
+
+**Deprecated**: Use `sources.set` instead. This command still works but logs a
+deprecation warning and may be translated to `sources.set` by the server.
 
 Switch the active video or audio source.
 
@@ -229,9 +294,9 @@ device active sources. Each source object should include:
 
 ---
 
-### 4. `set_pip` / `configure_pip`
+### 5. `set_pip` / `configure_pip` / `pip.configure`
 
-Configure picture-in-picture (PiP) settings. Both actions are aliases.
+Configure picture-in-picture (PiP) settings. All three actions are aliases.
 
 **Command**:
 
@@ -288,7 +353,7 @@ consume `result.pip_size` (number) for the configured PiP size.
 
 ---
 
-### 5. `update_config`
+### 6. `update_config`
 
 Update device configuration.
 
@@ -335,7 +400,7 @@ Update device configuration.
 
 ---
 
-### 6. `get_status`
+### 7. `get_status`
 
 Request current device status.
 
@@ -372,7 +437,7 @@ Request current device status.
 
 ---
 
-### 7. `list_sources` / `get_sources`
+### 8. `list_sources` / `get_sources`
 
 List all available video and audio sources. Both actions are aliases.
 
@@ -442,7 +507,7 @@ List all available video and audio sources. Both actions are aliases.
 
 ---
 
-### 8. `start_session`
+### 9. `start_session`
 
 Start a recording session.
 
@@ -458,8 +523,6 @@ Start a recording session.
     "sessionId": "broadcast-session-uuid",
     "civicpressSessionId": "civicpress-session-uuid",
     "config": {
-      "videoSource": "hdmi1",
-      "audioSource": "usb_audio",
       "quality": "standard"
     }
   }
@@ -470,7 +533,9 @@ Start a recording session.
 
 - `sessionId` (string, required): Broadcast Box session ID
 - `civicpressSessionId` (string, required): CivicPress session record ID
-- `config` (object, optional): Session configuration
+- `config` (object, optional): Session configuration. **Only `quality` is
+  accepted**; video/audio sources are set via `sources.set` and used
+  automatically.
 
 **Expected ACK**:
 
@@ -490,7 +555,7 @@ Start a recording session.
 
 ---
 
-### 9. `stop_session`
+### 10. `stop_session`
 
 Stop a recording session.
 
@@ -704,7 +769,33 @@ notify CivicPress that the device is online and provide device capabilities.
       "videoSources": ["hdmi1", "hdmi2"],
       "audioSources": ["usb_audio"],
       "pipSupported": true,
-      "hardwareEncoding": true
+      "hardwareEncoding": true,
+      "quality": {
+        "presets": [
+          {
+            "name": "low",
+            "video_bitrate_kbps": 1500,
+            "audio_bitrate_kbps": 128,
+            "resolution": [1280, 720],
+            "framerate": 30
+          },
+          {
+            "name": "standard",
+            "video_bitrate_kbps": 4000,
+            "audio_bitrate_kbps": 192,
+            "resolution": [1920, 1080],
+            "framerate": 30
+          },
+          {
+            "name": "high",
+            "video_bitrate_kbps": 8000,
+            "audio_bitrate_kbps": 256,
+            "resolution": [1920, 1080],
+            "framerate": 60
+          }
+        ],
+        "defaults": { "preview": "low", "streaming": "standard", "recording": "high" }
+      }
     },
     "sources": {
       "video": [
@@ -750,6 +841,12 @@ notify CivicPress that the device is online and provide device capabilities.
   - `pipSupported` (boolean, optional): Whether PiP is supported
   - `hardwareEncoding` (boolean, optional): Whether hardware encoding is
     available
+  - `quality` (object, optional): Quality presets and default preset names
+    - `presets` (array): List of quality presets. Each preset: `name` (string),
+      `video_bitrate_kbps` (number), `audio_bitrate_kbps` (number), `resolution`
+      ([width, height]), `framerate` (number).
+    - `defaults` (object, optional): Default preset names per use: `preview`,
+      `streaming`, `recording` (strings).
 - `sources` (object, optional): Detailed source information
   - `video` (array, optional): Array of video source objects with full details
   - `audio` (array, optional): Array of audio source objects with full details
@@ -806,6 +903,33 @@ notify CivicPress that the device is online and provide device capabilities.
   }
 }
 ```
+
+---
+
+### 2. `sources.changed`
+
+Published when active video/audio sources are updated via `sources.set`.
+
+**Event Message**:
+
+```json
+{
+  "type": "event",
+  "id": "event-uuid",
+  "timestamp": "2026-01-16T18:00:00.100Z",
+  "event": "sources.changed",
+  "payload": {
+    "video": "razer_kiyo_pro",
+    "audio": "razer_kiyo_pro"
+  }
+}
+```
+
+**Payload Fields**:
+
+- `video` (string): Current active video source identifier (device identifier or
+  `"pip"`).
+- `audio` (string): Current active audio source identifier.
 
 ---
 
@@ -1002,6 +1126,16 @@ to observers). The routing happens through:
 
 7. **PiP support**: The `set_pip` command requires device capability
    `pipSupported: true`.
+
+8. **Centralized source configuration**: Video/audio sources are set once via
+   `sources.set` and used automatically by `preview.start`, `record.start`, and
+   `start_session`. These commands no longer accept `video_source` /
+   `audio_source` in their payloads; only `quality` (or `config.quality`) is
+   accepted. Call `sources.set` when the user changes camera/mic selection.
+
+9. **Manual recording** (`record.start`): Payload is
+   `{ config: { quality: "high" } }` only. Do not send `video_source` or
+   `audio_source`; sources are taken from the current `sources.set` state.
 
 ---
 

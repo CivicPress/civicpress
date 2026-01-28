@@ -242,7 +242,7 @@ onUnmounted(() => {
 const deviceUuid = computed(() => props.device.deviceUuid);
 const deviceUuidRef = computed(() => deviceUuid.value);
 
-const { setPip, loading } = useDeviceCommands(deviceUuidRef);
+const { setPip, setSources, loading } = useDeviceCommands(deviceUuidRef);
 
 // Video sources for dropdowns (convert to USelectMenu format)
 const videoSources = computed(() => {
@@ -532,6 +532,15 @@ const handleApply = async () => {
         },
         props.device
       );
+      // After enabling PiP, set active video source to "pip" so preview/record use PiP layout
+      const currentAudio =
+        props.device.activeSources?.audio?.identifier ??
+        props.device.config?.defaultAudioSource;
+      if (currentAudio) {
+        await setSources('pip', currentAudio);
+      } else {
+        await setSources('pip');
+      }
     } catch (error) {
       // Error already handled in composable
       console.error('Failed to configure PiP:', error);

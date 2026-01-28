@@ -192,10 +192,16 @@ export class DeviceCommandService {
         throw new Error(`Device ${request.deviceId} is not connected`);
       }
 
+      // Sanitize payload for commands that no longer accept source fields (use sources.set instead)
+      const payload = this.sanitizeCommandPayload(
+        request.action,
+        request.payload
+      );
+
       // Create command message
       const command: CommandMessage = this.protocol.createCommand(
         request.action,
-        request.payload,
+        payload,
         commandId
       );
 
@@ -401,6 +407,27 @@ export class DeviceCommandService {
   }
 
   /**
+   * Sanitize payload for commands that no longer accept video/audio source fields.
+   * Sources are set via sources.set and used by preview, record, and session.
+   */
+  private sanitizeCommandPayload(action: string, payload: any): any {
+    if (action === 'preview.start') {
+      return { quality: payload?.quality };
+    }
+    if (action === 'record.start') {
+      return { config: { quality: payload?.config?.quality } };
+    }
+    if (action === 'start_session') {
+      return {
+        sessionId: payload?.sessionId,
+        civicpressSessionId: payload?.civicpressSessionId,
+        config: { quality: payload?.config?.quality },
+      };
+    }
+    return payload;
+  }
+
+  /**
    * Validate command before execution
    */
   private validateCommand(
@@ -471,7 +498,29 @@ export class DeviceCommandService {
   }
 
   /**
-   * Switch video/audio source on device
+   * Set active video/audio sources on device (primary API).
+   * Sources persist across sessions and are used by preview, record, and session commands.
+   */
+  async setSources(
+    deviceId: string,
+    payload: { video?: string; audio?: string },
+    source: CommandSource
+  ): Promise<CommandResponse> {
+    if (!payload.video && !payload.audio) {
+      throw new Error(
+        'At least one of video or audio must be provided for sources.set'
+      );
+    }
+    return this.executeCommand({
+      deviceId,
+      action: 'sources.set',
+      payload: { video: payload.video, audio: payload.audio },
+      source,
+    });
+  }
+
+  /**
+   * Switch video/audio source on device (deprecated: use setSources instead).
    */
   async switchSource(
     deviceId: string,

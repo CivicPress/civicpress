@@ -214,6 +214,43 @@ export function useDeviceCommands(
   };
 
   /**
+   * Set active video/audio sources (primary API). Sources persist across sessions
+   * and are used by preview, record, and session commands. Call when user changes
+   * camera/mic selection.
+   *
+   * @param video - Video source identifier or "pip" for PiP layout
+   * @param audio - Audio source identifier
+   */
+  const setSources = async (
+    video?: string,
+    audio?: string
+  ): Promise<CommandResponse> => {
+    if (!video && !audio) {
+      const err = new Error(
+        'At least one of video or audio must be provided for sources.set'
+      );
+      error.value = err.message;
+      throw err;
+    }
+    try {
+      const payload: { video?: string; audio?: string } = {};
+      if (video) payload.video = video;
+      if (audio) payload.audio = audio;
+      const response = await sendCommand('sources.set', payload);
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.sourceSwitched'),
+          description: t('broadcastBox.success.sourceSwitchedDesc'),
+          color: 'primary',
+        });
+      }
+      return response;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  /**
    * Update device configuration
    */
   const updateConfig = async (
@@ -595,31 +632,20 @@ export function useDeviceCommands(
   };
 
   /**
-   * Start manual recording
+   * Start manual recording. Sources are set via setSources; only quality is sent.
    *
-   * @param videoSource - Optional video source identifier
-   * @param audioSource - Optional audio source identifier
-   * @param quality - Optional quality preset (default: 'standard')
+   * @param _videoSource - Ignored (sources are set via setSources)
+   * @param _audioSource - Ignored (sources are set via setSources)
+   * @param quality - Quality preset (default: 'standard')
    */
   const startManualRecording = async (
-    videoSource?: string,
-    audioSource?: string,
+    _videoSource?: string,
+    _audioSource?: string,
     quality: 'low' | 'standard' | 'high' = 'standard'
   ): Promise<CommandResponse> => {
     try {
-      const config: any = {
-        quality,
-      };
-
-      if (videoSource) {
-        config.video_source = videoSource;
-      }
-      if (audioSource) {
-        config.audio_source = audioSource;
-      }
-
       const response = await sendCommand('record.start', {
-        config,
+        config: { quality },
       });
 
       // Check if device doesn't support manual recording
@@ -749,6 +775,7 @@ export function useDeviceCommands(
   return {
     // Methods
     sendCommand,
+    setSources,
     switchSource,
     setPip,
     updateConfig,

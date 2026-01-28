@@ -54,6 +54,17 @@ export interface DeviceConnectionStatus {
     };
     maxResolution?: string;
     hardwareEncoding?: boolean;
+    /** Quality presets and defaults from device.connected / status */
+    quality?: {
+      presets: Array<{
+        name: string;
+        videoBitrateKbps: number;
+        audioBitrateKbps: number;
+        resolution: [number, number];
+        framerate: number;
+      }>;
+      defaults?: { preview?: string; streaming?: string; recording?: string };
+    };
   }; // Capabilities extracted from status messages and device.connected events
   manualRecording?: {
     isRecording: boolean;
@@ -728,6 +739,70 @@ async function connectToDeviceRoom(
                     capabilitiesUpdate.hardwareEncoding = hwEncCap;
                   }
                 }
+
+                // Quality presets and defaults (capabilities.quality)
+                const qualityCap = caps.quality;
+                if (
+                  qualityCap != null &&
+                  typeof qualityCap === 'object' &&
+                  Array.isArray(qualityCap.presets)
+                ) {
+                  const presets: Array<{
+                    name: string;
+                    videoBitrateKbps: number;
+                    audioBitrateKbps: number;
+                    resolution: [number, number];
+                    framerate: number;
+                  }> = [];
+                  for (const p of qualityCap.presets) {
+                    if (
+                      p &&
+                      typeof p.name === 'string' &&
+                      typeof (p.video_bitrate_kbps ?? p.videoBitrateKbps) ===
+                        'number' &&
+                      typeof (p.audio_bitrate_kbps ?? p.audioBitrateKbps) ===
+                        'number' &&
+                      Array.isArray(p.resolution) &&
+                      p.resolution.length === 2 &&
+                      typeof p.resolution[0] === 'number' &&
+                      typeof p.resolution[1] === 'number' &&
+                      typeof p.framerate === 'number'
+                    ) {
+                      presets.push({
+                        name: p.name,
+                        videoBitrateKbps:
+                          p.video_bitrate_kbps ?? p.videoBitrateKbps,
+                        audioBitrateKbps:
+                          p.audio_bitrate_kbps ?? p.audioBitrateKbps,
+                        resolution: [p.resolution[0], p.resolution[1]],
+                        framerate: p.framerate,
+                      });
+                    }
+                  }
+                  if (presets.length > 0) {
+                    const defaults: {
+                      preview?: string;
+                      streaming?: string;
+                      recording?: string;
+                    } = {};
+                    if (
+                      qualityCap.defaults &&
+                      typeof qualityCap.defaults === 'object'
+                    ) {
+                      const d = qualityCap.defaults;
+                      if (typeof d.preview === 'string')
+                        defaults.preview = d.preview;
+                      if (typeof d.streaming === 'string')
+                        defaults.streaming = d.streaming;
+                      if (typeof d.recording === 'string')
+                        defaults.recording = d.recording;
+                    }
+                    capabilitiesUpdate.quality = {
+                      presets,
+                      ...(Object.keys(defaults).length > 0 ? { defaults } : {}),
+                    };
+                  }
+                }
               }
 
               // Extract sources from payload.sources
@@ -803,6 +878,8 @@ async function connectToDeviceRoom(
                       !!capabilitiesUpdate.audioMixingCapabilities,
                     hasHardwareEncodingCapabilities:
                       !!capabilitiesUpdate.hardwareEncodingCapabilities,
+                    hasQualityPresets:
+                      !!capabilitiesUpdate.quality?.presets?.length,
                     videoSourcesCount:
                       capabilitiesUpdate.videoSourceObjects?.length || 0,
                     audioSourcesCount:
@@ -856,6 +933,25 @@ async function connectToDeviceRoom(
                   filePath: null,
                 },
               });
+            } else if (message.event === 'sources.changed') {
+              const payload = message.payload;
+              if (
+                payload &&
+                (payload.video !== undefined || payload.audio !== undefined)
+              ) {
+                const current = deviceStatuses.value.get(deviceUuid);
+                const video =
+                  payload.video !== undefined
+                    ? { id: 0, identifier: payload.video, name: payload.video }
+                    : (current?.activeSources?.video ?? null);
+                const audio =
+                  payload.audio !== undefined
+                    ? { id: 0, identifier: payload.audio, name: payload.audio }
+                    : (current?.activeSources?.audio ?? null);
+                updateDeviceStatus(deviceUuid, {
+                  activeSources: { video, audio },
+                });
+              }
             }
           }
 
@@ -1065,7 +1161,9 @@ function updateDeviceStatus(
         currentCapabilities.pipSupported !== newCapabilities.pipSupported ||
         currentCapabilities.maxResolution !== newCapabilities.maxResolution ||
         currentCapabilities.hardwareEncoding !==
-          newCapabilities.hardwareEncoding
+          newCapabilities.hardwareEncoding ||
+        JSON.stringify(currentCapabilities.quality) !==
+          JSON.stringify(newCapabilities.quality)
       ) {
         hasChanges = true;
         break;

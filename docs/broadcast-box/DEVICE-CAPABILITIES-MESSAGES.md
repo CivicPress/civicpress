@@ -75,6 +75,21 @@ device features.
 - `hardware_encoding.supported`: `boolean` - Whether the device supports
   hardware encoding
 
+#### `capabilities.quality` (optional)
+
+Quality presets and default preset names for preview, streaming, and recording.
+
+- `quality.presets`: `array` - List of quality presets. Each preset object:
+  - `name`: `string` - Preset identifier (e.g. `"low"`, `"standard"`, `"high"`)
+  - `video_bitrate_kbps`: `number` - Video bitrate in kbps
+  - `audio_bitrate_kbps`: `number` - Audio bitrate in kbps
+  - `resolution`: `[number, number]` - `[width, height]` in pixels
+  - `framerate`: `number` - Frames per second
+- `quality.defaults`: `object` (optional) - Default preset names per use:
+  - `preview`: `string` - Default for preview stream
+  - `streaming`: `string` - Default for live streaming
+  - `recording`: `string` - Default for recording (used by CivicPress config UI)
+
 **Notes:**
 
 - This message is sent automatically after WebSocket connection is established

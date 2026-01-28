@@ -151,6 +151,75 @@ describe('createDefaultEventHandlers', () => {
     expect(mockContext.deviceEventModel.create).toHaveBeenCalled();
   });
 
+  it('should persist quality presets from device.connected payload', async () => {
+    const updateDevice = vi.fn().mockResolvedValue(undefined);
+    mockContext.deviceManager = {
+      getDevice: vi.fn().mockResolvedValue({
+        id: 'device-id',
+        capabilities: {},
+      }),
+      updateDevice,
+    };
+
+    const event: EventMessage = {
+      type: 'event',
+      id: 'event-id',
+      timestamp: new Date().toISOString(),
+      event: 'device.connected',
+      payload: {
+        deviceId: 'device-id',
+        version: '1.0.0',
+        capabilities: {
+          quality: {
+            presets: [
+              {
+                name: 'standard',
+                video_bitrate_kbps: 4000,
+                audio_bitrate_kbps: 192,
+                resolution: [1920, 1080],
+                framerate: 30,
+              },
+              {
+                name: 'high',
+                video_bitrate_kbps: 8000,
+                audio_bitrate_kbps: 256,
+                resolution: [1920, 1080],
+                framerate: 60,
+              },
+            ],
+            defaults: { recording: 'high' },
+          },
+        },
+      },
+    };
+
+    await registry.handleEvent(event, mockContext);
+
+    expect(updateDevice).toHaveBeenCalledWith('device-id', {
+      capabilities: expect.objectContaining({
+        quality: {
+          presets: [
+            {
+              name: 'standard',
+              videoBitrateKbps: 4000,
+              audioBitrateKbps: 192,
+              resolution: [1920, 1080],
+              framerate: 30,
+            },
+            {
+              name: 'high',
+              videoBitrateKbps: 8000,
+              audioBitrateKbps: 256,
+              resolution: [1920, 1080],
+              framerate: 60,
+            },
+          ],
+          defaults: { recording: 'high' },
+        },
+      }),
+    });
+  });
+
   it('should handle session.started event', async () => {
     const event: EventMessage = {
       type: 'event',

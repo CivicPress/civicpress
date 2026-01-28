@@ -6,7 +6,12 @@
 
 import type { Logger } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
-import type { EventMessage } from '../types/index.js';
+import type {
+  EventMessage,
+  QualityCapabilities,
+  QualityPreset,
+  QualityDefaults,
+} from '../types/index.js';
 import type { DeviceConnectionTracker } from '../services/device-connection-tracker.js';
 import type { DeviceManager } from '../services/device-manager.js';
 import { DeviceEventModel } from '../models/device-event.js';
@@ -25,6 +30,55 @@ export type EventHandler = (
   event: EventMessage,
   context: EventHandlerContext
 ) => Promise<void>;
+
+/**
+ * Normalize capabilities.quality from device payload (snake_case) to QualityCapabilities (camelCase).
+ */
+function normalizeQualityFromPayload(
+  qualityCap: any
+): QualityCapabilities | undefined {
+  if (
+    qualityCap == null ||
+    typeof qualityCap !== 'object' ||
+    !Array.isArray(qualityCap.presets)
+  ) {
+    return undefined;
+  }
+  const presets: QualityPreset[] = [];
+  for (const p of qualityCap.presets) {
+    if (
+      p &&
+      typeof p.name === 'string' &&
+      typeof (p.video_bitrate_kbps ?? p.videoBitrateKbps) === 'number' &&
+      typeof (p.audio_bitrate_kbps ?? p.audioBitrateKbps) === 'number' &&
+      Array.isArray(p.resolution) &&
+      p.resolution.length === 2 &&
+      typeof p.resolution[0] === 'number' &&
+      typeof p.resolution[1] === 'number' &&
+      typeof p.framerate === 'number'
+    ) {
+      presets.push({
+        name: p.name,
+        videoBitrateKbps: p.video_bitrate_kbps ?? p.videoBitrateKbps,
+        audioBitrateKbps: p.audio_bitrate_kbps ?? p.audioBitrateKbps,
+        resolution: [p.resolution[0], p.resolution[1]],
+        framerate: p.framerate,
+      });
+    }
+  }
+  if (presets.length === 0) return undefined;
+  const defaults: QualityDefaults = {};
+  if (qualityCap.defaults && typeof qualityCap.defaults === 'object') {
+    const d = qualityCap.defaults;
+    if (typeof d.preview === 'string') defaults.preview = d.preview;
+    if (typeof d.streaming === 'string') defaults.streaming = d.streaming;
+    if (typeof d.recording === 'string') defaults.recording = d.recording;
+  }
+  return {
+    presets,
+    ...(Object.keys(defaults).length > 0 ? { defaults } : {}),
+  };
+}
 
 export class EventHandlerRegistry {
   private handlers: Map<string, EventHandler> = new Map();
@@ -204,6 +258,14 @@ export function createDefaultEventHandlers(
             }
           }
 
+          // Quality presets and defaults (capabilities.quality)
+          const qualityNorm = normalizeQualityFromPayload(
+            (capabilities as any).quality
+          );
+          if (qualityNorm) {
+            updatedCapabilities.quality = qualityNorm;
+          }
+
           const capabilitiesChanged =
             JSON.stringify(updatedCapabilities) !==
             JSON.stringify(device.capabilities);
@@ -224,6 +286,8 @@ export function createDefaultEventHandlers(
                 hasAudioMixingCapabilities:
                   !!updatedCapabilities.audioMixingCapabilities,
                 hardwareEncoding: updatedCapabilities.hardwareEncoding,
+                hasQualityPresets:
+                  !!updatedCapabilities.quality?.presets?.length,
               }
             );
           }
@@ -629,6 +693,103 @@ export function createDefaultEventHandlers(
       operation: 'broadcast-box:event:preview-stopped',
       deviceId: context.deviceId,
     });
+  });
+
+  // Register sources.changed handler (published when sources are updated via sources.set)
+  registry.registerHandler('sources.changed', async (event, context) => {
+    const payload = event.payload?.eventData ?? event.payload;
+    const videoIdentifier = payload?.video;
+    const audioIdentifier = payload?.audio;
+
+    if (videoIdentifier === undefined && audioIdentifier === undefined) {
+      return;
+    }
+
+    try {
+      const device = await context.deviceManager.getDevice(context.deviceId);
+      if (!device) {
+        return;
+      }
+
+      const videoSourceObjects = device.capabilities?.videoSourceObjects ?? [];
+      const audioSourceObjects = device.capabilities?.audioSourceObjects ?? [];
+
+      const resolveVideo = (identifier: string | undefined): any => {
+        if (!identifier) return null;
+        if (identifier === 'pip') {
+          return { id: 0, identifier: 'pip', name: 'PiP' };
+        }
+        const obj = videoSourceObjects.find(
+          (s: any) =>
+            s.identifier === identifier ||
+            s.identifier?.toLowerCase() === identifier.toLowerCase() ||
+            s.name === identifier ||
+            s.name?.toLowerCase() === identifier.toLowerCase()
+        );
+        if (obj) {
+          return {
+            id: obj.id,
+            identifier: obj.identifier ?? obj.name ?? identifier,
+            name: obj.name ?? obj.identifier ?? identifier,
+            path: obj.path,
+            resolution: obj.resolution,
+            framerate: obj.framerate,
+            available: obj.available !== false,
+          };
+        }
+        return { id: 0, identifier, name: identifier };
+      };
+
+      const resolveAudio = (identifier: string | undefined): any => {
+        if (!identifier) return null;
+        const obj = audioSourceObjects.find(
+          (s: any) =>
+            s.identifier === identifier ||
+            s.identifier?.toLowerCase() === identifier.toLowerCase() ||
+            s.name === identifier ||
+            s.name?.toLowerCase() === identifier.toLowerCase()
+        );
+        if (obj) {
+          return {
+            id: obj.id,
+            identifier: obj.identifier ?? obj.name ?? identifier,
+            name: obj.name ?? obj.identifier ?? identifier,
+            available: obj.available !== false,
+          };
+        }
+        return { id: 0, identifier, name: identifier };
+      };
+
+      const deviceActiveSources = await context.deviceManager
+        .getDevice(context.deviceId)
+        .then((d) => d?.activeSources ?? { video: null, audio: null });
+
+      const activeVideo =
+        videoIdentifier !== undefined
+          ? resolveVideo(videoIdentifier)
+          : (deviceActiveSources?.video ?? null);
+      const activeAudio =
+        audioIdentifier !== undefined
+          ? resolveAudio(audioIdentifier)
+          : (deviceActiveSources?.audio ?? null);
+
+      await context.deviceManager.updateDevice(context.deviceId, {
+        activeSources: { video: activeVideo, audio: activeAudio } as any,
+      });
+
+      coreInfo('Device active sources updated from sources.changed', {
+        operation: 'broadcast-box:event:sources-changed',
+        deviceId: context.deviceId,
+        video: videoIdentifier,
+        audio: audioIdentifier,
+      });
+    } catch (error) {
+      coreWarn('Failed to update device active sources from sources.changed', {
+        operation: 'broadcast-box:event:sources-changed-error',
+        deviceId: context.deviceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   // Register health.update handler
@@ -1200,6 +1361,10 @@ export function createDefaultEventHandlers(
                 }
               : undefined;
 
+          const qualityFromStatus = normalizeQualityFromPayload(
+            payload.capabilities.quality
+          );
+
           const updatedCapabilities = {
             ...device.capabilities,
             videoSources:
@@ -1223,6 +1388,7 @@ export function createDefaultEventHandlers(
             ...(hardwareEncodingCapabilities
               ? { hardwareEncodingCapabilities }
               : {}),
+            ...(qualityFromStatus ? { quality: qualityFromStatus } : {}),
             // Preserve existing source objects if they exist
             videoSourceObjects: device.capabilities?.videoSourceObjects || [],
             audioSourceObjects: device.capabilities?.audioSourceObjects || [],

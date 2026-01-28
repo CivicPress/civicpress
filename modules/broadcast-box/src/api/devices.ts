@@ -7,6 +7,7 @@
 import { Router, Response, Request } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import type { Logger } from '@civicpress/core';
+import { coreWarn } from '@civicpress/core';
 
 // Type for authenticated requests
 interface AuthenticatedRequest extends Request {
@@ -875,9 +876,11 @@ export function createDevicesRouter(
 
         // Validate action is one of allowed actions
         const allowedActions = [
+          'sources.set',
           'switch_source',
           'set_pip',
           'configure_pip',
+          'pip.configure',
           'update_config',
           'get_status',
           'list_sources',
@@ -909,12 +912,27 @@ export function createDevicesRouter(
           });
         }
 
+        // Deprecated: switch_source → sources.set (log and rewrite so device receives sources.set)
+        let action = req.body.action;
+        let payload = req.body.payload || {};
+        if (action === 'switch_source') {
+          coreWarn('switch_source is deprecated, use sources.set instead', {
+            operation: 'broadcast-box:api:switch-source-deprecated',
+            deviceId: deviceUuid,
+          });
+          action = 'sources.set';
+          payload = {
+            video: payload.videoSource,
+            audio: payload.audioSource,
+          };
+        }
+
         // Execute command
         // Use device UUID for command execution (DeviceCommandService expects UUID)
         const commandResponse = await deviceCommandService.executeCommand({
           deviceId: deviceUuid, // Use device UUID, not the URL parameter
-          action: req.body.action,
-          payload: req.body.payload || {},
+          action,
+          payload,
           source: {
             type: 'user',
             userId,

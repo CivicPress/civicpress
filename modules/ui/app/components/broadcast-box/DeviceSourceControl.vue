@@ -101,7 +101,7 @@ const connectionStatus = computed(
 const deviceUuid = computed(() => props.device.deviceUuid);
 const deviceUuidRef = computed(() => deviceUuid.value);
 
-const { switchSource, loading } = useDeviceCommands(deviceUuidRef);
+const { setSources, loading } = useDeviceCommands(deviceUuidRef);
 
 // Get source objects if available (for better matching)
 const videoSourceObjects = computed(() => {
@@ -427,23 +427,21 @@ const hasChanges = computed(() => {
   );
 });
 
-// Switch sources (only called when button is clicked)
+// Set sources (only called when button is clicked; uses sources.set)
 const handleSwitch = async () => {
   if (!hasChanges.value || !props.isDeviceConnected) {
     return;
   }
 
   try {
-    // Send identifiers directly (no conversion needed)
-    await switchSource(
+    await setSources(
       selectedVideoSourceValue.value || undefined,
-      selectedAudioSourceValue.value || undefined,
-      props.device
+      selectedAudioSourceValue.value || undefined
     );
-    // Sources will be updated when device data is refreshed
+    // Sources will be updated via sources.changed or device refresh
   } catch (error) {
     // Error already handled in composable
-    console.error('Failed to switch source:', error);
+    console.error('Failed to set sources:', error);
   }
 };
 </script>

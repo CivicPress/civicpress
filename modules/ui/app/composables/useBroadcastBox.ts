@@ -41,6 +41,21 @@ export interface BroadcastDevice {
       supported: boolean;
     };
     hardwareEncoding?: boolean;
+    /** Quality presets and defaults from device.connected */
+    quality?: {
+      presets: Array<{
+        name: string;
+        videoBitrateKbps: number;
+        audioBitrateKbps: number;
+        resolution: [number, number];
+        framerate: number;
+      }>;
+      defaults?: {
+        preview?: string;
+        streaming?: string;
+        recording?: string;
+      };
+    };
     maxResolution: string;
   };
   config: Record<string, any>;
