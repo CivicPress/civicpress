@@ -38,14 +38,22 @@ describe('CommandHandlerRegistry', () => {
       protocol: {
         createAck: vi
           .fn()
-          .mockImplementation((id, success, error, payload) => ({
-            type: 'ack',
-            id: 'ack-id',
-            commandId: id,
-            success,
-            error,
-            payload,
-          })),
+          .mockImplementation((id, success, errorOrStructured, payload) => {
+            const error =
+              typeof errorOrStructured === 'object' &&
+              errorOrStructured !== null &&
+              'message' in errorOrStructured
+                ? (errorOrStructured as { message: string }).message
+                : errorOrStructured;
+            return {
+              type: 'ack',
+              id: 'ack-id',
+              commandId: id,
+              success,
+              error,
+              payload,
+            };
+          }),
       },
       logger: mockLogger,
     };
@@ -164,14 +172,22 @@ describe('createDefaultCommandHandlers', () => {
       protocol: {
         createAck: vi
           .fn()
-          .mockImplementation((id, success, error, payload) => ({
-            type: 'ack',
-            id: 'ack-id',
-            commandId: id,
-            success,
-            error,
-            payload,
-          })),
+          .mockImplementation((id, success, errorOrStructured, payload) => {
+            const error =
+              typeof errorOrStructured === 'object' &&
+              errorOrStructured !== null &&
+              'message' in errorOrStructured
+                ? (errorOrStructured as { message: string }).message
+                : errorOrStructured;
+            return {
+              type: 'ack',
+              id: 'ack-id',
+              commandId: id,
+              success,
+              error,
+              payload,
+            };
+          }),
       },
       logger: mockLogger,
     };
@@ -281,7 +297,9 @@ describe('createDefaultCommandHandlers', () => {
     expect(result?.payload).toBeDefined();
     expect(result?.payload.videoSource).toBe('HDMI2');
     expect(result?.payload.audioSource).toBe('USB');
-    expect(mockContext.deviceManager.getDevice).toHaveBeenCalledWith('device-id');
+    expect(mockContext.deviceManager.getDevice).toHaveBeenCalledWith(
+      'device-id'
+    );
   });
 
   it('should reject switch_source with invalid video source', async () => {
@@ -316,6 +334,8 @@ describe('createDefaultCommandHandlers', () => {
     expect(result?.payload).toBeDefined();
     expect(result?.payload.videoSources).toEqual(['HDMI1', 'HDMI2', 'USB']);
     expect(result?.payload.audioSources).toEqual(['HDMI1', 'USB', 'LineIn']);
-    expect(mockContext.deviceManager.getDevice).toHaveBeenCalledWith('device-id');
+    expect(mockContext.deviceManager.getDevice).toHaveBeenCalledWith(
+      'device-id'
+    );
   });
 });

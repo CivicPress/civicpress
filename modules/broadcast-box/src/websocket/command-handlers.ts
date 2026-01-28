@@ -7,7 +7,15 @@
 import type { Logger } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
 import type { CommandMessage, AckMessage } from '../types/index.js';
-import { BroadcastBoxErrorCode, getErrorMessage } from '../types/errors.js';
+import {
+  BroadcastBoxErrorCode,
+  BroadcastBoxError,
+  SourceError,
+  SessionError,
+  StreamingError,
+  isBroadcastBoxError,
+  toStructuredError,
+} from '../types/errors.js';
 import type { ProtocolHandler } from './protocol.js';
 import type { DeviceConnectionTracker } from '../services/device-connection-tracker.js';
 import type { DeviceManager } from '../services/device-manager.js';
@@ -60,11 +68,11 @@ export class CommandHandlerRegistry {
         deviceId: context.deviceId,
       });
 
-      return context.protocol.createAck(
-        command.id,
-        false,
-        `Unknown command action: ${command.action}`
-      );
+      return context.protocol.createAck(command.id, false, {
+        code: BroadcastBoxErrorCode.ERR_INVALID_COMMAND,
+        message: `Unknown command action: ${command.action}`,
+        type: 'BroadcastBoxError',
+      });
     }
 
     try {
@@ -83,11 +91,10 @@ export class CommandHandlerRegistry {
         }
       );
 
-      return context.protocol.createAck(
-        command.id,
-        false,
-        error instanceof Error ? error.message : 'Command execution failed'
-      );
+      const structured = isBroadcastBoxError(error)
+        ? error.toDict()
+        : toStructuredError(error);
+      return context.protocol.createAck(command.id, false, structured);
     }
   }
 
@@ -115,9 +122,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'Missing required fields: sessionId or civicpressSessionId',
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'Missing required fields: sessionId or civicpressSessionId'
+        ).toDict()
       );
     }
 
@@ -129,9 +137,9 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        getErrorMessage(BroadcastBoxErrorCode.SESSION_ALREADY_ACTIVE),
-        undefined,
-        BroadcastBoxErrorCode.SESSION_ALREADY_ACTIVE
+        new SessionError(
+          BroadcastBoxErrorCode.ERR_SESSION_ALREADY_ACTIVE
+        ).toDict()
       );
     }
 
@@ -162,7 +170,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'Missing required field: sessionId'
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'Missing required field: sessionId'
+        ).toDict()
       );
     }
 
@@ -192,7 +203,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'Missing required field: config'
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'Missing required field: config'
+        ).toDict()
       );
     }
 
@@ -247,9 +261,9 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
-        undefined,
-        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_DEVICE_NOT_FOUND
+        ).toDict()
       );
     }
 
@@ -271,18 +285,16 @@ export function createDefaultCommandHandlers(
             return context.protocol.createAck(
               command.id,
               false,
-              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
-              undefined,
-              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              new SourceError(
+                BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              ).toDict()
             );
           }
         } else {
           return context.protocol.createAck(
             command.id,
             false,
-            getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
-            undefined,
-            BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+            new SourceError(BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND).toDict()
           );
         }
       } else if (sourceType === 'audio') {
@@ -296,18 +308,16 @@ export function createDefaultCommandHandlers(
             return context.protocol.createAck(
               command.id,
               false,
-              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
-              undefined,
-              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              new SourceError(
+                BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              ).toDict()
             );
           }
         } else {
           return context.protocol.createAck(
             command.id,
             false,
-            getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
-            undefined,
-            BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+            new SourceError(BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND).toDict()
           );
         }
       } else if (sourceType === 'pip') {
@@ -315,9 +325,10 @@ export function createDefaultCommandHandlers(
         return context.protocol.createAck(
           command.id,
           false,
-          'PiP source switching not yet implemented',
-          undefined,
-          BroadcastBoxErrorCode.INVALID_CONFIG
+          new BroadcastBoxError(
+            BroadcastBoxErrorCode.INVALID_CONFIG,
+            'PiP source switching not yet implemented'
+          ).toDict()
         );
       }
 
@@ -344,9 +355,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'At least one source (videoSource or audioSource) must be provided',
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'At least one source (videoSource or audioSource) must be provided'
+        ).toDict()
       );
     }
 
@@ -366,9 +378,9 @@ export function createDefaultCommandHandlers(
             return context.protocol.createAck(
               command.id,
               false,
-              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
-              undefined,
-              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              new SourceError(
+                BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              ).toDict()
             );
           }
         }
@@ -383,9 +395,7 @@ export function createDefaultCommandHandlers(
         return context.protocol.createAck(
           command.id,
           false,
-          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
-          undefined,
-          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+          new SourceError(BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND).toDict()
         );
       }
     }
@@ -405,9 +415,9 @@ export function createDefaultCommandHandlers(
             return context.protocol.createAck(
               command.id,
               false,
-              getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE),
-              undefined,
-              BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              new SourceError(
+                BroadcastBoxErrorCode.SOURCE_NOT_AVAILABLE
+              ).toDict()
             );
           }
         }
@@ -421,9 +431,7 @@ export function createDefaultCommandHandlers(
         return context.protocol.createAck(
           command.id,
           false,
-          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
-          undefined,
-          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+          new SourceError(BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND).toDict()
         );
       }
     }
@@ -450,9 +458,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'At least one of video or audio must be provided',
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'At least one of video or audio must be provided'
+        ).toDict()
       );
     }
 
@@ -461,9 +470,9 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
-        undefined,
-        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_DEVICE_NOT_FOUND
+        ).toDict()
       );
     }
 
@@ -482,9 +491,7 @@ export function createDefaultCommandHandlers(
         return context.protocol.createAck(
           command.id,
           false,
-          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
-          undefined,
-          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+          new SourceError(BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND).toDict()
         );
       }
     }
@@ -504,9 +511,7 @@ export function createDefaultCommandHandlers(
         return context.protocol.createAck(
           command.id,
           false,
-          getErrorMessage(BroadcastBoxErrorCode.SOURCE_NOT_FOUND),
-          undefined,
-          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+          new SourceError(BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND).toDict()
         );
       }
     }
@@ -536,9 +541,9 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
-        undefined,
-        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_DEVICE_NOT_FOUND
+        ).toDict()
       );
     }
 
@@ -592,9 +597,9 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        getErrorMessage(BroadcastBoxErrorCode.DEVICE_NOT_FOUND),
-        undefined,
-        BroadcastBoxErrorCode.DEVICE_NOT_FOUND
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_DEVICE_NOT_FOUND
+        ).toDict()
       );
     }
 
@@ -603,9 +608,7 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        getErrorMessage(BroadcastBoxErrorCode.PIP_NOT_SUPPORTED),
-        undefined,
-        BroadcastBoxErrorCode.PIP_NOT_SUPPORTED
+        new BroadcastBoxError(BroadcastBoxErrorCode.PIP_NOT_SUPPORTED).toDict()
       );
     }
 
@@ -614,9 +617,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'mainSource is required',
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'mainSource is required'
+        ).toDict()
       );
     }
 
@@ -723,9 +727,10 @@ export function createDefaultCommandHandlers(
             return context.protocol.createAck(
               command.id,
               false,
-              'pipSource must be different from mainSource',
-              undefined,
-              BroadcastBoxErrorCode.INVALID_CONFIG
+              new BroadcastBoxError(
+                BroadcastBoxErrorCode.INVALID_CONFIG,
+                'pipSource must be different from mainSource'
+              ).toDict()
             );
           }
           pipSourceInfo = validated;
@@ -734,9 +739,10 @@ export function createDefaultCommandHandlers(
         return context.protocol.createAck(
           command.id,
           false,
-          error.message || 'Invalid pipSource',
-          undefined,
-          BroadcastBoxErrorCode.SOURCE_NOT_FOUND
+          new SourceError(
+            BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND,
+            error.message || 'Invalid pipSource'
+          ).toDict()
         );
       }
     }
@@ -754,9 +760,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        `Invalid pipPosition: ${position}. Must be one of: ${validPositions.join(', ')}`,
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.INVALID_CONFIG,
+          `Invalid pipPosition: ${position}. Must be one of: ${validPositions.join(', ')}`
+        ).toDict()
       );
     }
 
@@ -772,9 +779,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'pipSize must be a number in range (0, 1] (e.g. 0.25 for 25%)',
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.INVALID_CONFIG,
+          'pipSize must be a number in range (0, 1] (e.g. 0.25 for 25%)'
+        ).toDict()
       );
     }
 
@@ -836,9 +844,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'Invalid quality parameters: width, height, framerate, and bitrate must be positive numbers',
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.INVALID_CONFIG,
+          'Invalid quality parameters: width, height, framerate, and bitrate must be positive numbers'
+        ).toDict()
       );
     }
 
@@ -927,9 +936,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        'url and stream_key are required',
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new StreamingError(
+          BroadcastBoxErrorCode.ERR_STREAMING_NOT_CONFIGURED,
+          'url and stream_key are required'
+        ).toDict()
       );
     }
     const validPlatforms = ['youtube', 'facebook', 'twitch', 'generic'];
@@ -938,9 +948,10 @@ export function createDefaultCommandHandlers(
       return context.protocol.createAck(
         command.id,
         false,
-        `platform must be one of: ${validPlatforms.join(', ')}`,
-        undefined,
-        BroadcastBoxErrorCode.INVALID_CONFIG
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.INVALID_CONFIG,
+          `platform must be one of: ${validPlatforms.join(', ')}`
+        ).toDict()
       );
     }
     coreInfo('Stream configure command processed', {

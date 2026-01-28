@@ -15,6 +15,13 @@ import type {
   AckMessage,
   DeviceConfig,
 } from '../types/index.js';
+import {
+  BroadcastBoxError,
+  BroadcastBoxErrorCode,
+  isBroadcastBoxError,
+  toStructuredError,
+  inferErrorCode,
+} from '../types/errors.js';
 import type { DeviceManager } from './device-manager.js';
 import type { DeviceConnectionTracker } from './device-connection-tracker.js';
 import type { DeviceEventModel } from '../models/device-event.js';
@@ -42,13 +49,17 @@ export interface CommandRequest {
 }
 
 /**
- * Command execution response
+ * Command execution response.
+ * On failure, error/code/type/details allow programmatic handling.
  */
 export interface CommandResponse {
   success: boolean;
   commandId: string;
   ack?: AckMessage;
   error?: string;
+  errorCode?: string;
+  errorType?: string;
+  errorDetails?: Record<string, unknown>;
   timestamp: Date;
 }
 
@@ -237,8 +248,10 @@ export class DeviceCommandService {
         timestamp,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const structured = isBroadcastBoxError(error)
+        ? error.toDict()
+        : toStructuredError(error);
+      const errorMessage = structured.message;
 
       // Try to get database ID for logging (may fail if device not found)
       let deviceDatabaseId = request.deviceId;
@@ -262,6 +275,36 @@ export class DeviceCommandService {
         errorMessage
       );
 
+      // Publish command.error for monitoring (structured payload)
+      try {
+        await this.deviceEventModel.create({
+          id: uuidv4(),
+          deviceId: deviceDatabaseId,
+          eventType: 'command.error',
+          eventData: {
+            commandId,
+            action: request.action,
+            deviceId: request.deviceId,
+            code: structured.code,
+            message: errorMessage,
+            type: structured.type,
+            details: structured.details,
+            source: request.source,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } catch (publishErr) {
+        coreWarn('Failed to publish command.error event', {
+          operation: 'broadcast-box:command:error-publish-failed',
+          deviceId: request.deviceId,
+          commandId,
+          error:
+            publishErr instanceof Error
+              ? publishErr.message
+              : String(publishErr),
+        });
+      }
+
       coreError(
         'Command execution failed',
         'broadcast-box:command:execution-failed',
@@ -272,6 +315,7 @@ export class DeviceCommandService {
           action: request.action,
           commandId,
           source: request.source,
+          errorCode: structured.code,
         }
       );
 
@@ -279,6 +323,9 @@ export class DeviceCommandService {
         success: false,
         commandId,
         error: errorMessage,
+        errorCode: structured.code,
+        errorType: structured.type,
+        errorDetails: structured.details,
         timestamp,
       };
     }
@@ -393,7 +440,16 @@ export class DeviceCommandService {
       if (ack.success) {
         pending.resolve(ack);
       } else {
-        pending.reject(new Error(ack.error || 'Command failed on device'));
+        const code =
+          (ack.errorCode as BroadcastBoxErrorCode) ||
+          inferErrorCode(ack.error || '');
+        pending.reject(
+          new BroadcastBoxError(
+            code,
+            ack.error || 'Command failed on device',
+            ack.errorDetails
+          )
+        );
       }
     } else {
       coreWarn('Received ack for unknown command', {

@@ -5,16 +5,18 @@
  * and current implementation format (flat event field)
  */
 
-import type { EventMessage, CommandMessage, AckMessage } from '../types/index.js';
+import type {
+  EventMessage,
+  CommandMessage,
+  AckMessage,
+} from '../types/index.js';
 
 /**
  * Convert protocol format event to current format
  * Protocol: { type: "event", payload: { event_type: "...", event_data: {...} } }
  * Current: { type: "event", event: "...", payload: {...} }
  */
-export function adaptProtocolEventToCurrent(
-  message: any
-): EventMessage | null {
+export function adaptProtocolEventToCurrent(message: any): EventMessage | null {
   if (message.type !== 'event') {
     return null;
   }
@@ -49,9 +51,7 @@ export function adaptProtocolEventToCurrent(
  * Current: { type: "event", event: "...", payload: {...} }
  * Protocol: { type: "event", payload: { event_type: "...", event_data: {...} } }
  */
-export function adaptCurrentEventToProtocol(
-  message: EventMessage
-): any {
+export function adaptCurrentEventToProtocol(message: EventMessage): any {
   return {
     type: 'event',
     id: message.id,
@@ -101,9 +101,7 @@ export function adaptProtocolCommandToCurrent(
  * Current: { type: "command", action: "...", payload: {...} }
  * Protocol: { type: "command", payload: { action: "...", ... } }
  */
-export function adaptCurrentCommandToProtocol(
-  message: CommandMessage
-): any {
+export function adaptCurrentCommandToProtocol(message: CommandMessage): any {
   return {
     type: 'command',
     id: message.id,
@@ -140,6 +138,9 @@ export function adaptProtocolAckToCurrent(message: any): AckMessage | null {
       success: message.payload.success,
       error: message.payload.error,
       errorCode: message.payload.error_code || message.payload.errorCode,
+      errorType: message.payload.error_type || message.payload.errorType,
+      errorDetails:
+        message.payload.error_details || message.payload.errorDetails,
       payload: message.payload.result || message.payload.payload,
     };
   }
@@ -163,8 +164,9 @@ export function adaptCurrentAckToProtocol(message: AckMessage): any {
       success: message.success,
       error: message.error,
       error_code: message.errorCode,
+      error_type: message.errorType,
+      error_details: message.errorDetails,
       result: message.payload,
     },
   };
 }
-

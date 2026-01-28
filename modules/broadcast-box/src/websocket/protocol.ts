@@ -12,6 +12,7 @@ import type {
   EventMessage,
   AckMessage,
 } from '../types/index.js';
+import type { StructuredErrorDict } from '../types/errors.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ParsedMessage {
@@ -198,23 +199,48 @@ export class ProtocolHandler {
   }
 
   /**
-   * Create acknowledgment message
+   * Create acknowledgment message.
+   * When success is false, pass either a string error or a structured error (code, message, type, details).
    */
   createAck(
     commandId: string,
     success: boolean,
-    error?: string,
+    errorOrStructured?: string | StructuredErrorDict,
     payload?: any,
     errorCode?: string
   ): AckMessage {
+    const isStructured =
+      errorOrStructured &&
+      typeof errorOrStructured === 'object' &&
+      'code' in errorOrStructured;
+    const errorMsg =
+      typeof errorOrStructured === 'string'
+        ? errorOrStructured
+        : isStructured
+          ? (errorOrStructured as StructuredErrorDict).message
+          : undefined;
+    const code =
+      errorCode ??
+      (isStructured
+        ? (errorOrStructured as StructuredErrorDict).code
+        : undefined);
+    const errorType = isStructured
+      ? (errorOrStructured as StructuredErrorDict).type
+      : undefined;
+    const errorDetails = isStructured
+      ? (errorOrStructured as StructuredErrorDict).details
+      : undefined;
+
     return {
       type: 'ack',
       id: uuidv4(),
       timestamp: new Date().toISOString(),
       commandId,
       success,
-      error,
-      errorCode,
+      error: errorMsg,
+      errorCode: code,
+      errorType,
+      errorDetails,
       payload,
     };
   }

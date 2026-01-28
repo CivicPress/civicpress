@@ -1164,6 +1164,28 @@ URL, stream key, or network error).
 
 ---
 
+### 6. `command.error` (CivicPress monitoring)
+
+Published by CivicPress when a command fails (handler error or device ACK
+`success: false`). Stored in device events for monitoring and audit; clients can
+query or subscribe to these events.
+
+**Payload** (in stored event `eventData`):
+
+- `commandId` (string): Command ID that failed.
+- `action` (string): Command action (e.g. `sources.set`, `stream.start`).
+- `deviceId` (string): Device UUID.
+- `code` (string): Standardized error code (e.g. `ERR_SOURCE_NOT_FOUND`).
+- `message` (string): Human-readable error message.
+- `type` (string): Error class name (e.g. `SourceError`, `StreamingError`).
+- `details` (object, optional): Additional context.
+- `source` (object, optional): Request source (user, API, etc.).
+- `timestamp` (string): ISO 8601.
+
+Clients can handle errors programmatically using the `code` field.
+
+---
+
 ## ACK Response Format
 
 All commands must be acknowledged with an ACK message. **The ACK message format
@@ -1174,15 +1196,25 @@ is strict and must match exactly as specified below.**
 ```typescript
 interface AckMessage extends BaseMessage {
   type: 'ack';                    // REQUIRED: Must be exactly "ack" (lowercase)
-  id: string;                     // REQUIRED: UUID for this ACK message (e.g., "3d9a1e19-0c46-471d-b27b-b0822618d3d3")
-  timestamp: string;               // REQUIRED: ISO 8601 timestamp (e.g., "2026-01-16T17:46:16.900Z")
+  id: string;                     // REQUIRED: UUID for this ACK message
+  timestamp: string;               // REQUIRED: ISO 8601 timestamp
   commandId: string;              // REQUIRED: ID of the command being acknowledged (from command.id)
   success: boolean;                // REQUIRED: true if command succeeded, false if failed
-  error?: string;                  // Optional: Error message if success=false
-  errorCode?: string;              // Optional: Standardized error code (e.g., "SOURCE_NOT_FOUND")
-  payload?: any;                   // Optional: Result data (use this field, NOT "result")
+  error?: string;                 // Optional: Human-readable error message if success=false
+  errorCode?: string;             // Optional: Standardized error code (e.g., ERR_SOURCE_NOT_FOUND)
+  errorType?: string;             // Optional: Error class name (e.g., SourceError, StreamingError)
+  errorDetails?: Record<string, unknown>; // Optional: Additional context for the error
+  payload?: any;                  // Optional: Result data (use this field, NOT "result")
 }
 ```
+
+When `success` is `false`, devices should set at least `error` (message).
+CivicPress supports structured errors: include `errorCode` (and optionally
+`errorType`, `errorDetails`) so clients can handle errors programmatically.
+Standard error codes include `ERR_SOURCE_NOT_FOUND`,
+`ERR_STREAMING_NOT_CONFIGURED`, `ERR_SESSION_ALREADY_ACTIVE`,
+`ERR_DEVICE_NOT_FOUND`, `ERR_MISSING_PARAMETER`, `ERR_INVALID_COMMAND`, and
+others (see Broadcast Box error handling documentation).
 
 ### Critical Requirements
 
@@ -1225,7 +1257,7 @@ interface AckMessage extends BaseMessage {
 }
 ```
 
-### Error ACK Example
+### Error ACK Example (structured)
 
 ```json
 {
@@ -1234,10 +1266,15 @@ interface AckMessage extends BaseMessage {
   "timestamp": "2026-01-16T17:46:16.900Z",
   "commandId": "df47ab6d-a95c-4b51-88a5-2462f5843672",
   "success": false,
-  "error": "Source not found",
-  "errorCode": "SOURCE_NOT_FOUND"
+  "error": "Requested source not found",
+  "errorCode": "ERR_SOURCE_NOT_FOUND",
+  "errorType": "SourceError",
+  "errorDetails": { "identifier": "hdmi3" }
 }
 ```
+
+CivicPress and clients use the `code` field for programmatic handling; `message`
+and `details` are for display and debugging.
 
 ### Common Mistakes to Avoid
 

@@ -958,7 +958,12 @@ export function createDevicesRouter(
           res.status(500).json({
             success: false,
             error: {
+              code: commandResponse.errorCode ?? 'ERR_UNKNOWN',
               message: commandResponse.error || 'Command execution failed',
+              type: commandResponse.errorType ?? 'BroadcastBoxError',
+              ...(commandResponse.errorDetails && {
+                details: commandResponse.errorDetails,
+              }),
             },
             commandId: commandResponse.commandId,
             timestamp: commandResponse.timestamp.toISOString(),
@@ -974,7 +979,9 @@ export function createDevicesRouter(
         res.status(500).json({
           success: false,
           error: {
+            code: 'ERR_SERVICE_UNAVAILABLE',
             message: 'Failed to execute device command',
+            type: 'BroadcastBoxError',
           },
         });
       }

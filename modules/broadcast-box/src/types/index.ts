@@ -438,8 +438,10 @@ export interface AckMessage extends BaseMessage {
   commandId: string;
   success: boolean;
   error?: string;
-  errorCode?: string; // Standardized error code (from protocol)
-  payload?: any; // Result data
+  errorCode?: string;
+  errorType?: string;
+  errorDetails?: Record<string, unknown>;
+  payload?: any;
 }
 
 // ============================================================================
