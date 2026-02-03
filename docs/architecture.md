@@ -118,6 +118,7 @@ civicpress/
 │   │   ├── geography/        # Geography records (core type)
 │   │   └── session/          # Session records (core type)
 │   └── .git/                 # Git repository for records
+├── cli/                       # CLI module (root level)
 ├── core/                      # Core platform modules
 │   ├── civic-core.ts          # Main CivicPress orchestrator
 │   ├── hooks/hook-system.ts   # Event system
@@ -130,9 +131,12 @@ civicpress/
 │   └── indexing/indexing-service.ts # Indexing service
 ├── modules/                   # Civic modules
 │   ├── api/                  # REST API module
-│   ├── cli/                  # CLI module
-│   ├── ui/                   # UI module
-│   └── legal-register/       # Legal document management
+│   ├── broadcast-box/        # Broadcast Box device control & session recording
+│   ├── legal-register/       # Legal document management
+│   ├── notifications/        # Notification delivery module
+│   ├── realtime/             # Real-time collaborative editing (yjs)
+│   ├── storage/              # Multi-provider file storage
+│   └── ui/                   # Web UI module
 ├── docs/specs/               # Detailed specifications
 └── agent/                    # AI agent memory system
 ```
@@ -161,8 +165,14 @@ civicpress/
 **Service Initialization Order**:
 
 1. `DatabaseService.initialize()` - Database connection and schema
-2. `completeServiceInitialization()` - Cache registration, indexing service
-   setup
+2. `completeServiceInitialization()` - Multi-step async initialization:
+   - `SecretsManager.initialize()` - Load encryption keys
+   - `AuthService.initializeSecrets()` - JWT signing secrets
+   - `NotificationService.initializeSecrets()` - Email delivery secrets
+   - `IndexingService` creation (replaces placeholder registration)
+   - Optional module registration (storage, realtime, broadcast-box)
+   - Realtime server initialization (if available)
+   - Cache registration (7 named caches) and `UnifiedCacheManager.initialize()`
 3. `WorkflowEngine.initialize()` - Workflow definitions loading
 4. `GitEngine.initialize()` - Git repository initialization
 5. `HookSystem.initialize()` - Hook configuration loading
@@ -212,13 +222,23 @@ export function registerCivicPressServices(
   container.singleton('logger', () => new Logger(loggerOptions));
   container.registerInstance('config', config);
 
-  // Step 2: Register database service (depends on logger)
-  container.singleton('database', (c) => {
-    const logger = c.resolve<Logger>('logger');
-    return new DatabaseService(dbConfig, logger);
+  // Step 1.5: Register secrets manager (before auth services)
+  container.singleton('secretsManager', (c) => {
+    const config = c.resolve<CivicPressConfig>('config');
+    return SecretsManager.getInstance(config.dataDir);
   });
 
-  // Step 3: Register services with dependencies
+  // Step 2: Register database service (depends on logger, cacheManager)
+  container.singleton('database', (c) => {
+    const logger = c.resolve<Logger>('logger');
+    const dbConfig = c.resolve<typeof config.database>('dbConfig');
+    const cacheManager = c.resolve<UnifiedCacheManager>('cacheManager');
+    return new DatabaseService(dbConfig!, logger, cacheManager);
+  });
+
+  // Step 3+: Register services with dependencies
+  // auth, configDiscovery, workflow, git, hooks, template,
+  // notification, cacheManager, saga services, recordManager
   // ... all services registered in dependency order
 }
 ```
@@ -227,7 +247,7 @@ export function registerCivicPressServices(
 
 - **Singleton** (default): One instance shared across all requests
 - **Transient**: New instance created for each resolution
-- **Scoped**: One instance per scope (future enhancement)
+- **Scoped**: One instance per scope (via `createScope()` on the container)
 
 **Benefits**:
 
@@ -449,15 +469,20 @@ unauthorized resources
 
 - Multiple authentication methods (OAuth, password, simulated)
 - JWT token management
-- Role-based access control
-- Session management
+- Role-based access control (RBAC) with role hierarchy
+- Session and API key management
+- Email verification workflow
 
 **Key Features**:
 
-- GitHub OAuth integration
-- Password authentication
+- OAuth integration (GitHub, Google, Microsoft)
+- Password authentication with bcrypt hashing
 - Simulated accounts for development
 - JWT token validation and management
+- API key generation and validation
+- Email validation service (verification tokens, email change requests)
+- RBAC via `RoleManager` with configurable roles in `data/.civic/roles.yml`
+- Audit logging for authentication events
 
 ### 8. Record Manager (`record-manager.ts`)
 
@@ -597,6 +622,9 @@ await searchCache.delete('key');
 - `searchSuggestions` - Search suggestions caching (MemoryCache, 5min TTL)
 - `diagnostics` - Diagnostic results caching (MemoryCache, 5min TTL)
 - `templates` - Template caching (FileWatcherCache, file watching)
+- `templateLists` - Template list result caching (MemoryCache, 5min TTL)
+- `recordSuggestions` - Record suggestion caching (MemoryCache, 5min TTL)
+- `storageMetadata` - Storage file metadata caching (MemoryCache, 5min TTL)
 
 **Reference**: `docs/cache-usage-guide.md`
 
@@ -953,50 +981,34 @@ entries:
 
 ### Search Algorithm
 
-The search algorithm uses a **filter-then-search** approach:
+The search system uses **SQLite FTS5** for full-text search with composite
+relevance scoring:
 
-1. **Filter by Options**: First filter by type, status, module, or tags
-2. **Text Search**: Then search within filtered results
-3. **Ranking**: Results ranked by relevance (title matches > tag matches >
-   author matches)
+1. **FTS5 Query**: Search terms are run against the FTS5 index using BM25
+   ranking
+2. **Filter by Options**: Results filtered by type, status, module, or tags
+3. **Composite Scoring**: Results ranked by a weighted combination of signals
 
-**Search Implementation**:
+**Search Scoring Pipeline**:
 
-```typescript
-searchIndex(index, query, options) {
-  // Step 1: Filter by options (type, status, module, tags)
-  let results = index.entries.filter(entry => {
-    if (options.type && entry.type !== options.type) return false;
-    if (options.status && entry.status !== options.status) return false;
-    if (options.module && entry.module !== options.module) return false;
-    if (options.tags && !hasMatchingTag(entry.tags, options.tags)) return false;
-    return true;
-  });
-
-  // Step 2: Text search within filtered results
-  if (query) {
-    const lowerQuery = query.toLowerCase();
-    results = results.filter(entry => {
-      return entry.title.toLowerCase().includes(lowerQuery) ||
-             entry.slug?.toLowerCase().includes(lowerQuery) ||
-             entry.tags?.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
-             entry.authors?.some(author =>
-               author.name.toLowerCase().includes(lowerQuery)
-             );
-    });
-  }
-
-  return results;
-}
+```
+FTS5 BM25 Score (base relevance)
+  + Field Match Score (title matches weighted higher than content)
+  + Recency Score (recent records ranked higher)
+  + Type Priority Score (record type weighting)
+  + Status Priority Score (status weighting)
+  = Composite Relevance Score
 ```
 
 **Search Features**:
 
-- Case-insensitive matching
-- Partial word matching
-- Multi-field search (title, slug, tags, authors)
-- Fast filtering (no full-text content scanning)
-- Module-specific search (searches within module indexes)
+- SQLite FTS5 native full-text search
+- BM25 relevance ranking
+- Multi-word and phrase matching
+- Typo tolerance via Levenshtein distance
+- Search suggestions with autocomplete
+- Faceting (type and status counts)
+- Result caching (5-minute TTL via UnifiedCacheManager)
 
 ### Index Updates
 
@@ -1200,6 +1212,51 @@ The Storage module uses **Pattern 2: Service Registration** (DI Container):
 
 **Reference**: `docs/module-integration-guide.md`, `docs/uuid-storage-system.md`
 
+### Realtime Module (`modules/realtime/`)
+
+**Status**: Fully implemented
+
+**Purpose**: Real-time collaborative editing
+
+**Architecture**:
+
+- WebSocket server for real-time communication
+- yjs CRDT for conflict-free collaborative editing
+- Integrates with core via DI container (optional module)
+- Services registered via `registerRealtimeServices()`
+
+**Key Features**:
+
+- Collaborative document editing with conflict resolution
+- WebSocket-based real-time updates
+- Device authentication support (for broadcast-box integration)
+- Automatic initialization after broadcast-box services are registered
+
+### Broadcast Box Module (`modules/broadcast-box/`)
+
+**Status**: Phase 8 complete
+
+**Purpose**: Device control and session recording for broadcast workflows
+
+**Architecture**:
+
+- WebSocket-based device communication protocol
+- Session controller for recording management
+- Device command service for sending commands to hardware devices
+- Integrates with core via DI container (optional module)
+- Services registered via `registerBroadcastBoxServices()`
+
+**Key Features**:
+
+- Device connection management and status tracking
+- Session recording (start/stop/configure)
+- RTMP streaming support
+- Picture-in-Picture (PiP) configuration
+- Centralized source configuration
+- Structured error handling and reporting
+
+**Reference**: `docs/broadcast-box/` directory
+
 ### Legal Register Module (`modules/legal-register/`)
 
 **Status**: Schema extension implemented
@@ -1319,13 +1376,12 @@ Each transition can be:
 User Input
   → API/CLI Layer
   → RecordManager.createRecord()
-  → CreateRecordSaga
-    → DatabaseService (transaction)
-    → File System (create file)
-    → GitEngine (commit)
-    → HookSystem (emit event)
-    → WorkflowEngine (execute workflows)
-    → IndexingService (update index)
+  → SagaExecutor.execute(CreateRecordSaga)
+    Step 1: CreateInRecordsStep    → DB insert (compensatable: delete)
+    Step 2: CreateFileStep         → Write markdown file (compensatable: delete)
+    Step 3: CommitToGitStep        → Git commit (non-compensatable, authoritative)
+    Step 4: QueueIndexingStep      → Update search index (fire-and-forget)
+    Step 5: EmitHooksStep          → Emit record:created event (fire-and-forget)
   → Success/Compensation
 ```
 
@@ -1334,13 +1390,13 @@ User Input
 ```
 Draft Approval
   → RecordManager.publishDraft()
-  → PublishDraftSaga
-    → DatabaseService (move draft → record)
-    → File System (create published file)
-    → GitEngine (commit)
-    → HookSystem (emit event)
-    → WorkflowEngine (execute workflows)
-    → IndexingService (update index)
+  → SagaExecutor.execute(PublishDraftSaga)
+    Step 1: MoveToRecordsStep      → DB move draft→records (compensatable: delete)
+    Step 2: CreateOrUpdateFileStep → Write markdown file (compensatable: delete)
+    Step 3: CommitToGitStep        → Git commit (non-compensatable, authoritative)
+    Step 4: DeleteDraftStep        → Remove draft from DB (compensatable: warn)
+    Step 5: QueueIndexingStep      → Update search index (fire-and-forget)
+    Step 6: EmitHooksStep          → Emit event (fire-and-forget)
   → Success/Compensation
 ```
 
@@ -1376,7 +1432,8 @@ Config Update → Validation → Service Reload → Hook Event → Workflow Trig
 
 ### 1. Authentication & Authorization
 
-- **Multiple Methods**: OAuth (GitHub), user/password, simulated accounts
+- **Multiple Methods**: OAuth (GitHub, Google, Microsoft), user/password,
+  simulated accounts
 - **JWT Tokens**: All methods return valid JWT tokens with proper validation
 - **Role-Based Access**: Granular permissions system with role hierarchy
 - **Session Management**: JWT-based stateless sessions with proper cleanup
@@ -1403,15 +1460,41 @@ Config Update → Validation → Service Reload → Hook Event → Workflow Trig
 **Error Hierarchy**:
 
 ```
-CivicPressError (base class)
-├── ValidationError (400) - Input validation failures
-├── NotFoundError (404) - Resource not found
-├── DatabaseError (500) - Database operation failures
-├── StorageError (500) - Storage operation failures
-├── RecordError - Record-specific errors
-├── TemplateError - Template-specific errors
-├── GeographyError - Geography-specific errors
-└── AuthError - Authentication/authorization errors
+CivicPressError (abstract base class, with correlationId)
+│
+├── Base HTTP errors (errors/index.ts):
+│   ├── ValidationError (400) - Input validation failures
+│   ├── NotFoundError (404) - Resource not found
+│   ├── UnauthorizedError (401) - Authentication required
+│   ├── ForbiddenError (403) - Insufficient permissions
+│   ├── ConflictError (409) - Resource conflict
+│   ├── DatabaseError (500) - Database operation failures
+│   ├── FileSystemError (500) - File system operation failures
+│   └── InternalError (500) - Unexpected internal errors
+│
+├── Domain errors (errors/domain-errors.ts):
+│   ├── RecordNotFoundError, RecordValidationError, RecordConflictError
+│   ├── TemplateNotFoundError, TemplateExistsError, TemplateValidationError,
+│   │   TemplateInvalidError, TemplateSystemError
+│   ├── GeographyNotFoundError, GeographyValidationError
+│   ├── AuthenticationFailedError, AuthorizationFailedError, SessionExpiredError
+│   ├── GitError, GitConflictError
+│   └── WorkflowError, WorkflowTransitionError
+│
+├── DI errors (di/errors.ts):
+│   ├── ServiceNotFoundError, CircularDependencyError
+│   ├── ServiceRegistrationError, DuplicateServiceError
+│   └── MissingDependencyError
+│
+├── Cache errors (cache/errors.ts):
+│   ├── CacheError, CacheKeyError
+│   ├── CacheSizeError, CacheInitializationError
+│
+└── Saga errors (saga/errors.ts):
+    ├── SagaStepError, SagaCompensationError
+    ├── UncompensatableFailureError, SagaContextError
+    ├── SagaTimeoutError (504), SagaLockError (409)
+    └── SagaRecoveryError
 ```
 
 **Key Features**:
@@ -1451,7 +1534,19 @@ if (error instanceof CivicPressError) {
 
 **Reference**: `docs/error-handling.md`
 
-### 4. Configuration Security
+### 4. CSRF Protection
+
+- **Token-based CSRF protection** via `CsrfProtection` service
+- Integrated into API middleware for state-changing requests
+
+### 5. Secrets Management
+
+- **`SecretsManager`**: Centralized secrets storage for JWT keys, API signing
+  keys
+- Secrets stored in `.system-data/` (outside Git-versioned data directory)
+- Initialized early in the service lifecycle (before auth services)
+
+### 6. Configuration Security
 
 - **Separation**: System config (`.civicrc`) vs Organization config
   (`data/.civic/`)

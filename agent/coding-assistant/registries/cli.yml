@@ -37,6 +37,11 @@ commands:
     desc: Authenticate with username and password
     status: stable
 
+  - id: auth:simulated
+    file: cli/src/commands/auth.ts
+    desc: Create simulated user account (development only)
+    status: stable
+
   - id: users:create
     file: cli/src/commands/users.ts
     desc: Create a new user account
@@ -55,6 +60,41 @@ commands:
   - id: users:delete
     file: cli/src/commands/users.ts
     desc: Delete a user account
+    status: stable
+
+  - id: users:delete-all-test
+    file: cli/src/commands/users.ts
+    desc: Delete all test users (development only)
+    status: draft
+
+  - id: users:change-password
+    file: cli/src/commands/users.ts
+    desc: Change user password (self-service or admin)
+    status: stable
+
+  - id: users:set-password
+    file: cli/src/commands/users.ts
+    desc: Set user password (admin only)
+    status: stable
+
+  - id: users:request-email-change
+    file: cli/src/commands/users.ts
+    desc: Request email address change with verification
+    status: stable
+
+  - id: users:verify-email
+    file: cli/src/commands/users.ts
+    desc: Verify email change with token
+    status: stable
+
+  - id: users:cancel-email-change
+    file: cli/src/commands/users.ts
+    desc: Cancel pending email change
+    status: stable
+
+  - id: users:security-info
+    file: cli/src/commands/users.ts
+    desc: View user security information
     status: stable
 
   - id: notify:test
@@ -249,7 +289,67 @@ commands:
     desc: Export configurations to a directory
     status: stable
 
+  - id: config:status
+    file: cli/src/commands/config.ts
+    desc: Show configuration status (user/default/missing)
+    status: stable
+
+  - id: config:init
+    file: cli/src/commands/config.ts
+    desc: Initialize configs from defaults
+    status: stable
+
   - id: config:import
     file: cli/src/commands/config.ts
     desc: Import configurations from a directory
+    status: stable
+
+  # Search & discovery
+  - id: search
+    file: cli/src/commands/search.ts
+    desc: Search records by content, metadata, or Git history
+    status: stable
+
+  - id: diff
+    file: cli/src/commands/diff.ts
+    desc: Show differences between record versions or commits
+    status: stable
+
+  # Backup & restore
+  - id: backup
+    file: cli/src/commands/backup.ts
+    desc: Create compressed backup of data and storage
+    status: stable
+
+  - id: backup:restore
+    file: cli/src/commands/backup.ts
+    desc: Restore from a backup archive
+    status: stable
+
+  # System diagnostics
+  - id: diagnose
+    file: cli/src/commands/diagnose.ts
+    desc: Run system diagnostics and health checks
+    status: stable
+
+  # Cache management
+  - id: cache:metrics
+    file: cli/src/commands/cache.ts
+    desc: Show cache metrics and statistics
+    status: stable
+
+  - id: cache:health
+    file: cli/src/commands/cache.ts
+    desc: Run cache health checks
+    status: stable
+
+  - id: cache:list
+    file: cli/src/commands/cache.ts
+    desc: List registered cache instances
+    status: stable
+
+  # Record operations
+  - id: records:migrate-folders
+    file: cli/src/commands/records.ts
+    desc: Organize records into year-based subdirectories
     status: stable

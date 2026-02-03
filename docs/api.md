@@ -10,7 +10,8 @@ standard HTTP status codes.
 
 ### JWT Token Flow
 
-1. **Login**: POST `/auth/login` with credentials
+1. **Login**: POST `/api/v1/auth/password` or `/api/v1/auth/login` with
+   credentials
 2. **Get Token**: Receive JWT token in response
 3. **Use Bearer Token**: Include token in `Authorization: Bearer <token>` header
 
@@ -18,18 +19,31 @@ standard HTTP status codes.
 
 #### **Public Endpoints** (No Authentication Required)
 
-These endpoints are accessible without authentication and are used by the UI for
-initial configuration:
+These endpoints are accessible without authentication:
 
-- `GET /api/v1/config/roles` - Get available user roles
-- `GET /api/v1/system/record-types` - Get available record types
-- `GET /api/v1/system/record-statuses` - Get available record statuses
+- `GET /api/v1/health` - Health check
+- `GET /api/v1/health/detailed` - Detailed health info
+- `GET /api/v1/info` - System/organization info (partial)
 - `GET /api/v1/status` - Get system status
 - `GET /api/v1/status/git` - Get Git repository status
 - `GET /api/v1/status/records` - Get records statistics
+- `GET /api/v1/system/record-types` - Get available record types
+- `GET /api/v1/system/record-statuses` - Get available record statuses
+- `GET /api/v1/config/attachment-types` - Get attachment type categories
+- `GET /api/v1/config/link-categories` - Get link categories
+- `POST /api/v1/config/:type/validate` - Validate configuration
 - `GET /api/v1/records` - List records (read-only)
 - `GET /api/v1/records/:id` - Get specific record (read-only)
 - `GET /api/v1/search` - Search records (read-only)
+- `GET /api/v1/geography` - List geography files
+- `GET /api/v1/geography/:id` - Get geography file
+- `GET /api/v1/geography/presets` - List geography presets
+- `POST /api/v1/geography/validate` - Validate geography content
+- `GET /api/v1/auth/csrf-token` - Get CSRF token
+- `GET /api/v1/auth/providers` - List OAuth providers
+- `POST /api/v1/users/register` - Public user registration
+- `GET /api/v1/docs` - Swagger UI
+- `GET /api/v1/docs/api-docs.json` - OpenAPI schema JSON
 
 #### **Protected Endpoints** (Authentication Required)
 
@@ -54,16 +68,22 @@ Protected endpoints use role-based permissions:
 
 ### Authentication Endpoints
 
-#### POST /auth/login
+All auth endpoints are mounted at `/api/v1/auth`.
 
-Authenticate user and receive JWT token.
+#### GET /api/v1/auth/csrf-token
+
+Get a CSRF token for form submissions (public endpoint).
+
+#### POST /api/v1/auth/login
+
+Authenticate with an OAuth provider token.
 
 **Request Body:**
 
 ```json
 {
-  "username": "string",
-  "password": "string"
+  "provider": "github|google|microsoft",
+  "token": "string"
 }
 ```
 
@@ -87,7 +107,82 @@ Authenticate user and receive JWT token.
 }
 ```
 
-#### POST /auth/register
+#### POST /api/v1/auth/password
+
+Authenticate with username and password.
+
+**Request Body:**
+
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+**Response:** Same format as `/api/v1/auth/login`.
+
+#### GET /api/v1/auth/providers
+
+List available OAuth providers (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "providers": ["github", "google", "microsoft"]
+  }
+}
+```
+
+#### GET /api/v1/auth/me
+
+Get the currently authenticated user.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@example.com",
+      "name": "Administrator",
+      "role": "admin",
+      "avatar_url": null
+    }
+  }
+}
+```
+
+#### POST /api/v1/auth/logout
+
+Logout (stateless, invalidates token).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Logged out successfully"
+  }
+}
+```
+
+#### POST /api/v1/auth/simulated
+
+Create a simulated user session (development/test only, disabled in production).
+
+#### POST /api/v1/users/register
 
 Register a new user account (public endpoint).
 
@@ -118,23 +213,6 @@ Register a new user account (public endpoint).
       "created_at": "2025-07-30T21:33:40.000Z"
     },
     "message": "User registered successfully"
-  }
-}
-```
-
-#### POST /auth/logout
-
-Logout and invalidate current session.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Logged out successfully"
   }
 }
 ```
@@ -327,6 +405,64 @@ Delete a record (requires authentication).
   }
 }
 ```
+
+#### GET /api/v1/records/summary
+
+Get aggregate record counts by type and status (optional auth).
+
+#### GET /api/v1/records/drafts
+
+List draft records (requires `records:view` permission).
+
+#### GET /api/v1/records/:id/raw
+
+Get raw markdown content of a record (optional auth).
+
+#### GET /api/v1/records/:id/frontmatter
+
+Get parsed frontmatter YAML of a record (optional auth).
+
+#### POST /api/v1/records/:id/status
+
+Change a record's status (requires `records:edit` permission).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "status": "string (required)"
+}
+```
+
+#### GET /api/v1/records/:id/transitions
+
+Get allowed status transitions for a record (requires authentication).
+
+#### PUT /api/v1/records/:id/draft
+
+Save a draft version of a record (requires `records:edit` permission).
+
+#### DELETE /api/v1/records/:id/draft
+
+Delete a draft version (requires `records:edit` permission).
+
+#### POST /api/v1/records/:id/publish
+
+Publish a draft record (requires `records:edit` permission).
+
+#### POST /api/v1/records/:id/lock
+
+Acquire an edit lock on a record (requires `records:edit` permission).
+
+#### DELETE /api/v1/records/:id/lock
+
+Release an edit lock (requires `records:edit` permission).
+
+#### GET /api/v1/records/:id/lock
+
+Get the lock status of a record (requires `records:edit` permission).
 
 ### Validation
 
@@ -567,6 +703,14 @@ Search records with full-text search capabilities.
   }
 }
 ```
+
+#### GET /api/v1/search/suggestions
+
+Get search suggestions for autocomplete (optional auth).
+
+**Query Parameters:**
+
+- `q` (required): Partial search query
 
 ### User Management
 
@@ -860,6 +1004,24 @@ Cancel pending email change (self-service or admin).
 }
 ```
 
+#### POST /api/v1/users/:id/send-email-verification
+
+Send an email verification message (requires authentication).
+
+**Headers:** `Authorization: Bearer <token>`
+
+#### POST /api/v1/users/verify-current-email
+
+Verify current email address with token (public endpoint, no authentication).
+
+**Request Body:**
+
+```json
+{
+  "token": "string (required)"
+}
+```
+
 #### GET /api/v1/users/:id/security-info
 
 Get user security information (self-service or admin).
@@ -910,9 +1072,49 @@ Get user security information (self-service or admin).
 
 ### Configuration
 
-#### GET /api/v1/config/roles
+Configuration endpoints manage system settings. Three endpoints are public; the
+rest require authentication with the `config:manage` permission.
 
-Get available user roles (public endpoint).
+#### GET /api/v1/config/attachment-types
+
+Get attachment type categories for file attachments (public endpoint).
+
+#### GET /api/v1/config/link-categories
+
+Get link categories for record linking (public endpoint).
+
+#### POST /api/v1/config/:type/validate
+
+Validate a configuration without saving (public endpoint).
+
+#### GET /api/v1/config/list
+
+List all available configuration files (requires `config:manage`).
+
+#### GET /api/v1/config/metadata/:type
+
+Get configuration metadata/schema for a config type (requires `config:manage`).
+
+#### GET /api/v1/config/raw/:type
+
+Get raw YAML content of a configuration (requires `config:manage`).
+
+#### PUT /api/v1/config/raw/:type
+
+Save raw YAML content (requires `config:manage`).
+
+#### GET /api/v1/config/status
+
+Get status of all configurations (user/default/missing) (requires
+`config:manage`).
+
+#### GET /api/v1/config/:type
+
+Load a configuration by type. Valid types: `org-config`, `roles`, `workflows`,
+`hooks`, `notifications` (requires `config:manage`).
+
+**Note:** `GET /api/v1/config/roles` is **not** a public endpoint. It requires
+authentication and the `config:manage` permission.
 
 **Response:**
 
@@ -957,6 +1159,21 @@ Get available user roles (public endpoint).
   }
 }
 ```
+
+#### PUT /api/v1/config/:type
+
+Save a configuration (requires `config:manage`).
+
+#### POST /api/v1/config/:type/reset
+
+Reset a configuration to defaults (requires `config:manage`).
+
+#### GET /api/v1/config/validate/all
+
+Validate all configurations and return combined results (requires
+`config:manage`).
+
+### System
 
 #### GET /api/v1/system/record-types
 
@@ -1143,11 +1360,9 @@ All endpoints return consistent error responses:
 
 ## Rate Limiting
 
-API requests are rate-limited to prevent abuse:
-
-- **Public endpoints**: 100 requests per minute
-- **Protected endpoints**: 1000 requests per minute per user
-- **Authentication endpoints**: 10 requests per minute per IP
+The API does not currently enforce HTTP-level rate limiting. The WebSocket
+realtime server enforces rate limiting (10 messages/sec per client, configurable
+in `.system-data/realtime.yml`).
 
 ## Versioning
 
@@ -1400,6 +1615,27 @@ Validate geography content without saving (public endpoint).
 }
 ```
 
+#### GET /api/v1/geography/:id/raw
+
+Get raw geography content (GeoJSON, KML, etc.) for a specific file (public
+endpoint).
+
+#### GET /api/v1/geography/:id/linked-records
+
+Get records linked to a geography file (requires authentication).
+
+#### GET /api/v1/geography/presets
+
+List available geography presets (public endpoint).
+
+#### GET /api/v1/geography/presets/:key
+
+Get a specific geography preset (public endpoint).
+
+#### POST /api/v1/geography/presets/:key/apply
+
+Apply a geography preset (public endpoint).
+
 #### GET /api/v1/geography/search
 
 Search geography files (public endpoint).
@@ -1453,6 +1689,310 @@ Search geography files (public endpoint).
 }
 ```
 
+### Health
+
+#### GET /api/v1/health
+
+Basic health check (public endpoint).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "healthy"
+  }
+}
+```
+
+#### GET /api/v1/health/detailed
+
+Detailed health information including service status (public endpoint).
+
+#### POST /api/v1/health/test-error
+
+Emit a test error for diagnostics (public endpoint).
+
+### Info
+
+#### GET /api/v1/info
+
+Get system and organization info. Returns partial info for unauthenticated
+users; full info for admins (public endpoint with optional auth).
+
+### Templates
+
+Template endpoints manage record templates. All require authentication.
+
+#### GET /api/v1/templates
+
+List templates (requires `templates:view`).
+
+#### GET /api/v1/templates/:id
+
+Get a specific template (requires `templates:view`).
+
+#### POST /api/v1/templates
+
+Create a new template (requires `templates:manage`).
+
+#### PUT /api/v1/templates/:id
+
+Update a template (requires `templates:manage`).
+
+#### DELETE /api/v1/templates/:id
+
+Delete a template (requires `templates:manage`).
+
+#### POST /api/v1/templates/:id/preview
+
+Preview a template with variable substitution (requires `templates:view`).
+
+#### POST /api/v1/templates/:id/validate
+
+Validate template structure and inheritance (requires `templates:view`).
+
+### Workflows
+
+Workflow endpoints manage record approval workflows. All require authentication.
+
+#### GET /api/v1/workflows
+
+List workflows (requires `workflows:view`).
+
+#### GET /api/v1/workflows/:id
+
+Get a workflow (requires `workflows:view`).
+
+#### POST /api/v1/workflows
+
+Create a workflow (requires `workflows:manage`).
+
+#### PUT /api/v1/workflows/:id
+
+Update a workflow (requires `workflows:manage`).
+
+#### DELETE /api/v1/workflows/:id
+
+Delete a workflow (requires `workflows:manage`).
+
+### Hooks
+
+Hook endpoints manage system event hooks. All require authentication.
+
+#### GET /api/v1/hooks
+
+List hooks (requires `hooks:view`).
+
+#### GET /api/v1/hooks/:id
+
+Get a hook (requires `hooks:view`).
+
+#### POST /api/v1/hooks
+
+Create a hook (requires `hooks:manage`).
+
+#### PUT /api/v1/hooks/:id
+
+Update a hook (requires `hooks:manage`).
+
+#### DELETE /api/v1/hooks/:id
+
+Delete a hook (requires `hooks:manage`).
+
+### Export & Import
+
+#### GET /api/v1/export
+
+Export records data (requires `records:export`).
+
+#### POST /api/v1/import
+
+Import records data (requires `records:import`).
+
+### Indexing
+
+Indexing endpoints manage the full-text search index. All require
+authentication.
+
+#### POST /api/v1/indexing/generate
+
+Generate or regenerate indexes (requires `records:import`).
+
+#### GET /api/v1/indexing/status
+
+Get indexing status (requires `records:view`).
+
+#### POST /api/v1/indexing/sync
+
+Sync file-based records to the database (requires `records:import`).
+
+#### GET /api/v1/indexing/search
+
+Search the index directly (requires `records:view`).
+
+#### GET /api/v1/indexing/stats
+
+Get indexing statistics (requires authentication).
+
+#### GET /api/v1/indexing/validate
+
+Validate index integrity (requires authentication).
+
+### History
+
+History endpoints provide Git-based version history. All require `records:view`.
+
+#### GET /api/v1/history
+
+Get Git commit history for all records.
+
+#### GET /api/v1/history/:record
+
+Get commit history for a specific record.
+
+### Diff
+
+Diff endpoints compare record versions. All require `records:view`.
+
+#### GET /api/v1/diff/:recordId
+
+Compare two versions of a record.
+
+**Query Parameters:**
+
+- `from` - Source commit hash or version
+- `to` - Target commit hash or version
+
+#### GET /api/v1/diff/:recordId/history
+
+Get the commit history for a record (diff context).
+
+#### GET /api/v1/diff/:recordId/commits
+
+Get commits that modified a record.
+
+#### GET /api/v1/diff/:recordId/versions
+
+Get all versions of a record.
+
+### Storage (UUID-based)
+
+Storage endpoints manage file uploads with UUID tracking. Supports local, S3,
+and Azure storage providers.
+
+#### POST /api/v1/storage/files
+
+Upload a file (requires `storage:upload`). Supports multipart form data.
+
+#### GET /api/v1/storage/files/:id
+
+Download a file by UUID (optional auth).
+
+#### GET /api/v1/storage/files/:id/info
+
+Get file metadata by UUID (optional auth).
+
+#### PUT /api/v1/storage/files/:id
+
+Update file metadata (requires `storage:manage`).
+
+#### DELETE /api/v1/storage/files/:id
+
+Delete a file by UUID (requires `storage:delete`).
+
+#### POST /api/v1/storage/files/batch
+
+Batch upload multiple files (requires `storage:upload`).
+
+#### DELETE /api/v1/storage/files/batch
+
+Batch delete multiple files (requires `storage:delete`).
+
+#### GET /api/v1/storage/folders/:folder/files
+
+List files in a storage folder (requires `storage:download`).
+
+#### GET /api/v1/storage/config
+
+Get storage configuration (requires `storage:manage`).
+
+#### GET /api/v1/storage/health
+
+Check storage provider health status.
+
+#### GET /api/v1/storage/health/:provider
+
+Check health for a specific storage provider.
+
+#### GET /api/v1/storage/metrics
+
+Get storage operation metrics (counts, latency, errors).
+
+#### POST /api/v1/storage/metrics/reset
+
+Reset storage metrics (admin only).
+
+#### GET /api/v1/storage/usage
+
+Get storage usage report (total, by folder, by provider).
+
+#### GET /api/v1/storage/usage/:folder
+
+Get storage usage for a specific folder.
+
+#### GET /api/v1/storage/cleanup
+
+Get orphaned file cleanup report (admin only).
+
+#### POST /api/v1/storage/cleanup
+
+Apply orphaned file cleanup (admin only).
+
+### Cache
+
+Cache endpoints provide visibility into the caching layer. All require
+authentication.
+
+#### GET /api/v1/cache/metrics
+
+Get metrics for all caches.
+
+#### GET /api/v1/cache/metrics/:name
+
+Get metrics for a specific named cache.
+
+#### GET /api/v1/cache/health
+
+Get cache health status.
+
+#### GET /api/v1/cache/list
+
+List all registered caches.
+
+### Diagnostics
+
+Diagnostic endpoints run system health checks. All require admin authentication.
+
+#### GET /api/v1/diagnose
+
+Run all diagnostics.
+
+#### GET /api/v1/diagnose/:component
+
+Run diagnostics for a specific component.
+
+#### POST /api/v1/diagnose/fix
+
+Auto-fix detected issues.
+
+### Notifications
+
+#### POST /api/v1/notifications/test
+
+Send a test notification (requires `system:admin`).
+
 ### Audit Endpoints
 
 #### GET /api/v1/audit
@@ -1490,19 +2030,7 @@ Permissions:
 
 Failures are also logged with `outcome: "failure"` and an error `message`.
 
-## SDKs and Libraries
+## OpenAPI Documentation
 
-Official SDKs are available for:
-
-- **JavaScript/TypeScript**: `@civicpress/sdk`
-- **Python**: `civicpress-python`
-- **Ruby**: `civicpress-ruby`
-
-## Support
-
-For API support and questions:
-
-- **Documentation**: [docs.civicpress.org](https://docs.civicpress.org)
-- **Community**: [community.civicpress.org](https://community.civicpress.org)
-- **Issues**:
-  [github.com/civicpress/civicpress/issues](https://github.com/civicpress/civicpress/issues)
+An auto-generated OpenAPI specification is available at
+`GET /api/v1/docs/api-docs.json`, with Swagger UI at `GET /api/v1/docs`.
