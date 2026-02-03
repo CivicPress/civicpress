@@ -453,7 +453,8 @@ async function connectToDeviceRoom(
                     pipPayload.supported !== undefined
                       ? Boolean(pipPayload.supported)
                       : true,
-                  enabled: pipPayload.enabled || false,
+                  configured:
+                    pipPayload.configured ?? pipPayload.enabled ?? false,
                   pipSource: (() => {
                     const value = pipPayload.pip_source;
                     if (!value) return null;
@@ -603,6 +604,20 @@ async function connectToDeviceRoom(
             // Only update capabilities if we have data
             if (capabilitiesUpdate !== undefined) {
               statusUpdate.capabilities = capabilitiesUpdate;
+            }
+
+            // Extract streaming status (device sends streaming: { streaming: true, platform: "twitch", ... } in status payload)
+            if (payload.streaming && typeof payload.streaming === 'object') {
+              const s = payload.streaming;
+              statusUpdate.streaming = {
+                active: Boolean(s.streaming),
+                platform:
+                  typeof s.platform === 'string' ? s.platform : undefined,
+                url: typeof s.url === 'string' ? s.url : undefined,
+                quality: typeof s.quality === 'string' ? s.quality : undefined,
+                error: undefined,
+                retryCount: undefined,
+              };
             }
 
             updateDeviceStatus(deviceUuid, statusUpdate);
@@ -912,6 +927,40 @@ async function connectToDeviceRoom(
             updateDeviceStatus(deviceUuid, { connected: false });
           }
 
+          // Handle ACK for stream.start/stream.stop: device may send streaming state in ACK payload instead of a separate event
+          if (
+            message.type === 'ack' &&
+            message.success === true &&
+            message.payload
+          ) {
+            const payload = message.payload;
+            if (payload.status === 'streaming') {
+              updateDeviceStatus(deviceUuid, {
+                streaming: {
+                  active: true,
+                  platform: payload.platform,
+                  url: payload.url,
+                  quality: payload.quality,
+                  error: undefined,
+                  retryCount: undefined,
+                },
+              });
+            } else if (
+              payload.status === 'stopped' ||
+              payload.status === 'idle'
+            ) {
+              const current = deviceStatuses.value.get(deviceUuid);
+              updateDeviceStatus(deviceUuid, {
+                streaming: {
+                  active: false,
+                  platform: current?.streaming?.platform,
+                  error: undefined,
+                  retryCount: undefined,
+                },
+              });
+            }
+          }
+
           // Handle manual recording events
           if (message.type === 'event') {
             if (message.event === 'record.started') {
@@ -1175,7 +1224,7 @@ function updateDeviceStatus(
       const newPip = value as PiPConfiguration;
       if (
         !currentPip ||
-        currentPip.enabled !== newPip.enabled ||
+        currentPip.configured !== newPip.configured ||
         currentPip.position !== newPip.position ||
         JSON.stringify(currentPip.pipSource) !==
           JSON.stringify(newPip.pipSource) ||
@@ -1234,6 +1283,14 @@ function updateDeviceStatus(
   if (hasChanges) {
     deviceStatuses.value.set(deviceUuid, { ...current, ...updates });
   }
+}
+
+/**
+ * Clear session state for a device (e.g. after user stops session from UI).
+ * Call this when stop session succeeds so the UI shows idle instead of "session in progress".
+ */
+export function clearDeviceSessionState(deviceUuid: string): void {
+  updateDeviceStatus(deviceUuid, { state: 'idle', sessionId: null });
 }
 
 /**

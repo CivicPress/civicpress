@@ -239,6 +239,13 @@ Available in device.connected capabilities:
 - Streaming: standard
 - Recording: high
 
+You can set quality separately per output: preview (preview.start), streaming
+(stream.start), and recording (record.start / session). The device reports
+default preset names in capabilities.quality.defaults (preview, streaming,
+recording). The UI may expose one shared quality preset (applied to recording
+and streaming) or separate controls for each output using these defaults when
+the user has not chosen a preset.
+
 ---
 
 Events  
@@ -341,5 +348,7 @@ Migration Checklist
 - Subscribe to sources.changed event if tracking active sources
 - Subscribe to streaming.rtmp.\* events for streaming status
 - Update quality preset UI to use values from capabilities.quality
+- Optionally allow setting quality per output (preview, streaming, recording)
+  using capabilities.quality.defaults as defaults
 
 ---

@@ -294,4 +294,147 @@ describe('createDefaultEventHandlers', () => {
 
     expect(mockContext.deviceEventModel.create).toHaveBeenCalled();
   });
+
+  it('should persist pip config from status with sources.pip.configured', async () => {
+    const updateDevice = vi.fn().mockResolvedValue(undefined);
+    mockContext.deviceManager = {
+      getDevice: vi.fn().mockResolvedValue({
+        id: 'device-id',
+        capabilities: {
+          videoSourceObjects: [
+            { id: 0, identifier: 'hdmi1', name: 'HDMI 1' },
+            { id: 1, identifier: 'hdmi2', name: 'HDMI 2' },
+          ],
+        },
+      }),
+      updateDevice,
+    };
+
+    // Use payload.pip (not payload.sources.pip) so only the pip block runs and updateDevice is called once with pipConfig
+    const event: EventMessage = {
+      type: 'status',
+      id: 'status-id',
+      timestamp: new Date().toISOString(),
+      event: 'status',
+      payload: {
+        device_id: 'device-id',
+        pip: {
+          configured: true,
+          supported: true,
+          pip_source: 'hdmi2',
+          main_source: 'hdmi1',
+          position: 'top_right',
+          size: 0.25,
+        },
+      },
+    };
+
+    await registry.handleEvent(event, mockContext);
+
+    expect(updateDevice).toHaveBeenCalledWith(
+      'device-id',
+      expect.objectContaining({
+        pipConfig: expect.objectContaining({
+          configured: true,
+          supported: true,
+          position: 'top_right',
+          size: 0.25,
+        }),
+      })
+    );
+    const pipConfig = updateDevice.mock.calls[0][1].pipConfig;
+    expect(pipConfig.pipSource).toBeDefined();
+    expect(pipConfig.pipSource?.identifier).toBe('hdmi2');
+    expect(pipConfig.mainSource).toBeDefined();
+    expect(pipConfig.mainSource?.identifier).toBe('hdmi1');
+  });
+
+  it('should map pip.enabled to configured for backward compat in status', async () => {
+    const updateDevice = vi.fn().mockResolvedValue(undefined);
+    mockContext.deviceManager = {
+      getDevice: vi.fn().mockResolvedValue({
+        id: 'device-id',
+        capabilities: { videoSourceObjects: [] },
+      }),
+      updateDevice,
+    };
+
+    const event: EventMessage = {
+      type: 'status',
+      id: 'status-id',
+      timestamp: new Date().toISOString(),
+      event: 'status',
+      payload: {
+        device_id: 'device-id',
+        sources: {
+          pip: {
+            enabled: true,
+            supported: true,
+            pip_source: { id: 1, identifier: 'hdmi2' },
+            main_source: { id: 0, identifier: 'hdmi1' },
+            position: 'top_right',
+            size: 0.25,
+          },
+        },
+      },
+    };
+
+    await registry.handleEvent(event, mockContext);
+
+    expect(updateDevice).toHaveBeenCalledWith(
+      'device-id',
+      expect.objectContaining({
+        pipConfig: expect.objectContaining({
+          configured: true,
+        }),
+      })
+    );
+  });
+
+  it('should update active sources from status and treat pip as active when video is pip', async () => {
+    const updateDevice = vi.fn().mockResolvedValue(undefined);
+    mockContext.deviceManager = {
+      getDevice: vi.fn().mockResolvedValue({
+        id: 'device-id',
+        capabilities: {
+          videoSourceObjects: [
+            { id: 0, identifier: 'hdmi1', name: 'HDMI 1' },
+            { id: 1, identifier: 'pip', name: 'Picture-in-Picture' },
+          ],
+          audioSourceObjects: [
+            { id: 0, identifier: 'usb_audio', name: 'USB Audio' },
+          ],
+        },
+      }),
+      updateDevice,
+    };
+
+    const event: EventMessage = {
+      type: 'status',
+      id: 'status-id',
+      timestamp: new Date().toISOString(),
+      event: 'status',
+      payload: {
+        device_id: 'device-id',
+        sources: {
+          active: {
+            video: { id: 1, identifier: 'pip' },
+            audio: { id: 0, identifier: 'usb_audio' },
+          },
+        },
+      },
+    };
+
+    await registry.handleEvent(event, mockContext);
+
+    expect(updateDevice).toHaveBeenCalledWith(
+      'device-id',
+      expect.objectContaining({
+        activeSources: expect.objectContaining({
+          video: expect.objectContaining({ identifier: 'pip' }),
+          audio: expect.objectContaining({ identifier: 'usb_audio' }),
+        }),
+      })
+    );
+  });
 });

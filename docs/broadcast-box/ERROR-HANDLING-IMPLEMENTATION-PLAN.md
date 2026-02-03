@@ -1,5 +1,8 @@
 # Broadcast Box: Error Handling and Reporting — Implementation Plan
 
+**Status**: Implemented (see commits on `broadcast-box` for structured error
+handling).
+
 This plan aligns CivicPress (TypeScript) with the device-side error handling
 spec: standardized error codes, typed errors, structured responses, error event
 publishing, and error-code inference.
@@ -9,7 +12,7 @@ publishing, and error-code inference.
 ## 1. Error Codes (`modules/broadcast-box/src/types/errors.ts`)
 
 **Current state**: `BroadcastBoxErrorCode` enum exists with a subset
-(SESSION*\*, INVALID_CONFIG, SOURCE*_, PIP\__, DEVICE\_\*, etc.).
+(SESSION*\*, INVALID_CONFIG, SOURCE*\_, PIP\_\_, DEVICE\_\*, etc.).
 `getErrorMessage(code)` exists.
 
 **Target**: Add the full set of codes from the spec. Use `ERR_` prefix for

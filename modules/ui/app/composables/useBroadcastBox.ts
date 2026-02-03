@@ -464,8 +464,9 @@ export const useBroadcastBox = () => {
       const url = `/api/v1/broadcast-box/sessions${params.toString() ? `?${params.toString()}` : ''}`;
       const response = (await $civicApi(url)) as any;
 
-      if (response.success && response.data?.sessions) {
-        return response.data.sessions;
+      const sessions = response.sessions ?? response.data?.sessions;
+      if (response.success && sessions) {
+        return sessions;
       }
       return [];
     } catch (error: any) {
@@ -487,8 +488,9 @@ export const useBroadcastBox = () => {
         `/api/v1/broadcast-box/sessions/${sessionId}`
       )) as any;
 
-      if (response.success && response.data?.session) {
-        return response.data.session;
+      const session = response.session ?? response.data?.session;
+      if (response.success && session) {
+        return session;
       }
       return null;
     } catch (error: any) {
@@ -506,14 +508,19 @@ export const useBroadcastBox = () => {
         body: data,
       })) as any;
 
-      if (response.success && response.data?.session) {
+      const session = response.session ?? response.data?.session;
+      if (response.success && session) {
         toast.add({
           title: t('broadcastBox.success.sessionStarted'),
           color: 'primary',
         });
-        return response.data.session;
+        return session;
       }
-      throw new Error(response.error || t('broadcastBox.errors.startSession'));
+      throw new Error(
+        response.error?.message ??
+          response.error ??
+          t('broadcastBox.errors.startSession')
+      );
     } catch (error: any) {
       console.error('Failed to start session:', error);
       toast.add({
@@ -526,26 +533,73 @@ export const useBroadcastBox = () => {
   };
 
   const stopSession = async (sessionId: string): Promise<BroadcastSession> => {
+    const STOP_TIMEOUT_MS = 15000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), STOP_TIMEOUT_MS);
+
     try {
       const response = (await $civicApi(
         `/api/v1/broadcast-box/sessions/${sessionId}/stop`,
         {
           method: 'POST',
+          signal: controller.signal,
         }
       )) as any;
 
-      if (response.success && response.data?.session) {
+      clearTimeout(timeoutId);
+
+      const session = response.session ?? response.data?.session;
+      if (response.success && session) {
+        // Clear connection status session state so UI shows idle (not "session in progress")
+        const { clearDeviceSessionState } = await import(
+          './useDeviceConnectionStatus'
+        );
+        if (session.deviceId) {
+          clearDeviceSessionState(session.deviceId);
+        }
         toast.add({
           title: t('broadcastBox.success.sessionStopped'),
           color: 'primary',
         });
-        return response.data.session;
+        return session;
       }
-      throw new Error(response.error || t('broadcastBox.errors.stopSession'));
+      throw new Error(
+        response.error?.message ??
+          response.error ??
+          t('broadcastBox.errors.stopSession')
+      );
     } catch (error: any) {
+      clearTimeout(timeoutId);
+      const isTimeout =
+        error?.name === 'AbortError' ||
+        error?.message?.includes('abort') ||
+        error?.message?.includes('timeout');
       console.error('Failed to stop session:', error);
       toast.add({
         title: t('broadcastBox.errors.stopSession'),
+        description: isTimeout
+          ? (t('broadcastBox.errors.stopTimeout') as string) ||
+            'Request timed out. The session may have stopped on the device.'
+          : error.message || t('broadcastBox.errors.generic'),
+        color: 'error',
+      });
+      throw error;
+    }
+  };
+
+  const deleteSession = async (sessionId: string): Promise<void> => {
+    try {
+      await $civicApi(`/api/v1/broadcast-box/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+      toast.add({
+        title: t('broadcastBox.success.sessionRemoved'),
+        color: 'primary',
+      });
+    } catch (error: any) {
+      console.error('Failed to delete session:', error);
+      toast.add({
+        title: t('broadcastBox.errors.deleteSessionFailed'),
         description: error.message || t('broadcastBox.errors.generic'),
         color: 'error',
       });
@@ -609,6 +663,7 @@ export const useBroadcastBox = () => {
     getSession,
     startSession,
     stopSession,
+    deleteSession,
     // Uploads
     listUploads,
     getUpload,

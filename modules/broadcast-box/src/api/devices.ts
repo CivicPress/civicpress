@@ -894,6 +894,10 @@ export function createDevicesRouter(
           'stream.configure',
           'stream.start',
           'stream.stop',
+          'watermark.upload',
+          'watermark.set',
+          'watermark.remove',
+          'watermark.status',
         ];
         if (!allowedActions.includes(req.body.action)) {
           return res.status(400).json({
@@ -948,6 +952,52 @@ export function createDevicesRouter(
 
         // Return response
         if (commandResponse.success) {
+          // Persist config to DB so it is recalled when user navigates back (device ACK only sends updated_keys, not values)
+          if (action === 'update_config' && payload?.config) {
+            try {
+              await deviceManager.updateDevice(device.id, {
+                config: payload.config,
+              });
+            } catch (persistErr) {
+              logger.warn(
+                'Failed to persist device config after update_config',
+                {
+                  operation: 'broadcast-box:api:devices:command-persist-config',
+                  deviceId: device.id,
+                  error:
+                    persistErr instanceof Error
+                      ? persistErr.message
+                      : String(persistErr),
+                }
+              );
+            }
+          }
+          // Persist RTMP url/platform (not stream_key) so UI can recall when user navigates back
+          if (action === 'stream.configure' && payload?.url) {
+            try {
+              await deviceManager.updateDevice(device.id, {
+                config: {
+                  streaming: {
+                    url: payload.url,
+                    platform: payload.platform ?? 'generic',
+                  },
+                },
+              });
+            } catch (persistErr) {
+              logger.warn(
+                'Failed to persist stream config after stream.configure',
+                {
+                  operation: 'broadcast-box:api:devices:command-persist-stream',
+                  deviceId: device.id,
+                  error:
+                    persistErr instanceof Error
+                      ? persistErr.message
+                      : String(persistErr),
+                }
+              );
+            }
+          }
+
           res.json({
             success: true,
             commandId: commandResponse.commandId,
@@ -955,11 +1005,19 @@ export function createDevicesRouter(
             timestamp: commandResponse.timestamp.toISOString(),
           });
         } else {
-          res.status(500).json({
+          const isTimeout =
+            commandResponse.errorCode === 'TIMEOUT' ||
+            (commandResponse.error &&
+              /timeout|timed out/i.test(commandResponse.error));
+          const status = isTimeout ? 504 : 500;
+          const message = isTimeout
+            ? 'Device did not respond in time. Try again or check that the device is connected.'
+            : commandResponse.error || 'Command execution failed';
+          res.status(status).json({
             success: false,
             error: {
               code: commandResponse.errorCode ?? 'ERR_UNKNOWN',
-              message: commandResponse.error || 'Command execution failed',
+              message,
               type: commandResponse.errorType ?? 'BroadcastBoxError',
               ...(commandResponse.errorDetails && {
                 details: commandResponse.errorDetails,

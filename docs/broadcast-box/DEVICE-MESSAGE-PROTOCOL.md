@@ -208,7 +208,11 @@ configure sources. Sources persist across sessions and are used automatically by
 - Sources persist across sessions. If `sources.set` is called while capturing,
   FFmpeg automatically restarts with the new sources.
 - Setting `video` to `"pip"` uses the configured PiP layout as the video source
-  (call `set_pip` / `pip.configure` first).
+  (call `pip.configure` first). Deactivate PiP by setting `video` to a regular
+  camera (e.g. `"camera_0"`).
+- In status reports, `sources.pip` uses `configured` (not `enabled`):
+  `configured` means the user has run `pip.configure`; PiP is **in use** when
+  `sources.active.video.identifier === "pip"`.
 
 ---
 

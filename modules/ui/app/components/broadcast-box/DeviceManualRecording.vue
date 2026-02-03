@@ -153,6 +153,22 @@ const { formatDate } = useRecordUtils();
 // Create computed ref for deviceId
 const deviceId = computed(() => props.device?.deviceUuid);
 
+// Effective recording quality: config (from Configuration panel) or device default, per integration doc
+const recordingQuality = computed(
+  (): 'low' | 'standard' | 'high' | 'ultra' =>
+    (props.device?.config?.qualityPreset as
+      | 'low'
+      | 'standard'
+      | 'high'
+      | 'ultra') ??
+    (props.device?.capabilities?.quality?.defaults?.recording as
+      | 'low'
+      | 'standard'
+      | 'high'
+      | 'ultra') ??
+    'standard'
+);
+
 // Use manual recording composable
 const connectionStatusRef = computed(() => props.connectionStatus);
 const {
@@ -172,10 +188,10 @@ const { loading } = useDeviceCommands(deviceId);
 
 // State sync is handled in useManualRecording composable via connectionStatus watch
 
-// Handle start recording
+// Handle start recording (use device quality preset per integration doc)
 const handleStart = async () => {
   try {
-    await startRecording();
+    await startRecording(undefined, undefined, recordingQuality.value);
     // Load recordings list after starting (in case there are previous recordings)
     await loadRecordings();
   } catch (err: any) {

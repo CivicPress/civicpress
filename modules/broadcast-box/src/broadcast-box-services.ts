@@ -345,12 +345,14 @@ export async function registerBroadcastBoxServices(
       }
       const protocol = c.resolve<ProtocolHandler>('broadcastBoxProtocol');
       const recordManager = c.resolve<RecordManager>('recordManager');
+      const db = c.resolve<DatabaseService>('database');
       return new SessionController(
         deviceManager,
         connectionTracker,
         roomManager,
         protocol,
         recordManager,
+        db,
         logger
       );
     }

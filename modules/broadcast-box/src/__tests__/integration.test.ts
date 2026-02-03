@@ -95,6 +95,7 @@ describe('Broadcast Box Integration', () => {
       mockRoomManager,
       mockProtocol,
       mockRecordManager,
+      mockDb,
       mockLogger
     );
     uploadProcessor = new UploadProcessor(
@@ -184,8 +185,9 @@ describe('Broadcast Box Integration', () => {
             id: 'broadcast-session-id',
             deviceId: device.id,
             civicpressSessionId: 'civicpress-session-id',
-            status: 'stopping',
+            status: 'complete',
             stoppedAt: new Date(),
+            completedAt: new Date(),
           }),
       };
 
@@ -210,7 +212,7 @@ describe('Broadcast Box Integration', () => {
       // Stop session (getById mock already set up to return recording session)
       const stoppedSession = await sessionController.stopSession(session.id);
 
-      expect(stoppedSession.status).toBe('stopping');
+      expect(stoppedSession.status).toBe('complete');
       expect(mockProtocol.createCommand).toHaveBeenCalledWith(
         'stop_session',
         expect.any(Object)

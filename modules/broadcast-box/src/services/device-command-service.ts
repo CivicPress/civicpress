@@ -66,10 +66,11 @@ export interface CommandResponse {
 /**
  * Default command timeout (5 seconds)
  * Preview commands need more time for WebRTC offer creation (20 seconds)
- * The device may take 5+ seconds to create the offer, plus network latency
+ * Source commands can take longer on some devices (re-enumeration, driver latency)
  */
 const DEFAULT_COMMAND_TIMEOUT = 5000;
 const PREVIEW_COMMAND_TIMEOUT = 20000; // 20 seconds for preview.start/stop (WebRTC setup + network latency)
+const SOURCE_COMMAND_TIMEOUT = 15000; // 15 seconds for sources.set / switch_source (device re-enumeration)
 
 /**
  * Device Command Service
@@ -219,12 +220,18 @@ export class DeviceCommandService {
       // Log command execution (audit trail)
       await this.logCommand(request, commandId, 'pending');
 
-      // Determine timeout - preview commands need more time for WebRTC setup
+      // Determine timeout - preview and source commands may need more time
       const isPreviewCommand =
         request.action === 'preview.start' || request.action === 'preview.stop';
+      const isSourceCommand =
+        request.action === 'sources.set' || request.action === 'switch_source';
       const commandTimeout =
         request.timeout ||
-        (isPreviewCommand ? PREVIEW_COMMAND_TIMEOUT : DEFAULT_COMMAND_TIMEOUT);
+        (isPreviewCommand
+          ? PREVIEW_COMMAND_TIMEOUT
+          : isSourceCommand
+            ? SOURCE_COMMAND_TIMEOUT
+            : DEFAULT_COMMAND_TIMEOUT);
 
       // Send command via WebSocket (using UUID for room lookup)
       const ack = await this.sendCommandViaWebSocket(
@@ -346,11 +353,11 @@ export class DeviceCommandService {
       );
     }
 
-    // Get device room
-    const room = roomManager.getRoom(`device:${deviceId}`);
-    if (!room) {
-      throw new Error(`Device room not found: device:${deviceId}`);
-    }
+    // Get or create device room (room is created when device connects; create on demand if missing)
+    const roomId = `device:${deviceId}`;
+    const room =
+      roomManager.getRoom(roomId) ??
+      roomManager.getOrCreateRoom(roomId, 'device', {});
 
     // Set up promise for ack response
     return new Promise<AckMessage>((resolve, reject) => {

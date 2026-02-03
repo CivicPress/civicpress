@@ -27,19 +27,7 @@
         icon="i-lucide-ban"
       />
 
-      <!-- Enable/Disable Toggle -->
-      <UFormField
-        :label="t('broadcastBox.pipStatus')"
-        :description="t('broadcastBox.pipStatusDesc')"
-      >
-        <USwitch
-          v-model="pipEnabled"
-          :disabled="loading || !isDeviceConnected || pipSupported === false"
-          @update:model-value="handlePipEnabledChange"
-        />
-      </UFormField>
-
-      <!-- Main Source -->
+      <!-- Main Source (real cameras only; exclude virtual "pip" source) -->
       <UFormField
         :label="t('broadcastBox.pipMainSource')"
         :description="t('broadcastBox.pipMainSourceDesc')"
@@ -48,12 +36,7 @@
         <USelectMenu
           v-model="selectedMainSource"
           :items="videoSources"
-          :disabled="
-            loading ||
-            !isDeviceConnected ||
-            !pipEnabled ||
-            pipSupported === false
-          "
+          :disabled="loading || !isDeviceConnected || pipSupported === false"
           :loading="loading"
           :placeholder="t('broadcastBox.selectMainSource')"
           value-attribute="value"
@@ -139,22 +122,36 @@
         <div class="space-y-2 text-sm">
           <div class="flex items-center gap-2">
             <span class="text-gray-600 dark:text-gray-400">
-              {{ t('broadcastBox.pipStatus') }}:
+              {{ t('broadcastBox.pipConfigured') }}:
             </span>
             <UBadge
-              :color="currentPipConfig.enabled ? 'primary' : 'neutral'"
+              :color="pipConfigured ? 'primary' : 'neutral'"
               variant="soft"
               size="sm"
             >
-              {{
-                currentPipConfig.enabled
-                  ? t('broadcastBox.enabled')
-                  : t('broadcastBox.disabled')
-              }}
+              {{ pipConfigured ? t('common.yes') : t('common.no') }}
             </UBadge>
           </div>
+          <div class="flex items-center gap-2">
+            <span class="text-gray-600 dark:text-gray-400">
+              {{ t('broadcastBox.pipInUse') }}:
+            </span>
+            <UBadge
+              :color="pipInUse ? 'primary' : 'neutral'"
+              variant="soft"
+              size="sm"
+            >
+              {{ pipInUse ? t('common.yes') : t('common.no') }}
+            </UBadge>
+          </div>
+          <p
+            v-if="pipConfigured && !pipInUse"
+            class="text-xs text-gray-500 dark:text-gray-400 mt-1"
+          >
+            {{ t('broadcastBox.pipSelectInSourceControl') }}
+          </p>
           <div
-            v-if="currentPipConfig.enabled && currentPipConfig.mainSource"
+            v-if="pipConfigured && currentPipConfig.mainSource"
             class="flex items-center gap-2"
           >
             <span class="text-gray-600 dark:text-gray-400">
@@ -165,7 +162,7 @@
             </span>
           </div>
           <div
-            v-if="currentPipConfig.enabled && currentPipConfig.pipSource"
+            v-if="pipConfigured && currentPipConfig.pipSource"
             class="flex items-center gap-2"
           >
             <span class="text-gray-600 dark:text-gray-400">
@@ -176,7 +173,7 @@
             </span>
           </div>
           <div
-            v-if="currentPipConfig.enabled && currentPipConfig.position"
+            v-if="pipConfigured && currentPipConfig.position"
             class="flex items-center gap-2"
           >
             <span class="text-gray-600 dark:text-gray-400">
@@ -187,7 +184,7 @@
             </span>
           </div>
           <div
-            v-if="currentPipConfig.enabled && currentPipConfig.size != null"
+            v-if="pipConfigured && currentPipConfig.size != null"
             class="flex items-center gap-2"
           >
             <span class="text-gray-600 dark:text-gray-400">
@@ -198,6 +195,18 @@
             </span>
           </div>
         </div>
+        <UButton
+          v-if="pipConfigured && !pipInUse"
+          color="primary"
+          variant="soft"
+          size="xs"
+          class="mt-3"
+          :loading="loading"
+          :disabled="loading || !isDeviceConnected"
+          @click="handleUsePipNow"
+        >
+          {{ t('broadcastBox.pipUseNow') }}
+        </UButton>
       </div>
     </div>
   </UCard>
@@ -207,7 +216,7 @@
 import type { BroadcastDevice } from '~/composables/useBroadcastBox';
 import { useDeviceCommands } from '~/composables/useDeviceCommands';
 import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps<{
   device: BroadcastDevice;
@@ -244,17 +253,52 @@ const deviceUuidRef = computed(() => deviceUuid.value);
 
 const { setPip, setSources, loading } = useDeviceCommands(deviceUuidRef);
 
-// Video sources for dropdowns (convert to USelectMenu format)
+// Real cameras only for main/pip source dropdowns (exclude virtual "pip" and "none" sources)
 const videoSources = computed(() => {
-  return (props.device.capabilities?.videoSources || []).map((s) => ({
-    label: s,
-    value: s,
-  }));
+  const exclude = (id: string, name?: string) => {
+    const lower = (id || name || '').toLowerCase();
+    return (
+      lower === 'pip' ||
+      lower === 'none' ||
+      (name || '').toLowerCase().includes('disable pip')
+    );
+  };
+  const objects = props.device.capabilities?.videoSourceObjects || [];
+  if (objects.length > 0) {
+    return objects
+      .filter(
+        (s: any) =>
+          !exclude(
+            s.identifier || s.name || String(s.id),
+            s.name || s.identifier
+          )
+      )
+      .map((s: any) => ({
+        label: s.name || s.identifier || `Source ${s.id}`,
+        value: s.identifier || s.name || String(s.id),
+      }));
+  }
+  const ids = props.device.capabilities?.videoSources || [];
+  return ids
+    .filter((id: string) => !exclude(id, id))
+    .map((id: string) => ({ label: id, value: id }));
 });
 
 // Current PiP configuration (from WebSocket or device)
 const currentPipConfig = computed(() => {
   return connectionStatus.value.pip || props.device.pip;
+});
+
+// PiP layout is configured when user has run pip.configure (status uses "configured"; legacy "enabled" for backward compat)
+const pipConfigured = computed(() => {
+  const c = currentPipConfig.value;
+  return c?.configured ?? (c as any)?.enabled ?? false;
+});
+
+// PiP is in use when active video source is "pip" (select "Picture-in-Picture" in Source Control)
+const pipInUse = computed(() => {
+  const active = connectionStatus.value.activeSources?.video;
+  return (active?.identifier || active?.name) === 'pip';
 });
 
 const pipCapabilities = computed(
@@ -281,13 +325,18 @@ function pipSizeAsNumber(
   return PIP_SIZE_DEFAULT;
 }
 
-// Form state
-const pipEnabled = ref(currentPipConfig.value?.enabled || false);
+// Form state (never init with "none" — that option was removed and causes Vue/Nuxt UI errors)
 const mainSourceValue = ref<string | undefined>(
-  currentPipConfig.value?.mainSource?.identifier
+  (() => {
+    const id = currentPipConfig.value?.mainSource?.identifier;
+    return id?.toLowerCase() === 'none' ? undefined : id;
+  })()
 );
-const pipSourceValue = ref<string | null | undefined>(
-  currentPipConfig.value?.pipSource?.identifier || null
+const pipSourceValue = ref<string | undefined>(
+  (() => {
+    const id = currentPipConfig.value?.pipSource?.identifier;
+    return id?.toLowerCase() === 'none' ? undefined : id;
+  })()
 );
 const positionValue = ref<string>(
   currentPipConfig.value?.position || 'top_right'
@@ -314,15 +363,13 @@ const selectedMainSource = computed({
 
 const selectedPipSource = computed({
   get: () => {
-    if (pipSourceValue.value === null || pipSourceValue.value === undefined) {
-      return pipSourceOptions.value.find((opt) => opt.value === null);
-    }
+    if (!pipSourceValue.value) return undefined;
     return pipSourceOptions.value.find(
       (opt) => opt.value === pipSourceValue.value
     );
   },
-  set: (value: { label: string; value: string | null } | undefined) => {
-    pipSourceValue.value = value?.value ?? null;
+  set: (value: { label: string; value: string } | undefined) => {
+    pipSourceValue.value = value?.value;
   },
 });
 
@@ -346,14 +393,10 @@ const errors = ref<{
   pipSize?: string;
 }>({});
 
-// PiP source options (include "None" to disable)
-const pipSourceOptions = computed(() => {
-  const sources = props.device.capabilities?.videoSources || [];
-  return [
-    { label: t('broadcastBox.pipNone'), value: null },
-    ...sources.map((s) => ({ label: s, value: s })),
-  ];
-});
+// PiP source options (real cameras only; no "None" option)
+const pipSourceOptions = computed(() =>
+  videoSources.value.map((s) => ({ label: s.label, value: s.value }))
+);
 
 // Position options
 const positionOptions = computed(() => {
@@ -390,14 +433,17 @@ const formatPipSizeDisplay = (
   return `${size.width}×${size.height}`;
 };
 
-// Update form when current config changes
+// Update form when current config changes (never set "none" — that option was removed)
 watch(
   () => currentPipConfig.value,
   (newConfig) => {
     if (newConfig) {
-      pipEnabled.value = newConfig.enabled || false;
-      mainSourceValue.value = newConfig.mainSource?.identifier;
-      pipSourceValue.value = newConfig.pipSource?.identifier || null;
+      const mainId = newConfig.mainSource?.identifier;
+      const pipId = newConfig.pipSource?.identifier;
+      mainSourceValue.value =
+        mainId?.toLowerCase() === 'none' ? undefined : mainId;
+      pipSourceValue.value =
+        pipId?.toLowerCase() === 'none' ? undefined : pipId;
       positionValue.value = newConfig.position || 'top_right';
       pipSizeValue.value = pipSizeAsNumber(
         newConfig.size as number | { width: number; height: number } | undefined
@@ -407,16 +453,42 @@ watch(
   { deep: true }
 );
 
-// Check if there are changes to apply
-const hasChanges = computed(() => {
-  if (!pipEnabled.value) {
-    // If disabling, check if currently enabled
-    return currentPipConfig.value?.enabled === true;
-  }
+// Clear selection when current value is no longer in options (e.g. "none" was filtered out)
+// Prevents Vue/Nuxt UI from accessing .type on a null instance during update
+watch(
+  [pipSourceOptions, () => pipSourceValue.value],
+  () => {
+    if (
+      pipSourceOptions.value.length > 0 &&
+      pipSourceValue.value &&
+      !pipSourceOptions.value.some((opt) => opt.value === pipSourceValue.value)
+    ) {
+      nextTick(() => {
+        pipSourceValue.value = undefined;
+      });
+    }
+  },
+  { deep: true, immediate: true }
+);
+watch(
+  [videoSources, () => mainSourceValue.value],
+  () => {
+    if (
+      videoSources.value.length > 0 &&
+      mainSourceValue.value &&
+      !videoSources.value.some((s) => s.value === mainSourceValue.value)
+    ) {
+      nextTick(() => {
+        mainSourceValue.value = undefined;
+      });
+    }
+  },
+  { deep: true, immediate: true }
+);
 
-  // If enabling, check if values differ
-  const currentPipSource =
-    currentPipConfig.value?.pipSource?.identifier || null;
+// Check if there are changes to apply (layout: main, pip source, position, size)
+const hasChanges = computed(() => {
+  const currentPipSource = currentPipConfig.value?.pipSource?.identifier;
   const currentSize = pipSizeAsNumber(
     currentPipConfig.value?.size as
       | number
@@ -431,120 +503,94 @@ const hasChanges = computed(() => {
   );
 });
 
-// Handle PiP enabled toggle
-const handlePipEnabledChange = (enabled: boolean) => {
-  if (!enabled) {
-    // When disabling, clear pipSource
-    pipSourceValue.value = null;
-  } else {
-    // When enabling, ensure mainSource is set
-    const sources = props.device.capabilities?.videoSources || [];
-    if (!mainSourceValue.value && sources.length > 0) {
-      mainSourceValue.value = sources[0];
+// Switch active video source to "pip" (use PiP layout now)
+async function handleUsePipNow() {
+  try {
+    const currentAudio =
+      connectionStatus.value.activeSources?.audio?.identifier ??
+      props.device.activeSources?.audio?.identifier ??
+      props.device.config?.defaultAudioSource;
+    if (currentAudio) {
+      await setSources('pip', currentAudio);
+    } else {
+      await setSources('pip');
     }
+  } catch (e) {
+    console.error('Failed to switch to PiP:', e);
   }
-};
+}
 
 // Validate form
 const validate = (): boolean => {
   errors.value = {};
 
-  if (pipEnabled.value) {
-    if (pipSupported.value === false) {
-      errors.value.mainSource = t('broadcastBox.notSupported');
-      return false;
-    }
+  if (pipSupported.value === false) {
+    errors.value.mainSource = t('broadcastBox.notSupported');
+    return false;
+  }
 
-    if (!mainSourceValue.value) {
-      errors.value.mainSource = t(
-        'broadcastBox.pipValidationMainSourceRequired'
-      );
-      return false;
-    }
+  if (!mainSourceValue.value) {
+    errors.value.mainSource = t('broadcastBox.pipValidationMainSourceRequired');
+    return false;
+  }
 
-    if (
-      pipSourceValue.value &&
-      pipSourceValue.value === mainSourceValue.value
-    ) {
-      errors.value.pipSource = t(
-        'broadcastBox.pipValidationPipSourceDifferent'
-      );
-      return false;
-    }
+  if (!pipSourceValue.value) {
+    errors.value.pipSource = t('broadcastBox.pipValidationPipSourceRequired');
+    return false;
+  }
 
-    const size = pipSizeValue.value ?? PIP_SIZE_DEFAULT;
-    if (
-      typeof size !== 'number' ||
-      !Number.isFinite(size) ||
-      size < PIP_SIZE_MIN ||
-      size > PIP_SIZE_MAX
-    ) {
-      errors.value.pipSize = t('broadcastBox.pipValidationSizeFraction');
-      return false;
-    }
+  if (pipSourceValue.value === mainSourceValue.value) {
+    errors.value.pipSource = t('broadcastBox.pipValidationPipSourceDifferent');
+    return false;
+  }
+
+  const size = pipSizeValue.value ?? PIP_SIZE_DEFAULT;
+  if (
+    typeof size !== 'number' ||
+    !Number.isFinite(size) ||
+    size < PIP_SIZE_MIN ||
+    size > PIP_SIZE_MAX
+  ) {
+    errors.value.pipSize = t('broadcastBox.pipValidationSizeFraction');
+    return false;
   }
 
   return true;
 };
 
-// Apply PiP configuration
+// Apply PiP configuration (pip.configure: main source, pip source, position, size)
 const handleApply = async () => {
   if (!validate()) {
     return;
   }
 
-  if (!pipEnabled.value) {
-    // Disable PiP
-    if (!mainSourceValue.value) {
-      errors.value.mainSource = t(
-        'broadcastBox.pipValidationMainSourceRequired'
-      );
-      return;
-    }
+  if (!mainSourceValue.value) {
+    errors.value.mainSource = t('broadcastBox.pipValidationMainSourceRequired');
+    return;
+  }
 
-    try {
-      await setPip(mainSourceValue.value, null, undefined, props.device);
-    } catch (error) {
-      // Error already handled in composable
-      console.error('Failed to disable PiP:', error);
-    }
-  } else {
-    // Enable/Update PiP
-    if (!mainSourceValue.value) {
-      errors.value.mainSource = t(
-        'broadcastBox.pipValidationMainSourceRequired'
-      );
-      return;
-    }
+  if (!pipSourceValue.value) {
+    errors.value.pipSource = t('broadcastBox.pipValidationPipSourceRequired');
+    return;
+  }
 
-    try {
-      await setPip(
-        mainSourceValue.value,
-        pipSourceValue.value,
-        {
-          position: positionValue.value as
-            | 'top_left'
-            | 'top_right'
-            | 'bottom_left'
-            | 'bottom_right'
-            | 'center',
-          size: pipSizeValue.value ?? PIP_SIZE_DEFAULT,
-        },
-        props.device
-      );
-      // After enabling PiP, set active video source to "pip" so preview/record use PiP layout
-      const currentAudio =
-        props.device.activeSources?.audio?.identifier ??
-        props.device.config?.defaultAudioSource;
-      if (currentAudio) {
-        await setSources('pip', currentAudio);
-      } else {
-        await setSources('pip');
-      }
-    } catch (error) {
-      // Error already handled in composable
-      console.error('Failed to configure PiP:', error);
-    }
+  try {
+    await setPip(
+      mainSourceValue.value,
+      pipSourceValue.value,
+      {
+        position: positionValue.value as
+          | 'top_left'
+          | 'top_right'
+          | 'bottom_left'
+          | 'bottom_right'
+          | 'center',
+        size: pipSizeValue.value ?? PIP_SIZE_DEFAULT,
+      },
+      props.device
+    );
+  } catch (error) {
+    console.error('Failed to configure PiP:', error);
   }
 };
 </script>

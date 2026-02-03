@@ -148,15 +148,18 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
         case 500:
         case 503:
-          // Server / Unavailable - check if it's a device command "expected" error
+        case 504:
+          // Server / Unavailable / Gateway Timeout - check if it's a device command "expected" error
           // These are handled by useDeviceCommands / useDevicePreview, so don't show duplicate toast
           const errorMessage =
             apiError.message || apiError.data?.error?.message || '';
+          const errorCode = apiError.data?.error?.code || apiError.errorCode;
           const isDeviceNotConnectedError =
             errorMessage.includes('not connected') ||
             (errorMessage.includes('Device') &&
               errorMessage.includes('not connected'));
           const isTimeoutError =
+            errorCode === 'TIMEOUT' ||
             errorMessage.includes('timeout') ||
             errorMessage.includes('Command timeout');
           const isServiceNotAvailable =
@@ -171,16 +174,19 @@ export default defineNuxtPlugin(async (nuxtApp) => {
             // Don't show toast - command/preview composables will show a single friendly message
             handleError(apiError, {
               title:
-                response.status === 503
-                  ? 'Service Unavailable'
-                  : 'Server Error',
+                response.status === 504
+                  ? 'Gateway Timeout'
+                  : response.status === 503
+                    ? 'Service Unavailable'
+                    : 'Server Error',
               showToast: false,
               logToConsole: false,
             });
           } else {
             // Show toast for other server errors
             handleError(apiError, {
-              title: 'Server Error',
+              title:
+                response.status === 504 ? 'Gateway Timeout' : 'Server Error',
               showToast: true,
             });
           }

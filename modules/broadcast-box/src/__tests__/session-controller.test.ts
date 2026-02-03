@@ -49,12 +49,13 @@ describe('SessionController', () => {
       debug: vi.fn(),
     } as any;
 
-    // Mock database
+    // Mock database (includes getDraft for draft record resolution)
     const mockDb = {
       getAdapter: vi.fn().mockReturnValue({
         execute: vi.fn(),
         query: vi.fn(),
       }),
+      getDraft: vi.fn().mockResolvedValue(null),
     };
 
     // Mock session model
@@ -62,6 +63,7 @@ describe('SessionController', () => {
       create: vi.fn(),
       getById: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       getByCivicPressSessionId: vi.fn(),
       list: vi.fn(),
     };
@@ -77,11 +79,11 @@ describe('SessionController', () => {
       mockRoomManager,
       mockProtocol,
       mockRecordManager,
+      mockDb as any,
       mockLogger
     );
 
     // Inject mocks
-    (sessionController as any).db = mockDb;
     (sessionController as any).sessionModel = mockSessionModel;
     (sessionController as any).deviceEventModel = mockDeviceEventModel;
   });
@@ -214,6 +216,58 @@ describe('SessionController', () => {
         })
       ).rejects.toThrow('already recording');
     });
+
+    it('should accept session record that exists only as draft', async () => {
+      const deviceId = 'device-id';
+      const civicpressSessionId = 'record-123';
+      const request = {
+        deviceId,
+        civicpressSessionId,
+        metadata: {},
+      };
+
+      mockDeviceManager.getDevice.mockResolvedValue({
+        id: deviceId,
+        status: 'active',
+      });
+      mockConnectionTracker.isConnected.mockReturnValue(true);
+      mockConnectionTracker.getConnectionState.mockReturnValue({
+        state: { status: 'idle' },
+      });
+
+      // Published record not found; draft exists
+      mockRecordManager.getRecord.mockResolvedValue(null);
+      const mockDb = (sessionController as any).db;
+      mockDb.getDraft.mockResolvedValue({
+        id: civicpressSessionId,
+        type: 'session',
+      });
+
+      const mockRoom = { broadcast: vi.fn() };
+      mockRoomManager.getRoom.mockReturnValue(mockRoom);
+
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.create.mockResolvedValue({
+        id: 'broadcast-session-id',
+        deviceId,
+        civicpressSessionId,
+        status: 'pending',
+      });
+      mockSessionModel.update.mockResolvedValue({
+        id: 'broadcast-session-id',
+        deviceId,
+        civicpressSessionId,
+        status: 'recording',
+      });
+
+      const result = await sessionController.startSession(request);
+
+      expect(mockRecordManager.getRecord).toHaveBeenCalledWith(
+        civicpressSessionId
+      );
+      expect(mockDb.getDraft).toHaveBeenCalledWith(civicpressSessionId);
+      expect(result.civicpressSessionId).toBe(civicpressSessionId);
+    });
   });
 
   describe('stopSession', () => {
@@ -228,11 +282,13 @@ describe('SessionController', () => {
         status: 'recording',
       });
 
+      const now = new Date();
       mockSessionModel.update.mockResolvedValue({
         id: sessionId,
         deviceId,
-        status: 'stopping',
-        stoppedAt: new Date(),
+        status: 'complete',
+        stoppedAt: now,
+        completedAt: now,
       });
 
       const mockRoom = {
@@ -242,7 +298,7 @@ describe('SessionController', () => {
 
       const result = await sessionController.stopSession(sessionId);
 
-      expect(result.status).toBe('stopping');
+      expect(result.status).toBe('complete');
       expect(mockProtocol.createCommand).toHaveBeenCalledWith(
         'stop_session',
         expect.objectContaining({ sessionId })
@@ -259,11 +315,79 @@ describe('SessionController', () => {
       ).rejects.toThrow('Session not found');
     });
 
-    it('should throw error if session not recording', async () => {
+    it('should return session idempotently when already stopping or complete', async () => {
+      const mockSessionModel = (sessionController as any).sessionModel;
+      const stoppingSession = {
+        id: 'session-id',
+        deviceId: 'device-id',
+        status: 'stopping',
+      };
+      mockSessionModel.getById.mockResolvedValue(stoppingSession);
+
+      const result = await sessionController.stopSession('session-id');
+
+      expect(result).toEqual(stoppingSession);
+      expect(result.status).toBe('stopping');
+      expect(mockProtocol.createCommand).not.toHaveBeenCalled();
+    });
+
+    it('should mark pending session complete and return (no device command)', async () => {
+      const sessionId = 'session-id';
+      const deviceId = 'device-id';
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue({
+        id: sessionId,
+        deviceId,
+        status: 'pending',
+      });
+      const completedSession = {
+        id: sessionId,
+        deviceId,
+        status: 'complete',
+        stoppedAt: new Date(),
+        completedAt: new Date(),
+      };
+      mockSessionModel.update.mockResolvedValue(completedSession);
+
+      const result = await sessionController.stopSession(sessionId);
+
+      expect(result.status).toBe('complete');
+      expect(mockSessionModel.update).toHaveBeenCalledWith(
+        sessionId,
+        expect.objectContaining({ status: 'complete' })
+      );
+      expect(mockProtocol.createCommand).not.toHaveBeenCalled();
+    });
+
+    it('should mark failed session complete and return (no device command)', async () => {
+      const sessionId = 'session-id';
+      const deviceId = 'device-id';
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue({
+        id: sessionId,
+        deviceId,
+        status: 'failed',
+      });
+      const completedSession = {
+        id: sessionId,
+        deviceId,
+        status: 'complete',
+        stoppedAt: new Date(),
+        completedAt: new Date(),
+      };
+      mockSessionModel.update.mockResolvedValue(completedSession);
+
+      const result = await sessionController.stopSession(sessionId);
+
+      expect(result.status).toBe('complete');
+      expect(mockProtocol.createCommand).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if session not recording (e.g. encoding)', async () => {
       const mockSessionModel = (sessionController as any).sessionModel;
       mockSessionModel.getById.mockResolvedValue({
         id: 'session-id',
-        status: 'complete',
+        status: 'encoding',
       });
 
       await expect(sessionController.stopSession('session-id')).rejects.toThrow(
@@ -314,6 +438,65 @@ describe('SessionController', () => {
 
       expect(result).toEqual(mockSessions);
       expect(mockSessionModel.list).toHaveBeenCalledWith(filters);
+    });
+  });
+
+  describe('deleteSession', () => {
+    it('should delete session and clear device state when session was active', async () => {
+      const sessionId = 'session-id';
+      const deviceId = 'device-id';
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue({
+        id: sessionId,
+        deviceId,
+        status: 'complete',
+      });
+      mockSessionModel.delete.mockResolvedValue(undefined);
+
+      mockConnectionTracker.getConnectionState.mockReturnValue({
+        connected: true,
+        state: { activeSessionId: sessionId },
+      });
+
+      await sessionController.deleteSession(sessionId);
+
+      expect(mockSessionModel.delete).toHaveBeenCalledWith(sessionId);
+      expect(mockConnectionTracker.updateDeviceState).toHaveBeenCalledWith(
+        deviceId,
+        { status: 'idle', activeSessionId: undefined }
+      );
+    });
+
+    it('should delete session without clearing device state when different session active', async () => {
+      const sessionId = 'session-id';
+      const deviceId = 'device-id';
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue({
+        id: sessionId,
+        deviceId,
+        status: 'complete',
+      });
+      mockSessionModel.delete.mockResolvedValue(undefined);
+
+      mockConnectionTracker.getConnectionState.mockReturnValue({
+        connected: true,
+        state: { activeSessionId: 'other-session-id' },
+      });
+
+      await sessionController.deleteSession(sessionId);
+
+      expect(mockSessionModel.delete).toHaveBeenCalledWith(sessionId);
+      expect(mockConnectionTracker.updateDeviceState).not.toHaveBeenCalled();
+    });
+
+    it('should throw if session not found', async () => {
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue(null);
+
+      await expect(
+        sessionController.deleteSession('unknown-session')
+      ).rejects.toThrow('Session not found');
+      expect(mockSessionModel.delete).not.toHaveBeenCalled();
     });
   });
 });

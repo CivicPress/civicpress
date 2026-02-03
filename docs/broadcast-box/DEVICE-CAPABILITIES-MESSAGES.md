@@ -169,10 +169,10 @@ Quality presets and default preset names for preview, streaming, and recording.
 
 **PiP Field Descriptions:**
 
-- `sources.pip.supported`: `boolean` - **NEW FIELD** - Whether the device
-  supports PiP functionality (capability indicator)
-- `sources.pip.enabled`: `boolean` - Whether PiP is currently active/enabled
-  (state indicator)
+- `sources.pip.supported`: `boolean` - Whether the device supports PiP
+  functionality (capability indicator)
+- `sources.pip.configured`: `boolean` - Whether the user has run `pip.configure`
+  and main/pip sources are set. Does **not** mean PiP is currently in use.
 - `sources.pip.pip_source`: `string|null` - Current PiP source identifier (null
   if not set)
 - `sources.pip.main_source`: `string|null` - Current main source identifier
@@ -185,7 +185,9 @@ Quality presets and default preset names for preview, streaming, and recording.
 **Key Distinction:**
 
 - `supported`: Indicates if the device **can** support PiP (capability)
-- `enabled`: Indicates if PiP is **currently active** (state)
+- `configured`: Indicates if PiP layout has been configured via `pip.configure`
+- **PiP is in use** when `sources.active.video.identifier === "pip"` (user
+  selects the virtual "pip" source in Source Control)
 
 **Example Scenarios:**
 

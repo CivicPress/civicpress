@@ -12,6 +12,7 @@ import DeviceSourceControl from '~/components/broadcast-box/DeviceSourceControl.
 import DevicePiPControl from '~/components/broadcast-box/DevicePiPControl.vue';
 import DeviceConfigControl from '~/components/broadcast-box/DeviceConfigControl.vue';
 import DeviceStreamingControl from '~/components/broadcast-box/DeviceStreamingControl.vue';
+import DeviceWatermarkControl from '~/components/broadcast-box/DeviceWatermarkControl.vue';
 import DeviceStatusControl from '~/components/broadcast-box/DeviceStatusControl.vue';
 import DevicePreview from '~/components/broadcast-box/DevicePreview.vue';
 import DeviceManualRecording from '~/components/broadcast-box/DeviceManualRecording.vue';
@@ -50,6 +51,7 @@ const {
   getDevice,
   getDeviceHealth,
   listSessions,
+  deleteSession,
   revokeDevice,
   regenerateEnrollmentCode,
 } = useBroadcastBox();
@@ -73,6 +75,7 @@ const enrollmentCodeStatus = ref<{
   usedAt: string | null;
 } | null>(null);
 const regenerating = ref(false);
+const removingSessionId = ref<string | null>(null);
 const uuidCopied = ref(false);
 const codeCopied = ref(false);
 const deviceIdCopied = ref(false);
@@ -237,6 +240,10 @@ watch(
     if (status.capabilities.hardwareEncodingCapabilities) {
       device.value.capabilities.hardwareEncodingCapabilities =
         status.capabilities.hardwareEncodingCapabilities;
+    }
+    // Quality presets from device.connected (low, standard, high, ultra per integration doc)
+    if (status.capabilities.quality) {
+      device.value.capabilities.quality = status.capabilities.quality;
     }
     // Note: hardwareEncoding boolean is also available in DeviceConnectionStatus.capabilities
     // but is not part of BroadcastDevice.capabilities type - it's only in connectionStatus
@@ -465,6 +472,48 @@ const handleConfigSuccess = () => {
   showConfigForm.value = false;
   // Force reload after config change (bypass debounce)
   loadDevice(true);
+};
+
+const handleRemoveSession = async (sessionId: string) => {
+  removingSessionId.value = sessionId;
+  try {
+    await deleteSession(sessionId);
+    sessions.value = await listSessions({ deviceId }).catch(() => []);
+  } catch {
+    // Toast already shown by deleteSession
+  } finally {
+    removingSessionId.value = null;
+  }
+};
+
+/** Optimistically update device.config when DeviceConfigControl applies config. Device ACK only sends updated_keys, not the new values. */
+const onConfigUpdated = (appliedConfig?: {
+  qualityPreset?: string;
+  autoStart?: boolean;
+  defaultVideoSource?: string;
+  defaultAudioSource?: string;
+}) => {
+  if (appliedConfig && device.value) {
+    if (!device.value.config) {
+      device.value.config = {};
+    }
+    if (appliedConfig.qualityPreset !== undefined) {
+      device.value.config.qualityPreset = appliedConfig.qualityPreset as
+        | 'low'
+        | 'standard'
+        | 'high'
+        | 'ultra';
+    }
+    if (appliedConfig.autoStart !== undefined) {
+      device.value.config.autoStart = appliedConfig.autoStart;
+    }
+    if (appliedConfig.defaultVideoSource !== undefined) {
+      device.value.config.defaultVideoSource = appliedConfig.defaultVideoSource;
+    }
+    if (appliedConfig.defaultAudioSource !== undefined) {
+      device.value.config.defaultAudioSource = appliedConfig.defaultAudioSource;
+    }
+  }
 };
 
 const handleRegenerateEnrollmentCode = async () => {
@@ -1176,7 +1225,7 @@ onUnmounted(() => {
             <DeviceConfigControl
               :device="device"
               :is-device-connected="isDeviceConnected"
-              @updated="loadDevice"
+              @updated="onConfigUpdated"
             />
 
             <!-- Streaming Control (RTMP) -->
@@ -1185,6 +1234,13 @@ onUnmounted(() => {
               :device="device"
               :is-device-connected="isDeviceConnected"
               :streaming-status="connectionStatus.streaming ?? null"
+            />
+
+            <!-- Watermark / Logo Overlay -->
+            <DeviceWatermarkControl
+              v-if="device"
+              :device="device"
+              :is-device-connected="isDeviceConnected"
             />
           </div>
 
@@ -1505,18 +1561,31 @@ onUnmounted(() => {
                     {{ formatDate(session.startedAt) }}
                   </div>
                 </div>
-                <UButton
-                  variant="ghost"
-                  size="xs"
-                  icon="i-lucide-arrow-right"
-                  @click="
-                    navigateTo(
-                      `/records/session/${session.civicpressSessionId}`
-                    )
-                  "
-                >
-                  {{ t('broadcastBox.viewSession') }}
-                </UButton>
+                <div class="flex items-center gap-1">
+                  <UButton
+                    variant="ghost"
+                    size="xs"
+                    icon="i-lucide-arrow-right"
+                    @click="
+                      navigateTo(
+                        `/records/session/${session.civicpressSessionId}`
+                      )
+                    "
+                  >
+                    {{ t('broadcastBox.viewSession') }}
+                  </UButton>
+                  <UButton
+                    variant="ghost"
+                    size="xs"
+                    color="error"
+                    icon="i-lucide-trash-2"
+                    :loading="removingSessionId === session.id"
+                    :disabled="removingSessionId !== null"
+                    @click="handleRemoveSession(session.id)"
+                  >
+                    {{ t('broadcastBox.removeSession') }}
+                  </UButton>
+                </div>
               </div>
             </div>
           </UCard>

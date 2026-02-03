@@ -160,6 +160,56 @@ export function createSessionsRouter(
   );
 
   /**
+   * DELETE /api/v1/broadcast-box/sessions/:id
+   * Delete a broadcast session (removes from list)
+   */
+  router.delete(
+    '/:id',
+    [param('id').isUUID().withMessage('Session ID must be a valid UUID')],
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              message: 'Validation failed',
+              details: errors.array(),
+            },
+          });
+        }
+
+        await sessionController.deleteSession(req.params.id);
+
+        res.status(200).json({
+          success: true,
+        });
+      } catch (error) {
+        logger.error('Error deleting session', {
+          operation: 'broadcast-box:api:sessions:delete',
+          sessionId: req.params.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        const statusCode =
+          error instanceof Error && error.message.includes('not found')
+            ? 404
+            : 500;
+
+        res.status(statusCode).json({
+          success: false,
+          error: {
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Failed to delete session',
+          },
+        });
+      }
+    }
+  );
+
+  /**
    * GET /api/v1/broadcast-box/sessions/:id
    * Get session details
    */

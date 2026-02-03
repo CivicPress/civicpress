@@ -1103,7 +1103,9 @@ export function createDefaultEventHandlers(
             pipPayload.supported !== undefined
               ? Boolean(pipPayload.supported)
               : true,
-          enabled: Boolean(pipPayload.enabled),
+          configured: Boolean(
+            pipPayload.configured ?? pipPayload.enabled ?? false
+          ),
           pipSource: resolveVideoSource(pipPayload.pip_source),
           mainSource: resolveVideoSource(pipPayload.main_source),
           position: pipPayload.position || 'top_right',
@@ -1117,7 +1119,7 @@ export function createDefaultEventHandlers(
         coreInfo('Device PiP configuration updated from status', {
           operation: 'broadcast-box:event:status-pip-config-updated',
           deviceId: context.deviceId,
-          pipEnabled: pipConfig.enabled,
+          pipConfigured: pipConfig.configured,
           pipSupported: pipConfig.supported,
         });
       } catch (error) {

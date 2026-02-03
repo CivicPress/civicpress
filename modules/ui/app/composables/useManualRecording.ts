@@ -88,7 +88,7 @@ export function useManualRecording(
   const startRecording = async (
     videoSource?: string,
     audioSource?: string,
-    quality: 'low' | 'standard' | 'high' = 'standard'
+    quality: 'low' | 'standard' | 'high' | 'ultra' = 'standard'
   ): Promise<void> => {
     if (isRecording.value) {
       throw new Error('Recording already in progress');

@@ -200,6 +200,11 @@ export interface DeviceConfig {
     bufferSizeLimit?: number;
     retentionRules?: any;
   };
+  /** RTMP streaming destination (url/platform persisted after stream.configure; stream_key not stored) */
+  streaming?: {
+    url?: string;
+    platform?: string;
+  };
 }
 
 /**
@@ -287,8 +292,14 @@ export interface PiPConfiguration {
    * If missing (older devices), treat as supported.
    */
   supported?: boolean;
-  enabled: boolean; // Whether PiP is currently active
-  pipSource: SourceInfo | null; // PiP source (null if disabled)
+  /**
+   * Whether the user has run pip.configure and main/pip sources are set.
+   * PiP is *active* (in use) when active video source is "pip".
+   */
+  configured: boolean;
+  /** @deprecated Use configured. Kept for backward compat when reading from API/DB. */
+  enabled?: boolean;
+  pipSource: SourceInfo | null; // PiP source (null if not configured)
   mainSource: SourceInfo | null; // Main source (null if no active video source)
   position:
     | 'top_left'

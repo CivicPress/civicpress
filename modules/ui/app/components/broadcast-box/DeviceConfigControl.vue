@@ -69,7 +69,14 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  updated: [];
+  updated: [
+    config?: {
+      qualityPreset?: string;
+      autoStart?: boolean;
+      defaultVideoSource?: string;
+      defaultAudioSource?: string;
+    },
+  ];
 }>();
 
 const { t } = useI18n();
@@ -80,16 +87,17 @@ const deviceUuidRef = computed(() => deviceUuid.value);
 
 const { updateConfig, loading } = useDeviceCommands(deviceUuidRef);
 
-// Quality preset label for known presets; otherwise capitalized name
+// Quality preset label for known presets; otherwise capitalized name (per integration doc: low, standard, high, ultra)
 function qualityPresetLabel(name: string): string {
   const key = name.toLowerCase();
   if (key === 'low') return t('broadcastBox.qualityLow');
   if (key === 'standard') return t('broadcastBox.qualityStandard');
   if (key === 'high') return t('broadcastBox.qualityHigh');
+  if (key === 'ultra') return t('broadcastBox.qualityUltra');
   return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
-// Quality preset options: from device capabilities or fallback to [low, standard, high]
+// Quality preset options: from device.connected capabilities.quality or fallback (per integration doc: low, standard, high, ultra)
 const qualityPresets = computed(() => {
   const presets = props.device?.capabilities?.quality?.presets;
   if (Array.isArray(presets) && presets.length > 0) {
@@ -102,6 +110,7 @@ const qualityPresets = computed(() => {
     { label: t('broadcastBox.qualityLow'), value: 'low' },
     { label: t('broadcastBox.qualityStandard'), value: 'standard' },
     { label: t('broadcastBox.qualityHigh'), value: 'high' },
+    { label: t('broadcastBox.qualityUltra'), value: 'ultra' },
   ];
 });
 
@@ -122,15 +131,13 @@ const selectedQualityPreset = ref<{ label: string; value: string } | undefined>(
 );
 const selectedAutoStart = ref(currentAutoStart.value);
 
-// Sync selected quality with current preset and available options (handle e.g. "ultra" in list)
+// Sync selected quality only when device config changes (not when options list reference changes).
+// Watching qualityPresets.value caused the watcher to run on every re-render (new array ref) and
+// overwrite the user's selection with currentQualityPreset, so the dropdown never "stuck".
 watch(
-  () => [
-    currentQualityPreset.value,
-    currentAutoStart.value,
-    qualityPresets.value,
-  ],
-  ([newQuality, newAutoStart, options]) => {
-    const opts = options as { label: string; value: string }[];
+  () => [currentQualityPreset.value, currentAutoStart.value],
+  ([newQuality, newAutoStart]) => {
+    const opts = qualityPresets.value;
     const match = opts.find((p) => p.value === newQuality);
     selectedQualityPreset.value =
       match ?? opts.find((p) => p.value === 'standard') ?? opts[0] ?? undefined;
@@ -153,16 +160,19 @@ const handleApply = async () => {
     return;
   }
 
+  const appliedConfig = {
+    qualityPreset:
+      selectedQualityPreset.value?.value ?? currentQualityPreset.value,
+    autoStart: selectedAutoStart.value,
+    defaultVideoSource: props.device?.config?.defaultVideoSource,
+    defaultAudioSource: props.device?.config?.defaultAudioSource,
+  };
+
   try {
-    await updateConfig({
-      qualityPreset:
-        selectedQualityPreset.value?.value ?? currentQualityPreset.value,
-      autoStart: selectedAutoStart.value,
-      // Preserve existing video/audio sources
-      defaultVideoSource: props.device?.config?.defaultVideoSource,
-      defaultAudioSource: props.device?.config?.defaultAudioSource,
-    });
-    emit('updated');
+    await updateConfig(appliedConfig);
+    // Emit the config we sent so the parent can optimistically update device.config.
+    // Device ACK only sends updated_keys, not the new values, so the UI must apply what we sent.
+    emit('updated', appliedConfig);
   } catch (error) {
     // Error already handled in composable
     console.error('Failed to update configuration:', error);

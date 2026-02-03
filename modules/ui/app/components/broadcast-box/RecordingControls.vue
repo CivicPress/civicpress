@@ -10,7 +10,7 @@
     </template>
 
     <div class="space-y-4">
-      <!-- Device Selector -->
+      <!-- Device Selector: locked to session device when recording/pending/stopping -->
       <UFormField
         v-if="!deviceId"
         :label="t('broadcastBox.selectDevice')"
@@ -20,9 +20,10 @@
         <USelectMenu
           v-model="selectedDeviceOption"
           :items="deviceOptions"
+          value-attribute="value"
           :placeholder="t('broadcastBox.selectDevice')"
           :loading="devicesLoading"
-          :disabled="devicesLoading || !canStartRecording"
+          :disabled="devicesLoading || isDeviceLockedBySession"
         />
       </UFormField>
 
@@ -79,16 +80,22 @@
         <UButton
           v-if="
             session &&
-            (session.status === 'recording' || session.status === 'pending')
+            (session.status === 'recording' ||
+              session.status === 'pending' ||
+              session.status === 'stopping')
           "
           color="error"
           icon="i-lucide-square"
           :loading="stopping"
-          :disabled="!canStopRecording"
+          :disabled="!canStopRecording && session?.status !== 'stopping'"
           @click="handleStop"
           class="flex-1"
         >
-          {{ t('broadcastBox.stopRecording') }}
+          {{
+            session?.status === 'stopping'
+              ? t('broadcastBox.stoppingSession')
+              : t('broadcastBox.stopRecording')
+          }}
         </UButton>
       </div>
 
@@ -150,13 +157,11 @@ const currentDevice = computed(() => {
 });
 
 const deviceOptions = computed(() => {
-  return devices.value
-    .filter((d) => d.status === 'active')
-    .map((device) => ({
-      label: device.name,
-      value: device.id,
-      device,
-    }));
+  return devices.value.map((device) => ({
+    label: device.name,
+    value: device.id,
+    device,
+  }));
 });
 
 const canStartRecording = computed(() => {
@@ -169,7 +174,19 @@ const canStartRecording = computed(() => {
 
 const canStopRecording = computed(() => {
   return (
-    props.session?.status === 'recording' || props.session?.status === 'pending'
+    props.session?.status === 'recording' ||
+    props.session?.status === 'pending' ||
+    props.session?.status === 'stopping'
+  );
+});
+
+/** When there is an active session, lock dropdown to the session's device so "selected device" always matches "device recording" */
+const isDeviceLockedBySession = computed(() => {
+  if (!props.session?.deviceId) return false;
+  return (
+    props.session.status === 'recording' ||
+    props.session.status === 'pending' ||
+    props.session.status === 'stopping'
   );
 });
 
@@ -189,10 +206,31 @@ const isDeviceConnected = (device: BroadcastDevice): boolean => {
   return diffMinutes < 5;
 };
 
+/** Sync selected device to the session's device when there is an active session (so UI always shows "this session is on this device") */
+function syncSelectedDeviceToSession() {
+  if (
+    !props.session?.deviceId ||
+    (props.session.status !== 'recording' &&
+      props.session.status !== 'pending' &&
+      props.session.status !== 'stopping')
+  ) {
+    return;
+  }
+  const device = devices.value.find((d) => d.id === props.session!.deviceId);
+  if (device) {
+    selectedDeviceOption.value = {
+      label: device.name,
+      value: device.id,
+      device,
+    };
+  }
+}
+
 const loadDevices = async () => {
   devicesLoading.value = true;
   try {
-    devices.value = await listDevices({ status: 'active' });
+    // Fetch all devices so the dropdown is never empty (enrolled + active); Start is disabled for non-active/disconnected
+    devices.value = await listDevices();
     if (props.deviceId && !selectedDeviceOption.value) {
       const device = devices.value.find((d) => d.id === props.deviceId);
       if (device) {
@@ -203,6 +241,7 @@ const loadDevices = async () => {
         };
       }
     }
+    syncSelectedDeviceToSession();
   } catch (err: any) {
     error.value = err.message || t('broadcastBox.errors.loadDevicesFailed');
   } finally {
@@ -257,4 +296,12 @@ const handleStop = async () => {
 onMounted(() => {
   loadDevices();
 });
+
+watch(
+  () => [props.session?.id, props.session?.deviceId, props.session?.status],
+  () => {
+    syncSelectedDeviceToSession();
+  },
+  { immediate: true }
+);
 </script>

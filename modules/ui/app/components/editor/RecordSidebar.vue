@@ -438,6 +438,15 @@ const accordionItems = computed(() => {
       value: 'details',
       icon: 'i-lucide-info',
     },
+    ...(props.recordType === 'session'
+      ? [
+          {
+            label: t('records.editor.broadcastBox'),
+            value: 'broadcast-box',
+            icon: 'i-lucide-video',
+          },
+        ]
+      : []),
     {
       label:
         props.attachedFiles.length <= 1

@@ -99,22 +99,20 @@
           {{ t('broadcastBox.streamingSaveConfig') }}
         </UButton>
         <UButton
-          v-if="!streamingStatus?.active"
           color="primary"
           variant="soft"
           :loading="loading"
-          :disabled="loading || !isDeviceConnected"
+          :disabled="loading || !isDeviceConnected || !!streamingStatus?.active"
           icon="i-lucide-radio"
           @click="handleStartStream"
         >
           {{ t('broadcastBox.streamingStart') }}
         </UButton>
         <UButton
-          v-else
           color="error"
           variant="soft"
           :loading="loading"
-          :disabled="loading || !isDeviceConnected"
+          :disabled="loading || !isDeviceConnected || !streamingStatus?.active"
           icon="i-lucide-square"
           @click="handleStopStream"
         >
@@ -164,6 +162,21 @@ const platformOptions = [
   { label: 'Generic', value: 'generic' },
 ];
 
+// Recall persisted RTMP url/platform when device is loaded (stream_key not stored for security)
+watch(
+  () => props.device?.config?.streaming,
+  (streaming) => {
+    if (streaming?.url) rtmpUrl.value = streaming.url;
+    if (streaming?.platform) {
+      const opt = platformOptions.find(
+        (p) => p.value === (streaming.platform ?? 'generic')
+      );
+      selectedPlatform.value = opt ?? { label: 'Generic', value: 'generic' };
+    }
+  },
+  { immediate: true }
+);
+
 function platformLabel(platform?: string): string {
   if (!platform) return '';
   const opt = platformOptions.find((p) => p.value === platform);
@@ -173,6 +186,22 @@ function platformLabel(platform?: string): string {
 const hasConfigChanges = computed(() => {
   return Boolean(rtmpUrl.value?.trim() && streamKey.value?.trim());
 });
+
+// Effective streaming quality: config (from Configuration panel) or device default, per integration doc
+const streamingQuality = computed(
+  (): 'low' | 'standard' | 'high' | 'ultra' =>
+    (props.device?.config?.qualityPreset as
+      | 'low'
+      | 'standard'
+      | 'high'
+      | 'ultra') ??
+    (props.device?.capabilities?.quality?.defaults?.streaming as
+      | 'low'
+      | 'standard'
+      | 'high'
+      | 'ultra') ??
+    'standard'
+);
 
 async function handleSaveConfig() {
   const url = rtmpUrl.value?.trim();
@@ -195,7 +224,7 @@ async function handleSaveConfig() {
 
 async function handleStartStream() {
   try {
-    await startStream('standard');
+    await startStream(streamingQuality.value);
   } catch (e) {
     console.error('Failed to start stream:', e);
   }

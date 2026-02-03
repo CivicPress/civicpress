@@ -294,9 +294,10 @@ Open browser DevTools → Console, look for:
    - Should show "No active audio source"
    - Should not crash
 
-3. **PiP disabled** (`pip.enabled: false`):
-   - PiP card should not appear
+3. **PiP not configured** (`pip.configured: false`):
+   - PiP card may show "Configured: No"; "PiP in use: No"
    - Should not crash
+   - PiP is "in use" when `sources.active.video.identifier === "pip"`
 
 4. **Missing health data**:
    - Should use fallback values

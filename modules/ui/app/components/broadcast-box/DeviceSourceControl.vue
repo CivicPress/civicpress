@@ -112,22 +112,53 @@ const audioSourceObjects = computed(() => {
   return props.device.capabilities?.audioSourceObjects || [];
 });
 
-// Transform source objects into dropdown items with identifier as value and name as label
-// Fallback to string array if source objects are not available
+const pipLabel = computed(() => t('broadcastBox.videoSourcePictureInPicture'));
+
+// Transform source objects into dropdown items. Add virtual "pip" option when PiP is available.
 const videoSources = computed((): Array<{ value: string; label: string }> => {
+  let items: Array<{ value: string; label: string }> = [];
   const objects = videoSourceObjects.value;
   if (objects && objects.length > 0) {
-    return objects.map((source: any) => ({
-      value: source.identifier || source.name || String(source.id),
-      label: source.name || source.identifier || `Source ${source.id}`,
-    }));
+    items = objects.map((source: any) => {
+      const value = source.identifier || source.name || String(source.id);
+      const isPip = String(value).toLowerCase() === 'pip';
+      return {
+        value: isPip ? 'pip' : value,
+        label: isPip
+          ? pipLabel.value
+          : source.name || source.identifier || `Source ${source.id}`,
+      };
+    });
+  } else {
+    const stringArray = props.device.capabilities?.videoSources || [];
+    items = stringArray.map((identifier: string) => {
+      const isPip = String(identifier).toLowerCase() === 'pip';
+      return {
+        value: isPip ? 'pip' : identifier,
+        label: isPip ? pipLabel.value : identifier,
+      };
+    });
   }
-  // Fallback to string array (legacy format)
-  const stringArray = props.device.capabilities?.videoSources || [];
-  return stringArray.map((identifier: string) => ({
-    value: identifier,
-    label: identifier,
-  }));
+  // Add Picture-in-Picture option when PiP is supported, device has 2+ cameras, or any video source (so it's always visible when sources exist)
+  const pipSupported = props.device.capabilities?.pipSupported ?? false;
+  const hasMultipleCameras = items.length >= 2;
+  const hasAnyVideoSource = items.length >= 1;
+  const alreadyHasPip = items.some(
+    (i) => String(i.value).toLowerCase() === 'pip'
+  );
+  if (
+    (pipSupported || hasMultipleCameras || hasAnyVideoSource) &&
+    !alreadyHasPip
+  ) {
+    items = [
+      ...items,
+      {
+        value: 'pip',
+        label: pipLabel.value,
+      },
+    ];
+  }
+  return items;
 });
 
 const audioSources = computed((): Array<{ value: string; label: string }> => {

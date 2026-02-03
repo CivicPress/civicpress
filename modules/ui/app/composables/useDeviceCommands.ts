@@ -45,6 +45,17 @@ export interface DeviceConfig {
   autoStart?: boolean;
 }
 
+/** Watermark / logo overlay status from device (watermark.status response) */
+export interface WatermarkStatus {
+  configured?: boolean;
+  valid?: boolean;
+  enabled?: boolean;
+  position?: string;
+  scale?: number;
+  opacity?: number;
+  file_path?: string;
+}
+
 /**
  * Composable for executing device commands
  *
@@ -113,14 +124,20 @@ export function useDeviceCommands(
         throw err;
       }
     } catch (err: any) {
-      // Check if error is about device not being connected or service unavailable
+      // Check if error is about device not being connected, timeout, or service unavailable
       const msg = err.message ?? '';
+      const errorCode = err.data?.error?.code;
+      const status = err.status ?? err.data?.status;
       const isNotConnectedError =
         msg.includes('not connected') ||
         (msg.includes('Device') && msg.includes('not connected')) ||
         msg.includes('Device not connected');
       const isServiceNotAvailable =
         msg.includes('not available') || msg.includes('service not available');
+      const isCommandTimeout =
+        errorCode === 'TIMEOUT' ||
+        status === 504 ||
+        /timeout|timed out/i.test(msg);
 
       let errorMessage = msg || t('broadcastBox.errors.commandFailed');
       let errorTitle = t('broadcastBox.errors.commandFailed');
@@ -131,6 +148,12 @@ export function useDeviceCommands(
         errorMessage =
           t('broadcastBox.errors.deviceNotConnectedDesc') ||
           'The device must be connected via WebSocket to receive commands. Please ensure the device is online and connected.';
+      } else if (isCommandTimeout) {
+        errorTitle =
+          t('broadcastBox.errors.commandTimeout') || 'Command Timed Out';
+        errorMessage =
+          t('broadcastBox.errors.commandTimeoutDesc') ||
+          'The device did not respond in time. Try again or check that the device is connected.';
       } else if (isServiceNotAvailable) {
         errorTitle =
           t('broadcastBox.errors.serviceNotAvailable') ||
@@ -704,12 +727,12 @@ export function useDeviceCommands(
    *
    * @param _videoSource - Ignored (sources are set via setSources)
    * @param _audioSource - Ignored (sources are set via setSources)
-   * @param quality - Quality preset (default: 'standard')
+   * @param quality - Quality preset (default: 'standard'); use device config or capabilities.defaults.recording when starting from UI
    */
   const startManualRecording = async (
     _videoSource?: string,
     _audioSource?: string,
-    quality: 'low' | 'standard' | 'high' = 'standard'
+    quality: 'low' | 'standard' | 'high' | 'ultra' = 'standard'
   ): Promise<CommandResponse> => {
     try {
       const response = await sendCommand('record.start', {
@@ -840,6 +863,85 @@ export function useDeviceCommands(
     }
   };
 
+  /**
+   * Upload a PNG as base64 and enable the watermark (watermark.upload)
+   */
+  const uploadWatermark = async (
+    base64Data: string
+  ): Promise<CommandResponse> => {
+    try {
+      const response = await sendCommand('watermark.upload', {
+        data: base64Data,
+      });
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.watermarkUploaded'),
+          color: 'primary',
+        });
+      }
+      return response;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  /**
+   * Set watermark config (enabled, position, scale, opacity). Only send fields to change (watermark.set)
+   */
+  const setWatermark = async (config: {
+    enabled?: boolean;
+    position?: string;
+    scale?: number;
+    opacity?: number;
+  }): Promise<CommandResponse> => {
+    try {
+      const response = await sendCommand('watermark.set', config);
+      return response;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  /**
+   * Remove watermark file and clear config (watermark.remove)
+   */
+  const removeWatermark = async (): Promise<CommandResponse> => {
+    try {
+      const response = await sendCommand('watermark.remove', {});
+      if (response.success && response.ack?.success) {
+        toast.add({
+          title: t('broadcastBox.success.watermarkRemoved'),
+          color: 'primary',
+        });
+      }
+      return response;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  /**
+   * Get current watermark status from device (watermark.status). Fails silently when device is offline.
+   */
+  const getWatermarkStatus = async (): Promise<WatermarkStatus | null> => {
+    if (!deviceId.value) return null;
+    try {
+      const response = (await $civicApi(
+        `/api/v1/broadcast-box/devices/${deviceId.value}/command`,
+        {
+          method: 'POST',
+          body: { action: 'watermark.status', payload: {} },
+        }
+      )) as any;
+      if (response.success && response.ack?.success && response.ack?.payload) {
+        return response.ack.payload as WatermarkStatus;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   return {
     // Methods
     sendCommand,
@@ -855,6 +957,10 @@ export function useDeviceCommands(
     startManualRecording,
     stopManualRecording,
     listManualRecordings,
+    uploadWatermark,
+    setWatermark,
+    removeWatermark,
+    getWatermarkStatus,
     // State
     loading,
     error,

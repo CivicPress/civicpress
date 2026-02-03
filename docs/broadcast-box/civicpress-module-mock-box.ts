@@ -478,8 +478,47 @@ export class MockBroadcastBox {
 
   /**
    * Handle get_status command
+   * Sends status with sources (video/audio, active, pip using configured) and streaming per new protocol.
    */
   private async handleGetStatus(command: any): Promise<void> {
+    const videoSources = this.config.capabilities?.videoSources ?? [
+      'hdmi1',
+      'hdmi2',
+      'usb_camera',
+    ];
+    const audioSources = this.config.capabilities?.audioSources ?? [
+      'usb_audio',
+      'hdmi_audio',
+    ];
+    const hasPip =
+      this.config.capabilities?.pipSupported && videoSources.length >= 2;
+    const videoSourceObjects = videoSources.map((id, i) =>
+      id === 'pip'
+        ? {
+            id: 'pip',
+            identifier: 'pip',
+            name: 'Picture-in-Picture',
+            type: 'virtual',
+          }
+        : { id: i, identifier: id, name: id, type: 'camera' }
+    );
+    if (
+      hasPip &&
+      !videoSourceObjects.some((s: any) => s.identifier === 'pip')
+    ) {
+      videoSourceObjects.push({
+        id: 'pip',
+        identifier: 'pip',
+        name: 'Picture-in-Picture',
+        type: 'virtual',
+      });
+    }
+    const audioSourceObjects = audioSources.map((id, i) => ({
+      id: i,
+      identifier: id,
+      name: id,
+    }));
+
     this.sendMessage({
       type: 'status',
       id: uuidv4(),
@@ -488,18 +527,48 @@ export class MockBroadcastBox {
       payload: {
         device_id: this.config.deviceUuid,
         status: this.state.recording ? 'recording' : 'active',
-        active_session: this.state.sessionId
-          ? {
-              session_id: this.state.sessionId,
-              state: 'recording',
-              started_at: new Date().toISOString(),
-            }
-          : null,
-        health: this.state.health,
+        state: this.state.recording ? 'recording' : 'idle',
+        session_id: this.state.sessionId ?? undefined,
+        session: {
+          state: this.state.recording ? 'recording' : 'idle',
+          session_id: this.state.sessionId ?? null,
+          metadata: {},
+        },
+        resources: {
+          cpu_percent: this.state.health.metrics.cpuPercent,
+          memory_percent: this.state.health.metrics.memoryPercent,
+          disk_percent: this.state.health.metrics.diskPercent,
+          healthy: this.state.health.status === 'healthy',
+        },
+        sources: {
+          video: videoSourceObjects,
+          audio: audioSourceObjects,
+          active: {
+            video: { id: 0, identifier: videoSources[0] },
+            audio: { id: 0, identifier: audioSources[0] },
+          },
+          pip: {
+            configured: false,
+            supported: !!this.config.capabilities?.pipSupported,
+            pip_source: null,
+            main_source: null,
+            position: 'top_right',
+            size: 0.25,
+          },
+        },
+        streaming: {
+          available: true,
+          configured: !!(
+            this.state.streamConfig.url && this.state.streamConfig.stream_key
+          ),
+          streaming: this.state.streaming,
+          platform: this.state.streamConfig.platform ?? undefined,
+        },
         storage: {
           free_bytes: 100000000000,
           used_bytes: 50000000000,
         },
+        health: this.state.health,
       },
     });
   }
