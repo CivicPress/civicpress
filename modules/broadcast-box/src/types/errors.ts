@@ -48,6 +48,22 @@ export enum BroadcastBoxErrorCode {
   DEVICE_NOT_FOUND = 'DEVICE_NOT_FOUND',
   DEVICE_NOT_CONNECTED = 'DEVICE_NOT_CONNECTED',
   TIMEOUT = 'TIMEOUT',
+
+  // Payload / capture / preview
+  ERR_INVALID_PAYLOAD = 'ERR_INVALID_PAYLOAD',
+  ERR_DEVICE_BUSY = 'ERR_DEVICE_BUSY',
+  ERR_CAPTURE_NOT_ACTIVE = 'ERR_CAPTURE_NOT_ACTIVE',
+  ERR_CAPTURE_ALREADY_ACTIVE = 'ERR_CAPTURE_ALREADY_ACTIVE',
+  ERR_CAPTURE_FAILED = 'ERR_CAPTURE_FAILED',
+  ERR_STREAMING_INVALID_URL = 'ERR_STREAMING_INVALID_URL',
+  ERR_PREVIEW_ALREADY_ACTIVE = 'ERR_PREVIEW_ALREADY_ACTIVE',
+  ERR_STORAGE_WRITE_FAILED = 'ERR_STORAGE_WRITE_FAILED',
+
+  // Enrollment
+  ERR_INVALID_ENROLLMENT_CODE = 'ERR_INVALID_ENROLLMENT_CODE',
+  ERR_DEVICE_ALREADY_ENROLLED = 'ERR_DEVICE_ALREADY_ENROLLED',
+  ERR_ENROLLMENT_DISABLED = 'ERR_ENROLLMENT_DISABLED',
+  ERR_INVALID_REQUEST = 'ERR_INVALID_REQUEST',
 }
 
 /**
@@ -112,6 +128,25 @@ export function getErrorMessage(code: BroadcastBoxErrorCode): string {
     [BroadcastBoxErrorCode.DEVICE_NOT_FOUND]: 'Device not found',
     [BroadcastBoxErrorCode.DEVICE_NOT_CONNECTED]: 'Device is not connected',
     [BroadcastBoxErrorCode.TIMEOUT]: 'Command timeout',
+
+    [BroadcastBoxErrorCode.ERR_INVALID_PAYLOAD]: 'Invalid payload',
+    [BroadcastBoxErrorCode.ERR_DEVICE_BUSY]:
+      'Device is busy with another operation',
+    [BroadcastBoxErrorCode.ERR_CAPTURE_NOT_ACTIVE]: 'Capture is not active',
+    [BroadcastBoxErrorCode.ERR_CAPTURE_ALREADY_ACTIVE]:
+      'Capture is already active',
+    [BroadcastBoxErrorCode.ERR_CAPTURE_FAILED]: 'Capture failed',
+    [BroadcastBoxErrorCode.ERR_STREAMING_INVALID_URL]: 'Invalid streaming URL',
+    [BroadcastBoxErrorCode.ERR_PREVIEW_ALREADY_ACTIVE]:
+      'Preview is already active',
+    [BroadcastBoxErrorCode.ERR_STORAGE_WRITE_FAILED]: 'Storage write failed',
+
+    [BroadcastBoxErrorCode.ERR_INVALID_ENROLLMENT_CODE]:
+      'Invalid or expired enrollment code',
+    [BroadcastBoxErrorCode.ERR_DEVICE_ALREADY_ENROLLED]:
+      'Device is already enrolled',
+    [BroadcastBoxErrorCode.ERR_ENROLLMENT_DISABLED]: 'Enrollment is disabled',
+    [BroadcastBoxErrorCode.ERR_INVALID_REQUEST]: 'Invalid request',
   };
 
   return messages[code] ?? 'Unknown error';
@@ -147,6 +182,28 @@ export function inferErrorCode(message: string): BroadcastBoxErrorCode {
   if (/storage full|disk full/.test(m))
     return BroadcastBoxErrorCode.ERR_STORAGE_FULL;
   if (/file not found/.test(m)) return BroadcastBoxErrorCode.ERR_FILE_NOT_FOUND;
+  if (/invalid payload|bad payload/.test(m))
+    return BroadcastBoxErrorCode.ERR_INVALID_PAYLOAD;
+  if (/device busy|device is busy/.test(m))
+    return BroadcastBoxErrorCode.ERR_DEVICE_BUSY;
+  if (/capture not active|not capturing/.test(m))
+    return BroadcastBoxErrorCode.ERR_CAPTURE_NOT_ACTIVE;
+  if (/capture already active|already capturing/.test(m))
+    return BroadcastBoxErrorCode.ERR_CAPTURE_ALREADY_ACTIVE;
+  if (/capture failed|capture error/.test(m))
+    return BroadcastBoxErrorCode.ERR_CAPTURE_FAILED;
+  if (/invalid.*url|invalid streaming url/.test(m))
+    return BroadcastBoxErrorCode.ERR_STREAMING_INVALID_URL;
+  if (/preview already active|preview.*already/.test(m))
+    return BroadcastBoxErrorCode.ERR_PREVIEW_ALREADY_ACTIVE;
+  if (/storage write|write failed/.test(m))
+    return BroadcastBoxErrorCode.ERR_STORAGE_WRITE_FAILED;
+  if (/invalid enrollment|enrollment code/.test(m))
+    return BroadcastBoxErrorCode.ERR_INVALID_ENROLLMENT_CODE;
+  if (/already enrolled|already registered/.test(m))
+    return BroadcastBoxErrorCode.ERR_DEVICE_ALREADY_ENROLLED;
+  if (/enrollment disabled/.test(m))
+    return BroadcastBoxErrorCode.ERR_ENROLLMENT_DISABLED;
   return BroadcastBoxErrorCode.ERR_UNKNOWN;
 }
 
@@ -231,6 +288,16 @@ export class StorageError extends BroadcastBoxBaseError {
     details?: Record<string, unknown>
   ) {
     super(code, message, details, 'StorageError');
+  }
+}
+
+export class EnrollmentError extends BroadcastBoxBaseError {
+  constructor(
+    code: BroadcastBoxErrorCode,
+    message?: string,
+    details?: Record<string, unknown>
+  ) {
+    super(code, message, details, 'EnrollmentError');
   }
 }
 

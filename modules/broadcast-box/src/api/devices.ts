@@ -27,6 +27,7 @@ import type {
   UpdateDeviceRequest,
   DeviceStatus,
 } from '../types/index.js';
+import { BroadcastBoxErrorCode } from '../types/errors.js';
 
 // Helper to get client IP
 function getClientIp(req: Request): string {
@@ -90,6 +91,7 @@ export function createDevicesRouter(
           'active',
           'suspended',
           'revoked',
+          'decommissioned',
         ] as const;
         const deviceStatus =
           status && validStatuses.includes(status as any)
@@ -497,25 +499,32 @@ export function createDevicesRouter(
         // Return generic error message for security (don't leak code existence)
         let statusCode = 500;
         let errorMessage = 'Failed to register device';
+        let errorCode: string = BroadcastBoxErrorCode.ERR_UNKNOWN;
 
         if (error instanceof Error) {
           if (error.message.includes('already registered')) {
             statusCode = 409;
             errorMessage = 'Device already registered';
+            errorCode = BroadcastBoxErrorCode.ERR_DEVICE_ALREADY_ENROLLED;
           } else if (
             error.message.includes('Invalid enrollment code') ||
             error.message.includes('Enrollment code expired') ||
-            error.message.includes('Enrollment code already used') ||
-            error.message.includes('Device UUID mismatch')
+            error.message.includes('Enrollment code already used')
           ) {
             statusCode = 401;
             errorMessage = 'Invalid enrollment credentials';
+            errorCode = BroadcastBoxErrorCode.ERR_INVALID_ENROLLMENT_CODE;
+          } else if (error.message.includes('Device UUID mismatch')) {
+            statusCode = 401;
+            errorMessage = 'Invalid enrollment credentials';
+            errorCode = BroadcastBoxErrorCode.ERR_INVALID_REQUEST;
           }
         }
 
         res.status(statusCode).json({
           success: false,
           error: {
+            code: errorCode,
             message: errorMessage,
           },
         });
@@ -536,7 +545,7 @@ export function createDevicesRouter(
       body('config').optional().isObject(),
       body('status')
         .optional()
-        .isIn(['enrolled', 'active', 'suspended', 'revoked']),
+        .isIn(['enrolled', 'active', 'suspended', 'revoked', 'decommissioned']),
     ],
     // TODO: Add authMiddleware from @civicpress/api
     async (req: AuthenticatedRequest, res: Response) => {
@@ -891,9 +900,12 @@ export function createDevicesRouter(
           'record.start',
           'record.stop',
           'record.list',
+          'record.get',
           'stream.configure',
           'stream.start',
           'stream.stop',
+          'stream.status',
+          'quality.set',
           'watermark.upload',
           'watermark.set',
           'watermark.remove',

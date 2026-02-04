@@ -266,6 +266,27 @@ export function createDefaultEventHandlers(
             updatedCapabilities.quality = qualityNorm;
           }
 
+          // Streaming capabilities (capabilities.streaming)
+          const streamingCap = (capabilities as any).streaming;
+          if (streamingCap !== undefined) {
+            if (typeof streamingCap === 'object' && streamingCap !== null) {
+              updatedCapabilities.streamingCapabilities = {
+                supported: Boolean(streamingCap.supported),
+                protocols: Array.isArray(streamingCap.protocols)
+                  ? streamingCap.protocols
+                  : undefined,
+                maxBitrateKbps:
+                  typeof streamingCap.max_bitrate_kbps === 'number'
+                    ? streamingCap.max_bitrate_kbps
+                    : undefined,
+              };
+            } else if (typeof streamingCap === 'boolean') {
+              updatedCapabilities.streamingCapabilities = {
+                supported: streamingCap,
+              };
+            }
+          }
+
           const capabilitiesChanged =
             JSON.stringify(updatedCapabilities) !==
             JSON.stringify(device.capabilities);
@@ -950,6 +971,40 @@ export function createDefaultEventHandlers(
       } as any);
     }
 
+    // Extract and store extended status sections (storage, upload, connection, streaming)
+    const extendedSections: Record<string, Record<string, unknown>> = {};
+    if (payload.storage && typeof payload.storage === 'object') {
+      extendedSections.storage = payload.storage;
+    }
+    if (payload.upload && typeof payload.upload === 'object') {
+      extendedSections.upload = payload.upload;
+    }
+    if (payload.connection && typeof payload.connection === 'object') {
+      extendedSections.connectionInfo = payload.connection;
+    }
+    if (payload.streaming && typeof payload.streaming === 'object') {
+      extendedSections.streaming = payload.streaming;
+    }
+    if (Object.keys(extendedSections).length > 0) {
+      context.connectionTracker.updateExtendedStatus(
+        context.deviceId,
+        extendedSections
+      );
+    }
+
+    // Record successful message receipt and reset status failure counter
+    context.connectionTracker.recordMessageReceived(context.deviceId);
+    context.connectionTracker.resetStatusFailures(context.deviceId);
+
+    // Log session metadata if present
+    if (payload.session?.metadata) {
+      coreInfo('Status event contains session metadata', {
+        operation: 'broadcast-box:event:status-session-metadata',
+        deviceId: context.deviceId,
+        metadata: payload.session.metadata,
+      });
+    }
+
     // Extract and store active sources.
     // Devices may send any of these formats:
     // - payload.active_sources (full objects)
@@ -1618,6 +1673,10 @@ export function createDefaultEventHandlers(
         active_sources: payload.active_sources,
         // Prefer the new location (payload.sources.pip), fallback to legacy (payload.pip)
         pip: payload.pip || payload.sources?.pip,
+        storage: payload.storage,
+        upload: payload.upload,
+        connection: payload.connection,
+        streaming: payload.streaming,
         timestamp: payload.timestamp || new Date().toISOString(),
       },
     });

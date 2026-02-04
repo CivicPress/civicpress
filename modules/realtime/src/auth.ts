@@ -132,6 +132,18 @@ export function extractToken(
     }
   }
 
+  // 1b. Try X-Device-Token header (Broadcast Box device connections)
+  if (headers) {
+    const deviceToken = headers['x-device-token'] || headers['X-Device-Token'];
+    if (
+      deviceToken &&
+      typeof deviceToken === 'string' &&
+      deviceToken.length > 0
+    ) {
+      return { token: deviceToken, method: 'header' };
+    }
+  }
+
   // 2. Try subprotocol (browser-compatible, secure)
   // Format: "auth.<token>" or just the token if it's the only protocol
   if (protocols && protocols.length > 0) {

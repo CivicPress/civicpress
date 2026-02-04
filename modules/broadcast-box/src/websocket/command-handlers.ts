@@ -992,5 +992,133 @@ export function createDefaultCommandHandlers(
     });
   });
 
+  // Register record.get handler (fetch details of a specific recording)
+  registry.registerHandler('record.get', async (command, context) => {
+    const { recording_id } = command.payload || {};
+    if (!recording_id) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'recording_id is required'
+        ).toDict()
+      );
+    }
+    coreInfo('Record get command processed', {
+      operation: 'broadcast-box:command:record-get',
+      deviceId: context.deviceId,
+      recording_id,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      recording_id,
+    });
+  });
+
+  // Register stream.status handler (query current streaming state)
+  registry.registerHandler('stream.status', async (command, context) => {
+    coreInfo('Stream status command processed', {
+      operation: 'broadcast-box:command:stream-status',
+      deviceId: context.deviceId,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {});
+  });
+
+  // Register quality.set handler (change quality preset)
+  registry.registerHandler('quality.set', async (command, context) => {
+    const { quality } = command.payload || {};
+    if (!quality) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'quality is required'
+        ).toDict()
+      );
+    }
+    const validQualities = ['low', 'standard', 'high', 'ultra'];
+    if (!validQualities.includes(quality)) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.INVALID_CONFIG,
+          `quality must be one of: ${validQualities.join(', ')}`
+        ).toDict()
+      );
+    }
+    coreInfo('Quality set command processed', {
+      operation: 'broadcast-box:command:quality-set',
+      deviceId: context.deviceId,
+      quality,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      quality,
+    });
+  });
+
+  // Register watermark.upload handler (upload watermark image data)
+  registry.registerHandler('watermark.upload', async (command, context) => {
+    const { data } = command.payload || {};
+    if (!data) {
+      return context.protocol.createAck(
+        command.id,
+        false,
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.ERR_MISSING_PARAMETER,
+          'data is required (base64 PNG)'
+        ).toDict()
+      );
+    }
+    coreInfo('Watermark upload command processed', {
+      operation: 'broadcast-box:command:watermark-upload',
+      deviceId: context.deviceId,
+      dataLength: typeof data === 'string' ? data.length : 0,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      status: 'uploaded',
+    });
+  });
+
+  // Register watermark.set handler (enable/configure watermark)
+  registry.registerHandler('watermark.set', async (command, context) => {
+    const { enabled, position, scale, opacity } = command.payload || {};
+    coreInfo('Watermark set command processed', {
+      operation: 'broadcast-box:command:watermark-set',
+      deviceId: context.deviceId,
+      enabled,
+      position,
+      scale,
+      opacity,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      enabled,
+      position,
+      scale,
+      opacity,
+    });
+  });
+
+  // Register watermark.remove handler (remove watermark)
+  registry.registerHandler('watermark.remove', async (command, context) => {
+    coreInfo('Watermark remove command processed', {
+      operation: 'broadcast-box:command:watermark-remove',
+      deviceId: context.deviceId,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {
+      status: 'removed',
+    });
+  });
+
+  // Register watermark.status handler (query watermark state)
+  registry.registerHandler('watermark.status', async (command, context) => {
+    coreInfo('Watermark status command processed', {
+      operation: 'broadcast-box:command:watermark-status',
+      deviceId: context.deviceId,
+    });
+    return context.protocol.createAck(command.id, true, undefined, {});
+  });
+
   return registry;
 }

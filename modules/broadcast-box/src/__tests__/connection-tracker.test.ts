@@ -152,10 +152,12 @@ describe('DeviceConnectionTracker', () => {
       const deviceId = 'device-id';
       await tracker.registerConnection(deviceId, 'client-id');
 
-      // Manually set old heartbeat (simulating stale connection)
+      // Manually set old heartbeat and lastMessageAt (simulating stale connection)
       const state = tracker.getConnectionState(deviceId);
       if (state) {
-        state.lastHeartbeat = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+        const staleTime = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+        state.lastHeartbeat = staleTime;
+        state.lastMessageAt = staleTime;
       }
 
       await tracker.cleanupStaleConnections(5 * 60 * 1000); // 5 minute timeout

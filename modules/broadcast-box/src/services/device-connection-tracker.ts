@@ -10,6 +10,8 @@ import type { DeviceManager } from './device-manager.js';
 import type { DeviceEventModel } from '../models/device-event.js';
 import { v4 as uuidv4 } from 'uuid';
 
+export type ConnectionHealthState = 'online' | 'degraded' | 'offline';
+
 export interface DeviceConnectionState {
   deviceId: string;
   connected: boolean;
@@ -17,10 +19,18 @@ export interface DeviceConnectionState {
   endpoint?: 'cloud' | 'local';
   lastHeartbeat?: Date;
   connectedAt?: Date;
+  connectionHealth: ConnectionHealthState;
+  lastMessageAt?: Date;
+  consecutiveStatusFailures: number;
   state: {
     status: 'idle' | 'recording' | 'encoding' | 'uploading';
     activeSessionId?: string;
+    health?: any;
   };
+  storage?: Record<string, unknown>;
+  upload?: Record<string, unknown>;
+  connectionInfo?: Record<string, unknown>;
+  streaming?: Record<string, unknown>;
 }
 
 export class DeviceConnectionTracker {
@@ -55,6 +65,9 @@ export class DeviceConnectionTracker {
       endpoint,
       lastHeartbeat: now,
       connectedAt: now,
+      connectionHealth: 'online',
+      lastMessageAt: now,
+      consecutiveStatusFailures: 0,
       state: {
         status: 'idle',
       },
@@ -220,21 +233,117 @@ export class DeviceConnectionTracker {
   }
 
   /**
+   * Record that a message was received from a device (updates lastMessageAt).
+   */
+  recordMessageReceived(deviceId: string): void {
+    const connection = this.connections.get(deviceId);
+    if (!connection) return;
+    connection.lastMessageAt = new Date();
+    if (connection.connectionHealth === 'degraded') {
+      connection.connectionHealth = 'online';
+    }
+    this.connections.set(deviceId, connection);
+  }
+
+  /**
+   * Record a status report failure (e.g. unparseable status message).
+   * After 3 consecutive failures, mark connection health as offline.
+   */
+  recordStatusFailure(deviceId: string): void {
+    const connection = this.connections.get(deviceId);
+    if (!connection) return;
+    connection.consecutiveStatusFailures += 1;
+    if (connection.consecutiveStatusFailures >= 3) {
+      connection.connectionHealth = 'offline';
+    }
+    this.connections.set(deviceId, connection);
+  }
+
+  /**
+   * Reset status failure counter (called on successful status parse).
+   */
+  resetStatusFailures(deviceId: string): void {
+    const connection = this.connections.get(deviceId);
+    if (!connection) return;
+    connection.consecutiveStatusFailures = 0;
+    if (connection.connectionHealth === 'offline') {
+      connection.connectionHealth = 'online';
+    }
+    this.connections.set(deviceId, connection);
+  }
+
+  /**
+   * Update extended status sections (storage, upload, connection info, streaming).
+   */
+  updateExtendedStatus(
+    deviceId: string,
+    sections: {
+      storage?: Record<string, unknown>;
+      upload?: Record<string, unknown>;
+      connectionInfo?: Record<string, unknown>;
+      streaming?: Record<string, unknown>;
+    }
+  ): void {
+    const connection = this.connections.get(deviceId);
+    if (!connection) return;
+    if (sections.storage !== undefined) connection.storage = sections.storage;
+    if (sections.upload !== undefined) connection.upload = sections.upload;
+    if (sections.connectionInfo !== undefined)
+      connection.connectionInfo = sections.connectionInfo;
+    if (sections.streaming !== undefined)
+      connection.streaming = sections.streaming;
+    this.connections.set(deviceId, connection);
+  }
+
+  private healthMonitorInterval: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Start periodic health monitoring.
+   * Checks staleness: >90s without message → offline, >60s → degraded.
+   */
+  startHealthMonitor(intervalMs: number = 15000): void {
+    this.stopHealthMonitor();
+    this.healthMonitorInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [, connection] of this.connections.entries()) {
+        if (!connection.connected) continue;
+        const lastMsg = connection.lastMessageAt ?? connection.lastHeartbeat;
+        if (!lastMsg) continue;
+        const elapsed = now - lastMsg.getTime();
+        if (elapsed > 90_000) {
+          connection.connectionHealth = 'offline';
+        } else if (elapsed > 60_000) {
+          connection.connectionHealth = 'degraded';
+        }
+      }
+    }, intervalMs);
+  }
+
+  /**
+   * Stop periodic health monitoring.
+   */
+  stopHealthMonitor(): void {
+    if (this.healthMonitorInterval) {
+      clearInterval(this.healthMonitorInterval);
+      this.healthMonitorInterval = null;
+    }
+  }
+
+  /**
    * Cleanup stale connections (devices that haven't sent heartbeat in timeout period)
    */
-  async cleanupStaleConnections(
-    timeoutMs: number = 5 * 60 * 1000
-  ): Promise<void> {
+  async cleanupStaleConnections(timeoutMs: number = 90 * 1000): Promise<void> {
     const now = Date.now();
     const staleDevices: string[] = [];
 
     for (const [deviceId, connection] of this.connections.entries()) {
-      if (!connection.lastHeartbeat) {
+      const lastActivity = connection.lastMessageAt ?? connection.lastHeartbeat;
+      if (!lastActivity) {
         continue;
       }
 
-      const timeSinceHeartbeat = now - connection.lastHeartbeat.getTime();
-      if (timeSinceHeartbeat > timeoutMs) {
+      const timeSinceActivity = now - lastActivity.getTime();
+      if (timeSinceActivity > timeoutMs) {
         staleDevices.push(deviceId);
       }
     }

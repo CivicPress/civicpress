@@ -67,6 +67,7 @@ export function useDevicePreview(
   let offerTimeout: NodeJS.Timeout | null = null;
   let diagnosticsInterval: NodeJS.Timeout | null = null;
   let isProcessingOffer = false; // Prevent duplicate offer processing
+  let currentOfferId: string | null = null; // Track offer_id from preview.offer for answer correlation
   let pendingIceCandidates: RTCIceCandidateInit[] = []; // Queue ICE candidates until remote description is set
   const OFFER_TIMEOUT_MS = 30000; // 30 seconds
 
@@ -713,6 +714,7 @@ export function useDevicePreview(
           payload: {
             type: 'answer',
             sdp: answer.sdp,
+            offer_id: currentOfferId,
           },
         };
         console.log('[DevicePreview] 📤 Sending preview.answer to device', {
@@ -1057,6 +1059,9 @@ export function useDevicePreview(
             currentError: error.value,
           });
 
+          // Store offer_id for answer correlation
+          currentOfferId = message.payload?.offer_id ?? message.id ?? null;
+
           // Clear any command timeout errors - we received the offer!
           if (
             error.value &&
@@ -1338,6 +1343,7 @@ export function useDevicePreview(
   function cleanup() {
     // Reset processing flags
     isProcessingOffer = false;
+    currentOfferId = null;
     pendingIceCandidates = [];
 
     // Cleanup WebSocket listeners

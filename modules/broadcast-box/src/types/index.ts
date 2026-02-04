@@ -25,7 +25,22 @@ export interface BroadcastDevice {
   updatedAt: Date;
 }
 
-export type DeviceStatus = 'enrolled' | 'active' | 'suspended' | 'revoked';
+export type DeviceStatus =
+  | 'enrolled'
+  | 'active'
+  | 'suspended'
+  | 'revoked'
+  | 'decommissioned';
+
+/**
+ * Capture state of a device.
+ * Maps to spec: idle, previewing, recording, previewing_and_recording.
+ */
+export type CaptureState =
+  | 'idle'
+  | 'previewing'
+  | 'recording'
+  | 'previewing_and_recording';
 
 /**
  * Source information from status message protocol
@@ -104,6 +119,11 @@ export interface DeviceCapabilities {
    */
   quality?: QualityCapabilities;
 
+  /**
+   * Streaming capability (from `device.connected` payload.capabilities.streaming).
+   */
+  streamingCapabilities?: StreamingCapabilities;
+
   maxResolution: string;
   maxFramerate?: number; // Maximum framerate supported
   encodingPresets?: EncodingPreset[]; // Available encoding presets
@@ -161,6 +181,15 @@ export interface QualityDefaults {
 export interface QualityCapabilities {
   presets: QualityPreset[];
   defaults?: QualityDefaults;
+}
+
+/**
+ * Streaming capability reported by device in device.connected capabilities.
+ */
+export interface StreamingCapabilities {
+  supported: boolean;
+  protocols?: string[];
+  maxBitrateKbps?: number;
 }
 
 /**
@@ -260,6 +289,18 @@ export interface BroadcastSession {
   updatedAt: Date;
 }
 
+/**
+ * Session status.
+ *
+ * Spec mapping:
+ * - starting → pending (session requested, device preparing)
+ * - capturing → recording (device is actively recording)
+ * - stopping → stopping (stop command sent, device finalizing)
+ * - encoding → encoding (device is encoding/transcoding)
+ * - uploading → uploading (file upload in progress)
+ * - complete → complete (session fully finished)
+ * - failed → failed (unrecoverable error)
+ */
 export type SessionStatus =
   | 'pending'
   | 'recording'

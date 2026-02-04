@@ -28,6 +28,9 @@ describe('EventHandlerRegistry', () => {
       clientId: 'client-id',
       connectionTracker: {
         updateDeviceState: vi.fn(),
+        recordMessageReceived: vi.fn(),
+        resetStatusFailures: vi.fn(),
+        updateExtendedStatus: vi.fn(),
       },
       deviceManager: {},
       deviceEventModel: {
@@ -122,6 +125,9 @@ describe('createDefaultEventHandlers', () => {
       clientId: 'client-id',
       connectionTracker: {
         updateDeviceState: vi.fn(),
+        recordMessageReceived: vi.fn(),
+        resetStatusFailures: vi.fn(),
+        updateExtendedStatus: vi.fn(),
       },
       deviceManager: {},
       deviceEventModel: {
