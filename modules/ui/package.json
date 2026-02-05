@@ -34,6 +34,7 @@
     "nuxt": "^4.2.1",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
+    "qrcode": "1.5.4",
     "typescript": "^5.6.3",
     "vue": "^3.5.18",
     "vue-router": "^4.5.1",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.57",
     "@nuxt/test-utils": "^3.20.1",
+    "@types/qrcode": "1.5.6",
     "@vitejs/plugin-vue": "6.0.3",
     "@vue/test-utils": "2.4.6",
     "autoprefixer": "^10.4.0",

@@ -113,6 +113,20 @@
       </div>
     </UFormField>
 
+    <!-- QR Code for Device Enrollment -->
+    <div
+      v-if="form.deviceUuid && form.enrollmentCode && qrDataUrl"
+      class="flex flex-col items-center gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20"
+    >
+      <p class="text-sm font-medium">
+        {{ t('broadcastBox.scanQrCode') }}
+      </p>
+      <img :src="qrDataUrl" alt="Enrollment QR Code" class="w-48 h-48" />
+      <p class="text-xs text-muted text-center max-w-xs">
+        {{ t('broadcastBox.scanQrCodeDesc') }}
+      </p>
+    </div>
+
     <!-- Room Location -->
     <UFormField
       :label="t('broadcastBox.roomLocation')"
@@ -206,6 +220,7 @@
 </template>
 
 <script setup lang="ts">
+import QRCode from 'qrcode';
 import type { CreateDeviceRequest } from '~/composables/useBroadcastBox';
 import { useBroadcastBox } from '~/composables/useBroadcastBox';
 
@@ -241,6 +256,24 @@ const registrationSuccess = ref(false);
 const registrationToken = ref('');
 const uuidCopied = ref(false);
 const codeCopied = ref(false);
+const qrDataUrl = ref('');
+
+watchEffect(async () => {
+  if (form.deviceUuid && form.enrollmentCode) {
+    const payload = {
+      type: 'civicpress-enrollment',
+      url: window.location.origin + '/api/v1/broadcast-box/devices',
+      code: form.enrollmentCode,
+      v: 1,
+    };
+    qrDataUrl.value = await QRCode.toDataURL(JSON.stringify(payload), {
+      width: 256,
+      margin: 2,
+    });
+  } else {
+    qrDataUrl.value = '';
+  }
+});
 
 const resolutionOptions = [
   { label: '720p', value: '720p' },

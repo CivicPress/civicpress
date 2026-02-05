@@ -1181,6 +1181,8 @@
     "generate": "Generate",
     "generateCredentials": "Generate Device Credentials",
     "generateCredentialsDesc": "Click to automatically generate a device UUID and enrollment code",
+    "scanQrCode": "Scan QR Code",
+    "scanQrCodeDesc": "Point the Broadcast Box camera at this QR code to complete enrollment automatically.",
     "copyToken": "Copy Token",
     "tokenCopied": "Token copied to clipboard",
     "loading": "Loading devices...",
