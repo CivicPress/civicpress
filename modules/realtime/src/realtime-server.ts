@@ -3534,4 +3534,91 @@ export class RealtimeServer {
   getConnections(): Map<string, WebSocket> {
     return this.connections;
   }
+
+  /**
+   * Trigger a snapshot for a specific record
+   *
+   * This is called by the API when collaborative editing autosave triggers.
+   * Creates a snapshot of the current Yjs document state and saves it.
+   *
+   * @param recordId The record ID to snapshot
+   * @returns Snapshot metadata or null if room doesn't exist
+   */
+  async triggerRecordSnapshot(
+    recordId: string
+  ): Promise<{ roomId: string; version: number; timestamp: number } | null> {
+    if (!this.roomManager || !this.snapshotManager) {
+      coreWarn('Cannot trigger snapshot: room manager or snapshot manager not initialized', {
+        operation: 'realtime:snapshot:trigger:error',
+        recordId,
+      });
+      return null;
+    }
+
+    // Try both room ID formats (record: and records:)
+    const roomIdFormats = [`record:${recordId}`, `records:${recordId}`];
+    let room: YjsRoom | null = null;
+
+    for (const roomId of roomIdFormats) {
+      const foundRoom = this.roomManager.getRoom(roomId);
+      if (foundRoom instanceof YjsRoom) {
+        room = foundRoom;
+        break;
+      }
+    }
+
+    if (!room) {
+      coreDebug('No active room found for record snapshot', {
+        operation: 'realtime:snapshot:trigger:no-room',
+        recordId,
+        triedRoomIds: roomIdFormats,
+      });
+      return null;
+    }
+
+    try {
+      const state = room.getState();
+      const snapshot = this.snapshotManager.createSnapshot(
+        room.roomId,
+        room.getYjsDoc(),
+        state.version
+      );
+
+      await this.snapshotManager.saveSnapshot(snapshot);
+      room.resetUpdateCount();
+
+      coreInfo('Record snapshot triggered via API', {
+        operation: 'realtime:snapshot:triggered',
+        recordId,
+        roomId: room.roomId,
+        version: state.version,
+      });
+
+      // Emit hook event
+      this.emitHook('realtime:snapshot:saved', {
+        roomId: room.roomId,
+        recordId,
+        version: state.version,
+        timestamp: snapshot.timestamp,
+        triggeredBy: 'api',
+      });
+
+      return {
+        roomId: room.roomId,
+        version: state.version,
+        timestamp: snapshot.timestamp,
+      };
+    } catch (error) {
+      coreError(
+        error instanceof Error ? error : new Error(String(error)),
+        'REALTIME_SNAPSHOT_TRIGGER_ERROR',
+        { recordId, roomId: room.roomId },
+        {
+          operation: 'realtime:snapshot:trigger:error',
+          recordId,
+        }
+      );
+      throw error;
+    }
+  }
 }
