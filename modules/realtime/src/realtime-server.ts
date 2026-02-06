@@ -60,6 +60,24 @@ import {
 } from './persistence/storage.js';
 import { YjsRoom } from './rooms/yjs-room.js';
 
+/**
+ * Generate a consistent color for a user based on their ID
+ * Uses a predefined palette of distinct, accessible colors
+ */
+const PARTICIPANT_COLORS = [
+  '#F44336', '#E91E63', '#9C27B0', '#673AB7',
+  '#3F51B5', '#2196F3', '#03A9F4', '#00BCD4',
+  '#009688', '#4CAF50', '#8BC34A', '#CDDC39',
+  '#FFC107', '#FF9800', '#FF5722', '#795548',
+];
+
+function generateParticipantColor(userId: string | number): string {
+  // Convert to number and use modulo to pick from palette
+  const numericId = typeof userId === 'number' ? userId : parseInt(String(userId), 10) || 0;
+  const index = Math.abs(numericId) % PARTICIPANT_COLORS.length;
+  return PARTICIPANT_COLORS[index] || '#3F51B5';
+}
+
 export class RealtimeServer {
   private logger: Logger;
   private hookSystem: HookSystem;
@@ -684,7 +702,7 @@ export class RealtimeServer {
         await this.deviceConnectionTracker.registerConnection(
           deviceIdString, // database ID as string
           clientId,
-          'cloud' // TODO: determine endpoint type (cloud vs local)
+          'cloud' // Connections to the realtime server are cloud connections
         );
         coreInfo('Device connection registered in tracker', {
           operation: 'realtime:server:device-connection:tracker-registered',
@@ -2936,26 +2954,18 @@ export class RealtimeServer {
   /**
    * Check connection limits
    *
-   * ⚠️ TEMPORARILY DISABLED FOR DEVELOPMENT ⚠️
-   *
-   * Before merging to main, remove the early return below to re-enable connection limits.
-   * See: modules/realtime/DEVELOPMENT.md for details.
+   * Enforces rate limiting based on connections per IP and per user.
+   * Throws ConnectionLimitExceededError if limits are exceeded.
    */
   private async checkConnectionLimits(
     ip: string,
     userId: number | null
   ): Promise<void> {
-    // ⚠️ TEMPORARILY DISABLED FOR DEVELOPMENT ⚠️
-    // TODO: Remove this return statement before merging to main
-    // See: modules/realtime/DEVELOPMENT.md - Pre-Merge Checklist
-    return;
-
     const config = this.realtimeConfig;
     if (!config) {
       return;
     }
-    // Narrowed after guard; assertions used so unreachable code (above return) type-checks
-    const limitConfig = config as NonNullable<typeof config>;
+    const limitConfig = config;
 
     // Check IP limit
     const ipCount = this.connectionCounts.get(ip) || 0;
@@ -3055,7 +3065,7 @@ export class RealtimeServer {
         participants: state.participants.map((p: any) => ({
           id: p.userId,
           name: p.username,
-          color: '#3b82f6', // TODO: Generate color
+          color: generateParticipantColor(p.userId),
         })),
         yjsState: state.yjsState
           ? Buffer.from(state.yjsState).toString('base64')
