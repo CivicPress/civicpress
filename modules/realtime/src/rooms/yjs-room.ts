@@ -27,7 +27,7 @@ export class YjsRoom implements Room {
   public readonly roomType: string;
   private clients: Map<string, ClientConnection> = new Map();
   private yjsDoc: Y.Doc;
-  private yjsText: Y.Text;
+  private yjsFragment: Y.XmlFragment;
   private logger: Logger;
   private server: RealtimeServer;
   private recordManager: RecordManager | null = null;
@@ -53,8 +53,9 @@ export class YjsRoom implements Room {
     // Initialize yjs document
     this.yjsDoc = new Y.Doc();
 
-    // Create yjs text type for document content
-    this.yjsText = this.yjsDoc.getText('content');
+    // Create yjs XmlFragment for TipTap editor content
+    // TipTap's Collaboration extension expects an XmlFragment, not Text
+    this.yjsFragment = this.yjsDoc.getXmlFragment('content');
 
     // Listen for yjs updates
     this.yjsDoc.on('update', (update: Uint8Array, origin: any) => {
@@ -133,14 +134,17 @@ export class YjsRoom implements Room {
   }
 
   /**
-   * Load content from Markdown into yjs
+   * Load content from Markdown into yjs XmlFragment
+   * Note: For TipTap, content is typically loaded client-side via the editor.
+   * This method stores the markdown as initial content that can be retrieved.
+   * The TipTap editor will handle the actual XML structure.
    */
   private loadFromMarkdown(markdown: string): void {
-    // Clear existing content
-    this.yjsText.delete(0, this.yjsText.length);
-
-    // Insert markdown content
-    this.yjsText.insert(0, markdown);
+    // For XmlFragment used by TipTap, we store the initial markdown
+    // in a separate Text type that can be used for initialization
+    const initialContent = this.yjsDoc.getText('initialMarkdown');
+    initialContent.delete(0, initialContent.length);
+    initialContent.insert(0, markdown);
 
     this.version++;
     this.lastActivity = Date.now();
@@ -148,9 +152,27 @@ export class YjsRoom implements Room {
 
   /**
    * Convert yjs document to Markdown
+   * Note: For TipTap XmlFragment, the actual content is in XML format.
+   * This returns the initial markdown if set, or serializes the XML content.
    */
   toMarkdown(): string {
-    return this.yjsText.toString();
+    // Check if we have initial markdown content
+    const initialContent = this.yjsDoc.getText('initialMarkdown');
+    if (initialContent.length > 0) {
+      return initialContent.toString();
+    }
+
+    // For XmlFragment, convert to string representation
+    // The actual markdown conversion should be done by TipTap on the client
+    return this.yjsFragment.toString();
+  }
+
+  /**
+   * Get initial markdown content (if set)
+   */
+  getInitialMarkdown(): string | null {
+    const initialContent = this.yjsDoc.getText('initialMarkdown');
+    return initialContent.length > 0 ? initialContent.toString() : null;
   }
 
   /**
@@ -273,10 +295,18 @@ export class YjsRoom implements Room {
   }
 
   /**
-   * Get yjs text content
+   * Get yjs XmlFragment (for TipTap editor)
+   */
+  getYjsFragment(): Y.XmlFragment {
+    return this.yjsFragment;
+  }
+
+  /**
+   * Get yjs text content (deprecated, use getYjsFragment for TipTap)
+   * @deprecated Use getYjsFragment() for TipTap compatibility
    */
   getYjsText(): Y.Text {
-    return this.yjsText;
+    return this.yjsDoc.getText('initialMarkdown');
   }
 
   /**
