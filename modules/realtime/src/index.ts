@@ -17,6 +17,10 @@ export {
   DatabaseSnapshotStorage,
   FilesystemSnapshotStorage,
 } from './persistence/storage.js';
+export {
+  DefaultHandlerRegistry,
+  createHandlerRegistry,
+} from './handler-registry.js';
 
 // Export types
 export type {
@@ -27,6 +31,19 @@ export type {
   SnapshotMetadata,
   PresenceData,
 } from './types/realtime.types.js';
+
+// Export handler registry types
+export type {
+  RoomTypeHandler,
+  HandlerRegistry,
+  ConnectionContext,
+  MessageContext,
+  DisconnectContext,
+  AuthResult,
+  RoomReference,
+  ClientData,
+  HandlerRegistryOptions,
+} from './types/handler-registry.types.js';
 
 // Export health status type
 import type { RealtimeServer } from './realtime-server.js';

@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
 import EditorHeader from './editor/EditorHeader.vue';
-import MarkdownEditor from './editor/MarkdownEditor.vue';
+import TipTapEditor from './editor/TipTapEditor.vue';
 import EditorToolbar from './editor/EditorToolbar.vue';
 import PreviewPanel from './editor/PreviewPanel.vue';
 import RecordSidebar from './editor/RecordSidebar.vue';
 import { useAutosave } from '~/composables/useAutosave';
 import { useRecordLock } from '~/composables/useRecordLock';
+import { useMarkdownEditor } from '~/composables/useMarkdownEditor';
+import { useRealtimeEditor } from '~/composables/useRealtimeEditor';
 
 // Types
 interface RecordFormData {
@@ -79,6 +81,11 @@ const { getTemplateOptions, getTemplateById, processTemplate } = useTemplates();
 const toast = useToast();
 const $civicApi = useNuxtApp().$civicApi;
 const authStore = useAuthStore();
+const {
+  extractTitleFromMarkdown,
+  stripTitleFromMarkdown,
+  prependTitleToMarkdown,
+} = useMarkdownEditor();
 
 // Form data
 const form = reactive({
@@ -111,6 +118,28 @@ const form = reactive({
   metadata: {
     tags: [] as string[],
     description: '',
+  },
+});
+
+// Collaborative editing state
+// Enable collaborative mode when editing an existing record
+const collaborativeMode = ref(false);
+
+// Initialize realtime editor (will connect when collaborativeMode is enabled)
+const realtimeEditor = useRealtimeEditor(() => form.id, {
+  onConnect: () => {
+    console.log('Realtime editor connected');
+  },
+  onDisconnect: () => {
+    console.log('Realtime editor disconnected');
+  },
+  onError: (error) => {
+    console.error('Realtime editor error:', error);
+    toast.add({
+      title: t('records.editor.collaborationError') || 'Collaboration error',
+      description: error.message,
+      color: 'error',
+    });
   },
 });
 
@@ -160,55 +189,18 @@ const recordAuthor = ref<string>('');
 const recordCreatedAt = ref<string>('');
 const recordUpdatedAt = ref<string>('');
 
-// Helper functions for title/content separation
-const extractTitleFromMarkdown = (content: string): string | null => {
-  if (!content) return null;
-  const lines = content.split('\n');
-  const firstLine = lines[0]?.trim();
-  // Check if first line is an H1 heading (# Title)
-  if (firstLine?.startsWith('# ')) {
-    return firstLine.substring(2).trim();
-  }
-  return null;
-};
-
-const stripFirstLineFromMarkdown = (content: string): string => {
-  if (!content) return '';
-  const lines = content.split('\n');
-  const firstLine = lines[0]?.trim();
-  // If first line is an H1, remove it and any following blank lines
-  if (firstLine?.startsWith('# ')) {
-    // Remove first line and any immediately following blank lines
-    let startIndex = 1;
-    while (startIndex < lines.length && lines[startIndex]?.trim() === '') {
-      startIndex++;
-    }
-    return lines.slice(startIndex).join('\n');
-  }
-  return content;
-};
-
-const prependTitleToMarkdown = (title: string, content: string): string => {
-  const titleLine = `# ${title}`;
-  // If content is empty, just return title
-  if (!content.trim()) {
-    return titleLine;
-  }
-  // Ensure there's a blank line between title and content
-  return `${titleLine}\n\n${content}`;
-};
-
 // Computed property for preview content (includes title as H1)
 const previewContent = computed(() => {
   return prependTitleToMarkdown(form.title || '', form.markdownBody || '');
 });
 
-// Initialize lock (only in edit mode) - moved to after form.id is set
+// Initialize lock (only in edit mode, disabled in collaborative mode) - moved to after form.id is set
 let lockComposable: ReturnType<typeof useRecordLock> | null = null;
 const initializeLock = () => {
   if (props.isEditing && form.id) {
     lockComposable = useRecordLock({
       recordId: form.id,
+      collaborativeMode: collaborativeMode.value, // Disable locks in collaborative mode
       onLockAcquired: () => {
         console.log('Lock acquired');
       },
@@ -290,7 +282,7 @@ onMounted(async () => {
         const extractedTitle = extractTitleFromMarkdown(rawContent);
         form.title = extractedTitle || data.title || '';
         form.markdownBody = extractedTitle
-          ? stripFirstLineFromMarkdown(rawContent)
+          ? stripTitleFromMarkdown(rawContent)
           : rawContent;
 
         form.description = data.metadata?.description || '';
@@ -333,7 +325,7 @@ onMounted(async () => {
         const extractedTitle = extractTitleFromMarkdown(rawContent);
         form.title = extractedTitle || props.record.title || '';
         form.markdownBody = extractedTitle
-          ? stripFirstLineFromMarkdown(rawContent)
+          ? stripTitleFromMarkdown(rawContent)
           : rawContent;
         form.description = (props.record.metadata as any)?.description || '';
         form.tags = props.record.metadata?.tags || [];
@@ -385,10 +377,12 @@ onMounted(async () => {
   }
 });
 
-// Autosave
+// Autosave (with collaborative mode support for snapshots)
 const autosave = useAutosave(form, {
   debounceMs: 2000,
   enabled: props.isEditing,
+  collaborativeMode: collaborativeMode.value,
+  recordId: form.id,
   onSave: async (data) => {
     if (!props.isEditing || !form.id) return;
 
@@ -455,6 +449,23 @@ watch(
   },
   { immediate: false } // Don't run on initial mount (handled in onMounted)
 );
+
+// Watch collaborativeMode to connect/disconnect realtime editor
+watch(
+  () => collaborativeMode.value,
+  (enabled) => {
+    if (enabled && form.id) {
+      realtimeEditor.connect();
+    } else {
+      realtimeEditor.disconnect();
+    }
+  }
+);
+
+// Toggle collaborative mode
+const toggleCollaborativeMode = () => {
+  collaborativeMode.value = !collaborativeMode.value;
+};
 
 // Save draft manually
 const handleSaveDraft = async () => {
@@ -582,7 +593,7 @@ const handleSaveDraft = async () => {
           const extractedTitle = extractTitleFromMarkdown(rawContent);
           form.title = extractedTitle || data.title || '';
           form.markdownBody = extractedTitle
-            ? stripFirstLineFromMarkdown(rawContent)
+            ? stripTitleFromMarkdown(rawContent)
             : rawContent;
 
           // Update metadata for YAML display
@@ -831,7 +842,7 @@ const handleDuplicate = async () => {
       // Extract content without title if it exists in markdown
       const rawContent = record.markdownBody || record.content || '';
       const contentWithoutTitle = extractTitleFromMarkdown(rawContent)
-        ? stripFirstLineFromMarkdown(rawContent)
+        ? stripTitleFromMarkdown(rawContent)
         : rawContent;
       const newTitle = `${record.title} (Copy)`;
 
@@ -1030,10 +1041,12 @@ onUnmounted(() => {
     document.removeEventListener('mouseup', stopResize);
   }
   autosave.stop();
+  // Disconnect realtime editor if connected
+  realtimeEditor.disconnect();
 });
 
 // Refs
-const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
+const editorRef = ref<InstanceType<typeof TipTapEditor> | null>(null);
 const editorContainerRef = ref<HTMLDivElement | null>(null);
 const sidebarRef = ref<InstanceType<typeof RecordSidebar> | null>(null);
 
@@ -1096,6 +1109,9 @@ defineExpose({
         :last-saved="lastSaved"
         :disabled="saving || isLocked"
         :allowed-transitions="allowedTransitions"
+        :collaborative-mode="collaborativeMode"
+        :connection-status="realtimeEditor.connectionStatus.value"
+        :collaborators="realtimeEditor.collaborators.value"
         @update:title="form.title = $event"
         @update:status="form.status = $event"
         @save-changes="handleSaveDraft"
@@ -1108,6 +1124,7 @@ defineExpose({
         @view-history="handleViewHistory"
         @duplicate="handleDuplicate"
         @export="handleExport"
+        @toggle-collaborative-mode="toggleCollaborativeMode"
       />
     </div>
 
@@ -1193,12 +1210,32 @@ defineExpose({
 
           <!-- Editor -->
           <div class="flex-1 overflow-hidden">
-            <MarkdownEditor
+            <TipTapEditor
               ref="editorRef"
               v-model="form.markdownBody"
               :disabled="saving || isLocked"
               placeholder="Start writing your record content..."
               class="h-full"
+              :collaborative-mode="collaborativeMode"
+              :yjs-doc="realtimeEditor.yjsDoc.value"
+              :yjs-fragment="
+                realtimeEditor.yjsDoc.value?.getXmlFragment('content')
+              "
+              :ws-provider="realtimeEditor.wsProvider.value || undefined"
+              :current-user="
+                authStore.user
+                  ? {
+                      name:
+                        authStore.user.username ||
+                        authStore.user.email ||
+                        'Anonymous',
+                      color:
+                        realtimeEditor.collaborators.value.find(
+                          (c) => c.id === authStore.user?.id?.toString()
+                        )?.color || '#3b82f6',
+                    }
+                  : undefined
+              "
             />
           </div>
         </div>

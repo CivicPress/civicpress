@@ -508,7 +508,15 @@
         "insertImage": "Insérer une image",
         "showPreview": "Afficher l'aperçu",
         "hidePreview": "Masquer l'aperçu"
-      }
+      },
+      "oneEditing": "{name} en cours d'édition",
+      "multipleEditing": "{count} personnes en cours d'édition",
+      "collaborative": "Édition collaborative",
+      "connecting": "Connexion...",
+      "connected": "Connecté",
+      "disconnected": "Déconnecté",
+      "singleUser": "Édition individuelle",
+      "collaborationError": "Erreur de collaboration"
     },
     "updateRecord": "Mettre à jour le document",
     "templates": {

@@ -42,6 +42,16 @@ import {
 } from './errors/realtime-errors.js';
 import type { RealtimeMessage } from './types/messages.js';
 import { MessageType, PresenceEvent } from './types/messages.js';
+import type {
+  HandlerRegistry,
+  RoomTypeHandler,
+  ConnectionContext,
+  MessageContext,
+  DisconnectContext,
+  AuthResult,
+  RoomReference,
+} from './types/handler-registry.types.js';
+import { createHandlerRegistry } from './handler-registry.js';
 import { PresenceManager } from './presence/presence-manager.js';
 import { SnapshotManager } from './persistence/snapshots.js';
 import {
@@ -86,10 +96,17 @@ export class RealtimeServer {
     { count: number; resetTime: number; warned: boolean }
   > = new Map();
   // Optional device authentication dependencies (for Broadcast Box support)
+  // @deprecated Use handler registry instead
   private deviceAuthService: any | null = null; // DeviceAuthService - avoiding circular dependency
+  // @deprecated Use handler registry instead
   private deviceManager: any | null = null; // DeviceManager - avoiding circular dependency
+  // @deprecated Use handler registry instead
   private deviceCommandService: any | null = null; // DeviceCommandService - avoiding circular dependency
+  // @deprecated Use handler registry instead
   private deviceConnectionTracker: any | null = null; // DeviceConnectionTracker - avoiding circular dependency
+
+  // Handler registry for room type handlers
+  private handlerRegistry: HandlerRegistry;
 
   constructor(
     logger: Logger,
@@ -104,6 +121,7 @@ export class RealtimeServer {
     this.configManager = configManager;
     this.config = config;
     this.presenceManager = new PresenceManager(logger);
+    this.handlerRegistry = createHandlerRegistry();
   }
 
   /**
@@ -468,7 +486,28 @@ export class RealtimeServer {
         fullRoomId,
       });
 
-      // Route to device or user authentication based on room type
+      // Check if a custom handler is registered for this room type
+      const customHandler = this.handlerRegistry.getHandler(roomInfo.roomType);
+      if (customHandler) {
+        coreInfo('Using custom handler for room type', {
+          operation: 'realtime:server:connection:custom-handler',
+          clientId,
+          roomType: roomInfo.roomType,
+        });
+        await this.handleConnectionWithHandler(
+          ws,
+          clientId,
+          clientIp,
+          token,
+          roomInfo,
+          fullRoomId,
+          req,
+          customHandler
+        );
+        return;
+      }
+
+      // Route to device or user authentication based on room type (legacy)
       if (roomInfo.roomType === 'device') {
         // Try device authentication first (for Broadcast Box devices)
         // If that fails, try user authentication (for users observing device rooms)
@@ -1092,6 +1131,284 @@ export class RealtimeServer {
       clientId,
       userId: auth.user.id,
       roomId: `${roomInfo.roomType}:${roomInfo.roomId}`,
+    });
+  }
+
+  /**
+   * Handle connection using a custom room type handler
+   *
+   * This delegates authentication, message handling, and disconnect
+   * to the registered handler.
+   */
+  private async handleConnectionWithHandler(
+    ws: WebSocket,
+    clientId: string,
+    clientIp: string,
+    token: string,
+    roomInfo: { roomType: string; roomId: string },
+    fullRoomId: string,
+    req: {
+      url?: string;
+      socket?: { remoteAddress?: string };
+      headers?: Record<string, string>;
+      protocols?: string[];
+    },
+    handler: RoomTypeHandler
+  ): Promise<void> {
+    // Create connection context
+    const connectionContext: ConnectionContext = {
+      ws,
+      clientId,
+      clientIp,
+      token,
+      roomId: roomInfo.roomId,
+      fullRoomId,
+      url: req.url || '',
+      headers: req.headers,
+      protocols: req.protocols,
+    };
+
+    // Authenticate using handler
+    let authResult: AuthResult;
+    if (handler.onConnect) {
+      try {
+        authResult = await handler.onConnect(connectionContext);
+      } catch (error) {
+        coreError(
+          error instanceof Error ? error : new Error(String(error)),
+          'HANDLER_AUTH_ERROR',
+          { error: error instanceof Error ? error.message : String(error) },
+          {
+            operation: 'realtime:server:handler:auth:error',
+            clientId,
+            roomType: roomInfo.roomType,
+          }
+        );
+        this.sendError(
+          ws,
+          error instanceof Error ? error : new Error('Authentication failed')
+        );
+        ws.close();
+        return;
+      }
+
+      if (!authResult.success) {
+        coreWarn('Handler authentication failed', {
+          operation: 'realtime:server:handler:auth:failed',
+          clientId,
+          roomType: roomInfo.roomType,
+          error: authResult.error,
+          errorCode: authResult.errorCode,
+        });
+        this.sendError(
+          ws,
+          new AuthenticationFailedError({
+            message: authResult.error || 'Authentication failed',
+          })
+        );
+        ws.close();
+        return;
+      }
+    } else {
+      // No onConnect handler, allow connection with empty auth
+      authResult = { success: true };
+    }
+
+    // Track connection
+    this.connections.set(clientId, ws);
+
+    // Track IP connection count
+    const ipCount = this.connectionCounts.get(clientIp) || 0;
+    this.connectionCounts.set(clientIp, ipCount + 1);
+
+    // Initialize message rate limit tracking
+    this.messageRateLimits.set(clientId, {
+      count: 0,
+      resetTime: Date.now() + 1000,
+      warned: false,
+    });
+
+    // Get or create room
+    if (!this.roomManager) {
+      throw new Error('Room manager not initialized');
+    }
+
+    const room = this.roomManager.getOrCreateRoom(
+      fullRoomId,
+      roomInfo.roomType,
+      {}
+    );
+
+    // Create room reference for handler
+    const roomReference: RoomReference = {
+      roomId: fullRoomId,
+      roomType: roomInfo.roomType,
+      getState: () => room.getState() as any,
+      addClient: (cid: string, clientData: any) =>
+        room.addClient(cid, clientData),
+      removeClient: (cid: string) => room.removeClient(cid),
+      updateActivity: () => {
+        if (typeof (room as any).updateActivity === 'function') {
+          (room as any).updateActivity();
+        }
+      },
+    };
+
+    // Add client to room with metadata from auth
+    const clientConnection = {
+      id: clientId,
+      roomId: fullRoomId,
+      connectedAt: Date.now(),
+      lastActivity: Date.now(),
+      ...(authResult.clientMetadata || {}),
+    };
+    room.addClient(clientId, clientConnection);
+
+    // Send connection acknowledgment
+    ws.send(
+      JSON.stringify({
+        type: 'control',
+        event: 'connection.ack',
+        roomId: fullRoomId,
+        clientId,
+      })
+    );
+
+    // Call post-connect handler if available
+    if (handler.onPostConnect) {
+      try {
+        await handler.onPostConnect(connectionContext, authResult);
+      } catch (error) {
+        coreWarn('Handler post-connect failed', {
+          operation: 'realtime:server:handler:post-connect:error',
+          clientId,
+          roomType: roomInfo.roomType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue anyway - post-connect is optional
+      }
+    }
+
+    // Setup message handlers
+    ws.on('message', async (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString());
+
+        // Handle ping/pong (exempt from rate limiting)
+        if (message.type === 'ping' || message.type === MessageType.PING) {
+          this.sendPong(ws);
+          return;
+        }
+
+        // Check message rate limit
+        const rateLimitResult = this.checkMessageRateLimit(clientId);
+        if (!rateLimitResult.allowed) {
+          coreWarn('Message rate limit exceeded', {
+            operation: 'realtime:server:rate_limit:handler',
+            clientId,
+            roomType: roomInfo.roomType,
+          });
+          this.sendError(
+            ws,
+            new Error(
+              `Rate limit exceeded: ${this.realtimeConfig?.rate_limiting.messages_per_second || 10} messages per second`
+            )
+          );
+          ws.close(1008, 'Rate limit exceeded');
+          return;
+        }
+
+        // Delegate to handler
+        if (handler.onMessage) {
+          const messageContext: MessageContext = {
+            ws,
+            clientId,
+            message,
+            rawData: data,
+            room: roomReference,
+            auth: authResult,
+            sendToClient: (targetClientId: string, msg: unknown) => {
+              const targetWs = this.connections.get(targetClientId);
+              if (targetWs && targetWs.readyState === 1) {
+                targetWs.send(JSON.stringify(msg));
+              }
+            },
+            broadcastToRoom: (msg: unknown, excludeClientId?: string) => {
+              this.broadcastToRoom(room, msg, excludeClientId);
+            },
+            sendError: (error: Error) => {
+              this.sendError(ws, error);
+            },
+          };
+
+          await handler.onMessage(messageContext);
+        }
+      } catch (error) {
+        coreError(
+          error instanceof Error ? error : new Error(String(error)),
+          'HANDLER_MESSAGE_ERROR',
+          { error: error instanceof Error ? error.message : String(error) },
+          {
+            operation: 'realtime:server:handler:message:error',
+            clientId,
+            roomType: roomInfo.roomType,
+          }
+        );
+      }
+    });
+
+    // Setup disconnect handler
+    ws.on('close', () => {
+      // Delegate to handler
+      if (handler.onDisconnect) {
+        const disconnectContext: DisconnectContext = {
+          clientId,
+          room: roomReference,
+          auth: authResult,
+        };
+        handler.onDisconnect(disconnectContext);
+      }
+
+      // Cleanup
+      room.removeClient(clientId);
+      this.connections.delete(clientId);
+      this.messageRateLimits.delete(clientId);
+
+      // Update IP connection count
+      const currentIpCount = this.connectionCounts.get(clientIp) || 0;
+      if (currentIpCount <= 1) {
+        this.connectionCounts.delete(clientIp);
+      } else {
+        this.connectionCounts.set(clientIp, currentIpCount - 1);
+      }
+
+      // Emit hook event
+      this.emitHook('realtime:client:disconnected', {
+        clientId,
+        roomId: fullRoomId,
+        roomType: roomInfo.roomType,
+        timestamp: Date.now(),
+      });
+
+      coreInfo('Handler client disconnected', {
+        operation: 'realtime:server:handler:client:disconnected',
+        clientId,
+        roomType: roomInfo.roomType,
+      });
+    });
+
+    // Emit hook event
+    this.emitHook('realtime:client:connected', {
+      clientId,
+      roomId: fullRoomId,
+      roomType: roomInfo.roomType,
+      timestamp: Date.now(),
+    });
+
+    coreInfo('Handler client connected', {
+      operation: 'realtime:server:handler:client:connected',
+      clientId,
+      roomType: roomInfo.roomType,
     });
   }
 
@@ -3180,5 +3497,41 @@ export class RealtimeServer {
    */
   getRoomManager(): RoomManager | null {
     return this.roomManager;
+  }
+
+  /**
+   * Get handler registry for registering room type handlers
+   */
+  getHandlerRegistry(): HandlerRegistry {
+    return this.handlerRegistry;
+  }
+
+  /**
+   * Register a room type handler
+   *
+   * This allows external modules to handle specific room types.
+   * When a connection is made to a room of the registered type,
+   * the handler's methods will be called instead of default handling.
+   */
+  registerRoomTypeHandler(handler: RoomTypeHandler): void {
+    this.handlerRegistry.registerRoomTypeHandler(handler);
+    coreInfo('Room type handler registered via RealtimeServer', {
+      operation: 'realtime:server:handler:registered',
+      roomType: handler.roomType,
+    });
+  }
+
+  /**
+   * Get connection for a client ID (used by handlers for message routing)
+   */
+  getConnection(clientId: string): WebSocket | undefined {
+    return this.connections.get(clientId);
+  }
+
+  /**
+   * Get all connections map (used by handlers for broadcasting)
+   */
+  getConnections(): Map<string, WebSocket> {
+    return this.connections;
   }
 }

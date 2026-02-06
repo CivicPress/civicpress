@@ -516,7 +516,15 @@
         "insertImage": "Insert Image",
         "showPreview": "Show Preview",
         "hidePreview": "Hide Preview"
-      }
+      },
+      "oneEditing": "{name} editing",
+      "multipleEditing": "{count} people editing",
+      "collaborative": "Collaborative editing",
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "singleUser": "Single user editing",
+      "collaborationError": "Collaboration error"
     },
     "updateRecord": "Update Record",
     "drafts": {

@@ -20,6 +20,7 @@ import type { RoomManager, RealtimeServer } from '@civicpress/realtime';
 // @ts-ignore - @civicpress/storage may not be available in all environments
 import type { CloudUuidStorageService } from '@civicpress/storage';
 import { createDeviceRoomFactory } from './rooms/device-room.js';
+import { createDeviceRoomHandler } from './realtime/device-room-handler.js';
 import { DeviceManager } from './services/device-manager.js';
 import { DeviceAuthService } from './services/device-auth.js';
 import { DeviceConnectionTracker } from './services/device-connection-tracker.js';
@@ -690,6 +691,60 @@ export async function registerBroadcastBoxServices(
       {
         operation: 'broadcast-box:services:device-connection-tracker:not-set',
         error: e?.message || 'unknown',
+      }
+    );
+  }
+
+  // Register device room handler with realtime server's handler registry
+  // This is the new architecture - external modules register handlers instead of injecting services
+  try {
+    const realtimeServer = container.resolve<RealtimeServer>('realtimeServer');
+    if (
+      realtimeServer &&
+      typeof realtimeServer.getHandlerRegistry === 'function'
+    ) {
+      const deviceAuth = container.resolve<DeviceAuthService>(
+        'broadcastBoxDeviceAuth'
+      );
+      const deviceManager = container.resolve<DeviceManager>(
+        'broadcastBoxDeviceManager'
+      );
+      const connectionTracker = container.resolve<DeviceConnectionTracker>(
+        'broadcastBoxConnectionTracker'
+      );
+      const deviceCommandService = container.resolve<DeviceCommandService>(
+        'broadcastBoxDeviceCommandService'
+      );
+      const authService = container.resolve<any>('authService');
+      const db = container.resolve<DatabaseService>('database');
+      const deviceEventModel = new DeviceEventModel(db, logger);
+
+      const deviceRoomHandler = createDeviceRoomHandler({
+        deviceAuthService: deviceAuth,
+        deviceManager,
+        connectionTracker,
+        deviceCommandService,
+        deviceEventModel,
+        authService,
+        logger,
+      });
+
+      realtimeServer.registerRoomTypeHandler(deviceRoomHandler);
+
+      logger.info('Device room handler registered with realtime server', {
+        operation: 'broadcast-box:services:handler:registered',
+        roomType: 'device',
+      });
+    }
+  } catch (e: any) {
+    // Handler registration failed - fall back to legacy setter injection
+    // This is expected if using an older version of realtime module
+    logger.debug(
+      'Device room handler not registered (handler registry may not be available)',
+      {
+        operation: 'broadcast-box:services:handler:not-registered',
+        error: e?.message || 'unknown',
+        note: 'Falling back to legacy setter injection if available',
       }
     );
   }
