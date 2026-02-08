@@ -1220,15 +1220,22 @@ The Storage module uses **Pattern 2: Service Registration** (DI Container):
 
 **Architecture**:
 
-- WebSocket server for real-time communication
-- yjs CRDT for conflict-free collaborative editing
+- WebSocket server with binary y-protocols (sync + awareness)
+- Yjs CRDT for conflict-free collaborative editing
+- Binary sync step 1/step 2 handshake on connection, binary updates thereafter
+- Room management with per-record Yjs documents
+- Snapshot system with database persistence for state recovery
 - Integrates with core via DI container (optional module)
 - Services registered via `registerRealtimeServices()`
 
 **Key Features**:
 
 - Collaborative document editing with conflict resolution
-- WebSocket-based real-time updates
+- Binary y-protocols for optimal WebSocket performance (no JSON wrapping)
+- TipTap rich-text editor integration via Yjs bindings
+- Awareness protocol for cursor positions and user presence
+- Connection rate limiting (per IP and per user)
+- Periodic document snapshots with REST API for recovery
 - Device authentication support (for broadcast-box integration)
 - Automatic initialization after broadcast-box services are registered
 
