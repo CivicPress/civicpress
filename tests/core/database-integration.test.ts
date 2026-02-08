@@ -117,11 +117,13 @@ describe('Database Integration', () => {
         role: 'council',
       });
 
-      // Create session
+      // Create session (use a date far in the future to avoid expiration)
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
       const sessionId = await dbService.createSession(
         userId,
         'hashed_token_123',
-        new Date('2025-12-31')
+        futureDate
       );
 
       expect(sessionId).toBeGreaterThan(0);

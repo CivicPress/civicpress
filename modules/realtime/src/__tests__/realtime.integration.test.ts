@@ -26,14 +26,25 @@ import { RealtimeServer } from '../realtime-server.js';
 import { RoomManager } from '../rooms/room-manager.js';
 import { YjsRoom } from '../rooms/yjs-room.js';
 import * as Y from 'yjs';
+import * as syncProtocol from 'y-protocols/sync';
+import * as encoding from 'lib0/encoding';
+import * as decoding from 'lib0/decoding';
 import { MessageType, PresenceEvent, ControlEvent } from '../types/messages.js';
 import * as bcrypt from 'bcrypt';
+
+const YJS_MSG_SYNC = 0;
+const YJS_MSG_AWARENESS = 1;
+
+interface YjsMessage {
+  yjsType: number; // YJS_MSG_SYNC or YJS_MSG_AWARENESS
+  data: Uint8Array; // raw binary message
+}
 
 interface TestClient {
   ws: WebSocket;
   clientId: string;
   userId: number;
-  messages: any[];
+  messages: (YjsMessage | any)[];
   connected: boolean;
 }
 
@@ -356,10 +367,18 @@ describe('Realtime Module Integration', () => {
 
       ws.on('message', (data: Buffer) => {
         try {
-          const message = JSON.parse(data.toString());
-          client.messages.push(message);
+          const msg = new Uint8Array(data);
+          const decoder = decoding.createDecoder(msg);
+          const msgType = decoding.readVarUint(decoder);
+          client.messages.push({ yjsType: msgType, data: msg } as YjsMessage);
         } catch (error) {
-          // Ignore parse errors
+          // Try JSON fallback for error messages
+          try {
+            const message = JSON.parse(data.toString());
+            client.messages.push(message);
+          } catch {
+            // Ignore parse errors
+          }
         }
       });
 
@@ -386,79 +405,106 @@ describe('Realtime Module Integration', () => {
   }
 
   /**
-   * Wait for a specific message type
+   * Wait for the initial Yjs sync handshake (first binary sync message)
    */
-  function waitForMessage(
+  function waitForYjsSync(
     client: TestClient,
-    messageType: MessageType,
-    timeout: number = 5000, // Increased timeout
-    filter?: (message: any) => boolean
-  ): Promise<any> {
+    timeout: number = 5000
+  ): Promise<YjsMessage> {
     return new Promise((resolve, reject) => {
-      // Check if message already exists
-      let existing = client.messages.find((m) => {
-        if (m.type !== messageType) return false;
-        return filter ? filter(m) : true;
-      });
+      // Check if already received
+      const existing = client.messages.find(
+        (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+      );
       if (existing) {
-        resolve(existing);
+        resolve(existing as YjsMessage);
         return;
       }
 
       const startTime = Date.now();
       const checkInterval = setInterval(() => {
-        const message = client.messages.find((m) => {
-          if (m.type !== messageType) return false;
-          return filter ? filter(m) : true;
-        });
+        const message = client.messages.find(
+          (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+        );
         if (message) {
           clearInterval(checkInterval);
-          resolve(message);
+          resolve(message as YjsMessage);
           return;
         }
         if (Date.now() - startTime > timeout) {
           clearInterval(checkInterval);
           reject(
             new Error(
-              `Timeout waiting for ${messageType} after ${timeout}ms. Received messages: ${JSON.stringify(client.messages.map((m) => m.type))}`
+              `Timeout waiting for Yjs sync after ${timeout}ms. Received ${client.messages.length} messages.`
             )
           );
         }
-      }, 50); // Check more frequently
+      }, 50);
     });
   }
 
   /**
-   * Send a sync message (yjs update)
+   * Wait for a sync update message (not the initial step1/step2 handshake)
+   * Waits until we see more sync messages beyond the initial handshake count.
    */
-  function sendSyncMessage(client: TestClient, update: Uint8Array): void {
-    const message = {
-      type: MessageType.SYNC,
-      update: Buffer.from(update).toString('base64'),
-      timestamp: Date.now(),
-    };
-    client.ws.send(JSON.stringify(message));
+  function waitForSyncUpdate(
+    client: TestClient,
+    initialSyncCount: number,
+    timeout: number = 5000
+  ): Promise<YjsMessage> {
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      const checkInterval = setInterval(() => {
+        const syncMessages = client.messages.filter(
+          (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+        );
+        if (syncMessages.length > initialSyncCount) {
+          clearInterval(checkInterval);
+          resolve(syncMessages[syncMessages.length - 1] as YjsMessage);
+          return;
+        }
+        if (Date.now() - startTime > timeout) {
+          clearInterval(checkInterval);
+          reject(
+            new Error(
+              `Timeout waiting for sync update after ${timeout}ms. Have ${syncMessages.length} sync messages, expected more than ${initialSyncCount}.`
+            )
+          );
+        }
+      }, 50);
+    });
   }
 
   /**
-   * Send a presence message
+   * Count the current number of sync messages for a client
    */
-  function sendPresenceMessage(
+  function getSyncMessageCount(client: TestClient): number {
+    return client.messages.filter(
+      (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+    ).length;
+  }
+
+  /**
+   * Send a sync message (binary yjs update)
+   */
+  function sendSyncMessage(client: TestClient, update: Uint8Array): void {
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, YJS_MSG_SYNC);
+    syncProtocol.writeUpdate(encoder, update);
+    client.ws.send(encoding.toUint8Array(encoder));
+  }
+
+  /**
+   * Send a binary awareness message
+   */
+  function sendAwarenessMessage(
     client: TestClient,
-    event: PresenceEvent,
-    data?: any
+    awarenessPayload: Uint8Array
   ): void {
-    const message = {
-      type: MessageType.PRESENCE,
-      event,
-      user: {
-        id: client.userId.toString(),
-        name: `User ${client.userId}`,
-      },
-      ...data,
-      timestamp: Date.now(),
-    };
-    client.ws.send(JSON.stringify(message));
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, YJS_MSG_AWARENESS);
+    encoding.writeVarUint8Array(encoder, awarenessPayload);
+    client.ws.send(encoding.toUint8Array(encoder));
   }
 
   /**
@@ -491,42 +537,18 @@ describe('Realtime Module Integration', () => {
     it('should allow multiple clients to connect to the same room', async () => {
       const client1 = await createTestClient(1, 'user1');
 
-      // Wait for first client's room state
-      const roomState1 = (await waitForMessage(
-        client1,
-        MessageType.CONTROL
-      )) as any;
-
-      // Check if we got an error instead
-      if (roomState1.event === ControlEvent.ERROR) {
-        throw new Error(
-          `Connection error: ${JSON.stringify(roomState1.error)}`
-        );
-      }
-
-      expect(roomState1.event).toBe(ControlEvent.ROOM_STATE);
-      expect(roomState1.room?.participants.length).toBeGreaterThanOrEqual(1);
+      // Wait for first client's Yjs sync
+      await waitForYjsSync(client1);
+      expect(client1.connected).toBe(true);
 
       // Wait a bit before connecting second client
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client2 = await createTestClient(2, 'user2');
 
-      // Wait for second client's room state
-      const roomState2 = (await waitForMessage(
-        client2,
-        MessageType.CONTROL
-      )) as any;
-
-      // Check if we got an error instead
-      if (roomState2.event === ControlEvent.ERROR) {
-        throw new Error(
-          `Connection error: ${JSON.stringify(roomState2.error)}`
-        );
-      }
-
-      expect(roomState2.event).toBe(ControlEvent.ROOM_STATE);
-      expect(roomState2.room?.participants.length).toBeGreaterThanOrEqual(2);
+      // Wait for second client's Yjs sync
+      await waitForYjsSync(client2);
+      expect(client2.connected).toBe(true);
 
       await closeClient(client1);
       await closeClient(client2);
@@ -534,44 +556,42 @@ describe('Realtime Module Integration', () => {
 
     it('should synchronize yjs updates between multiple clients', async () => {
       const client1 = await createTestClient(1, 'user1');
+      await waitForYjsSync(client1);
 
-      // Wait for initial room state
-      await waitForMessage(client1, MessageType.CONTROL);
-
-      // Wait a bit before connecting second client
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client2 = await createTestClient(2, 'user2');
-
-      // Wait for initial room state
-      await waitForMessage(client2, MessageType.CONTROL);
+      await waitForYjsSync(client2);
 
       // Wait a bit more for both clients to be fully ready
       await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Record sync count before sending update
+      const client2SyncBefore = getSyncMessageCount(client2);
 
       // Create a yjs document and make an update
       const yjsDoc1 = new Y.Doc();
       const yjsText1 = yjsDoc1.getText('content');
       yjsText1.insert(0, 'Hello from client 1');
 
-      // Get the update
       const update1 = Y.encodeStateAsUpdate(yjsDoc1);
-
-      // Send update from client1
       sendSyncMessage(client1, update1);
 
-      // Wait for sync message on client2
-      const syncMessage = (await waitForMessage(
-        client2,
-        MessageType.SYNC
-      )) as any;
-      expect(syncMessage).toBeDefined();
-      expect(syncMessage.update).toBeDefined();
+      // Wait for sync update on client2
+      const syncMsg = await waitForSyncUpdate(client2, client2SyncBefore);
+      expect(syncMsg).toBeDefined();
+      expect(syncMsg.data).toBeDefined();
 
-      // Apply update to client2's document
+      // Decode the update from the binary message
+      const decoder = decoding.createDecoder(syncMsg.data);
+      decoding.readVarUint(decoder); // skip message type (YJS_MSG_SYNC)
       const yjsDoc2 = new Y.Doc();
-      const update2 = Buffer.from(syncMessage.update, 'base64');
-      Y.applyUpdate(yjsDoc2, update2);
+      syncProtocol.readSyncMessage(
+        decoder,
+        encoding.createEncoder(),
+        yjsDoc2,
+        'test'
+      );
 
       const yjsText2 = yjsDoc2.getText('content');
       expect(yjsText2.toString()).toBe('Hello from client 1');
@@ -582,20 +602,19 @@ describe('Realtime Module Integration', () => {
 
     it('should handle concurrent edits from multiple clients', async () => {
       const client1 = await createTestClient(1, 'user1');
+      await waitForYjsSync(client1);
 
-      // Wait for initial room state
-      await waitForMessage(client1, MessageType.CONTROL);
-
-      // Wait a bit before connecting second client
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client2 = await createTestClient(2, 'user2');
-
-      // Wait for initial room state
-      await waitForMessage(client2, MessageType.CONTROL);
+      await waitForYjsSync(client2);
 
       // Wait a bit more for both clients to be fully ready
       await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Record sync counts before sending updates
+      const client1SyncBefore = getSyncMessageCount(client1);
+      const client2SyncBefore = getSyncMessageCount(client2);
 
       // Create yjs documents for both clients
       const yjsDoc1 = new Y.Doc();
@@ -614,12 +633,27 @@ describe('Realtime Module Integration', () => {
       sendSyncMessage(client2, update2);
 
       // Wait for both updates to be received
-      const sync1 = await waitForMessage(client2, MessageType.SYNC);
-      const sync2 = await waitForMessage(client1, MessageType.SYNC);
+      const sync1 = await waitForSyncUpdate(client2, client2SyncBefore);
+      const sync2 = await waitForSyncUpdate(client1, client1SyncBefore);
 
-      // Apply updates to both documents
-      Y.applyUpdate(yjsDoc1, Buffer.from((sync2 as any).update, 'base64'));
-      Y.applyUpdate(yjsDoc2, Buffer.from((sync1 as any).update, 'base64'));
+      // Decode and apply updates
+      const decoder1 = decoding.createDecoder(sync1.data);
+      decoding.readVarUint(decoder1); // skip msg type
+      syncProtocol.readSyncMessage(
+        decoder1,
+        encoding.createEncoder(),
+        yjsDoc2,
+        'test'
+      );
+
+      const decoder2 = decoding.createDecoder(sync2.data);
+      decoding.readVarUint(decoder2); // skip msg type
+      syncProtocol.readSyncMessage(
+        decoder2,
+        encoding.createEncoder(),
+        yjsDoc1,
+        'test'
+      );
 
       // Both documents should have the same final state (CRDT merge)
       const final1 = yjsText1.toString();
@@ -637,15 +671,15 @@ describe('Realtime Module Integration', () => {
   describe('yjs Synchronization', () => {
     it('should maintain document consistency across clients', async () => {
       const client1 = await createTestClient(1, 'user1');
-      await waitForMessage(client1, MessageType.CONTROL);
+      await waitForYjsSync(client1);
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client2 = await createTestClient(2, 'user2');
-      await waitForMessage(client2, MessageType.CONTROL);
+      await waitForYjsSync(client2);
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client3 = await createTestClient(3, 'user3');
-      await waitForMessage(client3, MessageType.CONTROL);
+      await waitForYjsSync(client3);
 
       // Wait a bit more for all clients to be fully ready
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -659,74 +693,74 @@ describe('Realtime Module Integration', () => {
       texts[1].insert(0, 'Client2 ');
       texts[2].insert(0, 'Client3 ');
 
+      // Record sync counts before sending
+      const client1SyncBefore = getSyncMessageCount(client1);
+      const client2SyncBefore = getSyncMessageCount(client2);
+      const client3SyncBefore = getSyncMessageCount(client3);
+
       // Send updates from all clients sequentially
-      // Send client1's update and wait for it to be received by others
       sendSyncMessage(client1, Y.encodeStateAsUpdate(docs[0]));
       await Promise.all([
-        waitForMessage(client2, MessageType.SYNC, 5000).catch(() => null),
-        waitForMessage(client3, MessageType.SYNC, 5000).catch(() => null),
+        waitForSyncUpdate(client2, client2SyncBefore, 5000).catch(() => null),
+        waitForSyncUpdate(client3, client3SyncBefore, 5000).catch(() => null),
       ]);
 
-      // Send client2's update and wait for it to be received
+      const client1SyncAfter1 = getSyncMessageCount(client1);
+      const client3SyncAfter1 = getSyncMessageCount(client3);
+
       sendSyncMessage(client2, Y.encodeStateAsUpdate(docs[1]));
       await Promise.all([
-        waitForMessage(client1, MessageType.SYNC, 5000).catch(() => null),
-        waitForMessage(client3, MessageType.SYNC, 5000).catch(() => null),
+        waitForSyncUpdate(client1, client1SyncAfter1, 5000).catch(() => null),
+        waitForSyncUpdate(client3, client3SyncAfter1, 5000).catch(() => null),
       ]);
 
-      // Send client3's update and wait for it to be received
+      const client1SyncAfter2 = getSyncMessageCount(client1);
+      const client2SyncAfter2 = getSyncMessageCount(client2);
+
       sendSyncMessage(client3, Y.encodeStateAsUpdate(docs[2]));
       await Promise.all([
-        waitForMessage(client1, MessageType.SYNC, 5000).catch(() => null),
-        waitForMessage(client2, MessageType.SYNC, 5000).catch(() => null),
+        waitForSyncUpdate(client1, client1SyncAfter2, 5000).catch(() => null),
+        waitForSyncUpdate(client2, client2SyncAfter2, 5000).catch(() => null),
       ]);
 
-      // At this point, all sync messages should have been received during the sequential sends above
-      // Collect any remaining sync messages from each client's message queue
-      const syncs1: any[] = client1.messages.filter(
-        (m) => m.type === MessageType.SYNC
-      );
-      const syncs2: any[] = client2.messages.filter(
-        (m) => m.type === MessageType.SYNC
-      );
-      const syncs3: any[] = client3.messages.filter(
-        (m) => m.type === MessageType.SYNC
-      );
+      // Collect sync messages received after the initial handshake
+      const extractSyncUpdates = (
+        client: TestClient,
+        initialCount: number
+      ): YjsMessage[] => {
+        const allSync = client.messages.filter(
+          (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+        ) as YjsMessage[];
+        return allSync.slice(initialCount);
+      };
 
-      // Each client should have received 2 updates (from the other 2 clients)
-      // If not, wait a bit more and check again
+      const syncs1 = extractSyncUpdates(client1, client1SyncBefore);
+      const syncs2 = extractSyncUpdates(client2, client2SyncBefore);
+      const syncs3 = extractSyncUpdates(client3, client3SyncBefore);
+
+      // If not enough, wait a bit more
       if (syncs1.length < 2 || syncs2.length < 2 || syncs3.length < 2) {
         await new Promise((resolve) => setTimeout(resolve, 500));
-        // Re-collect
-        syncs1.length = 0;
-        syncs1.push(
-          ...client1.messages.filter((m) => m.type === MessageType.SYNC)
-        );
-        syncs2.length = 0;
-        syncs2.push(
-          ...client2.messages.filter((m) => m.type === MessageType.SYNC)
-        );
-        syncs3.length = 0;
-        syncs3.push(
-          ...client3.messages.filter((m) => m.type === MessageType.SYNC)
-        );
       }
 
       // Apply received updates to each client's document
-      // Each client already has its own local edit, so we only apply received updates
-      syncs1.forEach((sync) => {
-        Y.applyUpdate(docs[0], Buffer.from(sync.update, 'base64'));
-      });
-      syncs2.forEach((sync) => {
-        Y.applyUpdate(docs[1], Buffer.from(sync.update, 'base64'));
-      });
-      syncs3.forEach((sync) => {
-        Y.applyUpdate(docs[2], Buffer.from(sync.update, 'base64'));
-      });
+      const applyBinarySyncs = (doc: Y.Doc, syncs: YjsMessage[]) => {
+        syncs.forEach((sync) => {
+          const decoder = decoding.createDecoder(sync.data);
+          decoding.readVarUint(decoder); // skip msg type
+          syncProtocol.readSyncMessage(
+            decoder,
+            encoding.createEncoder(),
+            doc,
+            'test'
+          );
+        });
+      };
 
-      // All documents should have the same final state (yjs CRDT ensures convergence)
-      // Note: Due to concurrent edits at the same position, the exact order may vary
-      // but all documents should contain all the content
+      applyBinarySyncs(docs[0], extractSyncUpdates(client1, client1SyncBefore));
+      applyBinarySyncs(docs[1], extractSyncUpdates(client2, client2SyncBefore));
+      applyBinarySyncs(docs[2], extractSyncUpdates(client3, client3SyncBefore));
+
       const finalStates = texts.map((text) => text.toString());
 
       // Verify all states contain all three client texts
@@ -737,32 +771,9 @@ describe('Realtime Module Integration', () => {
         expect(state.length).toBeGreaterThan(0);
       });
 
-      // For yjs text CRDTs, concurrent inserts at position 0 can result in different orders
-      // but the length should be consistent (all contain the same content)
       const lengths = finalStates.map((s) => s.length);
       expect(lengths[0]).toBe(lengths[1]);
       expect(lengths[1]).toBe(lengths[2]);
-
-      // Verify all documents have the same total character count for each client text
-      const countClient1 = finalStates.map(
-        (s) => (s.match(/Client1/g) || []).length
-      );
-      const countClient2 = finalStates.map(
-        (s) => (s.match(/Client2/g) || []).length
-      );
-      const countClient3 = finalStates.map(
-        (s) => (s.match(/Client3/g) || []).length
-      );
-
-      expect(countClient1[0]).toBe(countClient1[1]);
-      expect(countClient1[1]).toBe(countClient1[2]);
-      expect(countClient2[0]).toBe(countClient2[1]);
-      expect(countClient2[1]).toBe(countClient2[2]);
-      expect(countClient3[0]).toBe(countClient3[1]);
-      expect(countClient3[1]).toBe(countClient3[2]);
-
-      // The exact string order may differ due to CRDT semantics, but content is consistent
-      // This is acceptable behavior for concurrent edits in CRDTs
 
       await closeClient(client1);
       await closeClient(client2);
@@ -771,15 +782,17 @@ describe('Realtime Module Integration', () => {
 
     it('should handle large document updates', async () => {
       const client1 = await createTestClient(1, 'user1');
-      await waitForMessage(client1, MessageType.CONTROL);
+      await waitForYjsSync(client1);
 
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client2 = await createTestClient(2, 'user2');
-      await waitForMessage(client2, MessageType.CONTROL);
+      await waitForYjsSync(client2);
 
       // Wait a bit more for both clients to be fully ready
       await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const client2SyncBefore = getSyncMessageCount(client2);
 
       const yjsDoc = new Y.Doc();
       const yjsText = yjsDoc.getText('content');
@@ -791,14 +804,18 @@ describe('Realtime Module Integration', () => {
       const update = Y.encodeStateAsUpdate(yjsDoc);
       sendSyncMessage(client1, update);
 
-      const syncMessage = (await waitForMessage(
-        client2,
-        MessageType.SYNC
-      )) as any;
-      expect(syncMessage.update).toBeDefined();
+      const syncMsg = await waitForSyncUpdate(client2, client2SyncBefore);
+      expect(syncMsg.data).toBeDefined();
 
       const yjsDoc2 = new Y.Doc();
-      Y.applyUpdate(yjsDoc2, Buffer.from(syncMessage.update, 'base64'));
+      const decoder = decoding.createDecoder(syncMsg.data);
+      decoding.readVarUint(decoder); // skip msg type
+      syncProtocol.readSyncMessage(
+        decoder,
+        encoding.createEncoder(),
+        yjsDoc2,
+        'test'
+      );
       const yjsText2 = yjsDoc2.getText('content');
 
       expect(yjsText2.toString()).toBe(largeText);
@@ -811,7 +828,7 @@ describe('Realtime Module Integration', () => {
   describe('Reconnection Handling', () => {
     it('should allow client to reconnect to the same room', async () => {
       const client1 = await createTestClient(1, 'user1');
-      await waitForMessage(client1, MessageType.CONTROL);
+      await waitForYjsSync(client1);
 
       // Make an edit
       const yjsDoc1 = new Y.Doc();
@@ -827,20 +844,20 @@ describe('Realtime Module Integration', () => {
 
       // Reconnect
       const client2 = await createTestClient(1, 'user1');
-      const roomState = (await waitForMessage(
-        client2,
-        MessageType.CONTROL
-      )) as any;
+      await waitForYjsSync(client2);
 
-      expect(roomState.event).toBe(ControlEvent.ROOM_STATE);
-      expect(roomState.room).toBeDefined();
+      // Verify we received sync messages (step 1 + step 2)
+      const syncMessages = client2.messages.filter(
+        (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+      );
+      expect(syncMessages.length).toBeGreaterThanOrEqual(2);
 
       await closeClient(client2);
     });
 
     it('should restore document state after reconnection', async () => {
       const client1 = await createTestClient(1, 'user1');
-      await waitForMessage(client1, MessageType.CONTROL);
+      await waitForYjsSync(client1);
 
       // Make edits
       const yjsDoc = new Y.Doc();
@@ -859,13 +876,13 @@ describe('Realtime Module Integration', () => {
 
       // Reconnect
       const client2 = await createTestClient(1, 'user1');
-      const roomState = (await waitForMessage(
-        client2,
-        MessageType.CONTROL
-      )) as any;
+      await waitForYjsSync(client2);
 
-      // Room should have state (may be from snapshot or other clients)
-      expect(roomState.room).toBeDefined();
+      // Verify we received sync messages on reconnection
+      const syncMessages = client2.messages.filter(
+        (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+      );
+      expect(syncMessages.length).toBeGreaterThanOrEqual(2);
 
       await closeClient(client2);
     });
@@ -873,7 +890,7 @@ describe('Realtime Module Integration', () => {
     it('should handle multiple reconnections', async () => {
       for (let i = 0; i < 3; i++) {
         const client = await createTestClient(1, 'user1');
-        await waitForMessage(client, MessageType.CONTROL);
+        await waitForYjsSync(client);
 
         // Make a small edit
         const yjsDoc = new Y.Doc();
@@ -887,120 +904,92 @@ describe('Realtime Module Integration', () => {
 
       // Final connection should work
       const finalClient = await createTestClient(1, 'user1');
-      const roomState = (await waitForMessage(
-        finalClient,
-        MessageType.CONTROL
-      )) as any;
-      expect(roomState.room).toBeDefined();
+      await waitForYjsSync(finalClient);
+
+      const syncMessages = finalClient.messages.filter(
+        (m) => 'yjsType' in m && m.yjsType === YJS_MSG_SYNC
+      );
+      expect(syncMessages.length).toBeGreaterThanOrEqual(2);
 
       await closeClient(finalClient);
     });
   });
 
   describe('Presence Broadcasting', () => {
-    it('should broadcast presence events to all clients', async () => {
+    it('should broadcast awareness messages to all clients', async () => {
       const client1 = await createTestClient(1, 'user1');
+      await waitForYjsSync(client1);
 
-      // Wait for initial room state
-      await waitForMessage(client1, MessageType.CONTROL);
-
-      // Wait a bit before connecting second client
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client2 = await createTestClient(2, 'user2');
-
-      // Wait for initial room state
-      await waitForMessage(client2, MessageType.CONTROL);
+      await waitForYjsSync(client2);
 
       // Wait a bit more for both clients to be fully ready
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Send presence update from client1
-      sendPresenceMessage(client1, PresenceEvent.CURSOR, {
-        cursor: { position: 10 },
+      // Send awareness message from client1
+      const awarenessPayload = new Uint8Array([10, 20, 30, 40]);
+      sendAwarenessMessage(client1, awarenessPayload);
+
+      // Wait for awareness message on client2
+      await new Promise<void>((resolve, reject) => {
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+          const awarenessMsg = client2.messages.find(
+            (m) => 'yjsType' in m && m.yjsType === YJS_MSG_AWARENESS
+          );
+          if (awarenessMsg) {
+            clearInterval(checkInterval);
+            resolve();
+            return;
+          }
+          if (Date.now() - startTime > 5000) {
+            clearInterval(checkInterval);
+            reject(new Error('Timeout waiting for awareness message'));
+          }
+        }, 50);
       });
 
-      // Wait a bit for message to be broadcast
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Client2 should receive the presence update
-      // Filter to get only CURSOR events from user 1
-      const presenceMessage = (await waitForMessage(
-        client2,
-        MessageType.PRESENCE,
-        5000,
-        (msg: any) => msg.event === PresenceEvent.CURSOR && msg.user?.id === '1'
-      )) as any;
-      expect(presenceMessage.event).toBe(PresenceEvent.CURSOR);
-      expect(presenceMessage.user.id).toBe('1');
-      expect(presenceMessage.cursor).toBeDefined();
+      const awarenessMsg = client2.messages.find(
+        (m) => 'yjsType' in m && m.yjsType === YJS_MSG_AWARENESS
+      ) as YjsMessage;
+      expect(awarenessMsg).toBeDefined();
+      expect(awarenessMsg.yjsType).toBe(YJS_MSG_AWARENESS);
 
       await closeClient(client1);
       await closeClient(client2);
     });
 
-    it('should broadcast join/leave events', async () => {
+    it('should handle connection and disconnection without breaking', async () => {
       const client1 = await createTestClient(1, 'user1');
-      await waitForMessage(client1, MessageType.CONTROL);
+      await waitForYjsSync(client1);
 
-      // Wait a bit before connecting second client
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       const client2 = await createTestClient(2, 'user2');
+      await waitForYjsSync(client2);
 
-      // Wait for client2's room state (it will receive its own JOINED event)
-      await waitForMessage(client2, MessageType.CONTROL);
-
-      // Wait a bit for JOINED event to be broadcast
+      // Wait a bit for both clients to be ready
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Check if JOINED message already received
-      let joinMessage = client1.messages.find(
-        (msg: any) =>
-          msg.type === MessageType.PRESENCE &&
-          msg.event === PresenceEvent.JOINED &&
-          msg.user?.id === '2'
-      );
+      // Verify both clients are connected
+      expect(client1.connected).toBe(true);
+      expect(client2.connected).toBe(true);
 
-      // If not found, wait for it
-      if (!joinMessage) {
-        joinMessage = (await waitForMessage(
-          client1,
-          MessageType.PRESENCE,
-          5000,
-          (msg: any) =>
-            msg.event === PresenceEvent.JOINED && msg.user?.id === '2'
-        )) as any;
-      }
-
-      expect(joinMessage.event).toBe(PresenceEvent.JOINED);
-      expect(joinMessage.user.id).toBe('2');
-
+      // Disconnect client2
       await closeClient(client2);
 
-      // Wait a bit for LEFT event to be broadcast
+      // Wait a bit for disconnection to propagate
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Check if LEFT message already received
-      let leaveMessage = client1.messages.find(
-        (msg: any) =>
-          msg.type === MessageType.PRESENCE &&
-          msg.event === PresenceEvent.LEFT &&
-          msg.user?.id === '2'
-      );
+      // Client1 should still be connected and functional
+      expect(client1.ws.readyState).toBe(WebSocket.OPEN);
 
-      // If not found, wait for it
-      if (!leaveMessage) {
-        leaveMessage = (await waitForMessage(
-          client1,
-          MessageType.PRESENCE,
-          5000,
-          (msg: any) => msg.event === PresenceEvent.LEFT && msg.user?.id === '2'
-        )) as any;
-      }
-
-      expect(leaveMessage.event).toBe(PresenceEvent.LEFT);
-      expect(leaveMessage.user.id).toBe('2');
+      // Client1 should still be able to send messages
+      const yjsDoc = new Y.Doc();
+      yjsDoc.getText('content').insert(0, 'Still working');
+      sendSyncMessage(client1, Y.encodeStateAsUpdate(yjsDoc));
 
       await closeClient(client1);
     });

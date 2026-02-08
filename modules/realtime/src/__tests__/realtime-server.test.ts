@@ -24,7 +24,13 @@ import {
 } from '../errors/realtime-errors.js';
 import { MessageType, PresenceEvent, ControlEvent } from '../types/messages.js';
 import * as Y from 'yjs';
+import * as syncProtocol from 'y-protocols/sync';
+import * as encoding from 'lib0/encoding';
+import * as decoding from 'lib0/decoding';
 import { join } from 'path';
+
+const YJS_MSG_SYNC = 0;
+const YJS_MSG_AWARENESS = 1;
 
 describe('RealtimeServer', () => {
   let realtimeServer: RealtimeServer;
@@ -461,7 +467,7 @@ describe('RealtimeServer', () => {
       }
     });
 
-    it('should handle ping message and respond with pong', async () => {
+    it('should receive Yjs sync step 1 on connection', async () => {
       return new Promise<void>((resolve, reject) => {
         ws = new WebSocket(
           `ws://127.0.0.1:${serverPort}/realtime/records/test-record-1`,
@@ -477,21 +483,19 @@ describe('RealtimeServer', () => {
           reject(new Error('Test timeout'));
         }, 3000);
 
-        ws.on('open', () => {
-          // Send ping
-          ws.send(JSON.stringify({ type: MessageType.PING }));
-        });
-
         ws.on('message', (data: Buffer) => {
           try {
-            const message = JSON.parse(data.toString());
-            if (message.type === MessageType.PONG) {
+            const message = new Uint8Array(data);
+            const decoder = decoding.createDecoder(message);
+            const msgType = decoding.readVarUint(decoder);
+            if (msgType === YJS_MSG_SYNC) {
+              // First sync message should be sync step 1
               clearTimeout(timeout);
               ws.close();
               resolve();
             }
           } catch (error) {
-            // Ignore other messages
+            // Ignore parse errors
           }
         });
 
@@ -502,7 +506,7 @@ describe('RealtimeServer', () => {
       });
     });
 
-    it('should send room state on connection', async () => {
+    it('should send Yjs sync step 1 and step 2 on connection', async () => {
       return new Promise<void>((resolve, reject) => {
         ws = new WebSocket(
           `ws://127.0.0.1:${serverPort}/realtime/records/test-record-1`,
@@ -518,22 +522,21 @@ describe('RealtimeServer', () => {
           reject(new Error('Test timeout'));
         }, 3000);
 
-        ws.on('open', () => {
-          // Wait for room state
-        });
+        const syncMessages: Uint8Array[] = [];
 
         ws.on('message', (data: Buffer) => {
           try {
-            const message = JSON.parse(data.toString());
-            if (
-              message.type === MessageType.CONTROL &&
-              message.event === ControlEvent.ROOM_STATE
-            ) {
-              expect(message.room).toBeDefined();
-              expect(message.room.id).toBeDefined();
-              clearTimeout(timeout);
-              ws.close();
-              resolve();
+            const message = new Uint8Array(data);
+            const decoder = decoding.createDecoder(message);
+            const msgType = decoding.readVarUint(decoder);
+            if (msgType === YJS_MSG_SYNC) {
+              syncMessages.push(message);
+              // We expect at least 2 sync messages (step 1 + step 2)
+              if (syncMessages.length >= 2) {
+                clearTimeout(timeout);
+                ws.close();
+                resolve();
+              }
             }
           } catch (error) {
             // Ignore parse errors
@@ -551,7 +554,6 @@ describe('RealtimeServer', () => {
       return new Promise<void>((resolve, reject) => {
         let client1: WebSocket;
         let client2: WebSocket;
-        let client1Received = false;
 
         const timeout = setTimeout(() => {
           if (client1) client1.close();
@@ -569,24 +571,23 @@ describe('RealtimeServer', () => {
           }
         );
 
-        client1.on('open', () => {
-          // Wait for room state
-          let roomStateReceived = false;
-          client1.on('message', (data: Buffer) => {
-            try {
-              const message = JSON.parse(data.toString());
-              if (
-                message.type === MessageType.CONTROL &&
-                message.event === ControlEvent.ROOM_STATE
-              ) {
-                roomStateReceived = true;
-              }
-            } catch (error) {
-              // Ignore
-            }
-          });
+        let client1SyncCount = 0;
 
-          // Connect second client after first is ready
+        client1.on('message', (data: Buffer) => {
+          try {
+            const msg = new Uint8Array(data);
+            const decoder = decoding.createDecoder(msg);
+            const msgType = decoding.readVarUint(decoder);
+            if (msgType === YJS_MSG_SYNC) {
+              client1SyncCount++;
+            }
+          } catch (error) {
+            // Ignore
+          }
+        });
+
+        client1.on('open', () => {
+          // Wait for initial sync handshake (step 1 + step 2)
           setTimeout(() => {
             client2 = new WebSocket(
               `ws://127.0.0.1:${serverPort}/realtime/records/test-record-1`,
@@ -597,47 +598,46 @@ describe('RealtimeServer', () => {
               }
             );
 
-            client2.on('open', () => {
-              // Wait for room state, then send sync
-              let roomStateReceived2 = false;
-              client2.on('message', (data: Buffer) => {
-                try {
-                  const message = JSON.parse(data.toString());
-                  if (
-                    message.type === MessageType.CONTROL &&
-                    message.event === ControlEvent.ROOM_STATE
-                  ) {
-                    roomStateReceived2 = true;
-                  } else if (
-                    message.type === MessageType.SYNC &&
-                    roomStateReceived2
-                  ) {
-                    // Client2 received sync from client1
+            let client2InitialSyncCount = 0;
+            let client2Ready = false;
+
+            client2.on('message', (data: Buffer) => {
+              try {
+                const msg = new Uint8Array(data);
+                const decoder = decoding.createDecoder(msg);
+                const msgType = decoding.readVarUint(decoder);
+                if (msgType === YJS_MSG_SYNC) {
+                  if (!client2Ready) {
+                    client2InitialSyncCount++;
+                    if (client2InitialSyncCount >= 2) {
+                      client2Ready = true;
+                    }
+                  } else {
+                    // This is the update from client1
                     clearTimeout(timeout);
                     client1.close();
                     client2.close();
                     resolve();
                   }
-                } catch (error) {
-                  // Ignore
                 }
-              });
+              } catch (error) {
+                // Ignore
+              }
+            });
 
-              // Send sync message from client1 after both are ready
+            client2.on('open', () => {
+              // Wait for client2's initial sync handshake, then send update from client1
               setTimeout(() => {
-                if (roomStateReceived && roomStateReceived2) {
-                  const yjsDoc = new Y.Doc();
-                  const yjsText = yjsDoc.getText('content');
-                  yjsText.insert(0, 'Test update');
-                  const update = Y.encodeStateAsUpdate(yjsDoc);
+                const yjsDoc = new Y.Doc();
+                const yjsText = yjsDoc.getText('content');
+                yjsText.insert(0, 'Test update');
+                const update = Y.encodeStateAsUpdate(yjsDoc);
 
-                  client1.send(
-                    JSON.stringify({
-                      type: MessageType.SYNC,
-                      update: Buffer.from(update).toString('base64'),
-                    })
-                  );
-                }
+                // Send as binary Yjs sync update
+                const encoder = encoding.createEncoder();
+                encoding.writeVarUint(encoder, YJS_MSG_SYNC);
+                syncProtocol.writeUpdate(encoder, update);
+                client1.send(encoding.toUint8Array(encoder));
               }, 500);
             });
 
@@ -657,7 +657,7 @@ describe('RealtimeServer', () => {
       });
     });
 
-    it('should route presence messages (cursor updates)', async () => {
+    it('should route awareness messages to other clients', async () => {
       return new Promise<void>((resolve, reject) => {
         let client1: WebSocket;
         let client2: WebSocket;
@@ -679,54 +679,54 @@ describe('RealtimeServer', () => {
         );
 
         client1.on('open', () => {
-          // Connect second client
-          client2 = new WebSocket(
-            `ws://127.0.0.1:${serverPort}/realtime/records/test-record-1`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          client2.on('open', () => {
-            // Wait a bit for both to be ready
-            setTimeout(() => {
-              // Send cursor update from client1
-              client1.send(
-                JSON.stringify({
-                  type: MessageType.PRESENCE,
-                  event: PresenceEvent.CURSOR,
-                  cursor: { position: 10 },
-                })
-              );
-            }, 500);
-          });
-
-          client2.on('message', (data: Buffer) => {
-            try {
-              const message = JSON.parse(data.toString());
-              if (
-                message.type === MessageType.PRESENCE &&
-                message.event === PresenceEvent.CURSOR
-              ) {
-                expect(message.cursor).toBeDefined();
-                expect(message.cursor.position).toBe(10);
-                clearTimeout(timeout);
-                client1.close();
-                client2.close();
-                resolve();
+          // Wait for initial sync
+          setTimeout(() => {
+            // Connect second client
+            client2 = new WebSocket(
+              `ws://127.0.0.1:${serverPort}/realtime/records/test-record-1`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
               }
-            } catch (error) {
-              // Ignore
-            }
-          });
+            );
 
-          client2.on('error', (error) => {
-            clearTimeout(timeout);
-            if (client1) client1.close();
-            reject(error);
-          });
+            client2.on('open', () => {
+              // Wait for initial sync, then send awareness from client1
+              setTimeout(() => {
+                // Build a binary awareness message
+                const encoder = encoding.createEncoder();
+                encoding.writeVarUint(encoder, YJS_MSG_AWARENESS);
+                // Write some awareness payload bytes
+                const awarenessPayload = new Uint8Array([1, 2, 3, 4]);
+                encoding.writeVarUint8Array(encoder, awarenessPayload);
+                client1.send(encoding.toUint8Array(encoder));
+              }, 500);
+            });
+
+            client2.on('message', (data: Buffer) => {
+              try {
+                const msg = new Uint8Array(data);
+                const decoder = decoding.createDecoder(msg);
+                const msgType = decoding.readVarUint(decoder);
+                if (msgType === YJS_MSG_AWARENESS) {
+                  // Client2 received the awareness message
+                  clearTimeout(timeout);
+                  client1.close();
+                  client2.close();
+                  resolve();
+                }
+              } catch (error) {
+                // Ignore
+              }
+            });
+
+            client2.on('error', (error) => {
+              clearTimeout(timeout);
+              if (client1) client1.close();
+              reject(error);
+            });
+          }, 500);
         });
 
         client1.on('error', (error) => {
