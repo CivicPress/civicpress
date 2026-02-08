@@ -211,9 +211,6 @@ export const useAuthStore = defineStore('auth', {
         if (this.token) {
           await useNuxtApp().$civicApi('/api/v1/auth/logout', {
             method: 'POST',
-            headers: {
-              Authorization: `Bearer ${this.token}`,
-            },
           });
         }
       } catch (error) {
@@ -300,9 +297,6 @@ export const useAuthStore = defineStore('auth', {
 
         const response = (await nuxtApp.$civicApi('/api/v1/auth/me', {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
         })) as any;
 
         if (response.success) {
@@ -339,9 +333,6 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = (await useNuxtApp().$civicApi('/api/v1/auth/me', {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
         })) as any;
 
         if (response.success) {

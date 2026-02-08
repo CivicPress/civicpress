@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, nextTick, shallowRef } from 'vue';
+import { onUnmounted, ref, watch, nextTick } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import Image from '@tiptap/extension-image';
 import Collaboration from '@tiptap/extension-collaboration';
-import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
-import type { Editor } from '@tiptap/core';
+import { CollaborationCursorFixed } from './CollaborationCursorFixed';
 import type * as Y from 'yjs';
 import type { WebsocketProvider } from 'y-websocket';
 
@@ -59,8 +58,8 @@ const getExtensions = () => {
   const extensions: any[] = [
     StarterKit.configure({
       // Disable undo/redo when in collaborative mode (Yjs handles this)
-      undoRedo: props.collaborativeMode ? false : undefined,
-    }),
+      ...(props.collaborativeMode ? { undoRedo: false } : {}),
+    } as any),
     // Markdown extension for import/export (disabled in collaborative mode to avoid conflicts)
     ...(props.collaborativeMode
       ? []
@@ -85,7 +84,7 @@ const getExtensions = () => {
     );
 
     extensions.push(
-      CollaborationCursor.configure({
+      CollaborationCursorFixed.configure({
         provider: props.wsProvider,
         user: props.currentUser || { name: 'Anonymous', color: '#888888' },
       })
@@ -96,9 +95,10 @@ const getExtensions = () => {
 };
 
 // Initialize editor
+// In collaborative mode, don't pass content - it comes from the Yjs document
 const editor = useEditor({
   extensions: getExtensions(),
-  content: props.modelValue,
+  ...(props.collaborativeMode ? {} : { content: props.modelValue }),
   editable: !props.disabled,
   editorProps: {
     attributes: {
@@ -124,10 +124,12 @@ const editor = useEditor({
 });
 
 // Update content when modelValue changes externally
+// Skip in collaborative mode - Yjs handles content sync, and calling setContent()
+// would reset the cursor position on every keystroke due to the v-model loop.
 watch(
   () => props.modelValue,
   (newValue) => {
-    if (!editor.value) return;
+    if (!editor.value || props.collaborativeMode) return;
 
     // Get current markdown content using v3 API
     const currentMarkdown = (editor.value as any).getMarkdown?.() ?? '';

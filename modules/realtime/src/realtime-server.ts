@@ -59,21 +59,43 @@ import {
   FilesystemSnapshotStorage,
 } from './persistence/storage.js';
 import { YjsRoom } from './rooms/yjs-room.js';
+import * as Y from 'yjs';
+import * as syncProtocol from 'y-protocols/sync';
+import * as awarenessProtocol from 'y-protocols/awareness';
+import * as encoding from 'lib0/encoding';
+import * as decoding from 'lib0/decoding';
+
+// y-websocket message types
+const YJS_MSG_SYNC = 0;
+const YJS_MSG_AWARENESS = 1;
 
 /**
  * Generate a consistent color for a user based on their ID
  * Uses a predefined palette of distinct, accessible colors
  */
 const PARTICIPANT_COLORS = [
-  '#F44336', '#E91E63', '#9C27B0', '#673AB7',
-  '#3F51B5', '#2196F3', '#03A9F4', '#00BCD4',
-  '#009688', '#4CAF50', '#8BC34A', '#CDDC39',
-  '#FFC107', '#FF9800', '#FF5722', '#795548',
+  '#F44336',
+  '#E91E63',
+  '#9C27B0',
+  '#673AB7',
+  '#3F51B5',
+  '#2196F3',
+  '#03A9F4',
+  '#00BCD4',
+  '#009688',
+  '#4CAF50',
+  '#8BC34A',
+  '#CDDC39',
+  '#FFC107',
+  '#FF9800',
+  '#FF5722',
+  '#795548',
 ];
 
 function generateParticipantColor(userId: string | number): string {
   // Convert to number and use modulo to pick from palette
-  const numericId = typeof userId === 'number' ? userId : parseInt(String(userId), 10) || 0;
+  const numericId =
+    typeof userId === 'number' ? userId : parseInt(String(userId), 10) || 0;
   const index = Math.abs(numericId) % PARTICIPANT_COLORS.length;
   return PARTICIPANT_COLORS[index] || '#3F51B5';
 }
@@ -1059,7 +1081,8 @@ export class RealtimeServer {
       roomInfo.roomId,
       this.authService,
       this.recordManager,
-      this.logger
+      this.logger,
+      this.databaseService
     );
 
     // Track connection
@@ -1113,26 +1136,99 @@ export class RealtimeServer {
       username: auth.user.username || auth.user.name || 'Unknown',
     });
 
-    // Send room state
-    this.sendRoomState(ws, room);
+    // Use y-websocket binary protocol for record rooms
+    const yjsDoc = room.getYjsDoc();
 
-    // Send presence joined message
-    this.broadcastToRoom(
-      room,
-      this.presenceManager.createPresenceMessage(
-        PresenceEvent.JOINED,
-        auth.user.id.toString(),
-        presence.username,
-        presence.color
-      ),
-      clientId
-    );
+    // Listen for Yjs doc updates and broadcast to other clients
+    const updateHandler = (update: Uint8Array, origin: any) => {
+      // Don't echo back to the client that sent the update
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, YJS_MSG_SYNC);
+      syncProtocol.writeUpdate(encoder, update);
+      const message = encoding.toUint8Array(encoder);
 
-    // Setup message handlers
-    this.setupMessageHandlers(ws, clientId, room, auth);
+      const clients = room.getClients();
+      clients.forEach((_conn: any, otherClientId: string) => {
+        if (otherClientId !== origin) {
+          const otherWs = this.connections.get(otherClientId);
+          if (otherWs && otherWs.readyState === WebSocket.OPEN) {
+            otherWs.send(message);
+          }
+        }
+      });
+    };
+    yjsDoc.on('update', updateHandler);
+
+    // Send Yjs sync step 1 to client
+    {
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, YJS_MSG_SYNC);
+      syncProtocol.writeSyncStep1(encoder, yjsDoc);
+      ws.send(encoding.toUint8Array(encoder));
+    }
+
+    // Send current document state as sync step 2
+    {
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, YJS_MSG_SYNC);
+      syncProtocol.writeSyncStep2(encoder, yjsDoc);
+      ws.send(encoding.toUint8Array(encoder));
+    }
+
+    // Setup y-websocket binary message handler
+    ws.on('message', (data: Buffer) => {
+      try {
+        const message = new Uint8Array(data);
+        const decoder = decoding.createDecoder(message);
+        const messageType = decoding.readVarUint(decoder);
+
+        switch (messageType) {
+          case YJS_MSG_SYNC: {
+            const encoder = encoding.createEncoder();
+            encoding.writeVarUint(encoder, YJS_MSG_SYNC);
+            syncProtocol.readSyncMessage(decoder, encoder, yjsDoc, clientId);
+            // If the encoder has data (sync step 2 response), send it back to this client
+            if (encoding.length(encoder) > 1) {
+              ws.send(encoding.toUint8Array(encoder));
+            }
+            break;
+          }
+          case YJS_MSG_AWARENESS: {
+            // Broadcast awareness to all other clients in the room
+            const clients = room.getClients();
+            clients.forEach((_conn: any, otherClientId: string) => {
+              if (otherClientId !== clientId) {
+                const otherWs = this.connections.get(otherClientId);
+                if (otherWs && otherWs.readyState === WebSocket.OPEN) {
+                  otherWs.send(data);
+                }
+              }
+            });
+            break;
+          }
+          default:
+            coreWarn('Unknown y-websocket message type', {
+              operation: 'realtime:server:yjs:unknown-message',
+              clientId,
+              messageType,
+            });
+        }
+      } catch (error) {
+        coreError(
+          error instanceof Error ? error : new Error(String(error)),
+          'YJS_MESSAGE_ERROR',
+          { error: error instanceof Error ? error.message : String(error) },
+          {
+            operation: 'realtime:server:yjs:message:error',
+            clientId,
+          }
+        );
+      }
+    });
 
     // Setup disconnect handler
     ws.on('close', () => {
+      yjsDoc.off('update', updateHandler);
       this.handleDisconnect(clientId, room);
     });
 
@@ -3558,10 +3654,13 @@ export class RealtimeServer {
     recordId: string
   ): Promise<{ roomId: string; version: number; timestamp: number } | null> {
     if (!this.roomManager || !this.snapshotManager) {
-      coreWarn('Cannot trigger snapshot: room manager or snapshot manager not initialized', {
-        operation: 'realtime:snapshot:trigger:error',
-        recordId,
-      });
+      coreWarn(
+        'Cannot trigger snapshot: room manager or snapshot manager not initialized',
+        {
+          operation: 'realtime:snapshot:trigger:error',
+          recordId,
+        }
+      );
       return null;
     }
 

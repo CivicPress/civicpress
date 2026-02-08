@@ -124,7 +124,8 @@ export function useRealtimeEditor(
     const url = new URL(apiUrl);
     // Realtime server runs on port 3001
     const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${url.hostname}:3001`;
+    // Include /realtime base path - y-websocket appends the room name as a path segment
+    return `${protocol}//${url.hostname}:3001/realtime`;
   }
 
   /**
@@ -190,12 +191,11 @@ export function useRealtimeEditor(
     setStatus('connecting');
 
     const realtimeUrl = getRealtimeUrl();
-    const roomName = `records:${id}`;
+    // Room name becomes a path segment: /realtime/records/{id}
+    const roomName = `records/${id}`;
     const token = authStore.token;
 
-    console.log(
-      `[useRealtimeEditor] Connecting to ${realtimeUrl}/realtime/records/${id}`
-    );
+    console.log(`[useRealtimeEditor] Connecting to ${realtimeUrl}/${roomName}`);
 
     try {
       // Create WebSocket provider with authentication
@@ -246,7 +246,7 @@ export function useRealtimeEditor(
         );
       });
 
-      // Connection close handler for reconnection
+      // Connection close handler (y-websocket handles reconnection internally)
       provider.on(
         'connection-close',
         (event: CloseEvent | null, _provider: WebsocketProvider) => {
@@ -255,24 +255,6 @@ export function useRealtimeEditor(
           console.log(
             `[useRealtimeEditor] Connection closed: ${code} ${reason}`
           );
-
-          // Handle reconnection with exponential backoff
-          if (code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            const delay =
-              RECONNECT_DELAYS[reconnectAttempts] ||
-              RECONNECT_DELAYS[RECONNECT_DELAYS.length - 1];
-            reconnectAttempts++;
-
-            console.log(
-              `[useRealtimeEditor] Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`
-            );
-
-            setTimeout(() => {
-              if (!wsProvider.value?.wsconnected) {
-                connect();
-              }
-            }, delay);
-          }
         }
       );
 

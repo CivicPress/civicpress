@@ -43,7 +43,8 @@ export async function authenticateConnection(
   recordId: string,
   authService: AuthService,
   recordManager: any, // RecordManager - avoiding circular dependency
-  logger: Logger
+  logger: Logger,
+  databaseService?: any // DatabaseService - for draft record lookup
 ): Promise<AuthenticatedConnection> {
   // Validate token
   const user = await authService.validateSession(token);
@@ -54,8 +55,12 @@ export async function authenticateConnection(
     throw new AuthenticationFailedError();
   }
 
-  // Check if record exists
-  const record = await recordManager.getRecord(recordId);
+  // Check if record exists (published records or drafts)
+  let record = await recordManager.getRecord(recordId);
+  if (!record && databaseService?.getDraft) {
+    // Record may be a draft that hasn't been published yet
+    record = await databaseService.getDraft(recordId);
+  }
   if (!record) {
     coreWarn('WebSocket connection failed: record not found', {
       operation: 'realtime:auth',

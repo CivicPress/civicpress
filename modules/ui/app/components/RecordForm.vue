@@ -1211,6 +1211,7 @@ defineExpose({
           <!-- Editor -->
           <div class="flex-1 overflow-hidden">
             <TipTapEditor
+              :key="`editor-${collaborativeMode}-${!!realtimeEditor.wsProvider.value}`"
               ref="editorRef"
               v-model="form.markdownBody"
               :disabled="saving || isLocked"

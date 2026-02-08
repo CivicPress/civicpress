@@ -35,11 +35,12 @@
   "license": "MIT",
   "dependencies": {
     "@civicpress/core": "workspace:*",
+    "fs-extra": "^11.2.0",
+    "lib0": "0.2.117",
     "ws": "^8.18.0",
-    "yjs": "^13.6.10",
     "y-protocols": "^1.0.6",
     "yaml": "^2.6.1",
-    "fs-extra": "^11.2.0"
+    "yjs": "^13.6.10"
   },
   "devDependencies": {
     "@types/ws": "^8.5.13",

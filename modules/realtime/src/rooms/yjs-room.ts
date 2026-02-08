@@ -310,6 +310,13 @@ export class YjsRoom implements Room {
   }
 
   /**
+   * Get all clients
+   */
+  getClients(): Map<string, ClientConnection> {
+    return this.clients;
+  }
+
+  /**
    * Get client count
    */
   getClientCount(): number {

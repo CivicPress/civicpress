@@ -345,6 +345,9 @@ importers:
       fs-extra:
         specifier: ^11.2.0
         version: 11.3.1
+      lib0:
+        specifier: 0.2.117
+        version: 0.2.117
       ws:
         specifier: ^8.18.0
         version: 8.18.3
@@ -503,6 +506,9 @@ importers:
       '@tiptap/vue-3':
         specifier: 3.19.0
         version: 3.19.0(@floating-ui/dom@1.7.2)(@tiptap/core@3.19.0)(@tiptap/pm@3.19.0)(vue@3.5.24)
+      '@tiptap/y-tiptap':
+        specifier: 3.0.2
+        version: 3.0.2(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.5)(y-protocols@1.0.7)(yjs@13.6.28)
       '@types/leaflet':
         specifier: 1.9.20
         version: 1.9.20
@@ -7379,7 +7385,7 @@ packages:
       y-protocols: ^1.0.1
       yjs: ^13.5.38
     dependencies:
-      lib0: 0.2.115
+      lib0: 0.2.117
       prosemirror-model: 1.25.4
       prosemirror-state: 1.4.4
       prosemirror-view: 1.41.5
@@ -13722,6 +13728,14 @@ packages:
       isomorphic.js: 0.2.5
     dev: false
 
+  /lib0@0.2.117:
+    resolution: {integrity: sha512-DeXj9X5xDCjgKLU/7RR+/HQEVzuuEUiwldwOGsHK/sfAfELGWEyTcf0x+uOvCvK3O2zPmZePXWL85vtia6GyZw==}
+    engines: {node: '>=16'}
+    hasBin: true
+    dependencies:
+      isomorphic.js: 0.2.5
+    dev: false
+
   /liftoff@4.0.0:
     resolution: {integrity: sha512-rMGwYF8q7g2XhG2ulBmmJgWv25qBsqRbDn5gH0+wnuyeFt7QBJlHJmtg5qEdn4pN6WVAUMgXnIxytMFRX9c1aA==}
     engines: {node: '>=10.13.0'}
@@ -19278,7 +19292,7 @@ packages:
       y-protocols: ^1.0.1
       yjs: ^13.5.38
     dependencies:
-      lib0: 0.2.115
+      lib0: 0.2.117
       prosemirror-model: 1.25.4
       prosemirror-state: 1.4.4
       prosemirror-view: 1.41.5
@@ -19292,7 +19306,7 @@ packages:
     peerDependencies:
       yjs: ^13.0.0
     dependencies:
-      lib0: 0.2.115
+      lib0: 0.2.117
       yjs: 13.6.28
     dev: false
 
@@ -19391,7 +19405,7 @@ packages:
     resolution: {integrity: sha512-EgnDOXs8+hBVm6mq3/S89Kiwzh5JRbn7w2wXwbrMRyKy/8dOFsLvuIfC+x19ZdtaDc0tA9rQmdZzbqqNHG44wA==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
     dependencies:
-      lib0: 0.2.115
+      lib0: 0.2.117
     dev: false
 
   /yocto-queue@0.1.0:
