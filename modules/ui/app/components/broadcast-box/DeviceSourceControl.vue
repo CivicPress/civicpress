@@ -139,17 +139,12 @@ const videoSources = computed((): Array<{ value: string; label: string }> => {
       };
     });
   }
-  // Add Picture-in-Picture option when PiP is supported, device has 2+ cameras, or any video source (so it's always visible when sources exist)
+  // Add virtual PiP option only when device explicitly supports it
   const pipSupported = props.device.capabilities?.pipSupported ?? false;
-  const hasMultipleCameras = items.length >= 2;
-  const hasAnyVideoSource = items.length >= 1;
   const alreadyHasPip = items.some(
     (i) => String(i.value).toLowerCase() === 'pip'
   );
-  if (
-    (pipSupported || hasMultipleCameras || hasAnyVideoSource) &&
-    !alreadyHasPip
-  ) {
+  if (pipSupported && !alreadyHasPip) {
     items = [
       ...items,
       {
