@@ -1736,3 +1736,5 @@ complete list.
 - [Error Handling Guide](error-handling.md) - Error handling patterns
 - [Cache Usage Guide](cache-usage-guide.md) - Caching system usage
 - [Saga Pattern Usage Guide](saga-pattern-usage-guide.md) - Saga pattern usage
+- [Architecture Diagrams](architecture-diagrams.md) - Mermaid diagrams of system
+  components and data flows

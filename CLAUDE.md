@@ -13,7 +13,7 @@ collaborative editing, and public transparency. Monorepo with pnpm workspaces.
 - **UI**: `modules/ui/` - Nuxt 4 with Nuxt UI Pro, TipTap editor
 - **Realtime**: `modules/realtime/` - WebSocket server with binary y-protocols
 - **Broadcast Box**: `modules/broadcast-box/` - Device control for recording
-  hardware
+  hardware (WebSocket device protocol, session recording, RTMP streaming)
 - **Storage**: `modules/storage/` - Multi-provider file storage (local, S3,
   Azure, GCS)
 
@@ -37,7 +37,39 @@ collaborative editing:
 - **Run all**: `pnpm vitest run` (from repo root or module dir)
 - **Run specific**: `pnpm vitest run src/__tests__/filename.test.ts`
 - **Total**: 1291+ tests, 118 test files, 0 failures
-- **Pre-commit hook**: Runs full test suite (can take ~200s)
+- **Pre-commit hook**: Runs full test suite + lint-staged + build (can take
+  ~200s)
+
+### Skipped Tests
+
+3 tests are intentionally skipped (`.skip()`) due to test database migration
+timing — not production bugs:
+
+- `tests/api/records.test.ts:454` — workflowState preservation on update
+- `tests/api/records.test.ts:603` — workflowState in draft response
+- `tests/integration/draft-publish-workflow.test.ts:29` — draft→publish with
+  workflowState
+
+See `docs/test-skip-decision.md` for details.
+
+### Known Flaky Tests
+
+- `tests/api/authorization.test.ts` — can be flaky under concurrency due to port
+  conflicts; error guards were added to surface failures clearly
+- `tests/api/records.test.ts` — occasionally flaky under heavy concurrent
+  execution
+
+## Documentation Structure
+
+- **`docs/`** — Main documentation directory
+  - `architecture.md` — Living architecture overview (single source of truth)
+  - `architecture-diagrams.md` — Mermaid diagrams of system components
+  - `project-status.md` — Current implementation status
+  - `todo.md` — Task tracking and roadmap
+  - `specs-index.md` — Index to all platform specifications
+- **`docs/specs/`** — 50+ detailed specifications (API, CLI, auth, search, etc.)
+- **`docs/architecture/decisions/`** — Architecture Decision Records (ADRs)
+- **`docs/broadcast-box/`** — Broadcast Box module documentation
 
 ## Common Patterns
 
@@ -51,9 +83,6 @@ collaborative editing:
 
 - Session expiration dates in tests must use future dates (not hardcoded past
   dates)
-- The authorization test (`tests/api/authorization.test.ts`) can be flaky when
-  run concurrently due to port conflicts - error guards were added to surface
-  failures clearly
 - `generateParticipantColor()` in `realtime-server.ts` is currently unused but
   retained
 - Branch `broadcast-box` contains all realtime + broadcast-box feature work

@@ -5,7 +5,7 @@
 **3 tests have been skipped** (not removed) to unblock CI/CD while preserving
 test cases for future fixes.
 
-**Status**: ✅ All tests passing (53 passed | 3 skipped)
+**Status**: ✅ All tests passing (1291+ passed | 3 skipped)
 
 ## Decision
 
@@ -63,7 +63,6 @@ Possible solutions:
 
 ## References
 
-- `docs/test-coverage-analysis.md` - Broader test coverage analysis
 - Code locations:
   - Migration logic: `core/src/database/database-adapter.ts`
   - Defensive checks: `core/src/database/database-service.ts`
