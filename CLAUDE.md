@@ -86,3 +86,29 @@ See `docs/test-skip-decision.md` for details.
 - `generateParticipantColor()` in `realtime-server.ts` is currently unused but
   retained
 - Branch `broadcast-box` contains all realtime + broadcast-box feature work
+
+## Broadcast Box UI Architecture
+
+The single device page
+(`modules/ui/app/pages/settings/broadcast-box/[id]/index.vue`) uses several
+child components with shared state:
+
+- **DevicePreview** — WebRTC live video preview with play/stop, mute, and
+  recording controls (record button is in preview, not in ManualRecording card)
+- **DeviceSourceControl** — Video/audio source dropdowns with multi-strategy
+  matching. Virtual PiP option only added when `pipSupported` is explicitly true
+- **DeviceManualRecording** — Mounted but hidden (`v-show="false"`); manages
+  recording state via `useManualRecording` composable. Exposes state via
+  `defineExpose` so the parent page can pass it as props to DevicePreview
+- **Recordings list** — Rendered in a separate UCard on the page (not inside
+  DeviceManualRecording) using template ref to access `manualRecordingRef` data
+
+Key composables:
+
+- `useManualRecording(deviceId, connectionStatus)` — recording start/stop,
+  duration, recordings list
+- `useDeviceCommands(deviceUuid)` — send commands to device (setSources, etc.)
+- `useDevicePreview(deviceId, wsConnection, connectionStatus)` — WebRTC preview
+  lifecycle
+- `useDeviceConnectionStatus(deviceId)` — WebSocket connection status +
+  real-time capabilities

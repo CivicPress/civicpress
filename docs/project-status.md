@@ -160,6 +160,25 @@ ready for development and testing.
 - **Dead Code Cleanup**: Removed legacy JSON message handlers (`sendRoomState`,
   `setupMessageHandlers`) replaced by binary y-protocols implementation
 
+#### **Broadcast Box Device Control UI (February 2026)**
+
+- **Status**: Fully Implemented
+- **Single Device Page**: Comprehensive device management with live preview,
+  source control, recording, and configuration
+- **Device Preview**: WebRTC-based live video preview with play/stop, audio
+  mute, and inline recording controls
+- **Source Control**: Video/audio source switching with multi-strategy matching
+  (exact, case-insensitive, label, partial). Virtual PiP option only shown when
+  device explicitly supports it (`pipSupported`)
+- **Manual Recording**: Start/stop recording with real-time duration display,
+  quality preset support (low/standard/high/ultra)
+- **Recordings List**: Dedicated card with recording history, file sizes,
+  durations, and refresh capability
+- **Component Architecture**: Recording state managed via `useManualRecording`
+  composable with `defineExpose` for cross-component data sharing
+- **Real-time Status**: WebSocket-based device connection status, active source
+  tracking, and capability discovery
+
 #### **Google Cloud Storage (GCS) Provider Support (January 2025)**
 
 - **Status**: Fully Implemented and Production-Ready
