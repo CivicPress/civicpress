@@ -102,68 +102,94 @@
 
       <!-- Controls -->
       <div class="flex items-center justify-between gap-2">
-        <UButton
-          v-if="!isPreviewActive"
-          color="primary"
-          :loading="connectionState === 'connecting'"
-          :disabled="!isDeviceConnected || connectionState === 'connecting'"
-          icon="i-lucide-play"
-          @click="handleStart"
-        >
-          {{ t('broadcastBox.preview.start') }}
-        </UButton>
-        <UButton
-          v-else
-          color="error"
-          variant="soft"
-          :disabled="connectionState === 'connecting'"
-          icon="i-lucide-square"
-          @click="handleStop"
-        >
-          {{ t('broadcastBox.preview.stop') }}
-        </UButton>
+        <!-- Left: Preview + Mute + Retry -->
+        <div class="flex items-center gap-2">
+          <UButton
+            v-if="!isPreviewActive"
+            color="primary"
+            :loading="connectionState === 'connecting'"
+            :disabled="!isDeviceConnected || connectionState === 'connecting'"
+            icon="i-lucide-play"
+            @click="handleStart"
+          >
+            {{ t('broadcastBox.preview.start') }}
+          </UButton>
+          <UButton
+            v-else
+            color="error"
+            variant="soft"
+            :disabled="connectionState === 'connecting'"
+            icon="i-lucide-square"
+            @click="handleStop"
+          >
+            {{ t('broadcastBox.preview.stop') }}
+          </UButton>
 
-        <UButton
-          v-if="connectionState === 'failed'"
-          color="neutral"
-          variant="ghost"
-          icon="i-lucide-refresh-cw"
-          @click="handleRetry"
-        >
-          {{ t('broadcastBox.preview.retry') }}
-        </UButton>
+          <UButton
+            v-if="previewStream"
+            color="neutral"
+            variant="soft"
+            :icon="audioEnabled ? 'i-lucide-volume-2' : 'i-lucide-volume-x'"
+            @click="toggleAudio"
+          />
 
-        <UButton
-          v-if="previewStream"
-          color="neutral"
-          variant="soft"
-          icon="i-lucide-volume-2"
-          @click="toggleAudio"
-        >
-          {{
-            audioEnabled
-              ? t('broadcastBox.preview.audio.disable')
-              : t('broadcastBox.preview.audio.enable')
-          }}
-        </UButton>
+          <span
+            v-if="previewStream && !hasAudioTrack"
+            class="text-xs text-gray-500 dark:text-gray-400"
+          >
+            {{ t('broadcastBox.preview.audio.noTrack') }}
+          </span>
+
+          <span
+            v-if="audioError"
+            class="text-xs text-red-500 dark:text-red-400"
+          >
+            {{ audioError }}
+          </span>
+
+          <UButton
+            v-if="connectionState === 'failed'"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-refresh-cw"
+            @click="handleRetry"
+          >
+            {{ t('broadcastBox.preview.retry') }}
+          </UButton>
+        </div>
+
+        <!-- Right: Recording -->
+        <div class="flex items-center gap-2">
+          <div
+            v-if="isRecording"
+            class="flex items-center gap-2 text-sm text-red-600 dark:text-red-400"
+          >
+            <div class="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+            <span class="font-medium">{{ recordingDuration }}</span>
+          </div>
+          <UButton
+            v-if="!isRecording"
+            color="error"
+            :loading="recordingLoading"
+            :disabled="recordingLoading || !isDeviceConnected"
+            icon="i-lucide-circle"
+            @click="emit('start-recording')"
+          >
+            {{ t('broadcastBox.startRecording') }}
+          </UButton>
+          <UButton
+            v-else
+            color="error"
+            variant="outline"
+            :loading="recordingLoading"
+            :disabled="recordingLoading || !isDeviceConnected"
+            icon="i-lucide-square"
+            @click="emit('stop-recording')"
+          >
+            {{ t('broadcastBox.stopRecording') }}
+          </UButton>
+        </div>
       </div>
-
-      <UAlert
-        v-if="previewStream && !hasAudioTrack"
-        color="neutral"
-        variant="soft"
-        :title="t('broadcastBox.preview.audio.noTrack')"
-        icon="i-lucide-volume-x"
-      />
-
-      <UAlert
-        v-if="audioError"
-        color="error"
-        variant="soft"
-        :title="t('broadcastBox.preview.audio.enableFailed')"
-        :description="audioError"
-        icon="i-lucide-alert-circle"
-      />
 
       <!-- WebRTC Not Supported -->
       <UAlert
@@ -201,6 +227,14 @@ const props = defineProps<{
     | null
     | Ref<WebSocket | null>
     | ComputedRef<WebSocket | null>; // Passed from parent to share single connection
+  isRecording?: boolean;
+  recordingDuration?: string;
+  recordingLoading?: boolean;
+}>();
+
+const emit = defineEmits<{
+  'start-recording': [];
+  'stop-recording': [];
 }>();
 
 const { t } = useI18n();

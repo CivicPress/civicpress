@@ -60,6 +60,9 @@ const toast = useToast();
 
 const deviceId = route.params.id as string;
 const device = ref<BroadcastDevice | null>(null);
+const manualRecordingRef = ref<InstanceType<
+  typeof DeviceManualRecording
+> | null>(null);
 const health = ref<any>(null);
 const sessions = ref<BroadcastSession[]>([]);
 const loading = ref(false);
@@ -1195,6 +1198,16 @@ onUnmounted(() => {
             </div>
           </UCard>
 
+          <!-- Manual Recording (hidden, kept mounted for composable state) -->
+          <div v-if="device" v-show="false">
+            <DeviceManualRecording
+              ref="manualRecordingRef"
+              :device="device"
+              :is-device-connected="isDeviceConnected"
+              :connection-status="connectionStatus"
+            />
+          </div>
+
           <!-- Preview Stream -->
           <DevicePreview
             v-if="device && isDeviceConnected"
@@ -1202,14 +1215,11 @@ onUnmounted(() => {
             :is-device-connected="isDeviceConnected"
             :connection-status="connectionStatus"
             :ws-connection="wsConnection"
-          />
-
-          <!-- Manual Recording -->
-          <DeviceManualRecording
-            v-if="device"
-            :device="device"
-            :is-device-connected="isDeviceConnected"
-            :connection-status="connectionStatus"
+            :is-recording="manualRecordingRef?.isRecording ?? false"
+            :recording-duration="manualRecordingRef?.formattedDuration ?? ''"
+            :recording-loading="manualRecordingRef?.loading ?? false"
+            @start-recording="manualRecordingRef?.handleStart()"
+            @stop-recording="manualRecordingRef?.handleStop()"
           />
 
           <!-- Device Control Cards (show when device is loaded; controls disabled when offline) -->
@@ -1585,6 +1595,94 @@ onUnmounted(() => {
                   >
                     {{ t('broadcastBox.removeSession') }}
                   </UButton>
+                </div>
+              </div>
+            </div>
+          </UCard>
+
+          <!-- Device Recordings -->
+          <UCard v-if="device">
+            <template #header>
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold">
+                  {{ t('broadcastBox.recordingsList') }}
+                </h2>
+                <UButton
+                  variant="ghost"
+                  size="xs"
+                  icon="i-lucide-refresh-cw"
+                  :loading="manualRecordingRef?.isLoadingRecordings"
+                  :disabled="!isDeviceConnected"
+                  @click="manualRecordingRef?.loadRecordings()"
+                >
+                  {{ t('common.refresh') }}
+                </UButton>
+              </div>
+            </template>
+
+            <!-- Loading State -->
+            <div
+              v-if="manualRecordingRef?.isLoadingRecordings"
+              class="text-center py-4"
+            >
+              <UIcon
+                name="i-lucide-loader-2"
+                class="w-5 h-5 animate-spin text-gray-400"
+              />
+            </div>
+
+            <!-- Empty State -->
+            <UAlert
+              v-else-if="!manualRecordingRef?.recordings?.length"
+              color="neutral"
+              variant="soft"
+              :title="t('broadcastBox.noRecordings')"
+              :description="t('broadcastBox.noRecordingsDesc')"
+              icon="i-lucide-info"
+            />
+
+            <!-- Recordings List -->
+            <div v-else class="space-y-2">
+              <div
+                v-for="recording in manualRecordingRef.recordings"
+                :key="recording.recording_id"
+                class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-sm font-medium">
+                      {{ formatDate(recording.started_at) }}
+                    </span>
+                    <UBadge
+                      v-if="!recording.stopped_at"
+                      color="error"
+                      variant="soft"
+                      size="xs"
+                    >
+                      {{ t('broadcastBox.recording') }}
+                    </UBadge>
+                  </div>
+                  <div class="text-xs text-gray-500 space-y-1">
+                    <div>
+                      {{ t('broadcastBox.duration') }}:
+                      {{
+                        manualRecordingRef.formatDuration(
+                          recording.duration_seconds
+                        )
+                      }}
+                    </div>
+                    <div>
+                      {{ t('broadcastBox.fileSize') }}:
+                      {{
+                        manualRecordingRef.formatFileSize(
+                          recording.file_size_bytes
+                        )
+                      }}
+                    </div>
+                    <div v-if="recording.quality" class="capitalize">
+                      {{ t('broadcastBox.quality') }}: {{ recording.quality }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

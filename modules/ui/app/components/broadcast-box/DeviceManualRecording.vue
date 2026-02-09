@@ -53,81 +53,6 @@
           {{ t('broadcastBox.stopRecording') }}
         </UButton>
       </div>
-
-      <!-- Recordings List -->
-      <div>
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-medium">
-            {{ t('broadcastBox.recordingsList') }}
-          </h3>
-          <UButton
-            variant="ghost"
-            size="xs"
-            icon="i-lucide-refresh-cw"
-            :loading="isLoadingRecordings"
-            :disabled="!isDeviceConnected"
-            @click="loadRecordings"
-          >
-            {{ t('common.refresh') }}
-          </UButton>
-        </div>
-
-        <!-- Loading State -->
-        <div v-if="isLoadingRecordings" class="text-center py-4">
-          <UIcon
-            name="i-lucide-loader-2"
-            class="w-5 h-5 animate-spin text-gray-400"
-          />
-        </div>
-
-        <!-- Empty State -->
-        <UAlert
-          v-else-if="recordings.length === 0"
-          color="neutral"
-          variant="soft"
-          :title="t('broadcastBox.noRecordings')"
-          :description="t('broadcastBox.noRecordingsDesc')"
-          icon="i-lucide-info"
-        />
-
-        <!-- Recordings Table -->
-        <div v-else class="space-y-2">
-          <div
-            v-for="recording in recordings"
-            :key="recording.recording_id"
-            class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-          >
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-sm font-medium">
-                  {{ formatDate(recording.started_at) }}
-                </span>
-                <UBadge
-                  v-if="!recording.stopped_at"
-                  color="error"
-                  variant="soft"
-                  size="xs"
-                >
-                  {{ t('broadcastBox.recording') }}
-                </UBadge>
-              </div>
-              <div class="text-xs text-gray-500 space-y-1">
-                <div>
-                  {{ t('broadcastBox.duration') }}:
-                  {{ formatDuration(recording.duration_seconds) }}
-                </div>
-                <div>
-                  {{ t('broadcastBox.fileSize') }}:
-                  {{ formatFileSize(recording.file_size_bytes) }}
-                </div>
-                <div v-if="recording.quality" class="capitalize">
-                  {{ t('broadcastBox.quality') }}: {{ recording.quality }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </UCard>
 </template>
@@ -210,6 +135,20 @@ const handleStop = async () => {
     console.error('Failed to stop recording:', err);
   }
 };
+
+// Expose recording state and recordings data for parent
+defineExpose({
+  isRecording,
+  formattedDuration,
+  loading,
+  handleStart,
+  handleStop,
+  recordings,
+  isLoadingRecordings,
+  loadRecordings,
+  formatDuration,
+  formatFileSize,
+});
 
 // Load recordings on mount
 onMounted(() => {
