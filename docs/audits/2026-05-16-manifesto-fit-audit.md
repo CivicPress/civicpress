@@ -2,11 +2,11 @@
 
 **Date:** 2026-05-16 to 2026-05-17
 **Branch:** `audit/2026-05-16-manifesto-fit` (LOCAL ONLY — do not push)
-**Status:** Audit **COMPLETE** (Phase 1 sweeps + Phase 2 synthesis).
+**Status:** Audit **COMPLETE** (Phase 1 sweeps + Phase 2 synthesis + Phase 3 extension).
 **Audit plan:** `docs/plans/2026-05-16-civicpress-audit-plan.md`
 **Synthesis plan:** `docs/plans/2026-05-17-civicpress-audit-synthesis-plan.md`
 **Phase 1 summary:** [`sections/phase-1-summary.md`](sections/phase-1-summary.md) — top findings per module
-**Consolidated findings:** [`2026-05-16-manifesto-fit-findings.md`](2026-05-16-manifesto-fit-findings.md) — sortable registry of all 154 findings
+**Consolidated findings:** [`2026-05-16-manifesto-fit-findings.md`](2026-05-16-manifesto-fit-findings.md) — sortable registry of all **205 findings** (Phase 1+2: 154; Phase 3 extension: 51)
 
 ---
 
@@ -16,7 +16,7 @@
 
 The CivicPress platform is **more architecturally ambitious than its v0.2 alpha status warrants**, with sophisticated-looking scaffolding (DI container, saga pattern, multi-provider storage, multi-channel notifications, collaborative editing) that frequently sits beside the missing or orphaned core flow it was meant to support. The flagship — broadcast-box, for civic meeting livestream and archive — **points the right direction but its seams are wrong**: the contract between software and hardware is fuzzy across three repos, the recording pipeline produces media blobs instead of civic records, and the module boundary with realtime has collapsed. Test coverage and "100% Functional" claims in `docs/project-status.md` are materially overstated across multiple modules. The manifesto's six principles and three hard constraints are violated in **specific, fixable ways** — none of them require abandoning the project's shape, but several block honest pilot deployment to a municipality.
 
-154 findings total: **17 Critical**, 47 High, 60 Medium, 30 Low.
+**205 findings total: 20 Critical, 65 High, 79 Medium, 41 Low.** (Phase 1+2: 154 findings across 10 audit targets. Phase 3 extension: 51 findings across 4 additional surfaces — civicpress-ingest sibling repo, site sibling repo, dependency/CVE+license audit, parent-directory workspace cleanup.)
 
 ### Top 10 findings (by manifesto + civic impact)
 
@@ -47,15 +47,20 @@ Cell verdicts: **FAIL** = critical or high-severity violation, **CONCERN** = med
 | legal-register | CONCERN | CONCERN | PASS | PASS | CONCERN | n/a | PASS | PASS | PASS |
 | notifications | **FAIL** | **FAIL** | PASS | CONCERN | **FAIL** | CONCERN | CONCERN | n/a | CONCERN |
 | broadcast-box hw | CONCERN | CONCERN | **FAIL** | PASS | **FAIL** | CONCERN | PASS | **FAIL** | CONCERN |
+| civicpress-ingest (ext) | PASS | CONCERN | PASS | PASS | CONCERN | PASS | PASS | **PASS** | PASS |
+| site (ext) | CONCERN | CONCERN | PASS | PASS | PASS | CONCERN | PASS | n/a | PASS |
+| deps-licenses (ext) | CONCERN | **FAIL** | PASS | PASS | CONCERN | n/a | CONCERN | n/a | CONCERN |
+| workspace (ext) | CONCERN | **FAIL** | PASS | PASS | CONCERN | n/a | CONCERN | n/a | CONCERN |
 
 ### What this means in plain terms
 
 The platform is **not broken — it is overclaimed and underwired**. The work required to honor the manifesto is concrete and bounded:
 
-- Close the **17 Criticals** (mostly security + a few hard-constraint violations). Most are S-effort fixes; a few are M-effort.
+- Close the **20 Criticals** across the whole audit (mostly security + a few hard-constraint violations). Most are S-effort fixes; a few are M-effort. The 3 added by Phase 3 (`simple-git`, `fast-xml-parser`, `handlebars` CVEs) are all minor-version-bump fixes — fast wins.
 - Apply one cleanup pattern systematically: **collapse the orphaned subsystems**. Either wire them or delete them. This single pass touches ~10 finding clusters across modules.
 - Refactor the **broadcast-box seams** (one architectural change spanning monorepo + hardware repo + contract). This is L-effort but transformative — and is exactly what the user already suspected when they paused the device-page redesign.
-- Update the **roadmap and manifesto** to reflect that broadcast-box is the flagship and to acknowledge the scope shift. This is a small documentation change that closes a Transparency gap.
+- Update the **roadmap and manifesto** to reflect that broadcast-box is the flagship and to acknowledge the scope shift. This is a small documentation change that closes a Transparency gap. Phase 3 confirmed the gap propagates to the public `site` repo too — fixing the upstream docs cascades.
+- **Workspace hygiene from Phase 3:** move personal billing data out of `_work_bk/`; recover ~8.1 GB of redundant backups; push the 3 local-only sibling repos (broadcast-box, broadcast-box-backup, ingest) to remotes; add a top-level `README.md`. ~1 evening of work, big quality-of-life return.
 
 None of these are existential. All are addressable in a small handful of focused sessions. See *Recommended Next Sessions* below.
 
@@ -94,6 +99,13 @@ Each section was produced by a fresh subagent reading its module independently a
 8. [legal-register](sections/legal-register.md) — 7 findings (2 High, 3 Medium, 2 Low)
 9. [notifications](sections/notifications.md) — 15 findings (3 Critical, 4 High, 6 Medium, 2 Low)
 10. [civicpress-broadcast-box (hardware)](sections/civicpress-broadcast-box-hardware.md) — 17 findings (3 Critical, 6 High, 6 Medium, 2 Low)
+
+**Phase 3 extension targets** (added 2026-05-17 at user request, after Phase 1+2 was committed):
+
+11. [civicpress-ingest](sections/civicpress-ingest.md) — 10 findings (4 High, 3 Medium, 3 Low). Sibling repo: OCR + cleanup pipeline for municipal records → Markdown civic records. **Manifesto-cleanest repo in the ecosystem**; main concerns are 6-month staleness, no git remote, single 3,927-line `cli.py`.
+12. [site](sections/site.md) — 14 findings (4 High, 7 Medium, 3 Low). Sibling repo: project marketing site. **Manifesto-cleaner than the monorepo UI** (free `@nuxt/ui` instead of paid Pro, statically generated, EN/FR parity); main failure is faithfully mirroring the stale upstream docs (overclaims v0.2.0 readiness; never names broadcast-box).
+13. [dependencies-licenses](sections/dependencies-licenses.md) — 12 findings (3 Critical, 5 High, 3 Medium, 1 Low). `pnpm audit` returned **140 advisories (4 Critical, 69 High)** including `simple-git` `blockUnsafeOperationsPlugin` bypass (civic-history integrity risk), `fast-xml-parser` entity bypass via S3/GCS, `handlebars` JS injection.
+14. [workspace-cleanup](sections/workspace-cleanup.md) — 15 findings (5 High, 6 Medium, 4 Low). Parent-directory hygiene: ~**8.1 GB recoverable** from `_work_bk/` (3.8 GB) + `civicpress-broadcast-box-backup/` (4.3 GB); **personal billing data sitting next to public repos** (high sensitivity, mode-600 today but one accidental `git add -A` away); **3 of 6 sibling repos have no git remote** (broadcast-box, broadcast-box-backup, ingest); no top-level `README.md` for a 6-repo workspace.
 
 ---
 

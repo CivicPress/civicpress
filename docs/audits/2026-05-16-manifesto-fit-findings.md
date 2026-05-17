@@ -1,16 +1,16 @@
 # CivicPress Manifesto-Fit Audit — Consolidated Findings Registry
 
-**Date:** 2026-05-17
-**Source:** `docs/audits/sections/<module>.md` (10 files)
+**Date:** 2026-05-17 (Phase 1+2 baseline) + 2026-05-17 (Phase 3 extension)
+**Source:** `docs/audits/sections/<module>.md` (14 files: 10 Phase 1+2 + 4 Phase 3 extension)
 **Branch:** `audit/2026-05-16-manifesto-fit` (LOCAL ONLY — do not push)
 
-| Severity | Count |
-|---|---|
-| **Critical** | 17 |
-| **High** | 47 |
-| **Medium** | 60 |
-| **Low** | 30 |
-| **TOTAL** | **154** |
+| Severity | Phase 1+2 | Phase 3 | **Combined** |
+|---|---|---|---|
+| **Critical** | 17 | 3 | **20** |
+| **High** | 47 | 18 | **65** |
+| **Medium** | 60 | 19 | **79** |
+| **Low** | 30 | 11 | **41** |
+| **TOTAL** | **154** | **51** | **205** |
 
 This is the consolidated, sortable findings list extracted from the per-module section files. Each row preserves the module's finding ID. Click the module name to open the source section for full context.
 
@@ -270,4 +270,109 @@ Severity definitions: **Critical** = manifesto hard-constraint violation or secu
 | legal-register | [legal-register.md](sections/legal-register.md) | 7 | 0 | 2 | 3 | 2 |
 | notifications | [notifications.md](sections/notifications.md) | 15 | 3 | 4 | 6 | 2 |
 | broadcast-box-hw | [civicpress-broadcast-box-hardware.md](sections/civicpress-broadcast-box-hardware.md) | 17 | 3 | 6 | 6 | 2 |
-| **TOTAL** | | **154** | **17** | **47** | **60** | **30** |
+| **Phase 1+2 subtotal** | | **154** | **17** | **47** | **60** | **30** |
+| civicpress-ingest (ext) | [civicpress-ingest.md](sections/civicpress-ingest.md) | 10 | 0 | 4 | 3 | 3 |
+| site (ext) | [site.md](sections/site.md) | 14 | 0 | 4 | 7 | 3 |
+| dependencies-licenses (ext) | [dependencies-licenses.md](sections/dependencies-licenses.md) | 12 | 3 | 5 | 3 | 1 |
+| workspace-cleanup (ext) | [workspace-cleanup.md](sections/workspace-cleanup.md) | 15 | 0 | 5 | 6 | 4 |
+| **Phase 3 subtotal** | | **51** | **3** | **18** | **19** | **11** |
+| **GRAND TOTAL** | | **205** | **20** | **65** | **79** | **41** |
+
+---
+
+## Phase 3 Extension Findings (2026-05-17, added at user request)
+
+### Phase 3 Critical (3)
+
+| ID | Module | Description | Manifesto principle | Effort |
+|---|---|---|---|---|
+| deps-001 | [dependencies-licenses](sections/dependencies-licenses.md) | `simple-git` 3.28.0 has `blockUnsafeOperationsPlugin` bypass (GHSA-vx2g-25mq-9c2h). Git is the civic platform's authoritative history store — a bypass here is a Trust failure. Pairs with `api-007` (simple-git also undeclared in `modules/api/package.json`). | Trust | S |
+| deps-002 | [dependencies-licenses](sections/dependencies-licenses.md) | `fast-xml-parser` (4.5.3 via `@google-cloud/storage`; 5.2.5 via `@aws-sdk/client-s3`) has entity-encoding bypass via DOCTYPE regex injection (GHSA-mpg4-rc92-vx8v). Reachable via cloud storage operations. | Trust | S |
+| deps-003 | [dependencies-licenses](sections/dependencies-licenses.md) | `handlebars` 4.7.8 (via `plop > node-plop`) has JS injection via AST type confusion (GHSA-3wjp-mcw9-37jh). | Trust | S |
+
+### Phase 3 High (18)
+
+| ID | Module | Description | Manifesto principle | Effort |
+|---|---|---|---|---|
+| ingest-001 | [civicpress-ingest](sections/civicpress-ingest.md) | No git remote — pipeline only exists on the developer's laptop. Cross-ref `workspace-003`. | Trust, Resilient archival | S |
+| ingest-002 | [civicpress-ingest](sections/civicpress-ingest.md) | Repo invisible in `docs/roadmap.md` and `docs/project-status.md`. Roadmap v0.5–0.8 names "migration/import tool" — but this *is* that tool. | Transparency | S |
+| ingest-003 | [civicpress-ingest](sections/civicpress-ingest.md) | Last commit 2025-11-11 — 6 months stale. Predates broadcast-box flagship pivot and several rounds of `record-format-standard.md` changes. Pipeline may silently produce records the current monorepo rejects. | Trust | M |
+| ingest-004 | [civicpress-ingest](sections/civicpress-ingest.md) | No real test suite (1 informal OCR helper). For OCR + heuristic-cleanup with per-municipality rules, no regression coverage means each new municipality's rules can silently break Richmond's. | Trust | M |
+| site-001 | [site](sections/site.md) | Public site repeats the "v0.2.0 stable / production-ready / ready for pilots" overclaim to municipal evaluators while monorepo has 17 open Criticals (pre-extension). | Transparency, Trust | S |
+| site-002 | [site](sections/site.md) | Broadcast-box (flagship per user) is invisible on the public site — the "Every meeting, visible." card never names the module, hardware repo, or protocol. Mirrors the roadmap/manifesto staleness. | Transparency, Public Good | S |
+| site-003 | [site](sections/site.md) | Five docs (README, `.cursor/rules.md`, 3 `agent/*` files) claim "Nuxt UI Pro" is the framework; `package.json` ships free `@nuxt/ui ^4.2.1`. Docs wrong about clean code. | Trust, Open-source | S |
+| site-004 | [site](sections/site.md) | No `.github/workflows/`, no `public/CNAME` — site is not reproducibly deployable from a commit. Manual `pnpm generate` + copy. | Transparency, Open-source | S |
+| workspace-001 | [workspace-cleanup](sections/workspace-cleanup.md) | **Sensitive:** Personal billing CSV/XLSX (timesheet_*) inside `_work_bk/` adjacent to public repos. Mode-600 today but one `git add -A` would leak PII + financial data. | (sensitive content) | S — **RELOCATE** out of workspace |
+| workspace-002 | [workspace-cleanup](sections/workspace-cleanup.md) | **Sensitive:** `_work_bk/__system-data-backup-20250903-160938/` has `civic.db`, `notification-audit.jsonl`, `org-config.yml`, `roles.yml` — operational state with potential user data, wrong location. | (sensitive content) | S — INVESTIGATE then delete or move |
+| workspace-003 | [workspace-cleanup](sections/workspace-cleanup.md) | Three local-only repos with no git remote: `civicpress-broadcast-box`, `civicpress-broadcast-box-backup`, `civicpress-ingest`. Flagship hardware module + ingest pipeline exist only on this laptop. Pairs with `BB-HW-002` (no license). | Resilient archival, Open-source | M — push to GitHub |
+| workspace-004 | [workspace-cleanup](sections/workspace-cleanup.md) | `civicpress-broadcast-box-backup/` is **4.3 GB** Jan-30 snapshot of an active repo at Feb 3. Non-gitignored differentiators are likely empty. Blocks parent dir from feeling clean. | (waste) | S — investigate then DELETE |
+| workspace-005 | [workspace-cleanup](sections/workspace-cleanup.md) | `_work_bk/` is **3.8 GB** of undifferentiated grab-bag: dated snapshots + 3rd hardware-repo copy + system-data backup + Quebec GeoJSON dataset + 2 monorepo tarballs + personal billing data. | (waste) | M — triage subitems, archive off-disk, delete |
+| deps-004 | [dependencies-licenses](sections/dependencies-licenses.md) | 140 total advisories (most remediable by minor/patch bumps). Concentrations: `minimatch` (9), `node-forge` (6), `axios` (6), `tar` (6), `seroval` (5), `fast-xml-parser` (5), `handlebars` (4). | Trust | M (1-2 days bump + test) |
+| deps-005 | [dependencies-licenses](sections/dependencies-licenses.md) | No Dependabot/Renovate config in `.github/` — no automated dep-freshness loop. The 140-advisory backlog is a direct consequence. | Trust | S |
+| deps-006 | [dependencies-licenses](sections/dependencies-licenses.md) | `axios` 6 high advisories — DoS, prototype pollution, header injection, NO_PROXY bypass. In the API hot path. | Trust | S |
+| deps-007 | [dependencies-licenses](sections/dependencies-licenses.md) | `h3` 2 high — SSE injection + request smuggling. Combined with `ui-004` (analytics injection), SSR-side surface for token theft. | Trust | S |
+| deps-008 | [dependencies-licenses](sections/dependencies-licenses.md) | Cloud SDKs (`@aws-sdk/client-s3`, `@azure/storage-blob`, `@google-cloud/storage`) as direct non-optional deps. Local-only municipalities install ~tens of MB of unused SDK. Cross-ref `storage-006`. | **No vendor lock-in (soft fail)** | M |
+
+### Phase 3 Medium (19)
+
+| ID | Module | Description | Manifesto principle | Effort |
+|---|---|---|---|---|
+| ingest-005 | [civicpress-ingest](sections/civicpress-ingest.md) | `cli.py` is 3,927 lines in a single file holding all 7 commands + helpers + nested functions. Will fragment unmaintainably as municipalities add. | Ease of Use | M |
+| ingest-006 | [civicpress-ingest](sections/civicpress-ingest.md) | No template config for adding a new municipality — only Richmond configs exist. Contributor onboarding gap. | Ease of Use, Public Good | S |
+| ingest-007 | [civicpress-ingest](sections/civicpress-ingest.md) | Two frontmatter builders coexist (`build_frontmatter` at line 497, nested `build_final_frontmatter` at line 3421). Likely should be unified. | Trust | S |
+| site-005 | [site](sections/site.md) | Plausible script loaded from `plausible.io` with no SRI hash and no privacy/consent disclosure. Risky under Quebec privacy law 25. `@nuxt/scripts` already installed but unused. | Transparency, Trust | S |
+| site-006 | [site](sections/site.md) | `pages/index.vue` is 1,020-line god-page with 12 sections + duplicate SVG decoration. `agent/conventions.md` says split via layout components; the page violates its own convention. | Ease of Use | M |
+| site-007 | [site](sections/site.md) | Unused deps in `package.json`: `marked`, `leaflet`, `@vueuse/core`, `@nuxt/scripts`. Three are misclassified as runtime instead of dev. Fake comprehensiveness echo. | Open-source (lean deps) | S |
+| site-008 | [site](sections/site.md) | Mixed `process.client` + `import.meta.client` in the same file. Same pattern as `ui-016`. | — | S |
+| site-009 | [site](sections/site.md) | `showDemoSection = false` hardcoded with 25 lines of dead `v-if`-gated demo template + i18n keys. Ship the demo or delete the section. | Ease of Use | S |
+| site-010 | [site](sections/site.md) | `appVersion: '0.1.2'` in `nuxt.config.ts` vs landing copy "v0.2.0". Same drift pattern as `ui-017`. | Transparency | S |
+| site-011 | [site](sections/site.md) | No security headers configurable from repo (no CSP, HSTS, X-Frame-Options, Referrer-Policy). Mozilla Observatory will flag — first signal a journalist or municipal IT contact sees. | Trust | M (requires reverse-proxy hosting) |
+| workspace-006 | [workspace-cleanup](sections/workspace-cleanup.md) | `_work_bk/civicpress-backup-20251217-*.tar.gz` (1.4 GB) full-repo tarballs. Git already provides this. | (waste) | S — DELETE |
+| workspace-007 | [workspace-cleanup](sections/workspace-cleanup.md) | `_work_bk/_geo_data/` (~250 MB Quebec municipal SHP/GDB/GeoJSON) used to seed Richmond demo. Living in "work backup" is wrong place. | (relocate) | M |
+| workspace-008 | [workspace-cleanup](sections/workspace-cleanup.md) | `_images/` has `.ai` Illustrator source files for civic icons whose PNG exports already live in storage. Sources live nowhere documented. | (relocate) | S |
+| workspace-009 | [workspace-cleanup](sections/workspace-cleanup.md) | `demo-update-commands.md` is a loose ops runbook at parent root. Not discoverable. Includes `git pull origin main` — meant to live inside the main repo. | (relocate) | S |
+| workspace-010 | [workspace-cleanup](sections/workspace-cleanup.md) | No `README.md` at parent dir. New contributors cannot tell from `ls` what the 6 repos are. | Transparency, Ease of Use | S |
+| workspace-011 | [workspace-cleanup](sections/workspace-cleanup.md) | Audit prompt described workspace as "5 named repos + 1 backup." Reality is **6 repos** (`media/` is the unmentioned sixth). | (docs accuracy) | S |
+| deps-009 | [dependencies-licenses](sections/dependencies-licenses.md) | `@nuxt/ui-pro ^3.3.7` is the only paid-commercial-license dep in the monorepo. Activation hook still wired (`theme.env: "NUXT_UI_PRO_LICENSE"`). Cross-ref `ui-002`. | **No vendor lock-in (HARD)**, Open-source | L |
+| deps-010 | [dependencies-licenses](sections/dependencies-licenses.md) | Cross-workspace undeclared imports: `modules/api/` imports `simple-git`, `gray-matter`, `nodemailer`, `@sendgrid/mail` without declaring. Works via pnpm hoisting; strict install breaks. Cross-ref `api-007`. | Trust | S |
+| deps-011 | [dependencies-licenses](sections/dependencies-licenses.md) | No `pnpm licenses ls` output captured as project artifact; license posture essentially undocumented. Recommend `docs/licenses.md` auto-generated per release. | Open-source, Transparency | S |
+
+### Phase 3 Low (11)
+
+| ID | Module | Description |
+|---|---|---|
+| ingest-008 | [civicpress-ingest](sections/civicpress-ingest.md) | README mixes three install paths ("virtualenv or Poetry" + `pip install -e .`) in one sentence. |
+| ingest-009 | [civicpress-ingest](sections/civicpress-ingest.md) | Several `temp_*.txt` files at repo root — leftover debugging scratch. |
+| ingest-010 | [civicpress-ingest](sections/civicpress-ingest.md) | Dashboard is a second Nuxt 4 app with different (better) UI dep stack than monorepo. Consolidation candidate later. |
+| site-012 | [site](sections/site.md) | Nav links skip sections that exist on the page (`#why-intro`, `#why-video`, `#municipal-leaders`, `#values`, `#cta`). Cannot deep-link. |
+| site-013 | [site](sections/site.md) | i18n message-AST unwrap via internal `@nuxtjs/i18n` shape. Will silently render empty strings if AST changes. |
+| site-014 | [site](sections/site.md) | No `<noscript>` fallback. Locale switcher, theme toggle, mobile menu all JS-only. |
+| workspace-012 | [workspace-cleanup](sections/workspace-cleanup.md) | Repo naming inconsistent: 3 prefixed (`civicpress-*`), 3 unprefixed. |
+| workspace-013 | [workspace-cleanup](sections/workspace-cleanup.md) | `_work_bk/20260125-civicpress-broadcast-box copy/` contains literal macOS Finder " copy" suffix. |
+| workspace-014 | [workspace-cleanup](sections/workspace-cleanup.md) | Multiple `.DS_Store` files at parent root + several repos. |
+| workspace-015 | [workspace-cleanup](sections/workspace-cleanup.md) | `site/dist -> /Users/stakabo/Work/repos/civicpress/site/.output/public` symlink encodes host's absolute path. |
+| deps-012 | [dependencies-licenses](sections/dependencies-licenses.md) | `vite` 2 high advisories (build-time exposure). Affects v0.9 build pipeline. |
+
+### Phase 3 sensitive-content summary
+
+Two High-severity sensitive-content findings (workspace-001, workspace-002) both inside `_work_bk/`. **No `.env`, key, or credential files** found anywhere in the workspace (confirmed by the workspace-cleanup agent). The two sensitive items are operational/personal data that needs to be **relocated out of the public-repo-adjacent workspace**, not security secrets.
+
+### Phase 3 cross-cutting observations
+
+1. **The "stale upstream docs" pattern propagates outward.** Phase 1+2 found `docs/roadmap.md`, manifesto §3.5, `docs/project-status.md` overclaim or undermention reality. Phase 3 found that pattern propagates to `civicpress-ingest` (which doesn't update its own README/CHANGELOG either), to `site` (which faithfully mirrors the upstream overclaim to municipal evaluators), and to a 6-month gap between the ingest repo's last commit and the broadcast-box pivot. Fixing the upstream docs cascades downstream.
+2. **The "no git remote" pattern is a workspace-level issue.** 3 of 6 repos have no remote (broadcast-box, broadcast-box-backup, ingest). The flagship hardware module + the working migration/import pipeline exist only on this laptop. Pairs with `BB-HW-002` (no license on the flagship hardware) — both block the manifesto's redistributability + resilience.
+3. **The dependency criticals are minor-version-bump fast wins.** `simple-git`, `fast-xml-parser`, `handlebars` are all remediable by updating to patched versions. Adding Dependabot would prevent recurrence.
+4. **The civicpress-ingest pipeline is the manifesto-cleanest repo in the ecosystem.** Its job is exactly "produce Markdown civic records," and it does. The lessons it carries (per-municipality YAML configs, CLI sequence of pure-ish commands, file-based handoff) could be a model for the broadcast-box civic-artifact derivation service recommended in the main audit's Recommended Next Sessions § 2.
+5. **`site` is also manifesto-cleaner than the monorepo UI** (free `@nuxt/ui`, statically generated, EN/FR parity, no XSS surface). Its primary failure is being a faithful public mirror of stale upstream docs.
+
+### Phase 3 workspace cleanup roll-up — recoverable space + recommended actions
+
+| Item | Size | Action |
+|---|---|---|
+| `_work_bk/` | 3.8 GB | Triage subitems, delete what's redundant (most), keep `_geo_data/` (relocate to `civicpress-ingest/data-sources/` or `civicpress-data/`), keep billing CSV/XLSX (relocate to `~/Documents/civicpress-admin/`). |
+| `civicpress-broadcast-box-backup/` | 4.3 GB | Investigate (verify nothing salvageable), then DELETE. Git provides the real backup. |
+| `_images/` `[Recovered]` autosave | small | DELETE the Illustrator autosave. Move `.ai` sources into `media/`. |
+| Various `.DS_Store` files | trivial | DELETE + system-wide `DSDontWriteNetworkStores` plist. |
+| `demo-update-commands.md` (loose file) | small | RELOCATE into `civicpress/docs/operations/demo-deploy.md`. |
+
+**Total reclaimable: ~8.1 GB.** Most can be done in one evening session.
