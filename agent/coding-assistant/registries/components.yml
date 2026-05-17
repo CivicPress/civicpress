@@ -96,3 +96,158 @@ components:
     purpose:
       Minimal file browser in a popover for selecting files to attach to records
     status: stable
+
+  # Additional top-level components
+  - name: RecordPreview
+    file: modules/ui/app/components/RecordPreview.vue
+    purpose: Markdown preview of a record
+    status: stable
+
+  - name: SecuritySettings
+    file: modules/ui/app/components/SecuritySettings.vue
+    purpose: User security settings (password, email, auth provider)
+    status: stable
+
+  - name: StatusTransitionControls
+    file: modules/ui/app/components/StatusTransitionControls.vue
+    purpose: Buttons for changing record status based on allowed transitions
+    status: stable
+
+  - name: SystemFooter
+    file: modules/ui/app/components/SystemFooter.vue
+    purpose: Application footer with branding and version
+    status: stable
+
+  # Record linking components
+  - name: LinkedRecordList
+    file: modules/ui/app/components/records/LinkedRecordList.vue
+    purpose: Display linked records on a record detail page
+    status: stable
+
+  - name: RecordLinkSelector
+    file: modules/ui/app/components/records/RecordLinkSelector.vue
+    purpose: Searchable list for selecting records to link
+    status: stable
+
+  # Editor components
+  - name: MarkdownEditor
+    file: modules/ui/app/components/editor/MarkdownEditor.vue
+    purpose: CodeMirror 6 markdown editor with syntax highlighting
+    status: stable
+
+  - name: PreviewPanel
+    file: modules/ui/app/components/editor/PreviewPanel.vue
+    purpose: Live rendered preview of markdown content
+    status: stable
+
+  - name: EditorToolbar
+    file: modules/ui/app/components/editor/EditorToolbar.vue
+    purpose: Formatting toolbar (bold, italic, headings, lists, links)
+    status: stable
+
+  - name: EditorHeader
+    file: modules/ui/app/components/editor/EditorHeader.vue
+    purpose: Title, metadata, and save controls for the editor
+    status: stable
+
+  - name: EditorAttachments
+    file: modules/ui/app/components/editor/EditorAttachments.vue
+    purpose: File attachment management in the editor sidebar
+    status: stable
+
+  - name: EditorRelations
+    file: modules/ui/app/components/editor/EditorRelations.vue
+    purpose: Linked records and geography in the editor sidebar
+    status: stable
+
+  - name: EditorActivity
+    file: modules/ui/app/components/editor/EditorActivity.vue
+    purpose: Activity feed and version history in the editor sidebar
+    status: stable
+
+  - name: RecordSidebar
+    file: modules/ui/app/components/editor/RecordSidebar.vue
+    purpose:
+      Collapsible sidebar with attachments, relations, activity, and recording
+    status: stable
+
+  # Broadcast Box components
+  - name: DeviceList
+    file: modules/ui/app/components/broadcast-box/DeviceList.vue
+    purpose: List enrolled devices with status indicators
+    status: stable
+
+  - name: DeviceRegistrationForm
+    file: modules/ui/app/components/broadcast-box/DeviceRegistrationForm.vue
+    purpose: Enrollment code entry for new devices
+    status: stable
+
+  - name: DeviceConfigurationForm
+    file: modules/ui/app/components/broadcast-box/DeviceConfigurationForm.vue
+    purpose: Device metadata editing form
+    status: stable
+
+  - name: DevicePreview
+    file: modules/ui/app/components/broadcast-box/DevicePreview.vue
+    purpose: WebRTC live preview from a device
+    status: stable
+
+  - name: DeviceSourceControl
+    file: modules/ui/app/components/broadcast-box/DeviceSourceControl.vue
+    purpose: Video/audio source selector
+    status: stable
+
+  - name: DevicePiPControl
+    file: modules/ui/app/components/broadcast-box/DevicePiPControl.vue
+    purpose: Picture-in-Picture configuration controls
+    status: stable
+
+  - name: DeviceStreamingControl
+    file: modules/ui/app/components/broadcast-box/DeviceStreamingControl.vue
+    purpose: RTMP streaming controls (configure, start, stop)
+    status: stable
+
+  - name: DeviceConfigControl
+    file: modules/ui/app/components/broadcast-box/DeviceConfigControl.vue
+    purpose: Device-level configuration controls
+    status: stable
+
+  - name: DeviceManualRecording
+    file: modules/ui/app/components/broadcast-box/DeviceManualRecording.vue
+    purpose: Manual recording start/stop with duration timer
+    status: stable
+
+  - name: DeviceWatermarkControl
+    file: modules/ui/app/components/broadcast-box/DeviceWatermarkControl.vue
+    purpose: Watermark overlay configuration
+    status: stable
+
+  - name: DeviceStatusBadge
+    file: modules/ui/app/components/broadcast-box/DeviceStatusBadge.vue
+    purpose: Online/offline status badge for devices
+    status: stable
+
+  - name: DeviceStatusControl
+    file: modules/ui/app/components/broadcast-box/DeviceStatusControl.vue
+    purpose: Device status management controls
+    status: stable
+
+  - name: BroadcastBoxControls
+    file: modules/ui/app/components/broadcast-box/BroadcastBoxControls.vue
+    purpose: Combined device controls panel
+    status: stable
+
+  - name: ConnectionStatusIndicator
+    file: modules/ui/app/components/broadcast-box/ConnectionStatusIndicator.vue
+    purpose: WebSocket connection state indicator
+    status: stable
+
+  - name: RecordingControls
+    file: modules/ui/app/components/broadcast-box/RecordingControls.vue
+    purpose: Session-based recording controls
+    status: stable
+
+  - name: SessionStatusBadge
+    file: modules/ui/app/components/broadcast-box/SessionStatusBadge.vue
+    purpose: Session status badge (recording, stopped, etc.)
+    status: stable

@@ -106,11 +106,10 @@ civic list [type] [options]
 
 **Options:**
 
-- `--status <status>` - Filter by status
-- `--author <author>` - Filter by author
-- `--format <format>` - Output format (human, json, csv)
-- `--include-content` - Include record content
-- `--sort <field>` - Sort by field
+- `-s, --status <status>` - Filter by status
+- `-a, --all` - List all records including archived
+- `--json` - Output as JSON
+- `--silent` - Suppress output
 
 **Examples:**
 
@@ -122,10 +121,10 @@ civic list
 civic list bylaw
 
 # Filter by status
-civic list --status draft,proposed
+civic list --status draft
 
 # JSON output
-civic list --format json
+civic list --json
 ```
 
 #### `view`
@@ -140,9 +139,8 @@ civic view <record-id> [options]
 
 **Options:**
 
-- `--format <format>` - Output format (human, json, markdown)
-- `--include-metadata` - Include full metadata
-- `--json` - Output as JSON
+- `-r, --raw` - Show raw file content
+- `--token <token>` - Authentication token
 
 **Examples:**
 
@@ -150,13 +148,13 @@ civic view <record-id> [options]
 # View record
 civic view bylaw/noise-ordinance
 
-# JSON output
-civic view policy/data-privacy --json
+# View raw content
+civic view policy/data-privacy --raw
 ```
 
 #### `edit`
 
-Edit a record.
+Open a record in an external editor.
 
 ```bash
 civic edit <record-id> [options]
@@ -166,20 +164,18 @@ civic edit <record-id> [options]
 
 **Options:**
 
-- `--title <title>` - Update title
-- `--content <content>` - Update content
-- `--status <status>` - Update status
-- `--dry-run` - Preview changes
-- `--json` - Output as JSON
+- `-e, --editor <editor>` - Specify editor to use
+- `--dry-run` - Preview changes without saving
+- `--token <token>` - Authentication token
 
 **Examples:**
 
 ```bash
-# Edit record
-civic edit bylaw/noise-ordinance --title "Updated Noise Ordinance"
+# Edit record in default editor
+civic edit bylaw/noise-ordinance
 
-# Update status
-civic edit policy/data-privacy --status proposed
+# Edit with specific editor
+civic edit policy/data-privacy --editor vim
 ```
 
 #### `commit`
@@ -194,9 +190,9 @@ civic commit [record] [options]
 
 **Options:**
 
-- `--message <message>` - Commit message
-- `--all` - Commit all changes
-- `--dry-run` - Preview commit
+- `-m, --message <message>` - Commit message
+- `-r, --role <role>` - Role for commit message
+- `-a, --all` - Commit all changes
 - `--json` - Output as JSON
 
 #### `records migrate-folders`
@@ -254,7 +250,7 @@ civic search [query] [options]
 - `--type <type>` - Filter by record type
 - `--author <author>` - Search by author
 - `--date <date>` - Search by date
-- `--git <text>` - Search in Git history
+- `--git-history` - Search in Git history
 - `--case-sensitive` - Case-sensitive search
 - `--regex` - Treat as regular expressions
 - `--limit <number>` - Limit results (default: 50)
@@ -270,7 +266,7 @@ civic search "noise"
 civic search "budget" --type resolution --status approved
 
 # Search in Git history
-civic search "update" --git
+civic search "update" --git-history
 
 # JSON output
 civic search "policy" --format json
@@ -483,30 +479,6 @@ civic info [options]
 - `--token <token>` - Authentication token
 - `--json` - Output as JSON
 
-#### `debug`
-
-Debug system configuration.
-
-```bash
-civic debug [command] [options]
-```
-
-**Commands:**
-
-- `config` - Show configuration
-- `permissions` - Show permissions
-- `hooks` - Show hooks
-
-**Examples:**
-
-```bash
-# Show configuration
-civic debug config
-
-# Show permissions
-civic debug permissions
-```
-
 #### `config` (Configuration Management)
 
 Manage system configuration files (parity with UI/API). Supports raw YAML and
@@ -666,6 +638,376 @@ civic import records.json --format json
 civic import records.csv --format csv --dry-run
 ```
 
+### Indexing
+
+#### `index`
+
+Generate and manage civic record indexes.
+
+```bash
+civic index [options]
+```
+
+**Options:**
+
+- `--rebuild` - Rebuild indexes from scratch
+- `--module <module>` - Filter by module
+- `--type <type>` - Filter by record type
+- `--status <status>` - Filter by status
+- `--search <query>` - Search within indexes
+- `--list` - List index entries
+- `--validate` - Validate index integrity
+- `--sync-db` - Synchronize index with database
+- `--conflict-resolution <strategy>` - Conflict resolution strategy
+- `--json` / `--silent` - Output controls
+
+**Examples:**
+
+```bash
+# Rebuild all indexes
+civic index --rebuild
+
+# Search within index
+civic index --search "noise ordinance"
+
+# Validate index integrity
+civic index --validate
+```
+
+#### `auto-index`
+
+Test and demonstrate the auto-indexing workflow.
+
+```bash
+civic auto-index [options]
+```
+
+**Options:**
+
+- `--create` - Create test records and index
+- `--update` - Update test records and re-index
+- `--list` - List indexed records
+- `--demo` - Run full demo workflow
+- `--json` / `--silent` - Output controls
+
+### History & Diff
+
+#### `history`
+
+View record version history from Git.
+
+```bash
+civic history <record> [options]
+```
+
+**Options:**
+
+- `-l, --limit <number>` - Limit number of entries
+- `--format <format>` - Output format
+
+**Examples:**
+
+```bash
+# View history of a record
+civic history bylaw/noise-ordinance
+
+# Limit to last 5 entries
+civic history policy/data-privacy --limit 5
+```
+
+### Storage Management
+
+#### `storage`
+
+Manage file storage configuration and files.
+
+```bash
+civic storage:[command] [options]
+```
+
+**Commands:**
+
+- `config` - Show storage configuration
+- `upload` - Upload file to storage folder
+- `download` - Download file from storage
+- `list` - List files in storage folder
+- `delete` - Delete file from storage
+- `info` - Get file information
+- `folder:add` - Add new storage folder
+- `folder:update` - Update storage folder configuration
+- `folder:remove` - Remove storage folder
+
+**Common Options:**
+
+- `--token <token>` - Authentication token
+- `-i, --input <path>` - Input file path
+- `-o, --output <path>` - Output file path
+- `-n, --name <name>` - Folder or file name
+- `-u, --uuid <uuid>` - File UUID
+- `-f, --force` - Force operation
+- `--json` / `--silent` - Output controls
+
+**Examples:**
+
+```bash
+# Show storage configuration
+civic storage:config
+
+# Upload a file
+civic storage:upload --input ./document.pdf --name public --token $TOKEN
+
+# List files in a folder
+civic storage:list public --token $TOKEN
+
+# Download a file by UUID
+civic storage:download --uuid abc123 --output ./download.pdf --token $TOKEN
+
+# Add a new storage folder
+civic storage:folder:add --name permits --token $TOKEN
+```
+
+### Notifications
+
+#### `notify`
+
+Test and manage the notification system.
+
+```bash
+civic notify:[command] [options]
+```
+
+**Commands:**
+
+- `test` - Send a test notification
+- `config` - Show notification configuration
+- `queue` - List notification queue status
+- `retry` - Retry failed notifications
+
+**Options:**
+
+- `-t, --to <address>` - Recipient address
+- `-s, --subject <text>` - Notification subject
+- `-m, --message <text>` - Notification message
+- `-p, --provider <provider>` - Notification provider
+- `--template <name>` - Use notification template
+- `--json` / `--silent` / `--verbose` - Output controls
+
+**Examples:**
+
+```bash
+# Send test notification
+civic notify:test --to user@example.com --subject "Test" --message "Hello"
+
+# Show notification configuration
+civic notify:config
+
+# Check queue status
+civic notify:queue
+```
+
+### Geography Data
+
+#### `geography`
+
+Validate, scan, and normalize geographic data in records.
+
+```bash
+civic geography:[command] [options]
+```
+
+**Commands:**
+
+- `validate` - Validate geography data in record files
+- `scan` - Scan all records for geography data
+- `normalize` - Normalize and fix geography data issues
+
+**Options:**
+
+- `--normalize` - Apply normalization fixes
+- `--summary` - Show summary only
+- `--write` - Write fixes to files
+- `--json` / `--silent` - Output controls
+
+**Examples:**
+
+```bash
+# Validate geography data in a record
+civic geography:validate bylaw/zoning-code
+
+# Scan all records for geography data
+civic geography:scan
+
+# Normalize geography data with fixes
+civic geography:normalize --write
+```
+
+### Backup & Restore
+
+#### `backup`
+
+Create and restore data backups.
+
+```bash
+civic backup [options]
+civic backup:restore <backup-path> [options]
+```
+
+**Options (create):**
+
+- `--include-storage` - Include storage files in backup
+- `--git-bundles` - Include Git bundles
+- `--compress` - Compress backup archive
+- `--compression-level <level>` - Compression level
+- `--dry-run` - Preview backup without creating
+
+**Options (restore):**
+
+- `--no-verify` - Skip verification after restore
+
+**Examples:**
+
+```bash
+# Create backup
+civic backup
+
+# Create backup with storage files
+civic backup --include-storage
+
+# Restore from backup
+civic backup:restore ./backups/2025-01-15
+```
+
+### System Diagnostics
+
+#### `diagnose`
+
+Run system diagnostics and health checks.
+
+```bash
+civic diagnose [options]
+```
+
+**Options:**
+
+- `--component <name>` - Run specific component check (database, search, config,
+  filesystem, system)
+- `--fix` - Attempt to auto-fix issues
+- `--format <format>` - Output format
+- `--timeout <ms>` - Timeout for checks
+- `--max-concurrency <n>` - Max concurrent checks
+- `--no-cache` - Skip cached results
+- `--force` - Force all checks
+- `--dry-run` - Preview fixes without applying
+- `--json` - Output as JSON
+
+**Examples:**
+
+```bash
+# Run all diagnostics
+civic diagnose
+
+# Check specific component
+civic diagnose --component database
+
+# Auto-fix issues
+civic diagnose --fix
+
+# Dry-run fixes
+civic diagnose --fix --dry-run
+```
+
+### Cache Management
+
+#### `cache`
+
+Inspect and manage the unified cache system.
+
+```bash
+civic cache:[command] [options]
+```
+
+**Commands:**
+
+- `metrics` - Show cache metrics and statistics
+- `health` - Run cache health checks
+- `list` - List registered cache instances
+
+**Options:**
+
+- `--name <cache>` - Filter by cache name
+- `--json` / `--silent` - Output controls
+
+**Examples:**
+
+```bash
+# Show cache metrics
+civic cache:metrics
+
+# Health check for a specific cache
+civic cache:health --name search
+
+# List all registered caches
+civic cache:list
+```
+
+### Cleanup
+
+#### `cleanup`
+
+Remove all data and reset to a clean default state.
+
+```bash
+civic cleanup [options]
+```
+
+**Options:**
+
+- `--force` - Skip confirmation prompt
+- `--json` / `--silent` - Output controls
+
+### Authentication (additional commands)
+
+#### `login`
+
+Standalone login/logout/status commands.
+
+```bash
+civic login [options]
+civic logout
+civic status
+```
+
+**Options:**
+
+- `--token <token>` - Authentication token
+- `--username <username>` - Username
+- `--password <password>` - Password
+- `--method <method>` - Authentication method
+
+#### `auth:me`
+
+Show current authenticated user information.
+
+```bash
+civic auth:me --token <token>
+```
+
+#### `auth:providers`
+
+List available OAuth providers.
+
+```bash
+civic auth:providers
+```
+
+#### `auth:validate`
+
+Validate an OAuth token.
+
+```bash
+civic auth:validate --token <token>
+```
+
 ### Validation & Testing
 
 #### `validate`
@@ -801,7 +1143,7 @@ civic create bylaw "Test Bylaw" --dry-run
 
 # 4. Validate setup
 civic validate --all
-civic debug config
+civic info
 ```
 
 ## Troubleshooting
@@ -814,28 +1156,31 @@ civic debug config
 # Check if user exists
 civic auth:simulated --username admin --role admin
 
-# Verify permissions
-civic debug permissions
+# Verify current user
+civic auth:me --token $TOKEN
 ```
 
 **Permission Errors:**
 
 ```bash
-# Check user role
-civic auth:me
+# Check user role and permissions
+civic auth:me --token $TOKEN
 
-# Verify record permissions
-civic debug permissions --user <username>
+# View user security information
+civic users:security-info myuser --token $TOKEN
 ```
 
 **Configuration Issues:**
 
 ```bash
-# Show configuration
-civic debug config
+# Show system information
+civic info
 
-# Reinitialize if needed
-civic init --config config.yml
+# Check configuration status
+civic config:status
+
+# Run diagnostics
+civic diagnose
 ```
 
 ### Getting Help

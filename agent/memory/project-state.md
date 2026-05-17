@@ -474,6 +474,102 @@
   - Only sorted current page, not all records
   - TODO added for future API/DB-level implementation
 
+### ✅ **Recently Completed (January 2025)**
+
+#### **Realtime Module**
+
+- **Status**: ✅ **Fully Implemented, Tested, and Production-Ready**
+- **Test Suite**: 111 tests passing (64 unit tests, 10 integration tests, 37
+  existing tests)
+- **Core Features**:
+  - WebSocket-based collaborative editing using yjs
+  - Presence tracking (user join/leave, cursor positions, selections)
+  - Room management with extensible room types
+  - Snapshot persistence for recovery and faster reconnection
+  - Rate limiting and security measures
+  - Complete authentication and authorization integration
+- **Implementation Phases**: All 12/13 phases complete (92%)
+  - ✅ Foundation & Module Setup
+  - ✅ Configuration & Service Registration
+  - ✅ WebSocket Server
+  - ✅ Room Management
+  - ✅ yjs Integration
+  - ✅ Presence Tracking
+  - ✅ Snapshot Persistence
+  - ✅ Initialization & Lifecycle
+  - ✅ Hook System Integration
+  - ✅ Error Handling & Logging
+  - ✅ Rate Limiting & Security
+  - ✅ Testing (comprehensive test suite)
+  - ⚠️ Documentation (complete, final review pending)
+- **Test Coverage**:
+  - WebSocket server (connection, auth, message routing, errors)
+  - Presence manager (join/leave, cursor, awareness, cleanup)
+  - Snapshot manager (save/load, versioning, cleanup, storage adapters)
+  - Integration tests (multi-client editing, yjs sync, reconnection, presence)
+- **Documentation**: Complete documentation suite
+  - README, Architecture, Development, Testing, Deployment guides
+  - Quick Start, Standalone usage, Changelog
+- **Integration**: Fully integrated with DI container, follows module
+  integration patterns
+
+#### **Broadcast Box Module**
+
+- **Status**: ✅ **Phase 8 Complete - UI Components Ready** (2025-01-31)
+- **Test Suite**: 78 tests passing (10 test files)
+- **Core Features**:
+  - Device enrollment, registration, and management
+  - WebSocket communication protocol for device control
+  - Session recording control (start/stop)
+  - File upload and storage integration
+  - Workflow automation integration
+  - Status message protocol integration (active sources, PiP configuration)
+  - PiP configuration commands (set_pip, configure_pip)
+  - Real-time device status monitoring
+  - Source switching and control
+  - Network connectivity tracking
+  - Extends realtime module with device room type
+- **Implementation Phases**: Phases 1-8 complete
+  - ✅ Core Infrastructure & Realtime Integration
+  - ✅ Device Management (with enrollment code system)
+  - ✅ WebSocket Protocol & Command Handling
+  - ✅ Session Control
+  - ✅ Upload & Storage Integration
+  - ✅ Workflow Integration
+  - ✅ Testing & Polish (78 tests passing)
+  - ✅ UI Components (12 components/pages)
+  - ✅ Status Message Protocol Integration (2025-01-31)
+  - ✅ PiP Configuration Commands (2025-01-31)
+- **Recent Additions (2025-01-31)**:
+  - Status message protocol: Active sources extraction and display
+  - PiP configuration: Full PiP control with UI component
+  - Database migration: Active sources and PiP config storage (migration 003)
+  - Shared type definitions: Consolidated broadcast-box-types.ts
+  - Comprehensive cleanup and test audit report
+  - Preview feature integration plan (ready for implementation)
+- **Recent Additions (2026-01)**:
+  - PiP size as decimal (0.05–1): protocol/docs, backend set_pip, UI single size
+    input with % display; device page and useDeviceConnectionStatus support
+  - PiP configuration UX: one "Picture-in-Picture Configuration" section with
+    editable form (toggle, sources, position, size, Apply); duplicate read-only
+    card removed; PiP source/position/size fields always visible
+  - WebRTC/service-unavailable handling: API plugin suppresses 500/503 toast for
+    "not available"; useDeviceCommands/serviceNotAvailable toast;
+    useDevicePreview fails immediately with friendly message; i18n keys
+  - Realtime: TypeScript fix in checkConnectionLimits (unreachable block types)
+  - PIP-SIZE-DECIMAL-IMPLEMENTATION-PLAN.md added
+- **UI Components**: 12 components complete
+  - DeviceList, DeviceRegistrationForm, DeviceConfigurationForm
+  - DeviceStatusBadge, ConnectionStatusIndicator, SessionStatusBadge
+  - DeviceSourceControl, DevicePiPControl
+  - RecordingControls, BroadcastBoxControls
+  - Device management pages (/settings/broadcast-box)
+- **Integration**: Fully integrated with DI container, realtime, storage, and
+  workflow modules
+- **Documentation**: Complete integration plans, testing guides, and audit
+  reports
+- **Ready For**: Production use, preview feature implementation
+
 ### 🔄 **In Progress**
 
 #### **Advanced Features Development**
@@ -583,7 +679,7 @@
 
 #### **Test Coverage**
 
-- **Total Tests**: 560+ passing (up from 391)
+- **Total Tests**: 671+ passing (up from 560)
 - **Core Services**: 95% coverage
 - **API Endpoints**: 90% coverage
 - **CLI Commands**: 85% coverage
@@ -591,6 +687,7 @@
 - **File Attachment System**: 100% coverage
 - **UUID Storage System**: 95% coverage
 - **Configuration System**: 90% coverage
+- **Realtime Module**: 111 tests (64 unit, 10 integration, 37 existing)
 
 #### **Code Quality**
 

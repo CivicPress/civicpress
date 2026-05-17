@@ -136,6 +136,15 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ): void {
+  // Log to console immediately for debugging
+  console.error('=== API ERROR HANDLER CALLED ===');
+  console.error('Error name:', err.name);
+  console.error('Error message:', err.message);
+  console.error('Error stack:', err.stack);
+  console.error('Request path:', req.path);
+  console.error('Request method:', req.method);
+  console.error('================================');
+
   const context = extractRequestContext(req);
   const categorization = categorizeError(err);
 
@@ -186,6 +195,19 @@ export function errorHandler(
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
   });
+
+  // Also log to console for immediate visibility
+  console.error('=== API ERROR HANDLER DETAILS ===');
+  console.error('Error name:', err.name);
+  console.error('Error message:', message);
+  console.error('Error code:', errorCode);
+  console.error('Category:', categorization.category);
+  console.error('Status code:', statusCode);
+  console.error('Path:', req.path);
+  console.error('Method:', req.method);
+  console.error('Stack:', err.stack);
+  console.error('Request body:', JSON.stringify(req.body, null, 2));
+  console.error('================================');
 
   // Additional logging for critical errors
   if (categorization.severity === 'critical' || statusCode >= 500) {

@@ -26,6 +26,11 @@ describe('Authorization System', () => {
         username: 'admin',
         role: 'admin',
       });
+    if (!adminResponse.body.data?.session) {
+      throw new Error(
+        `Admin simulated login failed: ${JSON.stringify(adminResponse.body)}`
+      );
+    }
     adminToken = adminResponse.body.data.session.token;
 
     const clerkResponse = await request(context.api.getApp())
@@ -34,6 +39,11 @@ describe('Authorization System', () => {
         username: 'clerk',
         role: 'clerk',
       });
+    if (!clerkResponse.body.data?.session) {
+      throw new Error(
+        `Clerk simulated login failed: ${JSON.stringify(clerkResponse.body)}`
+      );
+    }
     clerkToken = clerkResponse.body.data.session.token;
 
     const publicResponse = await request(context.api.getApp())
@@ -42,6 +52,11 @@ describe('Authorization System', () => {
         username: 'public',
         role: 'public',
       });
+    if (!publicResponse.body.data?.session) {
+      throw new Error(
+        `Public simulated login failed: ${JSON.stringify(publicResponse.body)}`
+      );
+    }
     publicToken = publicResponse.body.data.session.token;
 
     // Create a test record for testing permissions

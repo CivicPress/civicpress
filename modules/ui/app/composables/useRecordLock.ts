@@ -12,6 +12,11 @@ interface UseRecordLockOptions {
   recordId: string;
   lockDurationMinutes?: number;
   pollIntervalMs?: number;
+  /**
+   * When true, collaborative mode is enabled and locks are disabled.
+   * Yjs handles concurrent editing, so exclusive locks aren't needed.
+   */
+  collaborativeMode?: boolean;
   onLockAcquired?: () => void;
   onLockLost?: () => void;
   onLockError?: (error: Error) => void;
@@ -22,10 +27,31 @@ export function useRecordLock(options: UseRecordLockOptions) {
     recordId,
     lockDurationMinutes = 30,
     pollIntervalMs = 30000, // 30 seconds
+    collaborativeMode = false,
     onLockAcquired,
     onLockLost,
     onLockError,
   } = options;
+
+  // In collaborative mode, locks are disabled - Yjs handles concurrent editing
+  if (collaborativeMode) {
+    return {
+      lockInfo: ref<LockInfo>({
+        locked: false,
+        lockedBy: null,
+        lockedAt: null,
+        expiresAt: null,
+      }),
+      isAcquiring: ref(false),
+      error: ref<Error | null>(null),
+      acquireLock: async () => true, // Always succeeds in collaborative mode
+      releaseLock: async () => {}, // No-op in collaborative mode
+      checkLock: async () => {}, // No-op in collaborative mode
+      refreshLock: async () => {}, // No-op in collaborative mode
+      startPolling: () => {}, // No-op in collaborative mode
+      stopPolling: () => {}, // No-op in collaborative mode
+    };
+  }
 
   const lockInfo = ref<LockInfo>({
     locked: false,

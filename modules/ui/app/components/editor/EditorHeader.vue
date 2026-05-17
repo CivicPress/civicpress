@@ -2,8 +2,15 @@
 import { computed, ref } from 'vue';
 import { useRecordStatuses } from '~/composables/useRecordStatuses';
 import { useRecordUtils } from '~/composables/useRecordUtils';
+import CollaboratorsPresence from './CollaboratorsPresence.vue';
 
 const { t } = useI18n();
+
+interface Collaborator {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface Props {
   title: string;
@@ -15,6 +22,10 @@ interface Props {
   lastSaved?: Date | null;
   disabled?: boolean;
   allowedTransitions?: string[];
+  // Collaboration props
+  collaborativeMode?: boolean;
+  connectionStatus?: 'connecting' | 'connected' | 'disconnected';
+  collaborators?: Collaborator[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -24,6 +35,9 @@ const props = withDefaults(defineProps<Props>(), {
   autosaveStatus: 'idle',
   disabled: false,
   allowedTransitions: () => [],
+  collaborativeMode: false,
+  connectionStatus: 'disconnected',
+  collaborators: () => [],
 });
 
 const emit = defineEmits<{
@@ -39,6 +53,7 @@ const emit = defineEmits<{
   'view-history': [];
   duplicate: [];
   export: [];
+  'toggle-collaborative-mode': [];
 }>();
 
 const { getRecordStatusLabel, recordStatusOptions } = useRecordStatuses();
@@ -307,6 +322,63 @@ const formatTime = (date: Date) => {
 
       <!-- Right: Status + Actions Group -->
       <div class="flex items-center gap-2.5 flex-shrink-0">
+        <!-- Collaborators Presence (when in collaborative mode) -->
+        <CollaboratorsPresence
+          v-if="collaborativeMode && collaborators.length > 0"
+          :collaborators="collaborators"
+          :max-visible="3"
+        />
+
+        <!-- Connection Status Indicator (when in collaborative mode) -->
+        <div
+          v-if="collaborativeMode"
+          class="hidden md:flex items-center gap-1.5 text-xs"
+          :class="{
+            'text-green-500 dark:text-green-400':
+              connectionStatus === 'connected',
+            'text-yellow-500 dark:text-yellow-400':
+              connectionStatus === 'connecting',
+            'text-gray-400 dark:text-gray-500':
+              connectionStatus === 'disconnected',
+          }"
+        >
+          <span
+            class="w-2 h-2 rounded-full flex-shrink-0"
+            :class="{
+              'bg-green-500 dark:bg-green-400':
+                connectionStatus === 'connected',
+              'bg-yellow-500 dark:bg-yellow-400 animate-pulse':
+                connectionStatus === 'connecting',
+              'bg-gray-400 dark:bg-gray-500':
+                connectionStatus === 'disconnected',
+            }"
+          />
+          <span class="truncate">
+            {{
+              connectionStatus === 'connected'
+                ? t('records.editor.connected')
+                : connectionStatus === 'connecting'
+                  ? t('records.editor.connecting')
+                  : t('records.editor.disconnected')
+            }}
+          </span>
+        </div>
+
+        <!-- Collaborative Mode Toggle -->
+        <UButton
+          v-if="isEditing"
+          :icon="collaborativeMode ? 'i-lucide-users' : 'i-lucide-user'"
+          :variant="collaborativeMode ? 'soft' : 'ghost'"
+          :color="collaborativeMode ? 'primary' : 'neutral'"
+          size="xs"
+          :title="
+            collaborativeMode
+              ? t('records.editor.collaborative')
+              : t('records.editor.singleUser') || 'Single user mode'
+          "
+          @click="emit('toggle-collaborative-mode')"
+        />
+
         <!-- Autosave Indicator (Small, muted) -->
         <div
           class="hidden md:flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400"

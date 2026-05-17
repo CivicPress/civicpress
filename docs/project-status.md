@@ -1,10 +1,9 @@
 # CivicPress Project Status
 
-**Last Updated**: January 2025  
-**Current Version**: v0.2.0 (Alpha)  
-**Overall Status**: Stable & Production-Ready  
-**Test Coverage**: 1167+ tests passing (including 85+ security tests)  
-**Implementation**: Core maturity complete (v0.2.x goals achieved)
+**Last Updated**: February 2026 **Current Version**: v0.2.0 (Alpha) **Overall
+Status**: Stable & Production-Ready **Test Coverage**: 1291+ tests passing (118
+test files, including 85+ security tests) **Implementation**: Core maturity
+complete (v0.2.x goals achieved)
 
 **Website:** [civicpress.io](https://civicpress.io) | **Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
@@ -23,7 +22,7 @@ ready for development and testing.
 - **REST API**: Comprehensive API with 25+ endpoints and authentication
 - **Authentication**: Multi-method auth (OAuth, password, simulated)
 - **Database**: SQLite with Git integration and full CRUD operations
-- **Testing**: 600+ tests passing with comprehensive coverage
+- **Testing**: 1291+ tests passing with comprehensive coverage
 - **File Attachments**: Complete system for linking files to records
 - **Configuration Management**: Dynamic UI with full backend integration
 
@@ -98,7 +97,7 @@ ready for development and testing.
   - Automatic error recognition in API layer
   - Correlation ID tracking for debugging
   - Enhanced UI error handling with dev mode visibility
-  - Comprehensive test coverage (1048+ tests passing)
+  - Comprehensive test coverage (1291+ tests passing)
 
 ### In Progress
 
@@ -138,6 +137,47 @@ ready for development and testing.
 - Admin dashboard - In Progress
 
 ### Recently Completed Features
+
+#### **Realtime Collaborative Editing (February 2026)**
+
+- **Status**: Fully Implemented
+- **Binary y-protocols**: Server uses native binary y-protocols (sync +
+  awareness) instead of JSON message wrapping for optimal performance
+- **TipTap + Yjs Integration**: Rich-text collaborative editing in the UI using
+  TipTap editor with Yjs CRDT backend
+- **WebSocket Protocol**: Binary Yjs sync step 1/step 2 handshake on connection,
+  binary sync updates and awareness messages for real-time collaboration
+- **Room Management**: Per-record editing rooms with automatic creation/cleanup
+- **Snapshot System**: Periodic document snapshots with database persistence and
+  REST API endpoint for state recovery
+- **Presence & Awareness**: Cursor positions and user awareness via binary
+  awareness protocol
+- **Connection Limiting**: Rate limiting per IP and per user with configurable
+  thresholds
+- **Test Coverage**: 23 tests (13 unit + 10 integration) covering binary
+  protocol handshake, sync routing, awareness broadcasting, reconnection, and
+  multi-client editing scenarios
+- **Dead Code Cleanup**: Removed legacy JSON message handlers (`sendRoomState`,
+  `setupMessageHandlers`) replaced by binary y-protocols implementation
+
+#### **Broadcast Box Device Control UI (February 2026)**
+
+- **Status**: Fully Implemented
+- **Single Device Page**: Comprehensive device management with live preview,
+  source control, recording, and configuration
+- **Device Preview**: WebRTC-based live video preview with play/stop, audio
+  mute, and inline recording controls
+- **Source Control**: Video/audio source switching with multi-strategy matching
+  (exact, case-insensitive, label, partial). Virtual PiP option only shown when
+  device explicitly supports it (`pipSupported`)
+- **Manual Recording**: Start/stop recording with real-time duration display,
+  quality preset support (low/standard/high/ultra)
+- **Recordings List**: Dedicated card with recording history, file sizes,
+  durations, and refresh capability
+- **Component Architecture**: Recording state managed via `useManualRecording`
+  composable with `defineExpose` for cross-component data sharing
+- **Real-time Status**: WebSocket-based device connection status, active source
+  tracking, and capability discovery
 
 #### **Google Cloud Storage (GCS) Provider Support (January 2025)**
 
@@ -384,13 +424,14 @@ ready for development and testing.
 
 ### Test Coverage Summary
 
-| Component | Tests | Status  | Coverage |
-| --------- | ----- | ------- | -------- |
-| **CLI**   | 120+  | Passing | 95%      |
-| **API**   | 200+  | Passing | 90%      |
-| **Core**  | 160+  | Passing | 90%      |
-| **UI**    | 80+   | Passing | 85%      |
-| **Total** | 600+  | Passing | 90%      |
+| Component    | Tests | Status  | Coverage |
+| ------------ | ----- | ------- | -------- |
+| **CLI**      | 120+  | Passing | 95%      |
+| **API**      | 200+  | Passing | 90%      |
+| **Core**     | 160+  | Passing | 90%      |
+| **Realtime** | 111+  | Passing | 90%      |
+| **UI**       | 80+   | Passing | 85%      |
+| **Total**    | 1291  | Passing | 90%      |
 
 ### Test Categories
 
@@ -403,6 +444,8 @@ ready for development and testing.
 - **Geography Data Tests**: Geography file management and validation
 - **UUID Storage Tests**: Storage system operations
 - **Configuration Tests**: Dynamic configuration management
+- **Realtime Tests**: WebSocket protocol, binary y-protocols sync, multi-client
+  editing, reconnection handling, awareness broadcasting
 
 ## Development Environment
 
@@ -644,10 +687,10 @@ pnpm run clean
 
 ### Technical Metrics
 
-- 600+ tests passing (including comprehensive security test suite)
+- 1291+ tests passing (including comprehensive security test suite)
 - 0 critical security vulnerabilities
 - < 100ms API response times
-- 88% test coverage
+- 90% test coverage
 
 ### Development Metrics
 

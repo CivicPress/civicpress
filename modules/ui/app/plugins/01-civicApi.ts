@@ -147,11 +147,49 @@ export default defineNuxtPlugin(async (nuxtApp) => {
           break;
 
         case 500:
-          // Server error - show generic error
-          handleError(apiError, {
-            title: 'Server Error',
-            showToast: true,
-          });
+        case 503:
+        case 504:
+          // Server / Unavailable / Gateway Timeout - check if it's a device command "expected" error
+          // These are handled by useDeviceCommands / useDevicePreview, so don't show duplicate toast
+          const errorMessage =
+            apiError.message || apiError.data?.error?.message || '';
+          const errorCode = apiError.data?.error?.code || apiError.errorCode;
+          const isDeviceNotConnectedError =
+            errorMessage.includes('not connected') ||
+            (errorMessage.includes('Device') &&
+              errorMessage.includes('not connected'));
+          const isTimeoutError =
+            errorCode === 'TIMEOUT' ||
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('Command timeout');
+          const isServiceNotAvailable =
+            errorMessage.includes('not available') ||
+            errorMessage.includes('service not available');
+
+          if (
+            isDeviceNotConnectedError ||
+            isTimeoutError ||
+            isServiceNotAvailable
+          ) {
+            // Don't show toast - command/preview composables will show a single friendly message
+            handleError(apiError, {
+              title:
+                response.status === 504
+                  ? 'Gateway Timeout'
+                  : response.status === 503
+                    ? 'Service Unavailable'
+                    : 'Server Error',
+              showToast: false,
+              logToConsole: false,
+            });
+          } else {
+            // Show toast for other server errors
+            handleError(apiError, {
+              title:
+                response.status === 504 ? 'Gateway Timeout' : 'Server Error',
+              showToast: true,
+            });
+          }
           break;
 
         default:

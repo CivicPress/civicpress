@@ -1455,5 +1455,98 @@ export function createRecordsRouter(recordsService: RecordsService) {
     }
   );
 
+  // POST /api/v1/records/:id/snapshot - Trigger collaborative editing snapshot (authenticated only)
+  router.post(
+    '/:id/snapshot',
+    authMiddleware(recordsService.getCivicPress()),
+    requireRecordPermission('edit'),
+    param('id').isString().notEmpty(),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'trigger_snapshot' });
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return handleRecordsValidationError(
+          'trigger_snapshot',
+          errors.array(),
+          req,
+          res
+        );
+      }
+
+      try {
+        const { id } = req.params;
+        const user = req.user;
+
+        if (!user) {
+          const error = new Error('User authentication required');
+          (error as any).statusCode = 401;
+          throw error;
+        }
+
+        // Get the realtime server from the DI container
+        const civicPress = recordsService.getCivicPress();
+        let realtimeServer: any;
+
+        try {
+          realtimeServer = civicPress.getService('realtimeServer');
+        } catch {
+          // Realtime server not available
+          realtimeServer = null;
+        }
+
+        if (!realtimeServer || typeof realtimeServer.triggerRecordSnapshot !== 'function') {
+          // Realtime server not available or not initialized
+          // Return success with null result (no active collaborative session)
+          sendSuccess(
+            {
+              snapshotCreated: false,
+              message: 'No active collaborative editing session for this record',
+            },
+            req,
+            res,
+            { operation: 'trigger_snapshot' }
+          );
+          return;
+        }
+
+        const result = await realtimeServer.triggerRecordSnapshot(id);
+
+        if (result) {
+          sendSuccess(
+            {
+              snapshotCreated: true,
+              roomId: result.roomId,
+              version: result.version,
+              timestamp: result.timestamp,
+            },
+            req,
+            res,
+            { operation: 'trigger_snapshot' }
+          );
+        } else {
+          // No active room for this record
+          sendSuccess(
+            {
+              snapshotCreated: false,
+              message: 'No active collaborative editing session for this record',
+            },
+            req,
+            res,
+            { operation: 'trigger_snapshot' }
+          );
+        }
+      } catch (error) {
+        handleApiError(
+          'trigger_snapshot',
+          error,
+          req,
+          res,
+          'Failed to trigger snapshot'
+        );
+      }
+    }
+  );
+
   return router;
 }

@@ -538,6 +538,240 @@ await configService.initialize();
 - Verify configuration file format
 - Ensure configuration is loaded before module initialization
 
+## Realtime Module Integration ✅ (Implemented)
+
+The Realtime module follows **Pattern 2 (Service Registration)** similar to the
+Storage module, with additional considerations for WebSocket server lifecycle
+and room management. **Implementation is complete and tested.**
+
+### Architecture
+
+```
+modules/realtime/
+├── src/
+│   ├── realtime-services.ts      # Service registration
+│   ├── realtime-server.ts         # WebSocket server
+│   ├── realtime-config-manager.ts # Configuration management
+│   ├── rooms/
+│   │   ├── room-manager.ts        # Room management
+│   │   └── yjs-room.ts            # yjs document room
+│   ├── errors/
+│   │   └── realtime-errors.ts     # Error hierarchy
+│   └── types/
+│       └── realtime.types.ts       # TypeScript types
+└── package.json
+```
+
+### Integration Points
+
+1. **Core Dependency**: Uses `@civicpress/core` for:
+   - `Logger` - Logging utilities
+   - `HookSystem` - Event emission
+   - `AuthService` - Authentication validation
+   - `DatabaseService` - Snapshot storage (optional)
+   - `ServiceContainer` - DI container for service registration
+
+2. **DI Container Registration**: Services registered during core
+   initialization:
+
+   ```typescript
+   // In core/src/civic-core-services.ts
+   if (realtimeModule?.registerRealtimeServices) {
+     realtimeModule.registerRealtimeServices(container, config);
+   }
+
+   // In modules/realtime/src/realtime-services.ts
+   export function registerRealtimeServices(
+     container: ServiceContainer,
+     config: CivicPressConfig
+   ): void {
+     // Register 'realtimeConfigManager' (singleton)
+     container.singleton('realtimeConfigManager', () => {
+       return new RealtimeConfigManager(systemDataDir);
+     });
+
+     // Register 'realtimeServer' (singleton)
+     container.singleton('realtimeServer', (c) => {
+       const logger = c.resolve<Logger>('logger');
+       const hookSystem = c.resolve<HookSystem>('hooks');
+       const authService = c.resolve<AuthService>('auth');
+       const configManager = c.resolve<RealtimeConfigManager>('realtimeConfigManager');
+
+       return new RealtimeServer(
+         logger,
+         hookSystem,
+         authService,
+         configManager,
+         config
+       );
+     });
+
+     // Register 'realtimeRoomManager' (singleton)
+     container.singleton('realtimeRoomManager', (c) => {
+       const logger = c.resolve<Logger>('logger');
+       const server = c.resolve<RealtimeServer>('realtimeServer');
+       return new RoomManager(logger, server);
+     });
+   }
+   ```
+
+3. **Configuration**: Uses `.system-data/realtime.yml` for configuration via
+   `RealtimeConfigManager`:
+
+   ```yaml
+   realtime:
+     enabled: true
+     port: 3001
+     host: '0.0.0.0'
+     path: '/realtime'
+     rooms:
+       max_rooms: 100
+       cleanup_timeout: 3600
+     snapshots:
+       enabled: true
+       interval: 300
+       max_updates: 100
+     rate_limiting:
+       messages_per_second: 10
+       connections_per_ip: 100
+       connections_per_user: 10
+   ```
+
+4. **Error Handling**: Domain-specific errors extending `CivicPressError`:
+
+   ```typescript
+   // modules/realtime/src/errors/realtime-errors.ts
+   import {
+     CivicPressError,
+     NotFoundError,
+     ValidationError
+   } from '@civicpress/core/errors';
+
+   export class RoomNotFoundError extends NotFoundError {
+     code = 'ROOM_NOT_FOUND';
+   }
+
+   export class ConnectionLimitExceededError extends ValidationError {
+     code = 'CONNECTION_LIMIT_EXCEEDED';
+     statusCode = 429;
+   }
+   ```
+
+5. **Initialization & Shutdown**: Lifecycle management:
+
+   ```typescript
+   export class RealtimeServer {
+     async initialize(): Promise<void> {
+       // Load configuration
+       // Start WebSocket server
+       // Register room types
+       // Setup health checks
+     }
+
+     async shutdown(): Promise<void> {
+       // Close connections gracefully
+       // Save pending snapshots
+       // Cleanup resources
+     }
+   }
+   ```
+
+6. **Hook System Integration**: Emits events for workflow integration:
+
+   ```typescript
+   // Hook events emitted
+   - 'realtime:room:created'
+   - 'realtime:room:destroyed'
+   - 'realtime:client:connected'
+   - 'realtime:client:disconnected'
+   - 'realtime:snapshot:saved'
+   ```
+
+### Current Status
+
+- ✅ **Implementation Complete**: Fully implemented and tested
+- ✅ **Architecture Defined**: See `docs/specs/realtime-architecture.md`
+- ✅ **Integration Complete**: Fully integrated with DI container
+
+### Lessons for Module Development
+
+1. **Complete Spec First**: Ensure module integration sections are complete
+   before implementation
+2. **Follow Storage Pattern**: Use Storage module as template for new modules
+3. **Document Dependencies**: Explicitly list all core service dependencies
+4. **Error Hierarchy**: Define domain-specific errors extending
+   `CivicPressError`
+5. **Configuration Management**: Use config manager pattern for module settings
+6. **Lifecycle Management**: Document initialization and shutdown procedures
+
+## Broadcast Box Module Integration ✅ (Implemented)
+
+The Broadcast Box module follows **Pattern 2 (Service Registration)** similar to
+the Realtime module, extending it with device room types for remote device
+control.
+
+### Architecture
+
+```
+modules/broadcast-box/
+├── src/
+│   ├── broadcast-box-services.ts  # Service registration
+│   ├── rooms/
+│   │   └── device-room.ts         # Device room implementation
+│   ├── services/
+│   │   ├── device-manager.ts      # Device management
+│   │   ├── device-auth.ts         # Device authentication
+│   │   ├── session-controller.ts  # Session control
+│   │   └── upload-processor.ts    # File upload handling
+│   ├── api/
+│   │   ├── devices.ts             # Device API endpoints
+│   │   ├── sessions.ts             # Session API endpoints
+│   │   └── uploads.ts             # Upload API endpoints
+│   ├── websocket/
+│   │   ├── protocol.ts            # WebSocket protocol
+│   │   ├── command-handlers.ts    # Command handling
+│   │   └── event-handlers.ts      # Event handling
+│   └── workflows/
+│       ├── triggers.ts            # Workflow triggers
+│       └── actions.ts             # Workflow actions
+```
+
+### Integration Points
+
+1. **Service Registration**: All services registered in DI container via
+   `registerBroadcastBoxServices()`:
+
+   ```typescript
+   // In core/src/civic-core-services.ts
+   if (broadcastBoxModule?.registerBroadcastBoxServices) {
+     broadcastBoxModule.registerBroadcastBoxServices(container, config);
+   }
+   ```
+
+2. **Realtime Integration**: Extends realtime module with device room type:
+
+   ```typescript
+   // In modules/broadcast-box/src/broadcast-box-services.ts
+   const roomManager = container.resolve<RoomManager>('realtimeRoomManager');
+   const deviceRoomFactory = createDeviceRoomFactory(logger, realtimeServer);
+   roomManager.registerRoomType('device', deviceRoomFactory);
+   ```
+
+3. **Storage Integration**: Uses UUID storage service for file uploads
+
+4. **Workflow Integration**: Registers triggers and actions with workflow engine
+
+5. **API Integration**: REST endpoints registered via
+   `registerBroadcastBoxApiRoutes()`
+
+### Current Status
+
+- ✅ **Core Integration Complete**: Phase 7 complete (78 tests passing)
+- ✅ **Test Coverage**: 62 unit, 10 integration, 3 API, 3 other tests
+- ✅ **Integration**: Fully integrated with DI container, realtime, storage, and
+  workflow modules
+- 📋 **UI Components**: Phase 8 (device management, recording controls)
+
 ## Related Documentation
 
 - [Architecture Overview](architecture.md) - Core architecture
@@ -545,9 +779,48 @@ await configService.initialize();
   usage
 - [Error Handling](error-handling.md) - Error handling patterns
 - [Storage System](uuid-storage-system.md) - Storage module details
+- [Realtime Architecture](../specs/realtime-architecture.md) - Realtime module
+  specification
+- [Realtime Gaps Analysis](../specs/realtime-architecture-GAPS.md) - Identified
+  gaps in realtime spec
+
+---
+
+## Module Spec Template
+
+A complete module specification template is available at
+[`docs/specs/module-spec-template.md`](../specs/module-spec-template.md). This
+template is based on the complete realtime module specification and includes all
+required sections for module integration.
+
+**Key Sections in Template**:
+
+- Module Integration (Service Registration)
+- Configuration Management
+- Error Handling
+- Initialization & Lifecycle
+- Hook System Integration
+- Logging Patterns
+
+**Usage**: Copy the template and fill in module-specific details while following
+established CivicPress patterns.
+
+## Related Documentation
+
+- [Architecture Overview](architecture.md) - Core architecture
+- [Dependency Injection Guide](dependency-injection-guide.md) - DI container
+  usage
+- [Error Handling](error-handling.md) - Error handling patterns
+- [Storage System](uuid-storage-system.md) - Storage module details
+- [Realtime Architecture](../specs/realtime-architecture.md) - Realtime module
+  specification (complete example)
+- [Realtime Gaps Analysis](../specs/realtime-architecture-GAPS.md) - Identified
+  gaps in realtime spec
+- [Module Spec Template](../specs/module-spec-template.md) - Template for new
+  module specifications
 
 ---
 
 **Status**: Active  
 **Last Updated**: 2025-01-30  
-**Next Review**: After module registration system implementation
+**Next Review**: After realtime module implementation

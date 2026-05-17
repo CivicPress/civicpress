@@ -53,6 +53,15 @@ const settingsItems = computed<NavigationMenuItem[]>(() => {
     });
   }
 
+  if (authStore.hasPermission('broadcast-box:admin')) {
+    items.push({
+      label: t('broadcastBox.deviceManagement'),
+      icon: 'i-lucide-video',
+      to: '/settings/broadcast-box',
+      description: t('broadcastBox.deviceManagementDesc'),
+    });
+  }
+
   if (authStore.hasPermission('system:admin')) {
     items.push({
       label: t('settings.activityLog'),

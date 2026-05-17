@@ -296,6 +296,57 @@
 - Municipal partnerships
 - Developer community
 
+## 📦 **Module Development References**
+
+### **Module Integration Guide**
+
+- **Source**: `docs/module-integration-guide.md`
+- **Purpose**: Complete guide for module integration with CivicPress core
+- **Key Concepts**:
+  - Service registration patterns
+  - DI container integration
+  - Configuration management
+  - Error handling
+  - Lifecycle management
+- **Application**: All new module development
+- **Status**: Required reference for module development
+
+### **Module Specification Template**
+
+- **Source**: `docs/specs/module-spec-template.md`
+- **Purpose**: Template for creating complete module specifications
+- **Key Concepts**:
+  - Complete specification structure
+  - All required integration sections
+  - Examples and patterns
+- **Application**: Creating specifications for new modules
+- **Status**: Required template for new modules
+
+### **Realtime Module Specification**
+
+- **Source**: `docs/specs/realtime-architecture.md`
+- **Purpose**: Complete example of module specification
+- **Key Concepts**:
+  - All integration sections documented
+  - Service registration pattern
+  - Configuration management
+  - Error handling hierarchy
+  - Lifecycle management
+- **Application**: Reference implementation for new modules
+- **Status**: Complete specification example
+
+### **Storage Module Implementation**
+
+- **Source**: `modules/storage/`
+- **Purpose**: Complete module implementation example
+- **Key Concepts**:
+  - Service registration (`registerStorageServices()`)
+  - Configuration management (`StorageConfigManager`)
+  - Error handling (storage-specific errors)
+  - DI container integration
+- **Application**: Reference implementation for new modules
+- **Status**: Production implementation example
+
 ## 🔗 **Related Resources**
 
 - **Architecture**: `agent/memory/architecture.md`
@@ -303,3 +354,5 @@
 - **Examples**: `agent/knowledge/examples.md`
 - **Project State**: `agent/memory/project-state.md`
 - **Decisions**: `agent/memory/decisions.md`
+- **Module Integration**: `docs/module-integration-guide.md`
+- **Module Template**: `docs/specs/module-spec-template.md`

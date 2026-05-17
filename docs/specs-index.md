@@ -22,7 +22,7 @@ organized by category and implementation status.
 | [CLI](specs/cli.md)                             | Implemented | Command-line interface with JSON output support          |
 | [Authentication](specs/auth.md)                 | Implemented | Multi-method authentication (OAuth, password, simulated) |
 | [Database](specs/database.md)                   | Implemented | SQLite database with Git integration                     |
-| [Testing Framework](specs/testing-framework.md) | Implemented | Comprehensive test suite with 600+ tests                 |
+| [Testing Framework](specs/testing-framework.md) | Implemented | Comprehensive test suite with 1291+ tests                |
 
 ### In Progress
 

@@ -10,69 +10,30 @@ interacting with the CivicPress API.
 
 ### Technology Stack
 
-- **Framework**: Nuxt 4 (Vue 3)
-- **UI Library**: Nuxt UI Pro (built on Tailwind CSS)
-- **Mode**: SPA (Single Page Application)
-- **Port**: 3030
-- **API Integration**: RESTful API calls to CivicPress backend
+- **Framework**: Nuxt 4.2.1 (Vue 3.5)
+- **UI Library**: Nuxt UI Pro 3.3 (built on Tailwind CSS)
+- **State Management**: Pinia 3.0 with localStorage persistence
+- **i18n**: @nuxtjs/i18n 10.2 (English + French)
+- **Markdown**: CodeMirror 6 editor + marked renderer
+- **Maps**: Leaflet 1.9
+- **Utilities**: @vueuse/core 13.5
+- **Mode**: SPA (Single Page Application, no SSR)
+- **Port**: 3030 (dev), configurable via `PORT` or `NUXT_PORT`
 
 ### Key Decisions
 
-1. **Nuxt UI Pro**: Chosen over standard Nuxt UI for enhanced components and
-   features
-   - Note: Planned to become free soon
-   - Provides advanced components and better styling out of the box
-
-2. **SPA Mode**: No SSR since we're API-driven
-   - Faster development and deployment
-   - Simpler architecture for API integration
-
-3. **Port 3030**: Dedicated port to avoid conflicts with API (3000)
-
-4. **API-First Design**: Frontend consumes REST API endpoints
-   - Clean separation of concerns
-   - Enables multiple frontend implementations
-
-## Current Status
-
-### Working
-
-- Nuxt 4 development server running on port 3030
-- Nuxt UI Pro components available
-- API server integration fully implemented
-- Authentication system (JWT, OAuth, simulated)
-- Dynamic content loading
-- User interface components
-- Record management interface (create, edit, view, delete)
-- User dashboard and profile management
-- Admin panel with user management
-- Record listing and search functionality
-- Status transition controls
-- Internationalization (i18n) with English and French support
-- File attachment system
-- Geography file management
-- Configuration management UI
-- Development tools enabled
-
-### In Progress
-
-- Advanced workflow features
-- Real-time notifications
-- Plugin registry interface
-
-### Planned
-
-- Advanced analytics dashboard
-- Custom report generation
-- Multi-tenant support
-- Advanced search filters
+1. **SPA Mode**: No SSR since the app is API-driven with JWT authentication.
+2. **Port 3030**: Dedicated port to avoid conflicts with the API (3000) and
+   realtime server (3001).
+3. **API-First Design**: Frontend consumes REST API endpoints. A Nitro dev proxy
+   routes `/api` requests to the backend during development.
 
 ## Development
 
 ### Prerequisites
 
 ```bash
-# Install dependencies
+# Install dependencies from project root
 pnpm install
 
 # Ensure API server is running on port 3000
@@ -84,31 +45,32 @@ pnpm dev:api
 ```bash
 # Start UI development server
 pnpm dev:ui
-
-# Or from project root
-pnpm dev:ui
 ```
 
 ### Available Scripts
 
-- `pnpm dev` - Start development server
-- `pnpm build` - Build for production
-- `pnpm preview` - Preview production build
+- `pnpm dev` — Start development server (port 3030)
+- `pnpm build` — Build for production
+- `pnpm preview` — Preview production build
 
 ## Configuration
 
 ### Environment Variables
 
-- `API_BASE_URL` - Backend API URL (default: <http://localhost:3000>)
+| Variable                                 | Purpose            | Default                 |
+| ---------------------------------------- | ------------------ | ----------------------- |
+| `API_BASE_URL`                           | Backend API URL    | `http://localhost:3000` |
+| `PORT` / `NUXT_PORT`                     | UI dev server port | `3030`                  |
+| `NUXT_DEFAULT_LOCALE` / `DEFAULT_LOCALE` | Default locale     | `en`                    |
 
 ### Runtime Config
 
 ```typescript
 runtimeConfig: {
   public: {
-    apiBase: 'http://localhost:3000',
+    civicApiUrl: process.env.API_BASE_URL || 'http://localhost:3000',
     appName: 'CivicPress',
-    appVersion: '1.0.0'
+    appVersion: '0.1.3'
   }
 }
 ```
@@ -118,154 +80,90 @@ runtimeConfig: {
 ```
 modules/ui/
 ├── app/
-│   └── app.vue              # Root app component
-├── pages/
-│   └── index.vue            # Home page
-├── components/              # Vue components
-├── composables/            # Nuxt composables
-├── assets/                 # Static assets
-├── nuxt.config.ts          # Nuxt configuration
-└── package.json            # Dependencies
+│   ├── app.vue                 # Root app component
+│   ├── error.vue               # Error page
+│   ├── assets/css/main.css     # Global CSS
+│   ├── components/             # 56 Vue components
+│   │   ├── broadcast-box/      #   17 broadcast-box components
+│   │   ├── editor/             #   8 editor components
+│   │   ├── records/            #   2 record-linking components
+│   │   ├── storage/            #   5 storage components
+│   │   └── *.vue               #   24 top-level components
+│   ├── composables/            # 28 composables
+│   ├── layouts/default.vue     # Default layout
+│   ├── middleware/             # 4 route guards
+│   ├── pages/                  # 36 page files
+│   │   ├── auth/               #   6 auth pages
+│   │   ├── geography/          #   4 geography pages
+│   │   ├── records/            #   8 record pages
+│   │   └── settings/           #   17 settings pages
+│   ├── plugins/                # 2 plugins (civicApi, auth-init)
+│   ├── stores/                 # 3 Pinia stores (auth, app, records)
+│   ├── types/                  # 2 type definition files
+│   └── utils/                  # 3 utility files + 1 test
+├── i18n/locales/               # en.json, fr.json
+├── nuxt.config.ts              # Nuxt configuration
+├── package.json                # Dependencies
+└── public/                     # Static assets (favicon, logos, PWA manifest)
 ```
 
 ## API Integration
 
-### Current Setup
-
-- API proxy configured for `/api` routes
-- Base URL configurable via environment
-- Ready for REST API consumption
-
-### Planned Integration
-
-- Authentication endpoints
-- Record CRUD operations
-- User management
-- Workflow integration
-
-## Styling
-
-### Current Approach
-
-- Using Nuxt UI Pro components
-- Tailwind CSS included via Nuxt UI Pro
-- No custom CSS files needed initially
-
-### Future Enhancements
-
-- Custom theme configuration
-- Brand-specific styling
-- Responsive design improvements
+- **Plugin**: `01-civicApi.ts` creates a `$civicApi` fetch instance with base
+  URL, Bearer token injection, CSRF headers, and error interceptors.
+- **Composable**: `useApi.ts` wraps Nuxt `useFetch` with the civic API client.
+- **Dev Proxy**: Nitro proxies `/api` to `API_BASE_URL` during development.
+- **Auth**: JWT tokens stored in localStorage, injected via request interceptor.
+  CSRF tokens fetched from `/api/v1/auth/csrf-token` for state-changing
+  requests.
 
 ## Authentication
 
-### Planned Implementation
+- OAuth login (GitHub, Google, Microsoft) via `/api/v1/auth/login`
+- Password login via `/api/v1/auth/password`
+- Simulated auth for development via `/api/v1/auth/simulated`
+- Public registration via `/api/v1/users/register`
+- JWT stored in localStorage with expiration validation
+- Route guards: `requireAuth`, `requireAdmin`, `requireConfigManage`,
+  `requireUsersManage`
 
-- OAuth 2.0 integration
-- User/password authentication
-- Role-based access control
-- Session management
+## Features
 
-## Plugin System
-
-### Plugin Architecture
-
-- Complex plugin registry with hooks
-- Extensible component system
-- Custom workflow integration
-- Third-party plugin support
-
-## Testing
-
-### Planned Testing Strategy
-
-- Unit tests for components
-- Integration tests for API calls
-- E2E tests for user workflows
-- Visual regression testing
-
-## Deployment
-
-### Development Environment
-
-- Hot reload enabled
-- Development tools available
-- API proxy configured
-
-### Production
-
-- Static site generation
-- API integration
-- CDN deployment ready
+- **Records**: Create, edit (with CodeMirror markdown editor), view, delete,
+  status transitions, draft management, record locking.
+- **Geography**: Create, edit, view geography files with Leaflet map display,
+  presets, and record linking.
+- **Users**: Admin user management (create, edit, delete, role assignment),
+  self-service password and email changes.
+- **Configuration**: View and edit system configs (raw YAML and metadata form),
+  setup wizard, validation.
+- **Storage**: UUID-based file upload/download with media preview.
+- **Broadcast Box**: Device enrollment, live WebRTC preview, source selection,
+  PiP, RTMP streaming, manual recording, watermarks.
+- **Diagnostics**: System health checks and auto-fix.
+- **Activity Log**: Audit trail viewer (admin).
+- **i18n**: Full English and French translations.
+- **Collaborative Editing**: Record locking with autosave (yjs-based realtime
+  editing via the realtime module).
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Port conflicts**: Ensure port 3030 is available
+1. **Port conflicts**: Ensure port 3030 is available.
 2. **API connection**: Verify API server is running on port 3000
-3. **Styling issues**: Nuxt UI Pro handles most styling automatically
-
-### Debug Commands
-
-```bash
-# Check if servers are running
-curl http://localhost:3000/api/v1/health
-curl http://localhost:3030
-
-# View logs
-pnpm dev:ui --verbose
-```
-
-## Next Steps
-
-1. **Immediate**
-   - Implement API composables
-   - Add authentication flow
-   - Create basic record management interface
-
-2. **Short Term**
-   - User dashboard
-   - Record CRUD operations
-   - Search and filtering
-
-3. **Medium Term**
-   - Admin panel
-   - Plugin registry
-   - Advanced workflows
-
-4. **Long Term**
-   - Mobile optimization
-   - Offline capabilities
-   - Advanced analytics
-
-## Contributing
-
-When contributing to the UI module:
-
-1. Follow Vue 3 composition API patterns
-2. Use Nuxt UI Pro components when possible
-3. Test API integration thoroughly
-4. Maintain responsive design
-5. Document new features
+   (`curl http://localhost:3000/api/v1/health`).
+3. **Auth issues**: Clear localStorage keys `civic_auth_token`,
+   `civic_auth_user`, `civic_auth_expires_at`.
 
 ## Dependencies
 
 ### Core
 
-- `nuxt`: ^4.2.1 (Nuxt 4 - latest stable)
-- `@nuxt/ui-pro`: ^3.3.7 (Nuxt UI Pro 3 - Nuxt 4 compatible)
-- `vue`: ^3.5.18
-- `@pinia/nuxt`: ^0.11.3
-- `pinia`: ^3.0.4
-
-### Development Tools
-
-- `vue-tsc`: TypeScript checking
-- `@nuxt/devtools`: Development tools
-
-### Notes
-
-- Nuxt UI Pro is currently paid but planned to go free
-- All styling handled by Nuxt UI Pro components
-- No custom Tailwind configuration needed initially
+- `nuxt` ^4.2.1
+- `vue` ^3.5.18
+- `@nuxt/ui-pro` ^3.3.7
+- `@pinia/nuxt` ^0.11.3 / `pinia` ^3.0.4
+- `@nuxtjs/i18n` ^10.2.1
+- `@vueuse/core` ^13.5.0
+- `@codemirror/lang-markdown` ^6.0.2
+- `marked` ^16.1.1
+- `leaflet` ^1.9.4

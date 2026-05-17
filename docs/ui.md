@@ -18,10 +18,6 @@ For detailed UI docs and structure, see `modules/ui/README.md`.
   Leaflet map component for displaying geography data
 - **GeographySelector** (`modules/ui/app/components/GeographySelector.vue`):
   Browse and select existing geography files
-- **GeographyBrowser** (`modules/ui/app/components/GeographyBrowser.vue`): File
-  browser for record forms to link geography files
-- **GeographySummary** (`modules/ui/app/components/GeographySummary.vue`): Data
-  summary panels with feature counts and bounds
 
 ### Geography Pages
 
@@ -47,12 +43,151 @@ For detailed UI docs and structure, see `modules/ui/README.md`.
 
 ## Records UI
 
-- RecordList (`modules/ui/app/components/RecordList.vue`): paginated list with
-  search and basic filters.
-- RecordSearch (`modules/ui/app/components/RecordSearch.vue`): search box and
-  helpers.
-- RecordForm (`modules/ui/app/components/RecordForm.vue`): create/edit records;
-  shows save success/error feedback.
+### Components
+
+- **RecordList** (`modules/ui/app/components/RecordList.vue`): Paginated list
+  with search, type/status filters, and sort controls.
+- **RecordSearch** (`modules/ui/app/components/RecordSearch.vue`): Search box
+  with autocomplete suggestions via `useSearchSuggestions`.
+- **RecordForm** (`modules/ui/app/components/RecordForm.vue`): Create/edit
+  records with geography, file attachments, templates, and validation.
+- **RecordPreview** (`modules/ui/app/components/RecordPreview.vue`): Markdown
+  preview of a record.
+- **StatusTransitionControls**
+  (`modules/ui/app/components/StatusTransitionControls.vue`): Buttons for
+  changing record status based on allowed transitions.
+- **LinkedRecordList**
+  (`modules/ui/app/components/records/LinkedRecordList.vue`): Display linked
+  records on a record detail page.
+- **RecordLinkSelector**
+  (`modules/ui/app/components/records/RecordLinkSelector.vue`): Select records
+  to link from a searchable list.
+
+### Pages
+
+- **Records Index** (`pages/records/index.vue`): All records listing with
+  filters.
+- **Records by Type** (`pages/records/[type]/index.vue`): Records filtered by
+  type.
+- **New Record** (`pages/records/new.vue`): Type selection for creating records.
+- **New Record by Type** (`pages/records/[type]/new.vue`): Create form for a
+  specific type.
+- **Record View** (`pages/records/[type]/[id]/index.vue`): Record detail with
+  markdown preview.
+- **Record Edit** (`pages/records/[type]/[id]/edit.vue`): Edit form with
+  collaborative editing support.
+- **Record Raw** (`pages/records/[type]/[id]/raw.vue`): Raw markdown/YAML view.
+- **Drafts** (`pages/records/drafts.vue`): Draft records listing.
+
+## Editor UI
+
+The editor subsystem provides a markdown-based record editor with collaborative
+editing support via WebSocket/yjs.
+
+### Components
+
+- **MarkdownEditor** (`components/editor/MarkdownEditor.vue`): CodeMirror 6
+  markdown editor with syntax highlighting.
+- **PreviewPanel** (`components/editor/PreviewPanel.vue`): Live rendered preview
+  of markdown content.
+- **EditorToolbar** (`components/editor/EditorToolbar.vue`): Formatting toolbar
+  (bold, italic, headings, lists, links, etc.).
+- **EditorHeader** (`components/editor/EditorHeader.vue`): Title, metadata, and
+  save controls.
+- **EditorAttachments** (`components/editor/EditorAttachments.vue`): File
+  attachment management in the editor sidebar.
+- **EditorRelations** (`components/editor/EditorRelations.vue`): Linked records
+  and geography in the editor sidebar.
+- **EditorActivity** (`components/editor/EditorActivity.vue`): Activity feed and
+  version history in the editor sidebar.
+- **RecordSidebar** (`components/editor/RecordSidebar.vue`): Collapsible sidebar
+  with attachments, relations, activity, and broadcast-box recording controls.
+
+### Key Composables
+
+- **useAutosave**: Debounced autosave with retry and exponential backoff.
+- **useRecordLock**: Acquire/release/poll edit locks for concurrent editing.
+- **useMarkdown**: Render markdown to HTML with image URL normalization.
+
+## Broadcast Box UI
+
+The broadcast-box subsystem manages video devices for live recording and
+streaming sessions.
+
+### Components
+
+- **DeviceList** (`components/broadcast-box/DeviceList.vue`): List enrolled
+  devices with status indicators.
+- **DeviceRegistrationForm**
+  (`components/broadcast-box/DeviceRegistrationForm.vue`): Enrollment code
+  entry.
+- **DeviceConfigurationForm**
+  (`components/broadcast-box/DeviceConfigurationForm.vue`): Device metadata
+  editing.
+- **DevicePreview** (`components/broadcast-box/DevicePreview.vue`): WebRTC live
+  preview from a device.
+- **DeviceSourceControl** (`components/broadcast-box/DeviceSourceControl.vue`):
+  Video/audio source selector.
+- **DevicePiPControl** (`components/broadcast-box/DevicePiPControl.vue`):
+  Picture-in-Picture configuration.
+- **DeviceStreamingControl**
+  (`components/broadcast-box/DeviceStreamingControl.vue`): RTMP streaming
+  controls.
+- **DeviceConfigControl** (`components/broadcast-box/DeviceConfigControl.vue`):
+  Device-level configuration.
+- **DeviceManualRecording**
+  (`components/broadcast-box/DeviceManualRecording.vue`): Manual recording
+  start/stop with duration timer.
+- **DeviceWatermarkControl**
+  (`components/broadcast-box/DeviceWatermarkControl.vue`): Watermark overlay
+  configuration.
+- **DeviceStatusBadge** (`components/broadcast-box/DeviceStatusBadge.vue`):
+  Online/offline badge.
+- **DeviceStatusControl** (`components/broadcast-box/DeviceStatusControl.vue`):
+  Device status management.
+- **BroadcastBoxControls**
+  (`components/broadcast-box/BroadcastBoxControls.vue`): Combined device
+  controls panel.
+- **ConnectionStatusIndicator**
+  (`components/broadcast-box/ConnectionStatusIndicator.vue`): WebSocket
+  connection state indicator.
+- **RecordingControls** (`components/broadcast-box/RecordingControls.vue`):
+  Session-based recording controls.
+- **SessionStatusBadge** (`components/broadcast-box/SessionStatusBadge.vue`):
+  Session status badge.
+
+### Key Composables
+
+- **useBroadcastBox**: REST API operations for devices, sessions, uploads.
+- **useDeviceCommands**: Send commands to devices via the API.
+- **useDeviceConnectionStatus**: WebSocket connection to the realtime server for
+  device status, health, and event streaming.
+- **useDevicePreview**: WebRTC peer connection for live video preview.
+- **useManualRecording**: Manual recording with duration tracking.
+
+### Pages
+
+- **Device List** (`pages/settings/broadcast-box/index.vue`): Enrolled device
+  overview.
+- **Device Detail** (`pages/settings/broadcast-box/[id]/index.vue`): Device
+  controls, preview, source selection, recording, and streaming.
+
+## Storage UI
+
+### Components
+
+- **FileBrowser** (`components/storage/FileBrowser.vue`): Browse, search,
+  upload, and manage files with UUID tracking.
+- **FileBrowserPopover** (`components/storage/FileBrowserPopover.vue`): Compact
+  file browser in a popover for selecting attachments.
+- **FileUpload** (`components/storage/FileUpload.vue`): Drag-and-drop file
+  upload with progress.
+- **MediaPlayer** (`components/storage/MediaPlayer.vue`): Preview audio, video,
+  images, and PDFs from UUID storage.
+
+### Pages
+
+- **Storage** (`pages/settings/storage/index.vue`): File management dashboard.
 
 ## Settings UI
 
@@ -155,14 +290,85 @@ const translatedLabel = translateConfigValue('recordType', 'bylaw');
 
 ### Current Status
 
-✅ **Complete**: All UI components and pages are fully translated
+All UI components and pages are fully translated:
 
 - Records management (listing, detail, create, edit, raw view)
 - Geography management (listing, detail, create, edit)
 - Settings pages (profile, users, configuration, notifications, storage,
-  activity)
+  activity, broadcast-box, diagnostics)
 - Authentication pages (login, register, logout, verify email)
 - All form components and selectors
 - All modals, alerts, and toast notifications
 - Navigation and breadcrumbs
 - Footer component
+
+## Composables
+
+The UI module has 28 composables in `app/composables/`:
+
+| Composable                  | Purpose                                              |
+| --------------------------- | ---------------------------------------------------- |
+| `useApi`                    | Wrapper for `useFetch` with `$civicApi`              |
+| `useAuth`                   | Authentication wrapper for auth store                |
+| `useAttachmentTypes`        | Fetch attachment type configs from API               |
+| `useAutosave`               | Debounced autosave with retry                        |
+| `useBroadcastBox`           | Broadcast Box REST API operations                    |
+| `useCsrf`                   | CSRF token fetch/store/ensure                        |
+| `useConfigTranslations`     | Translate config-driven content via i18n             |
+| `useDeviceCommands`         | Device command execution via API                     |
+| `useDeviceConnectionStatus` | WebSocket connection to realtime server              |
+| `useDevicePreview`          | WebRTC live preview from device                      |
+| `useDiagnostics`            | Run system diagnostics via API                       |
+| `useErrorHandler`           | Centralized error handling with toasts               |
+| `useIcons`                  | Central Lucide icon registry (200+ icons)            |
+| `useLinkCategories`         | Fetch link categories from API                       |
+| `useLoading`                | Loading state management with global flag            |
+| `useManualRecording`        | Manual recording with duration tracking              |
+| `useMarkdown`               | Render markdown to HTML (marked + custom renderer)   |
+| `useRecordLock`             | Record edit lock acquire/release/poll                |
+| `useRecordQueryState`       | URL query param management for record listings       |
+| `useRecordStatuses`         | Fetch and cache record status metadata               |
+| `useRecordTypes`            | Fetch and cache record type metadata                 |
+| `useRecordUtils`            | Date formatting, status/type display helpers         |
+| `useSearchSuggestions`      | Debounced search autocomplete from API               |
+| `useSecurity`               | User security operations (password, email)           |
+| `useTemplates`              | Template fetch, preview, and client-side processing  |
+| `useUserRoles`              | Fetch and cache role configs with permission helpers |
+| `broadcast-box-types`       | TypeScript type definitions for broadcast-box        |
+
+## Plugins
+
+- **01-civicApi.ts**: Creates the `$civicApi` fetch instance with base URL, auth
+  token injection, CSRF headers, and error interceptors (401 redirect,
+  403/422/5xx toast handling).
+- **02-auth-init.client.ts**: Client-side plugin that validates stored tokens
+  and refreshes user data on app load.
+
+## Middleware
+
+- **requireAuth**: Redirects to `/auth/login` if not authenticated.
+- **requireAdmin**: Requires `system:admin` permission.
+- **requireConfigManage**: Requires `config:manage` permission.
+- **requireUsersManage**: Requires `users:manage` permission.
+
+## State Management (Pinia)
+
+Three stores in `app/stores/`:
+
+- **auth**: User, token, session expiration, login/logout/refresh actions.
+  Persisted to localStorage (`civic_auth_token`, `civic_auth_user`,
+  `civic_auth_expires_at`).
+- **app**: Sidebar state, theme preference, transient notifications. Persisted
+  to localStorage (`civic_app_state`).
+- **records**: Record list state and caching.
+
+## Pages Summary
+
+36 page files across 5 route groups:
+
+- **/** — Home/dashboard
+- **/auth/** — Login, logout, register, forgot-password, verify-email (6 pages)
+- **/records/** — List, new, drafts, by-type, view, edit, raw (8 pages)
+- **/geography/** — List, create, view, edit (4 pages)
+- **/settings/** — Profile, activity, diagnostics, notifications, setup,
+  broadcast-box, configuration, storage, users (17 pages)

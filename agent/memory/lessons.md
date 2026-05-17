@@ -312,3 +312,34 @@
 - **Accessibility**: WCAG compliance for inclusive design
 - **Mobile Optimization**: Responsive design for all screen sizes
 - **Performance Monitoring**: Track and optimize user experience metrics
+
+## Broadcast Box & Device UI
+
+### PiP Configuration UX
+
+- **Single Editable Section**: Avoid separate read-only and editable PiP cards.
+  Use one "Picture-in-Picture Configuration" section that contains the form
+  (toggle, source dropdowns, position, size input, Apply) plus a "Current
+  Configuration" summary at the bottom. Duplicate read-only cards confuse users
+  who expect to edit where they see the title.
+- **Always-Visible Fields**: Show PiP source, position, and size inputs whenever
+  the PiP section is shown, not only when PiP is enabled, so users can set
+  values before enabling and apply in one step.
+
+### Service-Unavailable and Preview Errors
+
+- **Suppress Generic Toasts**: For device command/preview 500/503 errors whose
+  message contains "not available" or "service not available", suppress the
+  generic "Server Error" toast in the API plugin; the command/preview composable
+  shows a single friendly message instead.
+- **Fail Fast for Preview**: When `preview.start` fails with "service not
+  available", set a user-friendly error, mark connection failed, and cleanup
+  immediately instead of waiting for the offer timeout.
+
+### TypeScript in Unreachable Code
+
+- **Unreachable Blocks Still Type-Checked**: Code after an early `return` is
+  still type-checked. Use a narrowed local (e.g.
+  `const limitConfig = config as NonNullable<typeof config>` after a guard) or
+  type assertions when fixing "possibly null" / "not assignable" in disabled or
+  unreachable blocks so the build passes without changing runtime behavior.

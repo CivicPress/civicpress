@@ -1,0 +1,23 @@
+# Default Realtime Module Configuration
+# This file is copied to .system-data/realtime.yml during initialization
+
+realtime:
+  enabled: true
+  port: 3001
+  host: '0.0.0.0'
+  path: '/realtime'
+
+  rooms:
+    max_rooms: 100
+    cleanup_timeout: 3600 # seconds (1 hour)
+
+  snapshots:
+    enabled: true
+    interval: 300 # seconds (5 minutes)
+    max_updates: 100
+    storage: 'database' # 'database' or 'filesystem'
+
+  rate_limiting:
+    messages_per_second: 10
+    connections_per_ip: 100
+    connections_per_user: 10

@@ -1,0 +1,89 @@
+-- Database Migrations for CivicPress Broadcast Box Module
+-- 
+-- Migration 001: Initial Schema
+-- Created: 2025-01-30
+-- Supports both SQLite and PostgreSQL
+
+-- Devices table
+CREATE TABLE IF NOT EXISTS broadcast_devices (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL DEFAULT 'default', -- Reserved for future multi-tenancy (Phase 7+)
+  device_uuid TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  room_location TEXT,
+  status TEXT NOT NULL CHECK(status IN ('enrolled', 'active', 'suspended', 'revoked')),
+  capabilities TEXT NOT NULL, -- JSON string (SQLite-compatible, parse with JSON.parse)
+  config TEXT, -- JSON string (SQLite-compatible, parse with JSON.parse)
+  last_seen_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  -- Note: organization_id foreign key will be added when multi-tenancy is implemented (Phase 7+)
+);
+
+-- Recording sessions table
+CREATE TABLE IF NOT EXISTS broadcast_sessions (
+  id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL,
+  civicpress_session_id TEXT NOT NULL, -- Links to CivicPress session record (records.id)
+  status TEXT NOT NULL CHECK(status IN ('pending', 'recording', 'stopping', 'encoding', 'uploading', 'complete', 'failed')),
+  started_at TIMESTAMP,
+  stopped_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  error TEXT,
+  metadata TEXT, -- JSON string (SQLite-compatible, parse with JSON.parse)
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (device_id) REFERENCES broadcast_devices(id) ON DELETE CASCADE
+  -- Note: civicpress_session_id references records.id but foreign key constraint
+  -- may not exist depending on CivicPress database schema
+);
+
+-- Upload jobs table
+CREATE TABLE IF NOT EXISTS broadcast_uploads (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  file_size BIGINT NOT NULL,
+  file_hash TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending', 'uploading', 'processing', 'complete', 'failed')),
+  progress_percent INTEGER DEFAULT 0 CHECK(progress_percent >= 0 AND progress_percent <= 100),
+  storage_location TEXT,
+  error TEXT,
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (session_id) REFERENCES broadcast_sessions(id) ON DELETE CASCADE,
+  FOREIGN KEY (device_id) REFERENCES broadcast_devices(id) ON DELETE CASCADE
+);
+
+-- Device events/telemetry table (for audit and monitoring)
+CREATE TABLE IF NOT EXISTS broadcast_device_events (
+  id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  event_data TEXT, -- JSON string (SQLite-compatible, parse with JSON.parse)
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (device_id) REFERENCES broadcast_devices(id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_broadcast_devices_org ON broadcast_devices(organization_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_devices_status ON broadcast_devices(status);
+CREATE INDEX IF NOT EXISTS idx_broadcast_devices_uuid ON broadcast_devices(device_uuid);
+
+CREATE INDEX IF NOT EXISTS idx_broadcast_sessions_device ON broadcast_sessions(device_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_sessions_civicpress ON broadcast_sessions(civicpress_session_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_sessions_status ON broadcast_sessions(status);
+
+CREATE INDEX IF NOT EXISTS idx_broadcast_uploads_session ON broadcast_uploads(session_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_uploads_device ON broadcast_uploads(device_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_uploads_status ON broadcast_uploads(status);
+
+CREATE INDEX IF NOT EXISTS idx_broadcast_device_events_device ON broadcast_device_events(device_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_device_events_type ON broadcast_device_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_broadcast_device_events_created ON broadcast_device_events(created_at);
+

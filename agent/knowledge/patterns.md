@@ -351,33 +351,145 @@ class MyService {
 
 ### **Module Development Pattern**
 
+#### **Pattern**: Complete Module Development Process
+
+- **When to Use**: For all new modules in CivicPress
+- **How to Apply**:
+  1. **Create Specification**: Copy `docs/specs/module-spec-template.md` and
+     fill in all sections
+  2. **Service Registration**: Register services in DI container using Pattern 2
+  3. **Configuration Management**: Implement `[ModuleName]ConfigManager`
+     following Storage module pattern
+  4. **Error Handling**: Define error hierarchy extending `CivicPressError`
+  5. **Initialization & Lifecycle**: Implement `initialize()` and `shutdown()`
+     methods
+  6. **Core Dependencies**: Document all core service dependencies
+  7. **Hook Integration**: Document hook events emitted (if applicable)
+  8. **Logging**: Use `Logger` from core for all logging
+- **Benefits**:
+  - Consistent module integration
+  - Proper service lifecycle management
+  - Unified error handling
+  - Configuration management
+  - Testability and maintainability
+- **Examples**: Storage module (`modules/storage/`), Realtime module spec
+  (`docs/specs/realtime-architecture.md`)
+- **Reference**: See `docs/module-integration-guide.md` and
+  `docs/specs/module-spec-template.md`
+
+#### Example: Complete Module Implementation
+
 ```typescript
-// modules/example-module/src/index.ts
-export class ExampleModule {
-  constructor(private config: ModuleConfig) {}
+// Step 1: Service Registration
+// modules/my-module/src/my-module-services.ts
+import {
+  ServiceContainer,
+  CivicPressConfig,
+  Logger,
+} from '@civicpress/core';
+import { MyModuleService } from './my-module-service.js';
+import { MyModuleConfigManager } from './my-module-config-manager.js';
+
+export function registerMyModuleServices(
+  container: ServiceContainer,
+  config: CivicPressConfig
+): void {
+  const systemDataDir = config.dataDir || '.system-data';
+
+  // Register config manager
+  container.singleton('myModuleConfigManager', () => {
+    return new MyModuleConfigManager(systemDataDir);
+  });
+
+  // Register main service
+  container.singleton('myModuleService', (c) => {
+    const logger = c.resolve<Logger>('logger');
+    const configManager = c.resolve<MyModuleConfigManager>('myModuleConfigManager');
+    return new MyModuleService(logger, configManager, config);
+  });
+}
+
+// Step 2: Configuration Management
+// modules/my-module/src/my-module-config-manager.ts
+export class MyModuleConfigManager {
+  private configPath: string;
+  private logger: Logger;
+  private defaultConfig: MyModuleConfig;
+
+  constructor(basePath: string = '.system-data') {
+    this.configPath = path.join(basePath, 'my-module.yml');
+    this.logger = new Logger();
+    this.defaultConfig = { enabled: true, /* defaults */ };
+  }
+
+  async loadConfig(): Promise<MyModuleConfig> {
+    // Load from file, merge with defaults
+  }
+
+  getDefaultConfig(): MyModuleConfig {
+    return this.defaultConfig;
+  }
+}
+
+// Step 3: Error Handling
+// modules/my-module/src/errors/my-module-errors.ts
+import { CivicPressError, NotFoundError } from '@civicpress/core/errors';
+
+export class MyModuleError extends CivicPressError {
+  code = 'MY_MODULE_ERROR';
+  statusCode = 500;
+}
+
+export class ResourceNotFoundError extends NotFoundError {
+  code = 'RESOURCE_NOT_FOUND';
+  constructor(resourceId: string, context?: Record<string, any>) {
+    super(`Resource '${resourceId}' not found`, { resourceId, ...context });
+  }
+}
+
+// Step 4: Main Service with Lifecycle
+// modules/my-module/src/my-module-service.ts
+import { Logger } from '@civicpress/core';
+
+export class MyModuleService {
+  constructor(
+    private logger: Logger,
+    private configManager: MyModuleConfigManager,
+    private config: CivicPressConfig
+  ) {}
 
   async initialize(): Promise<void> {
-    // Register hooks
-    this.registerHooks();
-    // Set up routes
-    this.setupRoutes();
-    // Initialize workflows
-    this.initializeWorkflows();
+    this.logger.info('Initializing my-module service');
+    const config = await this.configManager.loadConfig();
+    // Initialize service
+    this.logger.info('My-module service initialized');
   }
 
-  private registerHooks(): void {
-    // Register module-specific hooks
+  async shutdown(): Promise<void> {
+    this.logger.info('Shutting down my-module service');
+    // Cleanup resources
+    this.logger.info('My-module service shut down');
   }
 
-  private setupRoutes(): void {
-    // Set up API routes
-  }
-
-  private initializeWorkflows(): void {
-    // Initialize module workflows
+  async doSomething() {
+    this.logger.info('Doing something', { operation: 'my-module:do-something' });
+    // Module logic
   }
 }
 ```
+
+**Module Development Checklist:**
+
+- [ ] Specification created using template
+- [ ] Service registration implemented
+- [ ] Configuration management implemented
+- [ ] Error hierarchy defined
+- [ ] Initialization/shutdown implemented
+- [ ] Core dependencies documented
+- [ ] Hook events documented (if applicable)
+- [ ] Logging uses Logger from core
+- [ ] Tests written
+- [ ] Documentation complete
 
 ### **Hook System Pattern**
 
