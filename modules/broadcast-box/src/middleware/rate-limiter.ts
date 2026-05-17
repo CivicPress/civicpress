@@ -167,6 +167,12 @@ export class DeviceRegistrationRateLimiter {
    */
   middleware() {
     return (req: Request, res: Response, next: NextFunction): void => {
+      // Skip rate limiting in development
+      if (process.env.NODE_ENV !== 'production') {
+        next();
+        return;
+      }
+
       const ip = this.getClientIp(req);
       const enrollmentCode = req.body?.enrollmentCode as string | undefined;
 

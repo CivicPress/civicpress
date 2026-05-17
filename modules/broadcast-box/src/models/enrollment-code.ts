@@ -89,6 +89,37 @@ export class EnrollmentCodeModel {
   }
 
   /**
+   * Find an active (unused, non-expired) enrollment code by matching the plaintext code
+   * against stored bcrypt hashes. Returns the first match.
+   */
+  async findByCode(code: string): Promise<EnrollmentCode | null> {
+    const bcrypt = await import('bcrypt');
+    const normalizedCode = code.trim().toUpperCase();
+
+    // Get recent unused enrollment codes (created within the last 24 hours)
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const rows = await this.db
+      .getAdapter()
+      .query(
+        `SELECT * FROM broadcast_enrollment_codes WHERE used_at IS NULL AND created_at > ? ORDER BY created_at DESC`,
+        [cutoff]
+      );
+
+    for (const row of rows) {
+      const entry = this.mapRowToEnrollmentCode(row);
+      const isMatch = await bcrypt.compare(
+        normalizedCode,
+        entry.enrollmentCodeHash
+      );
+      if (isMatch) {
+        return entry;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Find enrollment code by device UUID
    */
   async findByDeviceUuid(deviceUuid: string): Promise<EnrollmentCode | null> {

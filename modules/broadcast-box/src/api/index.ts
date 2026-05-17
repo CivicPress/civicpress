@@ -215,7 +215,7 @@ export async function registerBroadcastBoxRoutes(
               error.message.includes('Enrollment code already used') ||
               error.message.includes('Device UUID mismatch')
             ) {
-              statusCode = 401;
+              statusCode = 422;
               errorMessage = 'Invalid enrollment credentials';
             }
           }

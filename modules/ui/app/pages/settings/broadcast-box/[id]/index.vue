@@ -13,33 +13,13 @@ import DevicePiPControl from '~/components/broadcast-box/DevicePiPControl.vue';
 import DeviceConfigControl from '~/components/broadcast-box/DeviceConfigControl.vue';
 import DeviceStreamingControl from '~/components/broadcast-box/DeviceStreamingControl.vue';
 import DeviceWatermarkControl from '~/components/broadcast-box/DeviceWatermarkControl.vue';
-import DeviceStatusControl from '~/components/broadcast-box/DeviceStatusControl.vue';
 import DevicePreview from '~/components/broadcast-box/DevicePreview.vue';
 import DeviceManualRecording from '~/components/broadcast-box/DeviceManualRecording.vue';
 import { useRecordUtils } from '~/composables/useRecordUtils';
 import { useDeviceConnectionStatus } from '~/composables/useDeviceConnectionStatus';
+import QRCode from 'qrcode';
 
 const { formatDate } = useRecordUtils();
-
-// Helper function to format PiP position
-const formatPipPosition = (position: string | undefined): string => {
-  if (!position) return '';
-  const key = `broadcastBox.pipPosition${position
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join('')}`;
-  const translated = t(key);
-  return translated !== key ? translated : position;
-};
-
-// Helper to format PiP size (number = "25%", legacy { width, height } = "320×240")
-const formatPipSizeDisplay = (
-  size: number | { width: number; height: number } | undefined
-): string => {
-  if (size == null) return '';
-  if (typeof size === 'number') return `${Math.round(size * 100)}%`;
-  return `${size.width}×${size.height}`;
-};
 
 definePageMeta({
   middleware: ['require-auth'],
@@ -68,6 +48,7 @@ const sessions = ref<BroadcastSession[]>([]);
 const loading = ref(false);
 const error = ref('');
 const showConfigForm = ref(false);
+const showRevokeModal = ref(false);
 const enrollmentCode = ref<{ code: string; expiresAt: string } | null>(null);
 const enrollmentCodeStatus = ref<{
   exists: boolean;
@@ -82,6 +63,7 @@ const removingSessionId = ref<string | null>(null);
 const uuidCopied = ref(false);
 const codeCopied = ref(false);
 const deviceIdCopied = ref(false);
+const enrollmentQrDataUrl = ref('');
 
 const canManageDevices = computed(() => {
   return authStore.hasPermission('broadcast-box:admin');
@@ -274,7 +256,7 @@ watch(
 // Don't auto-refresh device data - rely on WebSocket updates for real-time data
 // Only refresh:
 // 1. On initial mount
-// 2. When user explicitly refreshes (via DeviceStatusControl)
+// 2. When user explicitly refreshes
 // 3. After config changes
 // 4. Periodically for sessions (every 5 minutes, very infrequent)
 let sessionsRefreshInterval: NodeJS.Timeout | null = null;
@@ -328,6 +310,47 @@ const realtimeHealth = computed(() => {
   // Fallback to API health data
   return health.value;
 });
+
+// Device state from WebSocket connection status
+const deviceState = computed(() => {
+  return connectionStatus.value.state || 'idle';
+});
+
+// Accordion items for collapsible device details
+const detailsAccordionItems = [
+  {
+    label: t('broadcastBox.deviceInformation'),
+    slot: 'device-info',
+    defaultOpen: false,
+  },
+  {
+    label: t('broadcastBox.enrollmentCode'),
+    slot: 'enrollment',
+    defaultOpen: false,
+  },
+];
+
+// Generate QR code when enrollment code is regenerated
+watch(
+  () => enrollmentCode.value?.code,
+  async (code) => {
+    if (code && device.value) {
+      const payload = {
+        type: 'civicpress-enrollment',
+        url: window.location.origin + '/api/v1/broadcast-box/devices',
+        code: code,
+        v: 1,
+      };
+      enrollmentQrDataUrl.value = await QRCode.toDataURL(
+        JSON.stringify(payload),
+        { width: 256, margin: 2 }
+      );
+    } else {
+      enrollmentQrDataUrl.value = '';
+    }
+  },
+  { immediate: true }
+);
 
 // Debounce loadDevice to prevent multiple rapid calls from WebSocket updates
 let loadDeviceTimeout: NodeJS.Timeout | null = null;
@@ -459,14 +482,12 @@ const loadDevice = async (force = false) => {
 const handleRevoke = async () => {
   if (!device.value) return;
 
-  if (!confirm(t('broadcastBox.confirmRevoke'))) {
-    return;
-  }
-
   try {
     await revokeDevice(device.value.id);
+    showRevokeModal.value = false;
     navigateTo('/settings/broadcast-box');
   } catch (err: any) {
+    showRevokeModal.value = false;
     error.value = err.message || t('broadcastBox.errors.revokeFailed');
   }
 };
@@ -705,11 +726,8 @@ onUnmounted(() => {
       <UDashboardNavbar>
         <template #title>
           <h1 class="text-2xl font-semibold">
-            {{ device?.name || deviceId }}
+            {{ t('broadcastBox.deviceDetails') }}
           </h1>
-        </template>
-        <template #description>
-          {{ t('broadcastBox.deviceDetails') }}
         </template>
       </UDashboardNavbar>
     </template>
@@ -748,453 +766,161 @@ onUnmounted(() => {
 
         <!-- Device Details -->
         <template v-else-if="device">
-          <!-- Device Info Card -->
+          <!-- Health & Status Row -->
           <UCard>
-            <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">
-                  {{ t('broadcastBox.deviceInformation') }}
-                </h2>
-                <div class="flex items-center gap-2">
-                  <DeviceStatusBadge :status="device.status" />
-                  <ConnectionStatusIndicator
-                    :connected="isDeviceConnected"
-                    :last-seen-at="
-                      connectionStatus.lastSeenAt || device.lastSeenAt
-                    "
-                    :show-label="true"
-                  />
-                </div>
+            <div class="flex flex-wrap items-center gap-4">
+              <!-- Device Name + Connection Status -->
+              <div class="flex items-center gap-2 mr-auto">
+                <h2 class="text-lg font-semibold">{{ device.name }}</h2>
+                <ConnectionStatusIndicator
+                  :connected="isDeviceConnected"
+                  :last-seen-at="
+                    connectionStatus.lastSeenAt || device.lastSeenAt
+                  "
+                  :show-label="true"
+                />
               </div>
-            </template>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400"
+              <!-- Health Score -->
+              <div
+                v-if="realtimeHealth?.score !== undefined"
+                class="flex items-center gap-1.5"
+              >
+                <span class="text-xs text-gray-500">{{
+                  t('broadcastBox.healthScore')
+                }}</span>
+                <UBadge
+                  :color="
+                    realtimeHealth.score >= 80
+                      ? 'primary'
+                      : realtimeHealth.score >= 50
+                        ? 'neutral'
+                        : 'error'
+                  "
+                  variant="soft"
+                  size="sm"
                 >
-                  {{ t('broadcastBox.deviceId') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <p
-                    class="text-sm font-mono text-gray-900 dark:text-gray-100 flex-1"
-                  >
-                    {{ device.id }}
-                  </p>
-                  <UButton
-                    :icon="deviceIdCopied ? 'i-lucide-check' : 'i-lucide-copy'"
-                    size="xs"
-                    variant="ghost"
-                    :color="deviceIdCopied ? 'primary' : 'neutral'"
-                    @click="copyToClipboard(device.id, 'deviceId')"
-                  />
-                </div>
+                  {{ realtimeHealth.score }}%
+                </UBadge>
               </div>
 
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400"
+              <!-- CPU -->
+              <div
+                v-if="isDeviceConnected && realtimeHealth?.metrics"
+                class="flex items-center gap-1.5 min-w-[100px]"
+              >
+                <span class="text-xs text-gray-500 w-8">CPU</span>
+                <UProgress
+                  :value="realtimeHealth.metrics.cpuPercent || 0"
+                  size="xs"
+                  class="flex-1"
+                />
+                <span class="text-xs font-mono w-8 text-right"
+                  >{{ realtimeHealth.metrics.cpuPercent || 0 }}%</span
                 >
-                  {{ t('broadcastBox.deviceUuid') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <p
-                    class="text-sm font-mono text-gray-900 dark:text-gray-100 flex-1"
-                  >
-                    {{ device.deviceUuid }}
-                  </p>
-                  <UButton
-                    :icon="uuidCopied ? 'i-lucide-check' : 'i-lucide-copy'"
-                    size="xs"
-                    variant="ghost"
-                    :color="uuidCopied ? 'primary' : 'neutral'"
-                    @click="copyToClipboard(device.deviceUuid, 'uuid')"
-                  />
-                </div>
               </div>
 
-              <div v-if="device.roomLocation">
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400"
+              <!-- Memory -->
+              <div
+                v-if="isDeviceConnected && realtimeHealth?.metrics"
+                class="flex items-center gap-1.5 min-w-[100px]"
+              >
+                <span class="text-xs text-gray-500 w-8">Mem</span>
+                <UProgress
+                  :value="realtimeHealth.metrics.memoryPercent || 0"
+                  size="xs"
+                  class="flex-1"
+                />
+                <span class="text-xs font-mono w-8 text-right"
+                  >{{ realtimeHealth.metrics.memoryPercent || 0 }}%</span
                 >
-                  {{ t('broadcastBox.roomLocation') }}
-                </label>
-                <p class="text-sm text-gray-900 dark:text-gray-100">
-                  {{ device.roomLocation }}
-                </p>
               </div>
 
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400"
+              <!-- Disk -->
+              <div
+                v-if="isDeviceConnected && realtimeHealth?.metrics"
+                class="flex items-center gap-1.5 min-w-[100px]"
+              >
+                <span class="text-xs text-gray-500 w-8">Disk</span>
+                <UProgress
+                  :value="realtimeHealth.metrics.diskPercent || 0"
+                  size="xs"
+                  class="flex-1"
+                />
+                <span class="text-xs font-mono w-8 text-right"
+                  >{{ realtimeHealth.metrics.diskPercent || 0 }}%</span
                 >
-                  {{ t('broadcastBox.createdAt') }}
-                </label>
-                <p class="text-sm text-gray-900 dark:text-gray-100">
-                  {{ formatDate(device.createdAt) }}
-                </p>
               </div>
 
-              <div v-if="device.lastSeenAt">
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400"
-                >
-                  {{ t('broadcastBox.lastSeen') }}
-                </label>
-                <p class="text-sm text-gray-900 dark:text-gray-100">
-                  {{ formatDate(device.lastSeenAt) }}
-                </p>
-              </div>
-            </div>
+              <!-- Network -->
+              <UIcon
+                v-if="connectionStatus.health?.networkConnected !== undefined"
+                :name="
+                  connectionStatus.health.networkConnected
+                    ? 'i-lucide-wifi'
+                    : 'i-lucide-wifi-off'
+                "
+                :class="
+                  connectionStatus.health.networkConnected
+                    ? 'text-green-600 w-5 h-5'
+                    : 'text-red-600 w-5 h-5'
+                "
+              />
 
-            <template #footer>
-              <div class="flex justify-end gap-3">
+              <!-- Device State Badge -->
+              <UBadge
+                :color="
+                  deviceState === 'recording'
+                    ? 'error'
+                    : deviceState === 'encoding' || deviceState === 'uploading'
+                      ? 'primary'
+                      : 'neutral'
+                "
+                variant="soft"
+                size="sm"
+              >
+                <UIcon
+                  :name="
+                    deviceState === 'recording'
+                      ? 'i-lucide-circle-dot'
+                      : deviceState === 'encoding'
+                        ? 'i-lucide-cog'
+                        : deviceState === 'uploading'
+                          ? 'i-lucide-upload'
+                          : 'i-lucide-pause'
+                  "
+                  class="w-3 h-3 mr-1"
+                />
+                {{ t(`broadcastBox.state.${deviceState}`) }}
+              </UBadge>
+
+              <!-- Actions -->
+              <div class="flex items-center gap-1">
                 <UButton
                   variant="ghost"
+                  size="sm"
                   icon="i-lucide-settings"
                   @click="showConfigForm = true"
-                >
-                  {{ t('broadcastBox.configure') }}
-                </UButton>
+                />
                 <UButton
                   v-if="device.status !== 'revoked'"
                   color="error"
                   variant="ghost"
-                  icon="i-lucide-ban"
-                  @click="handleRevoke"
-                >
-                  {{ t('broadcastBox.revoke') }}
-                </UButton>
-              </div>
-            </template>
-          </UCard>
-
-          <!-- Enrollment Code Section -->
-          <UCard>
-            <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">
-                  {{ t('broadcastBox.enrollmentCode') }}
-                </h2>
-                <UButton
-                  color="primary"
-                  variant="ghost"
                   size="sm"
-                  icon="i-lucide-refresh-cw"
-                  :loading="regenerating"
-                  :disabled="regenerating"
-                  @click="handleRegenerateEnrollmentCode"
-                >
-                  {{ t('broadcastBox.regenerateEnrollmentCode') }}
-                </UButton>
+                  icon="i-lucide-ban"
+                  @click="showRevokeModal = true"
+                />
               </div>
-            </template>
-
-            <!-- Show newly generated code (with actual code value) -->
-            <div v-if="enrollmentCode" class="space-y-4">
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
-                >
-                  {{ t('broadcastBox.enrollmentCode') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <p
-                    class="text-lg font-mono font-semibold text-gray-900 dark:text-gray-100 flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                  >
-                    {{ enrollmentCode.code }}
-                  </p>
-                  <UButton
-                    :icon="codeCopied ? 'i-lucide-check' : 'i-lucide-copy'"
-                    size="sm"
-                    variant="ghost"
-                    color="primary"
-                    @click="copyToClipboard(enrollmentCode.code, 'code')"
-                  >
-                    {{
-                      codeCopied
-                        ? t('broadcastBox.copied')
-                        : t('broadcastBox.copy')
-                    }}
-                  </UButton>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
-                >
-                  {{ t('broadcastBox.expiration') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <UBadge
-                    :color="
-                      getExpirationStatus(enrollmentCode.expiresAt).status ===
-                      'expired'
-                        ? 'error'
-                        : 'primary'
-                    "
-                    variant="soft"
-                  >
-                    {{ getExpirationStatus(enrollmentCode.expiresAt).text }}
-                  </UBadge>
-                  <span class="text-sm text-gray-500">
-                    {{ formatDate(enrollmentCode.expiresAt) }}
-                  </span>
-                </div>
-              </div>
-
-              <UAlert
-                color="error"
-                variant="soft"
-                :title="t('broadcastBox.enrollmentCodeWarning')"
-                :description="t('broadcastBox.enrollmentCodeWarningDesc')"
-                icon="i-lucide-alert-triangle"
-              />
             </div>
 
-            <!-- Show existing enrollment code status (without actual code, since it's hashed) -->
-            <div v-else-if="enrollmentCodeStatus?.exists" class="space-y-4">
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
-                >
-                  {{ t('broadcastBox.enrollmentCodeStatus') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <UBadge
-                    :color="
-                      enrollmentCodeStatus.isUsed
-                        ? 'neutral'
-                        : enrollmentCodeStatus.isExpired
-                          ? 'error'
-                          : 'primary'
-                    "
-                    variant="soft"
-                  >
-                    {{
-                      enrollmentCodeStatus.isUsed
-                        ? t('broadcastBox.enrollmentCodeUsed')
-                        : enrollmentCodeStatus.isExpired
-                          ? t('broadcastBox.enrollmentCodeExpired')
-                          : t('broadcastBox.enrollmentCodeActive')
-                    }}
-                  </UBadge>
-                </div>
-              </div>
-
-              <div v-if="enrollmentCodeStatus.expiresAt">
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
-                >
-                  {{ t('broadcastBox.expiration') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <span class="text-sm text-gray-500">
-                    {{ formatDate(enrollmentCodeStatus.expiresAt) }}
-                  </span>
-                  <span
-                    v-if="
-                      !enrollmentCodeStatus.isExpired &&
-                      !enrollmentCodeStatus.isUsed
-                    "
-                    class="text-xs text-gray-400"
-                  >
-                    ({{
-                      getExpirationStatus(enrollmentCodeStatus.expiresAt).text
-                    }})
-                  </span>
-                </div>
-              </div>
-
-              <div v-if="enrollmentCodeStatus.usedAt">
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
-                >
-                  {{ t('broadcastBox.usedAt') }}
-                </label>
-                <span class="text-sm text-gray-500">
-                  {{ formatDate(enrollmentCodeStatus.usedAt) }}
-                </span>
-              </div>
-
-              <UAlert
-                v-if="
-                  !enrollmentCodeStatus.isUsed &&
-                  !enrollmentCodeStatus.isExpired
-                "
-                color="error"
-                variant="soft"
-                :title="t('broadcastBox.enrollmentCodeWarning')"
-                :description="t('broadcastBox.enrollmentCodeWarningDesc')"
-                icon="i-lucide-alert-triangle"
-              />
-
-              <UAlert
-                v-else-if="enrollmentCodeStatus.isExpired"
-                color="error"
-                variant="soft"
-                :title="t('broadcastBox.enrollmentCodeExpired')"
-                :description="t('broadcastBox.enrollmentCodeExpiredDesc')"
-                icon="i-lucide-alert-circle"
-              />
-            </div>
-
-            <!-- No enrollment code -->
-            <div v-else class="text-center py-8">
-              <UIcon
-                name="i-lucide-key"
-                class="w-12 h-12 text-gray-300 mb-4 mx-auto"
-              />
-              <p class="text-gray-500 mb-4">
-                {{ t('broadcastBox.noEnrollmentCode') }}
-              </p>
-              <UButton
-                color="primary"
-                icon="i-lucide-refresh-cw"
-                :loading="regenerating"
-                :disabled="regenerating"
-                @click="handleRegenerateEnrollmentCode"
-              >
-                {{ t('broadcastBox.generateEnrollmentCode') }}
-              </UButton>
-            </div>
-          </UCard>
-
-          <!-- Device Capabilities -->
-          <UCard v-if="device">
-            <template #header>
-              <h2 class="text-lg font-semibold">
-                {{ t('broadcastBox.deviceCapabilities') }}
-              </h2>
-            </template>
-
-            <div class="space-y-6">
-              <!-- Video Sources -->
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
-                >
-                  {{ t('broadcastBox.videoSources') }}
-                </label>
-                <div class="space-y-2">
-                  <div
-                    v-for="source in device.capabilities?.videoSources || []"
-                    :key="source"
-                    class="flex items-center justify-between p-2 rounded-lg"
-                    :class="{
-                      'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800':
-                        device.config?.defaultVideoSource === source,
-                      'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700':
-                        device.config?.defaultVideoSource !== source,
-                    }"
-                  >
-                    <div class="flex items-center gap-2">
-                      <UIcon
-                        name="i-lucide-video"
-                        class="w-4 h-4 text-gray-500"
-                      />
-                      <span class="text-sm font-medium">{{ source }}</span>
-                    </div>
-                    <UBadge
-                      v-if="device.config?.defaultVideoSource === source"
-                      color="primary"
-                      variant="soft"
-                      size="xs"
-                    >
-                      {{ t('broadcastBox.active') }}
-                    </UBadge>
-                  </div>
-                  <p
-                    v-if="!device.capabilities?.videoSources?.length"
-                    class="text-sm text-gray-500"
-                  >
-                    {{ t('broadcastBox.noVideoSources') }}
-                  </p>
-                </div>
-              </div>
-
-              <!-- Audio Sources -->
-              <div>
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
-                >
-                  {{ t('broadcastBox.audioSources') }}
-                </label>
-                <div class="space-y-2">
-                  <div
-                    v-for="source in device.capabilities?.audioSources || []"
-                    :key="source"
-                    class="flex items-center justify-between p-2 rounded-lg"
-                    :class="{
-                      'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800':
-                        device.config?.defaultAudioSource === source,
-                      'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700':
-                        device.config?.defaultAudioSource !== source,
-                    }"
-                  >
-                    <div class="flex items-center gap-2">
-                      <UIcon
-                        name="i-lucide-mic"
-                        class="w-4 h-4 text-gray-500"
-                      />
-                      <span class="text-sm font-medium">{{ source }}</span>
-                    </div>
-                    <UBadge
-                      v-if="device.config?.defaultAudioSource === source"
-                      color="primary"
-                      variant="soft"
-                      size="xs"
-                    >
-                      {{ t('broadcastBox.active') }}
-                    </UBadge>
-                  </div>
-                  <p
-                    v-if="!device.capabilities?.audioSources?.length"
-                    class="text-sm text-gray-500"
-                  >
-                    {{ t('broadcastBox.noAudioSources') }}
-                  </p>
-                </div>
-              </div>
-
-              <!-- Other Capabilities -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                <div>
-                  <label
-                    class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                  >
-                    {{ t('broadcastBox.maxResolution') }}
-                  </label>
-                  <p class="text-sm font-semibold">
-                    {{ device.capabilities?.maxResolution || 'N/A' }}
-                  </p>
-                </div>
-                <div>
-                  <label
-                    class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                  >
-                    {{ t('broadcastBox.pipSupport') }}
-                  </label>
-                  <div class="flex items-center gap-2">
-                    <UBadge
-                      :color="
-                        device.capabilities?.pipSupported
-                          ? 'primary'
-                          : 'neutral'
-                      "
-                      variant="soft"
-                      size="sm"
-                    >
-                      {{
-                        device.capabilities?.pipSupported
-                          ? t('broadcastBox.supported')
-                          : t('broadcastBox.notSupported')
-                      }}
-                    </UBadge>
-                  </div>
-                </div>
-              </div>
+            <!-- Fallback when no health data -->
+            <div
+              v-if="!realtimeHealth?.metrics && !realtimeHealth?.score"
+              class="mt-2"
+            >
+              <span class="text-xs text-gray-400">{{
+                t('broadcastBox.noHealthData') || 'No health data available'
+              }}</span>
             </div>
           </UCard>
 
@@ -1208,9 +934,9 @@ onUnmounted(() => {
             />
           </div>
 
-          <!-- Preview Stream -->
+          <!-- Preview Stream (always rendered, greyed out when offline) -->
           <DevicePreview
-            v-if="device && isDeviceConnected"
+            v-if="device"
             :device="device"
             :is-device-connected="isDeviceConnected"
             :connection-status="connectionStatus"
@@ -1222,7 +948,7 @@ onUnmounted(() => {
             @stop-recording="manualRecordingRef?.handleStop()"
           />
 
-          <!-- Device Control Cards (show when device is loaded; controls disabled when offline) -->
+          <!-- Device Control Cards (always rendered; controls disabled when offline) -->
           <div v-if="device" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Source Control -->
             <DeviceSourceControl
@@ -1240,7 +966,6 @@ onUnmounted(() => {
 
             <!-- Streaming Control (RTMP) -->
             <DeviceStreamingControl
-              v-if="device"
               :device="device"
               :is-device-connected="isDeviceConnected"
               :streaming-status="connectionStatus.streaming ?? null"
@@ -1248,287 +973,12 @@ onUnmounted(() => {
 
             <!-- Watermark / Logo Overlay -->
             <DeviceWatermarkControl
-              v-if="device"
               :device="device"
               :is-device-connected="isDeviceConnected"
             />
           </div>
 
-          <!-- Status Control -->
-          <DeviceStatusControl
-            :device="device"
-            :is-device-connected="isDeviceConnected"
-            :connection-status="connectionStatus"
-            @refreshed="loadDevice"
-          />
-
-          <!-- Device Health -->
-          <UCard v-if="realtimeHealth">
-            <template #header>
-              <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold">
-                  {{ t('broadcastBox.deviceHealth') }}
-                </h2>
-                <UBadge
-                  v-if="connectionStatus.health"
-                  color="primary"
-                  variant="soft"
-                  size="xs"
-                >
-                  {{ t('broadcastBox.live') || 'Live' }}
-                </UBadge>
-              </div>
-            </template>
-
-            <div class="space-y-4">
-              <div v-if="realtimeHealth.score !== undefined">
-                <div class="flex items-center justify-between">
-                  <span class="text-sm font-medium">{{
-                    t('broadcastBox.healthScore')
-                  }}</span>
-                  <span
-                    class="text-lg font-semibold"
-                    :class="{
-                      'text-green-600': realtimeHealth.score >= 80,
-                      'text-yellow-600':
-                        realtimeHealth.score >= 50 && realtimeHealth.score < 80,
-                      'text-red-600': realtimeHealth.score < 50,
-                    }"
-                  >
-                    {{ realtimeHealth.score }}%
-                  </span>
-                </div>
-              </div>
-
-              <div v-if="realtimeHealth.metrics" class="grid grid-cols-3 gap-4">
-                <div>
-                  <label class="text-xs text-gray-600 dark:text-gray-400">
-                    {{ t('broadcastBox.cpu') }}
-                  </label>
-                  <p class="text-sm font-semibold">
-                    {{ realtimeHealth.metrics.cpuPercent || 0 }}%
-                  </p>
-                </div>
-                <div>
-                  <label class="text-xs text-gray-600 dark:text-gray-400">
-                    {{ t('broadcastBox.memory') }}
-                  </label>
-                  <p class="text-sm font-semibold">
-                    {{ realtimeHealth.metrics.memoryPercent || 0 }}%
-                  </p>
-                </div>
-                <div>
-                  <label class="text-xs text-gray-600 dark:text-gray-400">
-                    {{ t('broadcastBox.disk') }}
-                  </label>
-                  <p class="text-sm font-semibold">
-                    {{ realtimeHealth.metrics.diskPercent || 0 }}%
-                  </p>
-                </div>
-              </div>
-
-              <!-- Network Connectivity -->
-              <div
-                v-if="
-                  connectionStatus.health?.networkConnected !== undefined ||
-                  realtimeHealth.networkConnected !== undefined
-                "
-                class="pt-4 border-t"
-              >
-                <div class="flex items-center justify-between">
-                  <label
-                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >
-                    {{ t('broadcastBox.networkConnectivity') || 'Network' }}
-                  </label>
-                  <div class="flex items-center gap-2">
-                    <UIcon
-                      :name="
-                        (connectionStatus.health?.networkConnected ??
-                        realtimeHealth.networkConnected)
-                          ? 'i-lucide-wifi'
-                          : 'i-lucide-wifi-off'
-                      "
-                      :class="
-                        (connectionStatus.health?.networkConnected ??
-                        realtimeHealth.networkConnected)
-                          ? 'w-5 h-5 text-green-600'
-                          : 'w-5 h-5 text-red-600'
-                      "
-                    />
-                    <UBadge
-                      :color="
-                        (connectionStatus.health?.networkConnected ??
-                        realtimeHealth.networkConnected)
-                          ? 'primary'
-                          : 'error'
-                      "
-                      variant="soft"
-                      size="sm"
-                    >
-                      {{
-                        (connectionStatus.health?.networkConnected ??
-                        realtimeHealth.networkConnected)
-                          ? t('broadcastBox.connected') || 'Connected'
-                          : t('broadcastBox.disconnected') || 'Disconnected'
-                      }}
-                    </UBadge>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </UCard>
-
-          <!-- Active Sources -->
-          <UCard
-            v-if="
-              connectionStatus.activeSources?.video ||
-              connectionStatus.activeSources?.audio ||
-              device?.activeSources?.video ||
-              device?.activeSources?.audio
-            "
-          >
-            <template #header>
-              <h2 class="text-lg font-semibold">
-                {{ t('broadcastBox.activeSources') }}
-              </h2>
-            </template>
-            <div class="space-y-4">
-              <!-- Active Video Source -->
-              <div
-                v-if="
-                  connectionStatus.activeSources?.video ||
-                  device?.activeSources?.video
-                "
-              >
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.activeVideoSource') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <UBadge color="primary" variant="soft" size="lg">
-                    {{
-                      (
-                        connectionStatus.activeSources?.video ||
-                        device?.activeSources?.video
-                      )?.identifier || 'Unknown'
-                    }}
-                  </UBadge>
-                  <span
-                    v-if="
-                      (
-                        connectionStatus.activeSources?.video ||
-                        device?.activeSources?.video
-                      )?.name
-                    "
-                    class="text-sm text-gray-600 dark:text-gray-400"
-                  >
-                    {{
-                      (
-                        connectionStatus.activeSources?.video ||
-                        device?.activeSources?.video
-                      )?.name
-                    }}
-                  </span>
-                </div>
-                <div
-                  v-if="
-                    (
-                      connectionStatus.activeSources?.video ||
-                      device?.activeSources?.video
-                    )?.resolution
-                  "
-                  class="text-xs text-gray-500 mt-1"
-                >
-                  {{
-                    (
-                      connectionStatus.activeSources?.video ||
-                      device?.activeSources?.video
-                    )?.resolution?.[0]
-                  }}x{{
-                    (
-                      connectionStatus.activeSources?.video ||
-                      device?.activeSources?.video
-                    )?.resolution?.[1]
-                  }}
-                  <span
-                    v-if="
-                      (
-                        connectionStatus.activeSources?.video ||
-                        device?.activeSources?.video
-                      )?.framerate
-                    "
-                  >
-                    @
-                    {{
-                      (
-                        connectionStatus.activeSources?.video ||
-                        device?.activeSources?.video
-                      )?.framerate
-                    }}
-                    fps
-                  </span>
-                </div>
-              </div>
-              <UAlert
-                v-else
-                color="neutral"
-                variant="soft"
-                :title="t('broadcastBox.noActiveVideoSource')"
-                icon="i-lucide-video-off"
-              />
-
-              <!-- Active Audio Source -->
-              <div
-                v-if="
-                  connectionStatus.activeSources?.audio ||
-                  device?.activeSources?.audio
-                "
-              >
-                <label
-                  class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 block"
-                >
-                  {{ t('broadcastBox.activeAudioSource') }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <UBadge color="primary" variant="soft" size="lg">
-                    {{
-                      (
-                        connectionStatus.activeSources?.audio ||
-                        device?.activeSources?.audio
-                      )?.identifier || 'Unknown'
-                    }}
-                  </UBadge>
-                  <span
-                    v-if="
-                      (
-                        connectionStatus.activeSources?.audio ||
-                        device?.activeSources?.audio
-                      )?.name
-                    "
-                    class="text-sm text-gray-600 dark:text-gray-400"
-                  >
-                    {{
-                      (
-                        connectionStatus.activeSources?.audio ||
-                        device?.activeSources?.audio
-                      )?.name
-                    }}
-                  </span>
-                </div>
-              </div>
-              <UAlert
-                v-else
-                color="neutral"
-                variant="soft"
-                :title="t('broadcastBox.noActiveAudioSource')"
-                icon="i-lucide-mic-off"
-              />
-            </div>
-          </UCard>
-
-          <!-- Picture-in-Picture Configuration (editable form and current state) -->
+          <!-- Picture-in-Picture Configuration -->
           <DevicePiPControl
             v-if="
               device &&
@@ -1540,72 +990,15 @@ onUnmounted(() => {
             :is-device-connected="isDeviceConnected"
           />
 
-          <!-- Recent Sessions -->
-          <UCard>
-            <template #header>
-              <h2 class="text-lg font-semibold">
-                {{ t('broadcastBox.recentSessions') }}
-              </h2>
-            </template>
-
-            <div
-              v-if="sessions.length === 0"
-              class="text-center py-8 text-gray-500"
-            >
-              {{ t('broadcastBox.noSessions') }}
-            </div>
-
-            <div v-else class="space-y-2">
-              <div
-                v-for="session in sessions"
-                :key="session.id"
-                class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-1">
-                    <SessionStatusBadge :status="session.status" />
-                    <span class="text-sm font-medium">{{ session.id }}</span>
-                  </div>
-                  <div v-if="session.startedAt" class="text-xs text-gray-500">
-                    {{ t('broadcastBox.startedAt') }}:
-                    {{ formatDate(session.startedAt) }}
-                  </div>
-                </div>
-                <div class="flex items-center gap-1">
-                  <UButton
-                    variant="ghost"
-                    size="xs"
-                    icon="i-lucide-arrow-right"
-                    @click="
-                      navigateTo(
-                        `/records/session/${session.civicpressSessionId}`
-                      )
-                    "
-                  >
-                    {{ t('broadcastBox.viewSession') }}
-                  </UButton>
-                  <UButton
-                    variant="ghost"
-                    size="xs"
-                    color="error"
-                    icon="i-lucide-trash-2"
-                    :loading="removingSessionId === session.id"
-                    :disabled="removingSessionId !== null"
-                    @click="handleRemoveSession(session.id)"
-                  >
-                    {{ t('broadcastBox.removeSession') }}
-                  </UButton>
-                </div>
-              </div>
-            </div>
-          </UCard>
-
-          <!-- Device Recordings -->
+          <!-- Recordings & Sessions -->
           <UCard v-if="device">
             <template #header>
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold">
-                  {{ t('broadcastBox.recordingsList') }}
+                  {{
+                    t('broadcastBox.recordingsAndSessions') ||
+                    'Recordings & Sessions'
+                  }}
                 </h2>
                 <UButton
                   variant="ghost"
@@ -1620,77 +1013,389 @@ onUnmounted(() => {
               </div>
             </template>
 
-            <!-- Loading State -->
-            <div
-              v-if="manualRecordingRef?.isLoadingRecordings"
-              class="text-center py-4"
-            >
-              <UIcon
-                name="i-lucide-loader-2"
-                class="w-5 h-5 animate-spin text-gray-400"
+            <!-- Recordings Section -->
+            <div>
+              <h3
+                class="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3"
+              >
+                {{ t('broadcastBox.recordingsList') }}
+              </h3>
+
+              <UAlert
+                v-if="!manualRecordingRef?.recordings?.length"
+                color="neutral"
+                variant="soft"
+                :title="t('broadcastBox.noRecordings')"
+                :description="t('broadcastBox.noRecordingsDesc')"
+                icon="i-lucide-info"
               />
+
+              <div v-else class="space-y-2">
+                <div
+                  v-for="recording in manualRecordingRef.recordings"
+                  :key="recording.recording_id"
+                  class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="text-sm font-medium">
+                        {{ formatDate(recording.started_at) }}
+                      </span>
+                      <UBadge
+                        v-if="!recording.stopped_at"
+                        color="error"
+                        variant="soft"
+                        size="xs"
+                      >
+                        {{ t('broadcastBox.recording') }}
+                      </UBadge>
+                    </div>
+                    <div class="text-xs text-gray-500 space-y-1">
+                      <div>
+                        {{ t('broadcastBox.duration') }}:
+                        {{
+                          manualRecordingRef.formatDuration(
+                            recording.duration_seconds
+                          )
+                        }}
+                      </div>
+                      <div>
+                        {{ t('broadcastBox.fileSize') }}:
+                        {{
+                          manualRecordingRef.formatFileSize(
+                            recording.file_size_bytes
+                          )
+                        }}
+                      </div>
+                      <div v-if="recording.quality" class="capitalize">
+                        {{ t('broadcastBox.quality') }}: {{ recording.quality }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <!-- Empty State -->
-            <UAlert
-              v-else-if="!manualRecordingRef?.recordings?.length"
-              color="neutral"
-              variant="soft"
-              :title="t('broadcastBox.noRecordings')"
-              :description="t('broadcastBox.noRecordingsDesc')"
-              icon="i-lucide-info"
-            />
+            <!-- Divider -->
+            <USeparator class="my-6" />
 
-            <!-- Recordings List -->
-            <div v-else class="space-y-2">
-              <div
-                v-for="recording in manualRecordingRef.recordings"
-                :key="recording.recording_id"
-                class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+            <!-- Sessions Section -->
+            <div>
+              <h3
+                class="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3"
               >
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="text-sm font-medium">
-                      {{ formatDate(recording.started_at) }}
-                    </span>
-                    <UBadge
-                      v-if="!recording.stopped_at"
-                      color="error"
-                      variant="soft"
-                      size="xs"
-                    >
-                      {{ t('broadcastBox.recording') }}
-                    </UBadge>
+                {{ t('broadcastBox.recentSessions') }}
+              </h3>
+
+              <div
+                v-if="sessions.length === 0"
+                class="text-center py-4 text-gray-500 text-sm"
+              >
+                {{ t('broadcastBox.noSessions') }}
+              </div>
+
+              <div v-else class="space-y-2">
+                <div
+                  v-for="session in sessions"
+                  :key="session.id"
+                  class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                      <SessionStatusBadge :status="session.status" />
+                      <span class="text-sm font-medium">{{ session.id }}</span>
+                    </div>
+                    <div v-if="session.startedAt" class="text-xs text-gray-500">
+                      {{ t('broadcastBox.startedAt') }}:
+                      {{ formatDate(session.startedAt) }}
+                    </div>
                   </div>
-                  <div class="text-xs text-gray-500 space-y-1">
-                    <div>
-                      {{ t('broadcastBox.duration') }}:
-                      {{
-                        manualRecordingRef.formatDuration(
-                          recording.duration_seconds
+                  <div class="flex items-center gap-1">
+                    <UButton
+                      variant="ghost"
+                      size="xs"
+                      icon="i-lucide-arrow-right"
+                      @click="
+                        navigateTo(
+                          `/records/session/${session.civicpressSessionId}`
                         )
-                      }}
-                    </div>
-                    <div>
-                      {{ t('broadcastBox.fileSize') }}:
-                      {{
-                        manualRecordingRef.formatFileSize(
-                          recording.file_size_bytes
-                        )
-                      }}
-                    </div>
-                    <div v-if="recording.quality" class="capitalize">
-                      {{ t('broadcastBox.quality') }}: {{ recording.quality }}
-                    </div>
+                      "
+                    >
+                      {{ t('broadcastBox.viewSession') }}
+                    </UButton>
+                    <UButton
+                      variant="ghost"
+                      size="xs"
+                      color="error"
+                      icon="i-lucide-trash-2"
+                      :loading="removingSessionId === session.id"
+                      :disabled="removingSessionId !== null"
+                      @click="handleRemoveSession(session.id)"
+                    >
+                      {{ t('broadcastBox.removeSession') }}
+                    </UButton>
                   </div>
                 </div>
               </div>
             </div>
           </UCard>
 
+          <!-- Device Details (Collapsible) -->
+          <UAccordion :items="detailsAccordionItems" class="mt-2">
+            <template #device-info>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                <div>
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t('broadcastBox.deviceId') }}
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <p
+                      class="text-sm font-mono text-gray-900 dark:text-gray-100 flex-1"
+                    >
+                      {{ device.id }}
+                    </p>
+                    <UButton
+                      :icon="
+                        deviceIdCopied ? 'i-lucide-check' : 'i-lucide-copy'
+                      "
+                      size="xs"
+                      variant="ghost"
+                      :color="deviceIdCopied ? 'primary' : 'neutral'"
+                      @click="copyToClipboard(device.id, 'deviceId')"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t('broadcastBox.deviceUuid') }}
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <p
+                      class="text-sm font-mono text-gray-900 dark:text-gray-100 flex-1"
+                    >
+                      {{ device.deviceUuid }}
+                    </p>
+                    <UButton
+                      :icon="uuidCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                      size="xs"
+                      variant="ghost"
+                      :color="uuidCopied ? 'primary' : 'neutral'"
+                      @click="copyToClipboard(device.deviceUuid, 'uuid')"
+                    />
+                  </div>
+                </div>
+
+                <div v-if="device.roomLocation">
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t('broadcastBox.roomLocation') }}
+                  </label>
+                  <p class="text-sm text-gray-900 dark:text-gray-100">
+                    {{ device.roomLocation }}
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t('broadcastBox.createdAt') }}
+                  </label>
+                  <p class="text-sm text-gray-900 dark:text-gray-100">
+                    {{ formatDate(device.createdAt) }}
+                  </p>
+                </div>
+
+                <div v-if="device.lastSeenAt">
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t('broadcastBox.lastSeen') }}
+                  </label>
+                  <p class="text-sm text-gray-900 dark:text-gray-100">
+                    {{ formatDate(device.lastSeenAt) }}
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {{ t('broadcastBox.status') || 'Status' }}
+                  </label>
+                  <DeviceStatusBadge :status="device.status" />
+                </div>
+              </div>
+            </template>
+
+            <template #enrollment>
+              <div class="p-4 space-y-4">
+                <!-- QR Code (shown after regeneration) -->
+                <div
+                  v-if="enrollmentCode && enrollmentQrDataUrl"
+                  class="flex flex-col items-center gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20"
+                >
+                  <p class="text-sm font-medium">
+                    {{ t('broadcastBox.scanQrCode') }}
+                  </p>
+                  <img
+                    :src="enrollmentQrDataUrl"
+                    alt="Enrollment QR Code"
+                    class="w-48 h-48"
+                  />
+                  <p class="text-xs text-muted text-center max-w-xs">
+                    {{ t('broadcastBox.scanQrCodeDesc') }}
+                  </p>
+                </div>
+
+                <!-- Enrollment code value (when freshly generated) -->
+                <div v-if="enrollmentCode">
+                  <label
+                    class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2 block"
+                  >
+                    {{ t('broadcastBox.enrollmentCode') }}
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <p
+                      class="text-lg font-mono font-semibold text-gray-900 dark:text-gray-100 flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    >
+                      {{ enrollmentCode.code }}
+                    </p>
+                    <UButton
+                      :icon="codeCopied ? 'i-lucide-check' : 'i-lucide-copy'"
+                      size="sm"
+                      variant="ghost"
+                      color="primary"
+                      @click="copyToClipboard(enrollmentCode.code, 'code')"
+                    >
+                      {{
+                        codeCopied
+                          ? t('broadcastBox.copied')
+                          : t('broadcastBox.copy')
+                      }}
+                    </UButton>
+                  </div>
+                  <div
+                    v-if="enrollmentCode.expiresAt"
+                    class="flex items-center gap-2 mt-2"
+                  >
+                    <UBadge
+                      :color="
+                        getExpirationStatus(enrollmentCode.expiresAt).status ===
+                        'expired'
+                          ? 'error'
+                          : 'primary'
+                      "
+                      variant="soft"
+                    >
+                      {{ getExpirationStatus(enrollmentCode.expiresAt).text }}
+                    </UBadge>
+                    <span class="text-sm text-gray-500">
+                      {{ formatDate(enrollmentCode.expiresAt) }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Enrollment status (when code already exists but value is hashed) -->
+                <div v-else-if="enrollmentCodeStatus?.exists">
+                  <div class="flex items-center gap-2 mb-2">
+                    <UBadge
+                      :color="
+                        enrollmentCodeStatus.isUsed
+                          ? 'neutral'
+                          : enrollmentCodeStatus.isExpired
+                            ? 'error'
+                            : 'primary'
+                      "
+                      variant="soft"
+                    >
+                      {{
+                        enrollmentCodeStatus.isUsed
+                          ? t('broadcastBox.enrollmentCodeUsed')
+                          : enrollmentCodeStatus.isExpired
+                            ? t('broadcastBox.enrollmentCodeExpired')
+                            : t('broadcastBox.enrollmentCodeActive')
+                      }}
+                    </UBadge>
+                    <span
+                      v-if="enrollmentCodeStatus.expiresAt"
+                      class="text-sm text-gray-500"
+                    >
+                      {{ formatDate(enrollmentCodeStatus.expiresAt) }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- No enrollment code -->
+                <div v-else class="text-sm text-gray-500">
+                  {{ t('broadcastBox.noEnrollmentCode') }}
+                </div>
+
+                <!-- Regenerate button -->
+                <UButton
+                  color="primary"
+                  variant="soft"
+                  size="sm"
+                  icon="i-lucide-refresh-cw"
+                  :loading="regenerating"
+                  :disabled="regenerating"
+                  @click="handleRegenerateEnrollmentCode"
+                >
+                  {{ t('broadcastBox.regenerateEnrollmentCode') }}
+                </UButton>
+              </div>
+            </template>
+          </UAccordion>
+
           <!-- Footer -->
           <SystemFooter />
         </template>
+
+        <!-- Revoke Confirmation Modal -->
+        <UModal
+          v-model:open="showRevokeModal"
+          :title="t('broadcastBox.revokeDevice') || 'Revoke Device'"
+        >
+          <template #body>
+            <div class="space-y-4">
+              <p class="text-gray-700 dark:text-gray-300">
+                {{ t('broadcastBox.confirmRevoke') }}
+              </p>
+              <div
+                class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"
+              >
+                <div class="flex items-start space-x-3">
+                  <UIcon
+                    name="i-lucide-alert-triangle"
+                    class="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0"
+                  />
+                  <p class="text-sm text-red-800 dark:text-red-200">
+                    {{
+                      t('broadcastBox.revokeWarning') ||
+                      'This will permanently disconnect the device and invalidate its credentials. The device will need to be re-enrolled to reconnect.'
+                    }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template #footer="{ close }">
+            <div class="flex justify-end space-x-3">
+              <UButton color="neutral" variant="outline" @click="close">
+                {{ t('common.cancel') }}
+              </UButton>
+              <UButton color="error" @click="handleRevoke">
+                {{ t('broadcastBox.revoke') }}
+              </UButton>
+            </div>
+          </template>
+        </UModal>
 
         <!-- Configuration Form Modal -->
         <UModal

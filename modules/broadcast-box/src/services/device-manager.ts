@@ -108,7 +108,8 @@ export class DeviceManager {
     }
   ): Promise<BroadcastDevice> {
     // Validate enrollment code
-    // First, find the enrollment code by device UUID
+    // Find the enrollment code by matching the provided code against stored hashes
+    // This allows any device UUID to register with a valid enrollment code
     this.logger.debug('Looking up enrollment code for device', {
       operation: 'broadcast-box:device:registration:lookup',
       deviceUuid: data.deviceUuid,
@@ -116,18 +117,26 @@ export class DeviceManager {
       enrollmentCodeFormat: data.enrollmentCode?.substring(0, 20) || 'empty',
     });
 
-    const enrollmentCode = await this.enrollmentCodeModel.findByDeviceUuid(
-      data.deviceUuid
+    // Try finding by code match first (supports device-provided UUIDs)
+    let enrollmentCode = await this.enrollmentCodeModel.findByCode(
+      data.enrollmentCode
     );
+
+    // Fall back to finding by device UUID (legacy path for re-registration)
+    if (!enrollmentCode) {
+      enrollmentCode = await this.enrollmentCodeModel.findByDeviceUuid(
+        data.deviceUuid
+      );
+    }
 
     if (!enrollmentCode) {
       this.logger.warn(
-        'Device registration failed: enrollment code not found for device UUID',
+        'Device registration failed: no matching enrollment code found',
         {
           operation: 'broadcast-box:device:registration:invalid-code',
           deviceUuid: data.deviceUuid,
           registrationIp: data.registrationIp || 'unknown',
-          note: 'No enrollment code found in database for this device UUID. Make sure you enrolled the device first.',
+          note: 'No enrollment code matched in database. Make sure you enrolled the device first.',
         }
       );
       throw new Error('Invalid enrollment code');
@@ -136,21 +145,11 @@ export class DeviceManager {
     this.logger.debug('Enrollment code found', {
       operation: 'broadcast-box:device:registration:code-found',
       enrollmentCodeId: enrollmentCode.id,
-      deviceUuid: enrollmentCode.deviceUuid,
+      enrollmentDeviceUuid: enrollmentCode.deviceUuid,
+      registrationDeviceUuid: data.deviceUuid,
       expiresAt: enrollmentCode.expiresAt.toISOString(),
       usedAt: enrollmentCode.usedAt?.toISOString() || null,
     });
-
-    // Verify device UUID matches
-    if (enrollmentCode.deviceUuid !== data.deviceUuid) {
-      coreWarn('Device registration failed: device UUID mismatch', {
-        operation: 'broadcast-box:device:registration:uuid-mismatch',
-        expectedUuid: enrollmentCode.deviceUuid,
-        providedUuid: data.deviceUuid,
-        registrationIp: data.registrationIp || 'unknown',
-      });
-      throw new Error('Device UUID mismatch');
-    }
 
     // Check if device UUID already exists FIRST (before expiration check)
     // This allows recovery for existing devices even with expired codes
