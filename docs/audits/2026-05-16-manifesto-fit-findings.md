@@ -387,10 +387,10 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 187 | (default; not listed below) |
+| `open` | 182 | (default; not listed below) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
 | `closed-with-commit-SHA` | 17 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) + Task 9 (1) |
-| `wontfix-pending-phase-X` | 0 | populated as Phase 2a defers in-scope items |
+| `wontfix-pending-phase-X` | 5 | Phase 2a deferrals (Task 10): broadcast-box-002/007, BB-HW-001/3, ui-002 |
 | **TOTAL** | **205** | |
 
 ### Closed findings
@@ -419,6 +419,14 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
 
-### Pending deferrals (populated by Phase 2a Task 10)
+### Deferrals (Phase 2a Task 10 — closed 2026-05-17)
 
-(None yet — Phase 2a tasks will mark `broadcast-box-002`, `broadcast-box-007`, `BB-HW-001`, `BB-HW-003`, and possibly `ui-002` as `wontfix-pending-phase-N` when their respective phases are scoped. `ui-002` may be promoted to `triaged` within Phase 2a instead, pending the Nuxt UI Pro v3→v4 migration scoping — see `nuxt-ui-pro-v4-free` memory.)
+These Criticals are explicitly deferred by the refactor sequencing. None are forgotten — each will be reopened in its target phase.
+
+| ID | Status | Target phase | Rationale |
+|---|---|---|---|
+| broadcast-box-002 | `wontfix-pending-phase-5` | Phase 5 (broadcast-box reintroduction) | Recording pipeline civic-artifact gap. Broadcast-box module is paused (master plan §2.3); the AI-port-driven civic-artifact derivation service that closes this finding will be designed + built when broadcast-box reintroduces through the clean module contract in Phase 5. See `broadcast-box-ai-port` memory for the implementation path. |
+| broadcast-box-007 | `wontfix-pending-phase-5` | Phase 5 | Rate limiter env gate. Lives inside the paused broadcast-box module; will be addressed during reintroduction with proper environment gating (positive opt-in like `CIVIC_DEV_DISABLE_RATELIMIT=true` rather than negative `NODE_ENV !== 'production'`). |
+| BB-HW-001 | `wontfix-pending-phase-4` | Phase 4 (hardware audit + fix) | Hardware protocol doc lies. Phase 4 owns the canonical shared protocol-spec artifact (JSON Schema or `.proto`) consumed by both repos; this finding closes when that artifact exists and both sides are bound to it. |
+| BB-HW-003 | `wontfix-pending-phase-4` | Phase 4 | Hardware civic-artifact gap (0 json sidecars). Partner to broadcast-box-002 from the hardware side. Closes when the AI-port pipeline produces transcripts + audio + Markdown civic artifacts. |
+| ui-002 | `wontfix-pending-phase-2d` | Phase 2d (structural hardening) — but may be promoted earlier | Nuxt UI Pro v4 is now free and open source (user confirmed 2026-05-17). Remediation reduces from "rip out and replace" to "upgrade v3 → v4 and confirm no license-key runtime check." A scoping pass on the v3 → v4 migration breaking-change surface is the first action; if migration is ≤1 day, ui-002 promotes to a Phase 2a follow-up. If larger, stays in Phase 2d as planned. See `nuxt-ui-pro-v4-free` memory. |
