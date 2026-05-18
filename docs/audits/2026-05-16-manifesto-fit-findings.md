@@ -387,9 +387,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 204 | (default; not listed below) |
+| `open` | 199 | (default; not listed below) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 0 | populated as Phase 2a tasks complete |
+| `closed-with-commit-SHA` | 5 | BB-HW-002 + deps-001/002/003/005 (Phase 2a Task 1) |
 | `wontfix-pending-phase-X` | 0 | populated as Phase 2a defers in-scope items |
 | **TOTAL** | **205** | |
 
@@ -398,6 +398,14 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | ID | Status | When | Action / commit |
 |---|---|---|---|
 | workspace-001 | `closed-no-commit` | 2026-05-17 | Personal billing files (timesheets 2025-05 → 2026-03 + summaries, 26 files total) moved from `_work_bk/` to `~/Documents/civicpress-admin/`. Mode-600 permissions preserved. Source directory now has zero billing files. No git commit (filesystem move only). |
+| BB-HW-002 | `closed-with-commit-SHA` | 2026-05-17 | AGPL-3.0-or-later license added to `civicpress-broadcast-box` repo. Commit `f63edaf` on the hardware repo (local-only; no remote yet — see workspace-003). |
+| deps-001 | `closed-with-commit-SHA` | 2026-05-17 | `simple-git` bumped `^3.28.0` → `^3.36.0` in `core/package.json`. Cleared GHSA-vx2g-25mq-9c2h (`blockUnsafeOperationsPlugin` bypass). |
+| deps-002 | `closed-with-commit-SHA` | 2026-05-17 | `@aws-sdk/client-s3` bumped `3.879.0` → `3.1048.0` (root + `modules/storage`); `@google-cloud/storage` `^7.15.0` → `^7.19.0`; `@azure/storage-blob` `12.28.0` → `12.31.0` (modules/storage). Cleared all paths to vulnerable `fast-xml-parser` via cloud SDKs (GHSA-mpg4-rc92-vx8v). |
+| deps-003 | `closed-with-commit-SHA` | 2026-05-17 | `plop` bumped `4.0.1` → `4.0.5`. Cleared `handlebars` GHSA-3wjp-mcw9-37jh via `node-plop`. |
+| deps-005 | `closed-with-commit-SHA` | 2026-05-17 | `renovate.json` added at repo root. Weekly Monday schedule, auto-merge minor+patch via branch, major requires manual review, security advisories labeled. Renovate chosen over Dependabot for manifesto "no vendor lock-in" alignment (runs anywhere, not GitHub-coupled). |
+
+**pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
+**pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
 
 ### Pending deferrals (populated by Phase 2a Task 10)
 
