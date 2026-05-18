@@ -31,6 +31,7 @@ import {
   coreInfo,
   coreWarn,
 } from '../utils/core-output.js';
+import type { AuditChannel } from '../audit/audit-channel.js';
 /**
  * Generate unique saga ID
  */
@@ -65,12 +66,14 @@ export class SagaExecutor {
   private idempotencyManager: IdempotencyManager;
   private lockManager: ResourceLockManager;
   private config: Required<SagaExecutorConfig>;
+  private auditChannel?: AuditChannel;
 
   constructor(
     stateStore: SagaStateStore,
     idempotencyManager: IdempotencyManager,
     lockManager: ResourceLockManager,
-    config: SagaExecutorConfig = {}
+    config: SagaExecutorConfig = {},
+    auditChannel?: AuditChannel
   ) {
     this.stateStore = stateStore;
     this.idempotencyManager = idempotencyManager;
@@ -82,6 +85,57 @@ export class SagaExecutor {
       idempotencyTtl: config.idempotencyTtl || 24 * 60 * 60 * 1000, // 24 hours
       persistState: config.persistState !== false, // Default true
     };
+    this.auditChannel = auditChannel;
+  }
+
+  /**
+   * Write a saga lifecycle audit entry through the unified channel.
+   * No-op if no channel was injected (transitional safety; production
+   * wires the channel via civic-core-services.ts).
+   *
+   * Phase 2c Task 9 — closes core-013 (sagas previously wrote no audit
+   * to either store).
+   */
+  private async auditSagaLifecycle(
+    saga: { name: string },
+    context: SagaContext,
+    phase: 'start' | 'complete' | 'failure',
+    extra?: { sagaId?: string; durationMs?: number; error?: string }
+  ): Promise<void> {
+    if (!this.auditChannel) return;
+    try {
+      const userId =
+        typeof (context as any).userId === 'number'
+          ? (context as any).userId
+          : typeof (context as any).user?.id === 'number'
+          ? (context as any).user.id
+          : undefined;
+      await this.auditChannel.record({
+        action: `saga:${saga.name}:${phase}`,
+        resourceType: 'saga',
+        resourceId: extra?.sagaId,
+        userId,
+        source: 'saga',
+        outcome: phase === 'failure' ? 'failure' : 'success',
+        message:
+          phase === 'failure'
+            ? `Saga ${saga.name} failed${
+                extra?.error ? `: ${extra.error}` : ''
+              }`
+            : `Saga ${saga.name} ${phase}`,
+        details: {
+          sagaId: extra?.sagaId,
+          durationMs: extra?.durationMs,
+          correlationId: context.correlationId,
+        },
+      });
+    } catch (err) {
+      // Audit write must never break saga execution.
+      coreWarn(
+        `[SagaExecutor] Audit write failed for saga ${saga.name}:${phase}`,
+        { error: err instanceof Error ? err.message : String(err) }
+      );
+    }
   }
 
   /**
@@ -163,6 +217,9 @@ export class SagaExecutor {
         await this.stateStore.saveState(initialState);
       }
 
+      // Audit: saga start (Phase 2c Task 9 — closes core-013)
+      await this.auditSagaLifecycle(saga, context, 'start', { sagaId });
+
       // Execute saga with timeout
       const result = await Promise.race([
         this.executeSaga(saga, context, sagaId),
@@ -175,6 +232,12 @@ export class SagaExecutor {
       if (this.config.persistState) {
         await this.stateStore.updateStatus(sagaId, 'completed');
       }
+
+      // Audit: saga complete (Phase 2c Task 9)
+      await this.auditSagaLifecycle(saga, context, 'complete', {
+        sagaId,
+        durationMs: duration,
+      });
 
       coreInfo(`Saga completed successfully: ${saga.name}`, {
         sagaId,
@@ -200,6 +263,12 @@ export class SagaExecutor {
           undefined,
           error.message
         );
+        // Audit: saga failure (Phase 2c Task 9 — closes core-013)
+        await this.auditSagaLifecycle(saga, context, 'failure', {
+          sagaId,
+          durationMs: duration,
+          error: error.message,
+        });
         throw error;
       }
 
@@ -219,6 +288,13 @@ export class SagaExecutor {
           undefined,
           error.message
         );
+
+        // Audit: saga failure (Phase 2c Task 9 — closes core-013)
+        await this.auditSagaLifecycle(saga, context, 'failure', {
+          sagaId,
+          durationMs: duration,
+          error: error.message,
+        });
 
         if (compensationResult.requiresManualIntervention) {
           coreError(
@@ -243,6 +319,13 @@ export class SagaExecutor {
         undefined,
         error instanceof Error ? error.message : String(error)
       );
+
+      // Audit: saga failure (Phase 2c Task 9 — closes core-013)
+      await this.auditSagaLifecycle(saga, context, 'failure', {
+        sagaId,
+        durationMs: duration,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       throw error;
     } finally {

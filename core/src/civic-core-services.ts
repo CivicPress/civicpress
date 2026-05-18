@@ -33,6 +33,8 @@ import {
 } from './saga/index.js';
 import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { SecretsManager } from './security/secrets.js';
+import { AuditLogger } from './audit/audit-logger.js';
+import { AuditChannel } from './audit/audit-channel.js';
 
 /**
  * Register all CivicPress services in the dependency injection container
@@ -174,10 +176,33 @@ export function registerCivicPressServices(
     const idempotencyManager =
       c.resolve<IdempotencyManager>('idempotencyManager');
     const lockManager = c.resolve<ResourceLockManager>('resourceLockManager');
-    return new SagaExecutor(stateStore, idempotencyManager, lockManager);
+    // AuditChannel injection: Phase 2c Task 9 — closes core-013 (sagas
+    // now write start / complete / failure to the unified channel).
+    const auditChannel = c.resolve<AuditChannel>('auditChannel');
+    return new SagaExecutor(
+      stateStore,
+      idempotencyManager,
+      lockManager,
+      undefined,
+      auditChannel
+    );
   });
 
-  // Step 11: Register record manager (depends on: database, git, hooks, workflow, template, config, cacheManager)
+  // Step 10.5: Register the unified AuditChannel (Phase 2c Task 9 — closes
+  // core-001 + core-013). Wraps AuditLogger (file-JSONL, resilient) + DB
+  // logAuditEvent (queryable). File-JSONL first; DB second.
+  container.singleton('auditLogger', (c) => {
+    const config = c.resolve<CivicPressConfig>('config');
+    return new AuditLogger({ dataDir: config.dataDir });
+  });
+  container.singleton('auditChannel', (c) => {
+    const db = c.resolve<DatabaseService>('database');
+    const fileLogger = c.resolve<AuditLogger>('auditLogger');
+    return new AuditChannel(db, fileLogger);
+  });
+
+  // Step 11: Register record manager (depends on: database, git, hooks,
+  // workflow, template, config, cacheManager, auditChannel)
   container.singleton('recordManager', (c) => {
     const db = c.resolve<DatabaseService>('database');
     const git = c.resolve<GitEngine>('git');
@@ -186,6 +211,7 @@ export function registerCivicPressServices(
     const template = c.resolve<TemplateEngine>('template');
     const config = c.resolve<CivicPressConfig>('config');
     const cacheManager = c.resolve<UnifiedCacheManager>('cacheManager');
+    const auditChannel = c.resolve<AuditChannel>('auditChannel');
     return new RecordManager(
       db,
       git,
@@ -193,7 +219,8 @@ export function registerCivicPressServices(
       workflow,
       template,
       config.dataDir,
-      cacheManager
+      cacheManager,
+      auditChannel
     );
   });
 }
