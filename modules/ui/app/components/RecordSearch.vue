@@ -436,6 +436,7 @@ onUnmounted(() => {
         <div class="flex-1 relative search-suggestions-container">
           <UInput
             v-model="searchQuery"
+            data-test="search-input"
             @focus="handleInputFocus"
             @blur="handleInputBlur"
             @keydown="handleInputKeydown"
@@ -451,6 +452,7 @@ onUnmounted(() => {
                 size="sm"
                 icon="i-lucide-circle-x"
                 aria-label="Clear search"
+                data-test="clear-search"
                 @click="searchQuery = ''"
               />
             </template>

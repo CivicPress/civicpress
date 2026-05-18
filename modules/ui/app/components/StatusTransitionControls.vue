@@ -222,12 +222,14 @@ const confirmChange = async () => {
           <div
             v-if="item.isTransition"
             class="mt-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-2"
+            :data-test="`transition-${item.status}`"
           >
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
               Transition to {{ getStatusLabel(item.status) }}
               <span v-if="!showStatusTransitions">(permission required)</span>
             </p>
             <UButton
+              :data-test="`transition-button-${item.status}`"
               size="xs"
               :color="getStatusColor(item.status) as any"
               :icon="getStatusIcon(item.status)"
@@ -264,7 +266,11 @@ const confirmChange = async () => {
       <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" /> Loading
       statuses...
     </div>
-    <div v-else-if="!showStatusTransitions" class="text-sm text-gray-500">
+    <div
+      v-else-if="!showStatusTransitions"
+      data-test="no-permission"
+      class="text-sm text-gray-500"
+    >
       You don't have permission to change record status.
     </div>
 

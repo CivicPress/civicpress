@@ -224,6 +224,7 @@ const handlePageSizeChange = (value: any) => {
           <UCard
             v-for="record in processedRecords"
             :key="record.id"
+            data-test="record-row"
             :ui="{ body: 'p-0' }"
             class="hover:shadow-md transition-shadow cursor-pointer"
             @click="navigateToRecord(record)"
@@ -272,6 +273,7 @@ const handlePageSizeChange = (value: any) => {
                           authStore.hasPermission('records:edit') &&
                           record.hasUnpublishedChanges
                         "
+                        data-test="unpublished-indicator"
                         size="xs"
                         color="error"
                         variant="soft"
@@ -379,6 +381,7 @@ const handlePageSizeChange = (value: any) => {
       <!-- Show no results when not loading and no records -->
       <div
         v-else-if="displayRecords.length === 0 && !shouldShowLoading"
+        data-test="empty-state"
         class="py-16"
       >
         <div
