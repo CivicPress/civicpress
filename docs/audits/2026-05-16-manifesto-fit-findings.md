@@ -387,7 +387,8 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 182 | (default; not listed below) |
+| `open` | 173 | (default; not listed below) |
+| `triaged-phase-2b` | 9 | legal-register-001/006, notifications-007, site-001/2/3, BB-HW-008, ui-005, cli-001 |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
 | `closed-with-commit-SHA` | 17 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) + Task 9 (1) |
 | `wontfix-pending-phase-X` | 5 | Phase 2a deferrals (Task 10): broadcast-box-002/007, BB-HW-001/3, ui-002 |
@@ -418,6 +419,22 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
+
+### Triaged for Phase 2b (2026-05-17)
+
+Per the Phase 2b plan (`docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md`), these 9 findings are in-scope for the in-progress Phase 2b — Truth Restoration. Each will close with a commit SHA (or `wontfix-by-phase-strategy` for site-002) during the phase.
+
+| ID | Status | Phase 2b task | Rationale |
+|---|---|---|---|
+| legal-register-001 | `triaged-phase-2b` | Task 1 (spec frontmatter sweep) | Spec rewrite from `status: stable, v1.0.0` to `planned` per master plan §9.4. |
+| legal-register-006 | `triaged-phase-2b` | Task 1 | Closes alongside legal-register-001; same module, scaffolding-vs-claim mismatch. |
+| notifications-007 | `triaged-phase-2b` | Task 1 | Spec rewrite to `partial` — implementation now honest after Phase 2a Tasks 6-8 fixes; spec must match. |
+| site-001 | `triaged-phase-2b` | Task 4 (civicpress-site repo) | en.json + fr.json overclaim fixes; push to site origin. |
+| site-002 | `triaged-phase-2b` | Task 4 | Will close as `wontfix-by-phase-strategy` — broadcast-box absence on site is intentional per §9.3; reopens in Phase 5. |
+| site-003 | `triaged-phase-2b` | Task 4 | `@nuxt/ui-pro` → `@nuxt/ui` doc fix in site repo. |
+| BB-HW-008 | `triaged-phase-2b` | Task 5 (civicpress-broadcast-box repo) | engineering-analysis.md self-grade fix (delete or honestly rewrite); local-only commit. |
+| ui-005 | `triaged-phase-2b` | Tasks 8 + 9 | Tier 1 (forms) + Tier 2 (record viewing) real component tests; full 25+ component coverage rolls to Phase 2d. |
+| cli-001 | `triaged-phase-2b` | Tasks 10 + 11 | Tier 1 (lifecycle) + Tier 2 (operational) real CLI tests; full 28-command coverage rolls to Phase 2d. |
 
 ### Deferrals (Phase 2a Task 10 — closed 2026-05-17)
 
