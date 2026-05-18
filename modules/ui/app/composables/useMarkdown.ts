@@ -1,4 +1,5 @@
 import { marked, type MarkedOptions } from 'marked';
+import DOMPurify from 'isomorphic-dompurify';
 
 // In Nuxt, useRuntimeConfig is globally available at runtime.
 // We declare it here for TypeScript without importing '#imports',
@@ -141,11 +142,23 @@ export const useMarkdown = () => {
 
     const processed = shouldPreserve ? postprocessHtml(html) : html;
 
+    // ui-001 (Critical) — sanitize the rendered HTML before handing it
+    // to any v-html sink. marked.parse does NOT strip <script>,
+    // <iframe>, on* handlers, or javascript: URIs by default; rendering
+    // unsanitized output in v-html on the public record page is a
+    // direct XSS vector (a malicious published record could steal JWT
+    // + CSRF tokens from localStorage). Allow the empty-line marker
+    // span class we add in postprocessHtml.
+    const sanitized = DOMPurify.sanitize(processed, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['aria-hidden'],
+    });
+
     if (typeof options?.onTransformHtml === 'function') {
-      return options.onTransformHtml(processed);
+      return options.onTransformHtml(sanitized);
     }
 
-    return processed;
+    return sanitized;
   };
 
   return {

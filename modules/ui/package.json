@@ -29,6 +29,7 @@
     "@vueuse/core": "13.5.0",
     "codemirror": "6.0.2",
     "eslint": "^9.38.0",
+    "isomorphic-dompurify": "3.13.0",
     "leaflet": "1.9.4",
     "marked": "16.1.1",
     "nuxt": "^4.2.1",
