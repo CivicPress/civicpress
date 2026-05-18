@@ -388,9 +388,11 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | Status | Count | Notes |
 |---|---|---|
 | `open` | 173 | (default; not listed below) |
-| `triaged-phase-2b` | 3 | site-002, ui-005, cli-001 (6 of original 9 closed in 2b Tasks 1+4+5) |
+| `triaged-phase-2b` | 0 | (all 9 cluster findings closed during Phase 2b) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 23 | 2a Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) + Task 9 (1) + 2b Task 1 (3) + 2b Task 4 (2) + 2b Task 5 (1) |
+| `closed-with-commit-SHA` | 25 | 2a (17) + 2b Task 1 (3) + 2b Task 4 (2) + 2b Task 5 (1) + 2b Tasks 8-11 (2: ui-005, cli-001) |
+| `wontfix-by-phase-strategy` | 1 | site-002 (Phase 5) |
+| `superseded-by-deletion` | 1 | broadcast-box-004 (verified absent) |
 | `wontfix-pending-phase-X` | 5 | Phase 2a deferrals (Task 10): broadcast-box-002/007, BB-HW-001/3, ui-002 |
 | **TOTAL** | **205** | |
 
@@ -422,19 +424,23 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | site-001 | `closed-with-commit-SHA` | 2026-05-18 | civicpress-site repo commit `e7ee413` (local only — pending maintainer push). i18n hero copy in `en.json` + `fr.json` softened: "first stable foundation" → "first working alpha"; mentions the post-audit refactor. The site is now mirror-honest with the monorepo's alpha status. |
 | site-003 | `closed-with-commit-SHA` | 2026-05-18 | civicpress-site repo commit `e7ee413` (local only). 6 docs corrected to say `@nuxt/ui` (free + OSS, what the site ships on) instead of `@nuxt/ui-pro`: README.md, .cursor/rules.md, agent/conventions.md, agent/tools/quick-guide.md, agent/memory/decisions.md, agent/memory/project-state.md. |
 | BB-HW-008 | `closed-with-commit-SHA` | 2026-05-18 | civicpress-broadcast-box repo commit `6c881db` (local only — repo has no remote yet, workspace-003). Deleted `docs/engineering-analysis.md` (765 lines self-grading "Top 0.1% Senior Engineer / 95% production-ready" while 20+ action items unchecked); added `docs/engineering-analysis-pending.md` pointing at Phase 4 of refactor master plan for honest assessment. |
+| ui-005 | `closed-with-commit-SHA` | 2026-05-18 | Phase 2b Tasks 8 (`b58cd27` — RecordForm/GeographyForm/UserForm, 24 cases) + 9 (`10997e3` — RecordList/RecordSearch/RecordPreview/StatusTransitionControls, 23 cases). 47 component test cases pinning the 7 civic-critical UI surfaces. `data-test` hooks added to the 4 viewing components. Full ≥25-component coverage rolls to Phase 2d structural hardening. |
+| cli-001 | `closed-with-commit-SHA` | 2026-05-18 | Phase 2b Tasks 10 (`5d9587d` — init/create/list/publish/validate, 34 cases incl. 3 .skip-with-TODO) + 11 (`08ed68a` — history/search/status/users/login, 37 cases). 71 CLI test cases pinning command registration, options, positional args. Surfaced real bugs: `publish.ts` doesn't exist (folded into status command); `status.ts` hardcodes valid statuses without 'published' while `init.ts` seeds it. Bugs tracked for Phase 2c, not fixed in scope. Full 28-command coverage rolls to Phase 2d. |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
 
-### Triaged for Phase 2b (2026-05-17)
+### Phase 2b closures (2026-05-18)
 
-Per the Phase 2b plan (`docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md`), these 9 findings are in-scope for the in-progress Phase 2b — Truth Restoration. Each will close with a commit SHA (or `wontfix-by-phase-strategy` for site-002) during the phase.
+All 9 Phase-2b-triaged findings are now closed (see Closed findings table above for SHAs):
 
-| ID | Status | Phase 2b task | Rationale |
-|---|---|---|---|
-| site-002 | `triaged-phase-2b` | Task 4 | Will close as `wontfix-by-phase-strategy` — broadcast-box absence on site is intentional per §9.3; reopens in Phase 5. |
-| ui-005 | `triaged-phase-2b` | Tasks 8 + 9 | Tier 1 (forms) + Tier 2 (record viewing) real component tests; full 25+ component coverage rolls to Phase 2d. |
-| cli-001 | `triaged-phase-2b` | Tasks 10 + 11 | Tier 1 (lifecycle) + Tier 2 (operational) real CLI tests; full 28-command coverage rolls to Phase 2d. |
+- `legal-register-001`, `legal-register-006`, `notifications-007` → closed in Task 1 (`ae5df26`)
+- `site-001`, `site-003` → closed in Task 4 (cross-repo SHA `e7ee413` on civicpress-site main)
+- `BB-HW-008` → closed in Task 5 (cross-repo SHA `6c881db` on civicpress-broadcast-box main)
+- `ui-005` → closed in Tasks 8 + 9 (`b58cd27`, `10997e3`)
+- `cli-001` → closed in Tasks 10 + 11 (`5d9587d`, `08ed68a`)
+- `site-002` → `wontfix-by-phase-strategy` (Phase 5)
+- `broadcast-box-004` → `superseded-by-deletion` (file no longer exists)
 
 ### Deferrals (Phase 2a Task 10 — closed 2026-05-17)
 
