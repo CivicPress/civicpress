@@ -387,14 +387,16 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 173 | (default; not listed below) |
+| `open` | 154 | (default; not listed below) |
 | `triaged-phase-2b` | 0 | (all 9 cluster findings closed during Phase 2b) |
+| `triaged-phase-2c` | 13 | Phase 2c Foundation Cleanup in-scope: core-001/4/5/6/10/13, api-008, storage-003/4/9, notifications-005/6/13 |
+| `triaged-phase-2c-for-recon-close` | 3 | realtime-007/8 + notifications-008 (closed in Phase 2c Task 2 by recon; files absent OR audit was stale) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
 | `closed-with-commit-SHA` | 25 | 2a (17) + 2b Task 1 (3) + 2b Task 4 (2) + 2b Task 5 (1) + 2b Tasks 8-11 (2: ui-005, cli-001) |
 | `wontfix-by-phase-strategy` | 1 | site-002 (Phase 5) |
 | `superseded-by-deletion` | 1 | broadcast-box-004 (verified absent) |
-| `wontfix-pending-phase-X` | 5 | Phase 2a deferrals (Task 10): broadcast-box-002/007, BB-HW-001/3, ui-002 |
-| **TOTAL** | **205** | |
+| `wontfix-pending-phase-X` | 7 | Phase 2a deferrals (5: broadcast-box-002/007, BB-HW-001/3, ui-002) + Phase 2c deferrals (2: broadcast-box-003 → Phase 4/5, broadcast-box-013 → Phase 5) |
+| **TOTAL** | **205** | (154 implicit-open + 51 tracked rows) — original snapshot's `open: 173` was 1-off; corrected here. |
 
 ### Closed findings
 
@@ -441,6 +443,39 @@ All 9 Phase-2b-triaged findings are now closed (see Closed findings table above 
 - `cli-001` → closed in Tasks 10 + 11 (`5d9587d`, `08ed68a`)
 - `site-002` → `wontfix-by-phase-strategy` (Phase 5)
 - `broadcast-box-004` → `superseded-by-deletion` (file no longer exists)
+
+### Phase 2c triage (2026-05-18)
+
+Phase 2c (Foundation Cleanup) starts. Branch: `refactor/phase-2c-foundation-cleanup` off `dev`'s post-Phase-2b tip (`35846c2`). Master plan §5 Phase 2c scope + 8 surfaced-by-Phase-2b items + CI integration. Plan: `docs/plans/2026-05-18-base-refactor-phase-2c-foundation-cleanup.md`.
+
+**13 findings marked `triaged-phase-2c`** (Foundation Cleanup in-scope, code commits expected):
+
+- **Orphaned subsystems** (Task 3 + Task 4 + Task 5 + Task 6 + Task 7): `core-004`, `core-005`, `core-006`, `api-008`, `storage-003`, `storage-004`, `storage-009`, `notifications-005`, `notifications-006`, `notifications-013`
+- **Exit-criteria items** (Task 8 + Task 9): `core-010` (notifications split), `core-001` + `core-013` (audit-trail unification)
+
+**3 findings marked `triaged-phase-2c-for-recon-close`** (close in Task 2 by recon — no code commit):
+
+- `realtime-007` — `generateParticipantColor` lives in `realtime-server.ts` which is NOT on `dev` (file is on the paused `broadcast-box` branch; Phase 3 reintroduces realtime). Will be marked `wontfix-pending-phase-3` in Task 2.
+- `realtime-008` — same rationale; `useRealtimeEditor.ts` not on `dev`.
+- `notifications-008` — recon 2026-05-18 confirmed `NotificationQueue` is actually wired (`notification-service.ts:23` instantiates it). Audit finding was stale. Will be marked `closed-by-recon-no-commit` in Task 2.
+
+**2 findings deferred to later phases** (moved from `open` to `wontfix-pending-phase-X`):
+
+- `broadcast-box-003` (`protocol-adapter.ts` dead) → `wontfix-pending-phase-4` per master plan §5 (defer to hardware-repo + reintroduction work).
+- `broadcast-box-013` (`command-handlers.ts` orphaned) → `wontfix-pending-phase-5` per master plan §5 (whole broadcast-box module is paused).
+
+**Follow-up notes (no triage row):**
+
+- `cli-001` (already `closed-with-commit-SHA` from Phase 2b) — Phase 2c Task 10 will delete the 16 legacy `tests/cli/*.test.ts` placeholder files and the `runCivicCommand` stub at `tests/utils/cli-test-utils.ts:145-156`. Phase 2c Task 11 will wire `civic publish` CLI + fix the `status.ts` valid-status list inconsistency. These are post-closure cleanup, not a re-open.
+- `api-004` already shows `closed-with-commit-SHA | 2026-05-17` (Phase 2a). No further action in Phase 2c; verified at registry-read time.
+
+**Surfaced-by-Phase-2b items tracked in Phase 2c** (no existing finding ID; closure rows added during execution):
+
+- `email-validation-regression` (Task 12) — expired-token rejection regression revealed by Phase 2b stale-artifact purge.
+- `docs-overclaim-architecture` (Task 14) — `docs/architecture-comprehensive-analysis.md` (1286 lines) self-grade cleanup.
+- `docs-overclaim-5` (Task 15) — remaining 5 docs allow-listed under `# ---- PHASE 2C TODO ----`.
+- `ci-truth-check` (Task 16) — `.github/workflows/truth-check.yml` creation.
+- `ui-record-form-emit`, `ui-geography-form-nullguard` (Task 13) — minor UI fixes.
 
 ### Deferrals (Phase 2a Task 10 — closed 2026-05-17)
 
