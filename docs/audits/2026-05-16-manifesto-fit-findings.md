@@ -388,9 +388,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | Status | Count | Notes |
 |---|---|---|
 | `open` | 173 | (default; not listed below) |
-| `triaged-phase-2b` | 6 | site-001/2/3, BB-HW-008, ui-005, cli-001 (3 of original 9 closed in 2b Task 1) |
+| `triaged-phase-2b` | 4 | site-002, BB-HW-008, ui-005, cli-001 (5 of original 9 closed in 2b Tasks 1+4) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 20 | 2a Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) + Task 9 (1) + 2b Task 1 (3) |
+| `closed-with-commit-SHA` | 22 | 2a Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) + Task 9 (1) + 2b Task 1 (3) + 2b Task 4 (2) |
 | `wontfix-pending-phase-X` | 5 | Phase 2a deferrals (Task 10): broadcast-box-002/007, BB-HW-001/3, ui-002 |
 | **TOTAL** | **205** | |
 
@@ -419,6 +419,8 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | legal-register-001 | `closed-with-commit-SHA` | 2026-05-18 | `docs/specs/legal-register.md` rewritten in Phase 2b Task 1: frontmatter demoted to `status: planned, version: 0.3.x-scope`; new "Current implementation" section documents the 210-line schema-only reality at `core/src/records/record-schema-builder.ts:219-236`. Triage rationale: `docs/audits/spec-stability-triage.md`. Real module build sequenced post-Phase-2d per master plan §9.4. |
 | legal-register-006 | `closed-with-commit-SHA` | 2026-05-18 | Closed alongside legal-register-001 — the empty `modules/legal-register/package.json` scaffold is now correctly framed by the spec's planned status (no longer claimed as a stable module). Real package metadata revisit happens when the module gets built. |
 | notifications-007 | `closed-with-commit-SHA` | 2026-05-18 | `docs/specs/notifications.md` frontmatter demoted to `status: partial, version: 0.2.x`. Implementation now honest after Phase 2a Tasks 6-8 (notifications-001/2/3); email channel works, SMS/Slack/webhooks/queue absent. Spec body retained as the target shape; frontmatter status is the truth signal. |
+| site-001 | `closed-with-commit-SHA` | 2026-05-18 | civicpress-site repo commit `e7ee413` (local only — pending maintainer push). i18n hero copy in `en.json` + `fr.json` softened: "first stable foundation" → "first working alpha"; mentions the post-audit refactor. The site is now mirror-honest with the monorepo's alpha status. |
+| site-003 | `closed-with-commit-SHA` | 2026-05-18 | civicpress-site repo commit `e7ee413` (local only). 6 docs corrected to say `@nuxt/ui` (free + OSS, what the site ships on) instead of `@nuxt/ui-pro`: README.md, .cursor/rules.md, agent/conventions.md, agent/tools/quick-guide.md, agent/memory/decisions.md, agent/memory/project-state.md. |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
@@ -429,9 +431,7 @@ Per the Phase 2b plan (`docs/plans/2026-05-17-base-refactor-phase-2b-truth-resto
 
 | ID | Status | Phase 2b task | Rationale |
 |---|---|---|---|
-| site-001 | `triaged-phase-2b` | Task 4 (civicpress-site repo) | en.json + fr.json overclaim fixes; push to site origin. |
 | site-002 | `triaged-phase-2b` | Task 4 | Will close as `wontfix-by-phase-strategy` — broadcast-box absence on site is intentional per §9.3; reopens in Phase 5. |
-| site-003 | `triaged-phase-2b` | Task 4 | `@nuxt/ui-pro` → `@nuxt/ui` doc fix in site repo. |
 | BB-HW-008 | `triaged-phase-2b` | Task 5 (civicpress-broadcast-box repo) | engineering-analysis.md self-grade fix (delete or honestly rewrite); local-only commit. |
 | ui-005 | `triaged-phase-2b` | Tasks 8 + 9 | Tier 1 (forms) + Tier 2 (record viewing) real component tests; full 25+ component coverage rolls to Phase 2d. |
 | cli-001 | `triaged-phase-2b` | Tasks 10 + 11 | Tier 1 (lifecycle) + Tier 2 (operational) real CLI tests; full 28-command coverage rolls to Phase 2d. |
