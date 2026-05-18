@@ -390,12 +390,13 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | `open` | 154 | (default; not listed below) |
 | `triaged-phase-2b` | 0 | (all 9 cluster findings closed during Phase 2b) |
 | `triaged-phase-2c` | 13 | Phase 2c Foundation Cleanup in-scope: core-001/4/5/6/10/13, api-008, storage-003/4/9, notifications-005/6/13 |
-| `triaged-phase-2c-for-recon-close` | 3 | realtime-007/8 + notifications-008 (closed in Phase 2c Task 2 by recon; files absent OR audit was stale) |
+| `triaged-phase-2c-for-recon-close` | 0 | (all 3 closed in Phase 2c Task 2 — see closed-by-recon-no-commit + wontfix-pending-phase-X rows) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
+| `closed-by-recon-no-commit` | 1 | notifications-008 — recon confirmed the NotificationQueue is actually wired; audit finding was stale (Phase 2c Task 2) |
 | `closed-with-commit-SHA` | 25 | 2a (17) + 2b Task 1 (3) + 2b Task 4 (2) + 2b Task 5 (1) + 2b Tasks 8-11 (2: ui-005, cli-001) |
 | `wontfix-by-phase-strategy` | 1 | site-002 (Phase 5) |
 | `superseded-by-deletion` | 1 | broadcast-box-004 (verified absent) |
-| `wontfix-pending-phase-X` | 7 | Phase 2a deferrals (5: broadcast-box-002/007, BB-HW-001/3, ui-002) + Phase 2c deferrals (2: broadcast-box-003 → Phase 4/5, broadcast-box-013 → Phase 5) |
+| `wontfix-pending-phase-X` | 9 | Phase 2a deferrals (5: broadcast-box-002/007, BB-HW-001/3, ui-002) + Phase 2c deferrals (4: broadcast-box-003 → Phase 4/5, broadcast-box-013 → Phase 5, realtime-007/008 → Phase 3) |
 | **TOTAL** | **205** | (154 implicit-open + 51 tracked rows) — original snapshot's `open: 173` was 1-off; corrected here. |
 
 ### Closed findings
@@ -428,6 +429,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | BB-HW-008 | `closed-with-commit-SHA` | 2026-05-18 | civicpress-broadcast-box repo commit `6c881db` (local only — repo has no remote yet, workspace-003). Deleted `docs/engineering-analysis.md` (765 lines self-grading "Top 0.1% Senior Engineer / 95% production-ready" while 20+ action items unchecked); added `docs/engineering-analysis-pending.md` pointing at Phase 4 of refactor master plan for honest assessment. |
 | ui-005 | `closed-with-commit-SHA` | 2026-05-18 | Phase 2b Tasks 8 (`b58cd27` — RecordForm/GeographyForm/UserForm, 24 cases) + 9 (`10997e3` — RecordList/RecordSearch/RecordPreview/StatusTransitionControls, 23 cases). 47 component test cases pinning the 7 civic-critical UI surfaces. `data-test` hooks added to the 4 viewing components. Full ≥25-component coverage rolls to Phase 2d structural hardening. |
 | cli-001 | `closed-with-commit-SHA` | 2026-05-18 | Phase 2b Tasks 10 (`5d9587d` — init/create/list/publish/validate, 34 cases incl. 3 .skip-with-TODO) + 11 (`08ed68a` — history/search/status/users/login, 37 cases). 71 CLI test cases pinning command registration, options, positional args. Surfaced real bugs: `publish.ts` doesn't exist (folded into status command); `status.ts` hardcodes valid statuses without 'published' while `init.ts` seeds it. Bugs tracked for Phase 2c, not fixed in scope. Full 28-command coverage rolls to Phase 2d. |
+| realtime-007 | `wontfix-pending-phase-3` | 2026-05-18 | Phase 2c Task 2 recon: `modules/realtime/src/realtime-server.ts` does not exist on `dev` (only compiled `.d.ts` artefacts remain). The file lives on the paused `broadcast-box` branch; per master plan §5/§9 Phase 3 reintroduces realtime "Yjs-only, no broadcast-box code." `generateParticipantColor()` and `PARTICIPANT_COLORS` get cleaned up as part of Phase 3 realtime reintroduction. No commit on Phase 2c branch (registry-only). |
+| realtime-008 | `wontfix-pending-phase-3` | 2026-05-18 | Phase 2c Task 2 recon: `modules/ui/app/composables/useRealtimeEditor.ts` does not exist on `dev`. Same rationale as realtime-007 — addressed during Phase 3 realtime reintroduction. `MAX_RECONNECT_ATTEMPTS` + `RECONNECT_DELAYS` cleanup deferred. |
+| notifications-008 | `closed-by-recon-no-commit` | 2026-05-18 | Phase 2c Task 2 recon: the audit finding said `NotificationQueue` was orphaned. Verification: `core/src/notifications/notification-service.ts:46` instantiates it (`this.queue = new NotificationQueue();`). Audit was stale — the queue IS wired into the production notification path. No code change required; registry-only closure. |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
