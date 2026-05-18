@@ -1,7 +1,10 @@
 /**
  * Orphaned File Cleaner
  *
- * Identifies and cleans up orphaned files (in storage but not in DB, or vice versa)
+ * Cleans orphans from any source (failed uploads, partial deletes, etc.).
+ * Originally also compensated for `LifecycleManager.archiveFile`, which was
+ * a DB-only no-op (deleted in Phase 2c storage-003 closure). The cleaner
+ * remains because other orphan sources still exist.
  */
 
 import { Logger } from '@civicpress/core';

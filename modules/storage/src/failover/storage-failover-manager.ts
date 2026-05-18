@@ -30,16 +30,22 @@ export class StorageFailoverManager {
     { healthy: boolean; lastFailure?: Date }
   > = new Map();
   private recoveryCheckInterval?: NodeJS.Timeout;
+  // Per-provider lightweight probe (same shape as StorageHealthChecker's
+  // checkOperations Map). Optional: when absent the recovery check is a
+  // no-op and we wait for the next operation attempt to re-prove health.
+  private recoveryProbes: Map<string, (provider: string) => Promise<void>>;
 
   constructor(
     retryManager: RetryManager,
     config: StorageConfig,
-    logger?: Logger
+    logger?: Logger,
+    recoveryProbes?: Map<string, (provider: string) => Promise<void>>
   ) {
     this.logger = logger || new Logger();
     this.retryManager = retryManager;
     this.config = config;
     this.currentProvider = config.active_provider || 'local';
+    this.recoveryProbes = recoveryProbes || new Map();
 
     // Initialize failover config
     this.failoverConfig = {
@@ -219,20 +225,61 @@ export class StorageFailoverManager {
   }
 
   /**
-   * Check if unhealthy providers have recovered
+   * Check if unhealthy providers have recovered.
+   *
+   * Phase 2c (storage-004 closure): this used to be a no-op debug log. It
+   * now actually invokes the per-provider recovery probe (the same
+   * cheap-read primitive `StorageHealthChecker` uses). On probe success
+   * the provider is marked healthy and re-enters the failover rotation;
+   * on failure the unhealthy state is preserved with `lastFailure` reset
+   * so the next interval re-tries.
    */
   private async checkProviderRecovery(): Promise<void> {
     for (const [provider, health] of this.providerHealth.entries()) {
       if (!health.healthy && health.lastFailure) {
         // Check if enough time has passed since last failure
         const timeSinceFailure = Date.now() - health.lastFailure.getTime();
-        if (timeSinceFailure >= this.failoverConfig.recoveryCheckInterval) {
-          // Try a simple health check operation
-          // For now, we'll just mark it as potentially recoverable
-          // Actual health check will happen on next operation attempt
-          this.logger.debug(`Checking recovery for provider: ${provider}`);
+        if (timeSinceFailure < this.failoverConfig.recoveryCheckInterval) {
+          continue;
         }
+
+        await this.probeProviderRecovery(provider);
       }
+    }
+  }
+
+  /**
+   * Probe a single unhealthy provider. If no recovery probe is registered
+   * for it, leave it unhealthy (the next real operation attempt will
+   * re-prove health on its own).
+   */
+  private async probeProviderRecovery(provider: string): Promise<boolean> {
+    const probe = this.recoveryProbes.get(provider);
+    if (!probe) {
+      this.logger.debug(
+        `No recovery probe registered for provider '${provider}'; waiting for next operation`
+      );
+      return false;
+    }
+
+    try {
+      await probe(provider);
+      this.markProviderHealthy(provider);
+      return true;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      // Refresh lastFailure so the next interval retries after the
+      // configured window rather than firing every tick.
+      this.providerHealth.set(provider, {
+        healthy: false,
+        lastFailure: new Date(),
+      });
+      this.logger.debug(
+        `Provider '${provider}' still unhealthy after recovery probe`,
+        { provider, error: errorMessage }
+      );
+      return false;
     }
   }
 
