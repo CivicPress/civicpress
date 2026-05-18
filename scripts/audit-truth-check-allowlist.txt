@@ -1,0 +1,59 @@
+# Files where overclaim patterns are EXPECTED (historical record, audit
+# reports describing the overclaim, changelog of past releases, etc.).
+# One path or directory per line. Trailing slash means "everything under".
+# Lines starting with # or blank are ignored.
+
+# Audit reports themselves quote the overclaims they flag.
+docs/audits/
+
+# Refactor plans reference the overclaim language they're closing.
+docs/plans/2026-05-16-civicpress-audit-plan.md
+docs/plans/2026-05-17-civicpress-audit-synthesis-plan.md
+docs/plans/2026-05-17-base-refactor-master-plan.md
+docs/plans/2026-05-17-base-refactor-phase-2a-bleed-stop.md
+docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md
+docs/plans/finding-tracking-convention.md
+
+# Historical changelog records past versions' marketing language.
+CHANGELOG.md
+docs/CHANGELOG.md
+
+# Agent-internal context (AI assistant memory, similar to .claude/).
+# Not user-facing. Periodic review owner is the maintainer who uses
+# those tools.
+agent/
+
+# Generated / vendor / build trees.
+node_modules/
+.git/
+.pnpm-store/
+core/dist/
+modules/api/dist/
+modules/ui/.nuxt/
+modules/ui/.output/
+modules/storage/dist/
+modules/serve/dist/
+modules/notifications/dist/
+modules/legal-register/dist/
+modules/realtime/dist/
+modules/broadcast-box/dist/
+cli/dist/
+
+# This script + its allow-list naturally mention the patterns.
+scripts/audit-truth-check.sh
+scripts/audit-truth-check-allowlist.txt
+
+# ---- PHASE 2C TODO ----
+# The files below contain audit-pattern overclaim language that Phase 2b
+# Task 2/3 didn't cover (those tasks were scoped to project-status.md
+# and roadmap.md per master plan §5). They're allow-listed here so the
+# recurring truth-check gate can pass immediately while preserving the
+# work for Phase 2c (Foundation Cleanup) to triage. Each entry is its
+# own to-be-revisited file — do NOT remove without enacting the fix.
+docs/architecture-comprehensive-analysis.md
+docs/file-attachment-system.md
+docs/schema-validation-refinement-analysis.md
+docs/specs/sort-api-spec-analysis.md
+docs/specs/storage.md
+docs/todo.md
+# ---- END PHASE 2C TODO ----

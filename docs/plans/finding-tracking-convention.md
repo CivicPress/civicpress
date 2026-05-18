@@ -64,3 +64,16 @@ This rule exists because the Jan-2025 `docs/broadcast-box/CLEANUP-AND-TEST-AUDIT
 A future audit can append a new findings file (e.g., `docs/audits/2026-09-XX-manifesto-fit-followup-findings.md`) without disturbing this one. The tracker grows to cover all open audit registries.
 
 If the same finding recurs (a regression), open a fresh row in the new registry referencing the closed-prior one (`superseded-by-<new-id>` on the old, `regression-of-<old-id>` note on the new).
+
+## Recurring truth-check
+
+Run `make audit-truth-check` before closing any sub-phase. The gate scans the working tree for documented overclaim patterns ("production-ready", "100% Functional", "Top 0.1%", "stable v1.0", "All goals completed", etc.) and exits non-zero if any are found outside the allow-list.
+
+- Pattern list: `scripts/audit-truth-check.sh` (`PATTERNS` array)
+- Allow-list: `scripts/audit-truth-check-allowlist.txt`
+
+The allow-list explicitly permits historical / audit-quoting files (audit reports, refactor plans, changelogs) and agent-internal context (`agent/`). It also carries a `# ---- PHASE 2C TODO ----` section listing files with overclaim language deferred to Phase 2c Foundation Cleanup; do NOT remove those entries without enacting the fix.
+
+CI integration is deferred to Phase 2c or Phase 2d (whichever lands first); until then, the gate is invoked manually before each sub-phase closure commit.
+
+This script was added in Phase 2b Task 6 (2026-05-17). See `docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md` Task 6.
