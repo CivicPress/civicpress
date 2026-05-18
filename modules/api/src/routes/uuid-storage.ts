@@ -806,9 +806,14 @@ router.put(
 );
 
 // GET /api/v1/storage/folders/:folder/files - List files in folder
+// storage-002 (Critical) — public-folder bypass applied here, matching
+// the pattern already used for GET /files/:id and GET /files/:id/info.
+// Previously this route required `storage:download` unconditionally,
+// so citizens could not enumerate files in folders configured as
+// access: 'public'. Auth is now done inside the handler so the
+// folder's access mode can be consulted first.
 router.get(
   '/folders/:folder/files',
-  requireStoragePermission('download'),
   param('folder').isString().notEmpty(),
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
@@ -834,6 +839,67 @@ router.get(
       const limit = parseInt(req.query.limit as string) || 50;
       const search = req.query.search as string;
       const type = req.query.type as string;
+
+      // Determine folder's access mode (same pattern as
+      // GET /files/:id and GET /files/:id/info).
+      const configManager = getStorageConfigManager(req);
+      let config;
+      try {
+        config = await configManager.loadConfig();
+      } catch (configError: any) {
+        if (
+          configError?.message?.includes('not found') ||
+          configError?.message?.includes('Storage configuration not found')
+        ) {
+          config = configManager.getDefaultConfig();
+        } else {
+          throw configError;
+        }
+      }
+      const folderConfig = config.folders?.[folderName];
+      if (!folderConfig) {
+        res.status(404).json({
+          success: false,
+          error: {
+            message: `Storage folder '${folderName}' not found`,
+            code: 'FOLDER_NOT_FOUND',
+          },
+        });
+        return;
+      }
+      const folderAccess = folderConfig.access ?? 'private';
+      const isPublicFolder = folderAccess === 'public';
+
+      if (!req.user) {
+        if (!isPublicFolder) {
+          res.status(401).json({
+            success: false,
+            error: {
+              message: 'Authentication required',
+              code: 'UNAUTHENTICATED',
+            },
+          });
+          return;
+        }
+      } else if (!isPublicFolder) {
+        const hasPermission = await userCan(req.user, 'storage:download', {
+          action: 'download',
+          folder: folderName,
+        } as any);
+
+        if (!hasPermission) {
+          res.status(403).json({
+            success: false,
+            error: {
+              message:
+                'Permission denied: Cannot list files in non-public folder',
+              code: 'INSUFFICIENT_PERMISSIONS',
+              required: 'storage:download',
+            },
+          });
+          return;
+        }
+      }
 
       const files = await storageService.listFiles(folderName);
 

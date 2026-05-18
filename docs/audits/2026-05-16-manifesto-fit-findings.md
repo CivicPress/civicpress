@@ -387,9 +387,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 193 | (default; not listed below) |
+| `open` | 191 | (default; not listed below) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 11 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) |
+| `closed-with-commit-SHA` | 13 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) |
 | `wontfix-pending-phase-X` | 0 | populated as Phase 2a defers in-scope items |
 | **TOTAL** | **205** | |
 
@@ -409,6 +409,8 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | api-004 | `closed-with-commit-SHA` | 2026-05-17 | 4 stub routers (`workflows.ts`, `hooks.ts`, `export.ts`, `import.ts`) — previously returned fake `200 OK` with hardcoded payloads while looking live to callers — now return `501 Not Implemented` with a structured body (`error`, `code`, `message`, `retry_after_milestone`). Workflows/hooks point at v0.4.x; export/import point at v0.5.x. Import also documents the civicpress-ingest workaround. Auth gates retained so the surface stays bounded. OpenAPI spec for `/api/v1/workflows` updated to document 501. |
 | ui-001 | `closed-with-commit-SHA` | 2026-05-17 | `useMarkdown.ts:140-ish` now sanitizes `marked.parse()` output via `isomorphic-dompurify` before returning (and before calling any `onTransformHtml` callback). Closes the XSS-via-published-record vector that could steal JWT/CSRF tokens from `localStorage` for any citizen viewing a malicious record. Both v-html sinks (`RecordPreview.vue:33` and `pages/records/[type]/[id]/index.vue:675`) go through this composable. 8 unit tests added at `modules/ui/app/composables/__tests__/useMarkdown.test.ts` covering script tags, iframes, on* handlers, javascript: URIs, data: URIs, object/embed tags, and preservation of safe markdown + the empty-line marker. **First real unit tests for the UI module.** Required adding `modules/ui/app/**/__tests__/**/*.{test,spec}.ts` to `vitest.config.mjs` `include` and fixing a duplicate `fileParallelism` key in that same config (small "make truth true" bonus). |
 | ui-003 | `closed-with-commit-SHA` (partial) | 2026-05-17 | `app.vue` template now includes a `<noscript>` block telling JS-disabled visitors what CivicPress is, where records live (`data/records/` Markdown), and how to read them without the SPA. Full SSR/prerender for the public read paths still deferred to Phase 2d as planned — this is the partial fix the master plan called out. |
+| storage-001 | `closed-with-commit-SHA` | 2026-05-17 | `cloud-uuid-storage-service.ts` now calls `quotaManager.checkQuota(folder, fileSize)` before accepting both the non-streaming and streaming upload paths. Previously `QuotaManager.checkQuota` was implemented + unit-tested but never called from any production code path; configured quotas were not enforced. Streaming path checks against the declared `request.size` if provided; if size is unknown the path logs a warning and proceeds (alternative — buffering to count bytes — defeats streaming). |
+| storage-002 | `closed-with-commit-SHA` | 2026-05-17 | `routes/uuid-storage.ts` `GET /folders/:folder/files` no longer requires `storage:download` unconditionally. The handler now loads the folder's `access` config; if `'public'`, unauthenticated callers can list (matching the existing pattern on `GET /files/:id` and `GET /files/:id/info`). For non-public folders, `req.user` is required and `userCan(...)` is checked. Also handles missing-folder gracefully with a 404 instead of empty list (small UX win against silent probing). |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
