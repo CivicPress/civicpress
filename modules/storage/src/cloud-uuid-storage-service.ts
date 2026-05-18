@@ -740,6 +740,16 @@ export class CloudUuidStorageService {
         };
       }
 
+      // storage-001 (Critical) — enforce quota BEFORE accepting the
+      // upload. Previously QuotaManager.checkQuota was wired up but
+      // never called from any upload path, so configured quotas were
+      // never enforced. checkQuota throws QuotaExceededError on
+      // rejection (caught by the outer try/catch and returned as
+      // { success: false, error: ... } to the caller).
+      if (this.quotaManager && this.quotaManager.isEnabled()) {
+        await this.quotaManager.checkQuota(request.folder, fileData.size);
+      }
+
       // Generate UUID and filename
       const fileId = uuidv4();
       const storedFilename = this.generateStoredFilename(fileData, fileId);
@@ -2183,6 +2193,25 @@ export class CloudUuidStorageService {
           success: false,
           error: `Storage folder '${request.folder}' not found`,
         };
+      }
+
+      // storage-001 (Critical) — enforce quota BEFORE streaming. The
+      // streaming path only knows the actual size after the stream
+      // finishes, but if the caller declared `request.size` upfront
+      // (which clients typically do via Content-Length), enforce the
+      // quota against that declared size. If size is unknown, log a
+      // warning and proceed (the alternative — buffering the stream
+      // to count bytes — defeats the purpose of streaming and is
+      // worse than the current state).
+      if (this.quotaManager && this.quotaManager.isEnabled()) {
+        if (typeof request.size === 'number' && request.size > 0) {
+          await this.quotaManager.checkQuota(request.folder, request.size);
+        } else {
+          this.logger.warn(
+            'Stream upload received with unknown size; quota cannot be enforced upfront. Folder: ' +
+              request.folder
+          );
+        }
       }
 
       // Get stream threshold from config or default

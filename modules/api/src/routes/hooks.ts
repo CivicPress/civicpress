@@ -1,26 +1,28 @@
 import { Router, Response } from 'express';
 import { param } from 'express-validator';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
-import { sendSuccess, logApiRequest } from '../utils/api-logger.js';
+import { logApiRequest } from '../utils/api-logger.js';
 
 export const hooksRouter = Router();
+
+// api-004 (Critical) — was returning fake 200 OK while looking live to
+// callers. Now returns 501 Not Implemented with a clear message and
+// planned milestone. Auth gates retained so the surface stays bounded.
+const NOT_IMPLEMENTED = {
+  error: 'not_implemented',
+  code: 'NOT_IMPLEMENTED',
+  message:
+    'Hook management is planned for v0.4.x. See docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
+  retry_after_milestone: 'v0.4.x',
+};
 
 // GET /api/v1/hooks - List all hooks
 hooksRouter.get(
   '/',
   requirePermission('hooks:view'),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'list_hooks' });
-
-    sendSuccess(
-      {
-        hooks: [],
-        total: 0,
-      },
-      req,
-      res,
-      { operation: 'list_hooks' }
-    );
+    logApiRequest(req, { operation: 'list_hooks', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -30,19 +32,8 @@ hooksRouter.get(
   requirePermission('hooks:view'),
   param('id').isString().notEmpty(),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'get_hook' });
-
-    const { id } = req.params;
-    sendSuccess(
-      {
-        id,
-        name: 'Sample Hook',
-        event: 'record:created',
-      },
-      req,
-      res,
-      { operation: 'get_hook' }
-    );
+    logApiRequest(req, { operation: 'get_hook', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -51,19 +42,8 @@ hooksRouter.post(
   '/',
   requirePermission('hooks:manage'),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'create_hook' });
-
-    sendSuccess(
-      {
-        message: 'Hook created successfully',
-      },
-      req,
-      res,
-      {
-        operation: 'create_hook',
-        statusCode: 201,
-      }
-    );
+    logApiRequest(req, { operation: 'create_hook', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -73,17 +53,8 @@ hooksRouter.put(
   requirePermission('hooks:manage'),
   param('id').isString().notEmpty(),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'update_hook' });
-
-    const { id } = req.params;
-    sendSuccess(
-      {
-        message: `Hook ${id} updated successfully`,
-      },
-      req,
-      res,
-      { operation: 'update_hook' }
-    );
+    logApiRequest(req, { operation: 'update_hook', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -93,16 +64,7 @@ hooksRouter.delete(
   requirePermission('hooks:manage'),
   param('id').isString().notEmpty(),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'delete_hook' });
-
-    const { id } = req.params;
-    sendSuccess(
-      {
-        message: `Hook ${id} deleted successfully`,
-      },
-      req,
-      res,
-      { operation: 'delete_hook' }
-    );
+    logApiRequest(req, { operation: 'delete_hook', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );

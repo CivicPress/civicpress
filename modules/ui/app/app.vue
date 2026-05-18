@@ -138,6 +138,57 @@ onMounted(() => {
   <UApp>
     <NuxtLoadingIndicator />
 
+    <!--
+      ui-003 (partial fix) — CivicPress currently renders as a JS-only
+      SPA (ssr: false). Citizens without JavaScript get a blank shell.
+      This <noscript> fallback at least tells them what the site is
+      and how to read records directly. Full SSR / prerender for the
+      public read paths is planned for Phase 2d of the base refactor
+      (docs/plans/2026-05-17-base-refactor-master-plan.md).
+    -->
+    <noscript>
+      <div
+        style="
+          padding: 2rem;
+          max-width: 680px;
+          margin: 2rem auto;
+          font-family: system-ui, -apple-system, sans-serif;
+          line-height: 1.6;
+        "
+      >
+        <h1>CivicPress requires JavaScript</h1>
+        <p>
+          You're seeing this message because JavaScript is disabled or your
+          browser hasn't loaded it yet.
+        </p>
+        <p>
+          CivicPress stores civic records as plain Markdown so they remain
+          readable forever, with or without this web interface. In the
+          meantime:
+        </p>
+        <ul>
+          <li>
+            Records live as plain text in the project's
+            <code>data/records/</code> directory and can be read with any
+            text viewer.
+          </li>
+          <li>
+            Your municipality can provide raw record access via
+            <code>git</code>, file download, or printed export.
+          </li>
+          <li>
+            Track the no-JavaScript / server-rendered version on the
+            <a href="https://github.com/CivicPress/civicpress">project repository</a>.
+          </li>
+        </ul>
+        <p>
+          <strong>Public infrastructure must stay public.</strong> If you
+          can't reach civic records because of a software requirement,
+          that's a bug — please tell your municipality.
+        </p>
+      </div>
+    </noscript>
+
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>

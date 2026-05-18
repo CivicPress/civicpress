@@ -104,11 +104,47 @@ export class NotificationService {
         operation: 'notification:send',
       });
 
-      // Security checks
-      await this.security.validateRequest(request);
+      // notifications-002 (Critical) — inspect validateRequest's return.
+      // Previously the call was awaited but the result was discarded, so
+      // requests with too many channels, oversized payloads, or missing
+      // required fields proceeded anyway.
+      const validation = await this.security.validateRequest(request);
+      if (!validation.valid) {
+        await this.audit.logNotification({
+          id: notificationId,
+          action: 'notification_rejected',
+          details: {
+            reason: 'validation_failed',
+            errors: validation.errors,
+            warnings: validation.warnings,
+            template: request.template,
+            channels: request.channels,
+          },
+        });
+        throw new Error(
+          `Notification request invalid: ${validation.errors.join(', ')}`
+        );
+      }
 
-      // Rate limiting
-      await this.rateLimiter.checkRateLimit(request);
+      // notifications-002 (Critical) — same for rate limiting. Previously
+      // the rate limiter incremented its counter but never enforced it.
+      const rateLimit = await this.rateLimiter.checkRateLimit(request);
+      if (!rateLimit.allowed) {
+        await this.audit.logNotification({
+          id: notificationId,
+          action: 'notification_rejected',
+          details: {
+            reason: 'rate_limited',
+            resetTime: rateLimit.resetTime,
+            remaining: rateLimit.remaining,
+            template: request.template,
+            channels: request.channels,
+          },
+        });
+        throw new Error(
+          `Notification rate-limited. Retry after ${rateLimit.resetTime.toISOString()}.`
+        );
+      }
 
       // Get template
       const template = this.templates.get(request.template);
@@ -120,8 +156,14 @@ export class NotificationService {
       // Process template with data
       const processedContent = await template.process(request.data);
 
-      // Filter sensitive data
-      const sanitizedData = this.security.sanitizeContent(request.data);
+      // notifications-003 (Critical) — DO NOT sanitize PII out of the
+      // template variable bag before rendering. Previously a user's
+      // email used as a template variable became literal "[REDACTED]"
+      // in the sent message body. PII protection belongs at the audit
+      // log persistence path (where PII must not be stored), not at
+      // the rendering path (where it's the actual content the
+      // recipient needs to see).
+      const channelData = request.data;
 
       // Send to each channel
       const results = await Promise.allSettled(
@@ -129,7 +171,7 @@ export class NotificationService {
           this.sendToChannel(channelName, {
             ...request,
             content: processedContent,
-            data: sanitizedData,
+            data: channelData,
           })
         )
       );
@@ -149,13 +191,27 @@ export class NotificationService {
         }
       });
 
-      // Audit the notification
+      // notifications-001 (Critical) — audit log now reflects ACTUAL
+      // delivery. Previously success: true was hardcoded regardless of
+      // outcome, producing a structurally dishonest log (5,156 entries
+      // historically had 0 failures recorded; 89% had empty channels
+      // arrays). Now: success = (≥1 channel succeeded AND 0 failed);
+      // partial = (≥1 succeeded AND ≥1 failed). The audit row also
+      // carries failedChannels and per-channel errors for accountability.
+      const allSucceeded =
+        sentChannels.length > 0 && failedChannels.length === 0;
+      const partial = sentChannels.length > 0 && failedChannels.length > 0;
+
       await this.audit.logNotification({
         id: notificationId,
-        action: 'notification_sent',
+        action: allSucceeded ? 'notification_sent' : 'notification_partial_or_failed',
         details: {
           channels: sentChannels,
-          success: true,
+          failedChannels,
+          success: allSucceeded,
+          partial,
+          errors: errors.length > 0 ? errors : undefined,
+          template: request.template,
         },
       });
 

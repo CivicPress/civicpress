@@ -27,10 +27,9 @@ export default defineConfig({
         isolate: true,
       },
     },
-    // Also reduce how many test files run concurrently to prevent too many processes
-    fileParallelism: 1, // Reduced from 2 to prevent too many forks
-
-    // Also reduce how many test files run concurrently
+    // Limit concurrent test file processes to prevent CPU overload.
+    // (Single value; previous duplicate `fileParallelism: 1` + `: 2`
+    // produced a "Duplicate key" warning every test run.)
     fileParallelism: 2,
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
@@ -46,7 +45,9 @@ export default defineConfig({
       'cli/src/**/__tests__/**/*.test.ts',   // CLI unit tests
       'cli/src/**/__tests__/**/*.spec.ts',   // CLI unit tests (spec naming)
       'modules/api/src/**/__tests__/**/*.test.ts',  // API unit tests
-      'modules/api/src/**/__tests__/**/*.spec.ts'  // API unit tests (spec naming)
+      'modules/api/src/**/__tests__/**/*.spec.ts',  // API unit tests (spec naming)
+      'modules/ui/app/**/__tests__/**/*.test.ts',   // UI composable/util unit tests (pure logic; no DOM needed)
+      'modules/ui/app/**/__tests__/**/*.spec.ts'    // UI composable/util unit tests (spec naming)
     ],
     exclude: [
       '**/node_modules/**',        // Skip all dependency tests
