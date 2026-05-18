@@ -70,4 +70,19 @@ Each subsequent Phase 2c task that touches a subsystem in the table above append
 
 | Subsystem | Decision | Why | Commit |
 |---|---|---|---|
-| _(filled in by Tasks 3-9 as they execute)_ | | | |
+| `saga-recovery.ts` (core-004) | DELETE (§4) | Placeholder 18+ months; only saga/index.ts + saga-e2e describe block consumed it. | T3 `42bf991` |
+| `saga-metrics.ts` (core-005) | DELETE (§4) | Only test-side consumer; no production wire. | T3 `42bf991` |
+| `cache-warmer.ts` (core-005) | DELETE (§4) | `warming.enabled` never set true; warming-init block + warmers Map + warming?: field on CacheConfig removed alongside. | T3 `42bf991` |
+| `'hybrid'` cache strategy (core-006) | DELETE-FROM-UNION (§4) | Trivially removable; sole consumer was the "not yet implemented" throw. | T3 `42bf991` |
+| `jwt-auth.ts` (api-008) | DELETE (§2) | 227 LoC pure dead duplicate of `middleware/auth.ts`; zero imports outside the file. | T4 `a32a06b` |
+| `uuid-storage-service.ts` (storage-009) | DELETE (§2) | No live importers; `CloudUuidStorageService` is the production path. Re-export removed from `modules/storage/src/index.ts`. | T5 `5e990e3` |
+| `LifecycleManager.archiveFile` (storage-003) | DELETE (§2) | Was a DB-only folder rename — never moved bytes (literal no-op). `OrphanedFileCleaner` already compensated for archival drift; its header doc now records that history. | T5 `5e990e3` |
+| `StorageFailoverManager.checkProviderRecovery` (storage-004) | WIRE (§3) | Real reliability gap; probe is cheap insurance via the existing `CloudUuidStorageService.performHealthCheck` primitive. 4 unit tests pin the wire. Also surfaced: storage test suite wasn't running under root vitest config — Task 5 added `modules/storage/vitest.config.mjs`. | T5 `5e990e3` |
+| 3 ad-hoc EmailChannel impls (notifications-005, 006) | CONSOLIDATE-THEN-DELETE (§2) | One canonical EmailChannel in `core/src/notifications/channels/`; SMTP + SendGrid; AWS SES (advertised + unimplemented) dropped per the "no fake comprehensiveness" rule. 8 unit tests. Module copy deleted. **4th ad-hoc impl surfaced** at `modules/api/src/routes/notifications.ts:83` — recon missed it; flagged as Phase 2c follow-up. | T6 `7b783af` |
+| `validateWebhookSignature` (notifications-013) | DELETE (§2) | No webhook endpoint exists in v0.2.x (zero `(post\|put).*webhook` route handlers across `modules/api/` + `cli/`). 42 LoC removed including companion `generateWebhookSignature`. Vestigial `secretsManager?` plumbing in NotificationSecurity flagged for a later hygiene pass. | T7 `2700e8d` |
+
+### Parallel-dispatch notes (Phase 2c T3-T7)
+
+T3-T7 were dispatched in parallel per Appendix C of the Phase 2c plan. Two commits (T5 SHA `730f302` and T6 SHA `705de25`) got orphaned by a working-tree race when one of the agents reset the branch to recover from a pollution incident. Both commits' file changes were preserved in the working tree and re-committed cleanly as T5 `5e990e3` and T6 `7b783af` by the coordinating session. Reflog retains the original SHAs (`git reflog | grep -E '730f302|705de25'`).
+
+**Lesson for future parallel dispatches:** subagents working on a shared branch should (a) only `git add` specific paths (never `-A`), (b) NOT do `git reset` even to recover from a polluted commit — surface the problem to the coordinator and let them serialize the cleanup. The pollution that triggered the reset was the parallel-running agents' unstaged changes showing up in each other's `git status` view. Worktree isolation (the option declined at sign-off) would have prevented this.
