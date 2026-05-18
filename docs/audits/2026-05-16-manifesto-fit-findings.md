@@ -387,9 +387,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 188 | (default; not listed below) |
+| `open` | 187 | (default; not listed below) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 16 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) |
+| `closed-with-commit-SHA` | 17 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) + Task 9 (1) |
 | `wontfix-pending-phase-X` | 0 | populated as Phase 2a defers in-scope items |
 | **TOTAL** | **205** | |
 
@@ -414,6 +414,7 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | notifications-001 | `closed-with-commit-SHA` | 2026-05-17 | `notification-service.ts` `sendNotification` now computes `success` from the actual `Promise.allSettled` results (`success = sentChannels.length > 0 && failedChannels.length === 0`). Audit row also carries `failedChannels`, `partial`, per-channel `errors`, and `template`. Action becomes `notification_sent` on full success, `notification_partial_or_failed` otherwise. **`.system-data/notification-audit.jsonl` wiped of its 5,156 leftover dishonest entries** (test/dev leftovers per the user; option (b) — truncate — from the Phase 2a plan). Logging starts fresh and honest. |
 | notifications-002 | `closed-with-commit-SHA` | 2026-05-17 | `validateRequest()` and `checkRateLimit()` return values are now inspected. Invalid requests throw with the validator's errors AND emit a `notification_rejected` audit entry. Rate-limited requests throw with the reset time AND emit a `notification_rejected` audit entry. The rejection audit entries include reason, template, channels, and (for rate limit) resetTime + remaining — so an operator can see what got blocked and why. |
 | notifications-003 | `closed-with-commit-SHA` | 2026-05-17 | Removed the `security.sanitizeContent(request.data)` call from the render path in `notification-service.ts:124`. The template variable bag is the message content; sanitizing it pre-render made recipient-bound emails read "Hello [REDACTED]". Sanitization remains available as a method for the audit-log path (the actual right place for PII redaction); the audit log entries currently don't include user PII, so no PII fields are persisted at all today. Also fixed `notification-security.ts:15`'s literal-pipe bug inside the email regex character class (`[A-Z|a-z]` → `[A-Za-z]`). |
+| deps-004 | `closed-with-commit-SHA` | 2026-05-17 | `pnpm update --recursive` (semver-respecting, no `--latest`) bumped 100+ packages within their existing version ranges. **143 → 21 vulnerabilities** (Critical 0/0, High 73 → 10, Moderate 53 → 7, Low 17 → 4). All 10 remaining Highs are transitive in dev-tooling or test-only paths (node-tar variants via sqlite3 prebuild + cli > tar; glob CLI; nodemailer addressparser DoS; happy-dom test env). Documented in `docs/dependencies-known-issues.md` with parent path + reason-not-bumpable + action. Renovate (deps-005) will surface upstream patches as they release. |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
