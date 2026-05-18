@@ -173,46 +173,4 @@ export class NotificationSecurity {
   generateSecureToken(): string {
     return `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
-
-  /**
-   * Validate webhook signature using HMAC-SHA256
-   *
-   * @param payload - The webhook payload (raw string)
-   * @param signature - The signature from the webhook header (hex-encoded)
-   * @returns true if signature is valid, false otherwise
-   */
-  validateWebhookSignature(payload: string, signature: string): boolean {
-    if (!this.secretsManager) {
-      // If secrets manager is not initialized, reject signature validation
-      // This ensures signatures are required when secrets are configured
-      return false;
-    }
-
-    if (!signature) {
-      return false;
-    }
-
-    try {
-      const signingKey = this.secretsManager.getWebhookSigningKey();
-      return this.secretsManager.verify(payload, signature, signingKey);
-    } catch (error) {
-      // Invalid signature format or verification error
-      return false;
-    }
-  }
-
-  /**
-   * Generate webhook signature for outgoing webhooks
-   *
-   * @param payload - The webhook payload (raw string)
-   * @returns Hex-encoded HMAC-SHA256 signature
-   */
-  generateWebhookSignature(payload: string): string {
-    if (!this.secretsManager) {
-      throw new Error('Secrets manager not initialized');
-    }
-
-    const signingKey = this.secretsManager.getWebhookSigningKey();
-    return this.secretsManager.sign(payload, signingKey);
-  }
 }
