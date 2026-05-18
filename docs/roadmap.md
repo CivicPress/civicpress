@@ -1,11 +1,10 @@
 # CivicPress Roadmap
 
 _A unified, authoritative roadmap for CivicPress, guiding the project from early
-alpha to a stable, production-ready civic infrastructure platform._
+alpha toward a stable, production-grade civic infrastructure platform._
 
-**Current Version:** v0.2.0 (Alpha)  
-**Status:** Core maturity complete, preparing for v0.3.x editor and UX
-enhancements
+**Current Version:** v0.2.0 (Alpha)
+**Status:** v0.2.0 shipped; **post-audit base refactor in progress** (Phase 2a complete, Phase 2b underway). The "Core Maturity and Stability" milestone shipped but the 2026-05 manifesto-fit audit identified 205 findings (20 Critical). Phase 2b — v0.3.x scope rebalanced to follow the refactor master plan at `docs/plans/2026-05-17-base-refactor-master-plan.md`. See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the full registry, and `docs/audits/phase-2a-closure-report.md` for what landed in 2a.
 
 ---
 
@@ -77,50 +76,66 @@ Each phase includes objectives and expected deliverables.
 
 ---
 
-# 3. v0.2.x — Core Maturity and Stability ✅ COMPLETE
+# 3. v0.2.x — Core Maturity and Stability 🟡 SHIPPED — refactor in progress
 
 **Focus:** Indexing, search, architecture cleanup, reliability improvements.
 
-**Status:** ✅ **All goals completed in v0.2.0 (2025-01-30)**
+**Status:** v0.2.0 shipped 2025-01-30. The 2026-05 manifesto-fit audit identified gaps (20 Critical findings) that were aspirational in earlier marks of "complete." Phase 2a of the post-audit refactor (2026-05-17) closed 18 findings; Phase 2b — Truth Restoration — is in progress. **Some items previously marked ✅ here were aspirational** — see the audit findings registry for the gap.
 
-### Goals
+### Goals (audited 2026-05)
 
 - Improve search performance and indexing logic ✅ (Search V2 implemented with
   FTS5)
 - Refine record schema validation ✅ (Comprehensive JSON Schema validation with
-  AJV, business rule validation, comprehensive documentation - analysis document
-  created for future enhancements)
+  AJV, business rule validation, comprehensive documentation)
 - Enhance storage abstraction layer (additional providers, performance
-  optimizations) ✅ (Google Cloud Storage provider added, all providers
-  integrated with failover, retry, circuit breaker, and metrics systems)
+  optimizations) ✅ (Google Cloud Storage provider added; failover, retry,
+  circuit breaker, and metrics integrated). 🟡 Quota enforcement was specified
+  but not wired in v0.2.0 — closed in Phase 2a (storage-001).
 - Add CLI improvements (diagnostics, repair, validation) ✅ (Diagnostics with
-  --fix flag provides repair functionality, validation command implemented)
+  --fix flag provides repair functionality, validation command implemented).
+  🟡 CLI test coverage claim ("120+ / 95%") was unsubstantiated — `cli-001`
+  in the registry; honest counts in `docs/project-status.md`. Phase 2b
+  Tasks 10+11 add real Tier 1/2 CLI tests.
 - Improve error handling and logs ✅ (Unified error handling system implemented
   with type-safe error hierarchy, correlation IDs, and comprehensive test
   coverage)
 - Polish UI navigation and list views ✅ (Page-based pagination, improved search
-  UX, sort options API implemented)
+  UX, sort options API implemented). 🟡 UI **component test coverage** (~0% in
+  v0.2.0) was overclaimed at "80+ tests / 85%" — `ui-005` in the registry;
+  Phase 2b Tasks 8+9 add Tier 1/2 component tests.
 - Add basic documentation for architecture ✅ (Comprehensive architecture.md
   with 1,600+ lines, ADRs, visual diagrams, and related documentation)
 
-**Note:** Basic storage abstraction (local, S3, Azure) is already implemented
+**Note:** Basic storage abstraction (local, S3, Azure) was already implemented
 (v0.1.x). This phase focused on enhancements and additional providers.
 
-### Deliverables ✅
+### Deliverables (audited 2026-05)
 
-- ✅ Stable API responses
+- ✅ API responses (Phase 2a Task 3 demoted 4 stub routers to 501 to match
+  reality; `api-004`)
 - ✅ Reliable local storage and backup
 - ✅ Improved demo dataset tooling
 - ✅ Indexed civic records (searchable by metadata and content)
-- ✅ Production-ready security system (SecretsManager, CSRF Protection)
+- 🟡 Security system (SecretsManager, CSRF Protection landed; 2026-05 audit
+  identified 20 Critical issues — 15 closed in Phase 2a including
+  XSS-via-record sanitization (`ui-001`), auth-gate enforcement
+  (`api-001/2/3`), truthful notification audit log (`notifications-001`),
+  storage quotas (`storage-001`), public-folder bypass (`storage-002`)).
+  Trust-restored; not yet enterprise-grade.
 - ✅ Comprehensive architecture documentation with visual diagrams
 
 ---
 
-# 4. v0.3.x — Editor, Attachments, and Civic UX
+# 4. v0.3.x — Editor, Attachments, Civic UX, and Refactor Completion
 
 **Focus:** Improve clerk-facing daily usability and make the platform visually
-compelling for demonstrations and municipal outreach.
+compelling for demonstrations and municipal outreach. **Couples with the
+post-audit base refactor** (Phases 2b → 2c → 2d → 3 of the master plan):
+truth-restored docs, foundation cleanup, structural hardening, and a clean
+reintroduction of realtime collaboration. By the time v0.3.x ships, every
+spec under `docs/specs/` should match implementation reality (per
+`docs/audits/spec-stability-triage.md`).
 
 ### Goals
 
@@ -277,13 +292,35 @@ CivicPress toward full digital governance infrastructure.
 
 ---
 
-# 10. Staying Up to Date
+# 10. Refactor truth meter
+
+Per the master plan's "make truth true again" spine, every refactor sub-phase
+ships its truth meter:
+
+| Phase | Findings closed | Findings deferred (with target phase) |
+|---|---|---|
+| 2a Bleed-Stop | 18 (15 Critical + 3 High) | 5 Critical (broadcast-box-002/007 → Phase 5; BB-HW-001/3 → Phase 4; ui-002 → 2d, may promote earlier) |
+| 2b Truth Restoration | _in progress_ — 3 closed so far (legal-register-001, legal-register-006, notifications-007); the spec-frontmatter sweep demoted 39 of 61 stable-claiming specs to honest `partial`/`planned` status | _pending closure report_ |
+| 2c Foundation Cleanup | _pending_ | _pending_ |
+| 2d Structural Hardening | _pending_ | _pending_ |
+| 3 Reintroduce realtime | _pending_ | _pending_ |
+| 4 Audit + fix broadcast-box hardware | _pending_ | _pending_ |
+| 5 Reintroduce broadcast-box to monorepo | _pending_ | _pending_ |
+
+See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the per-finding
+tracker (Status column on every finding row); each closure includes a commit
+SHA per the finding-tracking convention (`docs/plans/finding-tracking-convention.md`).
+
+---
+
+# 11. Staying Up to Date
 
 This roadmap will evolve as:
 
 - municipalities begin pilot projects
 - contributors join the project
 - feedback and civic needs shape priorities
+- the post-2026-05 refactor lands its phases
 
-For contributions or roadmap suggestions:  
+For contributions or roadmap suggestions:
 Contact: **<hello@civicpress.io>**
