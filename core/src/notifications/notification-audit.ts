@@ -6,17 +6,37 @@ export interface AuditEntry {
   id: string;
   timestamp: Date;
   userId?: string;
+  // Action union expanded in Phase 2a (notifications-001/2) to reflect
+  // the truthful audit semantics: a notification can succeed fully,
+  // partially fail, or be rejected at validation / rate-limit time.
   action:
     | 'notification_sent'
     | 'notification_failed'
+    | 'notification_partial_or_failed'
+    | 'notification_rejected'
     | 'channel_test'
     | 'config_updated';
   details: {
+    // Channels that succeeded on this attempt.
     channels?: string[];
+    // Channels that failed on this attempt (Phase 2a notifications-001).
+    failedChannels?: string[];
     template?: string;
     recipient?: string;
+    // success === true means all attempted channels delivered.
     success?: boolean;
+    // partial === true means at least one channel delivered AND at
+    // least one failed.
+    partial?: boolean;
     errors?: string[];
+    // Rejection metadata (Phase 2a notifications-002).
+    reason?: 'validation_failed' | 'rate_limited' | string;
+    warnings?: string[];
+    resetTime?: Date | string;
+    remaining?: number;
+    // Free-form supplemental.
+    action?: string;
+    [k: string]: unknown;
   };
   metadata?: Record<string, any>;
 }
