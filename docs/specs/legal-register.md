@@ -2,13 +2,13 @@
 
 ---
 
-version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+version: 0.3.x-scope status: planned created: '2025-07-03' updated: '2026-05-17'
 deprecated: false sunset_date: null breaking_changes: [] additions:
 
 - comprehensive legal register documentation
 - document integrity
 - security considerations fixes: [] migration_guide: null compatibility:
- min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
+ min_civicpress: 0.3.0 max_civicpress: 'null' dependencies:
  - 'public-data-structure.md: >=1.0.0'
  - 'records-validation.md: >=1.0.0' authors:
 - Sophie Germain <sophie@civicpress.io> reviewers:
@@ -16,6 +16,22 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 - Irène Joliot-Curie
 
 ---
+
+> **Status note (Phase 2b Truth Restoration, 2026-05-17):** This spec is `status: planned`. The described module is absent from v0.2.0 — see "Current implementation" below for what exists today. Closes audit findings `legal-register-001` and `legal-register-006`. Module build sequenced post-Phase-2d per refactor master plan §9.4. Triage rationale: `docs/audits/spec-stability-triage.md`.
+
+## Current implementation (2026-05-17)
+
+The entire `legal-register` "module" today consists of a 210-line JSON schema fragment at `core/src/records/record-schema-builder.ts:219-236` defining a few legal-record fields. There is:
+
+- no CLI command (`cli/src/commands/` has no `legal-*` entry)
+- no API route (`modules/api/` has no `legal` router)
+- no UI components or page (`modules/ui/app/components/` has no legal-register components)
+- no separate module directory under `modules/`
+- no in-module tests (the audit explicitly noted 0 tests for this surface)
+
+`modules/legal-register/` exists as a near-empty package shell (`package.json` is a `pnpm init` default — empty description, default test script — flagged as audit finding `legal-register-006`).
+
+The features described below ("bylaw lifecycle," "motion tracking," "ordinance versioning," etc.) are the **target shape** of the future module, not v0.2.0 behavior. Until the module is built (its own sub-phase, post-Phase-2d), citizens and clerks should treat `legal-register` records as generic records using the schema fragment for field hints only.
 
 ## Name
 
