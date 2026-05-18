@@ -387,9 +387,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 196 | (default; not listed below) |
+| `open` | 195 | (default; not listed below) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 8 | Task 1 (5) + Task 2 (3) |
+| `closed-with-commit-SHA` | 9 | Task 1 (5) + Task 2 (3) + Task 3 (1) |
 | `wontfix-pending-phase-X` | 0 | populated as Phase 2a defers in-scope items |
 | **TOTAL** | **205** | |
 
@@ -406,6 +406,7 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | api-001 | `closed-with-commit-SHA` | 2026-05-17 | `routes/info.ts` now uses `(req as any).civicPress` (injected by mount middleware in `src/index.ts:227`) instead of allocating a fresh `CivicPress` per request + initialise + shutdown. Removes the DoS amplifier on the unauthenticated `/api/v1/info` endpoint. |
 | api-002 | `closed-with-commit-SHA` | 2026-05-17 | Validation router mount at `src/index.ts:303` now wraps with `authMiddleware(this.civicPress)` + civicPress injection. All 4 validation routes use `requirePermission('records:view')` which needs `req.user`; previously the mount supplied neither, so production calls always 401d. |
 | api-003 | `closed-with-commit-SHA` | 2026-05-17 | Status router mount at `src/index.ts:281` now injects `(req as any).civicPress = this.civicPress` via middleware. Previously the status endpoints read `req.civicPress` and threw 500 outside of test fixtures. |
+| api-004 | `closed-with-commit-SHA` | 2026-05-17 | 4 stub routers (`workflows.ts`, `hooks.ts`, `export.ts`, `import.ts`) — previously returned fake `200 OK` with hardcoded payloads while looking live to callers — now return `501 Not Implemented` with a structured body (`error`, `code`, `message`, `retry_after_milestone`). Workflows/hooks point at v0.4.x; export/import point at v0.5.x. Import also documents the civicpress-ingest workaround. Auth gates retained so the surface stays bounded. OpenAPI spec for `/api/v1/workflows` updated to document 501. |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
