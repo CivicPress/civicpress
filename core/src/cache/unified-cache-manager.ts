@@ -14,7 +14,6 @@ import { MemoryCache } from './strategies/memory-cache.js';
 import { FileWatcherCache } from './strategies/file-watcher-cache.js';
 import { CacheInitializationError } from './errors.js';
 import { Logger } from '../utils/logger.js';
-import { CacheWarmer, type WarmingStrategy } from './warming/cache-warmer.js';
 
 /**
  * Unified cache manager
@@ -22,7 +21,6 @@ import { CacheWarmer, type WarmingStrategy } from './warming/cache-warmer.js';
 export class UnifiedCacheManager {
   private caches: Map<string, ICacheStrategy> = new Map();
   private configs: Map<string, CacheConfig> = new Map();
-  private warmers: Map<string, CacheWarmer> = new Map();
   private readonly logger: Logger;
   private initialized = false;
 
@@ -69,12 +67,6 @@ export class UnifiedCacheManager {
       case 'file_watcher':
         strategy = new FileWatcherCache(config, this.logger);
         break;
-      case 'hybrid':
-        // Future: implement hybrid cache
-        throw new CacheInitializationError(
-          'Hybrid cache strategy not yet implemented',
-          { name, strategy: config.strategy }
-        );
       default:
         throw new CacheInitializationError(
           `Unknown cache strategy: ${config.strategy}`,
@@ -86,25 +78,6 @@ export class UnifiedCacheManager {
     await strategy.initialize();
 
     this.register(name, strategy, config);
-
-    // Set up warming if configured
-    if (config.warming?.enabled) {
-      const warmerConfig = {
-        enabled: config.warming.enabled,
-        preloadOnStartup: config.warming.preloadOnStartup,
-        scheduled: config.warming.scheduled,
-      };
-      const warmer = new CacheWarmer(strategy, warmerConfig, this.logger);
-      this.warmers.set(name, warmer);
-
-      // Start scheduled warming if configured
-      if (
-        config.warming.scheduled?.enabled &&
-        config.warming.scheduled.strategy
-      ) {
-        warmer.startScheduledWarming(config.warming.scheduled.strategy);
-      }
-    }
   }
 
   /**
@@ -225,15 +198,6 @@ export class UnifiedCacheManager {
    * Shutdown all caches
    */
   async shutdown(): Promise<void> {
-    // Stop all warmers
-    for (const [name, warmer] of this.warmers.entries()) {
-      try {
-        warmer.shutdown();
-      } catch (error) {
-        this.logger.error('Error shutting down warmer', { name, error });
-      }
-    }
-
     const promises = Array.from(this.caches.entries()).map(
       async ([name, cache]) => {
         try {
@@ -247,7 +211,6 @@ export class UnifiedCacheManager {
     await Promise.all(promises);
     this.caches.clear();
     this.configs.clear();
-    this.warmers.clear();
     this.initialized = false;
     this.logger.info('Unified cache manager shut down');
   }

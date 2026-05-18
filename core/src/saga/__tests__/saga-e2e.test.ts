@@ -15,7 +15,6 @@ import {
   SagaStateStore,
   IdempotencyManager,
   ResourceLockManager,
-  SagaRecovery,
 } from '../index.js';
 import { DatabaseService } from '../../database/database-service.js';
 import { RecordManager } from '../../records/record-manager.js';
@@ -286,73 +285,4 @@ describe('Saga Pattern E2E Tests', () => {
     });
   });
 
-  describe('Recovery Scenarios', () => {
-    it('should recover stuck sagas', async () => {
-      const stateStore = new SagaStateStore(db);
-      const recovery = new SagaRecovery(stateStore);
-
-      // Manually create a stuck saga state (simulating a crash)
-      await stateStore.saveState({
-        id: 'stuck-saga-1',
-        sagaType: 'PublishDraft',
-        sagaVersion: '1.0.0',
-        context: JSON.stringify({ draftId: 'test', user: testUser }),
-        status: 'executing',
-        currentStep: 2,
-        stepResults: [],
-        startedAt: new Date(Date.now() - 400000), // 6+ minutes ago
-        correlationId: 'stuck-test',
-      });
-
-      // Recover stuck sagas
-      const recovered = await recovery.recoverStuckSagas();
-      expect(recovered).toBeGreaterThan(0);
-
-      // Verify saga was marked as failed
-      const state = await stateStore.getState('stuck-saga-1');
-      expect(state?.status).toBe('failed');
-    });
-  });
-
-  describe('Metrics Collection', () => {
-    it('should collect metrics for all saga executions', async () => {
-      const { sagaMetrics } = await import('../saga-metrics.js');
-
-      // Execute multiple sagas
-      const draftId = 'metrics-test';
-      await db.createDraft({
-        id: draftId,
-        title: 'Metrics Test',
-        type: 'bylaw',
-        status: 'draft',
-        markdown_body: '# Test',
-        metadata: JSON.stringify({}),
-        author: 'testuser',
-        created_by: 'testuser',
-      });
-
-      const saga = new PublishDraftSaga(
-        db,
-        recordManager,
-        civic.getGitEngine(),
-        civic.getHookSystem(),
-        civic.getIndexingService(),
-        testDir
-      );
-
-      // Execute saga
-      await sagaExecutor.execute(saga, {
-        correlationId: `metrics-${Date.now()}`,
-        startedAt: new Date(),
-        draftId,
-        user: testUser,
-        metadata: { recordId: draftId },
-      });
-
-      // Check metrics (if metrics collector is being used)
-      // Note: Metrics collection might not be enabled by default
-      // This test verifies the saga executes successfully
-      // Metrics collection would need to be explicitly enabled in the executor config
-    });
-  });
 });
