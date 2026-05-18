@@ -387,9 +387,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 191 | (default; not listed below) |
+| `open` | 188 | (default; not listed below) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 13 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) |
+| `closed-with-commit-SHA` | 16 | Task 1 (5) + Task 2 (3) + Task 3 (1) + Task 4 (2) + Task 5 (2) + Tasks 6-8 (3) |
 | `wontfix-pending-phase-X` | 0 | populated as Phase 2a defers in-scope items |
 | **TOTAL** | **205** | |
 
@@ -411,6 +411,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | ui-003 | `closed-with-commit-SHA` (partial) | 2026-05-17 | `app.vue` template now includes a `<noscript>` block telling JS-disabled visitors what CivicPress is, where records live (`data/records/` Markdown), and how to read them without the SPA. Full SSR/prerender for the public read paths still deferred to Phase 2d as planned — this is the partial fix the master plan called out. |
 | storage-001 | `closed-with-commit-SHA` | 2026-05-17 | `cloud-uuid-storage-service.ts` now calls `quotaManager.checkQuota(folder, fileSize)` before accepting both the non-streaming and streaming upload paths. Previously `QuotaManager.checkQuota` was implemented + unit-tested but never called from any production code path; configured quotas were not enforced. Streaming path checks against the declared `request.size` if provided; if size is unknown the path logs a warning and proceeds (alternative — buffering to count bytes — defeats streaming). |
 | storage-002 | `closed-with-commit-SHA` | 2026-05-17 | `routes/uuid-storage.ts` `GET /folders/:folder/files` no longer requires `storage:download` unconditionally. The handler now loads the folder's `access` config; if `'public'`, unauthenticated callers can list (matching the existing pattern on `GET /files/:id` and `GET /files/:id/info`). For non-public folders, `req.user` is required and `userCan(...)` is checked. Also handles missing-folder gracefully with a 404 instead of empty list (small UX win against silent probing). |
+| notifications-001 | `closed-with-commit-SHA` | 2026-05-17 | `notification-service.ts` `sendNotification` now computes `success` from the actual `Promise.allSettled` results (`success = sentChannels.length > 0 && failedChannels.length === 0`). Audit row also carries `failedChannels`, `partial`, per-channel `errors`, and `template`. Action becomes `notification_sent` on full success, `notification_partial_or_failed` otherwise. **`.system-data/notification-audit.jsonl` wiped of its 5,156 leftover dishonest entries** (test/dev leftovers per the user; option (b) — truncate — from the Phase 2a plan). Logging starts fresh and honest. |
+| notifications-002 | `closed-with-commit-SHA` | 2026-05-17 | `validateRequest()` and `checkRateLimit()` return values are now inspected. Invalid requests throw with the validator's errors AND emit a `notification_rejected` audit entry. Rate-limited requests throw with the reset time AND emit a `notification_rejected` audit entry. The rejection audit entries include reason, template, channels, and (for rate limit) resetTime + remaining — so an operator can see what got blocked and why. |
+| notifications-003 | `closed-with-commit-SHA` | 2026-05-17 | Removed the `security.sanitizeContent(request.data)` call from the render path in `notification-service.ts:124`. The template variable bag is the message content; sanitizing it pre-render made recipient-bound emails read "Hello [REDACTED]". Sanitization remains available as a method for the audit-log path (the actual right place for PII redaction); the audit log entries currently don't include user PII, so no PII fields are persisted at all today. Also fixed `notification-security.ts:15`'s literal-pipe bug inside the email regex character class (`[A-Z|a-z]` → `[A-Za-z]`). |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.
