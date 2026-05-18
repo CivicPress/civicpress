@@ -46,7 +46,7 @@
 |---|---|---|
 | broadcast-box-002, broadcast-box-007 | Phase 5 | Broadcast-box module is paused. Findings will be re-opened during reintroduction. |
 | BB-HW-001, BB-HW-003 | Phase 4 | Hardware-repo work blocks. Phase 4 owns the canonical protocol artifact AND the civic-artifact pipeline (the AI port; see `broadcast-box-ai-port` memory). |
-| ui-002 | Phase 2d | Requires 5-min upstream check on Nuxt UI Pro v3 production-license posture. If confirmed-free, mark `closed-no-code-change`. If not, full UI rewrite — large work, belongs in 2d structural hardening. |
+| ui-002 | **POSSIBLY PROMOTABLE TO PHASE 2A** | User confirmed 2026-05-17 that **Nuxt UI Pro v4 is now free and open source**. The remediation is now "upgrade v3 → v4" rather than "rip out and replace." Action: after Task 0 lands, do a scoping pass on the v3→v4 migration. If migration is ≤1 day, promote ui-002 to a Phase 2a task; if larger, keep in Phase 2d as originally planned. See `broadcast-box-ai-port` memory's sibling `nuxt-ui-pro-v4-free` for context. |
 
 ---
 
@@ -208,31 +208,44 @@ for v in crit.values():
 ```
 Expected: `Critical remaining: 0` (or only `simple-git` if its parent constraint blocks a clean bump — in which case escalate to "the parent needs a major-version bump" and we treat as a documented `wontfix-needs-major-bump` for this phase).
 
-### deps-005 — Dependabot
+### deps-005 — Renovate
 
-- [ ] **Step 8: Add `.github/dependabot.yml`**
+(User chose Renovate over Dependabot 2026-05-17 — Renovate is more "no vendor lock-in" — runs anywhere, not GitHub-coupled. Either is fine functionally; this picks the more manifesto-aligned one.)
+
+- [ ] **Step 8: Add `renovate.json` at repo root**
 
 Write:
-```yaml
-# .github/dependabot.yml
-version: 2
-updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    groups:
-      patch-and-minor:
-        update-types:
-          - "patch"
-          - "minor"
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+```json
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":timezone(America/Toronto)",
+    ":automergeMinor",
+    ":automergePatch"
+  ],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dep:major"]
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "labels": ["dep:minor-patch"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  },
+  "schedule": ["before 6am on Monday"],
+  "prConcurrentLimit": 5
+}
 ```
-(If the project uses Renovate instead, write `renovate.json` with equivalent config.)
+If running self-hosted Renovate (manifesto-aligned), document the runner setup in `docs/operations/renovate-runner.md` separately. If using the Mend SaaS Renovate App (default), enable it on the repo via https://github.com/apps/renovate.
 
 - [ ] **Step 9: Update findings registry**
 
@@ -740,18 +753,18 @@ If `sentChannels` AND `failedChannels` are both populated (partial success), `su
 - Send to two channels where one succeeds and one fails → assert `success: false, partial: true`.
 - Send to a channel that succeeds → assert `success: true`.
 
-- [ ] **Step 4: Discuss the existing log corruption**
+- [ ] **Step 4: Wipe the existing log**
 
-5,156 entries in `.system-data/notification-audit.jsonl` are dishonest (0 failures recorded). Options:
-- **(a)** Leave as-is. Truth resumes going forward. Document the discontinuity in a comment header at the top of new entries.
-- **(b)** Truncate the log and start over. Loses history, but the history was lying anyway.
-- **(c)** Append a synthetic record marking the truth-restoration point.
+**Decision (user 2026-05-17): option (b) — wipe.** The 5,156 entries in `.system-data/notification-audit.jsonl` are leftover from previous tests/dev runs and have no production value. Truncate and start fresh.
 
-**Recommended: (c)** — append one explicit record:
-```jsonl
-{"event":"audit-log-truth-restoration","timestamp":"2026-05-17T...","note":"From this point forward, audit entries reflect actual delivery. Entries before this timestamp may incorrectly show success:true regardless of actual delivery (per audit finding notifications-001).","commit":"<this-commit-SHA>"}
+```bash
+# Wipe; the file will be recreated truthfully going forward.
+> .system-data/notification-audit.jsonl
 ```
-User to confirm preferred option; default to (c).
+Verify:
+```bash
+wc -l .system-data/notification-audit.jsonl   # expect 0
+```
 
 ### Commit Task 6
 
