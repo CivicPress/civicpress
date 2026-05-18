@@ -1,23 +1,33 @@
 # CivicPress Project Status
 
-**Last Updated**: January 2025  
-**Current Version**: v0.2.0 (Alpha)  
-**Overall Status**: Stable & Production-Ready  
-**Test Coverage**: 1167+ tests passing (including 85+ security tests)  
-**Implementation**: Core maturity complete (v0.2.x goals achieved)
+**Last Updated**: 2026-05-17 (Phase 2b Truth Restoration)
+**Current Version**: v0.2.0 (Alpha)
+**Overall Status**: Alpha — refactor in progress (Phase 2a complete; see `docs/audits/phase-2a-closure-report.md`)
+**Test Suite**: 1213 passing / 1 known pre-existing flake / 27 skipped (API+core) + 67/67 passing (UI), per the verified Phase 2a test run
+**Implementation**: v0.2.0 shipped; 2026-05 audit identified 205 findings (20 Critical); base refactor is closing them across 7 phases
 
 **Website:** [civicpress.io](https://civicpress.io) | **Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
 
+## Audit findings (2026-05)
+
+The 2026-05 manifesto-fit audit identified **205 findings (20 Critical, 65 High, 79 Medium, 41 Low)**. A post-audit base refactor is in progress; tracker at:
+
+- `docs/audits/2026-05-16-manifesto-fit-findings.md` — full registry with Status column
+- `docs/audits/phase-2a-closure-report.md` — Phase 2a Bleed-Stop summary (18 closed, 5 deferred by design)
+- `docs/audits/spec-stability-triage.md` — spec-by-spec honest status (61 specs reviewed in Phase 2b Task 1)
+- `docs/plans/2026-05-17-base-refactor-master-plan.md` — 7-phase roadmap (~3-5 months total)
+- `docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md` — current sub-phase plan
+
+This file is **the public answer to "is it ready?"** The honest answer for v0.2.x is: **functional for early pilots; not yet production-grade by municipal procurement standards; expect breaking changes through v0.3.x as the refactor lands.**
+
 ## Current Status
 
-CivicPress is a **fully functional civic technology platform** with a solid
-foundation and comprehensive test coverage. The core platform is stable and
-ready for development and testing.
+CivicPress is a **working alpha** civic technology platform. The core record-management, Git-engine, CLI, API, and UI surfaces function for the v0.2.0 feature set, and Phase 2a of the post-audit refactor (2026-05) closed 15 Critical findings (auth gates wired, XSS sanitized, quotas enforced, audit logs made truthful, stub routers demoted to 501). It is suitable for early pilots and development; it is not yet production-grade by the standards a municipal procurement reviewer would apply.
 
 ### What's Working
 
-#### **Core Platform (100% Functional)**
+#### **Core Platform (Working in v0.2.0)**
 
 - **CLI Interface**: Complete command-line interface with 25+ commands
 - **REST API**: Comprehensive API with 25+ endpoints and authentication
@@ -27,7 +37,7 @@ ready for development and testing.
 - **File Attachments**: Complete system for linking files to records
 - **Configuration Management**: Dynamic UI with full backend integration
 
-#### **Record Management (100% Functional)**
+#### **Record Management (Working in v0.2.0)**
 
 - **Record CRUD**: Create, read, update, delete operations
 - **Directory Layout**: Records stored under `data/records/<type>/<year>/...` to
@@ -68,14 +78,14 @@ ready for development and testing.
   archival
 - **Extensions Support**: Flexible metadata.extensions object for custom fields
 
-#### **User Management (100% Functional)**
+#### **User Management (Working in v0.2.0)**
 
 - **Role-Based Access Control**: Granular permissions system
 - **User CRUD**: Complete user management operations
 - **Authentication**: Multiple auth methods with JWT tokens
 - **Authorization**: Permission-based access control
 
-#### **Development Tools (100% Functional)**
+#### **Development Tools (Working in v0.2.0)**
 
 - **Build System**: pnpm workspaces with TypeScript
 - **Testing Framework**: Vitest with comprehensive test suite
@@ -98,7 +108,7 @@ ready for development and testing.
   - Automatic error recognition in API layer
   - Correlation ID tracking for debugging
   - Enhanced UI error handling with dev mode visibility
-  - Comprehensive test coverage (1048+ tests passing)
+  - Test coverage per the Phase 2a verified run: 1213 passing / 1 known flake / 27 skipped (API+core); 67/67 passing (UI). Component coverage is sparse and expanding in Phase 2b/2d.
 
 ### In Progress
 
@@ -141,7 +151,7 @@ ready for development and testing.
 
 #### **Google Cloud Storage (GCS) Provider Support (January 2025)**
 
-- **Status**: Fully Implemented and Production-Ready
+- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
 - **Complete GCS Integration**: Full support for Google Cloud Storage as a
   storage provider
   - Service account key file authentication
@@ -164,7 +174,7 @@ ready for development and testing.
 
 #### **Diagnostic & Repair System (January 2025)**
 
-- **Status**: Fully Implemented
+- **Status**: Implemented in v0.2.0 (alpha)
 - **Diagnostic Command**: `civic diagnose` with component-specific checks
   - Database diagnostics (integrity, schema, indexes, FTS5)
   - Search diagnostics (index sync, performance, cache)
@@ -183,7 +193,7 @@ ready for development and testing.
 
 #### **Sort Options API (January 2025)**
 
-- **Status**: Fully Implemented
+- **Status**: Implemented in v0.2.0 (alpha)
 - **API Endpoints**: Sort parameter added to records and search endpoints
   - `/api/v1/records`: `updated_desc`, `created_desc`, `title_asc`, `title_desc`
   - `/api/v1/search`: `relevance`, `updated_desc`, `created_desc`, `title_asc`,
@@ -196,7 +206,7 @@ ready for development and testing.
 
 #### **Internationalization (i18n) System (December 2025)**
 
-- **Status**: Fully Implemented and Production-Ready
+- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
 - **Complete UI Translation**: All UI components, pages, and messages translated
   to English and French
 - **Translation Coverage**:
@@ -232,7 +242,7 @@ ready for development and testing.
 
 #### **Record Format Standardization (November 2025)**
 
-- **Status**: Fully Implemented and Production-Ready
+- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
 - **Comprehensive Standardization**: Unified markdown format across all record
   types
 - **RecordParser Class**: Central parsing/serialization with backward
@@ -384,13 +394,15 @@ ready for development and testing.
 
 ### Test Coverage Summary
 
-| Component | Tests | Status  | Coverage |
-| --------- | ----- | ------- | -------- |
-| **CLI**   | 120+  | Passing | 95%      |
-| **API**   | 200+  | Passing | 90%      |
-| **Core**  | 160+  | Passing | 90%      |
-| **UI**    | 80+   | Passing | 85%      |
-| **Total** | 600+  | Passing | 90%      |
+| Component | Test files | Cases | Component coverage |
+| --------- | ---------- | ----- | ------------------ |
+| **CLI**   | 1 (diagnose) | 13 | ~3% of commands have real tests today; Phase 2b Tasks 10+11 expand Tier 1+2 (≈10 commands). Full 28-command coverage rolls into Phase 2d. |
+| **API**   | ~50 integration files | 1213 passing (API+core combined) | Integration coverage strong; per-route unit coverage uneven. |
+| **Core**  | included above | included above | Integration coverage strong. |
+| **UI**    | 2 (+ Phase-2a XSS pins) | 40 + 8 XSS-pin cases | ~0% component coverage. Phase 2b Tasks 8+9 add Tier 1/2 component tests (forms + record viewing). Full ≥25-component coverage rolls into Phase 2d. |
+| **Notifications** | 1 integration | (audited 2026-05) | No unit tests yet for the 3 Phase 2a fixes (notifications-001/2/3); Phase 2b Task 7 adds ~10 cases. |
+
+> **Note:** The previous version of this table claimed CLI 120+ / 90%, API 200+ / 90%, Core 160+ / 90%, UI 80+ / 85%, Total 600+ / 90%. The 2026-05 manifesto-fit audit (findings `cli-001`, `ui-005`) showed those numbers were not substantiated by files on disk. The honest counts above replace them. See `docs/audits/2026-05-16-manifesto-fit-findings.md` and `docs/audits/phase-2a-closure-report.md` for the full audit trail.
 
 ### Test Categories
 
@@ -491,7 +503,7 @@ pnpm run clean
 
 ## Security Status
 
-**Security Implementation**: Complete & Production-Ready
+**Security Implementation**: Working alpha — 2026-05 audit identified 20 Critical findings (15 closed in Phase 2a, 5 deferred to Phase 4/5 by design). Trust-restoration work (api-001/2/3/4, ui-001/3, storage-001/2, notifications-001/2/3) landed in Phase 2a; see `docs/audits/phase-2a-closure-report.md`.
 
 ### Comprehensive Security System
 
@@ -528,12 +540,14 @@ pnpm run clean
 
 ### Security Testing & Validation
 
-#### **Comprehensive Test Coverage (85+ Security Tests)**
+#### **Security test coverage (post-Phase-2a)**
 
-- **Core Security Tests**: Email validation, security guards, auth flows
-- **API Security Tests**: Endpoint protection, permission enforcement
-- **CLI Security Tests**: Command security, interactive validation
-- **UI Security Tests**: Component behavior, conditional rendering
+- **Core Security Tests**: Email validation, security guards, auth flows (verified passing in Phase 2a test run)
+- **API Security Tests**: Endpoint protection, permission enforcement (Phase 2a Task 2 closed api-001/2/3 — auth gates now actually enforce; previously some mounts skipped auth)
+- **CLI Security Tests**: Diagnose command tested; broader command-security coverage is Phase 2b Tasks 10-11 + Phase 2d work
+- **UI Security Tests**: Phase 2a Task 4 added 8 XSS-pinning tests for `useMarkdown` (DOMPurify). Phase 2b Tasks 8-9 add component-level coverage.
+
+> **Note:** The previous version of this section claimed "85+ security tests" as a count. The 2026-05 audit (finding `ui-005`) showed UI security claims were unsubstantiated; the count above is the honest tally as of Phase 2a closure. Total test count: see Testing Status table.
 
 #### **Security Verification**
 
@@ -642,19 +656,20 @@ pnpm run clean
 
 ## Success Metrics
 
-### Technical Metrics
+### Technical Metrics (post-Phase-2a, 2026-05-17)
 
-- 600+ tests passing (including comprehensive security test suite)
-- 0 critical security vulnerabilities
-- < 100ms API response times
-- 88% test coverage
+- 1213 + 67 tests passing across API/core/UI suites (verified Phase 2a run); 1 known pre-existing flake (`database-integration session-mgmt`) tracked for a dedicated session
+- `pnpm audit`: 0 Critical / 10 High (all transitive in dev/test paths) — down from 4 / 73 pre-Phase-2a
+- 2026-05 audit Criticals: **15 of 20 closed**, 5 deferred to Phase 4/5 by design (see findings registry)
+- API response times: not currently measured under load — claim removed pending Phase 2c benchmarking
+- Test coverage: per-module honest counts in the Testing Status table above; aggregate percentage not currently produced
 
 ### Development Metrics
 
-- All core features implemented
-- Comprehensive documentation
-- Active development workflow
-- Clear project roadmap
+- v0.2.0 core feature set implemented (audit Criticals being closed across the 7-phase refactor)
+- Documentation truth-restoration in progress (Phase 2b); 39 specs demoted from `stable` to `partial`/`planned` per `docs/audits/spec-stability-triage.md`
+- Active development on `dev` branch off `main` (post-Phase-2a merge `0e40ea3`)
+- Clear refactor roadmap: `docs/plans/2026-05-17-base-refactor-master-plan.md`
 
 ## Contributing
 
