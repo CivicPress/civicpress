@@ -387,9 +387,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 
 | Status | Count | Notes |
 |---|---|---|
-| `open` | 199 | (default; not listed below) |
+| `open` | 196 | (default; not listed below) |
 | `closed-no-commit` | 1 | workspace-001 — out-of-band filesystem move on 2026-05-17 |
-| `closed-with-commit-SHA` | 5 | BB-HW-002 + deps-001/002/003/005 (Phase 2a Task 1) |
+| `closed-with-commit-SHA` | 8 | Task 1 (5) + Task 2 (3) |
 | `wontfix-pending-phase-X` | 0 | populated as Phase 2a defers in-scope items |
 | **TOTAL** | **205** | |
 
@@ -403,6 +403,9 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | deps-002 | `closed-with-commit-SHA` | 2026-05-17 | `@aws-sdk/client-s3` bumped `3.879.0` → `3.1048.0` (root + `modules/storage`); `@google-cloud/storage` `^7.15.0` → `^7.19.0`; `@azure/storage-blob` `12.28.0` → `12.31.0` (modules/storage). Cleared all paths to vulnerable `fast-xml-parser` via cloud SDKs (GHSA-mpg4-rc92-vx8v). |
 | deps-003 | `closed-with-commit-SHA` | 2026-05-17 | `plop` bumped `4.0.1` → `4.0.5`. Cleared `handlebars` GHSA-3wjp-mcw9-37jh via `node-plop`. |
 | deps-005 | `closed-with-commit-SHA` | 2026-05-17 | `renovate.json` added at repo root. Weekly Monday schedule, auto-merge minor+patch via branch, major requires manual review, security advisories labeled. Renovate chosen over Dependabot for manifesto "no vendor lock-in" alignment (runs anywhere, not GitHub-coupled). |
+| api-001 | `closed-with-commit-SHA` | 2026-05-17 | `routes/info.ts` now uses `(req as any).civicPress` (injected by mount middleware in `src/index.ts:227`) instead of allocating a fresh `CivicPress` per request + initialise + shutdown. Removes the DoS amplifier on the unauthenticated `/api/v1/info` endpoint. |
+| api-002 | `closed-with-commit-SHA` | 2026-05-17 | Validation router mount at `src/index.ts:303` now wraps with `authMiddleware(this.civicPress)` + civicPress injection. All 4 validation routes use `requirePermission('records:view')` which needs `req.user`; previously the mount supplied neither, so production calls always 401d. |
+| api-003 | `closed-with-commit-SHA` | 2026-05-17 | Status router mount at `src/index.ts:281` now injects `(req as any).civicPress = this.civicPress` via middleware. Previously the status endpoints read `req.civicPress` and threw 500 outside of test fixtures. |
 
 **pnpm audit before:** 140 advisories (4 Critical, 69 High, 49 Moderate, 18 Low).
 **pnpm audit after Task 1:** 143 advisories (**0 Critical**, 73 High, 53 Moderate, 17 Low). High +4 is expected — newer cloud SDKs pulled additional transitive deps; addressed by deps-004 in Task 9.

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { CentralConfigManager } from '@civicpress/core';
-import { CivicPress } from '@civicpress/core';
 
 const router = Router();
 
@@ -21,28 +20,23 @@ router.get('/', async (req, res) => {
     // Get analytics config (public, no auth needed)
     const analyticsConfig = CentralConfigManager.getAnalyticsConfig();
 
-    // Validate token if provided
+    // Validate token if provided. Use the shared CivicPress instance
+    // injected by the mount middleware (api-001 fix). Previously this
+    // block created a fresh CivicPress per request — a trivial DoS
+    // amplifier on an unauthenticated endpoint.
     if (token) {
       try {
-        const dataDir = CentralConfigManager.getDataDir();
-        const dbConfig = CentralConfigManager.getDatabaseConfig();
-
-        const civic = new CivicPress({
-          dataDir,
-          database: dbConfig,
-          logger: { json: true },
-        });
-        await civic.initialize();
-
-        const authService = civic.getAuthService();
-        const user = await authService.validateSession(token);
-
-        if (user) {
-          userInfo = user;
-          isAdmin = user.role === 'admin';
+        const civic = (req as any).civicPress;
+        if (civic) {
+          const authService = civic.getAuthService();
+          const user = await authService.validateSession(token);
+          if (user) {
+            userInfo = user;
+            isAdmin = user.role === 'admin';
+          }
         }
-
-        await civic.shutdown();
+        // If civic is not on the request, the core isn't initialised
+        // (or the mount didn't inject); treat as unauthenticated.
       } catch {
         // Invalid token, treat as not admin
         isAdmin = false;

@@ -223,8 +223,16 @@ export class CivicPressAPI {
     // Documentation (no auth required)
     this.app.use(apiPath('docs'), docsRouter);
 
-    // Info endpoint (no auth required)
-    this.app.use(apiPath('info'), infoRouter);
+    // Info endpoint (no auth required; uses optional token validation
+    // via the injected civicPress — see api-001 fix in info.ts)
+    this.app.use(
+      apiPath('info'),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      infoRouter
+    );
 
     // Auth routes (no auth required) - these need CivicPress instance
     this.app.use(
@@ -278,7 +286,17 @@ export class CivicPressAPI {
       },
       searchRouter
     );
-    this.app.use(apiPath('status'), createStatusRouter());
+    // Status routes (api-003 fix: inject civicPress; previously the
+    // mount had no injection, so every status endpoint threw 500
+    // outside of test fixtures.)
+    this.app.use(
+      apiPath('status'),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      createStatusRouter()
+    );
 
     // Cache metrics (requires auth)
     this.app.use(
@@ -300,7 +318,19 @@ export class CivicPressAPI {
       },
       createDiagnoseRouter()
     );
-    this.app.use(apiPath('validation'), createValidationRouter());
+    // Validation routes (api-002 fix: add authMiddleware + civicPress
+    // injection. Every route inside uses requirePermission('records:view')
+    // which needs req.user populated by authMiddleware. Previously the
+    // mount had neither, so all endpoints returned 401 in production.)
+    this.app.use(
+      apiPath('validation'),
+      authMiddleware(this.civicPress),
+      (req, _res, next) => {
+        (req as any).civicPress = this.civicPress;
+        next();
+      },
+      createValidationRouter()
+    );
     this.app.use(
       apiPath('config'),
       (req, _res, next) => {
