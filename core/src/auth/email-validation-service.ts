@@ -3,6 +3,10 @@ import { DatabaseService } from '../database/database-service.js';
 import { Logger } from '../utils/logger.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { NotificationConfig } from '../notifications/notification-config.js';
+import {
+  EmailChannel,
+  type EmailChannelOptions,
+} from '../notifications/channels/email-channel.js';
 import { coreError, coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
 
@@ -100,7 +104,13 @@ export class EmailValidationService {
   }
 
   /**
-   * Register email channel with notification service
+   * Register email channel with notification service.
+   *
+   * Uses the canonical `EmailChannel` from
+   * `core/src/notifications/channels/email-channel.ts`. The thin object below
+   * is a `NotificationChannel`-shaped adapter that translates the
+   * notification system's `ChannelRequest` envelope into the canonical
+   * channel's `EmailMessage` envelope.
    */
   private registerEmailChannel(): void {
     try {
@@ -113,7 +123,38 @@ export class EmailValidationService {
         return;
       }
 
-      // Create a simple email channel implementation
+      // Normalize the configuration (handle metadata format).
+      const normalizeValue = (obj: any) =>
+        obj && typeof obj === 'object' && 'value' in obj ? obj.value : obj;
+
+      const smtpConfig = normalizeValue(emailConfig.smtp || emailConfig);
+      const host = normalizeValue(smtpConfig.host);
+      const port = Number(normalizeValue(smtpConfig.port) ?? 587);
+      const secure = Boolean(normalizeValue(smtpConfig.secure));
+      const auth = {
+        user: normalizeValue(smtpConfig.auth?.user),
+        pass: normalizeValue(smtpConfig.auth?.pass),
+      };
+      const from = normalizeValue(smtpConfig.from);
+      const tlsRaw = normalizeValue(smtpConfig.tls);
+      const rejectUnauthorized =
+        tlsRaw && tlsRaw.rejectUnauthorized
+          ? normalizeValue(tlsRaw.rejectUnauthorized)
+          : false;
+
+      const options: EmailChannelOptions = {
+        smtp: {
+          host,
+          port,
+          secure,
+          auth,
+          tls: { rejectUnauthorized },
+        },
+        defaultFrom: from,
+      };
+
+      const canonical = new EmailChannel(options);
+
       const emailChannel = {
         getName() {
           return 'email';
@@ -122,63 +163,25 @@ export class EmailValidationService {
           return true;
         },
         async send(request: any) {
-          const nodemailer = await import('nodemailer');
-
-          // Normalize the configuration (handle metadata format)
-          const normalizeValue = (obj: any) =>
-            obj && typeof obj === 'object' && 'value' in obj ? obj.value : obj;
-
-          const smtpConfig = normalizeValue(emailConfig.smtp || emailConfig);
-          const host = normalizeValue(smtpConfig.host);
-          const port = normalizeValue(smtpConfig.port);
-          const secure = normalizeValue(smtpConfig.secure);
-          const auth = {
-            user: normalizeValue(smtpConfig.auth?.user),
-            pass: normalizeValue(smtpConfig.auth?.pass),
-          };
-          const from = normalizeValue(smtpConfig.from);
-          const tls = normalizeValue(smtpConfig.tls);
-
-          // Extract rejectUnauthorized from TLS config
-          const rejectUnauthorized =
-            tls && tls.rejectUnauthorized
-              ? normalizeValue(tls.rejectUnauthorized)
-              : false;
-
-          const tlsConfig = {
-            rejectUnauthorized, // Use the extracted value
-            // Don't spread the original tls config as it contains metadata format
-          };
-
-          const transporter = nodemailer.default.createTransport({
-            host,
-            port,
-            secure,
-            auth,
-            tls: tlsConfig,
-            debug: true,
-            logger: true,
-          });
-
-          // Test connection
-
-          await transporter.verify();
-
-          const mailOptions = {
-            from,
-            to: request.to,
-            subject:
-              request.content?.subject || 'Verify your CivicPress account',
-            text: request.content?.text || request.content?.body,
-            html: request.content?.html,
-          };
-
-          const info = await transporter.sendMail(mailOptions);
-
-          return {
-            success: true,
-            messageId: info.messageId || `smtp_${Date.now()}`,
-          };
+          try {
+            const { messageId } = await canonical.send({
+              to: request.to,
+              subject:
+                request.content?.subject || 'Verify your CivicPress account',
+              text: request.content?.text || request.content?.body,
+              html: request.content?.html,
+            });
+            return {
+              success: true,
+              messageId: messageId || `smtp_${Date.now()}`,
+            };
+          } catch (error) {
+            return {
+              success: false,
+              error:
+                error instanceof Error ? error.message : 'Email send failed',
+            };
+          }
         },
       };
 

@@ -5,6 +5,9 @@ export { NotificationTemplate } from './notification-template.js';
 export { NotificationConfig } from './notification-config.js';
 export { AuthTemplate } from './templates/auth-template.js';
 
+// Channels (canonical implementations)
+export { EmailChannel } from './channels/email-channel.js';
+
 // Supporting classes
 export { NotificationAudit } from './notification-audit.js';
 export { NotificationQueue } from './notification-queue.js';
@@ -41,3 +44,11 @@ export type {
 export type { SecurityValidationResult } from './notification-security.js';
 
 export type { LogEntry } from './notification-logger.js';
+
+export type {
+  EmailMessage,
+  EmailChannelOptions,
+  EmailSendResult,
+  SmtpOptions,
+  SendGridOptions,
+} from './channels/email-channel.js';
