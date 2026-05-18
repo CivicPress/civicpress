@@ -131,24 +131,18 @@ The 30-second-to-15-minute fixes. Do these first to demonstrate momentum and unb
 
 ### BB-HW-002 — License the hardware repo
 
-- [ ] **Step 1: Pick a license**
+- [ ] **Step 1: License confirmed**
 
-User decision needed (one of):
-- **Apache-2.0** — permissive, patent grant, common in OSS infra. Recommended default.
-- **MPL-2.0** — file-level copyleft. Good middle ground for hardware-adjacent code.
-- **AGPL-3.0** — strong copyleft, network-use clause. Aligns with the manifesto's "civic infra must stay open" framing but may chill adoption.
-
-Default to **Apache-2.0** unless user says otherwise.
+**License: AGPL-3.0** (user-confirmed 2026-05-17). Rationale: hardware is the deployed civic appliance, and AGPL's network-use clause prevents the corporate-extraction model the manifesto explicitly opposes ("breaks the fact that only large corporations can supply democracy tools and are greedy"). A vendor cannot take the broadcast-box hardware code, host it as a SaaS, and keep their fork closed.
 
 - [ ] **Step 2: Add LICENSE file to the hardware repo**
 
 Run:
 ```bash
 cd /Users/stakabo/Work/repos/civicpress/civicpress-broadcast-box
-curl -fsSL https://www.apache.org/licenses/LICENSE-2.0.txt -o LICENSE
-# Or copy from a known-good source.
+curl -fsSL https://www.gnu.org/licenses/agpl-3.0.txt -o LICENSE
 ```
-Update `pyproject.toml`'s `license = {text = "Apache-2.0"}` (currently says nothing or "TBD"). Update the README License section from "TBD" to "Apache-2.0".
+Update `pyproject.toml`'s `license = {text = "AGPL-3.0-or-later"}` (currently says nothing or "TBD"). Update the README License section from "TBD" to "AGPL-3.0-or-later". Add an `SPDX-License-Identifier: AGPL-3.0-or-later` header to top-level Python source files (optional but recommended for SPDX scanners).
 
 - [ ] **Step 3: Commit on the hardware repo**
 
@@ -1127,7 +1121,7 @@ gh pr create --base main --head refactor/phase-2a-bleed-stop --title "Refactor P
 
 ## Appendix B: Open decisions during execution
 
-1. **License pick for BB-HW-002.** Default Apache-2.0; user to override.
+1. ~~License pick for BB-HW-002.~~ **RESOLVED 2026-05-17: AGPL-3.0.**
 2. **Existing notification audit log discontinuity (Task 6 Step 4).** Default: option (c) truth-restoration marker.
 3. **`deps-004` final High-advisory threshold.** Default: ≤10 with documented rationale.
 4. **Whether to use Renovate instead of Dependabot.** Default: Dependabot (simpler config); switchable later.
