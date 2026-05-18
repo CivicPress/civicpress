@@ -34,6 +34,7 @@ export default defineConfig({
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
       '~': join(__dirname, 'modules', 'ui', 'app'),
       '@': join(__dirname, 'modules', 'ui', 'app'),
+      '#imports': join(__dirname, 'tests', 'ui', 'nuxt-imports-shim.ts'),
     },
     include: [
       'tests/ui/**/*.test.ts',
@@ -50,6 +51,7 @@ export default defineConfig({
       '~': resolve(__dirname, 'modules/ui/app'),
       '@': resolve(__dirname, 'modules/ui/app'),
       '#app': resolve(__dirname, 'modules/ui/app'),
+      '#imports': resolve(__dirname, 'tests/ui/nuxt-imports-shim.ts'),
     },
   },
   define: {
