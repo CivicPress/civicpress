@@ -58,7 +58,10 @@ import { StorageUsageReporter } from './reporting/storage-usage-reporter.js';
 import { QuotaManager } from './quota/quota-manager.js';
 import { OrphanedFileCleaner } from './cleanup/orphaned-file-cleaner.js';
 import { LifecycleManager } from './lifecycle/lifecycle-manager.js';
-import { BatchOperationError } from './errors/storage-errors.js';
+import {
+  BatchOperationError,
+  StorageFileNotFoundError,
+} from './errors/storage-errors.js';
 
 export class CloudUuidStorageService {
   private config: StorageConfig;
@@ -2389,7 +2392,11 @@ export class CloudUuidStorageService {
     try {
       const file = await this.getFileById(fileId);
       if (!file) {
-        return null;
+        // Throw to match the missing-file contract used elsewhere in the
+        // storage API (batchDelete throws STORAGE_FILE_NOT_FOUND for the
+        // same condition); the prior null-return was the storage-bug-8
+        // inconsistency.
+        throw new StorageFileNotFoundError(fileId);
       }
 
       const activeProvider = this.config.active_provider || 'local';
@@ -2410,6 +2417,12 @@ export class CloudUuidStorageService {
           throw new Error(`Unsupported provider type: ${provider.type}`);
       }
     } catch (error) {
+      // StorageFileNotFoundError is the explicit "not found" signal; let it
+      // bubble. Other unexpected errors keep the existing null-return
+      // fallback so cosmetic stream failures don't crash callers.
+      if (error instanceof StorageFileNotFoundError) {
+        throw error;
+      }
       this.logger.error('Stream download failed:', error);
       return null;
     }
