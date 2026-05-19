@@ -519,6 +519,33 @@ Phase 2c.5 (Foundation Cleanup follow-ups) was a 1-day sub-session that closed 4
 
 - Pre-existing storage test breakage uncovered by Phase 2c T5's module-local `vitest.config.mjs`. Real scope: 28 failures across 10 test files (`batch-operations`, `streaming-operations`, `timeout-utils`, `circuit-breaker`, `health-checker`, `retry-manager`, `storage-errors`, `lifecycle-manager`, `orphaned-file-cleaner`, `usage-reporter`). Too big for a 1-day sub-session — rolling forward as a sibling task to storage-006/storage-007 inside Phase 2d.
 
+### Phase 2d W0-T1 surfaced findings (2026-05-19, open)
+
+Phase 2d's W0 (Storage Test Triage + Rescue) is the first workstream of Phase 2d Structural Hardening. W0-T1 (analysis-only) triaged the 28 storage test failures deferred from Phase 2c.5. **9 underlying source-code defects** were identified as the root cause of 24 of the 28 failures (3 are stale tests; 1 is a fixture schema-drift). These are net-new findings; none existed in the original 205-finding audit (the storage reliability-primitives tests were dormant pre-Phase-2c-T5).
+
+Full triage analysis: `docs/audits/phase-2d-storage-test-triage.md`.
+
+**9 open findings, to be closed by W0-T2:**
+
+| ID | Severity | Module | Description | Location |
+|---|---|---|---|---|
+| `phase-2d-storage-bug-1` | **High** | storage | `validateFile` does not honor `'*'` wildcard in folder `allowed_types`; uses literal `.includes(extension)` so `['*'].includes('txt')` is `false`. Every folder configured with `['*']` rejects every file. Clears 9 cascading batch test failures. | `cloud-uuid-storage-service.ts:1713` |
+| `phase-2d-storage-bug-2` | **High** | storage | `batchUpload`/`batchDelete` throw `BatchOperationError` inside their own outer `try`; outer `catch` swallows the throw and returns a partial-result response. "Throws on total failure" contract broken on both methods. | `cloud-uuid-storage-service.ts:1907-1924, 2068-2083` |
+| `phase-2d-storage-bug-3` | **High** | storage | `evaluateLifecycle` iterates policies in array order and breaks on first match; delete-priority depends on policy insertion order. Test adds `[archive, delete]` → archive wins for files past both thresholds. | `lifecycle-manager.ts:75-89` |
+| `phase-2d-storage-bug-4` | **High** | storage | `isRetryable` lowercases the error message but checks UPPERCASE patterns (`ECONNRESET`, `ETIMEDOUT`, `ENOTFOUND`, `ECONNREFUSED`); these can never match. Common network errors are silently non-retryable. | `retry-manager.ts:159-175` |
+| `phase-2d-storage-bug-5` | **High** | storage | `withTimeout` checks `error.message.includes('timeout')` but the message produced is `"... timed out after Xms"` — 'timeout' substring is absent. Every timeout becomes a generic `Error`, never `StorageTimeoutError`; retry/classification breaks downstream. | `utils/timeout.ts:23, 40` |
+| `phase-2d-storage-bug-6` | **High** | storage | `StorageValidationError`/`StorageConfigurationError` extend core `ValidationError`, which wraps the 2nd constructor arg as `{ details: ... }`. Result: `error.context.field` is `undefined`; callers must read `error.context.details.field`. Inconsistent with other storage errors which expose flat `context`. Possible wider implications for other modules consuming core's `ValidationError`. | `errors/storage-errors.ts:130-147, 205-221` |
+| `phase-2d-storage-bug-7` | **Medium** | storage | `uploadStreamToLocal` listens to `'error'` only on writeStream; source-`Readable` errors (especially synchronous `emit('error')` from `read()`) become unhandled exceptions; upload promise never settles → caller hangs. Use `stream/promises.pipeline()`. Also resolves the 2 unhandled stream exceptions in the test run. | `cloud-uuid-storage-service.ts:2417-2422` |
+| `phase-2d-storage-bug-8` | **Medium** | storage | `downloadFileStream` returns `null` for non-existent files while `batchDelete` throws `STORAGE_FILE_NOT_FOUND` for the same condition. Inconsistent missing-file contract across storage API. | `cloud-uuid-storage-service.ts:2375` |
+| `phase-2d-storage-bug-9` | **Low** | storage | `stopHealthChecks` logs without a context object; `startHealthChecks` logs with `{providers, interval}`. Minor observability inconsistency. | `health/storage-health-checker.ts:226` |
+
+**Severity rollup:** 6 High + 2 Medium + 1 Low = 9 open. All scoped to `modules/storage/`. None affect manifesto hard-constraints in the audit-severity sense, but most are Trust principle (reliability primitives that silently misbehave). 7 of 9 fixes touch `cloud-uuid-storage-service.ts` (the W2-T18 god-file), pre-shrinking it slightly.
+
+**Also surfaced (not bugs — for W0-T2 action):**
+
+- 3 stale-test rewrites: `circuit-breaker.test.ts` (2 cases), `health-checker.test.ts` (1 case), `orphaned-file-cleaner.test.ts` (1 case).
+- 1 schema-drift fixture: `usage-reporter.test.ts` mock needs `provider_path: 's3://...'` instead of `provider: 's3'` field.
+
 ### Deferrals (Phase 2a Task 10 — closed 2026-05-17)
 
 These Criticals are explicitly deferred by the refactor sequencing. None are forgotten — each will be reopened in its target phase.
