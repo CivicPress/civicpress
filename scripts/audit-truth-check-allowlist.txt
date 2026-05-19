@@ -13,6 +13,8 @@ docs/plans/2026-05-17-base-refactor-master-plan.md
 docs/plans/2026-05-17-base-refactor-phase-2a-bleed-stop.md
 docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md
 docs/plans/2026-05-18-base-refactor-phase-2c-foundation-cleanup.md
+docs/plans/2026-05-19-base-refactor-phase-2c.5-followups.md
+docs/plans/2026-05-19-base-refactor-phase-2d-structural-hardening.md
 docs/plans/finding-tracking-convention.md
 
 # Historical changelog records past versions' marketing language.

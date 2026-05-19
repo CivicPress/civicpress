@@ -17,11 +17,15 @@ Phase 2c T5 added the module-local `modules/storage/vitest.config.mjs` and final
 
 | Category | Count | Notes |
 |---|---|---|
-| **stale** | 3 | Tests assert behavior the code intentionally doesn't have (or shouldn't have); test needs rewrite |
-| **real-bug** | 24 | Test assertions are correct; source code has 9 underlying defects causing 24 failures (cascading) |
+| **stale** | 4 | Tests assert behavior the code intentionally doesn't have (or shouldn't have); test needs rewrite. Rows 12, 13, 14, 17 in the per-failure table. |
+| **real-bug** | 23 | Test assertions are correct; source code has 9 underlying defects causing 23 cascading failures. |
 | **mock-drift** | 0 | None identified |
 | **schema-drift** | 1 | Mock fixture uses `provider: 'local'` field but code reads provider from `provider_path` prefix |
 | **Total** | 28 | |
+
+> **Counting note:** W0-T1 commit message and the body below originally said
+> "3 stale / 24 real-bug" — that was a miscount; the per-row table has always
+> shown 4 stale rows and 23 real-bug rows. The summary is now accurate.
 
 The 9 real-bug source defects are surfaced as new findings `phase-2d-storage-bug-1` through `-9` in the findings registry. None existed in the original 205-finding audit (the tests were dormant). All 9 must close before W0-T3 can sign off.
 
@@ -135,4 +139,50 @@ refactor(2d W0-T2 real-bug bug-9): stopHealthChecks logs with context object
 
 4. **No findings get re-opened from the original 205.** All 9 new findings are net-new (the storage reliability primitives weren't covered by the original audit's storage surface — that section focused on quota, public-folder bypass, lifecycle archive bug, failover recovery probe). The "delete-or-wire" rubric from Phase 2c finishing the job is exactly what surfaced these.
 
-5. **Stale-test deletions are NOT used here.** All 3 stale tests are rewritten to assert correct behavior, not deleted. The tests are valuable; their assertions just need to match current correct design (lazy state machine, lazy success threshold, idempotent fs.remove, realistic timeout-vs-vitest config).
+5. **Stale-test deletions are NOT used here.** All 4 stale tests are rewritten to assert correct behavior, not deleted. The tests are valuable; their assertions just need to match current correct design (lazy state machine, lazy success threshold, idempotent fs.remove, realistic timeout-vs-vitest config).
+
+---
+
+## Closure (W0-T3, 2026-05-19)
+
+W0-T2 cleared all 28 originally-failing storage tests. 11 commits total in the W0-T2 sequence (after the W0-T1 triage commit `13bb197`):
+
+| W0-T2 commit | SHA | Category | Cleared |
+|---|---|---|---|
+| schema-drift: usage-reporter provider_path fixture | `7aac837` | schema-drift | 1 test (row 28) |
+| stale-cleanup: 4 stale tests rewritten | `944c73a` | stale | 4 tests (rows 12, 13, 14, 17) |
+| bug-5: withTimeout throws StorageTimeoutError directly | `4b8ca01` | real-bug | 3 tests (rows 25, 26, 27); also fixed a latent stale test 26 setup |
+| bug-9: stopHealthChecks logs with context object | `e63b5f3` | real-bug | 1 test (row 15) |
+| bug-1: honor `'*'` wildcard in validateFile allowed_types | `34365c9` | real-bug | 9 tests (rows 1-3, 5-9, 11 — cascading from validation gate) |
+| bug-2: re-throw BatchOperationError in outer catches | `683573d` | real-bug | 2 tests (rows 4, 10) |
+| bug-4: retry-manager pattern case fix | `b2b751e` | real-bug | 2 tests (rows 18, 19) |
+| bug-3: lifecycle-manager delete-priority across policies | `6268c00` | real-bug | 1 test (row 16) |
+| bug-6: StorageValidationError/StorageConfigurationError flat context | `aa5ffb9` | real-bug | 2 tests (rows 20, 21) |
+| bug-8: downloadFileStream throws StorageFileNotFoundError on missing | `baec84e` | real-bug | 1 test (row 23) |
+| bug-7: uploadStreamToLocal handles source-stream errors via pipeline | `c284cbb` | real-bug | 2 tests (rows 22, 24) + 2 unhandled exceptions |
+
+**Numbers:**
+- `pnpm -C modules/storage test`: **216/216 pass**, 0 unhandled errors (was 188/216 + 2 unhandled at intake)
+- `pnpm test` (root): 1195 passing / 1 known §9.1 flake / 19 skipped — unchanged (storage module tests don't run via root config; only via the module-local `vitest.config.mjs` Phase 2c T5 added)
+- `pnpm -r build`: clean
+- `make audit-truth-check`: PASS
+
+**9 new findings status (all `closed-with-commit-SHA`):**
+
+| Finding ID | Closed by commit |
+|---|---|
+| `phase-2d-storage-bug-1` | `34365c9` |
+| `phase-2d-storage-bug-2` | `683573d` |
+| `phase-2d-storage-bug-3` | `6268c00` |
+| `phase-2d-storage-bug-4` | `b2b751e` |
+| `phase-2d-storage-bug-5` | `4b8ca01` |
+| `phase-2d-storage-bug-6` | `aa5ffb9` |
+| `phase-2d-storage-bug-7` | `c284cbb` |
+| `phase-2d-storage-bug-8` | `baec84e` |
+| `phase-2d-storage-bug-9` | `e63b5f3` |
+
+Registry updated in `docs/audits/2026-05-16-manifesto-fit-findings.md`.
+
+**Carry-forward debt resolved.** The deferred storage test breakage from Phase 2c.5 is closed. Phase 2c.5 → Phase 2d intake → Phase 2d W0 carry chain is complete.
+
+**Next:** W1 — Module contract design + legal-register rename. Master plan §5 Phase 2d order: W0 (done) → W1 (next) → W2 → W3 → W4 → closure.
