@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://civicpress.io/schemas/module.schema.json",
+  "title": "CivicPress Module Manifest",
+  "description": "Manifest format for CivicPress modules and schema-extensions. See docs/specs/module-contract.md for the full contract.",
+  "type": "object",
+  "required": ["name", "version", "kind", "capabilities"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URL/path to this JSON Schema (recommended for IDE autocomplete)."
+    },
+    "name": {
+      "type": "string",
+      "description": "Module canonical name. MUST match the directory name (or <group>/<name> for nested modules).",
+      "pattern": "^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)?$",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "version": {
+      "type": "string",
+      "description": "Semver-compatible version string.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.-]+)?(\\+[a-zA-Z0-9.-]+)?$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["module", "schema-extension"],
+      "description": "module = full module with code; schema-extension = schema fragments only (no code)."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 280,
+      "description": "One-line summary."
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX license expression."
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "What this module contributes. Each capability is opt-in.",
+      "additionalProperties": false,
+      "properties": {
+        "schemaExtensions": {
+          "type": "array",
+          "description": "Record types this module contributes a JSON Schema fragment to. Fragment must live at <module-dir>/schemas/record-schema-extension.json.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "routes": {
+          "type": "boolean",
+          "description": "If true, entry must export registerRoutes(app: Express)."
+        },
+        "audit": {
+          "type": "boolean",
+          "description": "If true, entry must export registerAuditConsumers(channel: AuditChannel)."
+        },
+        "cli": {
+          "type": "boolean",
+          "description": "If true, entry must export registerCliCommands(program: Commander)."
+        },
+        "lifecycle": {
+          "type": "boolean",
+          "description": "If true, entry must export init(services) and/or shutdown()."
+        }
+      }
+    },
+    "entry": {
+      "type": "string",
+      "description": "Path to module entry file, relative to module.json. Required when kind = 'module'."
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Names of other modules this module depends on.",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "kind": { "const": "module" } }
+      },
+      "then": {
+        "required": ["entry"],
+        "description": "Full modules MUST declare an entry file."
+      }
+    }
+  ]
+}
