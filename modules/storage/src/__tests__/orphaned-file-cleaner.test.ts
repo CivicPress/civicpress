@@ -258,13 +258,17 @@ describe('OrphanedFileCleaner', () => {
     });
 
     it('should handle cleanup errors gracefully', async () => {
-      // Create orphan with invalid path
+      // Force deleteFromStorage to throw by referencing a provider that isn't
+      // configured (orphaned-file-cleaner.ts:322 throws "Provider 'X' not
+      // found"). The prior test used fs.remove on a non-existent path, but
+      // fs-extra.remove is idempotent (silent on missing) — that path never
+      // exercised the catch block at orphaned-file-cleaner.ts:170-181.
       const orphaned = [
         {
           id: undefined,
           path: '/nonexistent/path/file.txt',
           type: 'in_storage' as const,
-          provider: 'local',
+          provider: 'unknown-provider',
         },
       ];
 
@@ -272,6 +276,7 @@ describe('OrphanedFileCleaner', () => {
 
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0].file).toBe('/nonexistent/path/file.txt');
+      expect(result.errors[0].error).toContain("Provider 'unknown-provider' not found");
     });
 
     it('should handle mismatched files', async () => {

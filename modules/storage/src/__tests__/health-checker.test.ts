@@ -82,20 +82,37 @@ describe('StorageHealthChecker', () => {
     });
 
     it('should handle timeout', async () => {
+      // Use a short health_check_timeout to keep the test well inside vitest's
+      // 5000ms test budget; the prior 5000ms-vs-5000ms race vs vitest's own
+      // timeout was inherently flaky. Mock delay must exceed health_check_timeout.
+      const shortTimeoutChecker = new StorageHealthChecker(
+        {
+          ...config,
+          global: {
+            ...config.global!,
+            health_check_timeout: 100,
+          },
+        },
+        checkOperations,
+        mockLogger
+      );
       checkOperations.set(
         'local',
         vi
           .fn()
           .mockImplementation(
-            () => new Promise((resolve) => setTimeout(resolve, 10000))
+            () => new Promise((resolve) => setTimeout(resolve, 500))
           )
       );
 
-      const result = await healthChecker.checkProviderHealth('local');
+      const result = await shortTimeoutChecker.checkProviderHealth('local');
 
       expect(result.healthy).toBe(false);
       expect(result.error).toBeDefined();
-      expect(result.error).toContain('timeout');
+      // createTimeout (storage-health-checker.ts:213) emits "Health check timed
+      // out after Xms"; test asserts the actual substring.
+      expect(result.error).toContain('timed out');
+      shortTimeoutChecker.shutdown();
     });
 
     it('should return error for provider without check operation', async () => {
