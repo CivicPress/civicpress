@@ -188,8 +188,8 @@ Focus on **Test Coverage** (#7):
 
 ## Conclusion
 
-The schema validation system is already production-ready. For v0.2.0, "refine"
-should mean:
+The schema validation system ships in v0.2.x as the working path. For
+"refine" in v0.3.x, we mean:
 
 1. **Add more business rule validations** (most valuable)
 2. **Expand validation coverage** for edge cases

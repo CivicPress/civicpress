@@ -242,7 +242,7 @@ V2)
 #### Templates API Implementation
 
 - [x] **Implement Templates API endpoints** ✅ **COMPLETED**
-  - **Status**: Fully implemented and production-ready
+  - **Status**: Shipped in v0.2.x (CRUD + preview/validate endpoints)
   - **Service Layer**: `TemplateService` with CRUD operations, caching, and
     validation
   - **API Endpoints**: All 7 endpoints implemented (`GET`, `POST`, `PUT`,

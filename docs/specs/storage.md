@@ -206,7 +206,11 @@ Future versions may define `.civic/backup.yml` for more advanced control.
 
 ### **Storage Abstraction Enhancements (December 2025)**
 
-**Status:** ✅ Complete - All enhancements implemented and production-ready
+**Status:** Shipped in v0.2.x — features below are present in the codebase.
+Audit-surfaced gaps (storage-003 lifecycle archiveFile no-op, storage-009
+legacy UuidStorageService unused) closed in Phase 2c Task 5; storage-004
+failover provider-recovery wired in the same task. See
+`docs/audits/2026-05-16-manifesto-fit-findings.md` for the per-finding state.
 
 #### Performance Optimizations
 
