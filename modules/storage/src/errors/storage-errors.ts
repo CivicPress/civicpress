@@ -143,6 +143,11 @@ export class StorageValidationError extends ValidationError {
     }
   ) {
     super(message, validationDetails);
+    // Core's ValidationError wraps the 2nd constructor arg as { details: arg }
+    // (see core/src/errors/index.ts:101-103); flatten here so storage-error
+    // consumers can read context.field / context.value directly, matching
+    // the rest of the storage-error family that exposes flat context.
+    this.context = validationDetails;
   }
 }
 
@@ -217,6 +222,11 @@ export class StorageConfigurationError extends ValidationError {
     }
   ) {
     super(message, configDetails);
+    // Same flatten pattern as StorageValidationError; see comment there for
+    // rationale. Storage error consumers read context.field directly.
+    if (configDetails) {
+      this.context = configDetails;
+    }
   }
 }
 
