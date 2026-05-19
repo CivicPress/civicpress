@@ -3,6 +3,7 @@ import path from 'path';
 import mime from 'mime-types';
 import { v4 as uuidv4 } from 'uuid';
 import { Readable } from 'stream';
+import { pipeline as streamPipeline } from 'node:stream/promises';
 import {
   S3Client,
   PutObjectCommand,
@@ -2430,6 +2431,12 @@ export class CloudUuidStorageService {
 
   /**
    * Upload stream to local storage
+   *
+   * Uses node:stream/promises.pipeline so source-stream errors (synchronous
+   * emit('error') in read(), or process.nextTick emits) propagate through
+   * the pipeline rejection — the prior implementation only attached 'error'
+   * to the writeStream (the .pipe() return), leaving source errors as
+   * unhandled exceptions that hung the upload promise.
    */
   private async uploadStreamToLocal(
     stream: Readable,
@@ -2440,16 +2447,9 @@ export class CloudUuidStorageService {
     // Ensure directory exists
     await fs.ensureDir(path.dirname(fullPath));
 
-    // Create write stream
     const writeStream = fs.createWriteStream(fullPath);
-
-    // Pipe stream to file
-    return new Promise((resolve, reject) => {
-      stream
-        .pipe(writeStream)
-        .on('finish', () => resolve(fullPath))
-        .on('error', reject);
-    });
+    await streamPipeline(stream, writeStream);
+    return fullPath;
   }
 
   /**
