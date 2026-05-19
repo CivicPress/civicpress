@@ -1931,6 +1931,12 @@ export class CloudUuidStorageService {
 
       return response;
     } catch (error) {
+      // BatchOperationError is the explicit "all failed" signal we threw
+      // above — let it bubble. The outer catch only exists for unexpected
+      // errors during the upload loop itself.
+      if (error instanceof BatchOperationError) {
+        throw error;
+      }
       this.logger.error('Batch upload failed:', error);
       // Return partial results if any were successful
       return {
@@ -2086,6 +2092,12 @@ export class CloudUuidStorageService {
 
       return response;
     } catch (error) {
+      // Same pattern as batchUpload — BatchOperationError is explicit; let
+      // it bubble. The outer catch is for unexpected errors during the
+      // delete loop itself.
+      if (error instanceof BatchOperationError) {
+        throw error;
+      }
       this.logger.error('Batch delete failed:', error);
       // Return partial results if any were successful
       return {
