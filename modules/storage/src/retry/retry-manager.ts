@@ -154,23 +154,24 @@ export class RetryManager {
       }
     }
 
-    // Check error message for common retryable patterns
+    // Check error message for common retryable patterns. Patterns are compared
+    // case-insensitively (both sides lowercased) — the prior implementation
+    // lowercased only the message, leaving the UPPERCASE Node error codes
+    // unmatchable (e.g., 'econnreset'.includes('ECONNRESET') is false).
     const errorMessage = error instanceof Error ? error.message : String(error);
     const retryablePatterns = [
       'timeout',
+      'timed out',
       'network',
       'connection',
-      'ECONNRESET',
-      'ETIMEDOUT',
-      'ENOTFOUND',
-      'ECONNREFUSED',
+      'econnreset',
+      'etimedout',
+      'enotfound',
+      'econnrefused',
     ];
 
-    if (
-      retryablePatterns.some((pattern) =>
-        errorMessage.toLowerCase().includes(pattern)
-      )
-    ) {
+    const lcMessage = errorMessage.toLowerCase();
+    if (retryablePatterns.some((pattern) => lcMessage.includes(pattern))) {
       return true;
     }
 
