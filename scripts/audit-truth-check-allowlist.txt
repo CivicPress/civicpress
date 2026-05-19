@@ -40,9 +40,10 @@ modules/realtime/dist/
 modules/broadcast-box/dist/
 cli/dist/
 
-# This script + its allow-list naturally mention the patterns.
+# This script + its allow-list + the CI workflow naturally mention the patterns.
 scripts/audit-truth-check.sh
 scripts/audit-truth-check-allowlist.txt
+.github/workflows/truth-check.yml
 
 # Phase 2c (2026-05-19) cleared the PHASE 2C TODO block:
 # - architecture-comprehensive-analysis.md deleted (redundant with
