@@ -25,12 +25,6 @@ export * from './resource-lock.js';
 // Saga executor
 export * from './saga-executor.js';
 
-// Saga recovery
-export * from './saga-recovery.js';
-
-// Saga metrics
-export * from './saga-metrics.js';
-
 // Publish Draft Saga
 export * from './publish-draft-saga.js';
 

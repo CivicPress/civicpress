@@ -289,6 +289,7 @@ export {
   NotificationRateLimiter,
   NotificationLogger,
   AuthTemplate,
+  EmailChannel,
 } from './notifications/index.js';
 export type {
   NotificationRequest,
@@ -304,6 +305,11 @@ export type {
   RateLimitResult,
   SecurityValidationResult,
   LogEntry,
+  EmailMessage,
+  EmailChannelOptions,
+  EmailSendResult,
+  SmtpOptions,
+  SendGridOptions,
 } from './notifications/index.js';
 
 // Configuration Management

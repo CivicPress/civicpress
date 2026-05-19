@@ -77,6 +77,10 @@ export class CloudUuidStorageService {
   private failoverManager: StorageFailoverManager | null = null;
   private circuitBreakerManager: CircuitBreakerManager | null = null;
   private healthChecker: StorageHealthChecker | null = null;
+  // Per-provider lightweight probes shared by the health checker AND the
+  // failover manager's recovery loop (storage-004 closure).
+  private providerProbes: Map<string, (provider: string) => Promise<void>> =
+    new Map();
   private timeoutConfig: TimeoutConfig = {};
   private metricsCollector: StorageMetricsCollector | null = null;
   private usageReporter: StorageUsageReporter | null = null;
@@ -129,33 +133,30 @@ export class CloudUuidStorageService {
       );
     }
 
+    // Build per-provider probe map. Used by the health checker (when
+    // enabled) and by the failover manager's recovery loop. Always
+    // populate it — the failover path needs it even when periodic health
+    // checks are disabled.
+    const allProviders = [
+      config.active_provider || 'local',
+      ...(config.failover_providers || []),
+    ];
+    allProviders.forEach((providerName) => {
+      const provider = config.providers?.[providerName];
+      if (provider) {
+        this.providerProbes.set(providerName, async (p: string) => {
+          // Simple health check: try to list files in a test folder
+          // This is a lightweight read operation
+          await this.performHealthCheck(p);
+        });
+      }
+    });
+
     // Initialize health checker if enabled
     if (globalConfig?.health_checks) {
-      const checkOperations = new Map<
-        string,
-        (provider: string) => Promise<void>
-      >();
-
-      // Add health check operations for each provider
-      const allProviders = [
-        config.active_provider || 'local',
-        ...(config.failover_providers || []),
-      ];
-
-      allProviders.forEach((providerName) => {
-        const provider = config.providers?.[providerName];
-        if (provider) {
-          checkOperations.set(providerName, async (p: string) => {
-            // Simple health check: try to list files in a test folder
-            // This is a lightweight read operation
-            await this.performHealthCheck(p);
-          });
-        }
-      });
-
       this.healthChecker = new StorageHealthChecker(
         config,
-        checkOperations,
+        this.providerProbes,
         this.logger
       );
     }
@@ -324,7 +325,8 @@ export class CloudUuidStorageService {
       this.failoverManager = new StorageFailoverManager(
         retryManager,
         this.config,
-        this.logger
+        this.logger,
+        this.providerProbes
       );
     }
   }

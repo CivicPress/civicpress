@@ -5,11 +5,35 @@ import {
   beforeEach,
   afterEach,
 } from '../fixtures/test-setup';
+import { vi } from 'vitest';
 import { join } from 'path';
 import { existsSync, mkdirSync, rmSync, copyFileSync } from 'fs';
+
+// Mock nodemailer so the canonical EmailChannel does not attempt real SMTP
+// connections against the fixture host (`smtp.test.com`). Hoisted via
+// vi.hoisted so the mock is in place before the canonical channel module
+// loads.
+const mocks = vi.hoisted(() => {
+  const sendMail = vi
+    .fn()
+    .mockResolvedValue({ messageId: 'mock-mid-notification-system-test' });
+  const createTransport = vi.fn(() => ({ sendMail }));
+  return { sendMail, createTransport };
+});
+vi.mock('nodemailer', () => ({
+  default: { createTransport: mocks.createTransport },
+  createTransport: mocks.createTransport,
+}));
+
 import { NotificationService } from '../../core/src/notifications/notification-service.js';
 import { NotificationConfig } from '../../core/src/notifications/notification-config.js';
-import { EmailChannel } from '../../modules/notifications/channels/email-channel.js';
+// Canonical EmailChannel + EmailChannelOptions. The module-side EmailChannel
+// (modules/notifications/channels/email-channel.ts) was deleted as part of
+// Phase 2c Task 6 — its tested surface lives here now.
+import {
+  EmailChannel,
+  type EmailChannelOptions,
+} from '../../core/src/notifications/channels/email-channel.js';
 import { AuthTemplate } from '../../core/src/notifications/templates/auth-template.js';
 
 // ---
@@ -55,15 +79,35 @@ describe('Notification System', () => {
     });
 
     it('should register and use email channel', async () => {
-      // Create email channel
+      // Build a canonical EmailChannel from the fixture's SMTP config and
+      // wrap it in a NotificationChannel-shaped adapter so the
+      // notification-service dispatcher can drive it.
       const emailConfig = config.getChannelConfig('email');
-      const emailChannel = new EmailChannel({
-        enabled: emailConfig.enabled,
-        provider: emailConfig.provider,
-        credentials: emailConfig.nodemailer, // Use nodemailer config for tests
-        settings: {},
+      const smtp = (emailConfig as any).nodemailer;
+      const canonical = new EmailChannel({
+        smtp: {
+          host: smtp.host,
+          port: smtp.port,
+          secure: smtp.secure,
+          auth: smtp.auth,
+        },
+        defaultFrom: smtp.from,
       });
-      notificationService.registerChannel('email', emailChannel);
+      const emailChannel = {
+        getName: () => 'email',
+        isEnabled: () => true,
+        async send(request: any) {
+          const { messageId } = await canonical.send({
+            to: request.to,
+            subject:
+              request.content?.subject || 'CivicPress Notification',
+            text: request.content?.text || request.content?.body,
+            html: request.content?.html,
+          });
+          return { success: true, messageId };
+        },
+      };
+      notificationService.registerChannel('email', emailChannel as any);
 
       // Create template
       const template = new AuthTemplate(
@@ -85,6 +129,8 @@ describe('Notification System', () => {
       expect(result.success).toBe(true);
       expect(result.sentChannels).toContain('email');
       expect(result.notificationId).toBeDefined();
+      // nodemailer mock was invoked by the canonical channel
+      expect(mocks.sendMail).toHaveBeenCalled();
     });
 
     it('should handle missing template gracefully', async () => {
@@ -136,99 +182,39 @@ describe('Notification System', () => {
     });
   });
 
-  describe('EmailChannel', () => {
-    it('should create email channel with configuration', () => {
+  // Note: detailed EmailChannel tests against the canonical surface
+  // (SMTP path, SendGrid path, defaultFrom, recipient-array join, missing
+  // transport, both-transports-set, tls passthrough) live in
+  // `tests/core/notifications/email-channel.test.ts`. The legacy module
+  // tests for `getProvider()`, `validateConfig()`, `getCapabilities()` were
+  // testing surface that the canonical EmailChannel intentionally does not
+  // expose — that surface was orphaned (no production caller used it). See
+  // Phase 2c Task 6 commit message.
+  describe('EmailChannel (canonical, smoke)', () => {
+    it('constructs from fixture SMTP config without throwing', () => {
       const emailConfig = config.getChannelConfig('email');
-      const channel = new EmailChannel({
-        enabled: emailConfig.enabled,
-        provider: emailConfig.provider,
-        credentials: emailConfig.nodemailer, // Use nodemailer config for tests
-        settings: {},
-      });
-      expect(channel.getName()).toBe('email');
-      expect(channel.isEnabled()).toBe(true);
-      expect(channel.getProvider()).toBe('nodemailer');
-    });
-
-    it('should create SendGrid email channel', () => {
-      const emailConfig = config.getChannelConfig('email');
-      const channel = new EmailChannel({
-        enabled: emailConfig.enabled,
-        provider: 'sendgrid',
-        credentials: emailConfig.sendgrid, // Use sendgrid config
-        settings: {},
-      });
-      expect(channel.getName()).toBe('email');
-      expect(channel.isEnabled()).toBe(true);
-      expect(channel.getProvider()).toBe('sendgrid');
-    });
-
-    it('should validate configuration', async () => {
-      // Always use the valid fixture config
-      const emailConfig = config.getChannelConfig('email');
-      const channel = new EmailChannel({
-        enabled: emailConfig.enabled,
-        provider: emailConfig.provider,
-        credentials: emailConfig.nodemailer, // Use nodemailer config for tests
-        settings: {},
-      });
-      const isValid = await channel.validateConfig();
-      expect(isValid).toBe(true);
-    });
-
-    it('should fail validation with invalid config (missing credentials/host)', async () => {
-      // Missing credentials
-      const invalidConfig = { enabled: true, settings: {} };
-      const channel = new EmailChannel(invalidConfig as any);
-      // Should not throw, should return false
-      const isValid = await channel.validateConfig();
-      expect(isValid).toBe(false);
-    });
-
-    it('should get capabilities', () => {
-      const emailConfig = config.getChannelConfig('email');
-      const channel = new EmailChannel({
-        enabled: emailConfig.enabled,
-        provider: emailConfig.provider,
-        credentials: emailConfig.nodemailer, // Use nodemailer config for tests
-        settings: {},
-      });
-      const capabilities = channel.getCapabilities();
-      expect(capabilities.supportsHtml).toBe(true);
-      expect(capabilities.supportsAttachments).toBe(true);
-      expect(capabilities.supportsTemplates).toBe(true);
-    });
-
-    it('should handle SendGrid email sending (mocked)', async () => {
-      const emailConfig = config.getChannelConfig('email');
-      const channel = new EmailChannel({
-        enabled: emailConfig.enabled,
-        provider: 'sendgrid',
-        credentials: {
-          apiKey: 'SG.test-api-key',
-          from: 'test@example.com',
+      const smtp = (emailConfig as any).nodemailer;
+      const options: EmailChannelOptions = {
+        smtp: {
+          host: smtp.host,
+          port: smtp.port,
+          secure: smtp.secure,
+          auth: smtp.auth,
         },
-        settings: {},
-      });
-
-      const request = {
-        to: 'recipient@example.com',
-        content: {
-          subject: 'Test Email',
-          body: 'This is a test email',
-          html: '<p>This is a test email</p>',
-        },
-        priority: 'normal' as const,
+        defaultFrom: smtp.from,
       };
+      const channel = new EmailChannel(options);
+      expect(channel).toBeInstanceOf(EmailChannel);
+    });
 
-      // For now, we'll test that the channel is properly configured
-      // and can handle the request structure
-      expect(channel.getProvider()).toBe('sendgrid');
-      expect(channel.isEnabled()).toBe(true);
-
-      // Test that the channel can validate its config
-      const isValid = await channel.validateConfig();
-      expect(isValid).toBe(true);
+    it('constructs from fixture SendGrid config without throwing', () => {
+      const emailConfig = config.getChannelConfig('email');
+      const sendgrid = (emailConfig as any).sendgrid;
+      const channel = new EmailChannel({
+        sendgrid: { apiKey: sendgrid.apiKey || 'SG.placeholder' },
+        defaultFrom: sendgrid.from,
+      });
+      expect(channel).toBeInstanceOf(EmailChannel);
     });
   });
 

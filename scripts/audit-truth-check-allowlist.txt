@@ -12,6 +12,7 @@ docs/plans/2026-05-17-civicpress-audit-synthesis-plan.md
 docs/plans/2026-05-17-base-refactor-master-plan.md
 docs/plans/2026-05-17-base-refactor-phase-2a-bleed-stop.md
 docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md
+docs/plans/2026-05-18-base-refactor-phase-2c-foundation-cleanup.md
 docs/plans/finding-tracking-convention.md
 
 # Historical changelog records past versions' marketing language.
@@ -39,21 +40,16 @@ modules/realtime/dist/
 modules/broadcast-box/dist/
 cli/dist/
 
-# This script + its allow-list naturally mention the patterns.
+# This script + its allow-list + the CI workflow naturally mention the patterns.
 scripts/audit-truth-check.sh
 scripts/audit-truth-check-allowlist.txt
+.github/workflows/truth-check.yml
 
-# ---- PHASE 2C TODO ----
-# The files below contain audit-pattern overclaim language that Phase 2b
-# Task 2/3 didn't cover (those tasks were scoped to project-status.md
-# and roadmap.md per master plan §5). They're allow-listed here so the
-# recurring truth-check gate can pass immediately while preserving the
-# work for Phase 2c (Foundation Cleanup) to triage. Each entry is its
-# own to-be-revisited file — do NOT remove without enacting the fix.
-docs/architecture-comprehensive-analysis.md
-docs/file-attachment-system.md
-docs/schema-validation-refinement-analysis.md
-docs/specs/sort-api-spec-analysis.md
-docs/specs/storage.md
-docs/todo.md
-# ---- END PHASE 2C TODO ----
+# Phase 2c (2026-05-19) cleared the PHASE 2C TODO block:
+# - architecture-comprehensive-analysis.md deleted (redundant with
+#   the canonical docs/architecture.md; git log preserves it).
+# - file-attachment-system.md, schema-validation-refinement-analysis
+#   .md, specs/storage.md, todo.md: overclaim phrasing demoted to
+#   honest v0.2.x language.
+# - specs/sort-api-spec-analysis.md moved to audits/ (analyses
+#   don't belong in specs/).

@@ -7,6 +7,7 @@ import { AuthUser } from '../auth/auth-service.js';
 import { Logger } from '../utils/logger.js';
 import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
 import { RecordValidationError } from '../errors/domain-errors.js';
+import { AuditChannel } from '../audit/audit-channel.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { RecordParser } from './record-parser.js';
@@ -103,6 +104,7 @@ export class RecordManager {
   private templates: TemplateEngine;
   private dataDir: string;
   private cacheManager?: UnifiedCacheManager;
+  private auditChannel?: AuditChannel;
 
   constructor(
     db: DatabaseService,
@@ -111,7 +113,8 @@ export class RecordManager {
     workflows: WorkflowEngine,
     templates: TemplateEngine,
     dataDir: string,
-    cacheManager?: UnifiedCacheManager
+    cacheManager?: UnifiedCacheManager,
+    auditChannel?: AuditChannel
   ) {
     this.db = db;
     this.git = git;
@@ -120,6 +123,45 @@ export class RecordManager {
     this.templates = templates;
     this.dataDir = dataDir;
     this.cacheManager = cacheManager;
+    this.auditChannel = auditChannel;
+  }
+
+  /**
+   * Write an audit entry through the unified AuditChannel if available,
+   * otherwise fall back to the legacy direct `db.logAuditEvent` call.
+   *
+   * Phase 2c (Task 9) introduced the channel as the canonical path; the
+   * fallback exists only for transitional safety. Once all RecordManager
+   * call sites use this helper and the DI container always provides the
+   * channel, the fallback can be removed.
+   */
+  private async writeAudit(event: {
+    action: string;
+    resourceType: 'record' | 'user' | 'config' | 'system' | string;
+    resourceId?: string;
+    userId?: number;
+    message?: string;
+    outcome?: 'success' | 'failure';
+  }): Promise<void> {
+    if (this.auditChannel) {
+      await this.auditChannel.record({
+        action: event.action,
+        resourceType: event.resourceType,
+        resourceId: event.resourceId,
+        userId: event.userId,
+        source: 'core',
+        outcome: event.outcome ?? 'success',
+        message: event.message,
+      });
+      return;
+    }
+    await this.db.logAuditEvent({
+      userId: event.userId,
+      action: event.action,
+      resourceType: event.resourceType,
+      resourceId: event.resourceId,
+      details: event.message,
+    });
   }
 
   /**
@@ -299,12 +341,13 @@ export class RecordManager {
       await this.createRecordFile(record);
     }
 
-    // Log audit event
-    await this.db.logAuditEvent({
+    // Log audit event (routed through unified AuditChannel — closes core-001)
+    await this.writeAudit({
       action: 'create_record',
       resourceType: 'record',
       resourceId: record.id,
-      details: `Created record ${record.id} of type ${record.type}`,
+      userId: typeof user?.id === 'number' ? user.id : undefined,
+      message: `Created record ${record.id} of type ${record.type}`,
     });
 
     // Trigger hooks
@@ -426,12 +469,13 @@ export class RecordManager {
       await this.createRecordFile(record);
     }
 
-    // Log audit event
-    await this.db.logAuditEvent({
+    // Log audit event (routed through unified AuditChannel — closes core-001)
+    await this.writeAudit({
       action: 'create_record',
       resourceType: 'record',
       resourceId: record.id,
-      details: `Created record ${record.id} of type ${record.type}`,
+      userId: typeof user?.id === 'number' ? user.id : undefined,
+      message: `Created record ${record.id} of type ${record.type}`,
     });
 
     // Trigger hooks
@@ -775,12 +819,15 @@ export class RecordManager {
     }
 
     // Log audit event (skip during sync operations)
+    // Routed through unified AuditChannel — closes core-001 (the audit
+    // finding named this specific call site as the userId-missing example).
     if (!request.skipAudit) {
-      await this.db.logAuditEvent({
+      await this.writeAudit({
         action: 'update_record',
         resourceType: 'record',
         resourceId: id,
-        details: `Updated record ${id}`,
+        userId: typeof user?.id === 'number' ? user.id : undefined,
+        message: `Updated record ${id}`,
       });
     }
 

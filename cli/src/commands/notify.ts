@@ -3,6 +3,8 @@ import {
   NotificationService,
   NotificationConfig,
   AuthTemplate,
+  EmailChannel,
+  type EmailChannelOptions,
 } from '@civicpress/core';
 import {
   initializeLogger,
@@ -46,141 +48,76 @@ function normalizeMetadata<T = any>(input: any): T {
   return input as T;
 }
 
-// We'll create a simple email channel for the CLI that uses SendGrid directly
-class EmailChannel {
-  public config: any;
-  private name: string = 'email';
+// Adapter: NotificationService dispatches via the {getName, isEnabled, send}
+// channel surface with a `ChannelRequest`. The canonical EmailChannel speaks
+// the simpler `EmailMessage` envelope. This adapter glues them together so
+// the CLI's notify command can register one channel without re-implementing
+// nodemailer transport setup.
+//
+// Built from a flat config object whose shape mirrors what
+// `NotificationConfig.getChannelConfig('email')` returns plus the provider
+// chosen by the --provider flag.
+type CliEmailAdapterInput = {
+  enabled: boolean;
+  provider: 'sendgrid' | 'smtp' | 'nodemailer';
+  credentials: any;
+  settings?: Record<string, any>;
+};
 
-  constructor(config: any) {
-    // Normalize entire config so provider credentials are plain scalars
-    this.config = normalizeMetadata(config);
-  }
+function buildEmailChannelAdapter(input: CliEmailAdapterInput) {
+  const normalized = normalizeMetadata(input);
+  const creds = normalized.credentials || {};
 
-  getName(): string {
-    return this.name;
-  }
-
-  isEnabled(): boolean {
-    return this.config?.enabled || false;
-  }
-
-  async send(request: any) {
-    try {
-      const provider = this.config.provider || 'sendgrid';
-
-      if (provider === 'smtp') {
-        return await this.sendViaSMTP(normalizeMetadata(request));
-      } else {
-        return await this.sendViaSendGrid(normalizeMetadata(request));
-      }
-    } catch (error) {
+  const options: EmailChannelOptions = (() => {
+    if (normalized.provider === 'sendgrid') {
       return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Email send failed',
+        sendgrid: { apiKey: creds.apiKey },
+        defaultFrom: creds.from,
       };
     }
-  }
-
-  private async sendViaSendGrid(request: any) {
-    const sgMail = await import('@sendgrid/mail');
-    sgMail.default.setApiKey(this.config.credentials.apiKey);
-
-    const msg = {
-      to: request.to || this.config.credentials.from,
-      from: this.config.credentials.from,
-      subject: request.content?.subject || 'CivicPress Notification',
-      text: request.content?.text || request.content?.body,
-      html: request.content?.html,
-    };
-
-    const response = await sgMail.default.send(msg);
-
+    // smtp + nodemailer both map to the SMTP transport (they were aliases in
+    // the legacy code — nodemailer was just a label for "generic SMTP").
     return {
-      success: true,
-      messageId: response[0]?.headers['x-message-id'] || `sg_${Date.now()}`,
+      smtp: {
+        host: creds.host,
+        port: Number(creds.port ?? 587),
+        secure: Boolean(creds.secure),
+        auth: creds.auth,
+        tls: creds.tls || { rejectUnauthorized: false },
+      },
+      defaultFrom: creds.from,
     };
-  }
+  })();
 
-  private async sendViaSMTP(request: any) {
-    try {
-      const nodemailer = await import('nodemailer');
+  const canonical = new EmailChannel(options);
 
-      const transporter = nodemailer.default.createTransport({
-        host: this.config.credentials.host,
-        port: this.config.credentials.port,
-        secure: this.config.credentials.secure,
-        auth: this.config.credentials.auth,
-        tls: this.config.credentials.tls || { rejectUnauthorized: false },
-        debug: false,
-        logger: false,
-      });
-
-      // Test connection first
-      await transporter.verify();
-
-      const mailOptions = {
-        from: this.config.credentials.from,
-        to: request.to,
-        subject: request.content?.subject || 'CivicPress Notification',
-        text: request.content?.text || request.content?.body,
-        html: request.content?.html,
-      };
-
-      const info = await transporter.sendMail(mailOptions);
-
-      return {
-        success: true,
-        messageId: info.messageId || `smtp_${Date.now()}`,
-      };
-    } catch (error: any) {
-      // Error will be handled by the caller
-      throw new Error(
-        `SMTP Error: ${error.message}${error.code ? ` (${error.code})` : ''}`
-      );
-    }
-  }
-
-  async test(): Promise<boolean> {
-    try {
-      const config = this.config.credentials;
-      if (!config.apiKey) {
-        return false;
+  return {
+    getName(): string {
+      return 'email';
+    },
+    isEnabled(): boolean {
+      return normalized.enabled === true;
+    },
+    async send(request: any) {
+      try {
+        const normalizedRequest = normalizeMetadata(request);
+        const { messageId } = await canonical.send({
+          to: normalizedRequest.to,
+          subject:
+            normalizedRequest.content?.subject || 'CivicPress Notification',
+          text:
+            normalizedRequest.content?.text || normalizedRequest.content?.body,
+          html: normalizedRequest.content?.html,
+        });
+        return { success: true, messageId };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Email send failed',
+        };
       }
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async validateConfig(): Promise<boolean> {
-    try {
-      const config = this.config.credentials;
-      if (!config.apiKey && this.config.provider === 'sendgrid') {
-        return false;
-      }
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  getCapabilities(): any {
-    return {
-      supportsHtml: true,
-      supportsAttachments: true,
-      supportsTemplates: true,
-      maxMessageLength: 100000,
-      rateLimit: 100,
-    };
-  }
-
-  getConfig(): any {
-    return this.config;
-  }
-
-  updateConfig(config: any): void {
-    this.config = normalizeMetadata(config);
-  }
+    },
+  };
 }
 
 export default function notifyCommand(cli: CAC) {
@@ -236,13 +173,14 @@ export default function notifyCommand(cli: CAC) {
           throw new Error('Email channel not enabled in configuration');
         }
 
-        // Create and register email channel
+        // Create and register email channel (adapter around canonical
+        // EmailChannel from @civicpress/core).
         const rawCreds =
           (emailConfig as any)[provider as any] ||
           (emailConfig as any).sendgrid;
-        const emailChannel = new EmailChannel({
+        const emailChannel = buildEmailChannelAdapter({
           enabled: emailConfig.enabled,
-          provider: provider as any,
+          provider: provider as 'sendgrid' | 'smtp' | 'nodemailer',
           credentials: rawCreds,
           settings: {},
         });

@@ -125,7 +125,9 @@ export class LifecycleManager {
 
         switch (action.action) {
           case 'archive':
-            await this.archiveFile(action.file, action.reason);
+            // Phase 2c: archiveFile was a no-op (DB-only folder rename, never
+            // moved bytes). OrphanedFileCleaner handles archival drift from
+            // any source. See storage-003 closure.
             result.archived++;
             break;
           case 'delete':
@@ -218,27 +220,6 @@ export class LifecycleManager {
     }
 
     return null; // No action needed
-  }
-
-  /**
-   * Archive a file
-   */
-  private async archiveFile(file: StorageFile, reason: string): Promise<void> {
-    // For now, we'll just move the file to an archive folder
-    // In a full implementation, this might copy to a different provider
-    const archiveFolder = 'archive';
-
-    // Update file folder in database
-    await this.databaseService.updateStorageFile(file.id, {
-      folder: archiveFolder,
-      updated_at: new Date(),
-    });
-
-    this.logger.info(`Archived file: ${file.id}`, {
-      originalFolder: file.folder,
-      archiveFolder,
-      reason,
-    });
   }
 
   /**

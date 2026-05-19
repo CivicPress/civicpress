@@ -214,7 +214,7 @@
             </div>
 
             <!-- Validation Results -->
-            <div v-if="preview.validation.errors.length > 0" class="space-y-2">
+            <div v-if="(preview?.validation?.errors?.length ?? 0) > 0" class="space-y-2">
               <h5 class="text-sm font-medium text-red-600">
                 {{ t('geography.validationErrors') }}:
               </h5>

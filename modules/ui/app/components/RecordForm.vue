@@ -8,39 +8,6 @@ import RecordSidebar from './editor/RecordSidebar.vue';
 import { useAutosave } from '~/composables/useAutosave';
 import { useRecordLock } from '~/composables/useRecordLock';
 
-// Types
-interface RecordFormData {
-  title: string;
-  type: string;
-  markdownBody: string;
-  status: string; // Legal status (stored in YAML + DB)
-  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
-  tags: string[];
-  description: string;
-  geography?: any;
-  attachedFiles?: Array<{
-    id: string;
-    path: string;
-    original_name: string;
-    description?: string;
-    category?: string;
-  }>;
-  linkedRecords?: Array<{
-    id: string;
-    type: string;
-    description: string;
-  }>;
-  linkedGeographyFiles?: Array<{
-    id: string;
-    name: string;
-    description?: string;
-  }>;
-  metadata: {
-    tags: string[];
-    description: string;
-  };
-}
-
 // Props
 interface Props {
   record?: CivicRecord | null;
@@ -64,7 +31,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-  submit: [recordData: RecordFormData];
   delete: [recordId: string];
   saved: [recordData: any];
 }>();

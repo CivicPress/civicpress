@@ -21,6 +21,23 @@ import {
   cliStartOperation,
 } from '../utils/cli-output.js';
 
+/**
+ * Valid status values accepted by `civic status`.
+ *
+ * Must agree with the lifecycle statuses seeded by `init.ts`
+ * (see `record_statuses_config`). Phase 2c Task 11 added `'published'`
+ * to close the inconsistency surfaced by Phase 2b.
+ */
+export const VALID_STATUSES = [
+  'draft',
+  'proposed',
+  'approved',
+  'active',
+  'published',
+  'archived',
+  'rejected',
+];
+
 export function statusCommand(cli: CAC) {
   cli
     .command('status <record> <status>', 'Change the status of a civic record')
@@ -48,22 +65,14 @@ export function statusCommand(cli: CAC) {
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       try {
-        // Validate status
-        const validStatuses = [
-          'draft',
-          'proposed',
-          'approved',
-          'active',
-          'archived',
-          'rejected',
-        ];
-        if (!validStatuses.includes(newStatus)) {
+        // Validate status (see VALID_STATUSES module-level export above)
+        if (!VALID_STATUSES.includes(newStatus)) {
           cliError(
             `Invalid status: ${newStatus}`,
             'INVALID_STATUS',
             {
               requestedStatus: newStatus,
-              validStatuses,
+              validStatuses: VALID_STATUSES,
             },
             'status'
           );
@@ -178,6 +187,7 @@ export function statusCommand(cli: CAC) {
           proposed: chalk.blue,
           approved: chalk.green,
           active: chalk.green,
+          published: chalk.green,
           archived: chalk.gray,
           rejected: chalk.red,
         };
