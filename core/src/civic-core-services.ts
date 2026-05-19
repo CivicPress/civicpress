@@ -101,11 +101,15 @@ export function registerCivicPressServices(
     return new DatabaseService(dbConfig!, logger, cacheManager);
   });
 
-  // Step 4: Register auth service (depends on: database, config)
+  // Step 4: Register auth service (depends on: database, config, auditChannel)
+  // Note: auditChannel is registered at Step 10.5 but resolution is lazy —
+  // 'auth' is only resolved during completeServiceInitialization (or first
+  // explicit resolve), by which point auditChannel is registered.
   container.singleton('auth', (c) => {
     const db = c.resolve<DatabaseService>('database');
     const config = c.resolve<CivicPressConfig>('config');
-    return new AuthService(db, config.dataDir);
+    const auditChannel = c.resolve<AuditChannel>('auditChannel');
+    return new AuthService(db, config.dataDir, auditChannel);
   });
 
   // Step 5: Initialize role manager (side effect, not a service)
@@ -244,11 +248,6 @@ export async function completeServiceInitialization(
   const authService = container.resolve<AuthService>('auth');
   authService.initializeSecrets(secretsManager);
   authService.initializeEmailValidationSecrets(secretsManager);
-
-  // Initialize secrets in notification service
-  const notificationService =
-    container.resolve<NotificationService>('notification');
-  notificationService.initializeSecrets(secretsManager);
 
   // Set up indexing service with CivicPress instance
   const indexingService = new IndexingService(

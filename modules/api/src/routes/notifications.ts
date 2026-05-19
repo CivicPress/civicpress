@@ -5,6 +5,7 @@ import {
   NotificationService,
   NotificationConfig,
   AuthTemplate,
+  EmailChannel,
 } from '@civicpress/core';
 
 const router = Router();
@@ -55,13 +56,35 @@ router.post('/test', async (req, res) => {
       });
     }
 
-    // Build a minimal inline email channel using SendGrid or SMTP
+    // Build the canonical EmailChannel for this test send (Phase 2c.5 T3 —
+    // closes the 4th ad-hoc EmailChannel impl that Phase 2c T6 missed).
     const effectiveProvider = provider || emailConfig.provider || 'sendgrid';
     const rawCreds =
       (emailConfig as any)[effectiveProvider] || (emailConfig as any).sendgrid;
-    const credentials = normalizeMetadata(rawCreds);
+    const credentials = normalizeMetadata<any>(rawCreds);
 
-    const emailChannel = {
+    let channel: EmailChannel;
+    if (effectiveProvider === 'smtp' || effectiveProvider === 'nodemailer') {
+      channel = new EmailChannel({
+        smtp: {
+          host: String(credentials.host || ''),
+          port: Number(credentials.port ?? 587),
+          secure: Boolean(credentials.secure),
+          auth: credentials.auth,
+          tls: credentials.tls || { rejectUnauthorized: false },
+        },
+        defaultFrom: credentials.from,
+      });
+    } else {
+      channel = new EmailChannel({
+        sendgrid: { apiKey: credentials.apiKey },
+        defaultFrom: credentials.from,
+      });
+    }
+
+    // Wrap the canonical EmailChannel in a NotificationChannel-shaped adapter
+    // so NotificationService.registerChannel + sendNotification keeps working.
+    const notificationChannel = {
       getName() {
         return 'email';
       },
@@ -74,49 +97,18 @@ router.post('/test', async (req, res) => {
         const bodyText =
           request?.content?.text || request?.content?.body || message || '';
         const bodyHtml = request?.content?.html || undefined;
-
-        if (
-          effectiveProvider === 'smtp' ||
-          effectiveProvider === 'nodemailer'
-        ) {
-          const nodemailer = await import('nodemailer');
-          const transporter = nodemailer.createTransport({
-            host: String(credentials.host || ''),
-            port: Number(credentials.port ?? 587),
-            secure: Boolean(credentials.secure),
-            auth: credentials.auth,
-            tls: credentials.tls || { rejectUnauthorized: false },
-          } as any);
-          await transporter.verify();
-          const info = await transporter.sendMail({
-            from: credentials.from,
-            to,
-            subject: subj,
-            text: bodyText,
-            html: bodyHtml,
-          });
-          return { success: true, messageId: info.messageId };
-        }
-
-        // Default to SendGrid
-        const sg = await import('@sendgrid/mail');
-        sg.default.setApiKey(credentials.apiKey);
-        const resp = await sg.default.send({
+        const result = await channel.send({
           to,
-          from: credentials.from,
           subject: subj,
           text: bodyText,
           html: bodyHtml,
         });
-        return {
-          success: true,
-          messageId: resp?.[0]?.headers?.['x-message-id'] || `sg_${Date.now()}`,
-        };
+        return { success: true, messageId: result.messageId };
       },
     };
 
     const service = new NotificationService(config);
-    service.registerChannel('email', emailChannel as any);
+    service.registerChannel('email', notificationChannel as any);
 
     // Register a simple template and send
     const tmpl = new AuthTemplate(

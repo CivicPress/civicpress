@@ -4,7 +4,7 @@
  * Error classes for saga pattern operations.
  */
 
-import { CivicPressError, InternalError } from '../errors/index.js';
+import { CivicPressError } from '../errors/index.js';
 
 /**
  * Saga step execution error
@@ -140,27 +140,6 @@ export class SagaLockError extends CivicPressError {
     super(`Failed to acquire lock on resource '${resourceKey}': ${reason}`, {
       resourceKey,
       reason,
-    });
-  }
-}
-
-/**
- * Saga recovery error
- * Thrown when saga recovery fails
- */
-export class SagaRecoveryError extends InternalError {
-  code = 'SAGA_RECOVERY_ERROR';
-  statusCode = 500;
-
-  constructor(
-    public sagaId: string,
-    public reason: string,
-    context?: Record<string, any>
-  ) {
-    super(`Failed to recover saga '${sagaId}': ${reason}`, {
-      sagaId,
-      reason,
-      ...context,
     });
   }
 }

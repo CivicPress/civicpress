@@ -9,6 +9,7 @@ import {
 } from '../notifications/channels/email-channel.js';
 import { coreError, coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
+import { AuditChannel } from '../audit/audit-channel.js';
 
 const logger = new Logger();
 
@@ -63,9 +64,11 @@ export class EmailValidationService {
   private tokenExpiryHours: number = 24; // 24 hours for email verification
   private notificationService: NotificationService;
   private secretsManager?: SecretsManager;
+  private auditChannel?: AuditChannel;
 
-  constructor(db: DatabaseService) {
+  constructor(db: DatabaseService, auditChannel?: AuditChannel) {
     this.db = db;
+    this.auditChannel = auditChannel;
     // Initialize notification service
     const notificationConfig = new NotificationConfig();
     this.notificationService = new NotificationService(notificationConfig);
@@ -75,12 +78,44 @@ export class EmailValidationService {
   }
 
   /**
+   * Write an email-validation audit entry through the unified AuditChannel
+   * if available, otherwise fall back to the legacy direct db call.
+   *
+   * Phase 2c.5 (T4) — same pattern as AuthService.writeAudit.
+   */
+  private async writeAudit(event: {
+    userId: number | undefined;
+    action: string;
+    resourceType: string;
+    resourceId?: string;
+    details?: string;
+  }): Promise<void> {
+    if (this.auditChannel) {
+      await this.auditChannel.record({
+        action: event.action,
+        resourceType: event.resourceType,
+        resourceId: event.resourceId,
+        userId: event.userId,
+        source: 'core',
+        outcome: 'success',
+        message: event.details,
+      });
+      return;
+    }
+    await this.db.logAuditEvent({
+      userId: event.userId,
+      action: event.action,
+      resourceType: event.resourceType,
+      resourceId: event.resourceId,
+      details: event.details,
+    });
+  }
+
+  /**
    * Initialize secrets manager for token signing
    */
   initializeSecrets(secretsManager: SecretsManager): void {
     this.secretsManager = secretsManager;
-    // Also initialize secrets in notification service used by email validation
-    this.notificationService.initializeSecrets(secretsManager);
   }
 
   /**
@@ -541,8 +576,8 @@ export class EmailValidationService {
         verification.id,
       ]);
 
-      // Log the successful email change
-      await this.db.logAuditEvent({
+      // Log the successful email change (routed through unified AuditChannel)
+      await this.writeAudit({
         userId: verification.user_id,
         action: 'email_changed',
         resourceType: 'user_management',

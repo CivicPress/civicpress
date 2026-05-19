@@ -7,7 +7,6 @@ import { NotificationSecurity } from './notification-security.js';
 import { NotificationRateLimiter } from './notification-rate-limiter.js';
 import { NotificationLogger } from './notification-logger.js';
 import { coreDebug, coreError } from '../utils/core-output.js';
-import { SecretsManager } from '../security/secrets.js';
 
 export interface NotificationRequest {
   userId?: string;
@@ -38,29 +37,16 @@ export class NotificationService {
   private security: NotificationSecurity;
   private rateLimiter: NotificationRateLimiter;
   private logger: NotificationLogger;
-  private secretsManager?: SecretsManager;
 
-  constructor(config: NotificationConfig, secretsManager?: SecretsManager) {
+  constructor(config: NotificationConfig) {
     this.config = config;
     this.audit = new NotificationAudit();
     this.queue = new NotificationQueue();
     this.security = new NotificationSecurity();
-    this.secretsManager = secretsManager;
-    if (secretsManager) {
-      this.security.initializeSecrets(secretsManager);
-    }
     this.rateLimiter = new NotificationRateLimiter(
       config.getRateLimits() as any
     );
     this.logger = new NotificationLogger();
-  }
-
-  /**
-   * Initialize secrets manager for webhook signature validation
-   */
-  initializeSecrets(secretsManager: SecretsManager): void {
-    this.secretsManager = secretsManager;
-    this.security.initializeSecrets(secretsManager);
   }
 
   /**

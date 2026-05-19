@@ -10,6 +10,7 @@ import {
 } from './email-validation-service.js';
 import { coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
+import { AuditChannel } from '../audit/audit-channel.js';
 
 const logger = new Logger();
 
@@ -50,12 +51,52 @@ export class AuthService {
   private roleManager: RoleManager;
   private emailValidationService: EmailValidationService;
   private secretsManager?: SecretsManager;
+  private auditChannel?: AuditChannel;
 
-  constructor(db: DatabaseService, dataDir: string) {
+  constructor(
+    db: DatabaseService,
+    dataDir: string,
+    auditChannel?: AuditChannel
+  ) {
     this.db = db;
     this.oauthManager = new OAuthProviderManager();
     this.roleManager = new RoleManager(dataDir);
-    this.emailValidationService = new EmailValidationService(db);
+    this.emailValidationService = new EmailValidationService(db, auditChannel);
+    this.auditChannel = auditChannel;
+  }
+
+  /**
+   * Write an auth audit entry through the unified AuditChannel if available,
+   * otherwise fall back to the legacy direct db.logAuditEvent call.
+   *
+   * Phase 2c.5 (T4) — closes the 2 remaining direct callers flagged in
+   * the Phase 2c closure report's §"Surfaced, not fixed".
+   */
+  private async writeAudit(event: {
+    userId: number | undefined;
+    action: string;
+    details?: string;
+    ipAddress?: string;
+  }): Promise<void> {
+    if (this.auditChannel) {
+      await this.auditChannel.record({
+        action: event.action,
+        resourceType: 'auth',
+        userId: event.userId,
+        source: 'core',
+        outcome: 'success',
+        message: event.details,
+        details: event.ipAddress ? { ipAddress: event.ipAddress } : undefined,
+      });
+      return;
+    }
+    await this.db.logAuditEvent({
+      userId: event.userId,
+      action: event.action,
+      resourceType: 'auth',
+      details: event.details,
+      ipAddress: event.ipAddress,
+    });
   }
 
   /**
@@ -714,13 +755,7 @@ export class AuthService {
     ipAddress?: string
   ): Promise<void> {
     try {
-      await this.db.logAuditEvent({
-        userId,
-        action,
-        resourceType: 'auth',
-        details,
-        ipAddress,
-      });
+      await this.writeAudit({ userId, action, details, ipAddress });
     } catch (error) {
       logger.error('Failed to log auth event:', error);
     }
