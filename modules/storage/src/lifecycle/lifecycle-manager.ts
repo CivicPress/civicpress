@@ -71,20 +71,33 @@ export class LifecycleManager {
       files = allFiles.map((record: any) => this.dbRecordToStorageFile(record));
     }
 
-    // Apply policies to each file
+    // Apply policies to each file. Evaluate every applicable enabled policy
+    // and pick the highest-priority action across all (delete > archive >
+    // retain). The earlier "break on first match" behavior made action
+    // priority depend on policy insertion order — a [archive, delete]
+    // ordering would archive a file past both thresholds instead of
+    // deleting it.
     for (const file of files) {
       const applicablePolicies = this.getApplicablePolicies(file.folder);
 
+      const candidates: LifecycleAction[] = [];
       for (const policy of applicablePolicies) {
         if (!policy.enabled) {
           continue;
         }
-
         const action = this.evaluatePolicy(file, policy);
         if (action) {
-          actions.push(action);
-          break; // Apply first matching policy
+          candidates.push(action);
         }
+      }
+
+      const winner =
+        candidates.find((a) => a.action === 'delete') ||
+        candidates.find((a) => a.action === 'archive') ||
+        candidates.find((a) => a.action === 'retain') ||
+        null;
+      if (winner) {
+        actions.push(winner);
       }
     }
 
