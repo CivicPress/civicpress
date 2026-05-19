@@ -1705,12 +1705,17 @@ export class CloudUuidStorageService {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Check file type
+    // Check file type. '*' is a wildcard meaning "any extension allowed";
+    // without the wildcard check, folders configured with allowed_types: ['*']
+    // rejected every upload because ['*'].includes('txt') is false.
     const fileExtension = path
       .extname(file.originalname)
       .toLowerCase()
       .slice(1);
-    if (!folder.allowed_types.includes(fileExtension)) {
+    const isExtensionAllowed =
+      folder.allowed_types.includes('*') ||
+      folder.allowed_types.includes(fileExtension);
+    if (!isExtensionAllowed) {
       errors.push(
         `File type '${fileExtension}' not allowed in folder '${folder.path}'`
       );
