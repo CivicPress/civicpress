@@ -116,17 +116,20 @@ describe('StorageUsageReporter', () => {
     });
 
     it('should group by provider', async () => {
+      // StorageUsageReporter derives provider from provider_path prefix
+      // (see extractProviderFromPath); the `provider` field on the row is not
+      // consulted. Tests must set provider_path to exercise byProvider grouping.
       databaseService.addFile({
         id: 'file1',
         folder: 'public',
         size: 1000,
-        provider: 'local',
+        provider_path: '', // empty/undefined => 'local' default
       });
       databaseService.addFile({
         id: 'file2',
         folder: 'public',
         size: 2000,
-        provider: 's3',
+        provider_path: 's3://test-bucket/file2',
       });
 
       const usage = await reporter.getOverallUsage();
