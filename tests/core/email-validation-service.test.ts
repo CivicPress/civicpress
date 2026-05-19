@@ -256,10 +256,14 @@ describe('EmailValidationService', () => {
       });
       expect(requestResult.success).toBe(true);
 
-      // Manually expire the token in the email_verifications table
+      // Manually expire the token in the email_verifications table.
+      // Note: addressing by user_id (not by the public verificationToken) —
+      // the row's token column stores a sha256 hash of the raw token, not
+      // the signed/raw value returned to the caller, so a WHERE token = ?
+      // match on the public string would no-op.
       await databaseService.execute(
-        'UPDATE email_verifications SET expires_at = datetime("now", "-1 hour") WHERE token = ?',
-        [requestResult.verificationToken!]
+        'UPDATE email_verifications SET expires_at = datetime("now", "-1 hour") WHERE user_id = ? AND type = "change"',
+        [testUserId]
       );
 
       // Try to complete with expired token

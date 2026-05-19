@@ -12,6 +12,29 @@ import { SecretsManager } from '../security/secrets.js';
 
 const logger = new Logger();
 
+/**
+ * Parse a datetime value returned by SQLite into a UTC-anchored Date.
+ *
+ * SQLite's `datetime()` and `CURRENT_TIMESTAMP` produce strings of the
+ * form "YYYY-MM-DD HH:MM:SS" with no timezone marker; passing them to
+ * `new Date(...)` makes JS interpret them as *local* time, which silently
+ * shifts comparisons by the host's UTC offset and produces clock-skew
+ * bugs (e.g. an "expired 1 hour ago" row appearing to expire in the
+ * future on a host that runs in UTC-4). ISO 8601 strings (with the `T`
+ * separator or a trailing `Z`) are already unambiguous and pass through
+ * unchanged.
+ */
+function parseSqliteDatetime(value: Date | string): Date {
+  if (value instanceof Date) return value;
+  if (typeof value !== 'string') return new Date(value);
+  // Already ISO or has explicit timezone — let Date parse as-is.
+  if (value.includes('T') || /[Zz]|[+-]\d{2}:?\d{2}$/.test(value)) {
+    return new Date(value);
+  }
+  // SQLite "YYYY-MM-DD HH:MM:SS" → anchor to UTC.
+  return new Date(value.replace(' ', 'T') + 'Z');
+}
+
 export interface EmailVerificationToken {
   id: number;
   user_id: number;
@@ -348,8 +371,11 @@ export class EmailValidationService {
         .update(tokenToHash)
         .digest('hex');
 
+      // Fetch by token hash only — defensively re-check expiry in code so the
+      // result is the same regardless of clock skew, SQLite datetime
+      // semantics, or future schema changes that drop the expires_at filter.
       const result = await this.db.query(
-        'SELECT * FROM email_verifications WHERE token = ? AND expires_at > datetime("now")',
+        'SELECT * FROM email_verifications WHERE token = ?',
         [tokenHash]
       );
 
@@ -358,8 +384,29 @@ export class EmailValidationService {
       }
 
       const verification = result[0] as EmailVerificationToken;
-      verification.expires_at = new Date(verification.expires_at);
-      verification.created_at = new Date(verification.created_at);
+      // SQLite datetime() functions return strings like "2026-05-19 12:27:42"
+      // (no timezone marker); without normalization, new Date() interprets
+      // them as local time, which silently shifts comparisons by the host's
+      // UTC offset. Anchor un-marked strings to UTC before constructing the
+      // Date so expiry checks are timezone-stable.
+      verification.expires_at = parseSqliteDatetime(verification.expires_at);
+      verification.created_at = parseSqliteDatetime(verification.created_at);
+
+      // Reject expired tokens; opportunistically purge the stale row.
+      if (verification.expires_at.getTime() <= Date.now()) {
+        try {
+          await this.db.execute(
+            'DELETE FROM email_verifications WHERE id = ?',
+            [verification.id]
+          );
+        } catch (cleanupError) {
+          logger.warn(
+            'Failed to purge expired verification token:',
+            cleanupError
+          );
+        }
+        return null;
+      }
 
       return verification;
     } catch (error) {
