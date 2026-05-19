@@ -1,5 +1,3 @@
-import { SecretsManager } from '../security/secrets.js';
-
 export interface SecurityValidationResult {
   valid: boolean;
   errors: string[];
@@ -7,20 +5,12 @@ export interface SecurityValidationResult {
 }
 
 export class NotificationSecurity {
-  private secretsManager?: SecretsManager;
   private piiPatterns: RegExp[] = [
     /\b\d{3}-\d{2}-\d{4}\b/g, // SSN
     /\b\d{4}-\d{4}-\d{4}-\d{4}\b/g, // Credit card
     /\b\d{10,11}\b/g, // Phone numbers
     /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, // Email addresses (fixed: was `[A-Z|a-z]` with a literal pipe inside the char class — notifications-003)
   ];
-
-  /**
-   * Initialize with secrets manager for webhook signature validation
-   */
-  initializeSecrets(secretsManager: SecretsManager): void {
-    this.secretsManager = secretsManager;
-  }
 
   /**
    * Validate notification request

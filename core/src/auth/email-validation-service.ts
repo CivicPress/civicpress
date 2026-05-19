@@ -79,8 +79,6 @@ export class EmailValidationService {
    */
   initializeSecrets(secretsManager: SecretsManager): void {
     this.secretsManager = secretsManager;
-    // Also initialize secrets in notification service used by email validation
-    this.notificationService.initializeSecrets(secretsManager);
   }
 
   /**

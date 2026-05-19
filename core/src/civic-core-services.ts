@@ -245,11 +245,6 @@ export async function completeServiceInitialization(
   authService.initializeSecrets(secretsManager);
   authService.initializeEmailValidationSecrets(secretsManager);
 
-  // Initialize secrets in notification service
-  const notificationService =
-    container.resolve<NotificationService>('notification');
-  notificationService.initializeSecrets(secretsManager);
-
   // Set up indexing service with CivicPress instance
   const indexingService = new IndexingService(
     civicPress,
