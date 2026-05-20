@@ -7,6 +7,12 @@ import PreviewPanel from './editor/PreviewPanel.vue';
 import RecordSidebar from './editor/RecordSidebar.vue';
 import { useAutosave } from '~/composables/useAutosave';
 import { useRecordLock } from '~/composables/useRecordLock';
+import {
+  extractTitleFromMarkdown,
+  stripFirstLineFromMarkdown,
+  prependTitleToMarkdown,
+} from '~/composables/recordMarkdown';
+import { useRecordEditorActions } from '~/composables/useRecordEditorActions';
 
 // Props
 interface Props {
@@ -126,43 +132,10 @@ const recordAuthor = ref<string>('');
 const recordCreatedAt = ref<string>('');
 const recordUpdatedAt = ref<string>('');
 
-// Helper functions for title/content separation
-const extractTitleFromMarkdown = (content: string): string | null => {
-  if (!content) return null;
-  const lines = content.split('\n');
-  const firstLine = lines[0]?.trim();
-  // Check if first line is an H1 heading (# Title)
-  if (firstLine?.startsWith('# ')) {
-    return firstLine.substring(2).trim();
-  }
-  return null;
-};
-
-const stripFirstLineFromMarkdown = (content: string): string => {
-  if (!content) return '';
-  const lines = content.split('\n');
-  const firstLine = lines[0]?.trim();
-  // If first line is an H1, remove it and any following blank lines
-  if (firstLine?.startsWith('# ')) {
-    // Remove first line and any immediately following blank lines
-    let startIndex = 1;
-    while (startIndex < lines.length && lines[startIndex]?.trim() === '') {
-      startIndex++;
-    }
-    return lines.slice(startIndex).join('\n');
-  }
-  return content;
-};
-
-const prependTitleToMarkdown = (title: string, content: string): string => {
-  const titleLine = `# ${title}`;
-  // If content is empty, just return title
-  if (!content.trim()) {
-    return titleLine;
-  }
-  // Ensure there's a blank line between title and content
-  return `${titleLine}\n\n${content}`;
-};
+// Template refs (declared early so action handlers can close over them)
+const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
+const editorContainerRef = ref<HTMLDivElement | null>(null);
+const sidebarRef = ref<InstanceType<typeof RecordSidebar> | null>(null);
 
 // Computed property for preview content (includes title as H1)
 const previewContent = computed(() => {
@@ -422,533 +395,35 @@ watch(
   { immediate: false } // Don't run on initial mount (handled in onMounted)
 );
 
-// Save draft manually
-const handleSaveDraft = async () => {
-  if (!form.title || !form.type) {
-    toast.add({
-      title: 'Validation error',
-      description: 'Title and type are required',
-      color: 'error',
-    });
-    return;
-  }
-
-  try {
-    if (props.isEditing && form.id) {
-      // Update existing draft
-      await $civicApi(`/api/v1/records/${form.id}/draft`, {
-        method: 'PUT',
-        body: {
-          title: form.title,
-          type: form.type,
-          status: form.status, // Legal status (stored in YAML + DB)
-          workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
-          markdownBody: prependTitleToMarkdown(form.title, form.markdownBody),
-          metadata: {
-            ...form.metadata,
-            tags: form.tags,
-            description: form.description,
-          },
-          geography: form.geography,
-          attachedFiles: form.attachedFiles,
-          linkedRecords: form.linkedRecords,
-          linkedGeographyFiles: form.linkedGeographyFiles,
-        },
-      });
-    } else {
-      // Create new draft
-      const response = (await $civicApi('/api/v1/records', {
-        method: 'POST',
-        body: {
-          title: form.title,
-          type: form.type,
-          status: form.status, // Legal status (stored in YAML + DB)
-          workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
-          content: prependTitleToMarkdown(form.title, form.markdownBody),
-          metadata: {
-            ...form.metadata,
-            tags: form.tags,
-            description: form.description,
-          },
-          geography: form.geography,
-          attachedFiles: form.attachedFiles,
-          linkedRecords: form.linkedRecords,
-          linkedGeographyFiles: form.linkedGeographyFiles,
-        },
-      })) as any;
-
-      if (response?.success && response?.data) {
-        form.id = response.data.id;
-        isDraft.value = true;
-
-        // Start autosave now that draft exists (before navigation)
-        if (props.isEditing) {
-          startAutosave();
-        }
-
-        toast.add({
-          title: 'Draft saved',
-          description: 'Your changes have been saved',
-          color: 'primary',
-        });
-
-        // Navigate to the record edit page after first save
-        navigateTo(`/records/${form.type}/${form.id}/edit`);
-        return; // Exit early after navigation
-      }
-    }
-
-    toast.add({
-      title: 'Draft saved',
-      description: 'Your changes have been saved',
-      color: 'primary',
-    });
-
-    autosaveStatus.value = 'saved';
-    lastSaved.value = new Date();
-
-    // If type was changed, update the form to reflect the saved type
-    // This ensures the UI stays in sync with the saved data
-    if (props.isEditing && form.id) {
-      try {
-        // Temporarily stop autosave to prevent triggering on refresh updates
-        autosave.stop();
-
-        // Use ?edit=true to fetch the draft version (not the published version)
-        const refreshResponse = (await $civicApi(
-          `/api/v1/records/${form.id}?edit=true`
-        )) as any;
-        if (refreshResponse?.success && refreshResponse?.data) {
-          const data = refreshResponse.data;
-          // Store current workflowState before updating (to preserve if API doesn't return it)
-          const currentWorkflowState = form.workflowState;
-
-          // Update isDraft based on response (record might have been published externally)
-          isDraft.value = data.isDraft || false;
-          // Update hasUnpublishedChanges flag
-          hasUnpublishedChanges.value = data.hasUnpublishedChanges || false;
-
-          // Update form with the latest data from the server
-          form.type = data.type;
-          form.status = data.status; // Legal status (stored in YAML + DB)
-          // Preserve workflowState if API returns a valid value, otherwise keep current form value
-          // This prevents resetting to 'draft' if the API returns null/undefined
-          if (
-            data.workflowState !== undefined &&
-            data.workflowState !== null &&
-            data.workflowState !== ''
-          ) {
-            form.workflowState = data.workflowState; // Internal editorial status (DB-only, never in YAML)
-          } else {
-            // If API doesn't return workflowState, keep the current form.workflowState value (don't reset)
-            form.workflowState = currentWorkflowState;
-          }
-          // Extract title from markdown content if first line is H1, otherwise use data.title
-          const rawContent = data.markdownBody || data.content || '';
-          const extractedTitle = extractTitleFromMarkdown(rawContent);
-          form.title = extractedTitle || data.title || '';
-          form.markdownBody = extractedTitle
-            ? stripFirstLineFromMarkdown(rawContent)
-            : rawContent;
-
-          // Update metadata for YAML display
-          recordAuthor.value =
-            data.author || data.created_by || authStore.user?.username || '';
-          recordUpdatedAt.value =
-            data.updated_at ||
-            data.last_draft_saved_at ||
-            new Date().toISOString();
-
-          // Emit saved event with updated record data for parent components (e.g., to update breadcrumbs)
-          emit('saved', data);
-        }
-
-        // Restart autosave after refresh is complete
-        // Only restart if it's still a draft (might have been published externally)
-        if (props.isEditing && form.id && isDraft.value) {
-          autosave.start();
-        }
-      } catch (err) {
-        console.error('Failed to refresh record after save:', err);
-        // Non-critical error, don't show to user
-        // Restart autosave even on error, but only if it's still a draft
-        if (props.isEditing && form.id && isDraft.value) {
-          autosave.start();
-        }
-      }
-    }
-
-    // Refresh YAML in sidebar if it's loaded
-    if (
-      sidebarRef.value &&
-      typeof sidebarRef.value.refreshYaml === 'function'
-    ) {
-      sidebarRef.value.refreshYaml();
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Save failed',
-      description: err.message || 'Failed to save draft',
-      color: 'error',
-    });
-    autosaveStatus.value = 'error';
-  }
-};
-
-// Publish draft
-const handlePublish = async (targetStatus?: string) => {
-  if (!form.id) {
-    toast.add({
-      title: 'Error',
-      description: 'Record ID is required',
-      color: 'error',
-    });
-    return;
-  }
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/publish`, {
-      method: 'POST',
-      body: {
-        status: targetStatus || form.status,
-      },
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: 'Record published',
-        description: 'The record has been published successfully',
-        color: 'primary',
-      });
-
-      // Note: User can navigate via the toast or manually
-
-      isDraft.value = false;
-
-      // Stop autosave after publishing (no longer a draft)
-      autosave.stop();
-
-      // Navigate to view page
-      navigateTo(`/records/${form.type}/${form.id}`);
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Publish failed',
-      description: err.message || 'Failed to publish record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle delete
-const handleDelete = () => {
-  if (props.record?.id) {
-    emit('delete', props.record.id);
-  }
-};
-
-// Handle delete unpublished changes (delete draft)
-const handleDeleteUnpublishedChanges = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/draft`, {
-      method: 'DELETE',
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: t('records.editor.unpublishedChangesDeleted'),
-        description: t('records.editor.unpublishedChangesDeletedDescription'),
-        color: 'primary',
-      });
-
-      // Navigate to drafts list page - the draft has been deleted from record_drafts table
-      // and will no longer appear in the drafts list
-      navigateTo('/records/drafts');
-    }
-  } catch (err: any) {
-    const errorMessage =
-      err.message || t('records.editor.failedToDeleteUnpublishedChanges');
-    toast.add({
-      title: t('common.error'),
-      description: errorMessage,
-      color: 'error',
-    });
-  }
-};
-
-// Handle unpublish (revert to draft)
-const handleUnpublish = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/status`, {
-      method: 'POST',
-      body: {
-        status: 'draft',
-      },
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: 'Record unpublished',
-        description: 'The record has been reverted to draft status',
-        color: 'primary',
-      });
-
-      form.status = 'draft';
-      isDraft.value = true;
-
-      // Start autosave after unpublishing (now it's a draft)
-      if (props.isEditing && form.id) {
-        startAutosave();
-      }
-
-      // Refresh record data
-      if (props.isEditing && form.id) {
-        try {
-          const refreshResponse = (await $civicApi(
-            `/api/v1/records/${form.id}?edit=true`
-          )) as any;
-          if (refreshResponse?.success && refreshResponse?.data) {
-            const data = refreshResponse.data;
-            form.status = data.status;
-            emit('saved', data);
-          }
-        } catch (err) {
-          console.error('Failed to refresh record after unpublish:', err);
-        }
-      }
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Unpublish failed',
-      description: err.message || 'Failed to unpublish record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle archive
-const handleArchive = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}`, {
-      method: 'PUT',
-      body: {
-        status: 'archived',
-      },
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: 'Record archived',
-        description: 'The record has been archived',
-        color: 'primary',
-      });
-
-      form.status = 'archived';
-
-      // Refresh record data
-      if (props.isEditing && form.id) {
-        try {
-          const refreshResponse = (await $civicApi(
-            `/api/v1/records/${form.id}`
-          )) as any;
-          if (refreshResponse?.success && refreshResponse?.data) {
-            const data = refreshResponse.data;
-            form.status = data.status;
-            emit('saved', data);
-          }
-        } catch (err) {
-          console.error('Failed to refresh record after archive:', err);
-        }
-      }
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Archive failed',
-      description: err.message || 'Failed to archive record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle view history
-const handleViewHistory = () => {
-  if (form.id) {
-    navigateTo(`/records/${form.type}/${form.id}/history`);
-  }
-};
-
-// Handle duplicate
-const handleDuplicate = async () => {
-  if (!form.id) return;
-
-  try {
-    // Fetch the current record
-    const response = (await $civicApi(`/api/v1/records/${form.id}`)) as any;
-
-    if (response?.success && response?.data) {
-      const record = response.data;
-
-      // Extract content without title if it exists in markdown
-      const rawContent = record.markdownBody || record.content || '';
-      const contentWithoutTitle = extractTitleFromMarkdown(rawContent)
-        ? stripFirstLineFromMarkdown(rawContent)
-        : rawContent;
-      const newTitle = `${record.title} (Copy)`;
-
-      // Create a new record with duplicated data
-      const duplicateResponse = (await $civicApi('/api/v1/records', {
-        method: 'POST',
-        body: {
-          title: newTitle,
-          type: record.type,
-          status: 'draft',
-          content: prependTitleToMarkdown(newTitle, contentWithoutTitle),
-          metadata: {
-            ...record.metadata,
-            tags: record.tags || [],
-            description: record.description || '',
-          },
-          geography: record.geography,
-          attachedFiles: record.attachedFiles || [],
-          linkedRecords: record.linkedRecords || [],
-          linkedGeographyFiles: record.linkedGeographyFiles || [],
-        },
-      })) as any;
-
-      if (duplicateResponse?.success && duplicateResponse?.data) {
-        toast.add({
-          title: 'Record duplicated',
-          description: 'A new draft has been created',
-          color: 'primary',
-        });
-
-        // Navigate to the new record
-        navigateTo(
-          `/records/${duplicateResponse.data.type}/${duplicateResponse.data.id}/edit`
-        );
-      }
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Duplicate failed',
-      description: err.message || 'Failed to duplicate record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle export
-const handleExport = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/export`, {
-      method: 'GET',
-    })) as any;
-
-    if (response?.success && response?.data?.markdown) {
-      // Create a blob and download
-      const blob = new Blob([response.data.markdown], {
-        type: 'text/markdown',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${form.title || 'record'}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.add({
-        title: 'Record exported',
-        description: 'The record has been exported as Markdown',
-        color: 'primary',
-      });
-    }
-  } catch (err: any) {
-    // Fallback: construct markdown manually if API doesn't support export
-    try {
-      const fullResponse = (await $civicApi(
-        `/api/v1/records/${form.id}/frontmatter`
-      )) as any;
-      const frontmatter = fullResponse || '';
-      const markdown = `---\n${frontmatter}\n---\n\n${form.markdownBody}`;
-
-      const blob = new Blob([markdown], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${form.title || 'record'}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.add({
-        title: 'Record exported',
-        description: 'The record has been exported as Markdown',
-        color: 'primary',
-      });
-    } catch (fallbackErr: any) {
-      toast.add({
-        title: 'Export failed',
-        description: fallbackErr.message || 'Failed to export record',
-        color: 'error',
-      });
-    }
-  }
-};
-
-// Toolbar actions
-const handleToolbarAction = (action: string, ...args: any[]) => {
-  if (!editorRef.value) return;
-
-  switch (action) {
-    case 'bold':
-      editorRef.value.executeBold();
-      break;
-    case 'italic':
-      editorRef.value.executeItalic();
-      break;
-    case 'underline':
-      // Markdown doesn't support underline, use bold instead
-      editorRef.value.executeBold();
-      break;
-    case 'code':
-      editorRef.value.executeCode();
-      break;
-    case 'heading':
-      if (args[0] && typeof args[0] === 'number') {
-        editorRef.value.executeHeading(args[0] as 1 | 2 | 3);
-      }
-      break;
-    case 'bulletList':
-      editorRef.value.executeBulletList();
-      break;
-    case 'numberedList':
-      editorRef.value.executeNumberedList();
-      break;
-    case 'blockquote':
-      editorRef.value.executeBlockquote();
-      break;
-    case 'horizontalRule':
-      editorRef.value.executeHorizontalRule();
-      break;
-    case 'link':
-      editorRef.value.executeLink();
-      break;
-    case 'image':
-      editorRef.value.executeImage();
-      break;
-  }
-};
+// Action handlers (extracted to composable in Phase 2d for ui-008)
+const {
+  handleSaveDraft,
+  handlePublish,
+  handleDelete,
+  handleDeleteUnpublishedChanges,
+  handleUnpublish,
+  handleArchive,
+  handleViewHistory,
+  handleDuplicate,
+  handleExport,
+  handleToolbarAction,
+} = useRecordEditorActions({
+  form,
+  props,
+  emit,
+  allowedTransitions,
+  isDraft,
+  hasUnpublishedChanges,
+  autosave,
+  lockComposable: () => lockComposable, // capture-time getter — lockComposable is reassignable
+  autosaveStatus,
+  lastSaved,
+  recordAuthor,
+  recordUpdatedAt,
+  editorRef,
+  sidebarRef,
+  startAutosave,
+});
 
 // Preview toggle
 const togglePreview = () => {
@@ -997,11 +472,6 @@ onUnmounted(() => {
   }
   autosave.stop();
 });
-
-// Refs
-const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
-const editorContainerRef = ref<HTMLDivElement | null>(null);
-const sidebarRef = ref<InstanceType<typeof RecordSidebar> | null>(null);
 
 // Handle template loading
 const handleLoadTemplate = async (templateId: string, content: string) => {
