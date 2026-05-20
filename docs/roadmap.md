@@ -4,7 +4,7 @@ _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha toward a stable, production-grade civic infrastructure platform._
 
 **Current Version:** v0.2.0 (Alpha)
-**Status:** v0.2.0 shipped; **post-audit base refactor in progress** (Phase 2a complete, Phase 2b underway). The "Core Maturity and Stability" milestone shipped but the 2026-05 manifesto-fit audit identified 205 findings (20 Critical). Phase 2b — v0.3.x scope rebalanced to follow the refactor master plan at `docs/plans/2026-05-17-base-refactor-master-plan.md`. See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the full registry, and `docs/audits/phase-2a-closure-report.md` for what landed in 2a.
+**Status:** v0.2.0 shipped; **post-audit base refactor in progress** (2026-05-20 snapshot). Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 merged to local `dev`; Phase 2d W0 (storage tests) + W1 (module contract + legal-register rename) + W2 (21 god-files decomposed) closed on `refactor/phase-2d-structural-hardening` (local-only, not yet merged). 53 of 205 original audit findings closed + 40 refactor-surfaced closures = 93 total measurable progress items. Remaining inside Phase 2d: W3 (type-safety, ~1,581 casts) + W4 (deps hygiene). After 2d: Phase 3 (realtime), 4 (hardware audit), 5 (broadcast-box reintegration). v0.3.x scope rebalanced to follow the refactor master plan at `docs/plans/2026-05-17-base-refactor-master-plan.md`. See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the full registry, `docs/audits/phase-2a-closure-report.md` for what landed in 2a, and the phase-2b/2c/2c.5 closure reports under `docs/audits/` for subsequent phases.
 
 ---
 
