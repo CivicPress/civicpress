@@ -1,0 +1,171 @@
+# Phase 2d W3-T1 — Type-Cast Inventory
+
+**Date:** 2026-05-20
+**Source:** Phase 2d Structural Hardening plan, §W3-T1
+**Branch:** `refactor/phase-2d-structural-hardening` (local)
+**Inputs:** all `*.ts` + `*.vue` files under `core/src/`, `modules/api/src/`, `modules/ui/app/`, `modules/storage/src/`
+
+This inventory categorizes every `as any` and `: any` cast across the four base-platform surfaces, identifies hot-spot files, and proposes a sequencing strategy for the elimination tasks (W3-T2 through W3-T6).
+
+---
+
+## Raw count
+
+```bash
+grep -rnE "\bas any\b|: any\b" \
+  core/src modules/api/src modules/ui/app modules/storage/src \
+  --include="*.ts" --include="*.vue"
+```
+
+**Total: 1,621 lines** (matches plan's "~1,581" estimate within +2.5%; the small surplus is Phase-2d W2 introducing some new collaborator seams that copied `as any` patterns verbatim from the god-files).
+
+---
+
+## Per-surface counts
+
+| Surface | Total | `as any` | `: any` | % of repo casts |
+|---|---:|---:|---:|---:|
+| `core/src/` | 447 | 93 | 358 | 27.6% |
+| `modules/api/src/` | 628 | 499 | 135 | 38.7% |
+| `modules/ui/app/` | 397 | 165 | 233 | 24.5% |
+| `modules/storage/src/` | 149 | 85 | 64 | 9.2% |
+| **Total** | **1,621** | **842** | **790** | 100% |
+
+Note: a small overlap exists (49 lines contain both forms or the regex matches twice — e.g. `(x as any): any`).
+
+**Per-surface profile:**
+- **API is the biggest concentration** by absolute count (628). 80% of API casts are `as any` (mostly `(req as any).<X>` Express-augmentation patterns — see §Per-category).
+- **Core has the most `: any` field/param declarations** (358 vs 93 `as any`). This is the surface where adding proper types in extracted collaborator interfaces moves the needle the most.
+- **UI splits evenly** (165/233) between value-coercion casts (`as any` on `civicApi` returns, prop forwarding) and Vue-prop loose typing (`: any` in `defineProps`-adjacent code).
+- **Storage is the smallest** (149) and is dominated by SDK-handle field declarations (`databaseService: any`, `: any` on injected handles) — the lightest surface to clean.
+
+---
+
+## Per-category counts (mutex bucketing)
+
+Every line is assigned to exactly one category in the priority order below:
+
+| Category | Count | % | Typed replacement |
+|---|---:|---:|---|
+| `express-augmentation` (`(req as any).<X>`, `req: any`) | 254 | 15.7% | Global `Express.Request` type augmentation in `modules/api/src/types/express-augment.d.ts`. Single fix kills the lot. |
+| `error-narrowing` (`catch (e: any)`, `(err as any).field`) | 350 | 21.6% | `catch (e: unknown)` + `e instanceof Error` narrowing, or a typed `extractStatusCode(e)` helper that also handles the `(err as any).statusCode = ...` mutation idiom used in route handlers. |
+| `test-mock-shortcut` (lines under `__tests__/`, `.test.ts`, `.spec.ts`) | 137 | 8.5% | Typed mock factories per service (`makeMockDatabaseService()` → `Partial<DatabaseService>` with vi.fn() defaults). Lower priority: tests are not production safety-critical, but the same pattern repeated 137 times is a maintenance smell. |
+| `function-param` (`(x: any[,)]` not caught above) | 194 | 12.0% | Case-by-case typed signatures. Often callbacks (`(file: any) => ...`) where the array element type is already known from context. |
+| `array-typed` (`: any[]`) | 86 | 5.3% | Specific element type. Most are diagnostic/issue arrays — `Issue[]` / `DiagnosticEntry[]` interfaces. |
+| `object-literal-cast` (`} as any`) | 9 | 0.6% | `satisfies` operator or a proper interface for the literal shape. |
+| `di-deferred` (`: any; //` annotated as injected) | 8 | 0.5% | Actual class type or an injection interface. (`databaseService: any` → `databaseService: DatabaseService`.) |
+| `index-signature` (`[k: string]: any`) | 7 | 0.4% | `Record<string, unknown>` or a strict-key map. The "any" version blocks downstream type-narrowing for no benefit. |
+| `dynamic-import` (`(await import(...)) as any`) | 0 (caught by `other`) | — | Typed dynamic-import wrapper. Only a handful exist; surfaced inside `other`. |
+| **`other`** (everything not matched above) | 576 | 35.5% | See breakdown below. |
+
+### `other` breakdown (sampled)
+
+Sampling 40 random rows from the 576-line `other` bucket surfaces these sub-categories:
+
+| Sub-category | Approx. count | Typed replacement |
+|---|---:|---|
+| **Property declaration loose typing** (class field or interface field `<name>: any`) | ~180 | Concrete type from the seam interface. Many are Phase 2d collaborator deps-bags where the original god-file used `any` because the proper type was in a different file. Now that W2 extracted seams, those types have homes. |
+| **Member-access cast** (`(x as any).<field>`) on under-typed runtime objects | ~120 | Either narrow the source type (preferable) or use a `hasField<K>(o, k)`-style type guard. |
+| **API-response cast** (`(await civicApi(...)) as any`) | ~70 | Typed response envelope: `ApiResponse<T>` generic + per-endpoint response types under `modules/ui/app/types/api-responses.ts` or imported from a shared package. |
+| **External-lib type holes** (AWS SDK stream cast, addFormats import default, `globalThis as any`, etc.) | ~50 | `// @ts-expect-error TS<code>: <reason>` with a CI-checked allowlist for legitimate cases; or vendor-supplied augmentation when fixable. |
+| **Generic / function-return `: any`** (function declared returning `any`) | ~80 | Concrete return type. Many are utilities (sanitizers, normalizers) that already preserve structure — `<T>(x: T): T` generics often work. |
+| **Other / one-offs** | ~80 | Case-by-case. |
+
+The "other" bucket is the hardest, but `property declaration loose typing` + `member-access cast` together (~300) are the same underlying problem (under-typed objects) — eliminating those at the source removes both child categories. W2's decomposition created the natural "homes" the plan §W3 prologue predicted.
+
+---
+
+## Per-file hot-spots (top 25)
+
+These 25 files account for **506 casts (31% of the total)**. Concentrated work here clears nearly a third of the inventory.
+
+| Rank | File | Count | Surface | Notes |
+|---:|---|---:|---|---|
+| 1 | `modules/api/src/routes/users/crud-handlers.ts` | 56 | api | Express handlers; mostly `(req as any)` + `(error as any).statusCode` patterns. **Both single-pattern fixes.** |
+| 2 | `modules/api/src/routes/indexing.ts` | 54 | api | Same Express + error patterns. |
+| 3 | `modules/api/src/routes/records/read-handlers.ts` | 52 | api | W2-T9 extracted file; inherited the cast pattern from the parent `records.ts`. |
+| 4 | `modules/api/src/utils/api-logger.ts` | 34 | api | Logger receives `(req as any).user` + `requestId`. Single-pattern fix. |
+| 5 | `modules/ui/app/composables/useRecordEditorActions.ts` | 24 | ui | API-response casts (`(await civicApi(...)) as any`). Typed `ApiResponse<T>` removes them. |
+| 6 | `modules/api/src/routes/diagnose.ts` | 22 | api | Express + error patterns. |
+| 7 | `core/src/diagnostics/checkers/search-checker.ts` | 22 | core | `catch (error: any)` repeated; one typed catch helper covers it. |
+| 8 | `modules/api/src/services/records-service/listing.ts` | 21 | api | W2-T8 extracted file; under-typed `user` object access. |
+| 9 | `modules/api/src/routes/search.ts` | 21 | api | Express + error patterns. |
+| 10 | `modules/api/src/routes/records/write-handlers.ts` | 21 | api | W2-T9 extracted file; same patterns. |
+| 11 | `modules/api/src/routes/users/auxiliary-handlers.ts` | 20 | api | W2-T10 extracted file; same patterns. |
+| 12 | `modules/api/src/routes/auth.ts` | 20 | api | Auth handlers; user-shape access through `as any`. |
+| 13 | `modules/api/src/routes/templates.ts` | 18 | api | Mixed: route handlers + `(apiError as any).statusCode` mutation. |
+| 14 | `modules/api/src/routes/records/draft-handlers.ts` | 18 | api | W2-T9 extracted file. |
+| 15 | `modules/api/src/routes/config.ts` | 17 | api | Express + config-shape access. |
+| 16 | `modules/api/src/routes/status.ts` | 16 | api | Express. |
+| 17 | `modules/api/src/middleware/__tests__/error-handler.test.ts` | 16 | api | Test mocks. |
+| 18 | `modules/ui/app/pages/settings/configuration/[configFile]/edit.vue` | 15 | ui | API-response + Vue prop loose typing. |
+| 19 | `core/src/config/configuration-service.ts` | 15 | core | Config-payload loose typing. |
+| 20 | `modules/ui/app/pages/settings/profile.vue` | 14 | ui | API-response casts. |
+| 21 | `modules/storage/src/cloud-uuid-storage/provider-init.ts` | 14 | storage | W2-T18 extracted file; credentials object access through `as any`. |
+| 22 | `modules/storage/src/__tests__/quota-manager.test.ts` | 14 | storage | Test mocks. |
+| 23 | `modules/api/src/routes/history.ts` | 14 | api | Express + commit-object loose typing. |
+| 24 | `modules/api/src/index.ts` | 14 | api | App-bootstrap-time global wiring. |
+| 25 | `core/src/records/record-schema-validator.ts` | 14 | core | `frontmatter: any` + Ajv module shape. |
+
+**Observation:** 17 of the top 25 hot-spots are in `modules/api/src/routes/`. They share three patterns: (a) `(req as any)` Express access, (b) `catch (error: any) ... (error as any).statusCode = N`, (c) `(req as any).user?.<field>` shape access. **One unified Express.Request augmentation + one typed catch helper would eliminate roughly half of all api/src casts.**
+
+---
+
+## Recommendations for W3-T2 through W3-T6
+
+### Strategic ordering
+
+Master plan §5's exit criterion is "zero `: any` / `as any` repo-wide" with `@typescript-eslint/no-explicit-any: error` enabled. The plan's task list (T3 core → T4 api → T5 ui → T6 storage + lint) is fine, but the inventory suggests a tighter dependency-aware sequencing:
+
+1. **W3-T2 first (typed patterns):** must land before any elimination. Critical artifacts:
+   - `modules/api/src/types/express-augment.d.ts` — augments `Express.Request` with `civicPress`, `user`, `requestId`, etc. **Single biggest leverage:** kills ~254 casts on its own.
+   - `modules/api/src/utils/typed-catch.ts` — typed-catch helper that handles `e instanceof Error` narrowing + the `(err as any).statusCode = N` mutation idiom (replacement: a thrown `HttpError` class or a `setStatus(err, N)` helper). **Second biggest leverage:** kills ~350 casts.
+   - `core/src/types/api-response.ts` (or `modules/ui/app/types/api-responses.ts`) — typed `ApiResponse<T>` envelope. Kills ~70 ui casts.
+   - `core/src/types/diagnostic.ts` — `Issue[]` / `DiagnosticEntry[]` interfaces for the diagnostics module.
+
+2. **W3-T3 (core, 447):** foundation surface. Many api/ui types depend on core. **High `: any` ratio** (358 of 447 = 80%) means most fixes are concrete type declarations, not casts to rewrite. Estimated leverage: high; downstream surfaces become easier after this lands.
+
+3. **W3-T4 (api, 628):** the bulk. Benefits maximally from W3-T2's `express-augment.d.ts` + typed-catch. Recommend per-file batches of 3-5 in worktree-parallel dispatch (the plan's pattern); the top-25 hot-spot list above tells the dispatcher which files to batch.
+
+4. **W3-T5 (ui, 397) + W3-T6 (storage, 149):** can run in parallel — different surfaces, no shared types beyond what W3-T3 produces. UI benefits from typed `ApiResponse<T>` from W3-T2. Storage is mostly DI-handle types (`databaseService: any` → `DatabaseService`) and SDK type holes.
+
+5. **W3-T6 final step (lint rule):** enable `@typescript-eslint/no-explicit-any: error` repo-wide ONLY after all four surfaces hit zero. CI gates new `any` reintroduction.
+
+### Single biggest wins
+
+If the user wants a fast first slice that visibly moves the truth meter:
+
+- **Land `express-augment.d.ts` as one commit during W3-T2.** Removes ~254 casts (15.7% of total) with one type declaration file. Likely a 1-2 hour task.
+- **Land typed-catch + `HttpError` class as one commit during W3-T2.** Removes ~350 casts (21.6% of total). The mutation idiom `(err as any).statusCode = 500; throw err` becomes `throw new HttpError(500, message)`.
+
+Together those two W3-T2 commits cut the inventory from 1,621 → ~1,000 (38% reduction) before any per-surface T3-T6 work begins.
+
+### Estimated effort (refined)
+
+| Task | Casts | Estimated effort | Confidence |
+|---|---:|---|---|
+| W3-T2 patterns + global type augmentations | (lands eliminations as a byproduct: ~600 inferred) | 2-3 days | Medium-high — depends on Express-augment scope creep |
+| W3-T3 core/src | ~447 → 0 | 4-6 days | High — mostly `: any` declarations with obvious replacements |
+| W3-T4 modules/api/src | ~628 → 0 (residual after W3-T2: ~150-200) | 5-7 days | Medium — Express augment knocks most out, rest is per-handler typing |
+| W3-T5 modules/ui/app | ~397 → 0 | 4-6 days | Medium — Vue type ergonomics + API response types |
+| W3-T6 modules/storage/src + lint | ~149 → 0 + CI | 2-3 days | High — smallest surface, mostly DI handle types |
+| **Total realistic effort** | 1,621 → 0 | **17-25 working days** | Master plan §5's 3-5 week estimate matches the upper bound |
+
+### Risk callouts
+
+- **Dynamic imports** (cloud SDKs in `modules/storage/src/providers/*-provider.ts` — post W2-T18 paths): 0 raw matches but likely hidden inside the `other` 576 bucket. W4-T1 will also touch these when moving cloud SDKs to `optionalDependencies`. **Coordinate sequencing**: either W3-T6 leaves storage SDK casts annotated for W4-T1 to convert as it wraps them in try/catch, or W4-T1 lands before W3-T6.
+- **Test-mock casts (137)** can be left for last and partially deferred. The lint rule should not fail on `// @ts-expect-error` comments in test files; consider a per-pattern ESLint override (`overrides: [{ files: ['**/*.test.ts'], rules: { '@typescript-eslint/no-explicit-any': 'warn' } }]`) if 137 fixes is too much yak shaving for the value.
+- **`globalThis as any`** patterns (8 found in `core/src/auth/auth-config.ts` etc.) are intentional Node.js runtime probes that lack DOM/Node intersection types. These legitimately need `// @ts-expect-error` with a CI-allowlisted reason — the lint rule should be configured to permit annotated allowances.
+
+---
+
+## Closes
+
+This inventory satisfies plan §W3-T1 step 4. Downstream W3-T2 onward will close:
+
+- `api-009` (~503 api casts eliminated — actually 628 in current measurement)
+- `ui-011` (~208 ui casts eliminated — actually 397 in current measurement)
+- `storage-015` (~80 storage casts eliminated — actually 149)
+- core-type-safety exit criterion (447 core casts eliminated)
+
+Updated estimates are 25-50% larger than the master plan's original numbers — the surplus is partly from W2 collaborator seams copying casts verbatim, partly from the original audit's under-counting.
