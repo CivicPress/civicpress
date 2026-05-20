@@ -546,6 +546,49 @@ Full triage + closure: `docs/audits/phase-2d-storage-test-triage.md`.
 - 4 stale-test rewrites in `944c73a`: `circuit-breaker.test.ts` (2 cases), `health-checker.test.ts` (1 case), `orphaned-file-cleaner.test.ts` (1 case). Plus a 5th latent stale test surfaced and fixed inline by `4b8ca01` (`timeout-utils.test.ts` "should throw StorageTimeoutError with correct timeout value" — operation delay was less than timeout, so the timeout never fired and `expect.fail` got caught).
 - 1 schema-drift fixture in `7aac837`: `usage-reporter.test.ts` mock now uses `provider_path: 's3://...'` (the storage code derives provider from `provider_path` prefix, not from a `provider` field).
 
+### Phase 2d W1 closures (2026-05-19, all closed)
+
+Module contract + legal-register rename. 5 commits (W1-T1 through W1-T5).
+
+| ID | Status | Closing commit | Notes |
+|---|---|---|---|
+| `legal-register-002` | `closed-with-commit-SHA` | `4e24f19` | Unhardcoded `moduleName === 'legal-register'` check from `record-schema-builder.ts`. Now manifest-driven via `capabilities.schemaExtensions`. |
+| `legal-register-005` | `closed-with-commit-SHA` | `309b907` | Replaced all `process.cwd()`-based module discovery with `ModuleResolver`. |
+
+**Artifacts:** `docs/specs/module-contract.md` (canonical contract, stable v1.0.0); `core/src/modules/module.schema.json` (Ajv-validated); `core/src/modules/{module-manifest.ts, module-resolver.ts}`; `modules/schema-extensions/legal/` (renamed from `modules/legal-register/`); rewritten `docs/module-integration-guide.md`; 13 characterization tests at `tests/core/modules/discovery-characterization.test.ts`. **Phase 3 entry criterion satisfied: "Module contract layer exists."**
+
+### Phase 2d W2 closures (2026-05-19 to 2026-05-20, all closed)
+
+God-file decomposition. 19 commits (W2-T1 through W2-T19). **18 named god-files + 3 surfaced extras decomposed.** Only `core/src/records/record-manager.ts` (933 LoC) remains above the 800 bar; documented in `docs/large-file-exemptions.md` with 3 sunset paths.
+
+| ID | Status | Closing commit | File | Notes |
+|---|---|---|---|---|
+| `phase-2d-godfile-template-engine` | `closed-with-commit-SHA` | `0c1688a` | template-engine.ts | 1,154 → 92 LoC. 4 collaborators (types, loader, generator, record-validator). 26 characterization tests pin behavior. |
+| `phase-2d-godfile-database-checker` | `closed-with-commit-SHA` | `af61dd8` | database-checker.ts | 985 → 505 LoC. 4 collaborators (result-builders, health-checks, schema-checks, auto-fixes). 5 characterization tests. |
+| `phase-2d-godfile-sqlite-search` | `closed-with-commit-SHA` | `105a792` | sqlite-search-service.ts | 970 → 227 LoC. 4 collaborators (sql-builder, suggestions, facets, indexer). 8 characterization tests. |
+| `phase-2d-godfile-database-adapter` | `closed-with-commit-SHA` | `9af3a7d` | database-adapter.ts | 923 → 326 LoC. 3 schema collaborators (tables, migrations, indexes-and-fts). |
+| `phase-2d-godfile-database-service` | `closed-with-commit-SHA` | `ff2fd7d` | database-service.ts | 1,577 → 499 LoC. 4 stores (draft, record, user, storage-file). |
+| `core-008` (master plan named) | `closed-with-commit-SHA` | `395eb5a` | record-manager.ts | 1,467 → 933 LoC (exempted with 3 sunset paths). 4 collaborators (helpers, sagas, search, file-ops). |
+| `phase-2d-godfile-auth-service` | `closed-with-commit-SHA` | `2a412be` | auth-service.ts | 1,354 → 644 LoC. 6 collaborators (crypto, user-ops, api-key-ops, session-ops, oauth-ops, password-ops). |
+| `phase-2d-godfile-records-service` | `closed-with-commit-SHA` | `2cb99b3` | records-service.ts | 1,760 → 229 LoC. 6 collaborators (helpers, crud, listing, drafts, frontmatter-and-publish, locks). |
+| `api-013` (master plan named) | `closed-with-commit-SHA` | `80597e7` | routes/records.ts | 1,459 → 23 LoC factory. 5 handler files + handlers-common. |
+| `phase-2d-godfile-routes-users` | `closed-with-commit-SHA` | `6b55843` | routes/users.ts | 1,443 → 39 LoC factory. 6 handler files. |
+| `phase-2d-godfile-routes-diff` | `closed-with-commit-SHA` | `f658c1b` | routes/diff.ts | 965 → 8 LoC factory. 5 helper files. |
+| `phase-2d-godfile-routes-uuid-storage` | `closed-with-commit-SHA` | `fcd6f01` | routes/uuid-storage.ts | 960 → 24 LoC entry. 4 handler files. |
+| `ui-008` (master plan named) | `closed-with-commit-SHA` | `822ee66` | RecordForm.vue | 1,276 → 746 LoC. 2 composables (recordMarkdown, useRecordEditorActions). |
+| `phase-2d-godfile-file-browser` | `closed-with-commit-SHA` | `63bc60b` | FileBrowser.vue | 1,156 → 320 LoC. 3 sub-components + useFileBrowser composable. |
+| `phase-2d-godfile-geography-form` | `closed-with-commit-SHA` | `62a0bc0` | GeographyForm.vue | 1,104 → 127 LoC. 3 sub-components + useGeographyForm composable. |
+| `phase-2d-godfile-record-sidebar` | `closed-with-commit-SHA` | `c1a3acd` | RecordSidebar.vue | 935 → 301 LoC. 6 panel sub-components + useRecordSidebar composable. |
+| `phase-2d-godfile-page-record-detail` | `closed-with-commit-SHA` | `b0b62c0` | records/[type]/[id]/index.vue | 935 → 171 LoC. 6 sub-components + useRecordDetail composable. |
+| `phase-2d-godfile-cloud-uuid-storage` | `closed-with-commit-SHA` | `258fe80` | cloud-uuid-storage-service.ts | 2,711 → 539 LoC. 8 collaborators (internals, validation, provider-init, upload-ops, download-ops, file-mgmt-ops, batch-ops, streaming-ops). Largest god-file in the codebase. |
+| `phase-2d-godfile-role-manager` | `closed-with-commit-SHA` | `f1c731c` | role-manager.ts | 832 → 586 LoC. Default config extracted. |
+| `phase-2d-godfile-email-validation-service` | `closed-with-commit-SHA` | `f1c731c` | email-validation-service.ts | 832 → 751 LoC. registerEmailChannel extracted. |
+| `phase-2d-godfile-backup-service` | `closed-with-commit-SHA` | `f1c731c` | backup-service.ts | 823 → 696 LoC. Storage-files export/restore pair extracted. |
+
+**Severity rollup:** these are net-new finding IDs created during Phase 2d (god-file decomposition wasn't in the original 205-finding audit's per-row catalog — it lived under master plan §5's general "structural hardening" scope). Master plan §5 explicitly named only 3: `core-008`, `api-013`, `ui-008`. The other 18 IDs are surfaced by exit-criterion adherence ("no file >800 LoC in core/api/ui").
+
+**Truth meter cumulative (end of Phase 2d W0+W1+W2):** 53 original-audit findings closed (51 pre-2d baseline + `legal-register-002` + `legal-register-005`); plus 6 Phase-2b-surfaced + 4 Phase-2c.5-surfaced + 9 Phase-2d-W0-surfaced + 21 Phase-2d-W2-decomp closures = **93 total measurable progress items** (53 from original 205 + 40 surfaced).
+
 ### Deferrals (Phase 2a Task 10 — closed 2026-05-17)
 
 These Criticals are explicitly deferred by the refactor sequencing. None are forgotten — each will be reopened in its target phase.

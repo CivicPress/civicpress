@@ -1513,3 +1513,80 @@ git merge --no-ff refactor/phase-2d-structural-hardening -m "Merge branch 'refac
 - W1-T4 rename touches every workspace (imports). Use `git mv` + comprehensive grep. Run `pnpm install` after the rename — pnpm workspace resolution may need refresh.
 - The `<= 800 LoC` exit criterion may surface files that legitimately can't go lower (generated, schemas, long-lived state machines). `docs/large-file-exemptions.md` is the escape hatch; each entry requires a sunset condition.
 - Net effort estimate (9-14 weeks) is much larger than master plan §5's 2-3 wk estimate. User chose biggest-scope at brainstorm. If pressure forces a smaller phase later, the natural break is W3 (the type-safety pass is the largest discrete chunk; can defer to a 2e if needed).
+
+---
+
+## Progress closure: W0 + W1 + W2 (2026-05-20, end of session)
+
+The first three of the five workstreams are complete on `refactor/phase-2d-structural-hardening` (local, 39 commits, not pushed, not merged to `dev`). **W3 (type-safety) and W4 (deps hygiene) remain.**
+
+### W0 — Storage test triage + rescue ✓
+
+- All **28 of 28** carry-forward storage test failures (deferred from Phase 2c.5) cleared.
+- Surfaced **9 source-code bugs** in storage reliability primitives (retry, timeout, circuit-breaker, batch ops, lifecycle, stream errors, error inheritance) — none in the original 205-finding audit; all closed-with-commit-SHA.
+- 4 stale tests rewritten + 1 schema-drift fixture fixed.
+- Triage doc: `docs/audits/phase-2d-storage-test-triage.md`.
+- 14 commits (W0-T1 through W0-T3 closure, including the 9 bug-fix commits).
+
+### W1 — Module contract + legal-register rename ✓
+
+- Plugin/module contract spec: `docs/specs/module-contract.md` (canonical) + `core/src/modules/module.schema.json` (Ajv-validated).
+- `ModuleResolver` replaces all `process.cwd()`-based discovery (closes `legal-register-005`).
+- Hardcoded `moduleName === 'legal-register'` removed; manifest-driven `capabilities.schemaExtensions` (closes `legal-register-002`).
+- `git mv modules/legal-register → modules/schema-extensions/legal/` (manifest.name kept as `legal-register` for backward compat with ~290 references).
+- `docs/module-integration-guide.md` rewritten (553 → 278 LoC).
+- 13 characterization tests for ModuleResolver discovery.
+- **Phase 3 entry criterion satisfied:** "Module contract layer exists."
+- 5 commits (W1-T1 through W1-T5).
+
+### W2 — God-file decomposition ✓
+
+**18 named god-files + 3 surfaced extras = 21 files decomposed.** Only `core/src/records/record-manager.ts` (933 LoC) remains above the 800 bar; documented in `docs/large-file-exemptions.md` with 3 sunset paths.
+
+| Task | File | Before → After | Closes |
+|---|---|---|---|
+| T1 | template-engine.ts | 1,154 → 92 | `phase-2d-godfile-template-engine` |
+| T2 | database-checker.ts | 985 → 505 | `phase-2d-godfile-database-checker` |
+| T3 | sqlite-search-service.ts | 970 → 227 | `phase-2d-godfile-sqlite-search` |
+| T4 | database-adapter.ts | 923 → 326 | `phase-2d-godfile-database-adapter` |
+| T5 | database-service.ts | 1,577 → 499 | `phase-2d-godfile-database-service` |
+| T6 | record-manager.ts | 1,467 → 933 (exempt) | `core-008` (master plan named) |
+| T7 | auth-service.ts | 1,354 → 644 | `phase-2d-godfile-auth-service` |
+| T8 | records-service.ts | 1,760 → 229 | `phase-2d-godfile-records-service` |
+| T9 | routes/records.ts | 1,459 → 23 factory | `api-013` (master plan named) |
+| T10 | routes/users.ts | 1,443 → 39 factory | `phase-2d-godfile-routes-users` |
+| T11 | routes/diff.ts | 965 → 8 factory | `phase-2d-godfile-routes-diff` |
+| T12 | routes/uuid-storage.ts | 960 → 24 entry | `phase-2d-godfile-routes-uuid-storage` |
+| T13 | RecordForm.vue | 1,276 → 746 | `ui-008` (master plan named) |
+| T14 | FileBrowser.vue | 1,156 → 320 | `phase-2d-godfile-file-browser` |
+| T15 | GeographyForm.vue | 1,104 → 127 | `phase-2d-godfile-geography-form` |
+| T16 | RecordSidebar.vue | 935 → 301 | `phase-2d-godfile-record-sidebar` |
+| T17 | records detail page | 935 → 171 | `phase-2d-godfile-page-record-detail` |
+| T18 | cloud-uuid-storage-service.ts | 2,711 → 539 | `phase-2d-godfile-cloud-uuid-storage` |
+| T19 | role-manager + email-validation + backup (3 surfaced) | 832/832/823 → 586/751/696 | `phase-2d-godfile-role-manager`, `-email-validation-service`, `-backup-service` |
+
+19 commits (W2-T1 through W2-T19).
+
+### Verification at session end
+
+- `pnpm test` (root): **1247 passing / 1 known date-bomb / 19 skipped** — identical to W0 baseline. No regressions across 21 god-file decompositions.
+- `pnpm -r build`: clean across all 6 workspaces.
+- `make audit-truth-check`: PASS.
+- Every file in `core/src/`, `modules/api/src/`, `modules/ui/app/` is ≤ 800 LoC except the documented exemption.
+- Storage god-file decomposed too: `modules/storage/src/cloud-uuid-storage-service.ts` 2,711 → 539 LoC.
+
+### Important discovery during W2-T19
+
+The long-running "§9.1 session-mgmt flake" is **NOT a flake** — it's a date-bomb. The test creates a session with hardcoded expiry `new Date('2025-12-31')`. Today is 2026-05-20, so `getSessionByToken` correctly filters out the now-expired row and returns `null`. Same test fails on the dev-tip baseline (independent of any Phase 2d work). Per master plan §9.1, pre-existing test failures are out of scope for the refactor; surfaced here for the dedicated test-suite-repair session §9.1 mentions.
+
+### Remaining workstreams
+
+- **W3 — Type-safety elimination.** ~1,581 `: any` / `as any` casts across core+api+ui+storage, plus enabling `@typescript-eslint/no-explicit-any: error` lint rule. Master plan §5's biggest remaining workstream; estimated 3-5 weeks. Will start in a fresh session.
+- **W4 — Deps hygiene structural.** Cloud SDKs to `optionalDependencies` (closes storage-006 + deps-008), declare all imports + `--shamefully-hoist=false` CI check (closes api-007 + deps-010), generate `docs/licenses.md` (closes deps-011), ui-002 final decision. Estimated 3-5 days.
+- **Closure task** at the very end: full closure report, registry update, merge readiness for `dev`.
+
+### Branch state
+
+- Not pushed to any origin (per `refactor-push-policy` memory rule).
+- 39 commits on `refactor/phase-2d-structural-hardening`.
+- Behind W2 close: 28 of 28 storage failures cleared, 21 god-files decomposed, plugin contract live.
