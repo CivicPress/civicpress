@@ -1567,9 +1567,28 @@ The first three of the five workstreams are complete on `refactor/phase-2d-struc
 
 19 commits (W2-T1 through W2-T19).
 
+### Characterization test coverage (targeted-closure approach, 2026-05-20 follow-up)
+
+The W2 method primer (this plan, §W2) called for one characterization test per god-file (18 total) as a regression guard before each decomposition. In the run-up to the W0+W1+W2 progress closure (commit `132baa1`), char-tests landed for W2-T1, T2, T3 only — the pattern was then dropped as decomposition-by-decomposition verification via the existing test suite gave green signals (1247 passing, no regressions). The W2 closure-task §3 ("18 characterization test files; all green") was therefore not satisfied as written.
+
+Reopened immediately after the progress-closure commit. After a per-file coverage audit (`grep -rl <file> tests/`), three files had **zero direct test coverage** — the three highest decomposition-regression-risk gaps:
+
+| Task | File | Existing direct tests | New char-test |
+|---|---|---|---|
+| T8 | `modules/api/src/services/records-service.ts` (1,760 → 229) | 0 direct (33 via routes/records integration) | `tests/api/characterization/records-service.characterization.test.ts` — 22 tests covering helpers (`normalizeDateString`, `getKindPriority`, `buildFilterClause`), locks collaborator, orchestrator public surface |
+| T14 | `modules/ui/app/components/storage/FileBrowser.vue` (1,156 → 320) | 0 | `tests/ui/characterization/file-browser.characterization.test.ts` — 24 tests covering `useFileBrowser` pure helpers (icon/color/preview/format), selection state machine, modal helpers |
+| T18 | `modules/storage/src/cloud-uuid-storage-service.ts` (2,711 → 539) | 0 | `tests/storage/characterization/cloud-uuid-storage-service.characterization.test.ts` — 37 tests covering `internals` pure helpers (parseSizeString, formatBytes, generateStoredFilename*, extractErrorCode, generateErrorSummary, dbRecordToStorageFile, getLocalStoragePath), `StorageValidation` (file + batch), orchestrator public surface |
+
+**Deviation rationale for T4-T7, T9-T13, T15-T17:** these files already carry meaningful direct test coverage (3-33 referencing test files each, see audit table) and the decompositions passed the existing tests at each extraction step. Retroactive characterization tests for files that already have a green-signaling test suite would be makework. Documenting the deviation here so a future hardening pass can revisit if needed.
+
+**One notable quirk surfaced by the FileBrowser char-test:** `useFileBrowser.getFileIcon` checks `mime.includes('document')` before `mime.includes('spreadsheet')`, so the openxml `.xlsx` mime (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`) falls into the word-document branch and renders with `i-lucide-file-text` + `text-blue-600` instead of the spreadsheet icon. Pinned as current behavior; not a Phase 2d regression (pre-existing in the original FileBrowser.vue), but worth fixing in a future polish pass.
+
+Total characterization tests: **6 files, 122 tests** (T1: 26, T2: 5, T3: 8, T8: 22, T14: 24, T18: 37) — all green.
+
 ### Verification at session end
 
-- `pnpm test` (root): **1247 passing / 1 known date-bomb / 19 skipped** — identical to W0 baseline. No regressions across 21 god-file decompositions.
+- `pnpm test` (root): **1305 passing / 1 known date-bomb / 19 skipped** — pre-W2 baseline was 1247; +58 net from new char-tests + earlier W2 sub-tests. No new regressions across the 21 god-file decompositions; `tests/api/records.test.ts > should update existing draft` occasionally times out under parallel load but passes 62/62 in isolation (flake, not regression).
+- `pnpm -C modules/storage test:run`: **216 passing across 17 files** (storage workspace runner — the new `tests/storage/characterization/` lives outside its include scope but the root runner picks it up).
 - `pnpm -r build`: clean across all 6 workspaces.
 - `make audit-truth-check`: PASS.
 - Every file in `core/src/`, `modules/api/src/`, `modules/ui/app/` is ≤ 800 LoC except the documented exemption.
@@ -1588,5 +1607,5 @@ The long-running "§9.1 session-mgmt flake" is **NOT a flake** — it's a date-b
 ### Branch state
 
 - Not pushed to any origin (per `refactor-push-policy` memory rule).
-- 39 commits on `refactor/phase-2d-structural-hardening`.
-- Behind W2 close: 28 of 28 storage failures cleared, 21 god-files decomposed, plugin contract live.
+- 39 commits on `refactor/phase-2d-structural-hardening` at progress-closure (`132baa1`); +1 followup commit for retroactive char-tests + W2 formal closure (this section).
+- Behind W2 close: 28 of 28 storage failures cleared, 21 god-files decomposed (3 with new retroactive char-tests for the highest-risk zero-coverage gaps), plugin contract live.
