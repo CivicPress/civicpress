@@ -243,27 +243,23 @@ export class RecordSchemaBuilder {
   }
 
   /**
-   * Determine if a module schema should be applied to a record type
+   * Determine if a module schema should be applied to a record type.
    *
-   * For example, legal-register applies to bylaw, ordinance, policy, etc.
+   * Reads `capabilities.schemaExtensions` from the module's manifest
+   * (loaded via ModuleResolver). The prior hardcoded
+   * `moduleName === 'legal-register'` check was replaced by this
+   * manifest-driven lookup in Phase 2d W1-T3 (closes legal-register-002).
+   * Future modules opt into record types by declaring them in their
+   * `module.json` — no core code changes required.
    */
   private static shouldApplyModuleSchema(
     moduleName: string,
     recordType: string
   ): boolean {
-    // legal-register applies to legal document types
-    if (moduleName === 'legal-register') {
-      return [
-        'bylaw',
-        'ordinance',
-        'policy',
-        'proclamation',
-        'resolution',
-      ].includes(recordType);
-    }
-
-    // Add other module logic here as needed
-    return false;
+    const loaded = getModuleResolver().loadByName(moduleName);
+    if (!loaded) return false;
+    const types = loaded.manifest.capabilities.schemaExtensions ?? [];
+    return types.includes(recordType);
   }
 
   /**
