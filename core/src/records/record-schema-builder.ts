@@ -16,6 +16,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { CentralConfigManager } from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
+import { ModuleResolver } from '../modules/module-resolver.js';
 
 const logger = new Logger();
 
@@ -34,6 +35,31 @@ const pluginSchemas = new Map<
   string,
   { schema: any; appliesTo: (recordType: string) => boolean }
 >();
+
+/**
+ * Injected ModuleResolver for filesystem-based module discovery.
+ * Set by civic-core-services.ts at startup (Phase 2d W1-T2). When unset,
+ * mergeModuleExtensions falls back to a process.cwd()-based default for
+ * backward compatibility during the migration; production code paths
+ * always set this.
+ */
+let injectedModuleResolver: ModuleResolver | null = null;
+
+export function setModuleResolver(resolver: ModuleResolver): void {
+  injectedModuleResolver = resolver;
+  // Invalidate schema cache so subsequent builds pick up the new resolver.
+  schemaCache.clear();
+}
+
+function getModuleResolver(): ModuleResolver {
+  if (injectedModuleResolver) {
+    return injectedModuleResolver;
+  }
+  // Fallback for direct test invocations / pre-init contexts. Same shape as
+  // the pre-W1-T2 behavior (look under cwd/modules) but routed through the
+  // resolver abstraction.
+  return new ModuleResolver(join(process.cwd(), 'modules'));
+}
 
 /**
  * RecordSchemaBuilder - Builds dynamic JSON schemas for record validation
@@ -170,10 +196,17 @@ export class RecordSchemaBuilder {
 
   /**
    * Merge module schema extensions (e.g., legal-register)
+   *
+   * As of Phase 2d W1-T2, discovery is routed through `ModuleResolver` so
+   * the `process.cwd()`-based traversal is gone. The W1-T3 follow-up
+   * removes the remaining hardcoded `moduleName === 'legal-register'`
+   * check by reading `manifest.capabilities.schemaExtensions` from the
+   * loaded module.
    */
   private static mergeModuleExtensions(schema: any, recordType?: string): void {
     try {
       const modules = CentralConfigManager.getModules();
+      const resolver = getModuleResolver();
 
       for (const moduleName of modules) {
         // Check if this record type should use this module's schema
@@ -184,26 +217,24 @@ export class RecordSchemaBuilder {
           continue;
         }
 
-        const moduleSchemaPath = join(
-          process.cwd(),
-          'modules',
-          moduleName,
-          'schemas',
-          'record-schema-extension.json'
-        );
+        const loaded = resolver.loadByName(moduleName);
+        if (!loaded || !loaded.schemaPath) {
+          logger.debug(`No schema extension found for module ${moduleName}`);
+          continue;
+        }
 
         try {
-          const moduleSchemaContent = readFileSync(moduleSchemaPath, 'utf-8');
+          const moduleSchemaContent = readFileSync(loaded.schemaPath, 'utf-8');
           const moduleSchema = JSON.parse(moduleSchemaContent);
 
-          // Merge using allOf pattern
           if (!schema.allOf) {
             schema.allOf = [];
           }
           schema.allOf.push(moduleSchema);
         } catch (error) {
-          // Module schema doesn't exist, that's okay
-          logger.debug(`No schema extension found for module ${moduleName}`);
+          logger.debug(
+            `Failed to read schema extension for module ${moduleName}: ${error}`
+          );
         }
       }
     } catch (error) {

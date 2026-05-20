@@ -135,6 +135,15 @@ export * from './cache/index.js';
 export { ServiceContainer } from './di/container.js';
 export type { ServiceContainer as IServiceContainer } from './di/container.js';
 
+// Module system (introduced Phase 2d W1-T2) — see docs/specs/module-contract.md
+export { ModuleResolver } from './modules/module-resolver.js';
+export type {
+  ModuleManifest,
+  LoadedModule,
+  ModuleCapabilities,
+  ModuleKind,
+} from './modules/module-manifest.js';
+
 export {
   TemplateService,
   TemplateCache,

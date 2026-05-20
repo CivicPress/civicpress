@@ -35,6 +35,8 @@ import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { SecretsManager } from './security/secrets.js';
 import { AuditLogger } from './audit/audit-logger.js';
 import { AuditChannel } from './audit/audit-channel.js';
+import { ModuleResolver } from './modules/module-resolver.js';
+import { setModuleResolver as setRecordSchemaModuleResolver } from './records/record-schema-builder.js';
 
 /**
  * Register all CivicPress services in the dependency injection container
@@ -91,6 +93,23 @@ export function registerCivicPressServices(
   }
 
   container.registerInstance('dbConfig', dbConfig);
+
+  // Step 2.5: Register ModuleResolver (Phase 2d W1-T2) — replaces the
+  // prior process.cwd()-based filesystem discovery in record-schema-builder
+  // and the storage-module fallback below. ModulesRoot resolves relative
+  // to the project root (parent of dataDir) so production and test runs
+  // both find the modules/ directory deterministically.
+  container.singleton('moduleResolver', (c) => {
+    const config = c.resolve<CivicPressConfig>('config');
+    const projectRoot = path.isAbsolute(config.dataDir)
+      ? path.dirname(config.dataDir)
+      : path.resolve(process.cwd(), path.dirname(config.dataDir));
+    const resolver = new ModuleResolver(path.join(projectRoot, 'modules'));
+    // Wire into RecordSchemaBuilder so schema-extension lookup uses the
+    // same resolver instance (singleton across the request lifecycle).
+    setRecordSchemaModuleResolver(resolver);
+    return resolver;
+  });
 
   // Step 3: Register database service (depends on: logger, dbConfig)
   // Note: cacheManager is registered later, but DatabaseService can work without it initially
@@ -240,6 +259,11 @@ export async function completeServiceInitialization(
   container: ServiceContainer,
   civicPress: CivicPress
 ): Promise<void> {
+  // Force-resolve ModuleResolver early so its factory side-effect (wiring
+  // RecordSchemaBuilder via setModuleResolver) runs before any schema
+  // build attempts. Phase 2d W1-T2.
+  container.resolve<ModuleResolver>('moduleResolver');
+
   // Initialize secrets manager first (before other services that depend on it)
   const secretsManager = container.resolve<SecretsManager>('secretsManager');
   await secretsManager.initialize();

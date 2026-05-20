@@ -206,3 +206,30 @@ export class WorkflowTransitionError extends ValidationError {
     });
   }
 }
+
+/**
+ * Module System Errors (introduced 2026-05-19, Phase 2d W1-T2)
+ *
+ * Raised by ModuleResolver during manifest discovery and validation.
+ * See docs/specs/module-contract.md for the manifest contract.
+ */
+
+export class ModuleManifestInvalid extends ValidationError {
+  override code = 'MODULE_MANIFEST_INVALID';
+
+  constructor(message: string, manifestPath?: string, validationErrors?: any) {
+    super(message, {
+      ...(manifestPath && { manifestPath }),
+      ...(validationErrors && { validationErrors }),
+    });
+  }
+}
+
+export class ModuleDependencyCycle extends CivicPressError {
+  code = 'MODULE_DEPENDENCY_CYCLE';
+  statusCode = 500;
+
+  constructor(message: string, cycle?: string[]) {
+    super(message, cycle ? { cycle } : undefined);
+  }
+}

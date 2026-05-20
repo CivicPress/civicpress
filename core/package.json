@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "tsc && npm run build:copy-schemas",
-    "build:copy-schemas": "mkdir -p dist/schemas/record-type-schemas && cp -r src/schemas/*.json dist/schemas/ 2>/dev/null || true && cp -r src/schemas/record-type-schemas/*.json dist/schemas/record-type-schemas/ 2>/dev/null || true",
+    "build:copy-schemas": "mkdir -p dist/schemas/record-type-schemas dist/modules && cp -r src/schemas/*.json dist/schemas/ 2>/dev/null || true && cp -r src/schemas/record-type-schemas/*.json dist/schemas/record-type-schemas/ 2>/dev/null || true && cp src/modules/module.schema.json dist/modules/ 2>/dev/null || true",
     "dev": "tsc --watch",
     "dev:build": "tsc && tsc --watch",
     "test": "jest",
