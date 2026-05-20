@@ -8,6 +8,6 @@ packages:
   - core
   - modules/api
   - modules/ui
-  - modules/legal-register
+  - modules/schema-extensions/legal
   - modules/storage
   # - modules/serve (Astro frontend removed)

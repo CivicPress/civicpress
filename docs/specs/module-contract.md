@@ -57,7 +57,7 @@ Every module directory MUST contain a `module.json` file at its root with the fo
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `$schema` | string | optional | URL/path to the JSON Schema this manifest validates against. Recommended for IDE autocomplete. |
-| `name` | string | **required** | Module's canonical name. MUST match the directory name (or `<group>/<name>` if nested). |
+| `name` | string | **required** | Module's canonical identifier (used by ModuleResolver cache, config's `modules: []` list, and record-frontmatter `module:` field). SHOULD match the directory name; MAY differ when a directory rename is performed without breaking existing identifier references (e.g., `legal-register` keeps its name while moving from `modules/legal-register/` to `modules/schema-extensions/legal/`). |
 | `version` | string | **required** | Semver-compatible version. |
 | `kind` | enum | **required** | `"module"` for full modules with code; `"schema-extension"` for schema-only contributions. |
 | `description` | string | optional | One-line description for human readers. |
