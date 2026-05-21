@@ -18,6 +18,28 @@ import { CentralConfigManager } from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
 import { ModuleResolver } from '../modules/module-resolver.js';
 
+/**
+ * Loose JSON Schema shape — captures the fields this builder reads and
+ * mutates. Mirrors the local type in `record-schema-validator.ts`.
+ */
+interface JsonSchemaObject {
+  $id?: string;
+  $ref?: string;
+  type?: string | string[];
+  properties?: Record<string, JsonSchemaObject>;
+  allOf?: JsonSchemaObject[];
+  anyOf?: JsonSchemaObject[];
+  oneOf?: JsonSchemaObject[];
+  items?: JsonSchemaObject | JsonSchemaObject[];
+  enum?: unknown[];
+  required?: string[];
+  if?: JsonSchemaObject;
+  then?: JsonSchemaObject;
+  else?: JsonSchemaObject;
+  additionalProperties?: boolean | JsonSchemaObject;
+  [key: string]: unknown;
+}
+
 const logger = new Logger();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,14 +48,14 @@ const __dirname = dirname(__filename);
 /**
  * Schema cache to avoid rebuilding schemas on every validation
  */
-const schemaCache = new Map<string, any>();
+const schemaCache = new Map<string, JsonSchemaObject>();
 
 /**
  * Registered plugin schemas (registered at runtime)
  */
 const pluginSchemas = new Map<
   string,
-  { schema: any; appliesTo: (recordType: string) => boolean }
+  { schema: JsonSchemaObject; appliesTo: (recordType: string) => boolean }
 >();
 
 /**
@@ -68,7 +90,7 @@ export class RecordSchemaBuilder {
   /**
    * Get the base schema from file
    */
-  private static getBaseSchema(): any {
+  private static getBaseSchema(): JsonSchemaObject {
     const schemaPath = join(__dirname, '../schemas/record-base-schema.json');
     try {
       const schemaContent = readFileSync(schemaPath, 'utf-8');
@@ -95,12 +117,13 @@ export class RecordSchemaBuilder {
       includeTypeExtensions?: boolean;
       includePluginExtensions?: boolean;
     } = {}
-  ): any {
+  ): JsonSchemaObject {
     const cacheKey = `${recordType || 'base'}-${JSON.stringify(options)}`;
 
     // Check cache first
-    if (schemaCache.has(cacheKey)) {
-      return schemaCache.get(cacheKey);
+    const cached = schemaCache.get(cacheKey);
+    if (cached) {
+      return cached;
     }
 
     try {
@@ -138,7 +161,7 @@ export class RecordSchemaBuilder {
   /**
    * Inject dynamic enum values for type and status from config
    */
-  private static injectDynamicEnums(schema: any): void {
+  private static injectDynamicEnums(schema: JsonSchemaObject): void {
     try {
       // Inject valid record types
       const recordTypes = CentralConfigManager.getRecordTypesConfig();
@@ -167,7 +190,7 @@ export class RecordSchemaBuilder {
   /**
    * Merge type-specific schema extension (geography, session)
    */
-  private static mergeTypeExtension(schema: any, recordType: string): void {
+  private static mergeTypeExtension(schema: JsonSchemaObject, recordType: string): void {
     const typeSchemaPath = join(
       __dirname,
       '../schemas/record-type-schemas',
@@ -203,7 +226,7 @@ export class RecordSchemaBuilder {
    * check by reading `manifest.capabilities.schemaExtensions` from the
    * loaded module.
    */
-  private static mergeModuleExtensions(schema: any, recordType?: string): void {
+  private static mergeModuleExtensions(schema: JsonSchemaObject, recordType?: string): void {
     try {
       const modules = CentralConfigManager.getModules();
       const resolver = getModuleResolver();
@@ -272,7 +295,7 @@ export class RecordSchemaBuilder {
   /**
    * Merge plugin schema extensions (registered at runtime)
    */
-  private static mergePluginExtensions(schema: any, recordType?: string): void {
+  private static mergePluginExtensions(schema: JsonSchemaObject, recordType?: string): void {
     for (const [pluginName, pluginSchema] of pluginSchemas.entries()) {
       // Check if this plugin schema applies to this record type
       if (recordType && !pluginSchema.appliesTo(recordType)) {
@@ -300,7 +323,7 @@ export class RecordSchemaBuilder {
    */
   static registerPluginSchema(
     pluginName: string,
-    schema: any,
+    schema: JsonSchemaObject,
     appliesTo: (recordType: string) => boolean
   ): void {
     pluginSchemas.set(pluginName, { schema, appliesTo });

@@ -12,9 +12,34 @@ import {
   coreDebug,
 } from '../utils/core-output.js';
 
+/**
+ * Workflow payload type — polymorphic by design (each workflow takes a
+ * different data shape). `unknown` forces consumers to narrow before
+ * accessing fields.
+ */
+export type WorkflowData = unknown;
+
+/**
+ * Workflow callable signature: each workflow receives the start data
+ * plus its assigned workflow ID.
+ */
+export type WorkflowFn = (
+  data: WorkflowData,
+  workflowId: string
+) => Promise<void>;
+
+export interface ActiveWorkflow {
+  name: string;
+  data: WorkflowData;
+  status: 'running' | 'completed' | 'failed';
+  startTime: Date;
+  /** Workflow-specific metadata recorded on completion. */
+  metadata?: Record<string, unknown>;
+}
+
 export class WorkflowEngine {
-  private workflows: Map<string, any>;
-  private activeWorkflows: Map<string, any>;
+  private workflows: Map<string, WorkflowFn>;
+  private activeWorkflows: Map<string, ActiveWorkflow>;
   private indexingService?: IndexingService;
 
   constructor() {
@@ -43,14 +68,14 @@ export class WorkflowEngine {
   /**
    * Register a workflow
    */
-  registerWorkflow(name: string, workflow: any): void {
+  registerWorkflow(name: string, workflow: WorkflowFn): void {
     this.workflows.set(name, workflow);
   }
 
   /**
    * Start a workflow
    */
-  async startWorkflow(name: string, data: any): Promise<string> {
+  async startWorkflow(name: string, data: WorkflowData): Promise<string> {
     const workflow = this.workflows.get(name);
     if (!workflow) {
       throw new Error(`Workflow '${name}' not found`);
@@ -78,14 +103,14 @@ export class WorkflowEngine {
   /**
    * Get workflow status
    */
-  getWorkflowStatus(workflowId: string): any {
+  getWorkflowStatus(workflowId: string): ActiveWorkflow | undefined {
     return this.activeWorkflows.get(workflowId);
   }
 
   /**
    * Get all active workflows
    */
-  getActiveWorkflows(): Map<string, any> {
+  getActiveWorkflows(): Map<string, ActiveWorkflow> {
     return this.activeWorkflows;
   }
 
@@ -97,7 +122,10 @@ export class WorkflowEngine {
   }
 
   // Default workflows
-  private async approvalWorkflow(data: any, workflowId: string): Promise<void> {
+  private async approvalWorkflow(
+    _data: WorkflowData,
+    workflowId: string
+  ): Promise<void> {
     // TODO: Implement approval workflow
     // - Check permissions
     // - Send notifications
@@ -109,7 +137,7 @@ export class WorkflowEngine {
   }
 
   private async publicationWorkflow(
-    data: any,
+    data: WorkflowData,
     workflowId: string
   ): Promise<void> {
     // TODO: Implement publication workflow
@@ -122,7 +150,10 @@ export class WorkflowEngine {
     });
   }
 
-  private async archivalWorkflow(data: any, workflowId: string): Promise<void> {
+  private async archivalWorkflow(
+    _data: WorkflowData,
+    workflowId: string
+  ): Promise<void> {
     // TODO: Implement archival workflow
     // - Archive record
     // - Update metadata
@@ -137,7 +168,7 @@ export class WorkflowEngine {
    * Auto-indexing workflow - triggered when records are updated
    */
   private async updateIndexWorkflow(
-    data: any,
+    data: WorkflowData,
     workflowId: string
   ): Promise<void> {
     if (!this.indexingService) {
@@ -149,21 +180,33 @@ export class WorkflowEngine {
     }
 
     try {
+      // Narrow the polymorphic `data` payload to extract the record
+      // metadata this workflow needs (title/module/type). The shape
+      // is set by record-manager when it emits the update event.
+      const record =
+        data &&
+        typeof data === 'object' &&
+        'record' in data &&
+        typeof (data as { record?: unknown }).record === 'object' &&
+        (data as { record?: unknown }).record !== null
+          ? ((data as { record: Record<string, unknown> }).record)
+          : null;
+
       coreInfo('Auto-indexing workflow started', {
         operation: 'workflow:update-index',
         workflowId,
-        record: data?.record?.title,
+        record: record?.title,
       });
 
       // Determine indexing scope based on the updated record
-      const indexingOptions: any = {};
+      const indexingOptions: Record<string, unknown> = {};
 
-      if (data?.record?.module) {
-        indexingOptions.modules = [data.record.module];
+      if (typeof record?.module === 'string') {
+        indexingOptions.modules = [record.module];
       }
 
-      if (data?.record?.type) {
-        indexingOptions.types = [data.record.type];
+      if (typeof record?.type === 'string') {
+        indexingOptions.types = [record.type];
       }
 
       // Generate indexes with the determined scope

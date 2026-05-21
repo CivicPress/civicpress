@@ -132,14 +132,14 @@ export class TemplateRecordValidator {
 
   // ----- rule helpers -----
 
-  private validateBusinessRule(_rule: string, _frontmatter: any): boolean {
+  private validateBusinessRule(_rule: string, _frontmatter: Record<string, unknown>): boolean {
     // Placeholder — in a real implementation, more sophisticated parsing.
     return true;
   }
 
   private validateAdvancedRule(
     rule: AdvancedValidationRule,
-    frontmatter: any
+    frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     if (rule.condition && !this.evaluateCondition(rule.condition, frontmatter)) {
       return { valid: true };
@@ -161,7 +161,7 @@ export class TemplateRecordValidator {
 
   private validateFieldRelationship(
     relationship: FieldRelationship,
-    frontmatter: any
+    frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     if (
       relationship.condition &&
@@ -204,7 +204,7 @@ export class TemplateRecordValidator {
 
   private validateCustomField(
     validator: CustomValidator,
-    frontmatter: any
+    frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     const fieldValue = frontmatter[validator.field];
 
@@ -250,7 +250,7 @@ export class TemplateRecordValidator {
 
   private validateDateSequence(
     rule: AdvancedValidationRule,
-    frontmatter: any
+    frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     const dates = rule.fields
       .map((field) => frontmatter[field])
@@ -259,6 +259,12 @@ export class TemplateRecordValidator {
     if (dates.length < 2) return { valid: true };
 
     const parsedDates = dates
+      .filter(
+        (date): date is string | number | Date =>
+          typeof date === 'string' ||
+          typeof date === 'number' ||
+          date instanceof Date
+      )
       .map((date) => new Date(date))
       .filter((date) => !isNaN(date.getTime()));
     if (parsedDates.length < 2) return { valid: true };
@@ -271,7 +277,7 @@ export class TemplateRecordValidator {
 
   private validateFieldDependency(
     rule: AdvancedValidationRule,
-    frontmatter: any
+    frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     const [dependentField, requiredField] = rule.fields;
     if (frontmatter[dependentField] && !frontmatter[requiredField]) {
@@ -282,7 +288,7 @@ export class TemplateRecordValidator {
 
   private validateContentQuality(
     rule: AdvancedValidationRule,
-    frontmatter: any
+    frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     const contentFields = rule.fields.map((field) => frontmatter[field]);
     const totalContent = contentFields.join(' ');
@@ -296,7 +302,7 @@ export class TemplateRecordValidator {
 
   private validateBusinessLogic(
     _rule: AdvancedValidationRule,
-    _frontmatter: any
+    _frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     // Placeholder — implement specific business rules as needed
     return { valid: true };
@@ -304,7 +310,7 @@ export class TemplateRecordValidator {
 
   private validateConditionalRelationship(
     relationship: FieldRelationship,
-    frontmatter: any
+    frontmatter: Record<string, unknown>
   ): { valid: boolean } {
     const [field1, field2] = relationship.fields;
     if (frontmatter[field1] && !frontmatter[field2]) {
@@ -315,12 +321,14 @@ export class TemplateRecordValidator {
 
   // ----- format validators -----
 
-  private isValidEmail(email: string): boolean {
+  private isValidEmail(email: unknown): boolean {
+    if (typeof email !== 'string') return false;
     if (!email) return true;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
-  private isValidUrl(url: string): boolean {
+  private isValidUrl(url: unknown): boolean {
+    if (typeof url !== 'string') return false;
     if (!url) return true;
     try {
       new URL(url);
@@ -330,18 +338,21 @@ export class TemplateRecordValidator {
     }
   }
 
-  private isValidPhone(phone: string): boolean {
+  private isValidPhone(phone: unknown): boolean {
+    if (typeof phone !== 'string') return false;
     if (!phone) return true;
     return /^[\+]?[1-9][\d]{0,15}$/.test(phone.replace(/[\s\-\(\)]/g, ''));
   }
 
-  private isValidDate(date: string): boolean {
+  private isValidDate(date: unknown): boolean {
+    if (typeof date !== 'string' && typeof date !== 'number') return false;
     if (!date) return true;
     const dateObj = new Date(date);
     return !isNaN(dateObj.getTime());
   }
 
-  private isValidSemanticVersion(version: string): boolean {
+  private isValidSemanticVersion(version: unknown): boolean {
+    if (typeof version !== 'string') return false;
     if (!version) return true;
     return /^\d+\.\d+\.\d+$/.test(version);
   }
@@ -372,7 +383,7 @@ export class TemplateRecordValidator {
 
   private evaluateCondition(
     condition: string,
-    variables: Record<string, any>
+    variables: Record<string, unknown>
   ): boolean {
     const parts = condition.trim().split(/\s*(==|!=)\s*/);
 

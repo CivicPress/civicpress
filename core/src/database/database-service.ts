@@ -139,11 +139,11 @@ export class DatabaseService {
   }
 
   // Direct database access methods
-  async query(sql: string, params: any[] = []): Promise<any[]> {
+  async query(sql: string, params: unknown[] = []): Promise<any[]> {
     return await this.adapter.query(sql, params);
   }
 
-  async execute(sql: string, params: any[] = []): Promise<any> {
+  async execute(sql: string, params: unknown[] = []): Promise<any> {
     return await this.adapter.execute(sql, params);
   }
 
@@ -373,7 +373,7 @@ export class DatabaseService {
       'DELETE FROM record_locks WHERE record_id = ? AND locked_by = ?',
       [recordId, lockedBy]
     );
-    return (result as any).changes > 0;
+    return ((result as { changes?: number }).changes ?? 0) > 0;
   }
 
   async getLock(recordId: string): Promise<any | null> {
@@ -398,7 +398,7 @@ export class DatabaseService {
       'UPDATE record_locks SET expires_at = ? WHERE record_id = ? AND locked_by = ?',
       [expiresAt.toISOString(), recordId, lockedBy]
     );
-    return (result as any).changes > 0;
+    return ((result as { changes?: number }).changes ?? 0) > 0;
   }
 
   // ---------------------------------------------------------------------------

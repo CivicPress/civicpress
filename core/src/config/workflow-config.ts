@@ -110,7 +110,7 @@ export class WorkflowConfigManager {
         'value' in config.transitions[fromStatus]
       ) {
         allowedTransitions =
-          (config.transitions[fromStatus] as any).value || [];
+          (config.transitions[fromStatus] as { value?: string[] }).value || [];
       }
     }
 
@@ -160,7 +160,7 @@ export class WorkflowConfigManager {
             'value' in roleConfig.can_transition[fromStatus]
           ) {
             allowedForRole =
-              (roleConfig.can_transition[fromStatus] as any).value || [];
+              (roleConfig.can_transition[fromStatus] as { value?: string[] }).value || [];
           }
         }
 
@@ -174,7 +174,7 @@ export class WorkflowConfigManager {
             'value' in roleConfig.can_transition['any']
           ) {
             anyTransitions =
-              (roleConfig.can_transition['any'] as any).value || [];
+              (roleConfig.can_transition['any'] as { value?: string[] }).value || [];
           }
           allowedForRole = [...allowedForRole, ...anyTransitions];
         }
@@ -229,7 +229,7 @@ export class WorkflowConfigManager {
         typeof actionPermissions === 'object' &&
         'value' in actionPermissions
       ) {
-        allowedTypes = (actionPermissions as any).value || [];
+        allowedTypes = (actionPermissions as { value?: string[] }).value || [];
       }
     }
 
@@ -264,7 +264,7 @@ export class WorkflowConfigManager {
         typeof typeStatuses === 'object' &&
         'value' in typeStatuses
       ) {
-        return (typeStatuses as any).value || [];
+        return (typeStatuses as { value?: string[] }).value || [];
       }
       return [];
     }
@@ -277,7 +277,7 @@ export class WorkflowConfigManager {
       typeof config.statuses === 'object' &&
       'value' in config.statuses
     ) {
-      return (config.statuses as any).value || [];
+      return (config.statuses as { value?: string[] }).value || [];
     }
 
     return [];
@@ -301,7 +301,7 @@ export class WorkflowConfigManager {
         'value' in config.transitions[fromStatus]
       ) {
         // New format: { value: string[], type: string, description: string, required: boolean }
-        allTransitions = (config.transitions[fromStatus] as any).value || [];
+        allTransitions = (config.transitions[fromStatus] as { value?: string[] }).value || [];
       }
     }
 
@@ -327,7 +327,7 @@ export class WorkflowConfigManager {
         ) {
           // New format: { value: string[], type: string, description: string, required: boolean }
           roleTransitions =
-            (roleConfig.can_transition[fromStatus] as any).value || [];
+            (roleConfig.can_transition[fromStatus] as { value?: string[] }).value || [];
         }
       }
 
@@ -341,7 +341,7 @@ export class WorkflowConfigManager {
           'value' in roleConfig.can_transition['any']
         ) {
           anyTransitions =
-            (roleConfig.can_transition['any'] as any).value || [];
+            (roleConfig.can_transition['any'] as { value?: string[] }).value || [];
         }
         roleTransitions = [...roleTransitions, ...anyTransitions];
       }

@@ -27,6 +27,7 @@ import {
 import { InternalError } from '../errors/index.js';
 import { GeographyParser } from './geography-parser.js';
 import { Logger } from '../utils/logger.js';
+import type { AuthUser } from '../auth/auth-service.js';
 import { coreWarn } from '../utils/core-output.js';
 
 const logger = new Logger();
@@ -45,7 +46,7 @@ export class GeographyManager {
    */
   async createGeographyFile(
     request: CreateGeographyRequest,
-    user: any
+    user: AuthUser
   ): Promise<GeographyFile> {
     try {
       // Validate the content
@@ -228,7 +229,7 @@ export class GeographyManager {
   async updateGeographyFile(
     id: string,
     request: UpdateGeographyRequest,
-    user: any
+    user: AuthUser
   ): Promise<GeographyFile> {
     try {
       const existingFile = await this.getGeographyFile(id);
@@ -346,7 +347,7 @@ export class GeographyManager {
   /**
    * Delete a geography file
    */
-  async deleteGeographyFile(id: string, user: any): Promise<void> {
+  async deleteGeographyFile(id: string, user: AuthUser): Promise<void> {
     try {
       const existingFile = await this.getGeographyFile(id);
       if (!existingFile) {
@@ -572,32 +573,33 @@ export class GeographyManager {
     content: string,
     type: GeographyFileType
   ): Promise<ParsedGeographyData> {
-    let parsedContent: any;
+    let parsedContent: unknown;
     let bounds: BoundingBox;
     let featureCount = 0;
     let geometryTypes: string[] = [];
 
     try {
       if (type === 'geojson') {
-        parsedContent = JSON.parse(content);
+        const parsed = JSON.parse(content) as {
+          type?: string;
+          features?: Array<{ geometry?: { type?: string } }>;
+        };
+        parsedContent = parsed;
 
-        if (
-          parsedContent.type === 'FeatureCollection' &&
-          Array.isArray(parsedContent.features)
-        ) {
-          featureCount = parsedContent.features.length;
+        if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
+          featureCount = parsed.features.length;
 
           // Extract geometry types
           geometryTypes = [
             ...new Set(
-              parsedContent.features
-                .map((f: any) => f.geometry?.type)
+              parsed.features
+                .map((f) => f.geometry?.type)
                 .filter(Boolean)
             ),
           ] as string[];
 
           // Calculate bounds
-          bounds = this.calculateBounds(parsedContent.features);
+          bounds = this.calculateBounds(parsed.features);
         } else {
           throw new Error('Invalid GeoJSON structure');
         }
@@ -626,7 +628,7 @@ export class GeographyManager {
   /**
    * Calculate bounding box from features
    */
-  private calculateBounds(features: any[]): BoundingBox {
+  private calculateBounds(features: Array<{ geometry?: { type?: string; coordinates?: unknown } }>): BoundingBox {
     let minLon = Infinity;
     let minLat = Infinity;
     let maxLon = -Infinity;
@@ -668,7 +670,7 @@ export class GeographyManager {
    * Extract coordinates from geometry recursively
    */
   private extractCoordinates(
-    coordinates: any,
+    coordinates: unknown,
     callback: (lon: number, lat: number) => void
   ): void {
     if (Array.isArray(coordinates)) {
