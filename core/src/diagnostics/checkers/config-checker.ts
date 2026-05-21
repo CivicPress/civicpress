@@ -5,6 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
 import { CentralConfigManager } from '../../config/central-config.js';
 import { ConfigurationService } from '../../config/configuration-service.js';
 import { Logger } from '../../utils/logger.js';
@@ -42,9 +43,9 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
         this.configurationService = new ConfigurationService({
           dataPath: dataDir,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.warn('Failed to initialize ConfigurationService', {
-          error: error.message,
+          error: errorMessage(error),
         });
       }
     }
@@ -222,10 +223,10 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
         checks,
         issues: [],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('Configuration diagnostic check failed', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
       });
       return this.createErrorResult(
         'Configuration diagnostic check failed',
@@ -284,7 +285,7 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
         path: configPath,
         size: stats.size,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult('Failed to check .civicrc file', error);
     }
   }
@@ -309,9 +310,9 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
         hasDataDir: !!config.dataDir,
         hasDatabase: !!config.database,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if it's a YAML parsing error
-      if (error.message?.includes('YAML') || error.message?.includes('parse')) {
+      if (errorMessage(error)?.includes('YAML') || errorMessage(error)?.includes('parse')) {
         return this.createErrorResult(
           'YAML parsing error in configuration',
           error,
@@ -384,7 +385,7 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult(
         'All required configuration fields present'
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult('Failed to check required fields', error);
     }
   }
@@ -434,9 +435,9 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
           // Try to parse YAML
           try {
             yaml.parse(content);
-          } catch (parseError: any) {
+          } catch (parseError: unknown) {
             validationErrors.push(
-              `${file}: YAML parse error - ${parseError.message}`
+              `${file}: YAML parse error - ${errorMessage(parseError)}`
             );
             continue;
           }
@@ -453,15 +454,15 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
             } else {
               validatedFiles.push(file);
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             // If validation fails, just mark as warning
             this.logger.warn(`Failed to validate ${file}`, {
-              error: error.message,
+              error: errorMessage(error),
             });
             validatedFiles.push(file); // Assume valid if validation service fails
           }
-        } catch (error: any) {
-          validationErrors.push(`${file}: ${error.message}`);
+        } catch (error: unknown) {
+          validationErrors.push(`${file}: ${errorMessage(error)}`);
         }
       }
 
@@ -480,9 +481,9 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('All configuration files validated', {
         files: validatedFiles.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check configuration files', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -530,9 +531,9 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
           writable: true,
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check file permissions', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -596,7 +597,7 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('Database configuration is valid', {
         type: dbConfig.type,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult(
         'Failed to check database configuration',
         error
@@ -679,12 +680,12 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
             )
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.push(
           this.createFixResult(
             issue.id,
             false,
-            `Auto-fix failed: ${error.message}`,
+            `Auto-fix failed: ${errorMessage(error)}`,
             {
               error,
               duration: Date.now() - startTime,

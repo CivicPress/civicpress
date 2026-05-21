@@ -125,7 +125,7 @@ export class DiagnosticCircuitBreaker {
       // Record success
       this.recordSuccess(checkName);
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Record failure
       this.recordFailure(checkName);
       throw error;

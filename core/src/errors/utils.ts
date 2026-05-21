@@ -29,7 +29,8 @@ export function getErrorCode(error: unknown): string {
     return error.code;
   }
   if (error instanceof Error && 'code' in error) {
-    return String((error as any).code);
+    const code = (error as Error & { code?: unknown }).code;
+    return String(code);
   }
   return 'INTERNAL_ERROR';
 }
@@ -42,7 +43,8 @@ export function getStatusCode(error: unknown): number {
     return error.statusCode;
   }
   if (error instanceof Error && 'statusCode' in error) {
-    return Number((error as any).statusCode) || 500;
+    const statusCode = (error as Error & { statusCode?: unknown }).statusCode;
+    return Number(statusCode) || 500;
   }
   return 500;
 }

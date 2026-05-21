@@ -7,6 +7,7 @@
  */
 
 import * as fs from 'fs';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../../utils/error-narrow.js';
 import type { DatabaseService } from '../../../database/database-service.js';
 import type { CheckResult } from '../../types.js';
 import { pass, warning, error } from './result-builders.js';
@@ -44,7 +45,7 @@ export async function checkDatabaseFile(
       path: dbPath,
       size: stats.size,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return error('Failed to check database file', err);
   }
 }
@@ -73,13 +74,13 @@ export async function checkIntegrity(
     return error('Database integrity check failed', undefined, {
       integrityResult: integrityValue,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (
-      err.message?.includes('corrupt') ||
-      err.message?.includes('malformed')
+      errorMessage(err)?.includes('corrupt') ||
+      errorMessage(err)?.includes('malformed')
     ) {
       return error('Database corruption detected', err, {
-        errorCode: err.code,
+        errorCode: errorCode(err),
       });
     }
     return error('Failed to run integrity check', err);
@@ -131,7 +132,7 @@ export async function checkFragmentation(
     return pass('Database fragmentation is acceptable', {
       fragmentation: `${fragmentation.toFixed(1)}%`,
     });
-  } catch (err: any) {
-    return warning('Failed to check fragmentation', { error: err.message });
+  } catch (err: unknown) {
+    return warning('Failed to check fragmentation', { error: errorMessage(err) });
   }
 }

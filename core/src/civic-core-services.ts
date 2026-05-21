@@ -6,6 +6,7 @@
  */
 
 import * as path from 'path';
+import { errorMessage, errorStack, errorCode, errorName } from './utils/error-narrow.js';
 import { ServiceContainer } from './di/container.js';
 import { CivicPressConfig } from './civic-core.js';
 import { Logger } from './utils/logger.js';
@@ -304,7 +305,7 @@ export async function completeServiceInitialization(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       try {
         storageModule = await import('@civicpress/storage' as string);
-      } catch (e1: any) {
+      } catch (e1: unknown) {
         // Fallback to file:// URL import if package import fails
         // This helps in test environments where module resolution might differ
         const path = await import('path');
@@ -323,11 +324,11 @@ export async function completeServiceInitialization(
           storageModule = await import(storageUrl);
           // Fallback succeeded - exit early, don't let outer catch interfere
           importError = null;
-        } catch (e2: any) {
+        } catch (e2: unknown) {
           // File path import also failed - storage module not available
           const logger = container.resolve<Logger>('logger');
           if (process.env.NODE_ENV === 'test') {
-            logger.warn(`Fallback import failed: ${e2?.message || e2}`);
+            logger.warn(`Fallback import failed: ${errorMessage(e2) || e2}`);
             logger.warn(`Storage path attempted: ${storagePath}`);
           }
           // Both imports failed - set error for outer catch
@@ -335,7 +336,7 @@ export async function completeServiceInitialization(
           storageModule = null;
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Only set error if not already set by inner catch
       if (!importError) {
         importError = err;
@@ -345,9 +346,9 @@ export async function completeServiceInitialization(
         // Module not found - this is expected in some environments
         // Check if it's a module not found error vs other errors
         if (
-          err?.code === 'ERR_MODULE_NOT_FOUND' ||
-          err?.message?.includes('Cannot find module') ||
-          err?.message?.includes('Cannot find package')
+          errorCode(err) === 'ERR_MODULE_NOT_FOUND' ||
+          errorMessage(err)?.includes('Cannot find module') ||
+          errorMessage(err)?.includes('Cannot find package')
         ) {
           // Expected - storage module not available
           storageModule = null;
@@ -356,7 +357,7 @@ export async function completeServiceInitialization(
           const logger = container.resolve<Logger>('logger');
           logger.warn(
             'Storage module import failed (non-standard error):',
-            err?.message || err
+            errorMessage(err) || err
           );
           storageModule = null;
         }
@@ -381,14 +382,14 @@ export async function completeServiceInitialization(
       // Always log in test environment to help debug
       if (process.env.NODE_ENV === 'test') {
         logger.warn(
-          `Storage module import failed: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+          `Storage module import failed: ${errorCode(importError) || 'unknown'} - ${errorMessage(importError) || 'no message'}`
         );
-        if (importError?.stack) {
-          logger.warn('Storage import stack:', importError.stack);
+        if (errorStack(importError)) {
+          logger.warn('Storage import stack:', errorStack(importError));
         }
       } else if (logger.isVerbose()) {
         logger.debug(
-          `Storage module not available: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+          `Storage module not available: ${errorCode(importError) || 'unknown'} - ${errorMessage(importError) || 'no message'}`
         );
       }
     }

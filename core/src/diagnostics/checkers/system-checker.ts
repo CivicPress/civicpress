@@ -5,6 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
 import {
   CheckResult,
@@ -274,10 +275,10 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         checks,
         issues: [],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('System diagnostic check failed', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
       });
       return this.createErrorResult('System diagnostic check failed', error, {
         checks,
@@ -322,9 +323,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         version: nodeVersion,
         major: majorVersion,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check Node.js version', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -493,9 +494,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         processRssGB: processRssGB.toFixed(2),
         heapUsagePercent: heapUsagePercent.toFixed(1) + '%',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check memory usage', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -579,9 +580,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         load5Min: load5Min.toFixed(2),
         load15Min: load15Min.toFixed(2),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check CPU usage', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -615,9 +616,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('Process limits are healthy', {
         maxRssMB: maxRssMB.toFixed(2),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check process limits', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -650,9 +651,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         osType,
         osRelease,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check platform', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }

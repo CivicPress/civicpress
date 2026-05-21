@@ -16,6 +16,7 @@ import {
   DiagnosticStatus,
   CheckResult,
 } from './types.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../utils/error-narrow.js';
 import { DatabaseService } from '../database/database-service.js';
 import { SearchService } from '../search/search-service.js';
 import { CentralConfigManager } from '../config/central-config.js';
@@ -202,14 +203,14 @@ export class DiagnosticService {
       });
 
       return report;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
 
       this.logger.error('Diagnostic run failed', {
         runId,
         duration,
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
         operation: 'diagnose:run_all',
       });
 
@@ -221,10 +222,10 @@ export class DiagnosticService {
           action: 'diagnose:run_all',
           target: { type: 'system' },
           outcome: 'failure',
-          message: `Diagnostic run failed: ${error.message}`,
+          message: `Diagnostic run failed: ${errorMessage(error)}`,
           metadata: {
             runId,
-            error: error.message,
+            error: errorMessage(error),
             duration,
           },
         });
@@ -321,20 +322,29 @@ export class DiagnosticService {
           try {
             const fixResults = await checker.autoFix(componentIssues, options);
             results.push(...fixResults);
-          } catch (error: any) {
+          } catch (error: unknown) {
             this.logger.error(
               `Auto-fix failed for ${component}:${checker.name}`,
               {
-                error: error.message,
+                error: errorMessage(error),
               }
             );
             results.push({
               issueId: componentIssues[0]?.id || 'unknown',
               success: false,
-              message: `Auto-fix failed: ${error.message}`,
+              message: `Auto-fix failed: ${errorMessage(error)}`,
               rollbackAvailable: false,
               duration: 0,
-              error: error,
+              error: {
+                category: 'unknown',
+                severity: 'medium',
+                actionable: false,
+                recoverable: true,
+                retryable: false,
+                message: errorMessage(error),
+                code: errorCode(error),
+                stack: errorStack(error),
+              },
             });
           }
         }

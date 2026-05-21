@@ -74,7 +74,7 @@ export function createTestContainer(
  * @returns Configured mock container
  */
 export function createMockContainer(mocks?: {
-  [key: string]: any;
+  [key: string]: unknown;
 }): ServiceContainer {
   const container = new ServiceContainer();
 

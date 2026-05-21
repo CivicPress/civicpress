@@ -5,6 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
 import {
   CheckResult,
@@ -219,10 +220,10 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
         checks,
         issues: [],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('Filesystem diagnostic check failed', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
       });
       return this.createErrorResult(
         'Filesystem diagnostic check failed',
@@ -290,7 +291,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('Data directory is accessible', {
         path: this.dataDir,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult('Failed to check data directory', error);
     }
   }
@@ -363,7 +364,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
         required: requiredDirs.length,
         optional: optionalDirs.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult(
         'Failed to check directory structure',
         error
@@ -400,19 +401,19 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
             }
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If statfs fails, return warning
         return this.createWarningResult('Failed to check disk space', {
-          error: error.message,
+          error: errorMessage(error),
           recommendation: 'Check disk space manually using system tools',
         });
       }
 
       return this.analyzeDiskSpace(freeBytes, totalBytes, freePercentage);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If disk space check fails, return warning (not error)
       return this.createWarningResult('Failed to check disk space', {
-        error: error.message,
+        error: errorMessage(error),
         recommendation: 'Check disk space manually',
       });
     }
@@ -481,7 +482,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
         fs.accessSync(this.dataDir, fs.constants.R_OK | fs.constants.W_OK);
       } catch (error) {
         permissionIssues.push(
-          `Data directory: ${error instanceof Error ? error.message : String(error)}`
+          `Data directory: ${error instanceof Error ? errorMessage(error) : String(error)}`
         );
       }
 
@@ -494,7 +495,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
             fs.accessSync(dirPath, fs.constants.R_OK | fs.constants.W_OK);
           } catch (error) {
             permissionIssues.push(
-              `${dir}: ${error instanceof Error ? error.message : String(error)}`
+              `${dir}: ${error instanceof Error ? errorMessage(error) : String(error)}`
             );
           }
         }
@@ -507,9 +508,9 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
       }
 
       return this.createSuccessResult('File permissions are correct');
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check permissions', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -553,9 +554,9 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('Data directory integrity is good', {
         recordFiles: recordFiles.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check data integrity', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -581,7 +582,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
           'Storage directory has permission issues',
           {
             path: storageDir,
-            error: error instanceof Error ? error.message : String(error),
+            error: error instanceof Error ? errorMessage(error) : String(error),
           }
         );
       }
@@ -589,9 +590,9 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('Storage directory is healthy', {
         path: storageDir,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check storage health', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -638,12 +639,12 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
             )
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.push(
           this.createFixResult(
             issue.id,
             false,
-            `Auto-fix failed: ${error.message}`,
+            `Auto-fix failed: ${errorMessage(error)}`,
             {
               error,
               duration: Date.now() - startTime,
@@ -690,9 +691,9 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
             // Set permissions to 755 (rwxr-xr-x)
             fs.chmodSync(dir, 0o755);
             this.logger.info(`Fixed permissions for: ${dir}`);
-          } catch (error: any) {
+          } catch (error: unknown) {
             this.logger.warn(`Failed to fix permissions for ${dir}`, {
-              error: error.message,
+              error: errorMessage(error),
             });
           }
         }

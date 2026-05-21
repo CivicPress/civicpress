@@ -64,7 +64,7 @@ export class ResourceLockManager {
         timeout,
         expiresAt,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if lock already exists
       const existingLock = await this.getLock(resourceKey);
 

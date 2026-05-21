@@ -1,5 +1,5 @@
 export interface TemplateData {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ProcessedTemplate {

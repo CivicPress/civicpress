@@ -5,6 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
 import { DatabaseService } from '../../database/database-service.js';
 import { SearchService } from '../../search/search-service.js';
 import { Logger } from '../../utils/logger.js';
@@ -219,10 +220,10 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         checks,
         issues: [],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('Search diagnostic check failed', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
       });
       return this.createErrorResult('Search diagnostic check failed', error, {
         checks,
@@ -246,12 +247,12 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         return this.createSuccessResult(
           'Search service is available and functional'
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         return this.createErrorResult('Search service query failed', error, {
-          errorMessage: error.message,
+          errorMessage: errorMessage(error),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult(
         'Failed to check search service availability',
         error
@@ -292,8 +293,8 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         return this.createSuccessResult('FTS5 table is healthy', {
           recordCount: count,
         });
-      } catch (error: any) {
-        if (error.message?.includes('no such table')) {
+      } catch (error: unknown) {
+        if (errorMessage(error)?.includes('no such table')) {
           return this.createErrorResult(
             'FTS5 table exists but is not accessible',
             error
@@ -301,7 +302,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         }
         return this.createErrorResult('Failed to query FTS5 table', error);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult('Failed to check FTS5 health', error);
     }
   }
@@ -324,7 +325,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
           'SELECT COUNT(*) as count FROM search_index_fts5'
         );
         fts5Count = fts5CountResult[0]?.count || 0;
-      } catch (error: any) {
+      } catch (error: unknown) {
         return this.createErrorResult(
           'Failed to query FTS5 table for sync check',
           error
@@ -364,7 +365,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
           recommendation: 'Run full index rebuild: civic index --sync-db',
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createErrorResult('Failed to check index sync', error);
     }
   }
@@ -389,7 +390,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
           await this.searchService.search(query, { limit: 10 });
           const duration = Date.now() - startTime;
           performanceResults.push(duration);
-        } catch (error: any) {
+        } catch (error: unknown) {
           // If query fails, skip it
           continue;
         }
@@ -429,9 +430,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         averageDuration: `${avgDuration.toFixed(0)}ms`,
         maxDuration: `${maxDuration.toFixed(0)}ms`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check query performance', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -491,9 +492,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('Search cache health is good', {
         cacheStats,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check cache health', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -526,7 +527,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
           } else {
             errorCount++;
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           errorCount++;
         }
       }
@@ -553,9 +554,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         testQueries: testQueries.length,
         successCount,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check search suggestions', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -596,9 +597,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
               databaseConfig: (adapter as any).config,
             });
             backupId = backup.timestamp;
-          } catch (error: any) {
+          } catch (error: unknown) {
             this.logger.warn('Failed to create backup before fix', {
-              error: error.message,
+              error: errorMessage(error),
             });
           }
         }
@@ -637,12 +638,12 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
             )
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.push(
           this.createFixResult(
             issue.id,
             false,
-            `Auto-fix failed: ${error.message}`,
+            `Auto-fix failed: ${errorMessage(error)}`,
             {
               error,
               duration: Date.now() - startTime,
@@ -667,9 +668,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
       await adapter.execute('DROP TRIGGER IF EXISTS search_index_fts5_insert');
       await adapter.execute('DROP TRIGGER IF EXISTS search_index_fts5_update');
       await adapter.execute('DROP TRIGGER IF EXISTS search_index_fts5_delete');
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.warn('Error dropping FTS5 table/triggers', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
 
@@ -740,9 +741,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
     if (searchService.searchCache) {
       try {
         searchService.searchCache.clear?.();
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.warn('Failed to clear search cache', {
-          error: error.message,
+          error: errorMessage(error),
         });
       }
     }
@@ -750,9 +751,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
     if (searchService.suggestionsCache) {
       try {
         searchService.suggestionsCache.clear?.();
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger.warn('Failed to clear suggestions cache', {
-          error: error.message,
+          error: errorMessage(error),
         });
       }
     }

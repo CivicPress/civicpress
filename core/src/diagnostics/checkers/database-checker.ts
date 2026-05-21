@@ -16,6 +16,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
 import { DatabaseService } from '../../database/database-service.js';
 import { Logger } from '../../utils/logger.js';
 import {
@@ -260,10 +261,10 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
         checks,
         issues: [],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('Database diagnostic check failed', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
       });
       return this.createErrorResult(
         'Database diagnostic check failed',
@@ -359,12 +360,12 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
             { duration: Date.now() - startTime }
           )
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.push(
           this.createFixResult(
             issue.id,
             false,
-            `Auto-fix failed: ${err.message}`,
+            `Auto-fix failed: ${errorMessage(err)}`,
             { error: err, duration: Date.now() - startTime }
           )
         );
@@ -406,10 +407,10 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
         backupPath: backup.tarballPath,
       });
       return backup.timestamp;
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.logger.warn('Failed to create backup before fix', {
-        error: err.message,
-        stack: err.stack,
+        error: errorMessage(err),
+        stack: errorStack(err),
         backupDir: path.join(this.dataDir, 'exports', 'backups'),
       });
       return undefined;
@@ -476,9 +477,9 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
         await fixIndexes(this.databaseService, this.logger);
         fixed = true;
         fixMessage = 'Indexes recreated (general schema fix)';
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.logger.warn('Failed to recreate indexes during schema fix', {
-          error: err.message,
+          error: errorMessage(err),
         });
       }
     }

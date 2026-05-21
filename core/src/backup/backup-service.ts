@@ -21,7 +21,7 @@ interface StorageFolderConfig {
   max_size?: string;
   description?: string;
   backup_included?: boolean;
-  [key: string]: any; // Allow additional properties
+  [key: string]: unknown; // Allow additional properties
 }
 
 interface StorageProviderConfig {

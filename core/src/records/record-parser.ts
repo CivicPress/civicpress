@@ -63,6 +63,37 @@ interface FrontmatterData {
     imported_by?: string;
   };
 
+  // Commit Linkage (populated during export/archive)
+  commit_ref?: string;
+  commit_signature?: string;
+
+  // Relationships (alternative naming used by some callers)
+  linkedRecords?: Array<{
+    id: string;
+    type: string;
+    description: string;
+    path?: string;
+    category?: string;
+  }>;
+  linkedGeographyFiles?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
+
   // Type-specific fields
   geography_data?: any;
   category?: string;
@@ -104,7 +135,7 @@ interface FrontmatterData {
   }>;
 
   // Metadata (catch-all for other fields)
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

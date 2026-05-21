@@ -12,6 +12,7 @@
  */
 
 import AjvModule from 'ajv';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../utils/error-narrow.js';
 import addFormatsModule from 'ajv-formats';
 import { RecordSchemaBuilder } from './record-schema-builder.js';
 import { Logger } from '../utils/logger.js';
@@ -108,10 +109,11 @@ export class RecordSchemaValidator {
       let validate;
       try {
         validate = ajv.compile(schemaForValidation);
-      } catch (compileError: any) {
+      } catch (compileError: unknown) {
+        const compileMsg = errorMessage(compileError);
         if (
-          compileError.message?.includes('already exists') ||
-          compileError.message?.includes('key or id')
+          compileMsg.includes('already exists') ||
+          compileMsg.includes('key or id')
         ) {
           // Schema ID collision - create a fresh AJV instance and try again
           this.ajvInstance = null;
@@ -161,7 +163,7 @@ export class RecordSchemaValidator {
       result.errors.push({
         severity: 'error',
         code: 'SCHEMA_VALIDATION_EXCEPTION',
-        message: `Schema validation exception: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Schema validation exception: ${error instanceof Error ? errorMessage(error) : String(error)}`,
         field: 'schema',
       });
     }

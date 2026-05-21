@@ -6,6 +6,7 @@
  */
 
 import { coreError, coreInfo, coreDebug } from '../../utils/core-output.js';
+import { errorMessage, errorStack, errorCode, errorName } from '../../utils/error-narrow.js';
 
 /**
  * Minimal executor surface used by migrations: query (for column
@@ -108,13 +109,13 @@ export async function ensureWorkflowStateColumn(
         { operation: 'database:initialize' }
       );
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     coreError(
       'Workflow state column migration check failed',
       'MIGRATION_ERROR',
       {
-        error: err?.message || String(err),
-        stack: err?.stack,
+        error: errorMessage(err) || String(err),
+        stack: errorStack(err),
         operation: 'database:initialize',
       },
       { operation: 'database:initialize' }
@@ -199,12 +200,12 @@ export async function migrateSearchIndexColumns(
         `ALTER TABLE search_index ADD COLUMN ${column.name} ${column.type}`
       );
       coreDebug(`Added column ${column.name} to search_index`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (
-        !err.message?.includes('duplicate column') &&
-        !err.message?.includes('already exists')
+        !errorMessage(err)?.includes('duplicate column') &&
+        !errorMessage(err)?.includes('already exists')
       ) {
-        coreDebug(`Error adding column ${column.name}:`, err.message);
+        coreDebug(`Error adding column ${column.name}:`, errorMessage(err));
       }
     }
   }

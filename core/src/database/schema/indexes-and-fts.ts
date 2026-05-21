@@ -5,6 +5,7 @@
  */
 
 import { coreDebug, coreError } from '../../utils/core-output.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
 import type { DDLExecutor } from './migrations.js';
 
 const SAGA_INDEXES = [
@@ -83,9 +84,9 @@ async function applyIndexBatch(
       coreDebug(`Created index ${index.name} for ${index.description}`, {
         operation: 'database:initialize',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       coreDebug(
-        `Index ${index.name} already exists or creation failed: ${err.message}`,
+        `Index ${index.name} already exists or creation failed: ${errorMessage(err)}`,
         { operation: 'database:initialize' }
       );
     }
@@ -159,8 +160,8 @@ export async function createFTS5Table(exec: DDLExecutor): Promise<void> {
     `);
 
     coreDebug('Created FTS5 triggers');
-  } catch (err: any) {
-    coreError('Error creating FTS5 table or triggers:', err.message);
+  } catch (err: unknown) {
+    coreError('Error creating FTS5 table or triggers:', errorMessage(err));
     // Don't throw — FTS5 might not be available in some SQLite builds.
   }
 }

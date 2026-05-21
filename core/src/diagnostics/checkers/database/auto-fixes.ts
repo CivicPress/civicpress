@@ -7,6 +7,7 @@
  */
 
 import type { DatabaseService } from '../../../database/database-service.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../../utils/error-narrow.js';
 import type { Logger } from '../../../utils/logger.js';
 
 /**
@@ -23,8 +24,8 @@ export async function fixFTS5(
     await adapter.execute('DROP TRIGGER IF EXISTS search_index_fts5_insert');
     await adapter.execute('DROP TRIGGER IF EXISTS search_index_fts5_update');
     await adapter.execute('DROP TRIGGER IF EXISTS search_index_fts5_delete');
-  } catch (err: any) {
-    logger.warn('Error dropping FTS5 table/triggers', { error: err.message });
+  } catch (err: unknown) {
+    logger.warn('Error dropping FTS5 table/triggers', { error: errorMessage(err) });
   }
 
   await adapter.execute(`
@@ -118,9 +119,9 @@ export async function fixIndexes(
   for (const index of indexes) {
     try {
       await adapter.execute(index.sql);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.warn(`Failed to create index ${index.name}`, {
-        error: err.message,
+        error: errorMessage(err),
       });
     }
   }
@@ -161,9 +162,9 @@ export async function fixMissingColumns(
         `ALTER TABLE ${table} ADD COLUMN ${column} ${columnType}`
       );
       logger.info(`Added missing column ${column} to ${table}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.warn(`Failed to add column ${column} to ${table}`, {
-        error: err.message,
+        error: errorMessage(err),
       });
     }
   }

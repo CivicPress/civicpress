@@ -9,6 +9,7 @@
  */
 
 import { DatabaseAdapter } from '../database-adapter.js';
+import { errorMessage, errorStack, errorCode, errorName } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
 
 export class DraftStore {
@@ -86,13 +87,13 @@ export class DraftStore {
         }
       }
       // If table doesn't exist, CREATE TABLE will include the column
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log error but continue - if INSERT fails, we'll get a clear error
       this.logger.error(
         'Error checking/adding workflow_state column before insert',
         {
           id: draftData.id,
-          error: error?.message || String(error),
+          error: errorMessage(error) || String(error),
         }
       );
       // Don't throw - let INSERT attempt proceed, it will fail with clear error if needed
@@ -118,11 +119,11 @@ export class DraftStore {
           draftData.created_by,
         ]
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If INSERT fails due to missing column, try to add it and retry
       if (
-        error?.message?.includes('no such column: workflow_state') ||
-        error?.message?.includes('no column named workflow_state')
+        errorMessage(error)?.includes('no such column: workflow_state') ||
+        errorMessage(error)?.includes('no column named workflow_state')
       ) {
         this.logger.warn(
           'INSERT failed due to missing workflow_state column, adding it and retrying',
@@ -158,12 +159,12 @@ export class DraftStore {
             { id: draftData.id }
           );
           columnAdded = true;
-        } catch (retryError: any) {
+        } catch (retryError: unknown) {
           this.logger.error(
             'Failed to create draft even after adding workflow_state column',
             {
               id: draftData.id,
-              error: retryError?.message || String(retryError),
+              error: errorMessage(retryError) || String(retryError),
             }
           );
           throw retryError;
@@ -245,14 +246,14 @@ export class DraftStore {
             }
           );
         }
-      } catch (verifyError: any) {
+      } catch (verifyError: unknown) {
         this.logger.error(
           'Failed to verify/update workflow_state after INSERT',
           {
             id: draftData.id,
             requested: requestedWorkflowState,
-            error: verifyError?.message || String(verifyError),
-            stack: verifyError?.stack,
+            error: errorMessage(verifyError) || String(verifyError),
+            stack: errorStack(verifyError),
           }
         );
         // Don't throw - the INSERT succeeded, just the verification/UPDATE failed

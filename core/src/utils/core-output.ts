@@ -13,7 +13,7 @@ export interface CoreSuccessOutput<T = any> {
     operation?: string;
     duration?: number;
     context?: Record<string, any>;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

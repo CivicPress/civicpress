@@ -1,4 +1,5 @@
 import { readFile, writeFile, access, mkdir } from 'fs/promises';
+import { errorMessage, errorStack, errorCode, errorName } from '../utils/error-narrow.js';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import { parse, stringify } from 'yaml';
@@ -161,9 +162,9 @@ export class ConfigurationService {
         lineWidth: 0,
       });
       await writeFile(userPath, yamlContent, 'utf-8');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMsg =
-        error?.message || error?.toString() || String(error) || 'Unknown error';
+        errorMessage(error) || error?.toString() || String(error) || 'Unknown error';
       throw new Error(
         `Failed to save configuration ${configType}: ${errorMsg}`
       );
@@ -191,25 +192,23 @@ export class ConfigurationService {
         await mkdir(dirname(userPath), { recursive: true });
       }
       await this.saveConfiguration(configType, defaultConfig);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Extract detailed error information
+      const msg = errorMessage(error);
+      const stack = errorStack(error);
+      const code = errorCode(error);
+      const name = errorName(error);
       let errorMsg = 'Unknown error';
-      if (error?.message && error.message.trim()) {
-        errorMsg = error.message;
+      if (msg && msg.trim()) {
+        errorMsg = msg;
       } else if (typeof error === 'string' && error.trim()) {
         errorMsg = error;
-      } else if (
-        error?.toString &&
-        error.toString() !== '[object Object]' &&
-        error.toString().trim()
-      ) {
-        errorMsg = error.toString();
-      } else if (error?.stack) {
-        errorMsg = error.stack.split('\n')[0];
-      } else if (error?.code) {
-        errorMsg = `Error code: ${error.code}`;
-      } else if (error?.name) {
-        errorMsg = `Error: ${error.name}`;
+      } else if (stack) {
+        errorMsg = stack.split('\n')[0];
+      } else if (code) {
+        errorMsg = `Error code: ${code}`;
+      } else if (name && name !== 'UnknownError') {
+        errorMsg = `Error: ${name}`;
       }
       throw new Error(
         `Failed to reset configuration ${configType}: ${errorMsg}`
@@ -341,12 +340,12 @@ export class ConfigurationService {
         try {
           const parsed = parse(content);
           config = this.transformToLegacyFormat(parsed);
-        } catch (parseError: any) {
+        } catch (parseError: unknown) {
           // YAML parsing error - this is a syntax error
           return {
             valid: false,
             errors: [
-              `YAML syntax error: ${parseError.message || String(parseError)}`,
+              `YAML syntax error: ${errorMessage(parseError) || String(parseError)}`,
             ],
           };
         }

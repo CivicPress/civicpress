@@ -7,6 +7,7 @@
  */
 
 import type { DatabaseService } from '../../../database/database-service.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../../../utils/error-narrow.js';
 import type { CheckResult } from '../../types.js';
 import { pass, warning, error } from './result-builders.js';
 
@@ -79,7 +80,7 @@ export async function checkSchema(
     }
 
     return pass('Schema validation passed', { tables: tableNames.length });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return error('Failed to check schema', err);
   }
 }
@@ -108,7 +109,7 @@ export async function checkTableColumns(
     }
 
     return pass('Table columns validated');
-  } catch (err: any) {
+  } catch (err: unknown) {
     return error('Failed to check table columns', err);
   }
 }
@@ -140,7 +141,7 @@ export async function checkIndexes(
     }
 
     return pass('Index validation passed', { indexes: indexNames.length });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return error('Failed to check indexes', err);
   }
 }
@@ -164,8 +165,8 @@ export async function checkFTS5(
 
     try {
       await databaseService.query('SELECT * FROM search_index_fts5 LIMIT 1');
-    } catch (err: any) {
-      if (err.message?.includes('no such table')) {
+    } catch (err: unknown) {
+      if (errorMessage(err)?.includes('no such table')) {
         return error('FTS5 table exists but is not accessible', err);
       }
       // Other errors (e.g. empty-table edge case) are OK.
@@ -190,7 +191,7 @@ export async function checkFTS5(
     return pass('FTS5 table and triggers validated', {
       triggers: triggerNames.length,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return error('Failed to check FTS5', err);
   }
 }

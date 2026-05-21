@@ -10,6 +10,7 @@ import {
   DiagnosticOptions,
   DiagnosticProgress,
 } from './types.js';
+import { errorMessage, errorStack, errorCode, errorName, toError } from '../utils/error-narrow.js';
 import { DiagnosticCircuitBreaker } from './circuit-breaker.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { Logger } from '../utils/logger.js';
@@ -137,25 +138,34 @@ export class CheckExecutor {
       });
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
 
       // Determine if it's a timeout
       const isTimeout =
-        error.code === 'CHECK_TIMEOUT' || error.message?.includes('timed out');
+        errorCode(error) === 'CHECK_TIMEOUT' || errorMessage(error)?.includes('timed out');
 
       const result: CheckResult = {
         name: checker.name,
         status: isTimeout ? 'timeout' : 'error',
-        message: error.message || 'Check failed',
+        message: errorMessage(error) || 'Check failed',
         duration,
-        error: error,
+        error: {
+          category: 'unknown',
+          severity: 'medium',
+          actionable: false,
+          recoverable: !isTimeout,
+          retryable: isTimeout,
+          message: errorMessage(error) || 'Check failed',
+          code: errorCode(error),
+          stack: errorStack(error),
+        },
       };
 
       this.logger?.warn(`Check failed: ${checkName}`, {
         status: result.status,
         duration,
-        error: error.message,
+        error: errorMessage(error),
       });
 
       return result;
@@ -168,8 +178,10 @@ export class CheckExecutor {
   private createTimeout(ms: number, checkName: string): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
-        const error = new Error(`Check ${checkName} timed out after ${ms}ms`);
-        (error as any).code = 'CHECK_TIMEOUT';
+        const error: Error & { code: string } = Object.assign(
+          new Error(`Check ${checkName} timed out after ${ms}ms`),
+          { code: 'CHECK_TIMEOUT' as const }
+        );
         reject(error);
       }, ms);
     });
