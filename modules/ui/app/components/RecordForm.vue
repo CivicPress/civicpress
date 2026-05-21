@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import EditorHeader from './editor/EditorHeader.vue';
 import MarkdownEditor from './editor/MarkdownEditor.vue';
 import EditorToolbar from './editor/EditorToolbar.vue';
@@ -187,7 +188,7 @@ const fetchAllowedTransitions = async () => {
   try {
     const response = (await $civicApi(
       `/api/v1/records/${props.record.id}/transitions`
-    )) as any;
+    )) as ApiResponse;
 
     if (response?.success && response?.data?.transitions) {
       allowedTransitions.value = response.data.transitions;
@@ -207,7 +208,7 @@ onMounted(async () => {
     try {
       const response = (await $civicApi(
         `/api/v1/records/${props.record.id}?edit=true`
-      )) as any;
+      )) as ApiResponse;
 
       if (response?.success && response?.data) {
         const data = response.data;

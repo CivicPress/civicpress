@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import RecordForm from '~/components/RecordForm.vue';
 import FormSkeleton from '~/components/FormSkeleton.vue';
 
@@ -45,7 +46,7 @@ const fetchRecord = async () => {
     // Add ?edit=true to get draft version if it exists (for authenticated users with edit permission)
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/records/${id}?edit=true`
-    )) as any;
+    )) as ApiResponse;
 
     if (response && response.success && response.data) {
       const apiRecord = response.data;
@@ -129,7 +130,7 @@ const handleDelete = async (recordId: string) => {
       {
         method: 'DELETE',
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response && response.success) {
       toast.add({

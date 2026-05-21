@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ApiResponse } from '~/utils/api-response';
 interface Props {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   showText?: boolean;
@@ -27,7 +28,7 @@ const organizationInfo = ref<any>(null);
 const fetchOrgInfo = async () => {
   if (!organizationInfo.value) {
     try {
-      const response = (await $civicApi('/api/v1/info')) as any;
+      const response = (await $civicApi('/api/v1/info')) as ApiResponse;
       if (response?.success && response.organization) {
         organizationInfo.value = response.organization;
       }

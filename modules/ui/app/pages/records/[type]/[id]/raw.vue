@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route parameters
@@ -64,7 +65,7 @@ const fetchRecord = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/records/${id}/raw`
-    )) as any;
+    )) as ApiResponse;
 
     if (response && response.success && response.data) {
       const apiRecord = response.data;

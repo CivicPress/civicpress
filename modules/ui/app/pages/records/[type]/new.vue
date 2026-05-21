@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
@@ -31,7 +32,7 @@ const handleSubmit = async (recordData: any) => {
     const response = (await useNuxtApp().$civicApi('/api/v1/records', {
       method: 'POST',
       body: recordData,
-    })) as any;
+    })) as ApiResponse;
 
     if (response && response.success) {
       toast.add({

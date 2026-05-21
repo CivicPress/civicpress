@@ -256,6 +256,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
 import {
   getFieldValue as normalizeValue,
   isMetadataField,
@@ -328,7 +329,7 @@ const loadConfiguration = async () => {
     // Load configuration metadata first
     const metadataResponse = (await useNuxtApp().$civicApi(
       `/api/v1/config/metadata/${configFile.value}`
-    )) as any;
+    )) as ApiResponse;
     if (metadataResponse.success && metadataResponse.data) {
       configMetadata.value = metadataResponse.data;
     } else {
@@ -338,7 +339,7 @@ const loadConfiguration = async () => {
     // Load configuration data
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/config/${configFile.value}`
-    )) as any;
+    )) as ApiResponse;
     if (response.success && response.data) {
       originalConfig.value = JSON.parse(JSON.stringify(response.data));
       config.value = JSON.parse(JSON.stringify(response.data));
@@ -447,7 +448,7 @@ const validateConfiguration = async (): Promise<boolean> => {
       {
         method: 'POST',
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success && response.data) {
       const isValid = response.data.valid === true;
@@ -483,7 +484,7 @@ const saveConfiguration = async () => {
         method: 'PUT',
         body: config.value,
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success) {
       // Mark as saved

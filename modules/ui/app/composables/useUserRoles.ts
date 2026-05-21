@@ -1,4 +1,5 @@
 import type { Role } from '~/types/user';
+import type { ApiResponse } from '~/utils/api-response';
 
 export const useUserRoles = () => {
   const { $civicApi } = useNuxtApp();
@@ -14,7 +15,7 @@ export const useUserRoles = () => {
       loading.value = true;
       error.value = '';
 
-      const response = (await $civicApi('/api/v1/config/roles')) as any;
+      const response = (await $civicApi('/api/v1/config/roles')) as ApiResponse;
 
       if (response.success) {
         const data = response.data;

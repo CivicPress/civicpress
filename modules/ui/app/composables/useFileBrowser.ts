@@ -1,4 +1,5 @@
 import type { Ref } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 
 /**
  * File metadata as displayed by the FileBrowser component family. Mirrors the
@@ -72,7 +73,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
     try {
       const response = (await useNuxtApp().$civicApi(
         `/api/v1/storage/folders/${props.folder}/files`
-      )) as any;
+      )) as ApiResponse;
 
       if (response.success) {
         // Map API response to FileInfo interface
@@ -194,7 +195,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
         {
           method: 'DELETE',
         }
-      )) as any;
+      )) as ApiResponse;
 
       if (response.success) {
         toast.add({
@@ -256,7 +257,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
             {
               method: 'DELETE',
             }
-          )) as any;
+          )) as ApiResponse;
 
           if (response.success) {
             deletedCount++;

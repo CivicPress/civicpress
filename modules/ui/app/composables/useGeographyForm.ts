@@ -1,4 +1,5 @@
 import { ref, computed, type Ref } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import { useDebounceFn } from '@vueuse/core';
 import {
   suggestPropertyName,
@@ -123,7 +124,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
       loading.value = true;
       const response = (await useNuxtApp().$civicApi(
         `/api/v1/geography/${props.geographyId}`
-      )) as any;
+      )) as ApiResponse;
 
       if (response.success) {
         const geographyFile: GeographyFile = response.data;
@@ -190,7 +191,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
             type: form.value.type,
           },
         }
-      )) as any;
+      )) as ApiResponse;
 
       if (response.success) {
         preview.value.validation = response.data;
@@ -296,7 +297,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
             icon_mapping: form.value.icon_mapping,
           },
         },
-      })) as any;
+      })) as ApiResponse;
 
       if (response.success) {
         toast.add({
@@ -502,7 +503,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
     try {
       const response = (await useNuxtApp().$civicApi(
         '/api/v1/geography/presets'
-      )) as any;
+      )) as ApiResponse;
       if (response.success) {
         presets.value = response.data || [];
       }
@@ -528,7 +529,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
             icon_mapping: form.value.icon_mapping,
           },
         }
-      )) as any;
+      )) as ApiResponse;
 
       if (response.success) {
         if (response.data.color_mapping) {

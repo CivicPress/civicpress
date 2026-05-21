@@ -77,6 +77,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
 
 definePageMeta({
   requiresAuth: true,
@@ -130,7 +131,7 @@ const load = async () => {
   try {
     const res = (await useNuxtApp().$civicApi(
       `/api/v1/config/raw/${configFile.value}`
-    )) as any;
+    )) as ApiResponse;
     if (typeof res === 'string') {
       yaml.value = res;
       original.value = res;
@@ -198,7 +199,7 @@ const validate = async () => {
         body: yaml.value,
         headers: { 'Content-Type': 'text/yaml' } as any,
       }
-    )) as any;
+    )) as ApiResponse;
     validation.value = res?.data || null;
     if (validation.value) {
       const isValid = !!validation.value.valid;

@@ -1,4 +1,5 @@
 import type { User } from '~/stores/auth';
+import type { ApiResponse } from '~/utils/api-response';
 
 export interface SecurityInfo {
   userId: number;
@@ -38,7 +39,7 @@ export const useSecurity = () => {
   const getSecurityInfo = async (userId: number): Promise<SecurityInfo> => {
     const response = (await $civicApi(
       `/api/v1/users/${userId}/security-info`
-    )) as any;
+    )) as ApiResponse;
     return response.data.securityInfo;
   };
 
@@ -55,7 +56,7 @@ export const useSecurity = () => {
         method: 'POST',
         body: passwordData,
       }
-    )) as any;
+    )) as ApiResponse;
     return response.data;
   };
 
@@ -69,7 +70,7 @@ export const useSecurity = () => {
     const response = (await $civicApi(`/api/v1/users/${userId}/set-password`, {
       method: 'POST',
       body: { newPassword },
-    })) as any;
+    })) as ApiResponse;
     return response.data;
   };
 
@@ -86,7 +87,7 @@ export const useSecurity = () => {
         method: 'POST',
         body: emailData,
       }
-    )) as any;
+    )) as ApiResponse;
     return response.data;
   };
 
@@ -99,7 +100,7 @@ export const useSecurity = () => {
     const response = (await $civicApi('/api/v1/users/verify-email-change', {
       method: 'POST',
       body: { token },
-    })) as any;
+    })) as ApiResponse;
     return response.data;
   };
 
@@ -114,7 +115,7 @@ export const useSecurity = () => {
       {
         method: 'POST',
       }
-    )) as any;
+    )) as ApiResponse;
     return response.data;
   };
 
@@ -178,7 +179,7 @@ export const useSecurity = () => {
       {
         method: 'POST',
       }
-    )) as any;
+    )) as ApiResponse;
     return response.data;
   };
 
@@ -191,7 +192,7 @@ export const useSecurity = () => {
     const response = (await $civicApi('/api/v1/users/verify-current-email', {
       method: 'POST',
       body: { token },
-    })) as any;
+    })) as ApiResponse;
     return response.data;
   };
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useMediaQuery } from '@vueuse/core';
+import type { ApiResponse } from '~/utils/api-response';
 
 interface StatusHistoryEntry {
   status: string;
@@ -104,7 +105,7 @@ onMounted(async () => {
       const { $civicApi } = useNuxtApp();
       const res = (await $civicApi(
         `/api/v1/records/${props.recordId}/transitions`
-      )) as any;
+      )) as ApiResponse;
       if (res?.success && res?.data?.transitions) {
         allowedTargets.value = res.data.transitions as string[];
       }
@@ -156,7 +157,7 @@ const confirmChange = async () => {
           status: pendingStatus.value,
         },
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response && response.success) {
       emit('changed', {

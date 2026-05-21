@@ -146,6 +146,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
 const { t } = useI18n();
 
 definePageMeta({
@@ -196,7 +197,7 @@ const load = async (goTo?: number) => {
     if (filters.action) params.set('action', filters.action);
     const res = (await useNuxtApp().$civicApi(
       `/api/v1/audit?${params.toString()}`
-    )) as any;
+    )) as ApiResponse;
     if (res?.success && res?.data?.entries) {
       items.value = res.data.entries;
       total.value = res.data.pagination?.total || items.value.length;

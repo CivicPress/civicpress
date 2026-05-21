@@ -174,6 +174,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
@@ -214,7 +215,7 @@ const fetchConfigurations = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/config/list'
-    )) as any;
+    )) as ApiResponse;
     if (response.success) {
       configurations.value = response.data || [];
     } else {
@@ -242,7 +243,7 @@ const validateConfiguration = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/config/validate/all'
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success && response.data) {
       // response.data is an object keyed by type → { valid, errors[] }

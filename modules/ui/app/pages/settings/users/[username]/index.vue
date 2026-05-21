@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Page metadata
@@ -49,7 +50,7 @@ const fetchUser = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/users/${username}`
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success) {
       user.value = response.data.user;

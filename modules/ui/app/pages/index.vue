@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import { getFieldValue as normalizeValue } from '~/utils/config';
 import SystemFooter from '~/components/SystemFooter.vue';
 
@@ -144,7 +145,7 @@ const handleClickOutside = (event: Event) => {
 // Fetch organization info (public endpoint)
 const fetchOrganizationInfo = async () => {
   try {
-    const response = (await $civicApi('/api/v1/info')) as any;
+    const response = (await $civicApi('/api/v1/info')) as ApiResponse;
     if (response.success) {
       organizationInfo.value = response.organization;
     }
@@ -157,7 +158,7 @@ const fetchOrganizationInfo = async () => {
 // Fetch recent records (public)
 const fetchRecentRecords = async () => {
   try {
-    const response = (await $civicApi('/api/v1/records?limit=5')) as any;
+    const response = (await $civicApi('/api/v1/records?limit=5')) as ApiResponse;
     if (response.success) {
       recentRecords.value = response.data.records || [];
     }

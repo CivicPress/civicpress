@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
@@ -32,7 +33,7 @@ const handleSubmit = async (userData: any) => {
     const response = (await useNuxtApp().$civicApi('/api/v1/users', {
       method: 'POST',
       body: userData,
-    })) as any;
+    })) as ApiResponse;
 
     if (response.success) {
       // Show success message

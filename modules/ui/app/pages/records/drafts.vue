@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
 import { useRecordsStore } from '~/stores/records';
 import { useAuthStore } from '~/stores/auth';
 
@@ -34,7 +35,7 @@ const fetchDrafts = async () => {
 
   try {
     // Fetch only from drafts endpoint - all drafts, unpublished changes, and internal docs are in record_drafts table
-    const response = (await $civicApi('/api/v1/records/drafts')) as any;
+    const response = (await $civicApi('/api/v1/records/drafts')) as ApiResponse;
 
     if (response?.success && response?.data?.drafts) {
       // All drafts are in record_drafts table - no need to combine multiple sources

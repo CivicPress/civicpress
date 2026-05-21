@@ -303,7 +303,7 @@ export const useAuthStore = defineStore('auth', {
           headers: {
             Authorization: `Bearer ${this.token}`,
           },
-        })) as any;
+        })) as ApiResponse;
 
         if (response.success) {
           // Update user data from server
@@ -342,7 +342,7 @@ export const useAuthStore = defineStore('auth', {
           headers: {
             Authorization: `Bearer ${this.token}`,
           },
-        })) as any;
+        })) as ApiResponse;
 
         if (response.success) {
           // Update user data from server

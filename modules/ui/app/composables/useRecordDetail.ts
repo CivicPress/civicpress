@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, watch, nextTick, type Ref } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import type { CivicRecord } from '~/stores/records';
 import { useAuthStore } from '~/stores/auth';
 
@@ -395,7 +396,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
     try {
       // Direct API call for now to test
       const { $civicApi } = useNuxtApp();
-      const response = (await $civicApi(`/api/v1/records/${id}`)) as any;
+      const response = (await $civicApi(`/api/v1/records/${id}`)) as ApiResponse;
 
       if (response && response.success && response.data) {
         const apiRecord = response.data;

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
@@ -22,7 +23,7 @@ const fetchUsers = async () => {
     loading.value = true;
     error.value = '';
 
-    const response = (await $civicApi('/api/v1/users')) as any;
+    const response = (await $civicApi('/api/v1/users')) as ApiResponse;
 
     if (response.success) {
       users.value = response.data.users || [];

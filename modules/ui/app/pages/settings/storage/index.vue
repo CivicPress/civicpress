@@ -176,6 +176,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 import { useAuthStore } from '@/stores/auth';
 import FileBrowser from '~/components/storage/FileBrowser.vue';
@@ -353,7 +354,7 @@ const loadStorageConfig = async () => {
     loadingFolders.value = true;
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/storage/config'
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success && response.data?.config?.folders) {
       folderConfigs.value = response.data.config.folders;
@@ -378,7 +379,7 @@ const loadStorageStats = async () => {
       if (folder.enabled) {
         const response = (await useNuxtApp().$civicApi(
           `/api/v1/storage/folders/${folder.name}/files`
-        )) as any;
+        )) as ApiResponse;
 
         if (response.success) {
           const files = response.data.files;

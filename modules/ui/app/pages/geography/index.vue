@@ -217,6 +217,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import { useToast } from '#imports';
@@ -325,7 +326,7 @@ const loadGeographyFiles = async () => {
 
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography?${params}`
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success) {
       geographyFiles.value = response.data.files;

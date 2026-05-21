@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/stores/auth';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 definePageMeta({
@@ -32,7 +33,7 @@ const fetchUserInfo = async () => {
 
     // Otherwise try to fetch from API (requires authentication)
     if (authStore.token) {
-      const response = (await $civicApi('/api/v1/auth/me')) as any;
+      const response = (await $civicApi('/api/v1/auth/me')) as ApiResponse;
       if (response.success) {
         userInfo.value = response.data.user;
         // Also update the auth store with fresh data

@@ -1,4 +1,5 @@
 import type { Ref } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import type { useAutosave } from '~/composables/useAutosave';
 import type { useRecordLock } from '~/composables/useRecordLock';
 import {
@@ -145,7 +146,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
             linkedRecords: form.linkedRecords,
             linkedGeographyFiles: form.linkedGeographyFiles,
           },
-        })) as any;
+        })) as ApiResponse;
 
         if (response?.success && response?.data) {
           form.id = response.data.id;
@@ -187,7 +188,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           // Use ?edit=true to fetch the draft version (not the published version)
           const refreshResponse = (await $civicApi(
             `/api/v1/records/${form.id}?edit=true`
-          )) as any;
+          )) as ApiResponse;
           if (refreshResponse?.success && refreshResponse?.data) {
             const data = refreshResponse.data;
             // Store current workflowState before updating (to preserve if API doesn't return it)
@@ -283,7 +284,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         body: {
           status: targetStatus || form.status,
         },
-      })) as any;
+      })) as ApiResponse;
 
       if (response?.success) {
         toast.add({
@@ -325,7 +326,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     try {
       const response = (await $civicApi(`/api/v1/records/${form.id}/draft`, {
         method: 'DELETE',
-      })) as any;
+      })) as ApiResponse;
 
       if (response?.success) {
         toast.add({
@@ -359,7 +360,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         body: {
           status: 'draft',
         },
-      })) as any;
+      })) as ApiResponse;
 
       if (response?.success) {
         toast.add({
@@ -381,7 +382,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           try {
             const refreshResponse = (await $civicApi(
               `/api/v1/records/${form.id}?edit=true`
-            )) as any;
+            )) as ApiResponse;
             if (refreshResponse?.success && refreshResponse?.data) {
               const data = refreshResponse.data;
               form.status = data.status;
@@ -411,7 +412,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         body: {
           status: 'archived',
         },
-      })) as any;
+      })) as ApiResponse;
 
       if (response?.success) {
         toast.add({
@@ -427,7 +428,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           try {
             const refreshResponse = (await $civicApi(
               `/api/v1/records/${form.id}`
-            )) as any;
+            )) as ApiResponse;
             if (refreshResponse?.success && refreshResponse?.data) {
               const data = refreshResponse.data;
               form.status = data.status;
@@ -460,7 +461,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
 
     try {
       // Fetch the current record
-      const response = (await $civicApi(`/api/v1/records/${form.id}`)) as any;
+      const response = (await $civicApi(`/api/v1/records/${form.id}`)) as ApiResponse;
 
       if (response?.success && response?.data) {
         const record = response.data;
@@ -490,7 +491,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
             linkedRecords: record.linkedRecords || [],
             linkedGeographyFiles: record.linkedGeographyFiles || [],
           },
-        })) as any;
+        })) as ApiResponse;
 
         if (duplicateResponse?.success && duplicateResponse?.data) {
           toast.add({
@@ -521,7 +522,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     try {
       const response = (await $civicApi(`/api/v1/records/${form.id}/export`, {
         method: 'GET',
-      })) as any;
+      })) as ApiResponse;
 
       if (response?.success && response?.data?.markdown) {
         // Create a blob and download
@@ -548,7 +549,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
       try {
         const fullResponse = (await $civicApi(
           `/api/v1/records/${form.id}/frontmatter`
-        )) as any;
+        )) as ApiResponse;
         const frontmatter = fullResponse || '';
         const markdown = `---\n${frontmatter}\n---\n\n${form.markdownBody}`;
 

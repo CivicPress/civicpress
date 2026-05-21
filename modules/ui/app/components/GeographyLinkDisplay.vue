@@ -148,6 +148,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import type { GeographyFile } from '~/types/geography';
 import GeographyMap from './GeographyMap.vue';
 
@@ -288,7 +289,7 @@ const loadGeographyFiles = async () => {
       try {
         const response = (await useNuxtApp().$civicApi(
           `/api/v1/geography/${link.id}`
-        )) as any;
+        )) as ApiResponse;
 
         if (response.success && response.data) {
           loadedFiles.push(response.data);

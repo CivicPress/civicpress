@@ -1,3 +1,5 @@
+import type { ApiResponse } from '~/utils/api-response';
+
 export const useLinkCategories = () => {
   const linkCategories = ref<
     Array<{ label: string; value: string; description: string }>
@@ -7,7 +9,7 @@ export const useLinkCategories = () => {
     try {
       const response = (await useNuxtApp().$civicApi(
         '/api/v1/config/link-categories'
-      )) as any;
+      )) as ApiResponse;
       if (response.success && response.data.categories) {
         linkCategories.value = Object.entries(response.data.categories).map(
           ([key, category]: [string, any]) => ({

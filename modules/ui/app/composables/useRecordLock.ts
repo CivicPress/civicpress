@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted, getCurrentInstance } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import { useNuxtApp } from '#app';
 
 interface LockInfo {
@@ -51,7 +52,7 @@ export function useRecordLock(options: UseRecordLockOptions) {
     try {
       const response = (await $civicApi(`/api/v1/records/${recordId}/lock`, {
         method: 'POST',
-      })) as any;
+      })) as ApiResponse;
 
       if (response?.success) {
         await checkLock();
@@ -114,7 +115,7 @@ export function useRecordLock(options: UseRecordLockOptions) {
     try {
       const response = (await $civicApi(
         `/api/v1/records/${recordId}/lock`
-      )) as any;
+      )) as ApiResponse;
 
       if (response?.success && response?.data) {
         const data = response.data;

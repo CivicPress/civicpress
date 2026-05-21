@@ -172,6 +172,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 
 // Props
 interface Props {
@@ -408,7 +409,7 @@ const uploadFiles = async () => {
       const response = (await useNuxtApp().$civicApi(`/api/v1/storage/files`, {
         method: 'POST',
         body: formData,
-      })) as any;
+      })) as ApiResponse;
 
       clearInterval(progressInterval);
 

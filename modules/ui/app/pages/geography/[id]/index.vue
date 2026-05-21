@@ -338,6 +338,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 // Define GeographyFile type locally to avoid import issues
@@ -411,7 +412,7 @@ const loadGeographyFile = async () => {
     const id = route.params.id as string;
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography/${id}`
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success) {
       geographyFile.value = response.data;
@@ -440,7 +441,7 @@ const loadRawContent = async () => {
     // In the future, we could fetch the raw file content
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography/${geographyFile.value.id}`
-    )) as any;
+    )) as ApiResponse;
     if (response.success && response.data.content) {
       rawContent.value = response.data.content;
     }
