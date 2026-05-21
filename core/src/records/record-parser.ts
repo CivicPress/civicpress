@@ -94,16 +94,18 @@ interface FrontmatterData {
         };
   }>;
 
-  // Type-specific fields
-  geography_data?: any;
+  // Type-specific fields (polymorphic — `unknown` forces consumers to
+  // narrow before use; the shapes vary per record type and are
+  // declared in the per-type schemas under `core/src/schemas/`).
+  geography_data?: unknown;
   category?: string;
   session_type?: 'regular' | 'emergency' | 'special';
   date?: string;
   duration?: number;
   location?: string;
-  attendees?: any[];
-  topics?: any[];
-  media?: any;
+  attendees?: unknown[];
+  topics?: unknown[];
+  media?: unknown;
 
   // Relationships
   linked_records?: Array<{
@@ -243,7 +245,7 @@ export class RecordParser {
           ...(normalized.location && { location: normalized.location }),
           ...(normalized.attendees && { attendees: normalized.attendees }),
           ...(normalized.topics && { topics: normalized.topics }),
-          ...(normalized.media && { media: normalized.media }),
+          ...(normalized.media ? { media: normalized.media } : {}),
           // Include any other custom metadata fields
           ...Object.entries(normalized)
             .filter(
@@ -326,7 +328,7 @@ ${record.content || ''}`;
    * @returns Frontmatter data object ready for schema validation or serialization
    */
   static buildFrontmatter(record: RecordData): FrontmatterData {
-    const frontmatter: any = {
+    const frontmatter: Partial<FrontmatterData> = {
       // Core Identification (Required)
       id: record.id,
       title: record.title,
@@ -359,7 +361,7 @@ ${record.content || ''}`;
         source.imported_at =
           typeof importedAt === 'string'
             ? importedAt
-            : new Date(importedAt as any).toISOString();
+            : new Date(importedAt as string | number | Date).toISOString();
       }
       frontmatter.source = source;
     }
@@ -405,7 +407,9 @@ ${record.content || ''}`;
         frontmatter.date =
           typeof record.metadata.date === 'string'
             ? record.metadata.date
-            : new Date(record.metadata.date as any).toISOString();
+            : new Date(
+                record.metadata.date as string | number | Date
+              ).toISOString();
       }
       if (record.metadata.duration) {
         frontmatter.duration = record.metadata.duration;
@@ -472,7 +476,7 @@ ${record.content || ''}`;
       }
     }
 
-    return frontmatter;
+    return frontmatter as FrontmatterData;
   }
 
   /**
@@ -482,7 +486,15 @@ ${record.content || ''}`;
    * @param frontmatter - Raw frontmatter object (may be old format)
    * @returns Normalized frontmatter in new format
    */
-  private static normalizeFormat(frontmatter: any): FrontmatterData {
+  private static normalizeFormat(
+    frontmatter: Record<string, unknown>
+  ): FrontmatterData {
+    // `normalized` stays `any` here because the metadata spread idiom
+    // below uses `(normalized.X && { X: normalized.X })` which doesn't
+    // type-check against `unknown` (spread of `unknown` is disallowed).
+    // The function boundaries are typed; only the local scratch object
+    // is loose. Properly typing this would require rewriting ~15 spread
+    // lines to ternary-style guards — deferred as a future polish.
     const normalized: any = { ...frontmatter };
 
     // Normalize author field - ensure it's a string
@@ -538,10 +550,10 @@ ${record.content || ''}`;
       normalized.geography_data = normalized.geography;
     }
 
-    return this.normalizeDateValues(normalized);
+    return this.normalizeDateValues(normalized) as FrontmatterData;
   }
 
-  private static normalizeDateValues(value: any): any {
+  private static normalizeDateValues(value: unknown): unknown {
     if (value === null || value === undefined) {
       return value;
     }
@@ -555,7 +567,7 @@ ${record.content || ''}`;
     }
 
     if (typeof value === 'object') {
-      const result: Record<string, any> = {};
+      const result: Record<string, unknown> = {};
       for (const [key, nestedValue] of Object.entries(value)) {
         result[key] = this.normalizeDateValues(nestedValue);
       }
@@ -573,7 +585,7 @@ ${record.content || ''}`;
    * @throws Error if required fields are missing
    */
   private static validateRequiredFields(
-    frontmatter: any,
+    frontmatter: Record<string, unknown>,
     filePath?: string
   ): void {
     const required = [
@@ -733,7 +745,7 @@ ${record.content || ''}`;
    * @param value - Field value
    * @returns Formatted YAML line
    */
-  private static formatYamlField(key: string, value: any): string {
+  private static formatYamlField(key: string, value: unknown): string {
     // Use YAML library to properly format the value
     // This handles arrays, objects, strings, numbers, booleans correctly
     try {
