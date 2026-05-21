@@ -81,7 +81,7 @@ export function registerDiffRoutes(router: Router): void {
           includeStats = true,
         } = req.query;
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -156,7 +156,7 @@ export function registerDiffRoutes(router: Router): void {
         const { recordId } = req.params;
         const { limit = 20, author, since } = req.query;
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -211,7 +211,7 @@ export function registerDiffRoutes(router: Router): void {
         const { recordId } = req.params;
         const { limit = 20, author, since } = req.query;
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -277,7 +277,7 @@ export function registerDiffRoutes(router: Router): void {
         const { recordId } = req.params;
         const { limit = 20 } = req.query;
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }

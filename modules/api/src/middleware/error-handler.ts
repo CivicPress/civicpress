@@ -38,9 +38,9 @@ function generateRequestId(): string {
 // Extract request context for logging
 function extractRequestContext(req: Request): RequestContext {
   return {
-    requestId: (req as any).requestId || generateRequestId(),
-    userId: (req as any).user?.id,
-    userRole: (req as any).user?.role,
+    requestId: req.requestId || generateRequestId(),
+    userId: req.user?.id !== undefined ? String(req.user.id) : undefined,
+    userRole: req.user?.role,
     ip: req.ip || req.connection.remoteAddress || 'unknown',
     userAgent: req.get('User-Agent') || 'unknown',
     method: req.method,
@@ -225,8 +225,8 @@ export function requestIdMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  (req as any).requestId = generateRequestId();
-  res.setHeader('X-Request-ID', (req as any).requestId);
+  req.requestId = generateRequestId();
+  res.setHeader('X-Request-ID', req.requestId);
   next();
 }
 

@@ -60,9 +60,9 @@ export class ApiLogger {
       path: req.path,
       ip: req.ip || req.connection.remoteAddress || 'unknown',
       userAgent: req.get('User-Agent') || 'unknown',
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
-      requestId: (req as any).requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      requestId: req.requestId,
       ...context,
     };
 
@@ -73,7 +73,7 @@ export class ApiLogger {
   logResponse(req: Request, res: Response, context: LogContext = {}): void {
     const responseContext = {
       statusCode: res.statusCode,
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
       method: req.method,
       path: req.path,
       ...context,
@@ -86,9 +86,9 @@ export class ApiLogger {
   logSuccess(operation: string, req: Request, context: LogContext = {}): void {
     const successContext = {
       operation,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -99,9 +99,9 @@ export class ApiLogger {
   logWarning(message: string, req: Request, context: LogContext = {}): void {
     const warningContext = {
       message,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -141,9 +141,9 @@ export class ApiLogger {
         stack: error.stack,
         ...(correlationId && { correlationId }),
       },
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       method: req.method,
       path: req.path,
       ...context,
@@ -162,9 +162,9 @@ export class ApiLogger {
     const validationContext = {
       operation,
       validationErrors: errors,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -179,9 +179,9 @@ export class ApiLogger {
   ): void {
     const dbContext = {
       operation,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -198,9 +198,9 @@ export class ApiLogger {
     const authContext = {
       event,
       success,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ip: req.ip || req.connection.remoteAddress || 'unknown',
       userAgent: req.get('User-Agent') || 'unknown',
       ...context,
@@ -223,9 +223,9 @@ export class ApiLogger {
     const perfContext = {
       operation,
       duration,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 

@@ -123,10 +123,10 @@ router.post('/test', async (req, res) => {
       data: {},
     });
 
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',
       target: { type: 'notification', name: 'test_email' },
       outcome: result.success ? 'success' : 'failure',
@@ -135,10 +135,10 @@ router.post('/test', async (req, res) => {
 
     return res.json({ success: true, data: result });
   } catch (error: any) {
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',
       target: { type: 'notification', name: 'test_email' },
       outcome: 'failure',

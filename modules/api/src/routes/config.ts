@@ -90,11 +90,11 @@ router.post(
       });
 
       // Optional audit logging (don't require auth for validation)
-      const actor = (req as any).user || {};
-      if (actor.id) {
+      const actor = req.user;
+      if (actor?.id) {
         await audit.log({
           source: 'api',
-          actor: { id: actor.id, username: actor.username, role: actor.role },
+          actor: { id: actor?.id, username: actor?.username, role: actor?.role },
           action: 'config:validate',
           target: { type: 'config', id: type },
           outcome: validation?.valid ? 'success' : 'failure',
@@ -106,11 +106,11 @@ router.post(
       }
     } catch (error) {
       const { type } = req.params || ({} as any);
-      const actor = (req as any).user || {};
-      if (actor.id) {
+      const actor = req.user;
+      if (actor?.id) {
         await audit.log({
           source: 'api',
-          actor: { id: actor.id, username: actor.username, role: actor.role },
+          actor: { id: actor?.id, username: actor?.username, role: actor?.role },
           action: 'config:validate',
           target: { type: 'config', id: type },
           outcome: 'failure',
@@ -127,7 +127,7 @@ router.post(
 
 // Secured configuration routes: require authenticated admin permission
 router.use((req, res, next) => {
-  const civicPress = (req as any).civicPress;
+  const civicPress = req.civicPress;
   if (!civicPress) return next();
   return authMiddleware(civicPress)(req as any, res as any, next as any);
 });
@@ -240,20 +240,20 @@ router.put(
       });
 
       // Audit success
-      const actor = (req as any).user || {};
+      const actor = req.user;
       await audit.log({
         source: 'api',
-        actor: { id: actor.id, username: actor.username, role: actor.role },
+        actor: { id: actor?.id, username: actor?.username, role: actor?.role },
         action: 'config:raw:put',
         target: { type: 'config', id: type, path: userPath },
         outcome: 'success',
       });
     } catch (error) {
       const { type } = req.params || ({} as any);
-      const actor = (req as any).user || {};
+      const actor = req.user;
       await audit.log({
         source: 'api',
-        actor: { id: actor.id, username: actor.username, role: actor.role },
+        actor: { id: actor?.id, username: actor?.username, role: actor?.role },
         action: 'config:raw:put',
         target: { type: 'config', id: type },
         outcome: 'failure',
@@ -323,20 +323,20 @@ router.put('/:type', async (req, res) => {
       message: `Configuration ${type} saved successfully`,
     });
 
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:save',
       target: { type: 'config', id: type },
       outcome: 'success',
     });
   } catch (error) {
     const { type } = req.params || ({} as any);
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:save',
       target: { type: 'config', id: type },
       outcome: 'failure',
@@ -364,20 +364,20 @@ router.post('/:type/reset', async (req, res) => {
       message: `Configuration ${type} reset to defaults successfully`,
     });
 
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:reset',
       target: { type: 'config', id: type },
       outcome: 'success',
     });
   } catch (error) {
     const { type } = req.params || ({} as any);
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:reset',
       target: { type: 'config', id: type },
       outcome: 'failure',

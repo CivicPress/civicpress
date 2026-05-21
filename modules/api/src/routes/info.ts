@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
     // amplifier on an unauthenticated endpoint.
     if (token) {
       try {
-        const civic = (req as any).civicPress;
+        const civic = req.civicPress;
         if (civic) {
           const authService = civic.getAuthService();
           const user = await authService.validateSession(token);

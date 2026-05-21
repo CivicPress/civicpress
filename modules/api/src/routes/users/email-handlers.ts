@@ -18,7 +18,10 @@ export function registerEmailRoutes(router: Router): void {
     try {
       const userId = parseInt(req.params.id);
       const { newEmail }: RequestEmailChangeRequest = req.body;
-      const requestingUser = (req as any).user;
+      const requestingUser = req.user;
+      if (!requestingUser) {
+        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+      }
 
       if (!newEmail) {
         const error = new Error('New email address is required');
@@ -33,7 +36,7 @@ export function registerEmailRoutes(router: Router): void {
       }
 
       // Users can only change their own email, unless they're admin
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       if (userId !== requestingUser.id) {
@@ -111,10 +114,13 @@ export function registerEmailRoutes(router: Router): void {
 
     try {
       const userId = parseInt(req.params.id);
-      const requestingUser = (req as any).user;
+      const requestingUser = req.user;
+      if (!requestingUser) {
+        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+      }
 
       // Users can only cancel their own email change, unless they're admin
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       if (userId !== requestingUser.id) {
@@ -190,10 +196,13 @@ export function registerEmailRoutes(router: Router): void {
 
     try {
       const userId = parseInt(req.params.id);
-      const requestingUser = (req as any).user;
+      const requestingUser = req.user;
+      if (!requestingUser) {
+        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+      }
 
       // Users can only verify their own email, unless they're admin
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       if (userId !== requestingUser.id) {

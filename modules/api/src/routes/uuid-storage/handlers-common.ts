@@ -102,7 +102,7 @@ export async function getStorageService(
   req: AuthenticatedRequest
 ): Promise<CloudUuidStorageService> {
   // Get CivicPress instance from request context
-  const civicPress = (req as any).context?.civicPress || req.civicPress;
+  const civicPress = req.context?.civicPress || req.civicPress;
   if (!civicPress) {
     throw new Error('CivicPress instance not available');
   }
@@ -152,7 +152,7 @@ export function getStorageConfigManager(
   req: AuthenticatedRequest
 ): StorageConfigManager {
   // Get CivicPress instance from request context
-  const civicPress = (req as any).context?.civicPress || req.civicPress;
+  const civicPress = req.context?.civicPress || req.civicPress;
   if (!civicPress) {
     throw new Error('CivicPress instance not available');
   }

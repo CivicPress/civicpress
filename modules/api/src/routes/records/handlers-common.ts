@@ -1,3 +1,4 @@
+import type { Request, Response } from 'express';
 import { Logger } from '@civicpress/core';
 import { AuditLogger } from '@civicpress/core';
 
@@ -8,15 +9,15 @@ export const audit = new AuditLogger();
 export function handleRecordsValidationError(
   operation: string,
   errors: any[],
-  req: any,
-  res: any
+  req: Request,
+  res: Response
 ): void {
   logger.warn(`${operation} validation failed`, {
     operation,
     validationErrors: errors,
-    requestId: (req as any).requestId,
-    userId: (req as any).user?.id,
-    userRole: (req as any).user?.role,
+    requestId: req.requestId,
+    userId: req.user?.id,
+    userRole: req.user?.role,
   });
 
   res.status(400).json({

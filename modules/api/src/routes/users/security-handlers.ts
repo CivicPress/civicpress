@@ -16,10 +16,13 @@ export function registerSecurityRoutes(router: Router): void {
 
     try {
       const userId = parseInt(req.params.id);
-      const requestingUser = (req as any).user;
+      const requestingUser = req.user;
+      if (!requestingUser) {
+        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+      }
 
       // Users can only view their own security info, unless they're admin
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       if (userId !== requestingUser.id) {

@@ -119,7 +119,7 @@ export function requestContextMiddleware(
   next: NextFunction
 ): void {
   // Add additional context to request for logging
-  (req as any).requestContext = {
+  req.requestContext = {
     timestamp: new Date().toISOString(),
     userAgent: req.get('User-Agent'),
     ip: req.ip || req.connection.remoteAddress,
@@ -137,7 +137,7 @@ export function createDatabaseContextMiddleware(
 ) {
   return (req: Request, res: Response, next: NextFunction): void => {
     // Add database service to request context for storage operations
-    (req as any).context = {
+    req.context = {
       databaseService: civicPress?.getDatabaseService?.(),
       civicPress,
       dataDir, // Include dataDir in context for storage operations

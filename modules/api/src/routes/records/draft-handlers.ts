@@ -42,7 +42,7 @@ export function registerDraftRoutes(
           type,
           limit,
           offset,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
           userId: req.user?.id,
           userRole: req.user?.role,
           showAllDrafts: canEdit,
@@ -60,7 +60,7 @@ export function registerDraftRoutes(
 
         logger.info('Drafts listed successfully', {
           totalRecords: result.drafts?.length || 0,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
           userId: req.user?.id,
           userRole: req.user?.role,
           showAllDrafts: canEdit,
@@ -141,11 +141,11 @@ export function registerDraftRoutes(
           outcome: 'success',
         });
       } catch (error) {
-        const user = (req as any).user || {};
-        const id = (req as any).params?.id;
+        const user = req.user;
+        const id = req.params?.id;
         await audit.log({
           source: 'api',
-          actor: { id: user.id, username: user.username, role: user.role },
+          actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:delete_draft',
           target: { type: 'draft', id },
           outcome: 'failure',
@@ -249,11 +249,11 @@ export function registerDraftRoutes(
           outcome: 'success',
         });
       } catch (error) {
-        const user = (req as any).user || {};
-        const id = (req as any).params?.id;
+        const user = req.user;
+        const id = req.params?.id;
         await audit.log({
           source: 'api',
-          actor: { id: user.id, username: user.username, role: user.role },
+          actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:save_draft',
           target: { type: 'record', id },
           outcome: 'failure',
@@ -313,11 +313,11 @@ export function registerDraftRoutes(
           outcome: 'success',
         });
       } catch (error) {
-        const user = (req as any).user || {};
-        const id = (req as any).params?.id;
+        const user = req.user;
+        const id = req.params?.id;
         await audit.log({
           source: 'api',
-          actor: { id: user.id, username: user.username, role: user.role },
+          actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:publish',
           target: { type: 'record', id },
           outcome: 'failure',

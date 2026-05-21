@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import {
   sendSuccess,
@@ -47,8 +47,8 @@ searchRouter.get(
       )
       .customSanitizer((value) => value?.toLowerCase()),
   ],
-  async (req: any, res: Response) => {
-    const isAuthenticated = (req as any).user !== undefined;
+  async (req: Request, res: Response) => {
+    const isAuthenticated = req.user !== undefined;
     const operation = isAuthenticated
       ? 'search_records_authenticated'
       : 'search_records_public';
@@ -77,14 +77,14 @@ searchRouter.get(
           type,
           pageSize,
           currentPage,
-          requestId: (req as any).requestId,
-          userId: (req as any).user?.id,
-          userRole: (req as any).user?.role,
+          requestId: req.requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
           isAuthenticated,
         }
       );
 
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         throw new Error('CivicPress instance not available');
       }
@@ -101,7 +101,7 @@ searchRouter.get(
           page: currentPage,
           sort: (sort as string) || 'relevance', // Default to relevance for search
         },
-        (req as any).user
+        req.user
       );
 
       logger.info(
@@ -112,9 +112,9 @@ searchRouter.get(
           totalCount: result.totalCount,
           currentPage: result.currentPage,
           totalPages: result.totalPages,
-          requestId: (req as any).requestId,
-          userId: (req as any).user?.id,
-          userRole: (req as any).user?.role,
+          requestId: req.requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
           isAuthenticated,
         }
       );
@@ -157,8 +157,8 @@ searchRouter.get(
       .isInt({ min: 1, max: 20 })
       .withMessage('Limit must be between 1 and 20'),
   ],
-  async (req: any, res: Response) => {
-    const isAuthenticated = (req as any).user !== undefined;
+  async (req: Request, res: Response) => {
+    const isAuthenticated = req.user !== undefined;
     const operation = 'search_suggestions';
 
     logApiRequest(req, { operation });
@@ -176,14 +176,14 @@ searchRouter.get(
         {
           query,
           limit,
-          requestId: (req as any).requestId,
-          userId: (req as any).user?.id,
-          userRole: (req as any).user?.role,
+          requestId: req.requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
           isAuthenticated,
         }
       );
 
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         throw new Error('CivicPress instance not available');
       }
@@ -237,9 +237,9 @@ searchRouter.get(
           wordsCount: words.length,
           titlesCount: titles.length,
           totalCount: suggestions.length,
-          requestId: (req as any).requestId,
-          userId: (req as any).user?.id,
-          userRole: (req as any).user?.role,
+          requestId: req.requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
           isAuthenticated,
         }
       );

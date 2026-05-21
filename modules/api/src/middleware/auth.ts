@@ -3,9 +3,16 @@ import { CivicPress, AuthUser, Logger, userCan } from '@civicpress/core';
 
 const logger = new Logger();
 
+/**
+ * Legacy local Request augmentation. The same fields are now in the global
+ * `Express.Request` via `types/express-augment.d.ts`; this interface is
+ * preserved as an alias-only re-export for backward compatibility with the
+ * ~20 route files that still import it. New code should use `Request`
+ * directly. The `null` variant on `civicPress` matches the global augment.
+ */
 export interface AuthenticatedRequest extends Request {
   user?: AuthUser;
-  civicPress?: CivicPress;
+  civicPress?: CivicPress | null;
 }
 
 export function authMiddleware(civicPress: CivicPress) {

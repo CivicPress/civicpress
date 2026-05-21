@@ -39,7 +39,7 @@ export const handleStorageSuccess = (
 
   logger.info(`Storage operation '${operation}' completed successfully`, {
     operation,
-    user: (req as any).user?.id,
+    user: req.user?.id,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
   });
@@ -101,7 +101,7 @@ export const handleStorageError = (
     operation,
     error: error.message,
     code: errorCode,
-    user: (req as any).user?.id,
+    user: req.user?.id,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
     stack: error.stack,
@@ -136,7 +136,7 @@ export const handleStorageValidationError = (
   logger.warn(`Storage operation '${operation}' validation failed`, {
     operation,
     errors: errors.length,
-    user: (req as any).user?.id,
+    user: req.user?.id,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
   });

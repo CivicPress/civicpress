@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import {
   Logger,
@@ -20,11 +20,11 @@ export function createStatusRouter() {
   const router = Router();
 
   // GET /api/status - Get comprehensive system status
-  router.get('/', async (req: any, res: Response) => {
+  router.get('/', async (req: Request, res: Response) => {
     logApiRequest(req, { operation: 'get_system_status' });
 
     try {
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         throw new Error('CivicPress not initialized');
       }
@@ -79,7 +79,7 @@ export function createStatusRouter() {
       logger.info('System status retrieved successfully', {
         totalRecords: recordStats.totalRecords,
         pendingChanges: gitStatus?.modified?.length || 0,
-        requestId: (req as any).requestId,
+        requestId: req.requestId,
       });
 
       sendSuccess(status, req, res, {
@@ -101,11 +101,11 @@ export function createStatusRouter() {
   });
 
   // GET /api/status/git - Get detailed Git status
-  router.get('/git', async (req: any, res: Response) => {
+  router.get('/git', async (req: Request, res: Response) => {
     logApiRequest(req, { operation: 'get_git_status' });
 
     try {
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         throw new Error('CivicPress not initialized');
       }
@@ -154,7 +154,7 @@ export function createStatusRouter() {
 
       logger.info('Git status retrieved successfully', {
         totalChanges: status.summary.totalChanges,
-        requestId: (req as any).requestId,
+        requestId: req.requestId,
       });
 
       sendSuccess(status, req, res, {
@@ -178,7 +178,7 @@ export function createStatusRouter() {
   router.get(
     '/records',
     [query('type').optional().isString().withMessage('Type must be a string')],
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       logApiRequest(req, { operation: 'get_record_status' });
 
       try {
@@ -192,7 +192,7 @@ export function createStatusRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -204,7 +204,7 @@ export function createStatusRouter() {
 
         logger.info('Record status retrieved successfully', {
           totalRecords: recordStats.totalRecords,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(recordStats, req, res, {

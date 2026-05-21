@@ -4,7 +4,7 @@
  * REST API endpoints for running system diagnostics
  */
 
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import {
   DiagnosticService,
@@ -36,7 +36,7 @@ export function createDiagnoseRouter() {
   router.use(requireDiagnosticAuth);
 
   // GET /api/v1/diagnose - Run all diagnostic checks
-  router.get('/', validateDiagnosticParams, async (req: any, res: Response) => {
+  router.get('/', validateDiagnosticParams, async (req: Request, res: Response) => {
     logApiRequest(req, { operation: 'diagnose:run_all' });
 
     try {
@@ -50,7 +50,7 @@ export function createDiagnoseRouter() {
         );
       }
 
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         throw new Error('CivicPress not initialized');
       }
@@ -110,8 +110,8 @@ export function createDiagnoseRouter() {
         maxConcurrency: maxConcurrency
           ? parseInt(maxConcurrency as string, 10)
           : undefined,
-        userId: (req as any).user?.id,
-        requestId: (req as any).requestId,
+        userId: req.user?.id !== undefined ? String(req.user.id) : undefined,
+        requestId: req.requestId,
         enableAutoFix: fix === 'true',
       };
 
@@ -158,7 +158,7 @@ export function createDiagnoseRouter() {
         component: component || 'all',
         status: sanitized.overallStatus,
         issuesFound: sanitized.issues?.length || 0,
-        requestId: (req as any).requestId,
+        requestId: req.requestId,
       });
 
       sendSuccess(sanitized, req, res, {
@@ -184,7 +184,7 @@ export function createDiagnoseRouter() {
   router.get(
     '/:component',
     validateDiagnosticParams,
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       logApiRequest(req, { operation: 'diagnose:run_component' });
 
       try {
@@ -198,7 +198,7 @@ export function createDiagnoseRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -274,8 +274,8 @@ export function createDiagnoseRouter() {
           maxConcurrency: maxConcurrency
             ? parseInt(maxConcurrency as string, 10)
             : undefined,
-          userId: (req as any).user?.id,
-          requestId: (req as any).requestId,
+          userId: req.user?.id !== undefined ? String(req.user.id) : undefined,
+          requestId: req.requestId,
           enableAutoFix: fix === 'true',
         };
 
@@ -305,7 +305,7 @@ export function createDiagnoseRouter() {
           component,
           status: result.status,
           issuesFound: result.issues.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(sanitized, req, res, {
@@ -341,7 +341,7 @@ export function createDiagnoseRouter() {
         .isBoolean()
         .withMessage('Dry run must be a boolean'),
     ],
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       logApiRequest(req, { operation: 'diagnose:auto_fix' });
 
       try {
@@ -355,7 +355,7 @@ export function createDiagnoseRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -431,7 +431,7 @@ export function createDiagnoseRouter() {
           total: issues.length,
           successful,
           failed,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(

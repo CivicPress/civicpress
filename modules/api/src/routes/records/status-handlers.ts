@@ -105,11 +105,11 @@ export function registerStatusRoutes(
           throw error;
         }
       } catch (error) {
-        const user = (req as any).user || {};
-        const id = (req as any).params?.id;
+        const user = req.user;
+        const id = req.params?.id;
         await audit.log({
           source: 'api',
-          actor: { id: user.id, username: user.username, role: user.role },
+          actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:status',
           target: { type: 'record', id },
           outcome: 'failure',

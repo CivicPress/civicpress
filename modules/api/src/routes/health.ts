@@ -16,7 +16,7 @@ healthRouter.get('/', (req: Request, res: Response) => {
 
   try {
     logger.info('Health check requested', {
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
       timestamp: new Date().toISOString(),
     });
 
@@ -40,7 +40,7 @@ healthRouter.get('/detailed', (req: Request, res: Response) => {
 
   try {
     logger.info('Detailed health check requested', {
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
     });
 
     const detailedHealth = {
@@ -75,7 +75,7 @@ healthRouter.post('/test-error', (req: Request, res: Response) => {
 
   try {
     logger.info('Error test requested', {
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
       body: req.body,
     });
 

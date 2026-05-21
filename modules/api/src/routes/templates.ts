@@ -27,7 +27,7 @@ export function createTemplatesRouter() {
    * Get TemplateService instance from request
    */
   function getTemplateService(req: AuthenticatedRequest): TemplateService {
-    const civicPress = (req as any).civicPress;
+    const civicPress = req.civicPress;
     if (!civicPress) {
       throw new Error('CivicPress not initialized');
     }

@@ -18,7 +18,10 @@ export function registerPasswordRoutes(router: Router): void {
     try {
       const userId = parseInt(req.params.id);
       const { currentPassword, newPassword }: ChangePasswordRequest = req.body;
-      const requestingUser = (req as any).user;
+      const requestingUser = req.user;
+      if (!requestingUser) {
+        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+      }
 
       if (!currentPassword || !newPassword) {
         const error = new Error('Current password and new password are required');
@@ -33,7 +36,7 @@ export function registerPasswordRoutes(router: Router): void {
       }
 
       // Users can only change their own password, unless they're admin
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       if (userId !== requestingUser.id) {
@@ -108,7 +111,10 @@ export function registerPasswordRoutes(router: Router): void {
     try {
       const userId = parseInt(req.params.id);
       const { newPassword } = req.body;
-      const requestingUser = (req as any).user;
+      const requestingUser = req.user;
+      if (!requestingUser) {
+        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+      }
 
       if (!newPassword) {
         const error = new Error('New password is required');
@@ -123,7 +129,7 @@ export function registerPasswordRoutes(router: Router): void {
       }
 
       // Only admins can set passwords for other users
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       const canManageUsers = await authService.userCan(

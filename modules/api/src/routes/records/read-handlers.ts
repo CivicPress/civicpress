@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { param, query, validationResult } from 'express-validator';
 import { optionalAuth } from '../../middleware/auth.js';
 import { RecordsService } from '../../services/records-service.js';
@@ -37,8 +37,8 @@ export function registerReadRoutes(
         .customSanitizer((value) => value?.toLowerCase()),
     ],
     optionalAuth(recordsService.getCivicPress()),
-    async (req: any, res: Response) => {
-      const isAuthenticated = (req as any).user !== undefined;
+    async (req: Request, res: Response) => {
+      const isAuthenticated = req.user !== undefined;
       const operation = isAuthenticated
         ? 'list_records_authenticated'
         : 'list_records_public';
@@ -83,9 +83,9 @@ export function registerReadRoutes(
             type,
             pageSize,
             currentPage,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
           }
         );
@@ -98,7 +98,7 @@ export function registerReadRoutes(
             page: currentPage,
             sort: (sort as string) || 'created_desc', // Default to created_desc
           },
-          (req as any).user
+          req.user
         );
 
         logger.info(
@@ -108,9 +108,9 @@ export function registerReadRoutes(
             totalCount: result.totalCount,
             currentPage: result.currentPage,
             totalPages: result.totalPages,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
           }
         );
@@ -136,8 +136,8 @@ export function registerReadRoutes(
   );
 
   // GET /api/records/summary - Aggregate counts
-  router.get('/summary', async (req: any, res: Response) => {
-    const isAuthenticated = (req as any).user !== undefined;
+  router.get('/summary', async (req: Request, res: Response) => {
+    const isAuthenticated = req.user !== undefined;
     const operation = isAuthenticated
       ? 'records_summary_authenticated'
       : 'records_summary_public';
@@ -154,9 +154,9 @@ export function registerReadRoutes(
         `Fetching record summary (${isAuthenticated ? 'authenticated' : 'public'})`,
         {
           type,
-          requestId: (req as any).requestId,
-          userId: (req as any).user?.id,
-          userRole: (req as any).user?.role,
+          requestId: req.requestId,
+          userId: req.user?.id,
+          userRole: req.user?.role,
           isAuthenticated,
         }
       );
@@ -184,8 +184,8 @@ export function registerReadRoutes(
     '/:id/frontmatter',
     param('id').isString().notEmpty(),
     optionalAuth(recordsService.getCivicPress()),
-    async (req: any, res: Response) => {
-      const isAuthenticated = (req as any).user !== undefined;
+    async (req: Request, res: Response) => {
+      const isAuthenticated = req.user !== undefined;
       const operation = isAuthenticated
         ? 'get_frontmatter_authenticated'
         : 'get_frontmatter_public';
@@ -209,16 +209,16 @@ export function registerReadRoutes(
           `Getting frontmatter YAML for record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
           {
             recordId: id,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
           }
         );
 
         const yaml = await recordsService.getFrontmatterYaml(
           id,
-          (req as any).user
+          req.user
         );
 
         if (!yaml) {
@@ -232,9 +232,9 @@ export function registerReadRoutes(
           `Frontmatter YAML for record ${id} retrieved successfully (${isAuthenticated ? 'authenticated' : 'public'})`,
           {
             recordId: id,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
           }
         );
@@ -261,8 +261,8 @@ export function registerReadRoutes(
     param('id').isString().notEmpty(),
     // Optional auth - attach user if token is present, but don't require it
     optionalAuth(recordsService.getCivicPress()),
-    async (req: any, res: Response) => {
-      const isAuthenticated = (req as any).user !== undefined;
+    async (req: Request, res: Response) => {
+      const isAuthenticated = req.user !== undefined;
       const operation = isAuthenticated
         ? 'get_record_authenticated'
         : 'get_record_public';
@@ -287,9 +287,9 @@ export function registerReadRoutes(
           `Getting record ${id} (${isAuthenticated ? 'authenticated' : 'public'}, edit: ${edit === 'true'})`,
           {
             recordId: id,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
             editMode: edit === 'true',
           }
@@ -297,7 +297,7 @@ export function registerReadRoutes(
 
         // For edit mode: authenticated users with edit permission get draft if it exists
         // For view mode: always return published records from records table
-        const user = (req as any).user;
+        const user = req.user;
         let record;
 
         if (
@@ -359,9 +359,9 @@ export function registerReadRoutes(
             recordId: id,
             recordType: record.type,
             recordStatus: record.status,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
           }
         );
@@ -377,8 +377,8 @@ export function registerReadRoutes(
   router.get(
     '/:id/raw',
     param('id').isString().notEmpty(),
-    async (req: any, res: Response) => {
-      const isAuthenticated = (req as any).user !== undefined;
+    async (req: Request, res: Response) => {
+      const isAuthenticated = req.user !== undefined;
       const operation = isAuthenticated
         ? 'get_raw_record_authenticated'
         : 'get_raw_record_public';
@@ -402,16 +402,16 @@ export function registerReadRoutes(
           `Getting raw record ${id} (${isAuthenticated ? 'authenticated' : 'public'})`,
           {
             recordId: id,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
           }
         );
 
         // For public users, only allow access to published records
         // For authenticated users with edit permission, allow access to drafts too
-        const user = (req as any).user;
+        const user = req.user;
 
         if (!user) {
           // Public users: verify the record is published before allowing access
@@ -473,9 +473,9 @@ export function registerReadRoutes(
             recordId: id,
             recordType: record.type,
             recordStatus: record.status,
-            requestId: (req as any).requestId,
-            userId: (req as any).user?.id,
-            userRole: (req as any).user?.role,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
             isAuthenticated,
           }
         );

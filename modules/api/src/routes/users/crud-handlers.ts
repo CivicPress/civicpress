@@ -21,7 +21,7 @@ export function registerCrudRoutes(router: Router): void {
 
     try {
       // Check if user has permission to list users
-      const user = (req as any).user;
+      const user = req.user;
       if (!user) {
         return handleApiError(
           'list_users',
@@ -33,7 +33,7 @@ export function registerCrudRoutes(router: Router): void {
       }
 
       // Get CivicPress instance from request
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       // Check if user can manage users
@@ -109,7 +109,7 @@ export function registerCrudRoutes(router: Router): void {
       }
 
       // Check if user has permission to create users
-      const user = (req as any).user;
+      const user = req.user;
       if (!user) {
         return handleApiError(
           'create_user',
@@ -121,7 +121,7 @@ export function registerCrudRoutes(router: Router): void {
       }
 
       // Get CivicPress instance from request
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       // Check if user can manage users
@@ -178,7 +178,7 @@ export function registerCrudRoutes(router: Router): void {
 
       // Log audit event BEFORE sending response
       try {
-        const actor: any = (req as any).user || {};
+        const actor: any = req.user || {};
         await audit.log({
           source: 'api',
           actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -207,8 +207,8 @@ export function registerCrudRoutes(router: Router): void {
       });
     } catch (error) {
       try {
-        const actor: any = (req as any).user || {};
-        const body = (req as any).body || {};
+        const actor: any = req.user || {};
+        const body = req.body || {};
         await audit.log({
           source: 'api',
           actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -233,7 +233,7 @@ export function registerCrudRoutes(router: Router): void {
 
     try {
       // Get CivicPress instance from request
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       const identifier = req.params.id;
@@ -255,7 +255,7 @@ export function registerCrudRoutes(router: Router): void {
       }
 
       // Check authentication
-      const user = (req as any).user;
+      const user = req.user;
       if (!user) {
         return handleApiError(
           'get_user',
@@ -316,7 +316,7 @@ export function registerCrudRoutes(router: Router): void {
 
     try {
       // Get CivicPress instance from request
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       const identifier = req.params.id;
@@ -340,7 +340,7 @@ export function registerCrudRoutes(router: Router): void {
       const userData: UpdateUserRequest = req.body;
 
       // Check authentication
-      const user = (req as any).user;
+      const user = req.user;
       if (!user) {
         return handleApiError(
           'update_user',
@@ -450,7 +450,7 @@ export function registerCrudRoutes(router: Router): void {
         res,
         { operation: 'update_user' }
       );
-      const actor: any = (req as any).user || {};
+      const actor: any = req.user || {};
       await audit.log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -463,8 +463,8 @@ export function registerCrudRoutes(router: Router): void {
         outcome: 'success',
       });
     } catch (error) {
-      const actor: any = (req as any).user || {};
-      const idParam = (req as any).params?.id;
+      const actor: any = req.user || {};
+      const idParam = req.params?.id;
       await audit.log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -486,7 +486,7 @@ export function registerCrudRoutes(router: Router): void {
 
     try {
       // Get CivicPress instance from request
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       const identifier = req.params.id;
@@ -508,7 +508,7 @@ export function registerCrudRoutes(router: Router): void {
       }
 
       // Check authentication
-      const user = (req as any).user;
+      const user = req.user;
       if (!user) {
         return handleApiError(
           'delete_user',
@@ -569,7 +569,7 @@ export function registerCrudRoutes(router: Router): void {
         res,
         { operation: 'delete_user' }
       );
-      const actor: any = (req as any).user || {};
+      const actor: any = req.user || {};
       await audit.log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -578,8 +578,8 @@ export function registerCrudRoutes(router: Router): void {
         outcome: 'success',
       });
     } catch (error) {
-      const actor: any = (req as any).user || {};
-      const idParam = (req as any).params?.id;
+      const actor: any = req.user || {};
+      const idParam = req.params?.id;
       await audit.log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },

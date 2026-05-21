@@ -55,7 +55,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -69,7 +69,7 @@ export function createValidationRouter() {
           recordId,
           isValid: result.isValid,
           issues: result.issues.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(result, req, res, {
@@ -117,7 +117,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -136,7 +136,7 @@ export function createValidationRouter() {
           totalRecords: validationResults.results.length,
           validRecords: validationResults.summary.validCount,
           invalidRecords: validationResults.summary.invalidCount,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(validationResults, req, res, {
@@ -188,7 +188,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -205,7 +205,7 @@ export function createValidationRouter() {
         logger.info('Validation status retrieved', {
           totalIssues: validationStatus.summary.totalIssues,
           bySeverity: validationStatus.summary.bySeverity,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(validationStatus, req, res, {
@@ -251,7 +251,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -270,7 +270,7 @@ export function createValidationRouter() {
           recordId,
           isValid: result.isValid,
           issues: result.issues.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(result, req, res, {

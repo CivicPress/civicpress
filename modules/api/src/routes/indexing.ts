@@ -31,7 +31,7 @@ export function createIndexingRouter() {
       logApiRequest(req, { operation: 'generate_indexes' });
 
       logger.debug('Generate indexes route called', {
-        requestId: (req as any).requestId,
+        requestId: req.requestId,
         body: req.body,
       });
 
@@ -39,7 +39,7 @@ export function createIndexingRouter() {
       if (!errors.isEmpty()) {
         logger.warn('Validation error in indexing generate', {
           errors: errors.array(),
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
         return handleValidationError(
           'generate_indexes',
@@ -66,18 +66,18 @@ export function createIndexingRouter() {
           statuses,
           syncDatabase,
           conflictResolution,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         logger.debug('CivicPress instance check', {
           hasCivicPress: !!civicPress,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         if (!civicPress) {
           logger.error('CivicPress instance not available', {
-            requestId: (req as any).requestId,
+            requestId: req.requestId,
           });
           const error = new Error('CivicPress instance not available');
           (error as any).statusCode = 500;
@@ -88,12 +88,12 @@ export function createIndexingRouter() {
         const indexingService = civicPress.getIndexingService();
         logger.debug('IndexingService instance check', {
           hasIndexingService: !!indexingService,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         if (!indexingService) {
           logger.error('Indexing service not available', {
-            requestId: (req as any).requestId,
+            requestId: req.requestId,
           });
           const error = new Error('Indexing service not available');
           (error as any).statusCode = 500;
@@ -112,7 +112,7 @@ export function createIndexingRouter() {
 
         logger.debug('Calling generateIndexes', {
           options,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         const index = await indexingService.generateIndexes(options);
@@ -122,7 +122,7 @@ export function createIndexingRouter() {
           modules: index.metadata.modules,
           types: index.metadata.types,
           statuses: index.metadata.statuses,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(
@@ -162,10 +162,10 @@ export function createIndexingRouter() {
 
       try {
         logger.info('Getting indexing status', {
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           const error = new Error('CivicPress instance not available');
           (error as any).statusCode = 500;
@@ -175,7 +175,7 @@ export function createIndexingRouter() {
 
         logger.debug('CivicPress instance available', {
           dataDir: civicPress.getDataDir(),
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         const indexingService = civicPress.getIndexingService();
@@ -190,7 +190,7 @@ export function createIndexingRouter() {
         const indexPath = join(civicPress.getDataDir(), 'records', 'index.yml');
         logger.debug('Loading index from path', {
           indexPath,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         const index = indexingService.loadIndex(indexPath);
@@ -198,7 +198,7 @@ export function createIndexingRouter() {
         if (!index) {
           logger.warn('No index found', {
             indexPath,
-            requestId: (req as any).requestId,
+            requestId: req.requestId,
           });
           const error = new Error('No index found');
           (error as any).statusCode = 404;
@@ -211,7 +211,7 @@ export function createIndexingRouter() {
           modules: index.metadata.modules,
           types: index.metadata.types,
           statuses: index.metadata.statuses,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(
@@ -255,7 +255,7 @@ export function createIndexingRouter() {
       if (!errors.isEmpty()) {
         logger.warn('Validation error in indexing sync', {
           errors: errors.array(),
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
         return handleValidationError('sync_records', errors.array(), req, res);
       }
@@ -265,10 +265,10 @@ export function createIndexingRouter() {
 
         logger.info('Starting database sync', {
           conflictResolution,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           const error = new Error('CivicPress instance not available');
           (error as any).statusCode = 500;
@@ -293,7 +293,7 @@ export function createIndexingRouter() {
         logger.info('Database sync completed successfully', {
           totalRecords: index.metadata.totalRecords,
           conflictResolution,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(
@@ -333,7 +333,7 @@ export function createIndexingRouter() {
 
         if (!query) {
           logger.warn('Missing query parameter in search', {
-            requestId: (req as any).requestId,
+            requestId: req.requestId,
           });
           const error = new Error('Query parameter "q" is required');
           (error as any).statusCode = 400;
@@ -346,10 +346,10 @@ export function createIndexingRouter() {
           status,
           module,
           tags,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           const error = new Error('CivicPress instance not available');
           (error as any).statusCode = 500;
@@ -369,7 +369,7 @@ export function createIndexingRouter() {
         const indexPath = join(civicPress.getDataDir(), 'records', 'index.yml');
         logger.debug('Loading index for search', {
           indexPath,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         const index = indexingService.loadIndex(indexPath);
@@ -377,7 +377,7 @@ export function createIndexingRouter() {
         if (!index) {
           logger.warn('No index found for search', {
             indexPath,
-            requestId: (req as any).requestId,
+            requestId: req.requestId,
           });
           const error = new Error('No index found');
           (error as any).statusCode = 404;
@@ -402,7 +402,7 @@ export function createIndexingRouter() {
           query,
           totalResults: results.length,
           searchOptions,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(
@@ -446,7 +446,7 @@ export function createIndexingRouter() {
     logApiRequest(req, { operation: 'get_indexing_stats' });
 
     try {
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         const error = new Error('CivicPress instance not available');
         (error as any).statusCode = 500;
@@ -478,7 +478,7 @@ export function createIndexingRouter() {
     logApiRequest(req, { operation: 'validate_indexes' });
 
     try {
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         const error = new Error('CivicPress instance not available');
         (error as any).statusCode = 500;

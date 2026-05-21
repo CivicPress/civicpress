@@ -436,7 +436,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         const { id } = req.params;
 
         // Get CivicPress instance from request (injected by middleware)
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress instance not available');
         }

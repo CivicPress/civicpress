@@ -228,7 +228,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('info'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       infoRouter
@@ -238,7 +238,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('auth'),
       (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       authRouter
@@ -255,7 +255,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('users/auth'),
       (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       authenticationRouter
@@ -272,7 +272,7 @@ export class CivicPressAPI {
       apiPath('geography'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createGeographyRouter(geographyManager)
@@ -281,7 +281,7 @@ export class CivicPressAPI {
       apiPath('search'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       searchRouter
@@ -292,7 +292,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('status'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createStatusRouter()
@@ -303,7 +303,7 @@ export class CivicPressAPI {
       apiPath('cache'),
       authMiddleware(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createCacheRouter(this.civicPress.getCacheManager())
@@ -313,7 +313,7 @@ export class CivicPressAPI {
       apiPath('diagnose'),
       authMiddleware(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createDiagnoseRouter()
@@ -326,7 +326,7 @@ export class CivicPressAPI {
       apiPath('validation'),
       authMiddleware(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createValidationRouter()
@@ -334,7 +334,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('config'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       // Config router has its own auth middleware, CSRF applies to browser requests
@@ -410,7 +410,7 @@ export class CivicPressAPI {
       optionalAuth(this.civicPress),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       uuidStorageRouter

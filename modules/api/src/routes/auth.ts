@@ -14,7 +14,7 @@ const router = Router();
  * This endpoint is accessible without authentication for initial page load
  */
 router.get('/csrf-token', (req, res) => {
-  const civicPress = (req as any).civicPress as CivicPress;
+  const civicPress = req.civicPress as CivicPress;
   const secretsManager = civicPress.getSecretsManager();
   const csrfProtection = new CsrfProtection(secretsManager);
 
@@ -44,7 +44,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Check if provider is supported
@@ -100,7 +100,7 @@ router.post('/password', async (req, res) => {
     }
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Authenticate with password
@@ -143,7 +143,7 @@ router.get('/providers', async (req, res) => {
 
   try {
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     const providers = authService.getAvailableOAuthProviders();
@@ -174,7 +174,7 @@ router.get('/me', async (req, res) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Validate session (async)
@@ -273,7 +273,7 @@ router.post('/simulated', async (req, res) => {
     }
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Validate role

@@ -64,7 +64,7 @@ export function registerRegistrationRoutes(router: Router): void {
       }
 
       // Get CivicPress instance from request
-      const civicPress = (req as any).context?.civicPress as CivicPress;
+      const civicPress = req.context?.civicPress as CivicPress;
       if (!civicPress) {
         const error = new Error('CivicPress instance not available');
         (error as any).statusCode = 500;
@@ -172,7 +172,7 @@ export function registerAuthenticationRoutes(router: Router): void {
       }
 
       // Get CivicPress instance from request
-      const civicPress = (req as any).civicPress as CivicPress;
+      const civicPress = req.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
 
       // Authenticate with password
@@ -238,7 +238,7 @@ export function registerPublicEmailChangeRoutes(router: Router): void {
       }
 
       // Complete email change
-      const civicPress = (req as any).context?.civicPress as CivicPress;
+      const civicPress = req.context?.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
       const result = await authService.completeEmailChange(token);
 
@@ -305,7 +305,7 @@ export function registerEmailVerificationRoutes(router: Router): void {
       }
 
       // Verify current email
-      const civicPress = (req as any).context?.civicPress as CivicPress;
+      const civicPress = req.context?.civicPress as CivicPress;
       const authService = civicPress.getAuthService();
       const result = await authService.verifyCurrentEmail(token);
 
