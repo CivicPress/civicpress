@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { StorageDatabaseService } from '../types/storage.types.js';
 import { StorageUsageReporter } from '../reporting/storage-usage-reporter.js';
 import { UnifiedCacheManager } from '@civicpress/core';
 import { Logger } from '@civicpress/core';
@@ -53,7 +54,7 @@ describe('StorageUsageReporter', () => {
 
     databaseService = new MockDatabaseService();
     reporter = new StorageUsageReporter(
-      databaseService,
+      databaseService as unknown as StorageDatabaseService,
       cacheManager,
       mockLogger
     );
@@ -240,7 +241,7 @@ describe('StorageUsageReporter', () => {
   describe('Cache Behavior', () => {
     it('should work without cache manager', async () => {
       const reporterNoCache = new StorageUsageReporter(
-        databaseService,
+        databaseService as unknown as StorageDatabaseService,
         undefined,
         mockLogger
       );
@@ -259,7 +260,7 @@ describe('StorageUsageReporter', () => {
     it('should handle cache errors gracefully', async () => {
       // Create reporter with cache
       const reporterWithCache = new StorageUsageReporter(
-        databaseService,
+        databaseService as unknown as StorageDatabaseService,
         cacheManager,
         mockLogger
       );

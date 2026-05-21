@@ -78,13 +78,47 @@ export interface AzureCredentials {
 export interface GCSCredentials {
   projectId: string;
   keyFilename?: string;
-  credentials?: Record<string, any>;
+  credentials?: Record<string, unknown>;
 }
 
 export type ProviderCredentials =
   | S3Credentials
   | AzureCredentials
   | GCSCredentials;
+
+/**
+ * Minimal structural interface for the methods on `DatabaseService`
+ * that storage modules call. The real `DatabaseService` lives in
+ * `@civicpress/core` and would create a circular import; this surface
+ * lets storage type its `databaseService` field without that hazard.
+ * Phase 2d W3-T6.
+ *
+ * Method signatures mirror the actual `DatabaseService` / `StorageFileStore`
+ * return types so consumers (like `file-mgmt-ops.ts`) can treat the
+ * `deleteStorageFile`/`updateStorageFile` results as booleans.
+ */
+export interface StorageDatabaseService {
+  createStorageFile(file: {
+    id: string;
+    original_name: string;
+    stored_filename: string;
+    folder: string;
+    relative_path: string;
+    provider_path: string;
+    size: number;
+    mime_type: string;
+    description?: string;
+    uploaded_by?: string;
+  }): Promise<void>;
+  getStorageFileById(id: string): Promise<StorageFile | null>;
+  getStorageFilesByFolder(folder: string): Promise<StorageFile[]>;
+  getAllStorageFiles(): Promise<StorageFile[]>;
+  updateStorageFile(
+    id: string,
+    updates: { description?: string; updated_by?: string }
+  ): Promise<boolean>;
+  deleteStorageFile(id: string): Promise<boolean>;
+}
 
 export interface StorageFolder {
   path: string;

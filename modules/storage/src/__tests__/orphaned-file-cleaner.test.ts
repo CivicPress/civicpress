@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { StorageDatabaseService } from '../types/storage.types.js';
 import { OrphanedFileCleaner } from '../cleanup/orphaned-file-cleaner.js';
 import { Logger } from '@civicpress/core';
 import * as fs from 'fs/promises';
@@ -63,7 +64,7 @@ describe('OrphanedFileCleaner', () => {
     };
 
     cleaner = new OrphanedFileCleaner(
-      databaseService,
+      databaseService as unknown as StorageDatabaseService,
       config,
       null, // s3Client
       null, // azureContainerClient

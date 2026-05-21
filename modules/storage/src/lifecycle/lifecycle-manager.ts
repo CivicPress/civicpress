@@ -5,7 +5,7 @@
  */
 
 import { Logger } from '@civicpress/core';
-import type { StorageFile } from '../types/storage.types.js';
+import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
 
 export interface LifecyclePolicy {
   name: string;
@@ -37,13 +37,13 @@ export interface LifecycleResult {
  */
 export class LifecycleManager {
   private logger: Logger;
-  private databaseService: any;
-  private storageService: any; // CloudUuidStorageService
+  private databaseService: StorageDatabaseService;
+  private storageService: import("../cloud-uuid-storage-service.js").CloudUuidStorageService; // CloudUuidStorageService
   private policies: LifecyclePolicy[];
 
   constructor(
-    databaseService: any,
-    storageService: any,
+    databaseService: StorageDatabaseService,
+    storageService: import("../cloud-uuid-storage-service.js").CloudUuidStorageService,
     policies: LifecyclePolicy[] = [],
     logger?: Logger
   ) {

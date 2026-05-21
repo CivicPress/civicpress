@@ -26,7 +26,7 @@ export class StorageError extends CivicPressError {
       operation?: string;
       fileId?: string;
       folder?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }
   ) {
     super(message, context);
@@ -136,9 +136,9 @@ export class StorageValidationError extends ValidationError {
     message: string,
     validationDetails: {
       field?: string;
-      value?: any;
+      value?: unknown;
       rule?: string;
-      expected?: any;
+      expected?: unknown;
       folder?: string;
     }
   ) {

@@ -135,47 +135,60 @@ export class CredentialManager {
     providerType: string
   ): ProviderCredentials | null {
     try {
-      const config = this.getStorageConfig();
-      const providers = config.providers || {};
+      // Storage config files use snake_case credential keys
+      // (`access_key_id`, `connection_string`, etc.); the SDKs use
+      // camelCase. This method translates between the two shapes —
+      // the unknown-typed input lets us read the raw config without
+      // committing to either casing here.
+      const config = this.getStorageConfig() as
+        | {
+            providers?: Record<
+              string,
+              {
+                account_name?: string;
+                credentials?: Record<string, unknown>;
+              }
+            >;
+          }
+        | undefined;
+      const providers = config?.providers || {};
       const provider = providers[providerType];
 
       if (!provider || !provider.credentials) {
         return null;
       }
+      const rawCreds = provider.credentials as Record<string, string | undefined>;
 
       switch (providerType) {
         case 's3':
-          const s3Creds = provider.credentials;
-          if (s3Creds.access_key_id && s3Creds.secret_access_key) {
+          if (rawCreds.access_key_id && rawCreds.secret_access_key) {
             return {
-              accessKeyId: s3Creds.access_key_id,
-              secretAccessKey: s3Creds.secret_access_key,
-              sessionToken: s3Creds.session_token || undefined,
+              accessKeyId: rawCreds.access_key_id,
+              secretAccessKey: rawCreds.secret_access_key,
+              sessionToken: rawCreds.session_token || undefined,
             } as S3Credentials;
           }
           break;
 
         case 'azure':
-          const azureCreds = provider.credentials;
-          if (azureCreds.connection_string) {
+          if (rawCreds.connection_string) {
             return {
-              connectionString: azureCreds.connection_string,
+              connectionString: rawCreds.connection_string,
             } as AzureCredentials;
           }
-          if (provider.account_name && azureCreds.account_key) {
+          if (provider.account_name && rawCreds.account_key) {
             return {
               accountName: provider.account_name,
-              accountKey: azureCreds.account_key,
+              accountKey: rawCreds.account_key,
             } as AzureCredentials;
           }
           break;
 
         case 'gcs':
-          const gcsCreds = provider.credentials;
-          if (gcsCreds.project_id) {
+          if (rawCreds.project_id) {
             return {
-              projectId: gcsCreds.project_id,
-              keyFilename: gcsCreds.service_account_key || undefined,
+              projectId: rawCreds.project_id,
+              keyFilename: rawCreds.service_account_key || undefined,
             } as GCSCredentials;
           }
           break;
@@ -380,7 +393,7 @@ export class CredentialManager {
   /**
    * Get current storage configuration
    */
-  getStorageConfig(): any {
+  getStorageConfig(): unknown {
     try {
       if (!existsSync(this.configPath)) {
         throw new Error(`Storage configuration not found: ${this.configPath}`);
@@ -397,7 +410,7 @@ export class CredentialManager {
   /**
    * Update storage configuration
    */
-  updateStorageConfig(config: any): void {
+  updateStorageConfig(config: unknown): void {
     try {
       const yamlContent = stringify(config, { indent: 2 });
       writeFileSync(this.configPath, yamlContent, 'utf8');

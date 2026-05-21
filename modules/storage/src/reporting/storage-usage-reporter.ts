@@ -5,6 +5,11 @@
  */
 
 import { Logger } from '@civicpress/core';
+import type {
+  StorageProvider,
+  StorageDatabaseService,
+  StorageFile,
+} from '../types/storage.types.js';
 import type { UnifiedCacheManager } from '@civicpress/core';
 
 export interface StorageUsageReport {
@@ -37,12 +42,12 @@ export interface StorageUsageReport {
  */
 export class StorageUsageReporter {
   private logger: Logger;
-  private databaseService: any; // Will be injected
+  private databaseService: StorageDatabaseService; // Will be injected
   private cache?: any; // Cache for usage reports
   private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
 
   constructor(
-    databaseService: any,
+    databaseService: StorageDatabaseService,
     cacheManager?: UnifiedCacheManager,
     logger?: Logger
   ) {
@@ -125,7 +130,7 @@ export class StorageUsageReporter {
 
     const folderUsage = {
       files: files.length,
-      size: files.reduce((sum: number, file: any) => sum + (file.size || 0), 0),
+      size: files.reduce((sum: number, file: StorageFile) => sum + (file.size || 0), 0),
       sizeFormatted: '',
     };
 
@@ -158,7 +163,7 @@ export class StorageUsageReporter {
     const total = {
       files: allFiles.length,
       size: allFiles.reduce(
-        (sum: number, file: any) => sum + (file.size || 0),
+        (sum: number, file: StorageFile) => sum + (file.size || 0),
         0
       ),
       sizeFormatted: '',

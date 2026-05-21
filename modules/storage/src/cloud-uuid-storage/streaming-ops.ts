@@ -19,6 +19,8 @@ import type {
   UploadFileResponse,
   StreamUploadRequest,
   StreamDownloadOptions,
+  StorageProvider,
+  StorageDatabaseService,
 } from '../types/storage.types.js';
 import { StorageFileNotFoundError } from '../errors/storage-errors.js';
 import {
@@ -297,7 +299,7 @@ export class StreamingOps {
   private async uploadStreamToS3(
     stream: Readable,
     relativePath: string,
-    provider: any,
+    provider: StorageProvider,
     contentType: string,
     metadata?: Record<string, string>
   ): Promise<string> {
@@ -333,7 +335,7 @@ export class StreamingOps {
   private async uploadStreamToAzure(
     stream: Readable,
     relativePath: string,
-    provider: any,
+    provider: StorageProvider,
     contentType: string,
     metadata?: Record<string, string>
   ): Promise<string> {
@@ -384,7 +386,7 @@ export class StreamingOps {
    */
   private async downloadStreamFromS3(
     file: StorageFile,
-    provider: any,
+    provider: StorageProvider,
     options?: StreamDownloadOptions
   ): Promise<Readable> {
     const host = this.deps.host;
@@ -419,7 +421,7 @@ export class StreamingOps {
    */
   private async downloadStreamFromAzure(
     file: StorageFile,
-    provider: any,
+    provider: StorageProvider,
     options?: StreamDownloadOptions
   ): Promise<Readable> {
     const host = this.deps.host;

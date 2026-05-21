@@ -87,8 +87,8 @@ export function registerStorageServices(
     // Mark service as needing initialization
     // The actual config loading and initialization will happen lazily
     // when the service is first used (handled in initializeStorageService helper)
-    (storageService as any)._needsInitialization = true;
-    (storageService as any)._configManager = configManager;
+    storageService._needsInitialization = true;
+    storageService._configManager = configManager;
 
     return storageService;
   });
@@ -119,13 +119,12 @@ export async function initializeStorageService(
   storageService: CloudUuidStorageService
 ): Promise<void> {
   // Check if already initialized
-  if ((storageService as any)._initialized) {
+  if (storageService._initialized) {
     return;
   }
 
   // Get config manager (stored during registration)
-  const configManager = (storageService as any)
-    ._configManager as StorageConfigManager;
+  const configManager = storageService._configManager;
   if (!configManager) {
     throw new Error(
       'Storage service not properly registered - config manager missing'
@@ -137,12 +136,13 @@ export async function initializeStorageService(
   let actualConfig;
   try {
     actualConfig = await configManager.loadConfig();
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If config file doesn't exist, use default config (service was created with defaults)
     // This is expected in test environments and fresh installations
+    const errMessage = error instanceof Error ? error.message : String(error);
     if (
-      error?.message?.includes('not found') ||
-      error?.message?.includes('Storage configuration not found')
+      errMessage.includes('not found') ||
+      errMessage.includes('Storage configuration not found')
     ) {
       // Use default config - service was already created with defaults during registration
       actualConfig = configManager.getDefaultConfig();
@@ -161,6 +161,6 @@ export async function initializeStorageService(
   await storageService.initialize();
 
   // Mark as initialized
-  (storageService as any)._initialized = true;
-  (storageService as any)._needsInitialization = false;
+  storageService._initialized = true;
+  storageService._needsInitialization = false;
 }

@@ -9,7 +9,7 @@
 
 import fs from 'fs-extra';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
-import type { StorageFile } from '../types/storage.types.js';
+import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
 import {
   withTimeout,
   getTimeoutForOperation,
@@ -159,8 +159,8 @@ export class FileMgmtOps {
       if (host.metricsCollector) {
         const latency = Date.now() - startTime;
         const errorCode =
-          err instanceof Error && (err as any).code
-            ? (err as any).code
+          err instanceof Error && (err as Error & { code?: string }).code
+            ? (err as Error & { code?: string }).code
             : 'UNKNOWN_ERROR';
         host.metricsCollector.recordDelete(false, latency, provider, errorCode);
       }
@@ -181,7 +181,7 @@ export class FileMgmtOps {
   /**
    * Delete file from S3
    */
-  private async deleteFromS3(file: StorageFile, provider: any): Promise<void> {
+  private async deleteFromS3(file: StorageFile, provider: StorageProvider): Promise<void> {
     const host = this.deps.host;
     if (!host.s3Client) {
       throw new Error('S3 client not initialized');
@@ -212,7 +212,7 @@ export class FileMgmtOps {
    */
   private async deleteFromAzure(
     file: StorageFile,
-    provider: any
+    provider: StorageProvider
   ): Promise<void> {
     const host = this.deps.host;
     if (!host.azureContainerClient) {
@@ -242,7 +242,7 @@ export class FileMgmtOps {
   /**
    * Delete file from Google Cloud Storage
    */
-  private async deleteFromGCS(file: StorageFile, provider: any): Promise<void> {
+  private async deleteFromGCS(file: StorageFile, provider: StorageProvider): Promise<void> {
     const host = this.deps.host;
     if (!host.gcsBucket) {
       throw new Error('GCS bucket not initialized');

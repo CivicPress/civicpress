@@ -106,7 +106,7 @@ export function generateStoredFilenameFromName(
  */
 export function extractErrorCode(error: unknown): string {
   if (error && typeof error === 'object' && 'code' in error) {
-    return String((error as any).code);
+    return String((error as Error & { code?: string }).code);
   }
   if (error instanceof Error) {
     // Try to extract from error message patterns

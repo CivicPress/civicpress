@@ -8,7 +8,7 @@
 
 import fs from 'fs-extra';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
-import type { StorageFile } from '../types/storage.types.js';
+import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
 import {
   withTimeout,
   getTimeoutForOperation,
@@ -135,8 +135,8 @@ export class DownloadOps {
       if (host.metricsCollector) {
         const latency = Date.now() - startTime;
         const errorCode =
-          err instanceof Error && (err as any).code
-            ? (err as any).code
+          err instanceof Error && (err as Error & { code?: string }).code
+            ? (err as Error & { code?: string }).code
             : 'UNKNOWN_ERROR';
         host.metricsCollector.recordDownload(
           false,
@@ -171,7 +171,7 @@ export class DownloadOps {
    */
   private async getFileContentFromS3(
     file: StorageFile,
-    provider: any
+    provider: StorageProvider
   ): Promise<Buffer | null> {
     const host = this.deps.host;
     if (!host.s3Client) {
@@ -229,7 +229,7 @@ export class DownloadOps {
    */
   private async getFileContentFromAzure(
     file: StorageFile,
-    provider: any
+    provider: StorageProvider
   ): Promise<Buffer | null> {
     const host = this.deps.host;
     if (!host.azureContainerClient) {
@@ -286,7 +286,7 @@ export class DownloadOps {
    */
   private async getFileContentFromGCS(
     file: StorageFile,
-    provider: any
+    provider: StorageProvider
   ): Promise<Buffer | null> {
     const host = this.deps.host;
     if (!host.gcsBucket) {
@@ -387,8 +387,8 @@ export class DownloadOps {
         const activeProvider = host.config.active_provider || 'local';
         provider = activeProvider;
         const errorCode =
-          err instanceof Error && (err as any).code
-            ? (err as any).code
+          err instanceof Error && (err as Error & { code?: string }).code
+            ? (err as Error & { code?: string }).code
             : 'UNKNOWN_ERROR';
         host.metricsCollector.recordList(false, latency, provider, errorCode);
       }

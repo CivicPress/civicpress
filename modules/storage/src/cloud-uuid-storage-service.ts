@@ -40,6 +40,8 @@ import type {
   UploadFileResponse,
   BatchUploadResponse,
   BatchDeleteResponse,
+  StorageProvider,
+  StorageDatabaseService,
 } from './types/storage.types.js';
 import { CredentialManager } from './credential-manager.js';
 import { Logger } from '@civicpress/core';
@@ -77,7 +79,16 @@ export class CloudUuidStorageService {
   config: StorageConfig;
   logger: Logger;
   basePath: string;
-  databaseService: any; // Will be injected
+  databaseService?: StorageDatabaseService; // Set by setDatabaseService()
+
+  /**
+   * Lazy-init state set by `storage-services.ts` registration. Allows the
+   * service to be created with defaults at DI-registration time and
+   * upgraded with real config on first use. Phase 2d W3-T6.
+   */
+  _initialized?: boolean;
+  _needsInitialization?: boolean;
+  _configManager?: import('./storage-config-manager.js').StorageConfigManager;
   credentialManager: CredentialManager;
   s3Client: S3Client | null = null;
   azureBlobServiceClient: BlobServiceClient | null = null;
@@ -212,33 +223,36 @@ export class CloudUuidStorageService {
    * exists (e.g. uploadToS3 will hit this if the active provider was
    * already initialized but client got cleared by shutdown()).
    */
-  async initializeS3Storage(provider: any): Promise<void> {
+  async initializeS3Storage(provider: StorageProvider): Promise<void> {
     return this.providerInit.initializeS3Storage(provider);
   }
 
   /**
    * Lazy-init wrapper — see initializeS3Storage.
    */
-  async initializeAzureStorage(provider: any): Promise<void> {
+  async initializeAzureStorage(provider: StorageProvider): Promise<void> {
     return this.providerInit.initializeAzureStorage(provider);
   }
 
   /**
    * Lazy-init wrapper — see initializeS3Storage.
    */
-  async initializeGCSStorage(provider: any): Promise<void> {
+  async initializeGCSStorage(provider: StorageProvider): Promise<void> {
     return this.providerInit.initializeGCSStorage(provider);
   }
 
   /**
    * Set database service for file tracking
    */
-  setDatabaseService(databaseService: any): void {
+  setDatabaseService(databaseService: StorageDatabaseService): void {
     this.databaseService = databaseService;
 
     // Initialize usage reporter when database service is set
     if (this.cacheAdapter) {
-      const cacheManager = (this.cacheAdapter as any).cache?.manager || null;
+      const cacheManager =
+        (this.cacheAdapter as unknown as {
+          cache?: { manager?: UnifiedCacheManager };
+        }).cache?.manager;
       this.usageReporter = new StorageUsageReporter(
         databaseService,
         cacheManager,
@@ -256,7 +270,7 @@ export class CloudUuidStorageService {
     const globalConfig = this.config.global;
     if (globalConfig?.quota_enforcement !== false && this.usageReporter) {
       // Build quota config from storage config
-      const quotaConfig: any = {
+      const quotaConfig: { enabled: boolean; folders: Record<string, { limit: number; limitFormatted: string }>; global?: { limit: number; limitFormatted: string } } = {
         enabled: true,
         folders: {},
       };
@@ -413,7 +427,7 @@ export class CloudUuidStorageService {
   /**
    * Get lifecycle manager
    */
-  getLifecycleManager(policies?: any[]): LifecycleManager | null {
+  getLifecycleManager(policies?: import('./lifecycle/lifecycle-manager.js').LifecyclePolicy[]): LifecycleManager | null {
     if (!this.databaseService) {
       return null;
     }

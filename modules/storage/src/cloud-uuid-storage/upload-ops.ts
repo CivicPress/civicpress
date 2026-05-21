@@ -20,6 +20,8 @@ import type {
   UploadFileResponse,
   StorageFile,
   MulterFile,
+  StorageProvider,
+  StorageDatabaseService,
 } from '../types/storage.types.js';
 import {
   withTimeout,
@@ -251,8 +253,8 @@ export class UploadOps {
       if (host.metricsCollector) {
         const latency = Date.now() - startTime;
         const errorCode =
-          err instanceof Error && (err as any).code
-            ? (err as any).code
+          err instanceof Error && (err as Error & { code?: string }).code
+            ? (err as Error & { code?: string }).code
             : 'UNKNOWN_ERROR';
         const fileSize = (fileData as MulterFile | undefined)?.size || 0;
         host.metricsCollector.recordUpload(
@@ -293,7 +295,7 @@ export class UploadOps {
   private async uploadToS3(
     fileData: MulterFile,
     relativePath: string,
-    provider: any
+    provider: StorageProvider
   ): Promise<string> {
     const host = this.deps.host;
     // Ensure client is initialized (reuse existing or recreate on error)
@@ -335,7 +337,7 @@ export class UploadOps {
   private async uploadToAzure(
     fileData: MulterFile,
     relativePath: string,
-    provider: any
+    provider: StorageProvider
   ): Promise<string> {
     const host = this.deps.host;
     if (!host.azureContainerClient) {
@@ -380,7 +382,7 @@ export class UploadOps {
   private async uploadToGCS(
     fileData: MulterFile,
     relativePath: string,
-    provider: any
+    provider: StorageProvider
   ): Promise<string> {
     const host = this.deps.host;
     if (!host.gcsBucket) {

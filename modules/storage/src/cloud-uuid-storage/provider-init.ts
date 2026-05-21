@@ -24,6 +24,12 @@ import {
 import { Storage } from '@google-cloud/storage';
 import { getLocalStoragePath } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
+import type {
+  StorageProvider,
+  S3Credentials,
+  AzureCredentials,
+  GCSCredentials,
+} from '../types/storage.types.js';
 
 export interface ProviderInitDeps {
   host: CloudUuidStorageService;
@@ -76,7 +82,7 @@ export class ProviderInit {
   /**
    * Initialize local storage
    */
-  async initializeLocalStorage(provider: any): Promise<void> {
+  async initializeLocalStorage(provider: StorageProvider): Promise<void> {
     const host = this.deps.host;
     // Use the same path resolution logic as getLocalStoragePath()
     const storagePath = provider.path || 'storage';
@@ -100,7 +106,7 @@ export class ProviderInit {
   /**
    * Initialize S3 storage
    */
-  async initializeS3Storage(provider: any): Promise<void> {
+  async initializeS3Storage(provider: StorageProvider): Promise<void> {
     const host = this.deps.host;
     const credentials = await host.credentialManager.getCredentials('s3');
 
@@ -111,10 +117,10 @@ export class ProviderInit {
     host.s3Client = new S3Client({
       region: provider.region,
       credentials: {
-        accessKeyId: (credentials as any).accessKeyId,
-        secretAccessKey: (credentials as any).secretAccessKey,
-        ...((credentials as any).sessionToken && {
-          sessionToken: (credentials as any).sessionToken,
+        accessKeyId: (credentials as S3Credentials).accessKeyId,
+        secretAccessKey: (credentials as S3Credentials).secretAccessKey,
+        ...((credentials as S3Credentials).sessionToken && {
+          sessionToken: (credentials as S3Credentials).sessionToken,
         }),
       },
       ...(provider.endpoint && { endpoint: provider.endpoint }),
@@ -129,7 +135,7 @@ export class ProviderInit {
   /**
    * Initialize Azure Blob Storage
    */
-  async initializeAzureStorage(provider: any): Promise<void> {
+  async initializeAzureStorage(provider: StorageProvider): Promise<void> {
     const host = this.deps.host;
     const credentials = await host.credentialManager.getCredentials('azure');
 
@@ -138,17 +144,18 @@ export class ProviderInit {
     }
 
     // Initialize Azure Blob Service Client
-    if ((credentials as any).connectionString) {
+    const azureCreds = credentials as AzureCredentials;
+    if (azureCreds.connectionString) {
       // Use connection string if available
       host.azureBlobServiceClient = BlobServiceClient.fromConnectionString(
-        (credentials as any).connectionString
+        azureCreds.connectionString
       );
-    } else if ((credentials as any).accountKey && provider.account_name) {
+    } else if (azureCreds.accountKey && provider.account_name) {
       // Use account name and key
       const accountUrl = `https://${provider.account_name}.blob.core.windows.net`;
       const sharedKeyCredential = new StorageSharedKeyCredential(
         provider.account_name,
-        (credentials as any).accountKey
+        azureCreds.accountKey
       );
       host.azureBlobServiceClient = new BlobServiceClient(
         accountUrl,
@@ -158,6 +165,10 @@ export class ProviderInit {
       throw new Error(
         'Azure credentials incomplete - need either connectionString or accountName + accountKey'
       );
+    }
+
+    if (!provider.container_name) {
+      throw new Error('Azure provider missing container_name');
     }
 
     // Get container client
@@ -185,7 +196,7 @@ export class ProviderInit {
   /**
    * Initialize Google Cloud Storage
    */
-  async initializeGCSStorage(provider: any): Promise<void> {
+  async initializeGCSStorage(provider: StorageProvider): Promise<void> {
     const host = this.deps.host;
     const credentials = await host.credentialManager.getCredentials('gcs');
 
@@ -193,10 +204,10 @@ export class ProviderInit {
       throw new Error('GCS credentials not found');
     }
 
-    const gcsCredentials = credentials as any;
+    const gcsCredentials = credentials as GCSCredentials;
 
     // Initialize GCS Storage client
-    const storageOptions: any = {
+    const storageOptions: Record<string, unknown> = {
       projectId: gcsCredentials.projectId || provider.project_id,
     };
 
