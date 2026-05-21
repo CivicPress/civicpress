@@ -7,6 +7,7 @@ import {
   getStatusCode,
   getCorrelationId,
 } from '@civicpress/core';
+import { HttpError } from './http-error.js';
 
 export interface LogContext {
   requestId?: string;
@@ -111,7 +112,7 @@ export class ApiLogger {
   // Log error with full context
   logError(
     operation: string,
-    error: Error | any,
+    error: unknown,
     req: Request,
     context: LogContext = {}
   ): void {
@@ -126,10 +127,14 @@ export class ApiLogger {
       errorMessage = error.message;
       errorCode = error.code;
       correlationId = error.correlationId;
-    } else {
+    } else if (error instanceof Error) {
       errorName = error.name || 'UnknownError';
       errorMessage = error.message || 'Unknown error';
-      errorCode = error.code;
+      errorCode = (error as Error & { code?: string }).code;
+    } else {
+      errorName = 'UnknownError';
+      errorMessage = typeof error === 'string' ? error : 'Unknown error';
+      errorCode = undefined;
     }
 
     const errorContext = {
@@ -138,7 +143,7 @@ export class ApiLogger {
         name: errorName,
         message: errorMessage,
         code: errorCode,
-        stack: error.stack,
+        stack: error instanceof Error ? error.stack : undefined,
         ...(correlationId && { correlationId }),
       },
       requestId: req.requestId,
@@ -237,7 +242,7 @@ export class ApiLogger {
 
   // Create standardized error response
   createErrorResponse(
-    error: Error | any,
+    error: unknown,
     req: Request,
     defaultMessage: string = 'Operation failed'
   ): { statusCode: number; success: false; error: any } {
@@ -256,14 +261,32 @@ export class ApiLogger {
       };
     }
 
-    // Fallback to ApiError or generic Error
-    if (error instanceof Error && 'statusCode' in error) {
+    // Typed HttpError path (post Phase 2d W3-T2).
+    if (error instanceof HttpError) {
       return {
-        statusCode: (error as any).statusCode || 500,
+        statusCode: error.statusCode,
         success: false,
         error: {
           message: error.message,
-          code: (error as any).code || 'API_ERROR',
+          code: error.code ?? 'API_ERROR',
+          ...(error.details && { details: error.details }),
+        },
+      };
+    }
+
+    // Fallback for legacy errors that carry `statusCode` as a runtime
+    // property without being a typed HttpError (e.g. third-party libs).
+    if (error instanceof Error && 'statusCode' in error) {
+      const legacy = error as Error & {
+        statusCode?: number;
+        code?: string;
+      };
+      return {
+        statusCode: legacy.statusCode ?? 500,
+        success: false,
+        error: {
+          message: error.message,
+          code: legacy.code ?? 'API_ERROR',
         },
       };
     }
@@ -281,7 +304,7 @@ export class ApiLogger {
   // Handle errors with logging and response
   handleError(
     operation: string,
-    error: Error | any,
+    error: unknown,
     req: Request,
     res: Response,
     defaultMessage: string = 'Operation failed'
@@ -370,7 +393,7 @@ export function logApiSuccess(
 
 export function logApiError(
   operation: string,
-  error: Error | any,
+  error: unknown,
   req: Request,
   context?: LogContext
 ): void {
@@ -379,7 +402,7 @@ export function logApiError(
 
 export function handleApiError(
   operation: string,
-  error: Error | any,
+  error: unknown,
   req: Request,
   res: Response,
   defaultMessage?: string

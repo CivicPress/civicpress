@@ -5,6 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { HttpError } from '../utils/http-error.js';
 import { query, validationResult } from 'express-validator';
 import {
   DiagnosticService,
@@ -216,12 +217,11 @@ export function createDiagnoseRouter() {
           'system',
         ];
         if (!validComponents.includes(component)) {
-          const error = new Error(
-            `Invalid component: ${component}. Must be one of: ${validComponents.join(', ')}`
+          throw new HttpError(
+            400,
+            `Invalid component: ${component}. Must be one of: ${validComponents.join(', ')}`,
+            'INVALID_COMPONENT'
           );
-          (error as any).statusCode = 400;
-          (error as any).code = 'INVALID_COMPONENT';
-          throw error;
         }
 
         // Initialize diagnostic service
@@ -365,12 +365,9 @@ export function createDiagnoseRouter() {
         const dataDir = civicPress.getDataDir();
 
         if (!Array.isArray(issues) || issues.length === 0) {
-          const error = new Error(
+          throw new HttpError(400, 
             'Issues array is required and must not be empty'
-          );
-          (error as any).statusCode = 400;
-          (error as any).code = 'INVALID_REQUEST';
-          throw error;
+          , 'INVALID_REQUEST');
         }
 
         // Initialize diagnostic service

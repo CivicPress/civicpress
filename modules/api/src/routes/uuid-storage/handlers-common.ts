@@ -119,19 +119,23 @@ export async function getStorageService(
     if (!storageService) {
       throw new Error('Storage service resolved but is null/undefined');
     }
-  } catch (error: any) {
-    // Check if it's a ServiceNotFoundError
+  } catch (error: unknown) {
+    const errorName = error instanceof Error ? error.name : undefined;
+    const errorCtorName =
+      error instanceof Error ? error.constructor?.name : undefined;
+    const errorMessage =
+      error instanceof Error ? error.message : String(error);
     if (
-      error?.name === 'ServiceNotFoundError' ||
-      error?.constructor?.name === 'ServiceNotFoundError'
+      errorName === 'ServiceNotFoundError' ||
+      errorCtorName === 'ServiceNotFoundError'
     ) {
       throw new Error(
-        `Storage service not found in DI container. This usually means the storage module was not registered during initialization. Original error: ${error?.message || error}`
+        `Storage service not found in DI container. This usually means the storage module was not registered during initialization. Original error: ${errorMessage}`
       );
     }
 
     throw new Error(
-      `Storage service not available. Storage module may not be registered in DI container. Original error: ${error?.message || error}`
+      `Storage service not available. Storage module may not be registered in DI container. Original error: ${errorMessage}`
     );
   }
 

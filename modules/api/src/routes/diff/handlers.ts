@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { param, query, validationResult } from 'express-validator';
 import { simpleGit } from 'simple-git';
 import {
@@ -96,10 +97,7 @@ export function registerDiffRoutes(router: Router): void {
           await git.show([commit1 as string]);
           await git.show([commit2 as string]);
         } catch (error) {
-          const err = new Error('One or both commits not found');
-          (err as any).statusCode = 400;
-          (err as any).code = 'COMMIT_NOT_FOUND';
-          throw err;
+          throw new HttpError(400, 'One or both commits not found', 'COMMIT_NOT_FOUND');
         }
 
         const result = await compareRecordVersions(
@@ -118,10 +116,7 @@ export function registerDiffRoutes(router: Router): void {
         );
 
         if (!result) {
-          const err = new Error('Record not found or no changes');
-          (err as any).statusCode = 404;
-          (err as any).code = 'NO_CHANGES';
-          throw err;
+          throw new HttpError(404, 'Record not found or no changes', 'NO_CHANGES');
         }
 
         sendSuccess(result, req, res, {

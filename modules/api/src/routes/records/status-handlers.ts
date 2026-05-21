@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { body, param, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
@@ -44,18 +45,13 @@ export function registerStatusRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         // First check if record exists
         const existingRecord = await recordsService.getRecord(id);
         if (!existingRecord) {
-          const error = new Error('Record not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'RECORD_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 
         const result = await recordsService.changeRecordStatus(
@@ -96,13 +92,12 @@ export function registerStatusRoutes(
             },
           });
         } else {
-          const error = new Error(
-            result.error || 'Failed to change record status'
+          throw new HttpError(
+            400,
+            result.error || 'Failed to change record status',
+            'STATUS_CHANGE_FAILED',
+            { details: { reason: result.error } }
           );
-          (error as any).statusCode = 400;
-          (error as any).code = 'STATUS_CHANGE_FAILED';
-          (error as any).details = result.error;
-          throw error;
         }
       } catch (error) {
         const user = req.user;
@@ -149,9 +144,7 @@ export function registerStatusRoutes(
         const user = req.user as any;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         const allowed = await recordsService.getAllowedTransitions(id, user);

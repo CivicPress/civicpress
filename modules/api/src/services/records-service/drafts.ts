@@ -132,11 +132,11 @@ export class RecordsDrafts {
         author: username,
         created_by: userId,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log the error for debugging
       this.deps.logger.error('Failed to create draft', {
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         recordId,
         title: data.title,
         type: data.type,

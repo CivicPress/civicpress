@@ -3,6 +3,7 @@ import {
   listRecordFilesSync,
   parseRecordRelativePath,
 } from '@civicpress/core';
+import { HttpError } from '../../utils/http-error.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -71,11 +72,12 @@ export function requireRecordPath(
   }
 
   const availableRecords = getAvailableRecords(dataDir);
-  const err = new Error(`Record not found: ${recordRef}`);
-  (err as any).statusCode = 404;
-  (err as any).code = 'RECORD_NOT_FOUND';
-  (err as any).details = { availableRecords };
-  throw err;
+  throw new HttpError(
+    404,
+    `Record not found: ${recordRef}`,
+    'RECORD_NOT_FOUND',
+    { details: { availableRecords } }
+  );
 }
 
 export function parseRecordMetadata(content: string): Record<string, any> {

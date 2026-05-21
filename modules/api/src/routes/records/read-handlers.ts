@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { param, query, validationResult } from 'express-validator';
 import { optionalAuth } from '../../middleware/auth.js';
 import { RecordsService } from '../../services/records-service.js';
@@ -60,14 +61,16 @@ export function registerReadRoutes(
 
         // Validate relevance sort is not used on records endpoint
         if (sort === 'relevance') {
-          const error = new Error(
-            'Relevance sort not available for records listing'
+          throw new HttpError(
+            400,
+            'Relevance sort not available for records listing',
+            'INVALID_SORT_CONTEXT',
+            {
+              details: {
+                reason: 'Relevance sort is only available for search endpoint',
+              },
+            }
           );
-          (error as any).statusCode = 400;
-          (error as any).code = 'INVALID_SORT_CONTEXT';
-          (error as any).details =
-            'Relevance sort is only available for search endpoint';
-          throw error;
         }
 
         // Query only records table - all records there are published (by table location)
@@ -222,10 +225,7 @@ export function registerReadRoutes(
         );
 
         if (!yaml) {
-          const error = new Error('Record not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'RECORD_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 
         logger.info(
@@ -347,10 +347,7 @@ export function registerReadRoutes(
         }
 
         if (!record) {
-          const error = new Error('Record not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'RECORD_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 
         logger.info(
@@ -417,10 +414,7 @@ export function registerReadRoutes(
           // Public users: verify the record is published before allowing access
           const publishedRecord = await recordsService.getRecord(id);
           if (!publishedRecord || publishedRecord.status !== 'published') {
-            const error = new Error('Record not found');
-            (error as any).statusCode = 404;
-            (error as any).code = 'RECORD_NOT_FOUND';
-            throw error;
+            throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
           }
         }
         // For authenticated users, getDraftOrRecord will handle draft vs published logic
@@ -461,10 +455,7 @@ export function registerReadRoutes(
         }
 
         if (!record) {
-          const error = new Error('Record not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'RECORD_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 
         logger.info(

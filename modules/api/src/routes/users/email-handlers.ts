@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { CivicPress } from '@civicpress/core';
 import {
   logApiRequest,
@@ -24,11 +25,9 @@ export function registerEmailRoutes(router: Router): void {
       }
 
       if (!newEmail) {
-        const error = new Error('New email address is required');
-        (error as any).statusCode = 400;
+        const error = new HttpError(400, 'New email address is required');
         return handleApiError(
-          'request_email_change',
-          error,
+          'request_email_change', error,
           req,
           res,
           'New email address is required'
@@ -45,11 +44,9 @@ export function registerEmailRoutes(router: Router): void {
           'users:manage'
         );
         if (!canManageUsers) {
-          const error = new Error('Insufficient permissions');
-          (error as any).statusCode = 403;
+          const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'request_email_change',
-            error,
+            'request_email_change', error,
             req,
             res,
             'You can only change your own email address'
@@ -61,11 +58,9 @@ export function registerEmailRoutes(router: Router): void {
       const result = await authService.requestEmailChange(userId, newEmail);
 
       if (!result.success) {
-        const error = new Error(result.message);
-        (error as any).statusCode = 400;
+        const error = new HttpError(400, result.message);
         return handleApiError(
-          'request_email_change',
-          error,
+          'request_email_change', error,
           req,
           res,
           result.message
@@ -129,11 +124,9 @@ export function registerEmailRoutes(router: Router): void {
           'users:manage'
         );
         if (!canManageUsers) {
-          const error = new Error('Insufficient permissions');
-          (error as any).statusCode = 403;
+          const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'cancel_email_change',
-            error,
+            'cancel_email_change', error,
             req,
             res,
             'You can only cancel your own email change request'
@@ -145,11 +138,9 @@ export function registerEmailRoutes(router: Router): void {
       const result = await authService.cancelEmailChange(userId);
 
       if (!result.success) {
-        const error = new Error(result.message);
-        (error as any).statusCode = 400;
+        const error = new HttpError(400, result.message);
         return handleApiError(
-          'cancel_email_change',
-          error,
+          'cancel_email_change', error,
           req,
           res,
           result.message
@@ -211,11 +202,9 @@ export function registerEmailRoutes(router: Router): void {
           'users:manage'
         );
         if (!canManageUsers) {
-          const error = new Error('Insufficient permissions');
-          (error as any).statusCode = 403;
+          const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'send_email_verification',
-            error,
+            'send_email_verification', error,
             req,
             res,
             'You can only verify your own email address'

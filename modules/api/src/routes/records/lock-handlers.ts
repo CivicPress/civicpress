@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { param, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
@@ -41,23 +42,24 @@ export function registerLockRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         const acquired = await recordsService.acquireLock(id, user);
 
         if (!acquired) {
           const lock = await recordsService.getLock(id);
-          const error = new Error(
-            `Record is locked by ${lock?.locked_by || 'another user'}`
+          throw new HttpError(
+            409,
+            `Record is locked by ${lock?.locked_by || 'another user'}`,
+            'RECORD_LOCKED',
+            {
+              details: {
+                lockedBy: lock?.locked_by,
+                expiresAt: lock?.expires_at,
+              },
+            }
           );
-          (error as any).statusCode = 409;
-          (error as any).code = 'RECORD_LOCKED';
-          (error as any).lockedBy = lock?.locked_by;
-          (error as any).expiresAt = lock?.expires_at;
-          throw error;
         }
 
         sendSuccess({ locked: true, recordId: id }, req, res, {
@@ -99,9 +101,7 @@ export function registerLockRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         const released = await recordsService.releaseLock(id, user);

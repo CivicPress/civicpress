@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { CivicPress } from '@civicpress/core';
 import {
   logApiRequest,
@@ -31,11 +32,9 @@ export function registerSecurityRoutes(router: Router): void {
           'users:manage'
         );
         if (!canManageUsers) {
-          const error = new Error('Insufficient permissions');
-          (error as any).statusCode = 403;
+          const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'get_security_info',
-            error,
+            'get_security_info', error,
             req,
             res,
             'You can only view your own security information'
@@ -46,11 +45,9 @@ export function registerSecurityRoutes(router: Router): void {
       // Get user by ID
       const user = await authService.getUserById(userId);
       if (!user) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
+        const error = new HttpError(404, 'User not found');
         return handleApiError(
-          'get_security_info',
-          error,
+          'get_security_info', error,
           req,
           res,
           'User not found'

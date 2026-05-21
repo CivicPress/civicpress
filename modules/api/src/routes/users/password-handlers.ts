@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { CivicPress } from '@civicpress/core';
 import {
   logApiRequest,
@@ -24,11 +25,9 @@ export function registerPasswordRoutes(router: Router): void {
       }
 
       if (!currentPassword || !newPassword) {
-        const error = new Error('Current password and new password are required');
-        (error as any).statusCode = 400;
+        const error = new HttpError(400, 'Current password and new password are required');
         return handleApiError(
-          'change_password',
-          error,
+          'change_password', error,
           req,
           res,
           'Current password and new password are required'
@@ -45,11 +44,9 @@ export function registerPasswordRoutes(router: Router): void {
           'users:manage'
         );
         if (!canManageUsers) {
-          const error = new Error('Insufficient permissions');
-          (error as any).statusCode = 403;
+          const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'change_password',
-            error,
+            'change_password', error,
             req,
             res,
             'You can only change your own password'
@@ -65,8 +62,7 @@ export function registerPasswordRoutes(router: Router): void {
       );
 
       if (!result.success) {
-        const error = new Error(result.message);
-        (error as any).statusCode = 400;
+        const error = new HttpError(400, result.message);
         return handleApiError('change_password', error, req, res, result.message);
       }
 
@@ -117,11 +113,9 @@ export function registerPasswordRoutes(router: Router): void {
       }
 
       if (!newPassword) {
-        const error = new Error('New password is required');
-        (error as any).statusCode = 400;
+        const error = new HttpError(400, 'New password is required');
         return handleApiError(
-          'set_password',
-          error,
+          'set_password', error,
           req,
           res,
           'New password is required'
@@ -137,11 +131,9 @@ export function registerPasswordRoutes(router: Router): void {
         'users:manage'
       );
       if (!canManageUsers) {
-        const error = new Error('Insufficient permissions');
-        (error as any).statusCode = 403;
+        const error = new HttpError(403, 'Insufficient permissions');
         return handleApiError(
-          'set_password',
-          error,
+          'set_password', error,
           req,
           res,
           'Admin privileges required to set user passwords'
@@ -156,8 +148,7 @@ export function registerPasswordRoutes(router: Router): void {
       );
 
       if (!result.success) {
-        const error = new Error(result.message);
-        (error as any).statusCode = 400;
+        const error = new HttpError(400, result.message);
         return handleApiError('set_password', error, req, res, result.message);
       }
 

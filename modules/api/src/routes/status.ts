@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { HttpError } from '../utils/http-error.js';
 import { query, validationResult } from 'express-validator';
 import {
   Logger,
@@ -112,10 +113,7 @@ export function createStatusRouter() {
 
       const gitEngine = civicPress.getGitEngine();
       if (!gitEngine) {
-        const error = new Error('Git engine not available');
-        (error as any).statusCode = 503;
-        (error as any).code = 'GIT_ENGINE_UNAVAILABLE';
-        throw error;
+        throw new HttpError(503, 'Git engine not available', 'GIT_ENGINE_UNAVAILABLE');
       }
 
       const gitStatus = await gitEngine.status();

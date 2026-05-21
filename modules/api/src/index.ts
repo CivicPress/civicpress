@@ -1,4 +1,5 @@
 import express from 'express';
+import { HttpError } from './utils/http-error.js';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
@@ -76,15 +77,22 @@ export class CivicPressAPI {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(
       (
-        err: any,
+        err: Error,
         req: express.Request,
         res: express.Response,
         next: express.NextFunction
       ) => {
         if (err instanceof SyntaxError && 'body' in err) {
-          (err as any).statusCode = 400;
-          (err as any).message = 'Malformed JSON';
-          return errorHandler(err, req, res, next);
+          // Wrap the underlying SyntaxError in a typed HttpError so the
+          // error handler can read statusCode without `as any`.
+          return errorHandler(
+            new HttpError(400, 'Malformed JSON', 'MALFORMED_JSON', {
+              cause: err,
+            }),
+            req,
+            res,
+            next
+          );
         }
         next(err);
       }

@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { HttpError } from '../utils/http-error.js';
 import { body, param, query, validationResult } from 'express-validator';
 import {
   GeographyManager,
@@ -46,8 +47,10 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
     res: Response,
     statusCode: number = 500
   ) => {
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-    (errorObj as any).statusCode = statusCode;
+    const message = error instanceof Error ? error.message : String(error);
+    const errorObj = new HttpError(statusCode, message, undefined, {
+      cause: error,
+    });
     handleApiError(operation, errorObj, req, res, `${operation} failed`);
   };
 
@@ -409,11 +412,16 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         await geographyManager.deleteGeographyFile(id, req.user);
 
         handleSuccess('delete_geography', { id }, res);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Check if it's a GeographyNotFoundError
+        const errorCode =
+          error instanceof Error
+            ? (error as Error & { code?: string }).code
+            : undefined;
+        const errorName = error instanceof Error ? error.name : undefined;
         if (
-          error?.code === 'NOT_FOUND' ||
-          error?.name === 'GeographyNotFoundError'
+          errorCode === 'NOT_FOUND' ||
+          errorName === 'GeographyNotFoundError'
         ) {
           return handleError('delete_geography', error, req, res, 404);
         }

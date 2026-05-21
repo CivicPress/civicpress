@@ -115,7 +115,7 @@ export function registerSingleFileRoutes(router: Router): void {
             statusCode
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('upload_file', error, req, res);
       }
     }
@@ -161,11 +161,13 @@ export function registerSingleFileRoutes(router: Router): void {
         let config;
         try {
           config = await configManager.loadConfig();
-        } catch (error: any) {
+        } catch (error: unknown) {
           // If config file doesn't exist, use default config
+          const errMessage =
+            error instanceof Error ? error.message : String(error);
           if (
-            error?.message?.includes('not found') ||
-            error?.message?.includes('Storage configuration not found')
+            errMessage.includes('not found') ||
+            errMessage.includes('Storage configuration not found')
           ) {
             config = configManager.getDefaultConfig();
           } else {
@@ -229,7 +231,7 @@ export function registerSingleFileRoutes(router: Router): void {
           req,
           res
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('get_file_info', error, req, res);
       }
     }
@@ -275,11 +277,13 @@ export function registerSingleFileRoutes(router: Router): void {
         let config;
         try {
           config = await configManager.loadConfig();
-        } catch (error: any) {
+        } catch (error: unknown) {
           // If config file doesn't exist, use default config
+          const errMessage =
+            error instanceof Error ? error.message : String(error);
           if (
-            error?.message?.includes('not found') ||
-            error?.message?.includes('Storage configuration not found')
+            errMessage.includes('not found') ||
+            errMessage.includes('Storage configuration not found')
           ) {
             config = configManager.getDefaultConfig();
           } else {
@@ -346,7 +350,7 @@ export function registerSingleFileRoutes(router: Router): void {
 
         // Send the file content
         res.send(fileContent);
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('download_file', error, req, res);
       }
     }
@@ -396,7 +400,7 @@ export function registerSingleFileRoutes(router: Router): void {
             404
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('delete_file', error, req, res);
       }
     }
@@ -450,7 +454,7 @@ export function registerSingleFileRoutes(router: Router): void {
             404
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('update_file', error, req, res);
       }
     }

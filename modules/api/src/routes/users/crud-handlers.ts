@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { CivicPress } from '@civicpress/core';
 import {
   logApiRequest,
@@ -41,12 +42,8 @@ export function registerCrudRoutes(router: Router): void {
       if (!canManageUsers) {
         // DEBUG: Get user permissions to see what's loaded
         const userPermissions = await authService.getUserPermissions(user);
-        const error = new Error(
-          `Insufficient permissions to list users. User ${user.username} (${user.role}) has permissions: ${userPermissions.join(', ')}`
-        );
-        (error as any).statusCode = 403;
-        (error as any).code = 'INSUFFICIENT_PERMISSIONS';
-        return handleApiError('list_users', error, req, res);
+        const error = new HttpError(403, `Insufficient permissions to list users. User ${user.username} (${user.role}) has permissions: ${userPermissions.join(', ')}`, 'INSUFFICIENT_PERMISSIONS');
+    return handleApiError('list_users', error, req, res);
       }
 
       // Get query parameters
@@ -127,22 +124,17 @@ export function registerCrudRoutes(router: Router): void {
       // Check if user can manage users
       const canManageUsers = await authService.userCan(user, 'users:manage');
       if (!canManageUsers) {
-        const error = new Error('Insufficient permissions to create users');
-        (error as any).statusCode = 403;
-        (error as any).code = 'INSUFFICIENT_PERMISSIONS';
+        const error = new HttpError(403, 'Insufficient permissions to create users', 'INSUFFICIENT_PERMISSIONS');
         return handleApiError('create_user', error, req, res);
       }
 
       // Validate role if provided
       if (userData.role && !(await authService.isValidRole(userData.role))) {
-        const error = new Error(`Invalid role: ${userData.role}`);
-        (error as any).statusCode = 400;
-        (error as any).code = 'INVALID_ROLE';
-        (error as any).details = {
+        const error = new HttpError(400, `Invalid role: ${userData.role}`, 'INVALID_ROLE', { details: {
           role: userData.role,
           availableRoles: await authService.getAvailableRoles(),
-        };
-        return handleApiError('create_user', error, req, res);
+        } });
+    return handleApiError('create_user', error, req, res);
       }
 
       // Hash password if provided
@@ -271,17 +263,13 @@ export function registerCrudRoutes(router: Router): void {
       const isSelf = userId !== undefined && user.id === userId;
 
       if (!canManageUsers && !isSelf) {
-        const error = new Error('Insufficient permissions to view user');
-        (error as any).statusCode = 403;
-        (error as any).code = 'INSUFFICIENT_PERMISSIONS';
+        const error = new HttpError(403, 'Insufficient permissions to view user', 'INSUFFICIENT_PERMISSIONS');
         return handleApiError('get_user', error, req, res);
       }
 
       // Check if user was found
       if (!targetUser) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
-        (error as any).code = 'USER_NOT_FOUND';
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
         return handleApiError('get_user', error, req, res);
       }
 
@@ -353,9 +341,7 @@ export function registerCrudRoutes(router: Router): void {
 
       // Check if user was found
       if (!targetUser) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
-        (error as any).code = 'USER_NOT_FOUND';
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
         return handleApiError('update_user', error, req, res);
       }
 
@@ -364,9 +350,7 @@ export function registerCrudRoutes(router: Router): void {
       const isSelf = userId !== undefined && user.id === userId;
 
       if (!canManageUsers && !isSelf) {
-        const error = new Error('Insufficient permissions to update user');
-        (error as any).statusCode = 403;
-        (error as any).code = 'INSUFFICIENT_PERMISSIONS';
+        const error = new HttpError(403, 'Insufficient permissions to update user', 'INSUFFICIENT_PERMISSIONS');
         return handleApiError('update_user', error, req, res);
       }
 
@@ -382,14 +366,11 @@ export function registerCrudRoutes(router: Router): void {
         canManageUsers &&
         !(await authService.isValidRole(userData.role))
       ) {
-        const error = new Error(`Invalid role: ${userData.role}`);
-        (error as any).statusCode = 400;
-        (error as any).code = 'INVALID_ROLE';
-        (error as any).details = {
+        const error = new HttpError(400, `Invalid role: ${userData.role}`, 'INVALID_ROLE', { details: {
           role: userData.role,
           availableRoles: await authService.getAvailableRoles(),
-        };
-        return handleApiError('update_user', error, req, res);
+        } });
+    return handleApiError('update_user', error, req, res);
       }
 
       // Hash password if provided (with security guards)
@@ -398,11 +379,9 @@ export function registerCrudRoutes(router: Router): void {
         // SECURITY GUARD: Check if user can set password (prevent external auth users)
         if (!authService.canSetPassword(targetUser)) {
           const provider = authService.getUserAuthProvider(targetUser);
-          const error = new Error(
+          const error = new HttpError(400, 
             `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external provider.`
-          );
-          (error as any).statusCode = 400;
-          (error as any).code = 'EXTERNAL_AUTH_PASSWORD_FORBIDDEN';
+          , 'EXTERNAL_AUTH_PASSWORD_FORBIDDEN');
           return handleApiError('update_user', error, req, res);
         }
 
@@ -413,9 +392,7 @@ export function registerCrudRoutes(router: Router): void {
 
       // Update user
       if (!userId) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
-        (error as any).code = 'USER_NOT_FOUND';
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
         return handleApiError('update_user', error, req, res);
       }
 
@@ -428,9 +405,7 @@ export function registerCrudRoutes(router: Router): void {
       });
 
       if (!updatedUser) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
-        (error as any).code = 'USER_NOT_FOUND';
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
         return handleApiError('update_user', error, req, res);
       }
 
@@ -521,42 +496,32 @@ export function registerCrudRoutes(router: Router): void {
 
       // Check if user was found
       if (!targetUser) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
-        (error as any).code = 'USER_NOT_FOUND';
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
         return handleApiError('delete_user', error, req, res);
       }
 
       // Check if user can manage users
       const canManageUsers = await authService.userCan(user, 'users:manage');
       if (!canManageUsers) {
-        const error = new Error('Insufficient permissions to delete users');
-        (error as any).statusCode = 403;
-        (error as any).code = 'INSUFFICIENT_PERMISSIONS';
+        const error = new HttpError(403, 'Insufficient permissions to delete users', 'INSUFFICIENT_PERMISSIONS');
         return handleApiError('delete_user', error, req, res);
       }
 
       // Prevent self-deletion
       if (userId !== undefined && user.id === userId) {
-        const error = new Error('Cannot delete your own account');
-        (error as any).statusCode = 400;
-        (error as any).code = 'SELF_DELETION_NOT_ALLOWED';
+        const error = new HttpError(400, 'Cannot delete your own account', 'SELF_DELETION_NOT_ALLOWED');
         return handleApiError('delete_user', error, req, res);
       }
 
       // Delete user
       if (!userId) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
-        (error as any).code = 'USER_NOT_FOUND';
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
         return handleApiError('delete_user', error, req, res);
       }
 
       const deleted = await authService.deleteUser(userId);
       if (!deleted) {
-        const error = new Error('User not found');
-        (error as any).statusCode = 404;
-        (error as any).code = 'USER_NOT_FOUND';
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
         return handleApiError('delete_user', error, req, res);
       }
 

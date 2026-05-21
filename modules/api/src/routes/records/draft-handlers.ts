@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { body, param, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
@@ -97,18 +98,13 @@ export function registerDraftRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         // Check if draft exists and belongs to user
         const draft = await recordsService.getDraftOrRecord(id, user);
         if (!draft || !draft.isDraft) {
-          const error = new Error('Draft not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'DRAFT_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'Draft not found', 'DRAFT_NOT_FOUND');
         }
 
         // Verify ownership (optional - can be removed if admins should delete any draft)
@@ -116,11 +112,9 @@ export function registerDraftRoutes(
           draft.created_by !== user.id?.toString() &&
           draft.created_by !== user.username
         ) {
-          const error = new Error(
+          throw new HttpError(403, 
             'Permission denied: You can only delete your own drafts'
           );
-          (error as any).statusCode = 403;
-          throw error;
         }
 
         // Delete draft
@@ -196,9 +190,7 @@ export function registerDraftRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         // Check if draft exists, update it; otherwise create it
@@ -212,11 +204,9 @@ export function registerDraftRoutes(
           // Create new draft (if record exists, we'll create a draft from it)
           // For now, we'll require the full data for creation
           if (!updates.title || !updates.type) {
-            const error = new Error(
+            throw new HttpError(400, 
               'Title and type are required for new drafts'
             );
-            (error as any).statusCode = 400;
-            throw error;
           }
           draft = await recordsService.createDraft(
             {
@@ -290,9 +280,7 @@ export function registerDraftRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         const record = await recordsService.publishDraft(id, user, status);

@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { HttpError } from '../utils/http-error.js';
 import { body, validationResult } from 'express-validator';
 import { join } from 'path';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
@@ -79,10 +80,7 @@ export function createIndexingRouter() {
           logger.error('CivicPress instance not available', {
             requestId: req.requestId,
           });
-          const error = new Error('CivicPress instance not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
         }
 
         const indexingService = civicPress.getIndexingService();
@@ -95,10 +93,7 @@ export function createIndexingRouter() {
           logger.error('Indexing service not available', {
             requestId: req.requestId,
           });
-          const error = new Error('Indexing service not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'INDEXING_SERVICE_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
         }
 
         const options = {
@@ -167,10 +162,7 @@ export function createIndexingRouter() {
 
         const civicPress = req.civicPress;
         if (!civicPress) {
-          const error = new Error('CivicPress instance not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
         }
 
         logger.debug('CivicPress instance available', {
@@ -180,10 +172,7 @@ export function createIndexingRouter() {
 
         const indexingService = civicPress.getIndexingService();
         if (!indexingService) {
-          const error = new Error('Indexing service not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'INDEXING_SERVICE_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
         }
 
         // Load the current index
@@ -200,10 +189,7 @@ export function createIndexingRouter() {
             indexPath,
             requestId: req.requestId,
           });
-          const error = new Error('No index found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'INDEX_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'No index found', 'INDEX_NOT_FOUND');
         }
 
         logger.info('Index status retrieved successfully', {
@@ -270,18 +256,12 @@ export function createIndexingRouter() {
 
         const civicPress = req.civicPress;
         if (!civicPress) {
-          const error = new Error('CivicPress instance not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
         }
 
         const indexingService = civicPress.getIndexingService();
         if (!indexingService) {
-          const error = new Error('Indexing service not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'INDEXING_SERVICE_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
         }
 
         // Generate indexes with sync enabled
@@ -335,9 +315,7 @@ export function createIndexingRouter() {
           logger.warn('Missing query parameter in search', {
             requestId: req.requestId,
           });
-          const error = new Error('Query parameter "q" is required');
-          (error as any).statusCode = 400;
-          throw error;
+          throw new HttpError(400, 'Query parameter "q" is required');
         }
 
         logger.info('Searching index', {
@@ -351,18 +329,12 @@ export function createIndexingRouter() {
 
         const civicPress = req.civicPress;
         if (!civicPress) {
-          const error = new Error('CivicPress instance not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
         }
 
         const indexingService = civicPress.getIndexingService();
         if (!indexingService) {
-          const error = new Error('Indexing service not available');
-          (error as any).statusCode = 500;
-          (error as any).code = 'INDEXING_SERVICE_NOT_AVAILABLE';
-          throw error;
+          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
         }
 
         // Load the current index
@@ -379,10 +351,7 @@ export function createIndexingRouter() {
             indexPath,
             requestId: req.requestId,
           });
-          const error = new Error('No index found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'INDEX_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'No index found', 'INDEX_NOT_FOUND');
         }
 
         const searchOptions = {
@@ -448,10 +417,7 @@ export function createIndexingRouter() {
     try {
       const civicPress = req.civicPress;
       if (!civicPress) {
-        const error = new Error('CivicPress instance not available');
-        (error as any).statusCode = 500;
-        (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
-        throw error;
+        throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
       }
 
       const indexingService = civicPress.getIndexingService();
@@ -480,10 +446,7 @@ export function createIndexingRouter() {
     try {
       const civicPress = req.civicPress;
       if (!civicPress) {
-        const error = new Error('CivicPress instance not available');
-        (error as any).statusCode = 500;
-        (error as any).code = 'CIVICPRESS_NOT_AVAILABLE';
-        throw error;
+        throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
       }
 
       const indexingService = civicPress.getIndexingService();

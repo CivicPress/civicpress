@@ -52,12 +52,15 @@ export const handleStorageSuccess = (
  */
 export const handleStorageError = (
   operation: string,
-  error: Error,
+  error: unknown,
   req: Request,
   res: Response,
   statusCode?: number
 ): Response => {
-  const errorCode = getStorageErrorCode(error);
+  // Narrow `unknown` to the Error shape the storage error helpers expect.
+  const errorObj =
+    error instanceof Error ? error : new Error(String(error ?? 'Unknown error'));
+  const errorCode = getStorageErrorCode(errorObj);
 
   // Automatically determine status code based on error code if not provided
   if (!statusCode) {
@@ -90,21 +93,21 @@ export const handleStorageError = (
   const response: StorageErrorResponse = {
     success: false,
     error: {
-      message: error.message || 'Storage operation failed',
+      message: errorObj.message || 'Storage operation failed',
       code: errorCode,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      details: process.env.NODE_ENV === 'development' ? errorObj.stack : undefined,
     },
     timestamp: new Date().toISOString(),
   };
 
   logger.error(`Storage operation '${operation}' failed`, {
     operation,
-    error: error.message,
+    error: errorObj.message,
     code: errorCode,
     user: req.user?.id,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    stack: error.stack,
+    stack: errorObj.stack,
   });
 
   return res.status(statusCode).json(response);

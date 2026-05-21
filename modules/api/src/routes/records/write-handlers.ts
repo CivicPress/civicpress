@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { HttpError } from '../../utils/http-error.js';
 import { body, param, validationResult } from 'express-validator';
 import {
   AuthenticatedRequest,
@@ -62,9 +63,7 @@ export function registerWriteRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         // Extract username correctly - handle case where user.username might be the full object
@@ -195,18 +194,13 @@ export function registerWriteRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         const record = await recordsService.updateRecord(id, updates, user);
 
         if (!record) {
-          const error = new Error('Record not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'RECORD_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 
         sendSuccess(record, req, res, { operation: 'update_record' });
@@ -267,18 +261,13 @@ export function registerWriteRoutes(
         const user = req.user;
 
         if (!user) {
-          const error = new Error('User authentication required');
-          (error as any).statusCode = 401;
-          throw error;
+          throw new HttpError(401, 'User authentication required');
         }
 
         // First check if record exists
         const existingRecord = await recordsService.getRecord(id);
         if (!existingRecord) {
-          const error = new Error('Record not found');
-          (error as any).statusCode = 404;
-          (error as any).code = 'RECORD_NOT_FOUND';
-          throw error;
+          throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 
         const result = await recordsService.deleteRecord(id, user);
@@ -307,11 +296,9 @@ export function registerWriteRoutes(
             outcome: 'success',
           });
         } else {
-          const error = new Error('Failed to delete record');
-          (error as any).statusCode = 500;
-          (error as any).code = 'DELETE_FAILED';
-          (error as any).details = 'Archive operation failed';
-          throw error;
+          throw new HttpError(500, 'Failed to delete record', 'DELETE_FAILED', {
+            details: { reason: 'Archive operation failed' },
+          });
         }
       } catch (error) {
         const user = req.user;

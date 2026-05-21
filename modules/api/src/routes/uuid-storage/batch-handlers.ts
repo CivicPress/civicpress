@@ -87,7 +87,7 @@ export function registerBatchRoutes(router: Router): void {
           req,
           res
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('batch_upload', error, req, res);
       }
     }
@@ -144,7 +144,7 @@ export function registerBatchRoutes(router: Router): void {
           req,
           res
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('batch_delete', error, req, res);
       }
     }

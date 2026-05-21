@@ -28,12 +28,14 @@ export function registerListingRoutes(router: Router): void {
         let config;
         try {
           config = await configManager.loadConfig();
-        } catch (error: any) {
+        } catch (error: unknown) {
           // If config file doesn't exist, return default config instead of error
           // This is expected in test environments and fresh installations
+          const errMessage =
+            error instanceof Error ? error.message : String(error);
           if (
-            error?.message?.includes('not found') ||
-            error?.message?.includes('Storage configuration not found')
+            errMessage.includes('not found') ||
+            errMessage.includes('Storage configuration not found')
           ) {
             config = configManager.getDefaultConfig();
           } else {
@@ -43,7 +45,7 @@ export function registerListingRoutes(router: Router): void {
         }
 
         return handleStorageSuccess('get_storage_config', { config }, req, res);
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('get_storage_config', error, req, res);
       }
     }
@@ -90,10 +92,14 @@ export function registerListingRoutes(router: Router): void {
         let config;
         try {
           config = await configManager.loadConfig();
-        } catch (configError: any) {
+        } catch (configError: unknown) {
+          const configErrMessage =
+            configError instanceof Error
+              ? configError.message
+              : String(configError);
           if (
-            configError?.message?.includes('not found') ||
-            configError?.message?.includes('Storage configuration not found')
+            configErrMessage.includes('not found') ||
+            configErrMessage.includes('Storage configuration not found')
           ) {
             config = configManager.getDefaultConfig();
           } else {
@@ -195,7 +201,7 @@ export function registerListingRoutes(router: Router): void {
           req,
           res
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         return handleStorageError('list_files', error, req, res);
       }
     }
