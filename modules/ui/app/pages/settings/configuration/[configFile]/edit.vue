@@ -256,7 +256,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import {
   getFieldValue as normalizeValue,
   isMetadataField,
@@ -345,7 +345,7 @@ const loadConfiguration = async () => {
       config.value = JSON.parse(JSON.stringify(response.data));
     } else {
       throw new Error(
-        response.message || `Failed to load ${configFile.value} configuration`
+        extractErrorMessage(response) || `Failed to load ${configFile.value} configuration`
       );
     }
   } catch (err: any) {
@@ -500,7 +500,7 @@ const saveConfiguration = async () => {
         color: 'primary',
       });
     } else {
-      throw new Error(response.message || 'Failed to save configuration');
+      throw new Error(extractErrorMessage(response) || 'Failed to save configuration');
     }
   } catch (err: any) {
     console.error('Failed to save configuration:', err);

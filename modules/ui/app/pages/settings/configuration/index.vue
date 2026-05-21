@@ -174,7 +174,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
@@ -219,7 +219,7 @@ const fetchConfigurations = async () => {
     if (response.success) {
       configurations.value = response.data || [];
     } else {
-      error.value = response.message || 'Failed to load configurations';
+      error.value = extractErrorMessage(response) || 'Failed to load configurations';
     }
   } catch (err: any) {
     error.value = err.message || 'Failed to load configurations';

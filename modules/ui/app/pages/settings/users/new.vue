@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
@@ -46,7 +46,7 @@ const handleSubmit = async (userData: any) => {
       // Navigate back to users list
       await navigateTo('/settings/users');
     } else {
-      error.value = response.message || t('settings.users.failedToCreateUser');
+      error.value = extractErrorMessage(response) || t('settings.users.failedToCreateUser');
     }
   } catch (err: any) {
     console.error('Error creating user:', err);

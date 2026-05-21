@@ -338,7 +338,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 // Define GeographyFile type locally to avoid import issues
@@ -423,7 +423,7 @@ const loadGeographyFile = async () => {
       // Parse content for statistics
       await parseContent();
     } else {
-      error.value = response.error || t('geography.failedToLoad');
+      error.value = extractErrorMessage(response) || t('geography.failedToLoad');
     }
   } catch (err) {
     console.error('Error loading geography file:', err);

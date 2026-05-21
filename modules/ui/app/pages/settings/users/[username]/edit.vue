@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Page metadata
@@ -66,7 +66,7 @@ const fetchUser = async () => {
     if (response.success) {
       user.value = response.data.user;
     } else {
-      error.value = response.message || t('settings.users.failedToFetchUser');
+      error.value = extractErrorMessage(response) || t('settings.users.failedToFetchUser');
     }
   } catch (err: any) {
     console.error('Error fetching user:', err);
@@ -102,7 +102,7 @@ const handleSubmit = async (userData: any) => {
       });
     } else {
       formError.value =
-        response.message || t('settings.users.failedToUpdateUser');
+        extractErrorMessage(response) || t('settings.users.failedToUpdateUser');
     }
   } catch (err: any) {
     console.error('Error updating user:', err);
@@ -136,7 +136,7 @@ const handleDelete = async () => {
       await navigateTo('/settings/users');
     } else {
       formError.value =
-        response.message || t('settings.users.failedToDeleteUser');
+        extractErrorMessage(response) || t('settings.users.failedToDeleteUser');
     }
   } catch (err: any) {
     console.error('Error deleting user:', err);

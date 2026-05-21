@@ -11,16 +11,46 @@
  * @module records/record-schema-validator
  */
 
-import AjvModule from 'ajv';
+import AjvModule, { Ajv as AjvClass, type ErrorObject } from 'ajv';
 import { errorMessage, errorStack, errorCode, errorName, toError } from '../utils/error-narrow.js';
 import addFormatsModule from 'ajv-formats';
 import { RecordSchemaBuilder } from './record-schema-builder.js';
 import { Logger } from '../utils/logger.js';
 import { ValidationError, ValidationResult } from './record-validator.js';
 
-// Handle default export for ajv
-const Ajv = (AjvModule as any).default || AjvModule;
-const addFormats = (addFormatsModule as any).default || addFormatsModule;
+// Type alias for Ajv instances. `Ajv` here is the class type imported
+// as a named export above.
+type AjvInstance = AjvClass;
+
+// Type for JSON Schema objects. Ajv accepts any plain-object shape, but
+// we want to recurse over `allOf`/`anyOf`/`oneOf`/`properties` without
+// re-introducing `as any`. This loose shape captures the surface we use.
+interface JsonSchemaObject {
+  $id?: string;
+  $ref?: string;
+  type?: string | string[];
+  properties?: Record<string, JsonSchemaObject>;
+  allOf?: JsonSchemaObject[];
+  anyOf?: JsonSchemaObject[];
+  oneOf?: JsonSchemaObject[];
+  items?: JsonSchemaObject | JsonSchemaObject[];
+  enum?: unknown[];
+  required?: string[];
+  [key: string]: unknown;
+}
+
+// Handle default export for ajv (CJS-vs-ESM interop). Both module shapes
+// expose the constructor; we read whichever this build resolved to. The
+// double-cast is one of the legitimate "external-lib type holes" the
+// W3-T1 inventory flagged — Ajv exposes the same class via both default
+// and named exports, but the dual-shape import shim doesn't model
+// cleanly in the type system.
+const Ajv = ((AjvModule as unknown as { default?: typeof AjvClass }).default ||
+  (AjvModule as unknown as typeof AjvClass));
+type AddFormatsFn = (ajv: AjvInstance) => AjvInstance;
+const addFormats = (((addFormatsModule as unknown) as {
+  default?: AddFormatsFn;
+}).default || (addFormatsModule as unknown as AddFormatsFn));
 
 const logger = new Logger();
 
@@ -28,13 +58,13 @@ const logger = new Logger();
  * RecordSchemaValidator - Validates frontmatter against JSON Schema
  */
 export class RecordSchemaValidator {
-  private static ajvInstance: any = null;
+  private static ajvInstance: AjvInstance | null = null;
 
   /**
    * Get or create the Ajv instance (singleton)
    * Note: In test environments, we create a new instance to avoid schema ID collisions
    */
-  private static getAjv(): any {
+  private static getAjv(): AjvInstance {
     // In test environments, always create a new instance to avoid schema ID collisions
     if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
       const ajv = new Ajv({
@@ -72,7 +102,7 @@ export class RecordSchemaValidator {
    * @returns ValidationResult with errors, warnings, and info messages
    */
   static validate(
-    frontmatter: any,
+    frontmatter: Record<string, unknown>,
     recordType?: string,
     options: {
       includeModuleExtensions?: boolean;
@@ -89,13 +119,13 @@ export class RecordSchemaValidator {
 
     try {
       // Build the schema for this record type
-      const schema = RecordSchemaBuilder.buildSchema(
-        recordType || frontmatter?.type,
-        {
-          includeModuleExtensions: options.includeModuleExtensions ?? true,
-          includeTypeExtensions: options.includeTypeExtensions ?? true,
-        }
-      );
+      const fmType = frontmatter?.type;
+      const schemaType =
+        recordType ?? (typeof fmType === 'string' ? fmType : undefined);
+      const schema = RecordSchemaBuilder.buildSchema(schemaType, {
+        includeModuleExtensions: options.includeModuleExtensions ?? true,
+        includeTypeExtensions: options.includeTypeExtensions ?? true,
+      });
 
       // Remove $id to avoid schema collision errors (AJV caches schemas by $id)
       // We create a deep copy to avoid mutating the cached schema
@@ -174,7 +204,7 @@ export class RecordSchemaValidator {
   /**
    * Format Ajv error message for better readability
    */
-  private static formatErrorMessage(ajvError: any): string {
+  private static formatErrorMessage(ajvError: ErrorObject): string {
     const field = ajvError.instancePath?.replace(/^\//, '') || 'root';
     const keyword = ajvError.keyword;
 
@@ -214,7 +244,7 @@ export class RecordSchemaValidator {
   /**
    * Get a helpful suggestion based on the error
    */
-  private static getSuggestion(ajvError: any): string | undefined {
+  private static getSuggestion(ajvError: ErrorObject): string | undefined {
     const keyword = ajvError.keyword;
     const field = ajvError.instancePath?.replace(/^\//, '') || '';
 
@@ -250,7 +280,7 @@ export class RecordSchemaValidator {
    * (e.g., cross-field validation, custom logic)
    */
   private static validateBusinessRules(
-    frontmatter: any,
+    frontmatter: Record<string, unknown>,
     recordType?: string
   ): ValidationResult {
     const result: ValidationResult = {
@@ -274,9 +304,14 @@ export class RecordSchemaValidator {
     }
 
     // Example: Validate that created <= updated
-    if (frontmatter.created && frontmatter.updated) {
-      const created = new Date(frontmatter.created);
-      const updated = new Date(frontmatter.updated);
+    const fmCreated = frontmatter.created;
+    const fmUpdated = frontmatter.updated;
+    if (
+      (typeof fmCreated === 'string' || typeof fmCreated === 'number') &&
+      (typeof fmUpdated === 'string' || typeof fmUpdated === 'number')
+    ) {
+      const created = new Date(fmCreated);
+      const updated = new Date(fmUpdated);
 
       if (created > updated) {
         result.warnings.push({
@@ -298,7 +333,7 @@ export class RecordSchemaValidator {
    * Recursively remove $id from schema and all nested schemas
    * This prevents schema ID collision errors when the same schema is compiled multiple times
    */
-  private static removeSchemaIds(schema: any): void {
+  private static removeSchemaIds(schema: JsonSchemaObject): void {
     if (!schema || typeof schema !== 'object') {
       return;
     }
@@ -310,37 +345,43 @@ export class RecordSchemaValidator {
 
     // Recursively process nested schemas
     if (schema.allOf) {
-      schema.allOf.forEach((subSchema: any) => this.removeSchemaIds(subSchema));
+      schema.allOf.forEach((subSchema: JsonSchemaObject) => this.removeSchemaIds(subSchema));
     }
     if (schema.anyOf) {
-      schema.anyOf.forEach((subSchema: any) => this.removeSchemaIds(subSchema));
+      schema.anyOf.forEach((subSchema: JsonSchemaObject) => this.removeSchemaIds(subSchema));
     }
     if (schema.oneOf) {
-      schema.oneOf.forEach((subSchema: any) => this.removeSchemaIds(subSchema));
+      schema.oneOf.forEach((subSchema: JsonSchemaObject) => this.removeSchemaIds(subSchema));
     }
-    if (schema.if) {
+    if (this.isSchemaObject(schema.if)) {
       this.removeSchemaIds(schema.if);
     }
-    if (schema.then) {
+    if (this.isSchemaObject(schema.then)) {
       this.removeSchemaIds(schema.then);
     }
-    if (schema.else) {
+    if (this.isSchemaObject(schema.else)) {
       this.removeSchemaIds(schema.else);
     }
     if (schema.items) {
-      this.removeSchemaIds(schema.items);
+      if (Array.isArray(schema.items)) {
+        schema.items.forEach((item) => this.removeSchemaIds(item));
+      } else {
+        this.removeSchemaIds(schema.items);
+      }
     }
     if (schema.properties) {
-      Object.values(schema.properties).forEach((prop: any) =>
+      Object.values(schema.properties).forEach((prop) =>
         this.removeSchemaIds(prop)
       );
     }
-    if (
-      schema.additionalProperties &&
-      typeof schema.additionalProperties === 'object'
-    ) {
+    if (this.isSchemaObject(schema.additionalProperties)) {
       this.removeSchemaIds(schema.additionalProperties);
     }
+  }
+
+  /** Type-guard narrowing an `unknown` to a JsonSchemaObject. */
+  private static isSchemaObject(v: unknown): v is JsonSchemaObject {
+    return typeof v === 'object' && v !== null && !Array.isArray(v);
   }
 
   /**

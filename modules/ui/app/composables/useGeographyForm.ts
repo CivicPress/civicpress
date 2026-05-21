@@ -1,5 +1,5 @@
 import { ref, computed, type Ref } from 'vue';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useDebounceFn } from '@vueuse/core';
 import {
   suggestPropertyName,
@@ -146,7 +146,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
           await onContentChange();
         }
       } else {
-        throw new Error(response.error || 'Failed to load geography file');
+        throw new Error(extractErrorMessage(response) || 'Failed to load geography file');
       }
     } catch (error) {
       toast.add({
@@ -210,7 +210,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
           preview.value.parsed = null;
         }
       } else {
-        throw new Error(response.error || 'Validation failed');
+        throw new Error(extractErrorMessage(response) || 'Validation failed');
       }
     } catch (error) {
       preview.value.error =
@@ -315,8 +315,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
         emit('success', response.data);
       } else {
         throw new Error(
-          response.error ||
-            (props.mode === 'create'
+          extractErrorMessage(response) ||             (props.mode === 'create'
               ? t('geography.failedToCreate')
               : t('geography.failedToUpdate'))
         );

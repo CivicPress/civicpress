@@ -1,5 +1,5 @@
 import type { Role } from '~/types/user';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 
 export const useUserRoles = () => {
   const { $civicApi } = useNuxtApp();
@@ -71,7 +71,7 @@ export const useUserRoles = () => {
         error.value = 'Unexpected roles format from API';
         roles.value = [];
       } else {
-        error.value = response.error || 'Failed to fetch roles';
+        error.value = extractErrorMessage(response) || 'Failed to fetch roles';
         console.error('Failed to fetch roles:', response.error);
       }
     } catch (err: any) {

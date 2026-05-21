@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Page metadata
@@ -55,7 +55,7 @@ const fetchUser = async () => {
     if (response.success) {
       user.value = response.data.user;
     } else {
-      error.value = response.message || 'Failed to fetch user';
+      error.value = extractErrorMessage(response) || 'Failed to fetch user';
     }
   } catch (err: any) {
     console.error('Error fetching user:', err);

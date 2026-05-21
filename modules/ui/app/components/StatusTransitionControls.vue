@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMediaQuery } from '@vueuse/core';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 
 interface StatusHistoryEntry {
   status: string;
@@ -168,9 +168,7 @@ const confirmChange = async () => {
       pendingStatus.value = null;
     } else {
       inlineError.value =
-        response?.error?.message ||
-        response?.message ||
-        'Failed to change status';
+        extractErrorMessage(response) || 'Failed to change status';
     }
   } catch (err: any) {
     inlineError.value = err?.message || 'Failed to change status';

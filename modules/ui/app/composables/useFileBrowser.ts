@@ -1,5 +1,5 @@
 import type { Ref } from 'vue';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 
 /**
  * File metadata as displayed by the FileBrowser component family. Mirrors the
@@ -88,7 +88,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
           modified: apiFile.updated_at,
         }));
       } else {
-        throw new Error(response.error?.message || 'Failed to load files');
+        throw new Error(extractErrorMessage(response) || 'Failed to load files');
       }
     } catch (error) {
       toast.add({
@@ -207,7 +207,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
         showDeleteModal.value = false;
         fileToDelete.value = null;
       } else {
-        throw new Error(response.error?.message || t('settings.storage.deleteFailed'));
+        throw new Error(extractErrorMessage(response) || t('settings.storage.deleteFailed'));
       }
     } catch (error) {
       toast.add({

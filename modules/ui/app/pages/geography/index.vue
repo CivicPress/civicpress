@@ -217,7 +217,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import { useToast } from '#imports';
@@ -333,7 +333,7 @@ const loadGeographyFiles = async () => {
       totalFiles.value = response.data.total;
       totalPages.value = Math.ceil(totalFiles.value / 12);
     } else {
-      throw new Error(response.error || 'Failed to load geography files');
+      throw new Error(extractErrorMessage(response) || 'Failed to load geography files');
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unknown error occurred';

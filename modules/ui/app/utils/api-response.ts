@@ -8,16 +8,31 @@
 export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
-  error?: {
-    message: string;
-    code?: string;
-    details?: any[];
-    correlationId?: string;
-  };
+  /**
+   * Server-side errors use the structured object form; a small number
+   * of UI-side helpers historically expected a bare string (the `as any`
+   * casts hid the mismatch). Accept both for backward compat.
+   */
+  error?:
+    | string
+    | {
+        message: string;
+        code?: string;
+        details?: any[];
+        correlationId?: string;
+      };
   timestamp?: string;
   path?: string;
   method?: string;
   requestId?: string;
+  /**
+   * A handful of legacy endpoints return data at the top level instead
+   * of wrapping it in `.data`. The index signature preserves that
+   * access pattern (`response.organization`, `response.message`, etc.)
+   * without re-introducing `as any`. Field types are `unknown`, so
+   * call sites must narrow before use.
+   */
+  [key: string]: unknown;
 }
 
 /**
@@ -56,7 +71,7 @@ export function validateApiResponse<T = any>(
 
   // Handle error responses
   if (response && typeof response === 'object' && 'error' in response) {
-    const errorMessage = response.error?.message || 'API request failed';
+    const errorMessage = extractErrorMessage(response) || 'API request failed';
     throw new Error(errorMessage);
   }
 
@@ -105,8 +120,15 @@ export function extractErrorMessage(
 ): string {
   if (response && typeof response === 'object') {
     // Try to get error from response.error
-    if ('error' in response && response.error?.message) {
-      return response.error.message;
+    if ('error' in response && response.error) {
+      // Server's structured error
+      if (typeof response.error === 'object' && response.error?.message) {
+        return response.error.message;
+      }
+      // Legacy: some endpoints return a bare string for `error`
+      if (typeof response.error === 'string') {
+        return response.error;
+      }
     }
 
     // Try to get error from response.data.error

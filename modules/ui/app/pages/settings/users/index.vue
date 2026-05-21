@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
-import type { ApiResponse } from '~/utils/api-response';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
@@ -28,7 +28,7 @@ const fetchUsers = async () => {
     if (response.success) {
       users.value = response.data.users || [];
     } else {
-      error.value = response.error || t('settings.users.failedToFetchUsers');
+      error.value = extractErrorMessage(response) || t('settings.users.failedToFetchUsers');
     }
   } catch (err: any) {
     error.value = err.message || t('settings.users.failedToFetchUsers');
