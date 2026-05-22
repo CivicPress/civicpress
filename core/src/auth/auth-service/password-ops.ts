@@ -45,7 +45,7 @@ export class PasswordOps {
     try {
       // Get user with password hash
       const user = await this.deps.db.getUserWithPassword(username);
-      if (!user) {
+      if (!user || !user.password_hash) {
         throw new Error('Invalid username or password');
       }
 
@@ -108,7 +108,7 @@ export class PasswordOps {
         name: currentUser.name,
         avatar_url: currentUser.avatar_url,
         auth_provider: currentUser.auth_provider,
-        email_verified: currentUser.email_verified,
+        email_verified: !!currentUser.email_verified,
         pending_email: currentUser.pending_email,
         created_at: currentUser.created_at
           ? new Date(currentUser.created_at)
@@ -202,7 +202,7 @@ export class PasswordOps {
         name: targetUser.name,
         avatar_url: targetUser.avatar_url,
         auth_provider: targetUser.auth_provider,
-        email_verified: targetUser.email_verified,
+        email_verified: !!targetUser.email_verified,
         pending_email: targetUser.pending_email,
         created_at: targetUser.created_at
           ? new Date(targetUser.created_at)

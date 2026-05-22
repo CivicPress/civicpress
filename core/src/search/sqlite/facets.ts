@@ -4,12 +4,20 @@
  * respecting the same workflow-state filter as the main search.
  */
 
-import type { DatabaseAdapter } from '../../database/database-adapter.js';
+import type {
+  DatabaseAdapter,
+  SqlParam,
+} from '../../database/database-adapter.js';
 import type {
   SearchOptions,
   SearchFacets,
 } from '../search-service.js';
 import { parseSearchQuery, buildFTS5Query } from '../query-parser.js';
+
+interface FacetRow {
+  value: string;
+  count: number | string;
+}
 
 export async function getFacets(
   adapter: DatabaseAdapter,
@@ -24,7 +32,7 @@ export async function getFacets(
   }
 
   const { type, status } = options;
-  const params: any[] = [ftsQuery, 'internal_only'];
+  const params: SqlParam[] = [ftsQuery, 'internal_only'];
 
   let baseWhereClause = `
     search_index_fts5 MATCH ?
@@ -60,7 +68,7 @@ export async function getFacets(
     ORDER BY count DESC, si.record_type
   `;
 
-  const typeResults = await adapter.query(typeQuery, params);
+  const typeResults = await adapter.query<FacetRow>(typeQuery, params);
 
   const statusQuery = `
     SELECT
@@ -74,16 +82,16 @@ export async function getFacets(
     ORDER BY count DESC, r.status
   `;
 
-  const statusResults = await adapter.query(statusQuery, params);
+  const statusResults = await adapter.query<FacetRow>(statusQuery, params);
 
   return {
-    types: typeResults.map((row: any) => ({
+    types: typeResults.map((row) => ({
       value: row.value,
-      count: parseInt(row.count, 10),
+      count: parseInt(String(row.count), 10),
     })),
-    statuses: statusResults.map((row: any) => ({
+    statuses: statusResults.map((row) => ({
       value: row.value,
-      count: parseInt(row.count, 10),
+      count: parseInt(String(row.count), 10),
     })),
   };
 }

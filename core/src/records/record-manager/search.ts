@@ -13,6 +13,7 @@ import { Logger } from '../../utils/logger.js';
 import type { ICacheStrategy, CacheConfig } from '../../cache/types.js';
 import { UnifiedCacheManager } from '../../cache/unified-cache-manager.js';
 import { MemoryCache } from '../../cache/strategies/memory-cache.js';
+import type { RecordRow } from '../../database/types/row-types.js';
 
 const logger = new Logger();
 
@@ -71,7 +72,7 @@ export class RecordSearch {
       offset?: number;
       sort?: string;
     } = {}
-  ): Promise<{ records: any[]; total: number }> {
+  ): Promise<{ records: Array<RecordRow & Record<string, unknown>>; total: number }> {
     // Use search service if available (includes pagination and relevance ranking)
     const searchService = this.deps.db.getSearchService();
     if (searchService) {
@@ -137,13 +138,13 @@ export class RecordSearch {
     }
 
     // Batch fetch records (no N+1 queries!)
-    const recordIds = searchResults.map((r: any) => r.record_id);
+    const recordIds = searchResults.map((r) => r.record_id);
     const records = await this.batchGetRecords(recordIds);
 
     // Map search results to records
     const recordsMap = new Map(records.map((r) => [r.id, r]));
     const resultRecords = searchResults
-      .map((searchResult: any) => {
+      .map((searchResult) => {
         const record = recordsMap.get(searchResult.record_id);
         if (!record) return null;
         return record;
@@ -159,19 +160,19 @@ export class RecordSearch {
   /**
    * Batch fetch records to avoid N+1 query problem
    */
-  private async batchGetRecords(recordIds: string[]): Promise<any[]> {
+  private async batchGetRecords(recordIds: string[]): Promise<RecordRow[]> {
     if (recordIds.length === 0) return [];
 
     // Handle SQLite IN clause limit (999)
     const BATCH_SIZE = 999;
-    const records: any[] = [];
+    const records: RecordRow[] = [];
 
     for (let i = 0; i < recordIds.length; i += BATCH_SIZE) {
       const batch = recordIds.slice(i, i + BATCH_SIZE);
       const placeholders = batch.map(() => '?').join(',');
       const sql = `SELECT * FROM records WHERE id IN (${placeholders})`;
 
-      const batchRecords = await this.deps.db.query(sql, batch);
+      const batchRecords = await this.deps.db.query<RecordRow>(sql, batch);
       records.push(...batchRecords);
     }
 
@@ -244,8 +245,11 @@ export class RecordSearch {
       LIMIT ?
     `;
 
-    const results = await this.deps.db.query(sql, [normalized, limit]);
-    const suggestions = results.map((r: any) => r.suggestion);
+    const results = await this.deps.db.query<{ suggestion: string }>(sql, [
+      normalized,
+      limit,
+    ]);
+    const suggestions = results.map((r) => r.suggestion);
 
     // Update cache
     await this.getSuggestionsCache().set(normalized, {

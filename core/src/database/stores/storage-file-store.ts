@@ -8,8 +8,9 @@
  * consumers see no signature change.
  */
 
-import { DatabaseAdapter } from '../database-adapter.js';
+import { DatabaseAdapter, SqlParam } from '../database-adapter.js';
 import { Logger } from '../../utils/logger.js';
+import type { StorageFileRow } from '../types/row-types.js';
 
 export class StorageFileStore {
   private adapter: DatabaseAdapter;
@@ -92,23 +93,23 @@ export class StorageFileStore {
     );
   }
 
-  async getStorageFileById(id: string): Promise<any | null> {
-    const results = await this.adapter.query(
+  async getStorageFileById(id: string): Promise<StorageFileRow | null> {
+    const results = await this.adapter.query<StorageFileRow>(
       'SELECT * FROM storage_files WHERE id = ?',
       [id]
     );
     return results.length > 0 ? results[0] : null;
   }
 
-  async getStorageFilesByFolder(folder: string): Promise<any[]> {
-    return await this.adapter.query(
+  async getStorageFilesByFolder(folder: string): Promise<StorageFileRow[]> {
+    return await this.adapter.query<StorageFileRow>(
       'SELECT * FROM storage_files WHERE folder = ? ORDER BY created_at DESC',
       [folder]
     );
   }
 
-  async getAllStorageFiles(): Promise<any[]> {
-    return await this.adapter.query(
+  async getAllStorageFiles(): Promise<StorageFileRow[]> {
+    return await this.adapter.query<StorageFileRow>(
       'SELECT * FROM storage_files ORDER BY created_at DESC'
     );
   }
@@ -134,7 +135,7 @@ export class StorageFileStore {
   ): Promise<boolean> {
     try {
       const setParts: string[] = [];
-      const params: any[] = [];
+      const params: SqlParam[] = [];
 
       if (updates.description !== undefined) {
         setParts.push('description = ?');
@@ -158,8 +159,10 @@ export class StorageFileStore {
     }
   }
 
-  async findStorageFileByPath(relativePath: string): Promise<any | null> {
-    const results = await this.adapter.query(
+  async findStorageFileByPath(
+    relativePath: string
+  ): Promise<StorageFileRow | null> {
+    const results = await this.adapter.query<StorageFileRow>(
       'SELECT * FROM storage_files WHERE relative_path = ?',
       [relativePath]
     );

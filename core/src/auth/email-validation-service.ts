@@ -1,5 +1,10 @@
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database-service.js';
+import type { SqlParam } from '../database/database-adapter.js';
+import type {
+  UserRow,
+  EmailVerificationRow,
+} from '../database/types/row-types.js';
 import { Logger } from '../utils/logger.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { NotificationConfig } from '../notifications/notification-config.js';
@@ -198,14 +203,14 @@ export class EmailValidationService {
   async isEmailInUse(email: string, excludeUserId?: number): Promise<boolean> {
     try {
       let query = 'SELECT COUNT(*) as count FROM users WHERE email = ?';
-      const params: any[] = [email];
+      const params: SqlParam[] = [email];
 
       if (excludeUserId) {
         query += ' AND id != ?';
         params.push(excludeUserId);
       }
 
-      const result = await this.db.query(query, params);
+      const result = await this.db.query<{ count: number }>(query, params);
       return result[0].count > 0;
     } catch (error) {
       logger.error('Error checking email uniqueness:', error);
@@ -553,7 +558,7 @@ export class EmailValidationService {
   async cleanupExpiredTokens(): Promise<number> {
     try {
       // Check if email_verifications table exists
-      const tableCheck = await this.db.query(
+      const tableCheck = await this.db.query<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='email_verifications'"
       );
 
@@ -573,7 +578,7 @@ export class EmailValidationService {
         'UPDATE users SET pending_email = NULL, pending_email_token = NULL, pending_email_expires = NULL WHERE datetime(pending_email_expires) <= datetime("now")'
       );
 
-      const deletedCount = (result as any).changes || 0;
+      const deletedCount = result.changes || 0;
 
       if (deletedCount > 0) {
         logger.info(
@@ -605,10 +610,11 @@ export class EmailValidationService {
     expiresAt: Date | null;
   }> {
     try {
-      const result = await this.db.query(
-        'SELECT pending_email, pending_email_expires FROM users WHERE id = ?',
-        [userId]
-      );
+      const result = await this.db.query<
+        Pick<UserRow, 'pending_email' | 'pending_email_expires'>
+      >('SELECT pending_email, pending_email_expires FROM users WHERE id = ?', [
+        userId,
+      ]);
 
       if (result.length === 0) {
         return { pendingEmail: null, expiresAt: null };

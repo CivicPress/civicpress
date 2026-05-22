@@ -278,9 +278,9 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
 
       // Try to query FTS5 table
       try {
-        const testQuery = await this.databaseService.query(
-          'SELECT COUNT(*) as count FROM search_index_fts5'
-        );
+        const testQuery = await this.databaseService.query<{
+          count?: number;
+        }>('SELECT COUNT(*) as count FROM search_index_fts5');
         const count = testQuery[0]?.count || 0;
 
         if (count === 0) {
@@ -313,17 +313,17 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
   private async checkIndexSync(): Promise<CheckResult> {
     try {
       // Get count from search_index
-      const searchIndexCount = await this.databaseService.query(
-        'SELECT COUNT(*) as count FROM search_index'
-      );
+      const searchIndexCount = await this.databaseService.query<{
+        count?: number;
+      }>('SELECT COUNT(*) as count FROM search_index');
       const baseCount = searchIndexCount[0]?.count || 0;
 
       // Get count from FTS5
       let fts5Count = 0;
       try {
-        const fts5CountResult = await this.databaseService.query(
-          'SELECT COUNT(*) as count FROM search_index_fts5'
-        );
+        const fts5CountResult = await this.databaseService.query<{
+          count?: number;
+        }>('SELECT COUNT(*) as count FROM search_index_fts5');
         fts5Count = fts5CountResult[0]?.count || 0;
       } catch (error: unknown) {
         return this.createErrorResult(

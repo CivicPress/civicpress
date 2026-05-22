@@ -9,9 +9,14 @@
  * consumers see no signature change.
  */
 
-import { DatabaseAdapter } from '../database-adapter.js';
+import { DatabaseAdapter, SqlParam } from '../database-adapter.js';
 import { Logger } from '../../utils/logger.js';
 import { SearchService } from '../../search/search-service.js';
+import type {
+  RecordRow,
+  CountRow,
+  SearchIndexRow,
+} from '../types/row-types.js';
 
 export class RecordStore {
   private adapter: DatabaseAdapter;
@@ -40,10 +45,13 @@ export class RecordStore {
     // Use search service if available (handles FTS indexing)
     if (this.searchService) {
       try {
-        let metadata: any = null;
+        let metadata: Record<string, unknown> | null = null;
         if (recordData.metadata) {
           try {
-            metadata = JSON.parse(recordData.metadata);
+            metadata = JSON.parse(recordData.metadata) as Record<
+              string,
+              unknown
+            >;
           } catch {
             metadata = null;
           }
@@ -99,7 +107,7 @@ export class RecordStore {
       offset?: number;
       sort?: string;
     }
-  ): Promise<any[]> {
+  ): Promise<Array<{ record_id: string }>> {
     // Use search service if available (FTS search)
     if (this.searchService) {
       try {
@@ -127,7 +135,7 @@ export class RecordStore {
       WHERE (si.title LIKE ? OR si.content LIKE ? OR si.tags LIKE ?)
       AND (r.workflow_state IS NULL OR r.workflow_state != ?)
     `;
-    const params: any[] = [
+    const params: SqlParam[] = [
       `%${query}%`,
       `%${query}%`,
       `%${query}%`,
@@ -186,7 +194,7 @@ export class RecordStore {
       }
     }
 
-    return await this.adapter.query(sql, params);
+    return await this.adapter.query<SearchIndexRow>(sql, params);
   }
 
   async removeRecordFromIndex(
@@ -271,8 +279,8 @@ export class RecordStore {
     });
   }
 
-  async getRecord(id: string): Promise<any | null> {
-    const rows = await this.adapter.query(
+  async getRecord(id: string): Promise<RecordRow | null> {
+    const rows = await this.adapter.query<RecordRow>(
       'SELECT *, attached_files FROM records WHERE id = ?',
       [id]
     );
@@ -294,8 +302,8 @@ export class RecordStore {
       path?: string;
     }
   ): Promise<void> {
-    const fields = [];
-    const values = [];
+    const fields: string[] = [];
+    const values: SqlParam[] = [];
 
     if (updates.title !== undefined) {
       fields.push('title = ?');
@@ -433,9 +441,9 @@ export class RecordStore {
       offset?: number;
       sort?: string;
     } = {}
-  ): Promise<{ records: any[]; total: number }> {
+  ): Promise<{ records: RecordRow[]; total: number }> {
     let sql = 'SELECT * FROM records WHERE 1=1';
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     // Defensive: Filter out internal_only records (shouldn't be in records table, but just in case)
     sql += ' AND (workflow_state IS NULL OR workflow_state != ?)';
@@ -470,7 +478,7 @@ export class RecordStore {
 
     // Get total count
     const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as count');
-    const countResult = await this.adapter.query(countSql, params);
+    const countResult = await this.adapter.query<CountRow>(countSql, params);
     const total = countResult[0].count;
 
     // Apply ordering and pagination (with kind priority and user sort)
@@ -487,7 +495,7 @@ export class RecordStore {
       params.push(options.offset);
     }
 
-    const records = await this.adapter.query(sql, params);
+    const records = await this.adapter.query<RecordRow>(sql, params);
 
     return {
       records,

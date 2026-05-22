@@ -74,8 +74,8 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
 
       context.draft = draft;
 
-      // Use target status or draft's current status
-      const finalStatus = context.targetStatus || draft.status;
+      // Use target status or draft's current status (schema default: 'draft')
+      const finalStatus = context.targetStatus || draft.status || 'draft';
 
       // Check if record already exists
       const existingRecord = await this.db.getRecord(context.draftId);
@@ -89,6 +89,8 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
         // So we'll update the DB directly
         const updatedRecord: RecordData = {
           ...existingRecord,
+          author: existingRecord.author || draft.author || '',
+          created_at: existingRecord.created_at || new Date().toISOString(),
           title: draft.title,
           content: draft.markdown_body,
           status: finalStatus,

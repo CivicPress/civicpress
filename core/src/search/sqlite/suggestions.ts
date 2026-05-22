@@ -112,7 +112,10 @@ async function getWordSuggestionsFallback(
   `;
 
   const queryLower = query.toLowerCase();
-  const results = await adapter.query(sql, [queryLower, queryLower]);
+  const results = await adapter.query<{ title?: string; tags?: string }>(
+    sql,
+    [queryLower, queryLower]
+  );
 
   if (results.length === 0) {
     coreDebug('Word extraction: no results from SQL query', {
@@ -210,10 +213,19 @@ export async function getTitleSuggestions(
     LIMIT ?
   `;
 
-  const results = await adapter.query(sql, [normalized, fetchLimit]);
+  interface TitleSuggestionRow {
+    suggestion: string;
+    source: string;
+    frequency?: number;
+    title_normalized?: string;
+  }
+  const results = await adapter.query<TitleSuggestionRow>(sql, [
+    normalized,
+    fetchLimit,
+  ]);
 
   if (!enableTypoTolerance || results.length >= titleLimit) {
-    return results.slice(0, titleLimit).map((row: any) => ({
+    return results.slice(0, titleLimit).map((row) => ({
       text: row.suggestion,
       source: row.source,
       type: 'title' as const,
@@ -221,10 +233,10 @@ export async function getTitleSuggestions(
     }));
   }
 
-  const suggestionsWithSimilarity = results.map((row: any) => {
+  const suggestionsWithSimilarity = results.map((row) => {
     const similarity = calculateTypoSimilarity(
       normalized,
-      row.title_normalized
+      row.title_normalized || ''
     );
     return {
       text: row.suggestion,

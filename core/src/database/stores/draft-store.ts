@@ -8,9 +8,15 @@
  * so external consumers see no signature change.
  */
 
-import { DatabaseAdapter } from '../database-adapter.js';
+import { DatabaseAdapter, SqlParam } from '../database-adapter.js';
 import { errorMessage, errorStack, errorCode, errorName } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
+import type {
+  DraftRow,
+  TableInfoRow,
+  SqliteMasterNameRow,
+  TotalRow,
+} from '../types/row-types.js';
 
 export class DraftStore {
   private adapter: DatabaseAdapter;
@@ -44,16 +50,16 @@ export class DraftStore {
     // This is critical to prevent silent failures when column doesn't exist
     try {
       // Check if table exists first
-      const tableExists = await this.adapter.query(
+      const tableExists = await this.adapter.query<SqliteMasterNameRow>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='record_drafts'"
       );
 
       if (tableExists.length > 0) {
         // Table exists, check if column exists
-        const tableInfo = await this.adapter.query(
+        const tableInfo = await this.adapter.query<TableInfoRow>(
           'PRAGMA table_info(record_drafts)'
         );
-        const columnNames = tableInfo.map((col: any) => col.name);
+        const columnNames = tableInfo.map((col) => col.name);
         const hasColumn = columnNames.includes('workflow_state');
 
         if (!hasColumn) {
@@ -68,10 +74,10 @@ export class DraftStore {
             "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
           );
           // Verify it was added
-          const verifyInfo = await this.adapter.query(
+          const verifyInfo = await this.adapter.query<TableInfoRow>(
             'PRAGMA table_info(record_drafts)'
           );
-          const verifyColumns = verifyInfo.map((col: any) => col.name);
+          const verifyColumns = verifyInfo.map((col) => col.name);
           if (!verifyColumns.includes('workflow_state')) {
             throw new Error(
               'Failed to add workflow_state column to record_drafts table'
@@ -187,10 +193,11 @@ export class DraftStore {
     ) {
       try {
         // Verify the value was actually saved correctly
-        const verifyRows = await this.adapter.query(
-          'SELECT workflow_state FROM record_drafts WHERE id = ?',
-          [draftData.id]
-        );
+        const verifyRows = await this.adapter.query<
+          Pick<DraftRow, 'workflow_state'>
+        >('SELECT workflow_state FROM record_drafts WHERE id = ?', [
+          draftData.id,
+        ]);
         const savedValue = verifyRows[0]?.workflow_state;
 
         this.logger.debug('Verifying workflow_state after INSERT', {
@@ -219,10 +226,11 @@ export class DraftStore {
           );
 
           // Verify the UPDATE worked
-          const verifyAfterUpdate = await this.adapter.query(
-            'SELECT workflow_state FROM record_drafts WHERE id = ?',
-            [draftData.id]
-          );
+          const verifyAfterUpdate = await this.adapter.query<
+            Pick<DraftRow, 'workflow_state'>
+          >('SELECT workflow_state FROM record_drafts WHERE id = ?', [
+            draftData.id,
+          ]);
           const updatedValue = verifyAfterUpdate[0]?.workflow_state;
 
           if (updatedValue === requestedWorkflowState) {
@@ -269,8 +277,8 @@ export class DraftStore {
     }
   }
 
-  async getDraft(id: string): Promise<any | null> {
-    const rows = await this.adapter.query(
+  async getDraft(id: string): Promise<DraftRow | null> {
+    const rows = await this.adapter.query<DraftRow>(
       'SELECT * FROM record_drafts WHERE id = ?',
       [id]
     );
@@ -290,11 +298,11 @@ export class DraftStore {
     ) {
       // Check if column actually exists in schema
       try {
-        const tableInfo = await this.adapter.query(
+        const tableInfo = await this.adapter.query<TableInfoRow>(
           'PRAGMA table_info(record_drafts)'
         );
         const hasColumn = tableInfo.some(
-          (col: any) => col.name === 'workflow_state'
+          (col) => col.name === 'workflow_state'
         );
 
         if (!hasColumn) {
@@ -307,7 +315,7 @@ export class DraftStore {
             "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
           );
           // Re-query to get the draft with the new column
-          const updatedRows = await this.adapter.query(
+          const updatedRows = await this.adapter.query<DraftRow>(
             'SELECT * FROM record_drafts WHERE id = ?',
             [id]
           );
@@ -339,9 +347,9 @@ export class DraftStore {
       limit?: number;
       offset?: number;
     } = {}
-  ): Promise<{ drafts: any[]; total: number }> {
+  ): Promise<{ drafts: DraftRow[]; total: number }> {
     const clauses: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (options.type) {
       clauses.push('type = ?');
@@ -356,7 +364,7 @@ export class DraftStore {
     const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
     // Get total count
-    const countRows = await this.adapter.query(
+    const countRows = await this.adapter.query<TotalRow>(
       `SELECT COUNT(*) as total FROM record_drafts ${whereClause}`,
       params
     );
@@ -371,7 +379,7 @@ export class DraftStore {
       }
     }
 
-    const rows = await this.adapter.query(query, params);
+    const rows = await this.adapter.query<DraftRow>(query, params);
 
     return {
       drafts: rows,
@@ -397,11 +405,11 @@ export class DraftStore {
     // Ensure workflow_state column exists before updating
     if (updates.workflow_state !== undefined) {
       try {
-        const tableInfo = await this.adapter.query(
+        const tableInfo = await this.adapter.query<TableInfoRow>(
           'PRAGMA table_info(record_drafts)'
         );
         const hasColumn = tableInfo.some(
-          (col: any) => col.name === 'workflow_state'
+          (col) => col.name === 'workflow_state'
         );
 
         if (!hasColumn) {
@@ -420,8 +428,8 @@ export class DraftStore {
         );
       }
     }
-    const fields = [];
-    const values = [];
+    const fields: string[] = [];
+    const values: SqlParam[] = [];
 
     if (updates.title !== undefined) {
       fields.push('title = ?');

@@ -31,6 +31,7 @@ import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 import {
   buildSearchSQL,
   mapRowToSearchResult,
+  type SearchRow,
 } from './sqlite/sql-builder.js';
 import {
   indexRecord as indexRecordFn,
@@ -138,13 +139,16 @@ export class SQLiteSearchService implements SearchService {
       titleBoostTerm: firstWord,
     });
 
-    const results = await this.adapter.query(sql.query, sql.params);
+    const results = await this.adapter.query<SearchRow>(
+      sql.query,
+      sql.params
+    );
 
-    const countResult = await this.adapter.query(
+    const countResult = await this.adapter.query<{ count: number | string }>(
       sql.countQuery,
       sql.countParams
     );
-    const total = parseInt(countResult[0]?.count || '0', 10);
+    const total = parseInt(String(countResult[0]?.count ?? '0'), 10);
 
     const searchResults = results.map(mapRowToSearchResult);
 

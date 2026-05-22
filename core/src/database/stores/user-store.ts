@@ -9,7 +9,14 @@
  * signature change.
  */
 
-import { DatabaseAdapter } from '../database-adapter.js';
+import { DatabaseAdapter, SqlParam } from '../database-adapter.js';
+import type {
+  UserRow,
+  ApiKeyWithUserRow,
+  SessionWithUserRow,
+  LastInsertIdRow,
+  CountRow,
+} from '../types/row-types.js';
 
 export class UserStore {
   private adapter: DatabaseAdapter;
@@ -42,35 +49,38 @@ export class UserStore {
     );
 
     // Get the inserted ID
-    const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
+    const rows = await this.adapter.query<LastInsertIdRow>(
+      'SELECT last_insert_rowid() as id'
+    );
     return rows[0].id;
   }
 
-  async getUserByUsername(username: string): Promise<any | null> {
-    const rows = await this.adapter.query(
+  async getUserByUsername(username: string): Promise<UserRow | null> {
+    const rows = await this.adapter.query<UserRow>(
       'SELECT * FROM users WHERE username = ?',
       [username]
     );
     return rows.length > 0 ? rows[0] : null;
   }
 
-  async getUserById(id: number): Promise<any | null> {
-    const rows = await this.adapter.query('SELECT * FROM users WHERE id = ?', [
-      id,
-    ]);
+  async getUserById(id: number): Promise<UserRow | null> {
+    const rows = await this.adapter.query<UserRow>(
+      'SELECT * FROM users WHERE id = ?',
+      [id]
+    );
     return rows.length > 0 ? rows[0] : null;
   }
 
-  async getUserByEmail(email: string): Promise<any | null> {
-    const rows = await this.adapter.query(
+  async getUserByEmail(email: string): Promise<UserRow | null> {
+    const rows = await this.adapter.query<UserRow>(
       'SELECT * FROM users WHERE email = ?',
       [email]
     );
     return rows.length > 0 ? rows[0] : null;
   }
 
-  async getUserWithPassword(username: string): Promise<any | null> {
-    const rows = await this.adapter.query(
+  async getUserWithPassword(username: string): Promise<UserRow | null> {
+    const rows = await this.adapter.query<UserRow>(
       'SELECT * FROM users WHERE username = ?',
       [username]
     );
@@ -89,9 +99,9 @@ export class UserStore {
     pending_email?: string;
     pending_email_token?: string;
     pending_email_expires?: Date;
-  }): Promise<any> {
+  }): Promise<number> {
     // Use a transaction to ensure atomicity
-    const result = await this.adapter.execute(
+    await this.adapter.execute(
       'INSERT INTO users (username, role, email, name, avatar_url, password_hash, auth_provider, email_verified, pending_email, pending_email_token, pending_email_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         userData.username,
@@ -109,11 +119,13 @@ export class UserStore {
     );
 
     // Get the inserted ID using last_insert_rowid() - this should work in SQLite
-    const idRows = await this.adapter.query('SELECT last_insert_rowid() as id');
+    const idRows = await this.adapter.query<LastInsertIdRow>(
+      'SELECT last_insert_rowid() as id'
+    );
     const userId = idRows[0].id;
 
     // Verify the user exists by querying it
-    const userRows = await this.adapter.query(
+    await this.adapter.query<Pick<UserRow, 'id' | 'username'>>(
       'SELECT id, username FROM users WHERE id = ?',
       [userId]
     );
@@ -138,7 +150,7 @@ export class UserStore {
     }
   ): Promise<boolean> {
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: SqlParam[] = [];
 
     if (userData.email !== undefined) {
       updates.push('email = ?');
@@ -204,9 +216,9 @@ export class UserStore {
       role?: string;
       search?: string;
     } = {}
-  ): Promise<{ users: any[]; total: number }> {
+  ): Promise<{ users: UserRow[]; total: number }> {
     let sql = 'SELECT * FROM users WHERE 1=1';
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (options.role) {
       sql += ' AND role = ?';
@@ -220,7 +232,7 @@ export class UserStore {
 
     // Get total count
     const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as count');
-    const countRows = await this.adapter.query(countSql, params);
+    const countRows = await this.adapter.query<CountRow>(countSql, params);
     const total = countRows[0].count;
 
     // Get users with pagination
@@ -234,7 +246,7 @@ export class UserStore {
       }
     }
 
-    const users = await this.adapter.query(sql, params);
+    const users = await this.adapter.query<UserRow>(sql, params);
 
     return { users, total };
   }
@@ -251,12 +263,14 @@ export class UserStore {
       [userId, keyHash, name, expiresAt?.toISOString()]
     );
 
-    const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
+    const rows = await this.adapter.query<LastInsertIdRow>(
+      'SELECT last_insert_rowid() as id'
+    );
     return rows[0].id;
   }
 
-  async getApiKeyByHash(keyHash: string): Promise<any | null> {
-    const rows = await this.adapter.query(
+  async getApiKeyByHash(keyHash: string): Promise<ApiKeyWithUserRow | null> {
+    const rows = await this.adapter.query<ApiKeyWithUserRow>(
       'SELECT ak.*, u.username, u.role, u.name as user_name, u.email, u.avatar_url FROM api_keys ak JOIN users u ON ak.user_id = u.id WHERE ak.key_hash = ?',
       [keyHash]
     );
@@ -278,12 +292,16 @@ export class UserStore {
       [userId, tokenHash, expiresAt.toISOString()]
     );
 
-    const rows = await this.adapter.query('SELECT last_insert_rowid() as id');
+    const rows = await this.adapter.query<LastInsertIdRow>(
+      'SELECT last_insert_rowid() as id'
+    );
     return rows[0].id;
   }
 
-  async getSessionByToken(tokenHash: string): Promise<any | null> {
-    const rows = await this.adapter.query(
+  async getSessionByToken(
+    tokenHash: string
+  ): Promise<SessionWithUserRow | null> {
+    const rows = await this.adapter.query<SessionWithUserRow>(
       'SELECT s.*, u.username, u.role, u.name, u.email, u.avatar_url FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > ?',
       [tokenHash, new Date().toISOString()]
     );

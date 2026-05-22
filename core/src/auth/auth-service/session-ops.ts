@@ -113,7 +113,7 @@ export class SessionOps {
         email: user.email,
         name: user.name,
         avatar_url: user.avatar_url,
-        email_verified: user.email_verified,
+        email_verified: !!user.email_verified,
       };
     } catch (error) {
       this.deps.logger?.error('Session validation failed:', error);

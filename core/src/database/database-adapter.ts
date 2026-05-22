@@ -48,15 +48,14 @@ export interface ExecuteResult {
 
 /**
  * SQLite driver returns untyped rows; per-callsite generic narrowing via
- * `query<TypedRow>(sql, params)` is preferred. The `any` defaults below
- * are an intentional type hole at the driver boundary — sqlite3 cannot
- * know schemas at compile time. Each callsite is expected to either pass
- * a generic Row type or cast the result to its known shape.
+ * `query<TypedRow>(sql, params)` is the expected pattern (typed Row
+ * interfaces live in `./types/row-types.ts`). The default is `unknown`
+ * so unparametrized callers must narrow explicitly — the previous `any`
+ * default silently leaked untyped values everywhere a query was made.
  */
 export interface DatabaseAdapter {
   connect(): Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole; callers use query<TypedRow>(...)
-  query<T = any>(sql: string, params?: SqlParam[]): Promise<T[]>;
+  query<T = unknown>(sql: string, params?: SqlParam[]): Promise<T[]>;
   execute(sql: string, params?: SqlParam[]): Promise<ExecuteResult>;
   close(): Promise<void>;
   initialize(): Promise<void>;
@@ -105,8 +104,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole
-  async query<T = any>(sql: string, params: SqlParam[] = []): Promise<T[]> {
+  async query<T = unknown>(sql: string, params: SqlParam[] = []): Promise<T[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not connected'));
@@ -291,8 +289,7 @@ export class PostgresAdapter implements DatabaseAdapter {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole
-  async query<T = any>(_sql: string, _params?: SqlParam[]): Promise<T[]> {
+  async query<T = unknown>(_sql: string, _params?: SqlParam[]): Promise<T[]> {
     throw new Error(
       'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
     );

@@ -159,7 +159,23 @@ export class OAuthOps {
         // Refresh user data
         const updatedUser = await this.deps.db.getUserById(user.id);
         if (updatedUser) {
-          user = updatedUser;
+          user = {
+            id: updatedUser.id,
+            username: updatedUser.username,
+            role: updatedUser.role,
+            email: updatedUser.email,
+            name: updatedUser.name,
+            avatar_url: updatedUser.avatar_url,
+            auth_provider: updatedUser.auth_provider,
+            email_verified: !!updatedUser.email_verified,
+            pending_email: updatedUser.pending_email,
+            created_at: updatedUser.created_at
+              ? new Date(updatedUser.created_at)
+              : undefined,
+            updated_at: updatedUser.updated_at
+              ? new Date(updatedUser.updated_at)
+              : undefined,
+          };
         }
       }
 

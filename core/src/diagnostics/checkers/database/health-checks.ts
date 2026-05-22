@@ -57,15 +57,16 @@ export async function checkIntegrity(
   databaseService: DatabaseService
 ): Promise<CheckResult> {
   try {
-    const result = await databaseService.query('PRAGMA integrity_check');
+    const result = await databaseService.query<{ integrity_check?: string }>(
+      'PRAGMA integrity_check'
+    );
 
     if (result.length === 0) {
       return error('Integrity check returned no results');
     }
 
     const integrityResult = result[0];
-    const integrityValue =
-      integrityResult.integrity_check || integrityResult['integrity_check'];
+    const integrityValue = integrityResult.integrity_check;
 
     if (integrityValue === 'ok') {
       return pass('Database integrity verified');
@@ -103,8 +104,12 @@ export async function checkFragmentation(
 
     const fileSize = fs.statSync(dbPath).size;
 
-    const pageSizeResult = await databaseService.query('PRAGMA page_size');
-    const pageCountResult = await databaseService.query('PRAGMA page_count');
+    const pageSizeResult = await databaseService.query<{
+      page_size?: number;
+    }>('PRAGMA page_size');
+    const pageCountResult = await databaseService.query<{
+      page_count?: number;
+    }>('PRAGMA page_count');
 
     const pageSize = pageSizeResult[0]?.page_size || 4096;
     const pageCount = pageCountResult[0]?.page_count || 0;

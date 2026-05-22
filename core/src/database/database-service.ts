@@ -39,6 +39,11 @@ import { DraftStore } from './stores/draft-store.js';
 import { RecordStore } from './stores/record-store.js';
 import { UserStore } from './stores/user-store.js';
 import { StorageFileStore } from './stores/storage-file-store.js';
+import type {
+  RecordLockRow,
+  AuditLogWithUserRow,
+  StorageFileRow,
+} from './types/row-types.js';
 
 export class DatabaseService {
   private adapter: DatabaseAdapter;
@@ -142,8 +147,7 @@ export class DatabaseService {
   }
 
   // Direct database access methods
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole; callers narrow
-  async query<T = any>(sql: string, params: SqlParam[] = []): Promise<T[]> {
+  async query<T = unknown>(sql: string, params: SqlParam[] = []): Promise<T[]> {
     return await this.adapter.query<T>(sql, params);
   }
 
@@ -361,7 +365,10 @@ export class DatabaseService {
 
     // Check if record is already locked
     const existingLock = await this.getLock(recordId);
-    if (existingLock && existingLock.expires_at > new Date().toISOString()) {
+    if (
+      existingLock?.expires_at &&
+      existingLock.expires_at > new Date().toISOString()
+    ) {
       // Lock exists and is not expired
       return false;
     }
@@ -380,16 +387,16 @@ export class DatabaseService {
       'DELETE FROM record_locks WHERE record_id = ? AND locked_by = ?',
       [recordId, lockedBy]
     );
-    return ((result as { changes?: number }).changes ?? 0) > 0;
+    return (result.changes ?? 0) > 0;
   }
 
-  async getLock(recordId: string): Promise<any | null> {
+  async getLock(recordId: string): Promise<RecordLockRow | null> {
     // Clean up expired locks first
     await this.adapter.execute(
       'DELETE FROM record_locks WHERE expires_at < CURRENT_TIMESTAMP'
     );
 
-    const rows = await this.adapter.query(
+    const rows = await this.adapter.query<RecordLockRow>(
       'SELECT * FROM record_locks WHERE record_id = ?',
       [recordId]
     );
@@ -405,7 +412,7 @@ export class DatabaseService {
       'UPDATE record_locks SET expires_at = ? WHERE record_id = ? AND locked_by = ?',
       [expiresAt.toISOString(), recordId, lockedBy]
     );
-    return ((result as { changes?: number }).changes ?? 0) > 0;
+    return (result.changes ?? 0) > 0;
   }
 
   // ---------------------------------------------------------------------------
@@ -426,17 +433,17 @@ export class DatabaseService {
 
   async getStorageFileById(
     ...args: Parameters<StorageFileStore['getStorageFileById']>
-  ): Promise<any | null> {
+  ): Promise<StorageFileRow | null> {
     return this.storageFiles.getStorageFileById(...args);
   }
 
   async getStorageFilesByFolder(
     ...args: Parameters<StorageFileStore['getStorageFilesByFolder']>
-  ): Promise<any[]> {
+  ): Promise<StorageFileRow[]> {
     return this.storageFiles.getStorageFilesByFolder(...args);
   }
 
-  async getAllStorageFiles(): Promise<any[]> {
+  async getAllStorageFiles(): Promise<StorageFileRow[]> {
     return this.storageFiles.getAllStorageFiles();
   }
 
@@ -454,7 +461,7 @@ export class DatabaseService {
 
   async findStorageFileByPath(
     ...args: Parameters<StorageFileStore['findStorageFileByPath']>
-  ): Promise<any | null> {
+  ): Promise<StorageFileRow | null> {
     return this.storageFiles.findStorageFileByPath(...args);
   }
 
@@ -483,8 +490,11 @@ export class DatabaseService {
     );
   }
 
-  async getAuditLogs(limit = 100, offset = 0): Promise<any[]> {
-    return await this.adapter.query(
+  async getAuditLogs(
+    limit = 100,
+    offset = 0
+  ): Promise<AuditLogWithUserRow[]> {
+    return await this.adapter.query<AuditLogWithUserRow>(
       'SELECT al.*, u.username FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id ORDER BY al.created_at DESC LIMIT ? OFFSET ?',
       [limit, offset]
     );
