@@ -231,3 +231,21 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 | **W3 total remaining** | | **~30-40 hours** |
 
 Then W4 (3 tasks, ~3-5 days) + Phase 2d closure (~1 day).
+
+### Next session pickup
+
+**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last commit: `01afbf0` (docs) → `698d823` (code). Working tree clean except `.vscode/settings.json` (unrelated).
+
+**Recommended next slice — saga error context refactor (deferral #2 above):**
+
+- Smallest remaining well-scoped item: -16 casts, 1-2 hours.
+- Touches 4 saga error subclasses in `core/src/saga/` (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) that each redeclare `public context: any`, shadowing the now-typed `CivicPressError.context: Record<string, unknown>` from `106c19b`.
+- Decision needed: either (a) rename the shadowing field to something like `sagaContext` so it doesn't collide, or (b) make the subclass generic on `TContext` and remove the field redeclaration so the base type flows through. (b) is cleaner if the saga executor's `TContext` parameter can be threaded; (a) is the no-thinking fallback.
+- Verify with `pnpm vitest run core/src/saga` + repo-wide `tsc --noEmit` before commit.
+
+**Alternatives if scope feels wrong:**
+- **Per-table Row typing** (4-6 h): biggest single leverage but a real cascade — only worth starting if the session has the budget.
+- **W3-T4 (api/src, 190 casts)**: switch surfaces; benefits from the W3-T2 patterns already landed.
+- **Remaining core batches** (~35 casts): per-file batches in records/indexing/geography/defaults/migrations — incremental, no cascade risk.
+
+Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **773**.
