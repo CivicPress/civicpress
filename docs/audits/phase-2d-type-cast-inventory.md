@@ -188,11 +188,27 @@ Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 
 - `106c19b` (W3-T3 part 6) — base `CivicPressError.context` tightened to `Record<string, unknown>`; saga `SagaStateRow` interface threaded through state-store query callsites; api-logger spread-of-conditional fixed; storage test narrows error.context.batch. -12 casts.
 - `2c08e5f` (W3-T3 part 7) — `update-record-saga.ts` + `publish-draft-saga.ts`: `dbUpdates: any` → `Record<string, unknown>`; `normalizeFrontmatterForValidation` signature typed. -6 casts.
 
-### 2026-05-22 (this session, ending `698d823`)
+### 2026-05-22 (session ending `698d823`)
 
 1 commit, 788 → 773 (-15 casts):
 
 - `698d823` (W3-T3 diagnostics-details) — closes deferred follow-up #3 from W3-T3p7. New `DiagnosticDetails` envelope in `core/src/diagnostics/types.ts` replaces 3x `details?: any` on `DiagnosticError` / `CheckResult` / `DiagnosticIssue`. Per-consumer narrowing: local `MemoryDetails`/`CpuDetails` interfaces in system-checker; inline schema/filesystem shape annotations replace `schemaCheck.details as any` / `structureCheck.details as any` patterns. base-checker create*Result + createIssue tightened from `unknown` to `DiagnosticDetails`; database/result-builders + buildDiagnosticError narrow before assignment. Removed dead-code fallback branch in `diagnostic-service.extractIssues` that used `(check.details as any).issues` (already handled by the prior arm). Two collateral key renames: `cache-health-checker.issues` (was a number under the array's key) → `issueCount`+`issues`; `filesystem-checker.permissionIssues` (was `string[]` under the same key). Gap vs. -30 inventory estimate: UI `useDiagnostics.ts` has its own local DiagnosticIssue shape, not part of this cascade.
+
+### 2026-05-22 (this session)
+
+1 commit, 773 → 769 (-4 casts):
+
+- `(pending)` (W3-T3 saga-error-context) — closes deferred follow-up #2 from W3-T3 session of 2026-05-22. The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) each redeclared `public context: any`, shadowing the now-typed `CivicPressError.context: Record<string, unknown>` from `106c19b`. Resolution: each subclass is now generic on `TContext extends SagaContext = SagaContext` and the shadowing field is renamed `sagaContext: TContext`. Rename was the correct call (not just typing the existing field) because the subclass field is semantically distinct from the base — it holds the saga's runtime working state (the executor's `TContext`), not the error-metadata bag that flows into `super(message, {step, ...})`. Naming the two separately removes the collision permanently and lets the base field tighten further in the future without re-tangling. Two collateral `Record<string, any>` → `Record<string, unknown>` tightenings on the `additionalContext?` params (SagaStepError, SagaCompensationError) for consistency (didn't match the regex, so they're not part of the -4 tally). `saga-executor.ts` updated in one place: `compensate()`'s `originalError: SagaStepError` parametrized to `SagaStepError<TContext>`. No external readers of `.context`/`.sagaContext` on these error instances anywhere in the repo, so the rename was contained to `errors.ts` + the one signature in `saga-executor.ts`. Gap vs. -16 inventory estimate: the doc's "+ propagation" never materialized — the executor never reads the field off the thrown error, only constructs them, so callers needed zero updates. Repo-wide `tsc --noEmit` clean across all workspaces; `pnpm vitest run core/src/saga` 32/32 green.
+
+**Per-surface state at end of session:**
+
+| Surface | This-session start | This-session end | Notes |
+|---|---:|---:|---|
+| core/src | 180 | 176 | saga error subclass field declarations (-4) |
+| modules/api/src | 190 | 190 | untouched |
+| modules/ui/app | 325 | 325 | untouched |
+| modules/storage/src | 78 | 78 | untouched |
+| **Total** | **773** | **769** | |
 
 **Per-surface state at end of session:**
 
@@ -210,7 +226,7 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 
 1. **Per-table Row typing on `DatabaseAdapter`/`DatabaseService`.** Tightening `query()` return from `any[]` to `unknown[]`/`SqlRow[]` cascades into 174+ callsites (per-table interface authoring: `UserRow`, `DraftRow`, `RecordRow`, `SessionRow`, etc.). The W3-T3p4 (`07781b3`) commit already flagged this as deferred for the same reason. **Current state: driver boundary kept as `any` with `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole; callers use query<TypedRow>(...)` annotation + reason. Per-table Row authoring + consumer narrowing is its own dedicated effort (estimated 4-6 hours).**
 
-2. **Saga error class `public context: any` field shadowing.** The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) declare `public context: any` as a *new* field shadowing the base `CivicPressError.context` (now `Record<string, unknown>` after `106c19b`). Tightening the subclass field to either `unknown` (widens — TS rejects as variance violation) or `Record<string, unknown>` (rejects passing `TContext` from saga executor) both fail. **Needs a refactor decision: rename the shadowing field, or change inheritance pattern to avoid field collision.** Left at `any` with intent to address in a focused micro-commit.
+2. **~~Saga error class `public context: any` field shadowing.~~** ✅ Closed by this session's saga-error-context commit (2026-05-22). Resolution: rename field to `sagaContext` + make subclasses generic on `TContext extends SagaContext = SagaContext`. The two fields (base `context` for error metadata, subclass `sagaContext` for saga runtime state) are now distinct and individually typed. -4 casts (vs. -16 estimate — gap was the assumed "propagation" that didn't materialize: no external code reads the field).
 
 3. **~~Diagnostics `details?: any` cascade.~~** ✅ Closed by `698d823` (2026-05-22). New `DiagnosticDetails` envelope + per-consumer local interfaces. -15 casts (vs. -30 estimate — gap was UI composable, not part of cascade).
 
@@ -219,7 +235,7 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 | Task | Scope | Estimated effort |
 |---|---|---|
 | Per-table Row typing (database) | ~50-80 casts cleared across stores + consumers | 4-6 hours |
-| Saga error context refactor | -16 casts (4 fields × 4 sites + propagation) | 1-2 hours |
+| ~~Saga error context refactor~~ | ✅ closed this session (-4 actual vs. -16 est.) | done |
 | ~~Diagnostics details narrowing~~ | ✅ closed `698d823` (-15) | done |
 | Remaining core/src per-file batches | ~35 casts (records, indexing, geography, defaults, migrations, etc.) | 3-4 hours |
 | W3-T4 modules/api/src | 190 → 0 | 6-8 hours |
@@ -234,18 +250,20 @@ Then W4 (3 tasks, ~3-5 days) + Phase 2d closure (~1 day).
 
 ### Next session pickup
 
-**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last commit: `01afbf0` (docs) → `698d823` (code). Working tree clean except `.vscode/settings.json` (unrelated).
+**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commit: this session's saga-error-context. Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
 
-**Recommended next slice — saga error context refactor (deferral #2 above):**
+**Recommended next slice — per-table Row typing (deferral #1 above):**
 
-- Smallest remaining well-scoped item: -16 casts, 1-2 hours.
-- Touches 4 saga error subclasses in `core/src/saga/` (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) that each redeclare `public context: any`, shadowing the now-typed `CivicPressError.context: Record<string, unknown>` from `106c19b`.
-- Decision needed: either (a) rename the shadowing field to something like `sagaContext` so it doesn't collide, or (b) make the subclass generic on `TContext` and remove the field redeclaration so the base type flows through. (b) is cleaner if the saga executor's `TContext` parameter can be threaded; (a) is the no-thinking fallback.
-- Verify with `pnpm vitest run core/src/saga` + repo-wide `tsc --noEmit` before commit.
+- The last large well-scoped item remaining in core/. Estimated -50-80 casts cleared, 4-6 hours.
+- Touches `core/src/storage/database-adapter.ts` (`query<T = any>()` → `query<T = unknown>()`) + per-table `Row` interfaces in `core/src/storage/types/` (or co-located with each store): `UserRow`, `DraftRow`, `RecordRow`, `SessionRow`, `SagaStateRow` (already exists per `106c19b`), `IdempotencyRow`, `ResourceLockRow`, etc.
+- 174+ callsites currently do `const rows = await query(...)` and then access columns via `(row as any).field` — most can become typed at the query site (`query<UserRow>(sql, params)`).
+- The `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole` annotation on the driver boundary can stay; only the `query<T = any>` default needs to change.
+- Verify with `pnpm vitest run core/src/storage` + repo-wide `tsc --noEmit` before commit.
+- Could land in 2-3 commits (interfaces first, then per-store narrowing) to keep blast-radius reviewable.
 
 **Alternatives if scope feels wrong:**
-- **Per-table Row typing** (4-6 h): biggest single leverage but a real cascade — only worth starting if the session has the budget.
-- **W3-T4 (api/src, 190 casts)**: switch surfaces; benefits from the W3-T2 patterns already landed.
-- **Remaining core batches** (~35 casts): per-file batches in records/indexing/geography/defaults/migrations — incremental, no cascade risk.
+- **W3-T4 (api/src, 190 casts)**: switch surfaces; benefits from the W3-T2 patterns already landed. 6-8 h.
+- **Remaining core batches** (~35 casts): per-file batches in records/indexing/geography/defaults/migrations — incremental, no cascade risk. 3-4 h.
+- **W3-T6 (storage/src, 78 casts)**: smallest surface, mostly DI-handle types. 2-3 h.
 
-Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **773**.
+Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **769**.
