@@ -255,7 +255,9 @@ export class ApiLogger {
         error: {
           message: outputDetails.message,
           code: outputDetails.code,
-          ...(outputDetails.details && { details: outputDetails.details }),
+          ...(outputDetails.details !== undefined && outputDetails.details !== null
+            ? { details: outputDetails.details }
+            : {}),
           correlationId: error.correlationId,
         },
       };
