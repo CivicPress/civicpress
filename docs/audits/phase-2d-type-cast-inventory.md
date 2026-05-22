@@ -180,7 +180,7 @@ Per-session running tally. Add to this section as W3-T3 → T6 land.
 
 Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 9 W3 commits). See per-commit breakdown in `refactor-2026-05-master-plan.md` memory.
 
-### 2026-05-22 (this session, ending `2c08e5f`)
+### 2026-05-22 (sessions ending `2c08e5f`)
 
 3 commits, 839 → 788 (-51 casts):
 
@@ -188,15 +188,21 @@ Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 
 - `106c19b` (W3-T3 part 6) — base `CivicPressError.context` tightened to `Record<string, unknown>`; saga `SagaStateRow` interface threaded through state-store query callsites; api-logger spread-of-conditional fixed; storage test narrows error.context.batch. -12 casts.
 - `2c08e5f` (W3-T3 part 7) — `update-record-saga.ts` + `publish-draft-saga.ts`: `dbUpdates: any` → `Record<string, unknown>`; `normalizeFrontmatterForValidation` signature typed. -6 casts.
 
+### 2026-05-22 (this session, ending `698d823`)
+
+1 commit, 788 → 773 (-15 casts):
+
+- `698d823` (W3-T3 diagnostics-details) — closes deferred follow-up #3 from W3-T3p7. New `DiagnosticDetails` envelope in `core/src/diagnostics/types.ts` replaces 3x `details?: any` on `DiagnosticError` / `CheckResult` / `DiagnosticIssue`. Per-consumer narrowing: local `MemoryDetails`/`CpuDetails` interfaces in system-checker; inline schema/filesystem shape annotations replace `schemaCheck.details as any` / `structureCheck.details as any` patterns. base-checker create*Result + createIssue tightened from `unknown` to `DiagnosticDetails`; database/result-builders + buildDiagnosticError narrow before assignment. Removed dead-code fallback branch in `diagnostic-service.extractIssues` that used `(check.details as any).issues` (already handled by the prior arm). Two collateral key renames: `cache-health-checker.issues` (was a number under the array's key) → `issueCount`+`issues`; `filesystem-checker.permissionIssues` (was `string[]` under the same key). Gap vs. -30 inventory estimate: UI `useDiagnostics.ts` has its own local DiagnosticIssue shape, not part of this cascade.
+
 **Per-surface state at end of session:**
 
 | Surface | This-session start | This-session end | Notes |
 |---|---:|---:|---|
-| core/src | 246 | 195 | 148 prod + 47 test |
+| core/src | 195 | 180 | diagnostics envelope narrowed; ~133 prod + 47 test |
 | modules/api/src | 190 | 190 | untouched |
-| modules/ui/app | 325 | 325 | untouched (was 322 at memory write; +3 drift) |
-| modules/storage/src | 78 | 78 | untouched (mostly SDK type holes + test mocks) |
-| **Total** | **839** | **788** | |
+| modules/ui/app | 325 | 325 | untouched |
+| modules/storage/src | 78 | 78 | untouched |
+| **Total** | **788** | **773** | |
 
 ### Deferred follow-ups surfaced
 
@@ -206,7 +212,7 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 
 2. **Saga error class `public context: any` field shadowing.** The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) declare `public context: any` as a *new* field shadowing the base `CivicPressError.context` (now `Record<string, unknown>` after `106c19b`). Tightening the subclass field to either `unknown` (widens — TS rejects as variance violation) or `Record<string, unknown>` (rejects passing `TContext` from saga executor) both fail. **Needs a refactor decision: rename the shadowing field, or change inheritance pattern to avoid field collision.** Left at `any` with intent to address in a focused micro-commit.
 
-3. **Diagnostics `details?: any` cascade.** `core/src/diagnostics/types.ts` exports `DiagnosticError.details`, `CheckResult.details`, `DiagnosticIssue.details` — all `any`. Tightening to `unknown` cascades into 24 errors across 4 consumer files (`system-checker.ts`, `diagnostic-service.ts`, `database-checker.ts`, `filesystem-checker.ts`) that access `.details.issues` / `.details.cpu` etc. without narrowing. **The fix is per-consumer typed narrowing (or per-checker `details` shape interface). This is its own focused commit (estimated 1-2 hours).**
+3. **~~Diagnostics `details?: any` cascade.~~** ✅ Closed by `698d823` (2026-05-22). New `DiagnosticDetails` envelope + per-consumer local interfaces. -15 casts (vs. -30 estimate — gap was UI composable, not part of cascade).
 
 ### Remaining work to fully close W3
 
@@ -214,8 +220,8 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 |---|---|---|
 | Per-table Row typing (database) | ~50-80 casts cleared across stores + consumers | 4-6 hours |
 | Saga error context refactor | -16 casts (4 fields × 4 sites + propagation) | 1-2 hours |
-| Diagnostics details narrowing | -30 casts | 1-2 hours |
-| Remaining core/src per-file batches | ~50 casts (records, indexing, geography, defaults, migrations, etc.) | 3-4 hours |
+| ~~Diagnostics details narrowing~~ | ✅ closed `698d823` (-15) | done |
+| Remaining core/src per-file batches | ~35 casts (records, indexing, geography, defaults, migrations, etc.) | 3-4 hours |
 | W3-T4 modules/api/src | 190 → 0 | 6-8 hours |
 | W3-T5 modules/ui/app | 325 → 0 | 8-10 hours |
 | W3-T6 modules/storage/src | 78 → annotated allowlist | 2-3 hours |
