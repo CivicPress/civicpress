@@ -71,7 +71,9 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
         structureCheck.status === 'error' ||
         structureCheck.status === 'warning'
       ) {
-        const details = structureCheck.details as any;
+        const details = structureCheck.details as
+          | { missing?: string[] }
+          | undefined;
         const missingDirs = details?.missing || [];
         const issueMessage =
           missingDirs.length > 0
@@ -503,7 +505,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
 
       if (permissionIssues.length > 0) {
         return this.createErrorResult('Permission issues found', undefined, {
-          issues: permissionIssues,
+          permissionIssues,
         });
       }
 

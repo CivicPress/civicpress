@@ -22,6 +22,7 @@ import { Logger } from '../../utils/logger.js';
 import {
   CheckResult,
   DiagnosticIssue,
+  DiagnosticDetails,
   FixResult,
   FixOptions,
   DiagnosticOptions,
@@ -108,17 +109,21 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
       const schemaCheck = await checkSchema(this.databaseService);
       checks.push(schemaCheck);
       if (schemaCheck.status === 'error' || schemaCheck.status === 'warning') {
-        const details = schemaCheck.details as any;
-        const hasFixableIssues =
-          (details?.missing &&
-            Array.isArray(details.missing) &&
-            details.missing.length > 0) ||
-          (details?.missingColumns &&
-            Array.isArray(details.missingColumns) &&
-            details.missingColumns.length > 0) ||
-          (details?.missingIndexes &&
-            Array.isArray(details.missingIndexes) &&
-            details.missingIndexes.length > 0);
+        const details = schemaCheck.details as
+          | {
+              missing?: unknown;
+              missingColumns?: unknown;
+              missingIndexes?: unknown;
+              extra?: unknown;
+            }
+          | undefined;
+        const hasFixableIssues = Boolean(
+          (Array.isArray(details?.missing) && details.missing.length > 0) ||
+            (Array.isArray(details?.missingColumns) &&
+              details.missingColumns.length > 0) ||
+            (Array.isArray(details?.missingIndexes) &&
+              details.missingIndexes.length > 0)
+        );
 
         const isExtraTablesOnly =
           (details?.extra &&
@@ -235,7 +240,7 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
         const warningMessage =
           firstWarning?.message || 'Database diagnostic found warnings';
 
-        const resultDetails: any = { checks, issues };
+        const resultDetails: DiagnosticDetails = { checks, issues };
 
         // Ensure each check that has issues stores them in its details so
         // downstream extractIssues() finds them.
@@ -422,7 +427,14 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
     backupId: string | undefined,
     startTime: number
   ): Promise<FixResult> {
-    const details = issue.details as any;
+    const details = issue.details as
+      | {
+          missing?: unknown;
+          missingColumns?: unknown;
+          missingIndexes?: unknown;
+          table?: unknown;
+        }
+      | undefined;
     let fixed = false;
     let fixMessage = 'Schema issues addressed';
 
@@ -442,7 +454,8 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
           : null;
 
     if (missingColumns && missingColumns.length > 0) {
-      const tableName = details?.table || 'search_index';
+      const tableName =
+        typeof details?.table === 'string' ? details.table : 'search_index';
       this.logger.info(
         `Fixing missing columns in ${tableName}: ${missingColumns.join(', ')}`
       );

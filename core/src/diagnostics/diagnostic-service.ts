@@ -437,25 +437,9 @@ export class DiagnosticService {
     const issues: DiagnosticIssue[] = [];
 
     for (const check of checks) {
-      // First, extract issues from check.details.issues (created by checkers)
+      // Extract issues from check.details.issues (created by checkers)
       if (check.details && Array.isArray(check.details.issues)) {
         issues.push(...check.details.issues);
-      }
-
-      // Also check if the overall check result has issues in its details
-      // (some checkers store issues in the overall result's details.issues)
-      if (
-        check.details &&
-        Array.isArray(check.details.issues) &&
-        check.details.issues.length > 0
-      ) {
-        // Already handled above
-      } else if (
-        check.details &&
-        Array.isArray((check.details as any).issues)
-      ) {
-        // Fallback: check if details itself has an issues array
-        issues.push(...(check.details as any).issues);
       }
 
       // If no issues in details but check failed, create a generic issue

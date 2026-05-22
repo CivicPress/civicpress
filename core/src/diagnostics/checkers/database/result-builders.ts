@@ -7,11 +7,14 @@
  * duplication keeps the collaborators decoupled from the abstract base.
  */
 
-import type { CheckResult } from '../../types.js';
+import type { CheckResult, DiagnosticDetails } from '../../types.js';
 
 const NAME = 'database';
 
-export function pass(message?: string, details?: any): CheckResult {
+export function pass(
+  message?: string,
+  details?: DiagnosticDetails
+): CheckResult {
   return {
     name: NAME,
     status: 'pass',
@@ -20,7 +23,10 @@ export function pass(message?: string, details?: any): CheckResult {
   };
 }
 
-export function warning(message: string, details?: any): CheckResult {
+export function warning(
+  message: string,
+  details?: DiagnosticDetails
+): CheckResult {
   return {
     name: NAME,
     status: 'warning',
@@ -31,26 +37,40 @@ export function warning(message: string, details?: any): CheckResult {
 
 export function error(
   message: string,
-  err?: any,
-  details?: any
+  err?: unknown,
+  details?: DiagnosticDetails
 ): CheckResult {
+  if (!err) {
+    return { name: NAME, status: 'error', message, details };
+  }
+  const errObj = err instanceof Error ? err : null;
+  const recordLike =
+    typeof err === 'object' && err !== null
+      ? (err as Record<string, unknown>)
+      : null;
+  const errDetails = recordLike?.details;
+  const errorDetails: DiagnosticDetails | undefined =
+    errDetails && typeof errDetails === 'object' && !Array.isArray(errDetails)
+      ? (errDetails as DiagnosticDetails)
+      : details;
   return {
     name: NAME,
     status: 'error',
     message,
-    error: err
-      ? {
-          category: 'unknown',
-          severity: 'medium',
-          actionable: false,
-          recoverable: true,
-          retryable: true,
-          message: err.message || message,
-          code: err.code,
-          details: err.details || details,
-          stack: err.stack,
-        }
-      : undefined,
+    error: {
+      category: 'unknown',
+      severity: 'medium',
+      actionable: false,
+      recoverable: true,
+      retryable: true,
+      message: errObj?.message || message,
+      code:
+        recordLike && typeof recordLike.code === 'string'
+          ? recordLike.code
+          : undefined,
+      details: errorDetails,
+      stack: errObj?.stack,
+    },
     details,
   };
 }

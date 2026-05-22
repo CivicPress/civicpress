@@ -17,6 +17,29 @@ import {
 import * as os from 'os';
 import * as process from 'process';
 
+/** Shape of details produced by checkMemoryUsage(). All numeric fields are
+ *  preformatted strings (toFixed). */
+interface MemoryDetails {
+  usagePercent?: string;
+  totalGB?: string;
+  usedGB?: string;
+  freeGB?: string;
+  processRssGB?: string;
+  heapUsagePercent?: string;
+  heapUsedMB?: string;
+  heapTotalMB?: string;
+}
+
+/** Shape of details produced by checkCPUUsage(). */
+interface CpuDetails {
+  cpuCount?: number;
+  load1Min?: string;
+  load5Min?: string;
+  load15Min?: string;
+  loadPercent1Min?: string;
+  loadPercent5Min?: string;
+}
+
 export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
   name = 'system';
   component = 'system';
@@ -61,7 +84,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       const memoryCheck = await this.checkMemoryUsage();
       checks.push(memoryCheck);
       if (memoryCheck.status === 'error' || memoryCheck.status === 'warning') {
-        const details = memoryCheck.details as any;
+        const details = memoryCheck.details as MemoryDetails | undefined;
         const usagePercent = details?.usagePercent || 'unknown';
         const totalGB = details?.totalGB || 'unknown';
         const usedGB = details?.usedGB || 'unknown';
@@ -143,7 +166,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       const cpuCheck = await this.checkCPUUsage();
       checks.push(cpuCheck);
       if (cpuCheck.status === 'warning') {
-        const details = cpuCheck.details as any;
+        const details = cpuCheck.details as CpuDetails | undefined;
         const cpuCount = details?.cpuCount || 'unknown';
         const load1Min = details?.load1Min || 'unknown';
         const load5Min = details?.load5Min || 'unknown';

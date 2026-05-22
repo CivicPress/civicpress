@@ -9,6 +9,8 @@ import {
   DiagnosticChecker,
   CheckResult,
   DiagnosticIssue,
+  DiagnosticDetails,
+  DiagnosticError,
   FixResult,
   FixOptions,
   CheckStatus,
@@ -52,7 +54,10 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
   /**
    * Create a successful check result
    */
-  protected createSuccessResult(message?: string, details?: unknown): CheckResult {
+  protected createSuccessResult(
+    message?: string,
+    details?: DiagnosticDetails
+  ): CheckResult {
     return {
       name: this.name,
       status: 'pass',
@@ -64,7 +69,10 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
   /**
    * Create a warning check result
    */
-  protected createWarningResult(message: string, details?: unknown): CheckResult {
+  protected createWarningResult(
+    message: string,
+    details?: DiagnosticDetails
+  ): CheckResult {
     return {
       name: this.name,
       status: 'warning',
@@ -79,7 +87,7 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
   protected createErrorResult(
     message: string,
     error?: unknown,
-    details?: unknown
+    details?: DiagnosticDetails
   ): CheckResult {
     return {
       name: this.name,
@@ -100,13 +108,20 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
   private buildDiagnosticError(
     error: unknown,
     fallbackMessage: string,
-    detailsFallback?: unknown
-  ): NonNullable<CheckResult['error']> {
+    detailsFallback?: DiagnosticDetails
+  ): DiagnosticError {
     const errObj = error instanceof Error ? error : null;
     const recordLike =
       typeof error === 'object' && error !== null
         ? (error as Record<string, unknown>)
         : null;
+    const rawDetails = recordLike?.details ?? detailsFallback;
+    const details: DiagnosticDetails | undefined =
+      rawDetails && typeof rawDetails === 'object' && !Array.isArray(rawDetails)
+        ? (rawDetails as DiagnosticDetails)
+        : rawDetails !== undefined
+          ? { value: rawDetails }
+          : undefined;
     return {
       category: 'unknown',
       severity: 'medium',
@@ -118,7 +133,7 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
         recordLike && typeof recordLike.code === 'string'
           ? recordLike.code
           : undefined,
-      details: recordLike?.details ?? detailsFallback,
+      details,
       stack: errObj?.stack,
     };
   }
@@ -138,7 +153,7 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
         estimatedDuration?: number;
       };
       recommendations?: string[];
-      details?: unknown;
+      details?: DiagnosticDetails;
     }
   ): DiagnosticIssue {
     return {

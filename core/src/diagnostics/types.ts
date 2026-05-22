@@ -33,6 +33,17 @@ export type DiagnosticErrorCategory =
   | 'unknown';
 
 /**
+ * Loose-shaped payload carried by check/issue/error records. Captures the one
+ * fixed cascade (`issues?: DiagnosticIssue[]`, mutated by checkers + read by
+ * diagnostic-service.extractIssues) and lets per-checker free-form fields
+ * fall through as `unknown` — callers narrow per-shape locally.
+ */
+export interface DiagnosticDetails {
+  issues?: DiagnosticIssue[];
+  [key: string]: unknown;
+}
+
+/**
  * Diagnostic error interface
  */
 export interface DiagnosticError {
@@ -43,7 +54,7 @@ export interface DiagnosticError {
   retryable: boolean;
   message: string;
   code?: string;
-  details?: any;
+  details?: DiagnosticDetails;
   stack?: string;
 }
 
@@ -54,7 +65,7 @@ export interface CheckResult {
   name: string;
   status: CheckStatus;
   message?: string;
-  details?: any;
+  details?: DiagnosticDetails;
   duration?: number; // milliseconds
   error?: DiagnosticError;
 }
@@ -68,7 +79,7 @@ export interface DiagnosticIssue {
   component: string;
   check: string;
   message: string;
-  details?: any;
+  details?: DiagnosticDetails;
   autoFixable: boolean;
   fix?: {
     description: string;

@@ -163,7 +163,8 @@ export class CacheHealthChecker extends BaseDiagnosticChecker {
           globalHitRate: stats.global.totalHitRate,
           globalSize: stats.global.totalSize,
           globalMemoryUsage: stats.global.totalMemoryUsage,
-          issues: issues.length,
+          issueCount: issues.length,
+          issues,
         },
       };
     } catch (error) {
