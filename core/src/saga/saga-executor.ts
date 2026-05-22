@@ -442,7 +442,7 @@ export class SagaExecutor {
     context: TContext,
     sagaId: string,
     failedStepName: string,
-    originalError: SagaStepError
+    originalError: SagaStepError<TContext>
   ): Promise<CompensationResult> {
     const failedStepIndex = saga.steps.findIndex(
       (s) => s.name === failedStepName
