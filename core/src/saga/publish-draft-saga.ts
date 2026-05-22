@@ -36,7 +36,7 @@ export interface PublishDraftContext extends SagaContext {
   /** User performing the publish (overrides SagaContext user with AuthUser) */
   user: AuthUser;
   /** Draft data (loaded in step 1) */
-  draft?: any;
+  draft?: Record<string, unknown>;
   /** Record data (created/updated in step 1) */
   record?: RecordData;
   /** File path (created in step 2) */
@@ -120,7 +120,7 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
         }
 
         // Update in database directly (without file operations)
-        const dbUpdates: any = {
+        const dbUpdates: Record<string, unknown> = {
           title: updatedRecord.title,
           content: updatedRecord.content,
           status: updatedRecord.status,
@@ -342,7 +342,9 @@ class CreateOrUpdateFileStep extends BaseSagaStep<PublishDraftContext, string> {
     return RecordParser.serializeToMarkdown(record);
   }
 
-  private normalizeFrontmatterForValidation(frontmatter: any): any {
+  private normalizeFrontmatterForValidation(
+    frontmatter: Record<string, unknown>
+  ): Record<string, unknown> {
     const normalized = { ...frontmatter };
     // Convert Date objects to ISO strings
     if (normalized.created && normalized.created instanceof Date) {

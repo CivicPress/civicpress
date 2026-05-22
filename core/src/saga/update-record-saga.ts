@@ -139,7 +139,7 @@ class UpdateInRecordsStep extends BaseSagaStep<
       }
 
       // Prepare database updates
-      const dbUpdates: any = {};
+      const dbUpdates: Record<string, unknown> = {};
       if (request.title !== undefined) dbUpdates.title = request.title;
       if (request.content !== undefined) dbUpdates.content = request.content;
       if (request.status !== undefined) dbUpdates.status = request.status;
@@ -187,7 +187,7 @@ class UpdateInRecordsStep extends BaseSagaStep<
     if (context.originalRecord && result) {
       try {
         const original = context.originalRecord;
-        const dbUpdates: any = {
+        const dbUpdates: Record<string, unknown> = {
           title: original.title,
           content: original.content,
           status: original.status,
@@ -370,7 +370,9 @@ class UpdateFileStep extends BaseSagaStep<UpdateRecordContext, string> {
     return RecordParser.serializeToMarkdown(record);
   }
 
-  private normalizeFrontmatterForValidation(frontmatter: any): any {
+  private normalizeFrontmatterForValidation(
+    frontmatter: Record<string, unknown>
+  ): Record<string, unknown> {
     const normalized = { ...frontmatter };
     if (normalized.created && normalized.created instanceof Date) {
       normalized.created = normalized.created.toISOString();
