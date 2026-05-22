@@ -169,3 +169,59 @@ This inventory satisfies plan §W3-T1 step 4. Downstream W3-T2 onward will close
 - core-type-safety exit criterion (447 core casts eliminated)
 
 Updated estimates are 25-50% larger than the master plan's original numbers — the surplus is partly from W2 collaborator seams copying casts verbatim, partly from the original audit's under-counting.
+
+---
+
+## Progress log
+
+Per-session running tally. Add to this section as W3-T3 → T6 land.
+
+### 2026-05-21 (sessions ending `fc8d322`)
+
+Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 9 W3 commits). See per-commit breakdown in `refactor-2026-05-master-plan.md` memory.
+
+### 2026-05-22 (this session, ending `2c08e5f`)
+
+3 commits, 839 → 788 (-51 casts):
+
+- `f925135` (W3-T3 part 5) — `core-output.ts` + `notification-logger.ts` + `notification-config.ts` (typed channel/template getters via indexed-access generics) + `sql-builder.ts` (typed `SqlParam` + `SearchRow`) + `database-adapter.ts` (driver-boundary annotated as type hole per the inventory's annotated-allowlist treatment; `query<T = any>()` made generic so callsites can opt into typed Rows) + `database-service.ts` (wrappers use `ReturnType<Store['method']>`) + `saga/resource-lock.ts`. -33 casts.
+- `106c19b` (W3-T3 part 6) — base `CivicPressError.context` tightened to `Record<string, unknown>`; saga `SagaStateRow` interface threaded through state-store query callsites; api-logger spread-of-conditional fixed; storage test narrows error.context.batch. -12 casts.
+- `2c08e5f` (W3-T3 part 7) — `update-record-saga.ts` + `publish-draft-saga.ts`: `dbUpdates: any` → `Record<string, unknown>`; `normalizeFrontmatterForValidation` signature typed. -6 casts.
+
+**Per-surface state at end of session:**
+
+| Surface | This-session start | This-session end | Notes |
+|---|---:|---:|---|
+| core/src | 246 | 195 | 148 prod + 47 test |
+| modules/api/src | 190 | 190 | untouched |
+| modules/ui/app | 325 | 325 | untouched (was 322 at memory write; +3 drift) |
+| modules/storage/src | 78 | 78 | untouched (mostly SDK type holes + test mocks) |
+| **Total** | **839** | **788** | |
+
+### Deferred follow-ups surfaced
+
+These three sub-tasks were attempted during the session and surfaced as needing their own focused commits because of cascade scope:
+
+1. **Per-table Row typing on `DatabaseAdapter`/`DatabaseService`.** Tightening `query()` return from `any[]` to `unknown[]`/`SqlRow[]` cascades into 174+ callsites (per-table interface authoring: `UserRow`, `DraftRow`, `RecordRow`, `SessionRow`, etc.). The W3-T3p4 (`07781b3`) commit already flagged this as deferred for the same reason. **Current state: driver boundary kept as `any` with `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole; callers use query<TypedRow>(...)` annotation + reason. Per-table Row authoring + consumer narrowing is its own dedicated effort (estimated 4-6 hours).**
+
+2. **Saga error class `public context: any` field shadowing.** The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) declare `public context: any` as a *new* field shadowing the base `CivicPressError.context` (now `Record<string, unknown>` after `106c19b`). Tightening the subclass field to either `unknown` (widens — TS rejects as variance violation) or `Record<string, unknown>` (rejects passing `TContext` from saga executor) both fail. **Needs a refactor decision: rename the shadowing field, or change inheritance pattern to avoid field collision.** Left at `any` with intent to address in a focused micro-commit.
+
+3. **Diagnostics `details?: any` cascade.** `core/src/diagnostics/types.ts` exports `DiagnosticError.details`, `CheckResult.details`, `DiagnosticIssue.details` — all `any`. Tightening to `unknown` cascades into 24 errors across 4 consumer files (`system-checker.ts`, `diagnostic-service.ts`, `database-checker.ts`, `filesystem-checker.ts`) that access `.details.issues` / `.details.cpu` etc. without narrowing. **The fix is per-consumer typed narrowing (or per-checker `details` shape interface). This is its own focused commit (estimated 1-2 hours).**
+
+### Remaining work to fully close W3
+
+| Task | Scope | Estimated effort |
+|---|---|---|
+| Per-table Row typing (database) | ~50-80 casts cleared across stores + consumers | 4-6 hours |
+| Saga error context refactor | -16 casts (4 fields × 4 sites + propagation) | 1-2 hours |
+| Diagnostics details narrowing | -30 casts | 1-2 hours |
+| Remaining core/src per-file batches | ~50 casts (records, indexing, geography, defaults, migrations, etc.) | 3-4 hours |
+| W3-T4 modules/api/src | 190 → 0 | 6-8 hours |
+| W3-T5 modules/ui/app | 325 → 0 | 8-10 hours |
+| W3-T6 modules/storage/src | 78 → annotated allowlist | 2-3 hours |
+| Enable lint rule + test override | per-workspace ESLint config + `**/*.test.ts` override to `warn` | 1-2 hours |
+| CI gate | `.github/workflows/*.yml` update | 30 min |
+| W3 closure (this doc + registry + commit) | append final per-surface table; flip api-009, ui-011, storage-015, core-type-safety | 1 hour |
+| **W3 total remaining** | | **~30-40 hours** |
+
+Then W4 (3 tasks, ~3-5 days) + Phase 2d closure (~1 day).
