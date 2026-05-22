@@ -5,10 +5,18 @@
  */
 
 import { DatabaseService } from '../database/database-service.js';
+import { SqlRow } from '../database/database-adapter.js';
 import { ResourceLock } from './types.js';
 import { SagaLockError } from './errors.js';
 import { coreDebug, coreError, coreWarn } from '../utils/core-output.js';
 import { Logger } from '../utils/logger.js';
+
+interface SagaResourceLockRow extends SqlRow {
+  resource_key: string;
+  saga_id: string;
+  acquired_at: string;
+  expires_at: string;
+}
 
 const logger = new Logger();
 
@@ -149,9 +157,10 @@ export class ResourceLockManager {
     try {
       const rows = await this.db
         .getAdapter()
-        .query('SELECT * FROM saga_resource_locks WHERE resource_key = ?', [
-          resourceKey,
-        ]);
+        .query<SagaResourceLockRow>(
+          'SELECT * FROM saga_resource_locks WHERE resource_key = ?',
+          [resourceKey]
+        );
 
       if (rows.length === 0) {
         return null;

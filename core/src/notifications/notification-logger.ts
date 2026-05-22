@@ -9,7 +9,7 @@ export interface LogEntry {
   timestamp: Date;
   level: LogLevel;
   message: string;
-  data?: any;
+  data?: unknown;
   error?: Error;
 }
 
@@ -32,28 +32,28 @@ export class NotificationLogger {
   /**
    * Log debug message
    */
-  debug(message: string, data?: any): void {
+  debug(message: string, data?: unknown): void {
     this.log(LogLevel.DEBUG, message, data);
   }
 
   /**
    * Log info message
    */
-  info(message: string, data?: any): void {
+  info(message: string, data?: unknown): void {
     this.log(LogLevel.INFO, message, data);
   }
 
   /**
    * Log warning message
    */
-  warn(message: string, data?: any): void {
+  warn(message: string, data?: unknown): void {
     this.log(LogLevel.WARN, message, data);
   }
 
   /**
    * Log error message
    */
-  error(message: string, error?: Error, data?: any): void {
+  error(message: string, error?: Error, data?: unknown): void {
     this.log(LogLevel.ERROR, message, data, error);
   }
 
@@ -63,7 +63,7 @@ export class NotificationLogger {
   private log(
     level: LogLevel,
     message: string,
-    data?: any,
+    data?: unknown,
     error?: Error
   ): void {
     if (level < this.logLevel) {

@@ -2,17 +2,17 @@ import { Logger, LogLevel, LoggerOptions } from './logger.js';
 
 export interface CoreOutputOptions extends LoggerOptions {
   operation?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
-export interface CoreSuccessOutput<T = any> {
+export interface CoreSuccessOutput<T = unknown> {
   success: true;
   data: T;
   message?: string;
   meta?: {
     operation?: string;
     duration?: number;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
     [key: string]: unknown;
   };
 }
@@ -22,8 +22,8 @@ export interface CoreErrorOutput {
   error: {
     message: string;
     code?: string;
-    details?: any;
-    context?: Record<string, any>;
+    details?: unknown;
+    context?: Record<string, unknown>;
   };
 }
 
@@ -82,16 +82,16 @@ export class CoreOutput {
   error(
     message: string,
     code?: string,
-    details?: any,
-    context?: Record<string, any>
+    details?: unknown,
+    context?: Record<string, unknown>
   ): void {
     const output: CoreErrorOutput = {
       success: false,
       error: {
         message,
-        ...(code && { code }),
-        ...(details && { details }),
-        ...(context && { context }),
+        ...(code ? { code } : {}),
+        ...(details !== undefined ? { details } : {}),
+        ...(context ? { context } : {}),
       },
     };
 
@@ -110,7 +110,7 @@ export class CoreOutput {
   }
 
   // Info output
-  info(message: string, context?: Record<string, any>): void {
+  info(message: string, context?: Record<string, unknown>): void {
     this.logger.info(message, {
       context,
       operation: this.options.operation,
@@ -118,7 +118,7 @@ export class CoreOutput {
   }
 
   // Warning output
-  warn(message: string, context?: Record<string, any>): void {
+  warn(message: string, context?: Record<string, unknown>): void {
     this.logger.warn(message, {
       context,
       operation: this.options.operation,
@@ -126,16 +126,20 @@ export class CoreOutput {
   }
 
   // Debug output
-  debug(message: string, data?: any, context?: Record<string, any>): void {
+  debug(
+    message: string,
+    data?: unknown,
+    context?: Record<string, unknown>
+  ): void {
     this.logger.debug(message, {
-      ...data,
+      ...(data && typeof data === 'object' ? data : { data }),
       context,
       operation: this.options.operation,
     });
   }
 
   // Progress output
-  progress(message: string, context?: Record<string, any>): void {
+  progress(message: string, context?: Record<string, unknown>): void {
     this.logger.info(`🔄 ${message}`, {
       context,
       operation: this.options.operation,
@@ -202,16 +206,32 @@ export function coreSuccess<T>(
   coreOutput.success(data, message, meta);
 }
 
+interface CivicPressLikeError extends Error {
+  getOutputDetails(): {
+    message: string;
+    code?: string;
+    details?: unknown;
+    context?: Record<string, unknown>;
+  };
+}
+
+function hasOutputDetails(error: Error): error is CivicPressLikeError {
+  return (
+    'getOutputDetails' in error &&
+    typeof (error as { getOutputDetails?: unknown }).getOutputDetails ===
+      'function'
+  );
+}
+
 export function coreError(
   message: string | Error,
   code?: string,
-  details?: any,
-  context?: Record<string, any>
+  details?: unknown,
+  context?: Record<string, unknown>
 ): void {
   // If first argument is a CivicPressError, extract details automatically
-  if (message instanceof Error && 'getOutputDetails' in message) {
-    const error = message as any;
-    const outputDetails = error.getOutputDetails();
+  if (message instanceof Error && hasOutputDetails(message)) {
+    const outputDetails = message.getOutputDetails();
     coreOutput.error(
       outputDetails.message,
       outputDetails.code,
@@ -230,25 +250,31 @@ export function coreError(
   );
 }
 
-export function coreInfo(message: string, context?: Record<string, any>): void {
+export function coreInfo(
+  message: string,
+  context?: Record<string, unknown>
+): void {
   coreOutput.info(message, context);
 }
 
-export function coreWarn(message: string, context?: Record<string, any>): void {
+export function coreWarn(
+  message: string,
+  context?: Record<string, unknown>
+): void {
   coreOutput.warn(message, context);
 }
 
 export function coreDebug(
   message: string,
-  data?: any,
-  context?: Record<string, any>
+  data?: unknown,
+  context?: Record<string, unknown>
 ): void {
   coreOutput.debug(message, data, context);
 }
 
 export function coreProgress(
   message: string,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): void {
   coreOutput.progress(message, context);
 }

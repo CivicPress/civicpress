@@ -55,11 +55,13 @@ export interface BuildSearchSQLOptions {
   titleBoostTerm?: string;
 }
 
+export type SqlParam = string | number | boolean | null | Buffer;
+
 export interface BuiltSearchSQL {
   query: string;
-  params: any[];
+  params: SqlParam[];
   countQuery: string;
-  countParams: any[];
+  countParams: SqlParam[];
 }
 
 /**
@@ -72,8 +74,8 @@ export function buildSearchSQL(
 ): BuiltSearchSQL {
   const { type, status, limit, offset, sort = 'relevance' } = options;
 
-  const params: any[] = [ftsQuery];
-  const countParams: any[] = [ftsQuery];
+  const params: SqlParam[] = [ftsQuery];
+  const countParams: SqlParam[] = [ftsQuery];
 
   let whereClause = `
     search_index_fts5 MATCH ?
@@ -197,36 +199,40 @@ export function buildSearchSQL(
   return { query, params, countQuery, countParams };
 }
 
+export type SearchRow = Record<string, unknown>;
+
 /**
  * Map a database row from the search query to a SearchResult.
  */
-export function mapRowToSearchResult(row: any): SearchResult {
-  let metadata: any = null;
-  if (row.metadata) {
+export function mapRowToSearchResult(row: SearchRow): SearchResult {
+  let metadata: unknown = null;
+  if (typeof row.metadata === 'string' && row.metadata) {
     try {
       metadata = JSON.parse(row.metadata);
     } catch {
       metadata = null;
     }
+  } else if (row.metadata && typeof row.metadata === 'object') {
+    metadata = row.metadata;
   }
 
   return {
-    id: row.id || row.record_id,
-    record_id: row.record_id,
-    record_type: row.record_type,
-    title: row.title,
-    content: row.content,
-    tags: row.tags,
+    id: (row.id ?? row.record_id) as string,
+    record_id: row.record_id as string,
+    record_type: row.record_type as string,
+    title: row.title as string,
+    content: row.content as string,
+    tags: row.tags as string,
     metadata,
-    status: row.status,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    relevance_score: row.relevance_score || 0,
-    field_match_score: row.field_match_score || 0,
-    recency_score: row.recency_score || 0,
-    type_priority_score: row.type_priority_score || 0,
-    status_priority_score: row.status_priority_score || 0,
-    excerpt: row.excerpt,
+    status: row.status as string,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+    relevance_score: (row.relevance_score as number) || 0,
+    field_match_score: (row.field_match_score as number) || 0,
+    recency_score: (row.recency_score as number) || 0,
+    type_priority_score: (row.type_priority_score as number) || 0,
+    status_priority_score: (row.status_priority_score as number) || 0,
+    excerpt: row.excerpt as string,
   };
 }
 

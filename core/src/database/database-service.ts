@@ -26,6 +26,9 @@ import {
   DatabaseConfig,
   createDatabaseAdapter,
   SQLiteAdapter,
+  SqlParam,
+  SqlRow,
+  ExecuteResult,
 } from './database-adapter.js';
 import { Logger } from '../utils/logger.js';
 import * as process from 'process';
@@ -139,11 +142,15 @@ export class DatabaseService {
   }
 
   // Direct database access methods
-  async query(sql: string, params: unknown[] = []): Promise<any[]> {
-    return await this.adapter.query(sql, params);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver type hole; callers narrow
+  async query<T = any>(sql: string, params: SqlParam[] = []): Promise<T[]> {
+    return await this.adapter.query<T>(sql, params);
   }
 
-  async execute(sql: string, params: unknown[] = []): Promise<any> {
+  async execute(
+    sql: string,
+    params: SqlParam[] = []
+  ): Promise<ExecuteResult> {
     return await this.adapter.execute(sql, params);
   }
 
@@ -159,31 +166,31 @@ export class DatabaseService {
 
   async getUserByUsername(
     ...args: Parameters<UserStore['getUserByUsername']>
-  ): Promise<any | null> {
+  ): ReturnType<UserStore['getUserByUsername']> {
     return this.users.getUserByUsername(...args);
   }
 
   async getUserById(
     ...args: Parameters<UserStore['getUserById']>
-  ): Promise<any | null> {
+  ): ReturnType<UserStore['getUserById']> {
     return this.users.getUserById(...args);
   }
 
   async getUserByEmail(
     ...args: Parameters<UserStore['getUserByEmail']>
-  ): Promise<any | null> {
+  ): ReturnType<UserStore['getUserByEmail']> {
     return this.users.getUserByEmail(...args);
   }
 
   async getUserWithPassword(
     ...args: Parameters<UserStore['getUserWithPassword']>
-  ): Promise<any | null> {
+  ): ReturnType<UserStore['getUserWithPassword']> {
     return this.users.getUserWithPassword(...args);
   }
 
   async createUserWithPassword(
     ...args: Parameters<UserStore['createUserWithPassword']>
-  ): Promise<any> {
+  ): ReturnType<UserStore['createUserWithPassword']> {
     return this.users.createUserWithPassword(...args);
   }
 
@@ -201,7 +208,7 @@ export class DatabaseService {
 
   async listUsers(
     ...args: Parameters<UserStore['listUsers']>
-  ): Promise<{ users: any[]; total: number }> {
+  ): ReturnType<UserStore['listUsers']> {
     return this.users.listUsers(...args);
   }
 
@@ -214,7 +221,7 @@ export class DatabaseService {
 
   async getApiKeyByHash(
     ...args: Parameters<UserStore['getApiKeyByHash']>
-  ): Promise<any | null> {
+  ): ReturnType<UserStore['getApiKeyByHash']> {
     return this.users.getApiKeyByHash(...args);
   }
 
@@ -233,7 +240,7 @@ export class DatabaseService {
 
   async getSessionByToken(
     ...args: Parameters<UserStore['getSessionByToken']>
-  ): Promise<any | null> {
+  ): ReturnType<UserStore['getSessionByToken']> {
     return this.users.getSessionByToken(...args);
   }
 
@@ -259,7 +266,7 @@ export class DatabaseService {
 
   async searchRecords(
     ...args: Parameters<RecordStore['searchRecords']>
-  ): Promise<any[]> {
+  ): ReturnType<RecordStore['searchRecords']> {
     return this.records.searchRecords(...args);
   }
 
@@ -281,7 +288,7 @@ export class DatabaseService {
 
   async getRecord(
     ...args: Parameters<RecordStore['getRecord']>
-  ): Promise<any | null> {
+  ): ReturnType<RecordStore['getRecord']> {
     return this.records.getRecord(...args);
   }
 
@@ -299,7 +306,7 @@ export class DatabaseService {
 
   async listRecords(
     ...args: Parameters<RecordStore['listRecords']>
-  ): Promise<{ records: any[]; total: number }> {
+  ): ReturnType<RecordStore['listRecords']> {
     return this.records.listRecords(...args);
   }
 
@@ -315,13 +322,13 @@ export class DatabaseService {
 
   async getDraft(
     ...args: Parameters<DraftStore['getDraft']>
-  ): Promise<any | null> {
+  ): ReturnType<DraftStore['getDraft']> {
     return this.drafts.getDraft(...args);
   }
 
   async listDrafts(
     ...args: Parameters<DraftStore['listDrafts']>
-  ): Promise<{ drafts: any[]; total: number }> {
+  ): ReturnType<DraftStore['listDrafts']> {
     return this.drafts.listDrafts(...args);
   }
 
