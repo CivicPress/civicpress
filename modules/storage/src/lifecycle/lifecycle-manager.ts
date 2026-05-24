@@ -191,7 +191,12 @@ export class LifecycleManager {
     policy: LifecyclePolicy
   ): LifecycleAction | null {
     const now = new Date();
-    const fileAge = now.getTime() - file.created_at.getTime();
+    if (!file.created_at) return null;
+    const createdAt =
+      file.created_at instanceof Date
+        ? file.created_at
+        : new Date(file.created_at);
+    const fileAge = now.getTime() - createdAt.getTime();
     const fileAgeDays = fileAge / (1000 * 60 * 60 * 24);
 
     // Check delete policy

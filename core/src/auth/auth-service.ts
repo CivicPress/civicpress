@@ -579,7 +579,11 @@ export class AuthService {
   /**
    * Check if user can set a password (only for password-auth users)
    */
-  canSetPassword(user: AuthUser): boolean {
+  // canSetPassword/getUserAuthProvider only inspect `auth_provider`; widened
+  // to a structural type so callers holding a UserRow (whose created_at is a
+  // string, not a Date as AuthUser declares) don't need a full row → AuthUser
+  // mapping just to ask "is this an external-auth user?".
+  canSetPassword(user: Pick<AuthUser, 'auth_provider'> | null | undefined): boolean {
     if (!user) return false; // Handle null user gracefully
     // Only allow password setting for password auth users or legacy users (no auth_provider)
     return user.auth_provider === 'password' || !user.auth_provider;
@@ -588,7 +592,9 @@ export class AuthService {
   /**
    * Get user's authentication provider
    */
-  getUserAuthProvider(user: AuthUser): string {
+  getUserAuthProvider(
+    user: Pick<AuthUser, 'auth_provider'> | null | undefined
+  ): string {
     if (!user) return 'unknown'; // Handle null user gracefully
     return user.auth_provider || 'password'; // Default to password for legacy users
   }

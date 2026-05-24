@@ -1,4 +1,12 @@
-import { simpleGit, SimpleGit } from 'simple-git';
+import {
+  simpleGit,
+  SimpleGit,
+  DefaultLogFields,
+  ListLogLine,
+} from 'simple-git';
+
+/** Shape of a single commit row in `git log` — re-exported for API consumers. */
+export type GitCommit = DefaultLogFields & ListLogLine;
 import { cwd } from 'process';
 import { coreDebug } from '../utils/core-output.js';
 
@@ -102,7 +110,7 @@ export class GitEngine {
   /**
    * Get commit history
    */
-  async getHistory(limit?: number): Promise<any[]> {
+  async getHistory(limit?: number): Promise<GitCommit[]> {
     try {
       const git = this.getGit();
       const options = limit ? ['-n', limit.toString()] : [];

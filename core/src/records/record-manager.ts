@@ -1,4 +1,5 @@
 import { DatabaseService } from '../database/database-service.js';
+import type { RecordRow } from '../database/types/row-types.js';
 import { GitEngine } from '../git/git-engine.js';
 import { HookSystem } from '../hooks/hook-system.js';
 import { WorkflowEngine } from '../workflows/workflow-engine.js';
@@ -833,7 +834,7 @@ export class RecordManager {
       offset?: number;
       sort?: string;
     } = {}
-  ): Promise<{ records: any[]; total: number }> {
+  ): Promise<{ records: RecordRow[]; total: number }> {
     const result = await this.db.listRecords(options);
 
     return {
@@ -847,7 +848,7 @@ export class RecordManager {
    */
   async searchRecords(
     ...args: Parameters<RecordSearch['searchRecords']>
-  ): Promise<{ records: any[]; total: number }> {
+  ): ReturnType<RecordSearch['searchRecords']> {
     return this.search.searchRecords(...args);
   }
 

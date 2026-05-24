@@ -92,6 +92,34 @@ export {
   DatabaseConfig,
   createDatabaseAdapter,
 } from './database/database-adapter.js';
+export type {
+  SqlParam,
+  SqlRow,
+  ExecuteResult,
+  Transaction,
+} from './database/database-adapter.js';
+export type {
+  UserRow,
+  ApiKeyRow,
+  ApiKeyWithUserRow,
+  SessionRow,
+  SessionWithUserRow,
+  RecordRow,
+  DraftRow,
+  StorageFileRow,
+  RecordLockRow,
+  AuditLogRow,
+  AuditLogWithUserRow,
+  SearchIndexRow,
+  EmailVerificationRow,
+  TableInfoRow,
+  IndexInfoRow,
+  TriggerInfoRow,
+  SqliteMasterNameRow,
+  LastInsertIdRow,
+  CountRow,
+  TotalRow,
+} from './database/types/row-types.js';
 
 // Export auth services
 export { AuthService, AuthUser, ApiKey, Session } from './auth/auth-service.js';
@@ -122,6 +150,7 @@ export {
 
 // Export existing services
 export { GitEngine } from './git/git-engine.js';
+export type { GitCommit } from './git/git-engine.js';
 export { HookSystem } from './hooks/hook-system.js';
 export { WorkflowEngine } from './workflows/workflow-engine.js';
 export { WorkflowConfigManager } from './config/workflow-config.js';

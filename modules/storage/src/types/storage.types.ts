@@ -178,6 +178,10 @@ export interface FileValidationResult {
 }
 
 // UUID-based file system interfaces
+// Field shapes match `StorageFileRow` from `@civicpress/core`: SQLite returns
+// `DATETIME` columns as ISO-ish strings (not Date objects), and nullable
+// columns surface as `undefined` (per the per-table-Row typing convention).
+// Consumers that need a Date should parse with `new Date(row.created_at)`.
 export interface StorageFile {
   id: string; // UUID
   original_name: string;
@@ -189,8 +193,8 @@ export interface StorageFile {
   mime_type: string;
   description?: string;
   uploaded_by?: string;
-  created_at: Date;
-  updated_at: Date;
+  created_at?: string | Date;
+  updated_at?: string | Date;
 }
 
 // Multer file interface
