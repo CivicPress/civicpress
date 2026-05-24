@@ -20,7 +20,7 @@ interface GeographyFormProps {
 
 export interface UseGeographyFormDeps {
   props: GeographyFormProps;
-  emit: (event: 'success' | 'cancel', ...args: any[]) => void;
+  emit: (event: 'success' | 'cancel', ...args: unknown[]) => void;
   t: (key: string, params?: Record<string, unknown>) => string;
 }
 
@@ -348,7 +348,13 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
     emit('cancel');
   };
 
-  const formatBounds = (bounds: any): string => {
+  interface BoundsObject {
+    minLon: number;
+    minLat: number;
+    maxLon: number;
+    maxLat: number;
+  }
+  const formatBounds = (bounds: BoundsObject): string => {
     return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} ${t('geography.boundsTo')} ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
   };
 
@@ -362,7 +368,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
       return [];
     }
     const values = new Set<string>();
-    geoJson.features.forEach((feature: any) => {
+    geoJson.features.forEach((feature: { properties?: Record<string, unknown> }) => {
       if (
         feature.properties &&
         feature.properties[form.value.color_mapping!.property!]
@@ -384,7 +390,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
       return [];
     }
     const values = new Set<string>();
-    geoJson.features.forEach((feature: any) => {
+    geoJson.features.forEach((feature: { properties?: Record<string, unknown> }) => {
       if (
         feature.properties &&
         feature.properties[form.value.icon_mapping!.property!]

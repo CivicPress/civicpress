@@ -13,7 +13,11 @@ export const useRecordUtils = () => {
   // Get translation functions at top level
   const { translateRecordType, translateStatus } = useConfigTranslations();
 
-  // Status color mapping with validation
+  // Status color mapping with validation.
+  // The string values intentionally include semantic names ('success',
+  // 'warning', 'danger') that don't all match Nuxt UI's strict prop enum;
+  // call sites translate via `as never` / `as 'primary' | ...` at the
+  // template boundary, which is documented per-callsite.
   const STATUS_COLORS: Record<string, string> = {
     draft: 'neutral',
     proposed: 'primary',

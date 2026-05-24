@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue';
+import type { IconName } from '~/composables/useIcons';
 
 // Define the interface locally
 export interface RecordTypeMetadata {
@@ -52,19 +53,23 @@ export function useRecordTypes() {
       };
 
       // Helper to unwrap metadata objects { value, ... } to scalars
-      const unwrap = (v: any) =>
-        v && typeof v === 'object' && 'value' in v ? v.value : v;
+      const unwrap = (v: unknown): unknown =>
+        v && typeof v === 'object' && 'value' in v
+          ? (v as { value: unknown }).value
+          : v;
 
-      // Extract and normalize the record_types from the nested response
-      const recordTypesData = (response.data?.record_types || []).map(
-        (rt: any) => ({
-          ...rt,
-          label: unwrap(rt?.label),
-          description: unwrap(rt?.description),
-          source_name: unwrap(rt?.source_name),
-          priority: unwrap(rt?.priority),
-        })
-      );
+      // Extract and normalize the record_types from the nested response.
+      // Server returns each field as either a bare value or `{ value, ... }`.
+      const recordTypesData = (response.data?.record_types || []).map((rt) => {
+        const r = rt as unknown as Record<string, unknown>;
+        return {
+          ...r,
+          label: unwrap(r?.label),
+          description: unwrap(r?.description),
+          source_name: unwrap(r?.source_name),
+          priority: unwrap(r?.priority),
+        };
+      });
 
       recordTypes.value = recordTypesData as RecordTypeMetadata[];
       globalRecordTypes = recordTypesData as RecordTypeMetadata[];
@@ -119,7 +124,9 @@ export function useRecordTypes() {
     };
 
     const iconKey = typeIconMap[key];
-    return iconKey ? getIcon(iconKey as any) : getIcon('file');
+    return iconKey
+      ? getIcon(iconKey as IconName)
+      : getIcon('file' as IconName);
   };
 
   const getRecordTypeColor = (key: string) => {

@@ -3,6 +3,7 @@ import { useRecordTypes } from '~/composables/useRecordTypes';
 import { useRecordStatuses } from '~/composables/useRecordStatuses';
 import { useTemplates } from '~/composables/useTemplates';
 import { useAuthStore } from '~/stores/auth';
+import { errorMessage } from '~/utils/errors';
 
 export interface RecordSidebarProps {
   recordId?: string;
@@ -61,17 +62,30 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
     loading: templatesLoading,
   } = useTemplates();
 
+  /** Generic select-option shape matching USelectMenu / getRecordTypeOptions. */
+  interface SelectOption {
+    value: string;
+    label: string;
+    icon?: string;
+    description?: string;
+  }
+
+  /** USelectMenu's v-model accepts a SelectOption or a bare string (typeahead). */
+  type SelectValue = SelectOption | string | null | undefined;
+
   // Record type options + selection
-  const recordTypeOptions = computed(() => getRecordTypeOptions());
+  const recordTypeOptions = computed<SelectOption[]>(
+    () => getRecordTypeOptions() as SelectOption[]
+  );
 
   const selectedType = computed({
     get: () => {
       if (!props.recordType) return undefined;
       return recordTypeOptions.value.find(
-        (opt: any) => opt.value === props.recordType
+        (opt) => opt.value === props.recordType
       );
     },
-    set: (value: any) => {
+    set: (value: SelectValue) => {
       if (value) {
         emit(
           'update:recordType',
@@ -84,8 +98,8 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
   });
 
   // Status options for selection (transform to match USelectMenu format)
-  const statusOptions = computed(() => {
-    return recordStatusOptions().map((option: any) => ({
+  const statusOptions = computed<SelectOption[]>(() => {
+    return (recordStatusOptions() as SelectOption[]).map((option) => ({
       value: option.value,
       label: option.label,
       icon: option.icon,
@@ -95,9 +109,9 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
   const selectedStatus = computed({
     get: () => {
       if (!props.status) return undefined;
-      return statusOptions.value.find((opt: any) => opt.value === props.status);
+      return statusOptions.value.find((opt) => opt.value === props.status);
     },
-    set: (value: any) => {
+    set: (value: SelectValue) => {
       if (value) {
         emit('update:status', typeof value === 'string' ? value : value.value);
       } else {
@@ -107,7 +121,7 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
   });
 
   // Workflow state options (hardcoded for now - can be refactored later)
-  const workflowStateOptions = computed(() => [
+  const workflowStateOptions = computed<SelectOption[]>(() => [
     { value: 'draft', label: t('records.workflowState.draft') },
     { value: 'under_review', label: t('records.workflowState.underReview') },
     {
@@ -121,10 +135,10 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
     get: () => {
       if (!props.workflowState) return undefined;
       return workflowStateOptions.value.find(
-        (opt: any) => opt.value === props.workflowState
+        (opt) => opt.value === props.workflowState
       );
     },
-    set: (value: any) => {
+    set: (value: SelectValue) => {
       if (value) {
         emit(
           'update:workflowState',
@@ -244,16 +258,14 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
       } else {
         throw new Error('Invalid preview response: missing rendered content');
       }
-    } catch (error: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+    } catch (error: unknown) {
       console.error('Failed to preview template:', error);
-      const errorMessage =
-        error?.data?.error?.message ||
-        error?.response?.data?.error?.message ||
-        error?.message ||
+      const msg =
+        errorMessage(error, '') ||
         t('records.templatePreviewError') ||
         'Error loading template preview';
       // Show error in a user-friendly format
-      templatePreviewContent.value = `## Error\n\n${errorMessage}\n\nPlease check:\n- The template exists and is valid\n- You have permission to view templates\n- The API is accessible`;
+      templatePreviewContent.value = `## Error\n\n${msg}\n\nPlease check:\n- The template exists and is valid\n- You have permission to view templates\n- The API is accessible`;
     } finally {
       templatePreviewLoading.value = false;
     }
@@ -272,7 +284,9 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
     { immediate: true, deep: true }
   );
 
-  const handleGeographySelection = (files: any[]) => {
+  const handleGeographySelection = (
+    files: Array<{ id: string; name: string; description?: string }>
+  ) => {
     const existing = props.linkedGeographyFiles || [];
     const newLinks = files
       .filter((file) => !existing.some((link) => link.id === file.id))
@@ -329,7 +343,8 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
       // Use fetch directly since $civicApi expects JSON responses
       const runtimeConfig = useRuntimeConfig();
       const apiBase =
-        (runtimeConfig.public as any)?.civicApiUrl || 'http://localhost:3000';
+        (runtimeConfig.public as { civicApiUrl?: string })?.civicApiUrl ||
+        'http://localhost:3000';
       const authStore = useAuthStore();
 
       const response = await fetch(
@@ -351,8 +366,8 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
       const yamlText = await response.text();
       // Remove leading/trailing whitespace from the YAML content
       rawYaml.value = yamlText.trim();
-    } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
-      yamlError.value = (err instanceof Error ? err.message : '') || 'Failed to load frontmatter YAML';
+    } catch (err: unknown) {
+      yamlError.value = errorMessage(err, 'Failed to load frontmatter YAML');
       rawYaml.value = `Error: ${yamlError.value}`;
       console.error('Error fetching frontmatter YAML:', err);
     } finally {
