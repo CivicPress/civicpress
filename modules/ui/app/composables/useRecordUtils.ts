@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue';
+import type { IconName } from '~/composables/useIcons';
 
 export interface RecordStatusConfig {
   label: string;
@@ -46,7 +47,9 @@ export const useRecordUtils = () => {
     };
 
     const iconKey = typeIconMap[type];
-    return iconKey ? getIcon(iconKey as any) : getIcon('file');
+    return iconKey
+      ? getIcon(iconKey as IconName)
+      : getIcon('file' as IconName);
   };
 
   // Type label mapping
@@ -91,7 +94,9 @@ export const useRecordUtils = () => {
     };
 
     const iconKey = statusIconMap[status];
-    return iconKey ? getIcon(iconKey as any) : getIcon('info');
+    return iconKey
+      ? getIcon(iconKey as IconName)
+      : getIcon('info' as IconName);
   };
 
   /**

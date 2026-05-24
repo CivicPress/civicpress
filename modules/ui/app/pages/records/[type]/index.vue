@@ -56,7 +56,7 @@ const updateURL = () => {
 };
 
 const restoreFromURL = () => {
-  const state = parseQueryToState(route as any);
+  const state = parseQueryToState(route);
   // Restore search query
   if (state.search) {
     searchQuery.value = state.search;

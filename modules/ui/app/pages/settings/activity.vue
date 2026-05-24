@@ -215,10 +215,12 @@ const load = async (goTo?: number) => {
 };
 
 const formatTime = (ts: string) => new Date(ts).toLocaleString();
-const formatActor = (a: any) =>
-  a ? `${a.username || a.id || ''}${a.role ? ` (${a.role})` : ''}` : '';
-const formatTarget = (t: any) =>
-  t ? `${t.type}${t.id ? `:${t.id}` : ''}` : '';
+const formatActor = (
+  a: { username?: string; id?: string | number; role?: string } | null | undefined
+) => (a ? `${a.username || a.id || ''}${a.role ? ` (${a.role})` : ''}` : '');
+const formatTarget = (
+  t: { type?: string; id?: string | number } | null | undefined
+) => (t ? `${t.type}${t.id ? `:${t.id}` : ''}` : '');
 
 const pageStart = computed(() => page.value * limit.value);
 const pageEnd = computed(() =>

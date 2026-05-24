@@ -62,12 +62,12 @@ const fetchDrafts = async () => {
 };
 
 // Navigate to edit page
-const editDraft = (draft: any) => {
+const editDraft = (draft: { id: string; type?: string }) => {
   navigateTo(`/records/${draft.type}/${draft.id}/edit`);
 };
 
 // Delete draft
-const deleteDraft = async (draft: any) => {
+const deleteDraft = async (draft: { id: string; title?: string }) => {
   if (!confirm(`Are you sure you want to delete "${draft.title}"?`)) {
     return;
   }

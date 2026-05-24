@@ -46,7 +46,7 @@ const updateURL = () => {
 };
 
 const restoreFromURL = () => {
-  const state = parseQueryToState(route as any);
+  const state = parseQueryToState(route);
   if (state.search) {
     searchQuery.value = state.search;
     filters.value.search = state.search;
@@ -439,7 +439,7 @@ const scrollToTop = () => {
         <RecordList
           :filters="filters"
           :search-query="searchQuery"
-          :breadcrumbs-ref="breadcrumbsRef as any"
+          :breadcrumbs-ref="breadcrumbsRef"
           :is-searching="isSearching"
           :current-page="page"
           :page-size="pageSize"

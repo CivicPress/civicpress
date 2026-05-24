@@ -160,7 +160,7 @@
                       class="w-5 h-5 text-blue-500"
                     />
                     <UBadge
-                      :color="getCategoryColor(file.category) as any"
+                      :color="getCategoryColor(file.category)"
                       variant="soft"
                       size="sm"
                     >
@@ -382,22 +382,32 @@ const getFileTypeIcon = (type: GeographyFileType): string => {
   return icons[type] || 'i-lucide-file';
 };
 
-const getCategoryColor = (category: GeographyCategory): string => {
-  const colors: Record<GeographyCategory, string> = {
-    zone: 'blue',
-    boundary: 'green',
-    district: 'purple',
-    facility: 'orange',
-    route: 'red',
+type UiBadgeColor = 'error' | 'primary' | 'neutral';
+const getCategoryColor = (category: GeographyCategory): UiBadgeColor => {
+  // Nuxt UI's strict color enum doesn't include the original semantic names
+  // (blue/green/purple/orange/red); the badge palette maps them to the
+  // available set, with error reserved for routes and primary for everything
+  // navigable.
+  const colors: Record<GeographyCategory, UiBadgeColor> = {
+    zone: 'primary',
+    boundary: 'primary',
+    district: 'primary',
+    facility: 'primary',
+    route: 'error',
   };
-  return colors[category] || 'gray';
+  return colors[category] || 'neutral';
 };
 
 const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString();
 };
 
-const formatBounds = (bounds: any): string => {
+const formatBounds = (bounds: {
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}): string => {
   return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} ${t('geography.boundsTo')} ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
 };
 

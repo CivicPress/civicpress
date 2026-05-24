@@ -68,8 +68,9 @@ export function useRecordLock(options: UseRecordLockOptions) {
       error.value = lockError;
 
       // Check if it's a lock conflict
-      if ((err as any)?.statusCode === 409) {
-        const lockData = (err as any)?.data;
+      const e = err as { statusCode?: number; data?: RecordLockResponse };
+      if (e?.statusCode === 409) {
+        const lockData = e.data;
         if (lockData) {
           lockInfo.value = {
             locked: true,
