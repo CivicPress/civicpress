@@ -1,11 +1,13 @@
 # Phase 2d W3-T1 — Type-Cast Inventory
 
-**Date:** 2026-05-20
+**Date:** 2026-05-20 (inventory) → 2026-05-24 (closure)
 **Source:** Phase 2d Structural Hardening plan, §W3-T1
 **Branch:** `refactor/phase-2d-structural-hardening` (local)
 **Inputs:** all `*.ts` + `*.vue` files under `core/src/`, `modules/api/src/`, `modules/ui/app/`, `modules/storage/src/`
 
 This inventory categorizes every `as any` and `: any` cast across the four base-platform surfaces, identifies hot-spot files, and proposes a sequencing strategy for the elimination tasks (W3-T2 through W3-T6).
+
+> **W3 closure status (2026-05-24):** elimination phase complete. 1,621 → 223 (-1,398, 86% cleared) across 36 commits. All four production surfaces at annotated-allowlist levels. 3 original-205 findings closed (`api-009`, `ui-011`, `storage-015`); 6 latent bugs surfaced + fixed during the work. See "Progress log" below and the registry's Phase 2d W3 closures section in `2026-05-16-manifesto-fit-findings.md`. **Deferred to a dedicated lint-hygiene session:** enable `@typescript-eslint/no-explicit-any: error` per workspace + add CI gate. Reason: ~335 pre-existing lint errors across core/api/storage configs (no-unused-vars, missing globals, broken storage flat-config) need triage first; no `.github/workflows/` exists in this repo, so a CI gate needs CI to be introduced from scratch. Both are valuable but should not block W3 → W4 transition.
 
 ---
 
