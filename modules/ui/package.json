@@ -21,6 +21,7 @@
     "@codemirror/view": "6.38.8",
     "@nuxt/eslint": "^1.15.2",
     "@nuxt/scripts": "^0.13.4",
+    "@nuxt/ui": "^3.3.7",
     "@nuxt/ui-pro": "^3.3.7",
     "@nuxtjs/i18n": "10.2.1",
     "@pinia/nuxt": "^0.11.3",
@@ -49,6 +50,7 @@
     "happy-dom": "20.0.11",
     "postcss": "^8.5.14",
     "tailwindcss": "^4.3.0",
-    "unplugin-auto-import": "20.3.0"
+    "unplugin-auto-import": "20.3.0",
+    "vitest": "^3.2.4"
   }
 }
