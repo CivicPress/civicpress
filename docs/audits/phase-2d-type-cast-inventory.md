@@ -200,6 +200,37 @@ Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 
 
 - `(pending)` (W3-T3 saga-error-context) — closes deferred follow-up #2 from W3-T3 session of 2026-05-22. The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) each redeclared `public context: any`, shadowing the now-typed `CivicPressError.context: Record<string, unknown>` from `106c19b`. Resolution: each subclass is now generic on `TContext extends SagaContext = SagaContext` and the shadowing field is renamed `sagaContext: TContext`. Rename was the correct call (not just typing the existing field) because the subclass field is semantically distinct from the base — it holds the saga's runtime working state (the executor's `TContext`), not the error-metadata bag that flows into `super(message, {step, ...})`. Naming the two separately removes the collision permanently and lets the base field tighten further in the future without re-tangling. Two collateral `Record<string, any>` → `Record<string, unknown>` tightenings on the `additionalContext?` params (SagaStepError, SagaCompensationError) for consistency (didn't match the regex, so they're not part of the -4 tally). `saga-executor.ts` updated in one place: `compensate()`'s `originalError: SagaStepError` parametrized to `SagaStepError<TContext>`. No external readers of `.context`/`.sagaContext` on these error instances anywhere in the repo, so the rename was contained to `errors.ts` + the one signature in `saga-executor.ts`. Gap vs. -16 inventory estimate: the doc's "+ propagation" never materialized — the executor never reads the field off the thrown error, only constructs them, so callers needed zero updates. Repo-wide `tsc --noEmit` clean across all workspaces; `pnpm vitest run core/src/saga` 32/32 green.
 
+### 2026-05-24 (W3 core/src long tail — 5-commit sweep A→E)
+
+5 commits, 326 → 223 (-103 casts). core/src driven from 148 → 56; ~89% of remaining cleared. Architectural deliverables: `DatabaseAdapter.getConfig()` method (replaces 5 `(adapter as any).config` sites in diagnostics); typed `Saga<X, Y>` end-to-end with explicit generics at `executor.execute` callsites; `IndexingService | null` propagated through 3 saga constructors with null-safe `QueueIndexingStep` execute paths. Three pre-existing latent bugs surfaced + fixed.
+
+- `2fbad6d` (W3 core sweep A — diagnostics + DatabaseAdapter.getConfig, -23) — `DatabaseAdapter.getConfig(): DatabaseConfig` added to the interface + both adapters; replaces `(adapter as any).config?.sqlite?.file` / `(adapter as any).config` across database/health-checks (×2), search-checker (×2), database-checker. PRAGMA query results typed via `query<{ name: string }>` generics in schema-checks. SearchServiceCacheProbe structural type for intentional probing of optional internal cache fields. filesystem-checker `(fsPromises as any).statfs` narrowed to structural probe. base-checker createFixResult `error?: any` → `error?: unknown` with narrowing via buildDiagnosticError before storage (fixed silent FixResult.error type violation that the prior `any` had hidden). sanitizer redact functions `any → unknown` with shape-preserving cast at consumer narrowing. diagnostic-service `Promise<any>` returns typed. cache + diagnostic-cache-adapter `options?: any` → `unknown`. defaults/index.ts placeholder `any` → `Record<string, unknown>`. base-checker test updated to assert the new (correct) narrowed shape.
+
+- `e7832a7` (W3 core sweep B — records + sagas + null-safe indexing, -13) — `sagaExecutor?: any` / `indexingService?: any` → `SagaExecutor` / `IndexingService | null` end-to-end (record-manager, sagas, all 3 saga classes' inner+outer constructors). `import type` is erased — no runtime circular import reintroduced. **Surfaced bug:** the prior `any` typing let callers pass `indexingService || null` into a non-null saga step constructor with no null guard; a missing indexing service would have crashed the saga at runtime. Indexing is fire-and-forget derived state, so QueueIndexingStep/QueueReIndexingStep now skip cleanly on null. dbUpdates scratch object + normalize* helpers typed `Record<string, unknown>`. record-parser `normalized: any` kept (annotated eslint-disable + rationale — metadata spread idiom doesn't typecheck against `unknown`/Partial without ~15 ternary rewrites). saga/resource-lock `(result as any).changes` → `result.changes` (already typed `ExecuteResult`). Explicit `executor.execute<TContext, TResult>` generics at all 5 callsites since dynamic-import + `implements Saga<X, Y>` doesn't always propagate inference to use.
+
+- `6938f3e` (W3 core sweep C — geography typing, -9) — local `GeoJsonFeatureLike` / `GeoJsonFeatureCollectionLike` / `GeoJsonGeometryLike` structural probes (we don't ship @types/geojson). geography-colors helpers retyped; geography-parser extractBoundsFromGeometry's per-case coordinates narrowing done via local `as` casts (coordinates shape varies per `type`). types/geography ParsedGeographyData.content `any` → `unknown`; GeographyError.details `any` → `unknown`.
+
+- `ea61c75` (W3 core sweep D — notifications + auth typing, -19) — notification pipeline (request → security validate → rate-limit → queue → audit) typed end-to-end. RateLimitConfig made an index signature `[key: string]: number | undefined` so per-channel `${channel}_per_hour` lookup typechecks; getChannelLimit simplified ~10 lines to a one-line index lookup. NotificationQueue's `request: any` → `NotificationRequest`. notification-service sendToChannel `content: any` → `ProcessedTemplate`. Auth: Octokit `let X: any = null` → structural `OctokitCtor` / `OctokitUser`; `(globalThis as any).process?.env.JWT_SECRET` → `process.env.JWT_SECRET`; mergeWithDefaults `any` → `DeepPartial<AuthConfig>` via a local DeepPartial helper that preserves arrays. email-channel-setup normalizeValue + send signatures typed; emailChannel cast through `as unknown as Parameters<NotificationService['registerChannel']>[1]` with documented duck-typing rationale. auth-service oauth-ops `oauthUser: any` / `oauthUserData?: any` → `OAuthUser`; `updateData: any` → `Parameters<DatabaseService['updateUser']>[1]`. user-ops `.map((user: any))` → typed via UserRow return type.
+
+- `8ced3ca` (W3 core sweep E — long-tail misc + sentinel-id bug, -28) — civic-core-services storageModule probe typed; DDLExecutor + PRAGMA queries typed via generics; di/types Class<T = unknown> + ServiceMetadata factory typed via type-only ServiceContainer import; security/secrets yaml.load narrowed to structural shape; config/central-config auth `any` → `Record<string, unknown>`, loadYamlIfExists kept `any` with annotated eslint-disable + docstring (legitimate metadata-vs-bare variance); search/template metadata `any` → `Record<string, unknown>` with sql-builder narrowing cascade. indexing-service `recordManager: any` / `_parsedRecord: any` / `existingRecord: any` → typed via type-only inline imports. **Surfaced bug:** sync user sentinel was passing `id: 'admin'` (string) into createRecordWithId/updateRecord but `AuthUser.id: number`; changed to `id: 0` (system sentinel reservation). modules/module-resolver Ajv default-export probe + cached validator initial-value pattern typed via named `AjvCtor` + `ManifestValidator | null` cache. Cascaded fixes: auth-config `as unknown as AuthConfig` bridge; record-store metadata `?? undefined` coercion for nullable→optional gap.
+
+**Per-surface state at end of session:**
+
+| Surface | Session start | Session end | Notes |
+|---|---:|---:|---|
+| core/src | 148 | 56 | -92 (~62% of starting); remaining 9 production + ~47 in __tests__ are all documented annotated-allowlist cases or comments referencing past patterns |
+| modules/api/src | 32 | 32 | untouched (production at 0) |
+| modules/ui/app | 68 | 68 | untouched (documented eslint-disable for Nuxt UI v-model bridges) |
+| modules/storage/src | 67 | 67 | untouched (production at 0; 67 test-mock casts for the planned `**/*.test.ts` warn override) |
+| **Total** | **326** | **223** | -103 across 5 commits |
+
+`pnpm -r build` clean; 357/357 core tests + 17/17 indexing integration tests green. tests/core session-mgmt date-bomb remains the only failure (pre-existing, documented).
+
+**Three latent bugs surfaced + fixed during sweeps:**
+1. base-checker FixResult.error was being stored verbatim under an `any` field, silently violating the typed `FixResult.error: DiagnosticError` contract. Narrowing helper now invoked before storage. (sweep A)
+2. Saga QueueIndexingStep / QueueReIndexingStep had no null-check on injected indexingService; callers passed `indexingService || null` via an `any` parameter, so a missing service would have crashed the saga. Null-safe skip now mirrors the documented fire-and-forget intent. (sweep B)
+3. IndexingService sync sentinel user was passing `id: 'admin'` (string) into create/update record methods expecting `id: number` per `AuthUser`. Changed to `id: 0` system sentinel. (sweep E)
+
 ### 2026-05-24 (W3-T6 storage production → 0)
 
 1 commit, 326 → 315 (-11 casts). All eliminated from production storage; the remaining 67 storage casts are all in `__tests__/*` (mock-typing for `StorageDatabaseService`/`StorageProvider`), to be handled by the planned `**/*.test.ts` ESLint override (warn, not error) when the repo-wide lint rule lands.
@@ -370,9 +401,9 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 | ~~Saga error context refactor~~ | ✅ closed `11c8f06` (-4) | done |
 | ~~Diagnostics details narrowing~~ | ✅ closed `698d823` (-15) | done |
 | ~~W3-T4 modules/api/src~~ | ✅ closed `0127e86`+`a709031`+`db5eca7` (-158) | done |
-| Remaining core/src per-file batches | ~148 casts (records, indexing, geography, defaults, migrations, ajv/ts-expect-error allowlist, etc.) | 4-6 hours |
+| ~~Remaining core/src per-file batches~~ | ✅ closed `2fbad6d`+`e7832a7`+`6938f3e`+`ea61c75`+`8ced3ca` (-92 across 5 sweeps A→E); 56 left (9 production annotated-allowlist + 47 in __tests__) | done |
 | W3-T5 modules/ui/app | ~68 remaining (was 325 at start; -257 cleared 2026-05-24 across two batches). Most remaining are documented eslint-disabled cases. | 2-3 hours |
-| ~~W3-T6 modules/storage/src production~~ | ✅ closed (pending W3-T6 commit) — production at 0; 67 test-mock casts deferred to `**/*.test.ts` warn override | done |
+| ~~W3-T6 modules/storage/src production~~ | ✅ closed `edd4164` — production at 0; 67 test-mock casts deferred to `**/*.test.ts` warn override | done |
 | Enable lint rule + test override | per-workspace ESLint config + `**/*.test.ts` override to `warn` | 1-2 hours |
 | CI gate | `.github/workflows/*.yml` update | 30 min |
 | W3 closure (this doc + registry + commit) | append final per-surface table; flip api-009, ui-011, storage-015, core-type-safety | 1 hour |
@@ -382,20 +413,28 @@ Then W4 (3 tasks, ~3-5 days) + Phase 2d closure (~1 day).
 
 ### Next session pickup
 
-**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `382ed65` → `08bc8ad` → `9b381aa` (W3-T5 sweeps 5-7) → `(pending)` W3-T6 storage production. Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
+**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `edd4164` (W3-T6 storage) → `2fbad6d` → `e7832a7` → `6938f3e` → `ea61c75` → `8ced3ca` (core sweeps A→E). Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
 
-**Recommended next slice — core/src long tail:**
+**Recommended next slice — enable lint rule + CI gate, then W3 closure:**
 
-With W3-T5 (ui/app) effectively complete and W3-T6 (storage production) closed, the only remaining production surface with non-trivial cast count is **core/src at ~148**. These cluster in: records (record-manager / record-loader access patterns), indexing helpers, geography (Geometry type holes — most should be annotated-and-allowlisted, not eliminated), the `(adapter as any).config?.sqlite?.file` pattern in diagnostics (3 sites; needs a `getConfig()` method on `DatabaseAdapter`), and ajv-driven schema bridges. No cascade risk; 30-60 min slices. Estimated 4-6 h total to drive to an annotated allowlist (~30-50 documented type holes).
+All four production surfaces are now at annotated-allowlist levels (core 9, api 0, ui 68 documented, storage 0). The remaining 223 casts split as:
+- ~9 production casts in core (all documented eslint-disable or comments)
+- ~68 in ui (Nuxt UI v-model bridges, all documented eslint-disable)
+- ~67 in storage `__tests__/*` (mock-typing — legitimate test-file pattern)
+- ~78 in `__tests__/*` across core (mock-typing)
+- 0 in api production
 
-After that:
+Concrete next steps:
 
-1. **Lint rule + CI gate** — enable `@typescript-eslint/no-explicit-any: error` per workspace with `**/*.test.ts` override to `warn`. Add CI gate on reintroduction. 1-2 h + 30 min.
-2. **W3 closure** — final per-surface table here; flip api-009, ui-011, storage-015, core-type-safety in the finding registry; closure commit. 1 h.
+1. **Enable `@typescript-eslint/no-explicit-any: error` per workspace** — `core/.eslintrc.*`, `modules/api/.eslintrc.*`, `modules/ui/.eslintrc.*`, `modules/storage/.eslintrc.*`. Add an override block `{ files: ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**'], rules: { '@typescript-eslint/no-explicit-any': 'warn' } }`. Run `pnpm lint` per workspace; fix any uncovered cases (likely zero — the annotated `eslint-disable-next-line` blocks already opt out where intentional). 1-2 h.
+2. **CI gate** — add a lint step to `.github/workflows/*.yml` so reintroductions block on PR. 30 min.
+3. **W3 closure** — append the final per-surface summary table to this doc; flip `api-009`, `ui-011`, `storage-015`, `core-type-safety` to closed-with-commit-SHA in the finding registry (`docs/audits/finding-registry.md` or equivalent); closure commit. 1 h.
 
-**Not recommended:** finish W3-T5 ui/app to 0 by replacing the ~11 documented eslint-disable blocks; this would require upstream Nuxt UI generic improvements or a separate decomposition pass. Same for the 67 storage test-mock casts (mock-typing is the legitimate use case the test-file warn override is for).
+After that: **W4 (deps hygiene, ~3-5 days)** and **Phase 2d closure (~1 day)**.
 
-Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **315**.
+**Not recommended:** finish W3-T5 ui/app to 0 by replacing the ~11 documented eslint-disable blocks; this would require upstream Nuxt UI generic improvements or a separate decomposition pass. Same for the 67 storage test-mock casts.
+
+Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **223**.
 
 The foundation (typed api-response, errors helper, per-endpoint types) is in place. Remaining ui/app casts are concentrated in a few file types:
 
