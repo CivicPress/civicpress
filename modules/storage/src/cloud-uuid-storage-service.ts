@@ -31,9 +31,9 @@
  */
 
 import { Readable } from 'stream';
-import { S3Client } from '@aws-sdk/client-s3';
-import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
-import { Storage, Bucket } from '@google-cloud/storage';
+import type { S3Client } from '@aws-sdk/client-s3';
+import type { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
+import type { Storage, Bucket } from '@google-cloud/storage';
 import type {
   StorageConfig,
   StorageFile,

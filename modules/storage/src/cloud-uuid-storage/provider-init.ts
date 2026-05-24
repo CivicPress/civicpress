@@ -16,12 +16,11 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import {
-  BlobServiceClient,
-  StorageSharedKeyCredential,
-} from '@azure/storage-blob';
-import { Storage } from '@google-cloud/storage';
+  loadAwsS3Sdk,
+  loadAzureBlobSdk,
+  loadGcsStorageSdk,
+} from './sdk-loader.js';
 import { getLocalStoragePath } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 import type {
@@ -114,6 +113,7 @@ export class ProviderInit {
       throw new Error('S3 credentials not found');
     }
 
+    const { S3Client } = await loadAwsS3Sdk();
     host.s3Client = new S3Client({
       region: provider.region,
       credentials: {
@@ -145,6 +145,8 @@ export class ProviderInit {
 
     // Initialize Azure Blob Service Client
     const azureCreds = credentials as AzureCredentials;
+    const { BlobServiceClient, StorageSharedKeyCredential } =
+      await loadAzureBlobSdk();
     if (azureCreds.connectionString) {
       // Use connection string if available
       host.azureBlobServiceClient = BlobServiceClient.fromConnectionString(
@@ -231,6 +233,7 @@ export class ProviderInit {
     }
     // Otherwise, use Application Default Credentials (ADC)
 
+    const { Storage } = await loadGcsStorageSdk();
     host.gcsStorage = new Storage(storageOptions);
 
     // Get bucket
@@ -311,6 +314,7 @@ export class ProviderInit {
           await this.initializeS3Storage(provider);
         }
         // Try to list objects (limit 1)
+        const { ListObjectsV2Command } = await loadAwsS3Sdk();
         const listCommand = new ListObjectsV2Command({
           Bucket: provider.bucket,
           MaxKeys: 1,

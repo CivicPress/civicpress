@@ -214,6 +214,7 @@ export {
   DatabaseError,
   FileSystemError,
   InternalError,
+  OptionalDependencyMissing,
 } from './errors/index.js';
 
 export {

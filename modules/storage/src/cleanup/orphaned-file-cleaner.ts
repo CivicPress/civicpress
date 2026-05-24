@@ -17,12 +17,9 @@ import type {
 } from '../types/storage.types.js';
 import fs from 'fs-extra';
 import path from 'path';
-import {
-  S3Client,
-  ListObjectsV2Command,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
-import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
+import { loadAwsS3Sdk } from '../cloud-uuid-storage/sdk-loader.js';
+import type { S3Client } from '@aws-sdk/client-s3';
+import type { ContainerClient } from '@azure/storage-blob';
 
 export interface OrphanedFile {
   id?: string; // Database ID if exists
@@ -265,6 +262,7 @@ export class OrphanedFileCleaner {
     const prefix = provider.prefix || '';
     let continuationToken: string | undefined;
 
+    const { ListObjectsV2Command } = await loadAwsS3Sdk();
     do {
       const command = new ListObjectsV2Command({
         Bucket: provider.bucket,
@@ -353,6 +351,7 @@ export class OrphanedFileCleaner {
     // Extract key from path (s3://bucket/key)
     const key = filePath.replace(`s3://${provider.bucket}/`, '');
 
+    const { DeleteObjectCommand } = await loadAwsS3Sdk();
     const command = new DeleteObjectCommand({
       Bucket: provider.bucket,
       Key: key,

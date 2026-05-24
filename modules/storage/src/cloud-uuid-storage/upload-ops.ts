@@ -14,7 +14,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import mime from 'mime-types';
 import { v4 as uuidv4 } from 'uuid';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { loadAwsS3Sdk } from './sdk-loader.js';
 import type {
   UploadFileRequest,
   UploadFileResponse,
@@ -308,6 +308,7 @@ export class UploadOps {
       : relativePath;
 
     const uploadOperation = async () => {
+      const { PutObjectCommand } = await loadAwsS3Sdk();
       const command = new PutObjectCommand({
         Bucket: provider.bucket,
         Key: key,

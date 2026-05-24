@@ -13,7 +13,7 @@ import mime from 'mime-types';
 import { v4 as uuidv4 } from 'uuid';
 import { Readable } from 'stream';
 import { pipeline as streamPipeline } from 'node:stream/promises';
-import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { loadAwsS3Sdk } from './sdk-loader.js';
 import type {
   StorageFile,
   UploadFileResponse,
@@ -312,6 +312,7 @@ export class StreamingOps {
       ? `${provider.prefix}/${relativePath}`
       : relativePath;
 
+    const { PutObjectCommand } = await loadAwsS3Sdk();
     const command = new PutObjectCommand({
       Bucket: provider.bucket,
       Key: key,
@@ -397,6 +398,7 @@ export class StreamingOps {
     // Extract key from provider_path (s3://bucket/key)
     const key = file.provider_path.replace(`s3://${provider.bucket}/`, '');
 
+    const { GetObjectCommand } = await loadAwsS3Sdk();
     const command = new GetObjectCommand({
       Bucket: provider.bucket,
       Key: key,

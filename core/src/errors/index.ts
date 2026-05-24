@@ -199,3 +199,21 @@ export class InternalError extends CivicPressError {
     super(message, context);
   }
 }
+
+/**
+ * Optional Dependency Missing Error (500)
+ * Thrown when a code path requires an optional npm package that wasn't installed.
+ * Used by storage cloud providers (S3/Azure/GCS SDKs in optionalDependencies).
+ */
+export class OptionalDependencyMissing extends CivicPressError {
+  code = 'OPTIONAL_DEPENDENCY_MISSING';
+  statusCode = 500;
+
+  constructor(packageName: string, feature: string) {
+    super(
+      `Optional dependency "${packageName}" is required for ${feature} but is not installed. ` +
+        `Run \`pnpm add ${packageName}\` (or your workspace install equivalent) to enable this feature.`,
+      { packageName, feature }
+    );
+  }
+}

@@ -7,7 +7,7 @@
  */
 
 import fs from 'fs-extra';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { loadAwsS3Sdk } from './sdk-loader.js';
 import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
 import {
   withTimeout,
@@ -182,6 +182,7 @@ export class DownloadOps {
     const key = file.provider_path.replace(`s3://${provider.bucket}/`, '');
 
     const downloadOperation = async () => {
+      const { GetObjectCommand } = await loadAwsS3Sdk();
       const command = new GetObjectCommand({
         Bucket: provider.bucket,
         Key: key,
