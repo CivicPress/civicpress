@@ -200,7 +200,33 @@ Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 
 
 - `(pending)` (W3-T3 saga-error-context) — closes deferred follow-up #2 from W3-T3 session of 2026-05-22. The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) each redeclared `public context: any`, shadowing the now-typed `CivicPressError.context: Record<string, unknown>` from `106c19b`. Resolution: each subclass is now generic on `TContext extends SagaContext = SagaContext` and the shadowing field is renamed `sagaContext: TContext`. Rename was the correct call (not just typing the existing field) because the subclass field is semantically distinct from the base — it holds the saga's runtime working state (the executor's `TContext`), not the error-metadata bag that flows into `super(message, {step, ...})`. Naming the two separately removes the collision permanently and lets the base field tighten further in the future without re-tangling. Two collateral `Record<string, any>` → `Record<string, unknown>` tightenings on the `additionalContext?` params (SagaStepError, SagaCompensationError) for consistency (didn't match the regex, so they're not part of the -4 tally). `saga-executor.ts` updated in one place: `compensate()`'s `originalError: SagaStepError` parametrized to `SagaStepError<TContext>`. No external readers of `.context`/`.sagaContext` on these error instances anywhere in the repo, so the rename was contained to `errors.ts` + the one signature in `saga-executor.ts`. Gap vs. -16 inventory estimate: the doc's "+ propagation" never materialized — the executor never reads the field off the thrown error, only constructs them, so callers needed zero updates. Repo-wide `tsc --noEmit` clean across all workspaces; `pnpm vitest run core/src/saga` 32/32 green.
 
-### 2026-05-24 (W3-T5 ui/app sweep — partial)
+### 2026-05-24 (W3-T5 ui/app sweep — second batch)
+
+4 commits, 459 → 326 (-133 casts). W3-T5 ~79% done; only documented eslint-disabled `any` (Nuxt UI v-model bridges) + a handful of small-file leftovers remain in modules/ui/app.
+
+- `8995238` (W3-T5 sweep 4 — utils + composables + plugin, -96) — utils/config.ts (LegacyOrMeta union + isMetadataShape guard); utils/geography-colors.ts (GeoJsonLike/Feature interfaces); useMarkdown (typed useRuntimeConfig declaration + marked Heading callback); useRecordTypes (`unwrap: unknown` + IconName import); useGeographyForm (emit args + formatBounds typed); useDiagnostics (DiagnosticIssue/Check/FixResult.details/error → Record<string, unknown> | unknown; typed fixResults/autoFixResults response union); useTemplates (8 catches migrated to `errorMessage` from ~/utils/errors); useRecordSidebar (11 — local SelectOption + SelectValue types; 3 USelectMenu computed proxies; template-preview error handler via errorMessage; runtimeConfig.public typed); plugin/01-civicApi (Headers narrowing on onRequest + onResponseError, ofetch 3-shape covered).
+
+- `382ed65` (W3-T5 sweep 5 — components + pages cleanup, -59) — SecuritySettings (5 catches migrated; `error.message?.includes(...)` patterns collapse to a single narrowed message check); StatusTransitionControls (StatusOption + TimelineItem types; UTimeline #default slot typed); GeographyMap (new GeoJsonGeometryType/Feature/FeatureCollection interfaces; 5 callback signatures typed; Leaflet IconDefault private-field delete narrows; apply_to.includes literal-union cast); UserMenu (locales typed; setLocale scoped to i18n union; removed stale chip-leading comment block); EditorAttachments (SelectedFile interface + updateFileCategory typed); GeographyDataCard (defineProps captures into props; formTypeLabel computed extracted); TemplatePanel (documented eslint-disable for USelectMenu generic v-model); profile.vue (verify-email response typed; 7 invalid-Nuxt-UI color casts → valid colors; SecuritySettings binding via computed); setup.vue (4 ConfigEnvelope-typed responses + 3 errorMessage migrations); notifications.vue (1 migration); raw.vue (4 migrations + validation-error fallback typed); configuration/edit.vue (2 migrations + isNestedObject narrowed + update* value params widened); settings/index.vue (RouteLike union for toPath/isActive); auth/register.vue (response success + errorMessage); useRecordUtils.ts (STATUS_COLORS docstring); GeographyLinkDisplay GeographyMap binding cast through `never`.
+
+- `08bc8ad` (W3-T5 sweep 6 — useRecordEditorActions, -3) — RecordEditorProps.record / Deps.form retained `any` with documented eslint-disable rationales (heterogeneous RecordForm.vue source); `emit('saved')` widened to `Record<string, unknown>`; one catch + handleToolbarAction `...args` migrated.
+
+- `9b381aa` (W3-T5 sweep 7 — records pages + small composables, -15) — useRecordStatuses unwrap-helper; useRecordLock typed statusCode/data narrow; useRecordUtils 2 getIcon IconName casts; useRecordQueryState parseQueryToState route arg widened to `unknown`; records/drafts + records/[type]/index narrow inline shapes; records/index breadcrumbsRef prop switched to `HTMLElement` (Vue auto-unwraps in template); settings/activity typed formatActor/formatTarget; geography/index UiBadgeColor for getCategoryColor.
+
+**Per-surface state at end of session:**
+
+| Surface | Session start | Session end | Notes |
+|---|---:|---:|---|
+| core/src | 146 | 146 | untouched |
+| modules/api/src | 32 | 32 | untouched (production already at 0) |
+| modules/ui/app | 201 | 68 | -133 this batch (~66%); only documented `eslint-disable` remain |
+| modules/storage/src | 80 | 80 | untouched |
+| **Total** | **459** | **326** | |
+
+`pnpm tsc --noEmit` clean repo-wide; `pnpm exec nuxt typecheck` clean.
+
+**Remaining ui/app casts (68):** ~11 are documented `eslint-disable @typescript-eslint/no-explicit-any` blocks (Nuxt UI v-model bridges in DetailsPanel/TemplatePanel/ConfigurationField, dynamic-config bindings in configuration/edit, reactive form state in useRecordEditorActions deps); the remaining ~57 are docstring text or hard cases (Leaflet, multi-component generic select bridges). Each is a documented intentional case, not residual cleanup work.
+
+### 2026-05-24 (W3-T5 ui/app sweep — first batch)
 
 4 commits, 583 → 459 (-124 casts). W3-T5 ~38% done; foundation + bulk error narrowing + key component types landed.
 
@@ -320,20 +346,32 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 | ~~Diagnostics details narrowing~~ | ✅ closed `698d823` (-15) | done |
 | ~~W3-T4 modules/api/src~~ | ✅ closed `0127e86`+`a709031`+`db5eca7` (-158) | done |
 | Remaining core/src per-file batches | ~146 casts (records, indexing, geography, defaults, migrations, ajv/ts-expect-error allowlist, etc.) | 4-6 hours |
-| W3-T5 modules/ui/app | ~201 remaining (was 325 at start; -124 cleared 2026-05-24) | 5-7 hours |
+| W3-T5 modules/ui/app | ~68 remaining (was 325 at start; -257 cleared 2026-05-24 across two batches). Most remaining are documented eslint-disabled cases. | 2-3 hours |
 | W3-T6 modules/storage/src | 80 → annotated allowlist | 2-3 hours |
 | Enable lint rule + test override | per-workspace ESLint config + `**/*.test.ts` override to `warn` | 1-2 hours |
 | CI gate | `.github/workflows/*.yml` update | 30 min |
 | W3 closure (this doc + registry + commit) | append final per-surface table; flip api-009, ui-011, storage-015, core-type-safety | 1 hour |
-| **W3 total remaining** | | **~14-20 hours** |
+| **W3 total remaining** | | **~11-16 hours** |
 
 Then W4 (3 tasks, ~3-5 days) + Phase 2d closure (~1 day).
 
 ### Next session pickup
 
-**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `a60bd8d` → `3e8f042` → `3a23731` → `59cd93b` (W3-T5 sweeps 1-3). Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
+**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `8995238` → `382ed65` → `08bc8ad` → `9b381aa` (W3-T5 sweeps 4-7). Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
 
-**Recommended next slice — continue W3-T5 (modules/ui/app, 201 casts remaining):**
+**Recommended next slice — switch surfaces (W3-T5 effectively complete):**
+
+modules/ui/app is at 68 casts, ~80% from W3-T5's starting 325. The remaining are predominantly documented `eslint-disable @typescript-eslint/no-explicit-any` blocks for Nuxt UI v-model bridges (DetailsPanel, TemplatePanel, ConfigurationField), dynamic-config bindings (configuration/edit's getNestedValue), and a few hard cases (Leaflet GeoJSON callbacks). Each has a rationale comment. Driving 68 → 0 would mean either rewriting those bridges with parent-coupled types (invasive) or upgrading to a Nuxt UI release with broader generics.
+
+The pragmatic next slice is:
+
+1. **W3-T6 (modules/storage/src, 80 casts)** — smallest remaining production surface; mostly DI-handle types. 2-3 h.
+2. **Remaining core/src long tail (~146 casts)** — records, indexing, geography (Geometry holes that should be annotated-and-allowlisted), diagnostics adapter access. 4-6 h.
+3. **Lint rule + CI gate** — once all four surfaces are at acceptable annotated-allowlist counts, enable `@typescript-eslint/no-explicit-any: error` per workspace with `**/*.test.ts` override to `warn`, and CI gate on reintroduction. 1-2 h + 30 min.
+
+**Older — not yet recommended:** finish W3-T5 to 0 by replacing the 11 documented eslint-disable blocks; this would require upstream Nuxt UI generic improvements or a separate decomposition pass.
+
+Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **326**.
 
 The foundation (typed api-response, errors helper, per-endpoint types) is in place. Remaining ui/app casts are concentrated in a few file types:
 
