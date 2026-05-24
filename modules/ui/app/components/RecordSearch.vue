@@ -142,12 +142,19 @@ onMounted(async () => {
     }
   }
 });
+/** Local select-option shape shared by the type/status/sort selects below. */
+interface FacetOption {
+  label: string;
+  value: string;
+  icon?: string;
+}
+
 // Facet counts from store
 const recordsStore = useRecordsStore();
 const typeFacetItems = computed(() => {
   const options = recordTypeOptionsComputed.value;
   const counts = recordsStore.facetCounts.types || {};
-  return options.map((opt: any) => ({
+  return options.map((opt) => ({
     ...opt,
     label: `${opt.label} (${counts[opt.value] || 0})`,
   }));
@@ -156,15 +163,15 @@ const typeFacetItems = computed(() => {
 const statusFacetItems = computed(() => {
   const options = recordStatusOptionsComputed.value;
   const counts = recordsStore.facetCounts.statuses || {};
-  return options.map((opt: any) => ({
+  return options.map((opt) => ({
     ...opt,
     label: `${opt.label} (${counts[opt.value] || 0})`,
   }));
 });
 
 // Computed properties for select options
-const recordTypeOptionsComputed = computed(() => {
-  return getRecordTypeOptions().map((option: any) => {
+const recordTypeOptionsComputed = computed<FacetOption[]>(() => {
+  return (getRecordTypeOptions() as FacetOption[]).map((option) => {
     return {
       label: option.label,
       icon: option.icon,
@@ -221,7 +228,7 @@ const selectedSortOption = computed({
       sortOptions.value[0]
     );
   },
-  set: (option: any) => {
+  set: (option: { value?: string } | string | null | undefined) => {
     if (option && typeof option === 'object' && option.value) {
       if (isValidSortOption(option.value)) {
         selectedSort.value = option.value;
@@ -258,8 +265,8 @@ watch(
   }
 );
 
-const recordStatusOptionsComputed = computed(() => {
-  return recordStatusOptions().map((option: any) => {
+const recordStatusOptionsComputed = computed<FacetOption[]>(() => {
+  return (recordStatusOptions() as FacetOption[]).map((option) => {
     return {
       label: option.label,
       icon: option.icon,
@@ -314,11 +321,12 @@ watch(
 
 // Emit filter changes
 const emitFilterChange = () => {
-  const typeValues = selectedRecordTypes.value.map((item: any) =>
-    typeof item === 'string' ? item : item.value || item.id
+  type FacetItem = string | { value?: string; id?: string };
+  const typeValues = (selectedRecordTypes.value as FacetItem[]).map((item) =>
+    typeof item === 'string' ? item : item.value || item.id || ''
   );
-  const statusValues = selectedRecordStatuses.value.map((item: any) =>
-    typeof item === 'string' ? item : item.value || item.id
+  const statusValues = (selectedRecordStatuses.value as FacetItem[]).map(
+    (item) => (typeof item === 'string' ? item : item.value || item.id || '')
   );
 
   emit('filterChange', {

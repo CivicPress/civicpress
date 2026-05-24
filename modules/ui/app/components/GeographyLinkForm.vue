@@ -28,7 +28,7 @@
               icon="i-lucide-external-link"
               variant="ghost"
               size="xs"
-              @click="() => handlePreview(link as any)"
+              @click="() => handlePreview(link)"
               :disabled="disabled"
             />
             <UButton
@@ -83,7 +83,7 @@
         <div v-if="previewFile" class="space-y-4">
           <div class="flex items-center gap-2">
             <UBadge
-              :color="getCategoryColor(previewFile.category || '') as any"
+              :color="getCategoryColor(previewFile.category || '')"
               variant="soft"
             >
               {{ previewFile.category }}
@@ -101,11 +101,11 @@
           </p>
 
           <div
-            v-if="(previewFile as any).geographyData"
+            v-if="previewGeographyData"
             class="h-96 rounded-lg overflow-hidden border"
           >
             <GeographyMap
-              :geography-data="(previewFile as any).geographyData"
+              :geography-data="previewGeographyData"
               :bounds="previewFile.bounds"
               :interactive="true"
               height="100%"
@@ -142,16 +142,22 @@ import GeographyMap from './GeographyMap.vue';
 const { t } = useI18n();
 
 // Props
+interface LinkStats {
+  featureCount?: number;
+}
+
+interface GeographyLink {
+  id: string;
+  name: string;
+  description?: string;
+  type?: string;
+  category?: string;
+  created_at?: string;
+  stats?: LinkStats;
+}
+
 interface Props {
-  modelValue: Array<{
-    id: string;
-    name: string;
-    description?: string;
-    type?: string;
-    category?: string;
-    created_at?: string;
-    stats?: any;
-  }>;
+  modelValue: GeographyLink[];
   disabled?: boolean;
 }
 
@@ -161,17 +167,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-  'update:modelValue': [
-    value: Array<{
-      id: string;
-      name: string;
-      description?: string;
-      type?: string;
-      category?: string;
-      created_at?: string;
-      stats?: any;
-    }>,
-  ];
+  'update:modelValue': [value: GeographyLink[]];
 }>();
 
 // State
@@ -191,9 +187,17 @@ watch(
 // Computed
 const linkedFiles = computed(() => props.modelValue);
 
+// Preview file may have a non-standard `geographyData` field attached by the
+// upstream loader; expose it via a typed accessor instead of casting in template.
+const previewGeographyData = computed(() => {
+  const f = previewFile.value as (GeographyFile & { geographyData?: unknown }) | null;
+  return f?.geographyData;
+});
+
 // Methods
-const getCategoryColor = (category: string): string => {
-  const colors: Record<string, string> = {
+type UiBadgeColor = 'error' | 'primary' | 'neutral';
+const getCategoryColor = (category: string): UiBadgeColor => {
+  const colors: Record<string, UiBadgeColor> = {
     Reference: 'primary',
     Financial: 'primary',
     Legal: 'primary',
@@ -208,7 +212,7 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
 };
 
-const updateLink = (index: number, link: any) => {
+const updateLink = (index: number, link: GeographyLink) => {
   const updatedLinks = [...props.modelValue];
   updatedLinks[index] = { ...link };
   emit('update:modelValue', updatedLinks);
@@ -233,7 +237,7 @@ const handleSelectionConfirm = (files: GeographyFile[]) => {
       type: file.type,
       category: file.category,
       created_at: file.created_at,
-      stats: (file as any).stats,
+      stats: (file as { stats?: LinkStats }).stats,
     }));
 
   if (newLinks.length > 0) {
@@ -245,8 +249,10 @@ const handleSelectionConfirm = (files: GeographyFile[]) => {
   selectedIds.value = [];
 };
 
-const handlePreview = (file: GeographyFile) => {
-  previewFile.value = file;
+const handlePreview = (file: GeographyFile | GeographyLink) => {
+  // previewFile is typed as GeographyFile; the link shape doesn't include
+  // all fields but only the ones the preview pane uses, so the cast is safe.
+  previewFile.value = file as GeographyFile;
   showPreview.value = true;
 };
 
