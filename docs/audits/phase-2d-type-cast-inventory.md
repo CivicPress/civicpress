@@ -200,7 +200,33 @@ Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 
 
 - `(pending)` (W3-T3 saga-error-context) — closes deferred follow-up #2 from W3-T3 session of 2026-05-22. The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) each redeclared `public context: any`, shadowing the now-typed `CivicPressError.context: Record<string, unknown>` from `106c19b`. Resolution: each subclass is now generic on `TContext extends SagaContext = SagaContext` and the shadowing field is renamed `sagaContext: TContext`. Rename was the correct call (not just typing the existing field) because the subclass field is semantically distinct from the base — it holds the saga's runtime working state (the executor's `TContext`), not the error-metadata bag that flows into `super(message, {step, ...})`. Naming the two separately removes the collision permanently and lets the base field tighten further in the future without re-tangling. Two collateral `Record<string, any>` → `Record<string, unknown>` tightenings on the `additionalContext?` params (SagaStepError, SagaCompensationError) for consistency (didn't match the regex, so they're not part of the -4 tally). `saga-executor.ts` updated in one place: `compensate()`'s `originalError: SagaStepError` parametrized to `SagaStepError<TContext>`. No external readers of `.context`/`.sagaContext` on these error instances anywhere in the repo, so the rename was contained to `errors.ts` + the one signature in `saga-executor.ts`. Gap vs. -16 inventory estimate: the doc's "+ propagation" never materialized — the executor never reads the field off the thrown error, only constructs them, so callers needed zero updates. Repo-wide `tsc --noEmit` clean across all workspaces; `pnpm vitest run core/src/saga` 32/32 green.
 
-### 2026-05-22 (this session — per-table Row typing)
+### 2026-05-22 / 2026-05-23 (W3-T4 api/src sweep)
+
+3 commits, 743 → 583 (-160 casts). W3-T4 (api surface) essentially done — production code at 0; remaining 32 are test-mock + docstring residue.
+
+- `0127e86` (W3-T4 core widening) — prepares the public surface so api consumers can name the types they need: `core/src/index.ts` re-exports every per-table Row interface (UserRow, RecordRow, DraftRow, StorageFileRow, joined rows, PRAGMA helpers, tag rows) + SqlParam/SqlRow/ExecuteResult/Transaction + new GitCommit alias (DefaultLogFields & ListLogLine from simple-git). RecordManager.listRecords return tightened to `Promise<{ records: RecordRow[]; total: number }>`; RecordManager.searchRecords switched to `ReturnType<RecordSearch['searchRecords']>` so it tracks the underlying contract. GitEngine.getHistory tightened to `Promise<GitCommit[]>`. AuthService.canSetPassword + getUserAuthProvider widened to `Pick<AuthUser, 'auth_provider'> | null | undefined` (both only inspect one field; AuthUser was forcing callers to do full row → domain mapping). Ripple: StorageFile.created_at/updated_at changed from `Date` to `string | Date` (SQLite returns strings at runtime; the Date type was a lie hidden by `Promise<any>` on the StorageDatabaseService contract); cli/src/commands/users.ts gained an updatedUser null guard that was hidden by `any`.
+
+- `a709031` (W3-T4 records-service) — sweeps the 6-collaborator decomposition from W2-T8. **-50 casts.** Same pattern across all 6 files: `user: any` → AuthUser; `record/records: any[]` returns formalized into named ApiRecord / ApiDraft / ListedRecord envelope interfaces; `geography?: any` → Geography; `Record<string, any>` → `Record<string, unknown>`; row destructures use core Row exports. listing.ts (21 → 0): the 8x `(user as any).role` defensive checks collapse since user is now typed; PRAGMA-flavored count queries typed. crud.ts (6 → 0): new ApiRecord interface formalizes the 20-field literal repeated 4×. drafts.ts (11 → 0): typed DraftUpdates = `Partial<Pick<DraftRow, ...>>`; JSON-parse boilerplate hoisted to 3 local helpers; 15-line defensive username-extraction block in createDraft collapses to one line since AuthUser.username is `string`. frontmatter-and-publish.ts (6 → 0): new DraftOrRecord hybrid envelope; `(dbService as any).adapter` replaced with `dbService.getAdapter()`. helpers.ts (3 → 0): `getKindPriority(record: any)` → structural type covering only the metadata.kind path. locks.ts (3 → 0): user: AuthUser + getLock returns RecordLockRow. records-service.ts orchestrator: `(civicPress as any).config?.dataDir` → `civicPress.getDataDir()`.
+
+- `db5eca7` (W3-T4 api routes + middleware) — sweeps the remaining 80-ish casts across 26 files. **~108 casts cleared.** Patterns: (1) the `(error as any).statusCode = N; throw error;` mutation idiom W3-T2's HttpError replaced — 9 stragglers in health.ts + auxiliary-handlers.ts now throw `new HttpError(...)`; (2) `(req.user as any).<field>` / `let actor: any = req.user || {}` audit-actor pattern — 22 sites typed as `AuthUser` / `Partial<AuthUser>`; (3) untyped map callbacks — typed via new core Row exports or local interfaces (history's `(commit: any)` × 8 now inferred from `Promise<GitCommit[]>`, status's 5× similar, diagnose's `result: any` → `DiagnosticReport`, etc.); (4) utility/handler interface fields widened from `[key: string]: any` / `details?: any` / `errors: any[]` to `unknown`. Notable named-type introductions: status.ts ConfigurationStatus, validation.ts ValidationIssue/Metadata/Report, info.ts InfoResponse (replacing 4× `let foo: any = null;` + a mutated `response: any = {}`), search.ts SuggestionResponse. Two latent bugs surfaced: (a) uuid-storage permission checks were passing 'download' as `action` even though userCan only matches create/edit/delete/view — the `as any` cast was silently failing the permission match; fixed to 'view'; (b) notifications.ts NotificationChannel registration was an abstract-class adapter that can't satisfy structural typing (`as unknown as Parameters<...>[1]` with a one-line rationale; subclassing would require implementing 3 abstract methods not used by this endpoint).
+
+**Untouched** (left as residue, not production code): error-handler.test.ts (16 test mocks), diagnose.test.ts (5), api-logger.test.ts (2), http-error.ts (5 docstring references describing the historical mutation idiom), express-augment.d.ts + index.ts + listing-handlers.ts + middleware/logging.ts (1 each: docstring or eslint-disabled lines). The middleware/logging.ts disable is intentional — Express `res.end` has 3 overloads (cb / chunk+cb / chunk+encoding+cb) that no single typed signature can satisfy.
+
+**Per-surface state at end of session:**
+
+| Surface | This-session start | This-session end | Notes |
+|---|---:|---:|---|
+| core/src | 150 | 146 | small ripples from RecordRow/auth widening |
+| modules/api/src | 190 | 32 | production code essentially at 0; -158 |
+| modules/ui/app | 325 | 325 | untouched |
+| modules/storage/src | 78 | 80 | +2 from StorageFile type-shape alignment ripples |
+| **Total** | **743** | **583** | |
+
+(The modules/storage delta is because the StorageFile interface alignment introduced two `string | Date` widenings that grep counts as casts — they're type unions, not `any`.)
+
+`pnpm tsc --noEmit` clean repo-wide. Targeted vitest (tests/core + tests/integration + tests/api): 608 pass, 15 skipped, 1 pre-existing failure (same `2025-12-31` expired-session flake confirmed on main).
+
+### 2026-05-22 (per-table Row typing — preceding session)
 
 2 commits, 769 → 743 (-26 casts). Closes deferred follow-up #1.
 
@@ -255,34 +281,36 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 
 | Task | Scope | Estimated effort |
 |---|---|---|
-| ~~Per-table Row typing (database)~~ | ✅ closed this session (-26) | done |
+| ~~Per-table Row typing (database)~~ | ✅ closed `ad84b31`+`818fc23` (-26) | done |
 | ~~Saga error context refactor~~ | ✅ closed `11c8f06` (-4) | done |
 | ~~Diagnostics details narrowing~~ | ✅ closed `698d823` (-15) | done |
-| Remaining core/src per-file batches | ~150 casts (records, indexing, geography, defaults, migrations, ajv/ts-expect-error allowlist, etc.) | 4-6 hours |
-| W3-T4 modules/api/src | 190 → 0 | 6-8 hours |
+| ~~W3-T4 modules/api/src~~ | ✅ closed `0127e86`+`a709031`+`db5eca7` (-158); 32 test-mock + docstring residue left | done |
+| Remaining core/src per-file batches | ~146 casts (records, indexing, geography, defaults, migrations, ajv/ts-expect-error allowlist, etc.) | 4-6 hours |
 | W3-T5 modules/ui/app | 325 → 0 | 8-10 hours |
-| W3-T6 modules/storage/src | 78 → annotated allowlist | 2-3 hours |
+| W3-T6 modules/storage/src | 80 → annotated allowlist | 2-3 hours |
 | Enable lint rule + test override | per-workspace ESLint config + `**/*.test.ts` override to `warn` | 1-2 hours |
 | CI gate | `.github/workflows/*.yml` update | 30 min |
 | W3 closure (this doc + registry + commit) | append final per-surface table; flip api-009, ui-011, storage-015, core-type-safety | 1 hour |
-| **W3 total remaining** | | **~26-34 hours** |
+| **W3 total remaining** | | **~18-24 hours** |
 
 Then W4 (3 tasks, ~3-5 days) + Phase 2d closure (~1 day).
 
 ### Next session pickup
 
-**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `ad84b31` (row-types module) + `818fc23` (query narrowing). Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
+**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `0127e86` → `a709031` → `db5eca7` (W3-T4 sweep). Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
 
-**Recommended next slice — switch to a new surface or finish the core long tail:**
+**Recommended next slice — W3-T5 (modules/ui/app, 325 casts):**
 
-Now that the three large well-scoped deferrals (saga-error-context, diagnostics-details, per-table Row typing) are all closed, the remaining core/src 150 casts are a long-tail mix that doesn't cluster cleanly. Three viable directions:
+Largest remaining surface. UI casts cluster differently than api: there's no single seam like express-augment that knocks out 80% with one type augmentation. Expected high-leverage batches:
 
-1. **W3-T4 (modules/api/src, 190 casts)** — switch surfaces. Benefits maximally from the W3-T2 `express-augment.d.ts` + `typed-catch` patterns already landed. Top-25 hot-spot list in §"Per-file hot-spots" identifies the highest-leverage batches. Estimated 6-8 h to zero.
+1. **`(await civicApi(...)) as any` API-response casts** (~70 in the original inventory) — typed `ApiResponse<T>` envelope + per-endpoint response types in `modules/ui/app/types/api-responses.ts`. The api side now returns named envelope types (`ApiRecord`, `ApiDraft`, `DraftOrRecord`); the ui can mirror these as response types.
+2. **Vue prop loose typing** (`defineProps<{...}>` with `as any` casts) — per-component cleanup.
+3. **Composables** — `useRecordEditorActions.ts` (24 casts) was the #5 hot-spot in the original inventory.
 
-2. **Remaining core/src batches** (~150 casts) — per-file pass through records (~14 in `record-schema-validator.ts`), indexing, geography (most are intentional `as any` for Geometry type holes — annotate-and-allowlist not eliminate), defaults, migrations, plus the `(adapter as any).config?.sqlite?.file` pattern in diagnostics health-checks + fragmentation (3 sites; needs a `getConfig()` getter on DatabaseAdapter or a SQLiteAdapter type guard). No cascade risk; can be done in 30-60 min slices. 4-6 h total.
+Estimated 8-10 hours to drive 325 → 0.
 
-3. **W3-T6 (modules/storage/src, 78 casts)** — smallest surface, mostly DI-handle types (`databaseService: any` → `DatabaseService` now that core is typed end-to-end). 2-3 h.
+**Alternatives if scope feels wrong:**
+- **W3-T6 (storage/src, 80 casts)** — smallest surface, mostly DI-handle types (`databaseService: any` → `DatabaseService`). 2-3 h. Quick win.
+- **Remaining core/src long tail** (~146 casts) — records-service.ts hot-spot in core (record-schema-validator.ts ~14), indexing, geography (Geometry type holes that should be annotated-and-allowlisted, not eliminated), `(adapter as any).config?.sqlite?.file` pattern in diagnostics (3 sites; needs a `getConfig()` method on DatabaseAdapter). No cascade risk; 30-60 min slices. 4-6 h total.
 
-**For the per-table Row work specifically:** the row-types module is in place but `searchRecords` still returns `Array<{record_id: string}>` (a minimal contract; the consumer only reads `.record_id`). A future tightening could split it into `Array<SearchResult> | Array<SearchIndexRow>` with discriminated narrowing, but that's a small ergonomics win for ~0 cast reduction.
-
-Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **743**.
+Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **583**.
