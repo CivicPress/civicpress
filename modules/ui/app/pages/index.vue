@@ -149,7 +149,7 @@ const fetchOrganizationInfo = async () => {
     if (response.success) {
       organizationInfo.value = response.organization;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error fetching organization info:', err);
     // Non-critical, so no error UI
   }
@@ -158,11 +158,14 @@ const fetchOrganizationInfo = async () => {
 // Fetch recent records (public)
 const fetchRecentRecords = async () => {
   try {
-    const response = (await $civicApi('/api/v1/records?limit=5')) as ApiResponse;
+    const response = (await $civicApi(
+      '/api/v1/records?limit=5'
+    )) as ApiResponse<{ records?: unknown[] }>;
     if (response.success) {
-      recentRecords.value = response.data.records || [];
+      recentRecords.value = (response.data.records ||
+        []) as unknown as CivicRecord[];
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error fetching recent records:', err);
     // Non-critical, so no error UI
   }
@@ -176,8 +179,8 @@ const loadDashboardData = async () => {
   try {
     await fetchOrganizationInfo();
     await fetchRecentRecords();
-  } catch (err: any) {
-    error.value = err.message || t('home.failedToLoad');
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || t('home.failedToLoad');
     console.error('Error loading dashboard data:', err);
   } finally {
     loading.value = false;

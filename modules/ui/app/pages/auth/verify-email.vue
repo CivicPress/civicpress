@@ -172,11 +172,11 @@ const verifyEmail = async () => {
         color: 'primary',
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Email verification failed:', error);
     verificationResult.value = {
       success: false,
-      message: error.message || t('auth.emailVerificationFailed'),
+      message: (error instanceof Error ? error.message : '') || t('auth.emailVerificationFailed'),
     };
   } finally {
     loading.value = false;
@@ -197,7 +197,7 @@ const requestNewToken = async () => {
 
     // Redirect to login or profile
     await navigateTo('/auth/login');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to request new token:', error);
     toast.add({
       title: 'Request Failed',

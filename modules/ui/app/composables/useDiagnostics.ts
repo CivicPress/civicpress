@@ -106,8 +106,8 @@ export const useDiagnostics = () => {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to run diagnostics';
+    } catch (err: unknown) {
+      error.value = (err instanceof Error ? err.message : '') || 'Failed to run diagnostics';
       throw err;
     } finally {
       loading.value = false;
@@ -176,8 +176,8 @@ export const useDiagnostics = () => {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to auto-fix issues';
+    } catch (err: unknown) {
+      error.value = (err instanceof Error ? err.message : '') || 'Failed to auto-fix issues';
       throw err;
     } finally {
       fixing.value = false;

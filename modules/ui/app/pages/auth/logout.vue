@@ -13,8 +13,8 @@ const handleLogout = async () => {
     await authStore.logout();
     // Redirect to login page after successful logout
     await navigateTo('/auth/login');
-  } catch (err: any) {
-    error.value = err.message || t('auth.logoutFailed');
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || t('auth.logoutFailed');
   } finally {
     loading.value = false;
   }

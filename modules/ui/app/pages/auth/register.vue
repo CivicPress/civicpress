@@ -122,9 +122,9 @@ const handleRegister = async () => {
         navigateTo('/auth/login');
       }, 2000);
     }
-  } catch (err: any) {
+  } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     error.value =
-      err.data?.error?.message || err.message || t('auth.registrationFailed');
+      err.data?.error?.message || (err instanceof Error ? err.message : '') || t('auth.registrationFailed');
   } finally {
     loading.value = false;
   }

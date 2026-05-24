@@ -354,7 +354,9 @@ const loadStorageConfig = async () => {
     loadingFolders.value = true;
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/storage/config'
-    )) as ApiResponse;
+    )) as ApiResponse<{
+      config?: { folders?: Record<string, unknown> };
+    }>;
 
     if (response.success && response.data?.config?.folders) {
       folderConfigs.value = response.data.config.folders;
@@ -379,14 +381,11 @@ const loadStorageStats = async () => {
       if (folder.enabled) {
         const response = (await useNuxtApp().$civicApi(
           `/api/v1/storage/folders/${folder.name}/files`
-        )) as ApiResponse;
+        )) as ApiResponse<{ files: Array<{ size: number }> }>;
 
         if (response.success) {
           const files = response.data.files;
-          const totalSize = files.reduce(
-            (sum: number, file: any) => sum + file.size,
-            0
-          );
+          const totalSize = files.reduce((sum, file) => sum + file.size, 0);
 
           storageStats.value.folderStats[folder.name] = {
             fileCount: files.length,

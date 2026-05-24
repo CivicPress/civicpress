@@ -84,8 +84,8 @@ export function useRecordStatuses() {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to fetch record statuses';
+    } catch (err: unknown) {
+      const errorMessage = (err instanceof Error ? err.message : '') || 'Failed to fetch record statuses';
       error.value = errorMessage;
       globalError = errorMessage;
       console.error('Error fetching record statuses:', err);

@@ -149,7 +149,7 @@ async function createFromDefaults(type: string) {
     } else {
       throw new Error(res?.error || 'Failed to create from defaults');
     }
-  } catch (e: any) {
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     useToast().add({
       title: `Failed to create ${type}`,
       description: e?.message || String(e),
@@ -172,7 +172,7 @@ async function validateOne(type: string) {
       title: valid ? `Valid: ${type}` : `Invalid: ${type}`,
       color: valid ? 'primary' : 'error',
     });
-  } catch (e: any) {
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     useToast().add({
       title: `Validation failed: ${type}`,
       description: e?.message || String(e),
@@ -204,7 +204,7 @@ async function validateAll() {
         });
       }
     }
-  } catch (e: any) {
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     useToast().add({
       title: 'Validation failed',
       description: e?.message || String(e),

@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, watch, nextTick, type Ref } from 'vue';
 import type { ApiResponse } from '~/utils/api-response';
+import type { RecordResponse } from '~/types/api-responses';
 import type { CivicRecord } from '~/stores/records';
 import { useAuthStore } from '~/stores/auth';
 
@@ -396,7 +397,9 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
     try {
       // Direct API call for now to test
       const { $civicApi } = useNuxtApp();
-      const response = (await $civicApi(`/api/v1/records/${id}`)) as ApiResponse;
+      const response = (await $civicApi(
+        `/api/v1/records/${id}`
+      )) as ApiResponse<RecordResponse & { created?: string; updated?: string }>;
 
       if (response && response.success && response.data) {
         const apiRecord = response.data;
@@ -416,28 +419,32 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
           }
         }
 
-        // Transform API response to match CivicRecord interface
+        // Transform API response to match CivicRecord interface. CivicRecord
+        // uses tight literal-union enums for type/status; cast at boundary.
         record.value = {
           id: apiRecord.id,
           title: apiRecord.title,
-          type: apiRecord.type,
+          type: apiRecord.type as CivicRecord['type'],
           content: contentBody, // Use only the content body, not the full markdown
-          status: apiRecord.status,
-          path: apiRecord.path,
-          author: apiRecord.author,
-          created_at: apiRecord.created || apiRecord.created_at,
-          updated_at: apiRecord.updated || apiRecord.updated_at,
-          linkedGeographyFiles: apiRecord.linkedGeographyFiles || [],
-          metadata: apiRecord.metadata || {},
-          attachedFiles: apiRecord.attachedFiles || [],
-          linkedRecords: apiRecord.linkedRecords || [],
+          status: (apiRecord.status || 'draft') as CivicRecord['status'],
+          path: apiRecord.path || '',
+          author: apiRecord.author || '',
+          created_at: apiRecord.created || apiRecord.created_at || '',
+          updated_at: apiRecord.updated || apiRecord.updated_at || '',
+          linkedGeographyFiles: (apiRecord.linkedGeographyFiles ||
+            []) as CivicRecord['linkedGeographyFiles'],
+          metadata: (apiRecord.metadata || {}) as CivicRecord['metadata'],
+          attachedFiles: (apiRecord.attachedFiles ||
+            []) as CivicRecord['attachedFiles'],
+          linkedRecords: (apiRecord.linkedRecords ||
+            []) as CivicRecord['linkedRecords'],
           hasUnpublishedChanges: apiRecord.hasUnpublishedChanges || false,
-        };
+        } as CivicRecord;
       } else {
         throw new Error(t('records.failedToLoadRecord'));
       }
-    } catch (err: any) {
-      error.value = err.message || t('records.failedToLoadRecord');
+    } catch (err: unknown) {
+      error.value = (err instanceof Error ? err.message : '') || t('records.failedToLoadRecord');
       console.error('Error fetching record:', err);
     } finally {
       loading.value = false;

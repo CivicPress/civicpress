@@ -326,7 +326,7 @@ const loadGeographyFiles = async () => {
 
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography?${params}`
-    )) as ApiResponse;
+    )) as ApiResponse<{ files: GeographyFile[]; total: number }>;
 
     if (response.success) {
       geographyFiles.value = response.data.files;

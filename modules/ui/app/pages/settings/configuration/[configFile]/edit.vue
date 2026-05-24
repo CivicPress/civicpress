@@ -348,9 +348,9 @@ const loadConfiguration = async () => {
         extractErrorMessage(response) || `Failed to load ${configFile.value} configuration`
       );
     }
-  } catch (err: any) {
+  } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     console.error(`Failed to load ${configFile.value} configuration:`, err);
-    error.value = err.message || 'Failed to load configuration';
+    error.value = (err instanceof Error ? err.message : '') || 'Failed to load configuration';
   } finally {
     loading.value = false;
   }
@@ -448,7 +448,7 @@ const validateConfiguration = async (): Promise<boolean> => {
       {
         method: 'POST',
       }
-    )) as ApiResponse;
+    )) as ApiResponse<{ valid: boolean; errors?: string[] }>;
 
     if (response.success && response.data) {
       const isValid = response.data.valid === true;
@@ -502,7 +502,7 @@ const saveConfiguration = async () => {
     } else {
       throw new Error(extractErrorMessage(response) || 'Failed to save configuration');
     }
-  } catch (err: any) {
+  } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     console.error('Failed to save configuration:', err);
     useToast().add({
       title: 'Error',

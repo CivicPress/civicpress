@@ -459,7 +459,7 @@ const fetchSecurityInfo = async () => {
       // Fallback to fetching full security info
       securityInfo.value = await getSecurityInfo(props.userId);
     }
-  } catch (error: any) {
+  } catch (error: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     console.error('Failed to fetch security info:', error);
     toast.add({
       title: t('common.error'),
@@ -501,7 +501,7 @@ const handlePasswordChange = async () => {
       });
       resetPasswordForm();
     }
-  } catch (error: any) {
+  } catch (error: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     console.error('Password change failed:', error);
 
     // Handle specific error cases
@@ -519,7 +519,7 @@ const handlePasswordChange = async () => {
       toast.add({
         title: t('settings.security.passwordChangeFailed'),
         description:
-          error.message || t('settings.security.failedToChangePassword'),
+          (error instanceof Error ? error.message : '') || t('settings.security.failedToChangePassword'),
         color: 'error',
       });
     }
@@ -546,7 +546,7 @@ const handleEmailChange = async () => {
       resetEmailForm();
       await fetchSecurityInfo(); // Refresh to show pending change
     }
-  } catch (error: any) {
+  } catch (error: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     console.error('Email change request failed:', error);
 
     if (error.message?.includes('already in use')) {
@@ -555,7 +555,7 @@ const handleEmailChange = async () => {
       toast.add({
         title: t('settings.security.emailChangeFailed'),
         description:
-          error.message || t('settings.security.failedToRequestEmailChange'),
+          (error instanceof Error ? error.message : '') || t('settings.security.failedToRequestEmailChange'),
         color: 'error',
       });
     }
@@ -577,12 +577,12 @@ const cancelEmailChange = async () => {
       });
       await fetchSecurityInfo(); // Refresh to hide pending change
     }
-  } catch (error: any) {
+  } catch (error: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     console.error('Cancel email change failed:', error);
     toast.add({
       title: t('settings.security.cancelFailed'),
       description:
-        error.message || t('settings.security.failedToCancelEmailChange'),
+        (error instanceof Error ? error.message : '') || t('settings.security.failedToCancelEmailChange'),
       color: 'error',
     });
   } finally {
@@ -602,7 +602,7 @@ const handleSendEmailVerification = async () => {
         color: 'primary',
       });
     }
-  } catch (error: any) {
+  } catch (error: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     console.error('Send email verification failed:', error);
     toast.add({
       title: t('settings.security.failedToSendVerificationEmail'),

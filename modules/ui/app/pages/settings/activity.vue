@@ -197,15 +197,18 @@ const load = async (goTo?: number) => {
     if (filters.action) params.set('action', filters.action);
     const res = (await useNuxtApp().$civicApi(
       `/api/v1/audit?${params.toString()}`
-    )) as ApiResponse;
+    )) as ApiResponse<{
+      entries: unknown[];
+      pagination?: { total?: number };
+    }>;
     if (res?.success && res?.data?.entries) {
       items.value = res.data.entries;
       total.value = res.data.pagination?.total || items.value.length;
     } else {
       throw new Error('Unexpected response');
     }
-  } catch (e: any) {
-    error.value = e.message || t('settings.activity.failedToLoad');
+  } catch (e: unknown) {
+    error.value = (e instanceof Error ? e.message : '') || t('settings.activity.failedToLoad');
   } finally {
     loading.value = false;
   }

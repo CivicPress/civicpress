@@ -244,7 +244,7 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
       } else {
         throw new Error('Invalid preview response: missing rendered content');
       }
-    } catch (error: any) {
+    } catch (error: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
       console.error('Failed to preview template:', error);
       const errorMessage =
         error?.data?.error?.message ||
@@ -351,8 +351,8 @@ export function useRecordSidebar(deps: UseRecordSidebarDeps) {
       const yamlText = await response.text();
       // Remove leading/trailing whitespace from the YAML content
       rawYaml.value = yamlText.trim();
-    } catch (err: any) {
-      yamlError.value = err.message || 'Failed to load frontmatter YAML';
+    } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+      yamlError.value = (err instanceof Error ? err.message : '') || 'Failed to load frontmatter YAML';
       rawYaml.value = `Error: ${yamlError.value}`;
       console.error('Error fetching frontmatter YAML:', err);
     } finally {

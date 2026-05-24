@@ -33,7 +33,9 @@ const fetchUserInfo = async () => {
 
     // Otherwise try to fetch from API (requires authentication)
     if (authStore.token) {
-      const response = (await $civicApi('/api/v1/auth/me')) as ApiResponse;
+      const response = (await $civicApi('/api/v1/auth/me')) as ApiResponse<{
+        user: User;
+      }>;
       if (response.success) {
         userInfo.value = response.data.user;
         // Also update the auth store with fresh data
@@ -42,8 +44,8 @@ const fetchUserInfo = async () => {
     } else {
       error.value = t('settings.authenticationRequired');
     }
-  } catch (err: any) {
-    error.value = err.message || t('settings.failedToFetchUserInfo');
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || t('settings.failedToFetchUserInfo');
     console.error('Error fetching user info:', err);
   } finally {
     loading.value = false;
@@ -162,10 +164,10 @@ const handleEmailVerification = async () => {
             t('settings.verificationFailed')
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       useToast().add({
         title: t('settings.emailVerificationFailed'),
-        description: err.message || t('settings.failedToVerifyEmail'),
+        description: (err instanceof Error ? err.message : '') || t('settings.failedToVerifyEmail'),
         color: 'error',
       });
 

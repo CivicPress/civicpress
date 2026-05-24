@@ -39,7 +39,7 @@ export const useSecurity = () => {
   const getSecurityInfo = async (userId: number): Promise<SecurityInfo> => {
     const response = (await $civicApi(
       `/api/v1/users/${userId}/security-info`
-    )) as ApiResponse;
+    )) as ApiResponse<{ securityInfo: SecurityInfo }>;
     return response.data.securityInfo;
   };
 
@@ -56,7 +56,7 @@ export const useSecurity = () => {
         method: 'POST',
         body: passwordData,
       }
-    )) as ApiResponse;
+    )) as ApiResponse<SecurityResponse>;
     return response.data;
   };
 
@@ -70,7 +70,7 @@ export const useSecurity = () => {
     const response = (await $civicApi(`/api/v1/users/${userId}/set-password`, {
       method: 'POST',
       body: { newPassword },
-    })) as ApiResponse;
+    })) as ApiResponse<SecurityResponse>;
     return response.data;
   };
 
@@ -87,7 +87,7 @@ export const useSecurity = () => {
         method: 'POST',
         body: emailData,
       }
-    )) as ApiResponse;
+    )) as ApiResponse<SecurityResponse>;
     return response.data;
   };
 
@@ -100,7 +100,7 @@ export const useSecurity = () => {
     const response = (await $civicApi('/api/v1/users/verify-email-change', {
       method: 'POST',
       body: { token },
-    })) as ApiResponse;
+    })) as ApiResponse<SecurityResponse>;
     return response.data;
   };
 
@@ -115,7 +115,7 @@ export const useSecurity = () => {
       {
         method: 'POST',
       }
-    )) as ApiResponse;
+    )) as ApiResponse<SecurityResponse>;
     return response.data;
   };
 
@@ -179,7 +179,7 @@ export const useSecurity = () => {
       {
         method: 'POST',
       }
-    )) as ApiResponse;
+    )) as ApiResponse<SecurityResponse>;
     return response.data;
   };
 
@@ -192,7 +192,7 @@ export const useSecurity = () => {
     const response = (await $civicApi('/api/v1/users/verify-current-email', {
       method: 'POST',
       body: { token },
-    })) as ApiResponse;
+    })) as ApiResponse<SecurityResponse>;
     return response.data;
   };
 

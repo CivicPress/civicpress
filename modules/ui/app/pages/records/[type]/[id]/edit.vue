@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
 import type { ApiResponse } from '~/utils/api-response';
+import type { RecordResponse } from '~/types/api-responses';
 import RecordForm from '~/components/RecordForm.vue';
 import FormSkeleton from '~/components/FormSkeleton.vue';
 
@@ -46,28 +47,34 @@ const fetchRecord = async () => {
     // Add ?edit=true to get draft version if it exists (for authenticated users with edit permission)
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/records/${id}?edit=true`
-    )) as ApiResponse;
+    )) as ApiResponse<
+      RecordResponse & { created?: string; updated?: string }
+    >;
 
     if (response && response.success && response.data) {
       const apiRecord = response.data;
 
       // Transform API response to match CivicRecord interface
-      // Note: Drafts return markdownBody, published records return content
+      // Note: Drafts return markdownBody, published records return content.
+      // CivicRecord uses narrow literal-union enums for type/status; cast at
+      // the boundary since the API returns broad `string`.
       record.value = {
         id: apiRecord.id,
         title: apiRecord.title,
-        type: apiRecord.type, // This should be the updated type from draft if it exists
+        type: apiRecord.type as CivicRecord['type'],
         content: apiRecord.markdownBody || apiRecord.content || '',
-        status: apiRecord.status,
-        path: apiRecord.path,
-        author: apiRecord.author,
-        created_at: apiRecord.created || apiRecord.created_at,
-        updated_at: apiRecord.updated || apiRecord.updated_at,
-        geography: apiRecord.geography,
-        attachedFiles: apiRecord.attachedFiles || [],
-        linkedRecords: apiRecord.linkedRecords || [],
-        metadata: apiRecord.metadata || {},
-      };
+        status: (apiRecord.status || 'draft') as CivicRecord['status'],
+        path: apiRecord.path || '',
+        author: apiRecord.author || '',
+        created_at: apiRecord.created || apiRecord.created_at || '',
+        updated_at: apiRecord.updated || apiRecord.updated_at || '',
+        geography: apiRecord.geography as CivicRecord['geography'],
+        attachedFiles: (apiRecord.attachedFiles ||
+          []) as CivicRecord['attachedFiles'],
+        linkedRecords: (apiRecord.linkedRecords ||
+          []) as CivicRecord['linkedRecords'],
+        metadata: (apiRecord.metadata || {}) as CivicRecord['metadata'],
+      } as CivicRecord;
 
       // If the record is a draft (has isDraft flag or markdownBody), mark as having saved changes
       // This means we're editing a draft, so breadcrumbs should show "All Drafts"
@@ -77,8 +84,8 @@ const fetchRecord = async () => {
     } else {
       throw new Error(t('records.failedToLoadRecord'));
     }
-  } catch (err: any) {
-    const errorMessage = err.message || t('records.failedToLoadRecord');
+  } catch (err: unknown) {
+    const errorMessage = (err instanceof Error ? err.message : '') || t('records.failedToLoadRecord');
     error.value = errorMessage;
     toast.add({
       title: t('common.error'),
@@ -144,8 +151,8 @@ const handleDelete = async (recordId: string) => {
     } else {
       throw new Error(t('records.failedToDeleteRecord'));
     }
-  } catch (err: any) {
-    const errorMessage = err.message || t('records.failedToDeleteRecord');
+  } catch (err: unknown) {
+    const errorMessage = (err instanceof Error ? err.message : '') || t('records.failedToDeleteRecord');
     error.value = errorMessage;
     toast.add({
       title: t('common.error'),

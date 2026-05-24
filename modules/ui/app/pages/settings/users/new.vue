@@ -48,9 +48,9 @@ const handleSubmit = async (userData: any) => {
     } else {
       error.value = extractErrorMessage(response) || t('settings.users.failedToCreateUser');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error creating user:', err);
-    error.value = err.message || t('settings.users.failedToCreateUser');
+    error.value = (err instanceof Error ? err.message : '') || t('settings.users.failedToCreateUser');
   } finally {
     saving.value = false;
   }

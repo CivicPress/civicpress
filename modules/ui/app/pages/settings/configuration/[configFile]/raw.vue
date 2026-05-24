@@ -141,8 +141,8 @@ const load = async () => {
     } else {
       throw new Error('Unexpected response');
     }
-  } catch (e: any) {
-    error.value = e.message || 'Failed to load raw YAML';
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+    error.value = (e instanceof Error ? e.message : '') || 'Failed to load raw YAML';
   } finally {
     loading.value = false;
   }
@@ -156,7 +156,7 @@ const save = async () => {
     await useNuxtApp().$civicApi(`/api/v1/config/raw/${configFile.value}`, {
       method: 'PUT',
       body: yaml.value,
-      headers: { 'Content-Type': 'text/yaml' } as any,
+      headers: { 'Content-Type': 'text/yaml' },
     });
     original.value = yaml.value;
     useToast().add({
@@ -164,8 +164,8 @@ const save = async () => {
       description: 'Configuration saved',
       color: 'primary',
     });
-  } catch (e: any) {
-    error.value = e.message || 'Failed to save YAML';
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+    error.value = (e instanceof Error ? e.message : '') || 'Failed to save YAML';
   } finally {
     saving.value = false;
   }
@@ -179,8 +179,8 @@ const resetToDefaults = async () => {
       method: 'POST',
     });
     await load();
-  } catch (e: any) {
-    error.value = e.message || 'Failed to reset to defaults';
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+    error.value = (e instanceof Error ? e.message : '') || 'Failed to reset to defaults';
   } finally {
     resetting.value = false;
   }
@@ -197,9 +197,9 @@ const validate = async () => {
       {
         method: 'POST',
         body: yaml.value,
-        headers: { 'Content-Type': 'text/yaml' } as any,
+        headers: { 'Content-Type': 'text/yaml' },
       }
-    )) as ApiResponse;
+    )) as ApiResponse<{ valid: boolean; errors: string[] }>;
     validation.value = res?.data || null;
     if (validation.value) {
       const isValid = !!validation.value.valid;
@@ -220,8 +220,8 @@ const validate = async () => {
         color: 'error',
       });
     }
-  } catch (e: any) {
-    error.value = e.message || 'Failed to validate configuration';
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+    error.value = (e instanceof Error ? e.message : '') || 'Failed to validate configuration';
     // Extract validation errors from response if available
     if (e?.data?.data?.errors && Array.isArray(e.data.data.errors)) {
       validation.value = e.data.data;

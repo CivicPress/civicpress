@@ -107,7 +107,7 @@ export function useTemplates() {
       } else {
         throw new Error('Invalid response from API');
       }
-    } catch (err: any) {
+    } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
       const errorMessage =
         err?.data?.error?.message ||
         err?.message ||
@@ -141,7 +141,7 @@ export function useTemplates() {
       } else {
         throw new Error('Template not found');
       }
-    } catch (err: any) {
+    } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
       const errorMessage =
         err?.data?.error?.message || err?.message || 'Failed to fetch template';
       error.value = errorMessage;
@@ -181,7 +181,7 @@ export function useTemplates() {
       } else {
         throw new Error('Failed to preview template');
       }
-    } catch (err: any) {
+    } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
       const errorMessage =
         err?.data?.error?.message ||
         err?.message ||

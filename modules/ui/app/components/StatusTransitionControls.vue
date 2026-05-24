@@ -112,7 +112,7 @@ onMounted(async () => {
     } catch (e) {
       // Ignore; will fall back to status list
     }
-  } catch (err: any) {
+  } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     // handled via statusesError
   }
 });
@@ -170,7 +170,7 @@ const confirmChange = async () => {
       inlineError.value =
         extractErrorMessage(response) || 'Failed to change status';
     }
-  } catch (err: any) {
+  } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     inlineError.value = err?.message || 'Failed to change status';
   } finally {
     saving.value = false;

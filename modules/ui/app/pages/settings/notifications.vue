@@ -139,7 +139,7 @@ async function sendTest() {
         res?.error || t('settings.notifications.failedToSendTestEmail')
       );
     }
-  } catch (e: any) {
+  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
     useToast().add({
       title: t('settings.notifications.failedToSendTestEmail'),
       description: e?.message || String(e),

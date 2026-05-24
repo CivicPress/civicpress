@@ -215,14 +215,14 @@ const fetchConfigurations = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/config/list'
-    )) as ApiResponse;
+    )) as ApiResponse<unknown[]>;
     if (response.success) {
       configurations.value = response.data || [];
     } else {
       error.value = extractErrorMessage(response) || 'Failed to load configurations';
     }
-  } catch (err: any) {
-    error.value = err.message || 'Failed to load configurations';
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || 'Failed to load configurations';
   } finally {
     loading.value = false;
   }

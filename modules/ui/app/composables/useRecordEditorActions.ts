@@ -1,5 +1,9 @@
 import type { Ref } from 'vue';
 import type { ApiResponse } from '~/utils/api-response';
+import type {
+  RecordResponse,
+  RecordExportResponse,
+} from '~/types/api-responses';
 import type { useAutosave } from '~/composables/useAutosave';
 import type { useRecordLock } from '~/composables/useRecordLock';
 import {
@@ -146,7 +150,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
             linkedRecords: form.linkedRecords,
             linkedGeographyFiles: form.linkedGeographyFiles,
           },
-        })) as ApiResponse;
+        })) as ApiResponse<RecordResponse>;
 
         if (response?.success && response?.data) {
           form.id = response.data.id;
@@ -188,7 +192,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           // Use ?edit=true to fetch the draft version (not the published version)
           const refreshResponse = (await $civicApi(
             `/api/v1/records/${form.id}?edit=true`
-          )) as ApiResponse;
+          )) as ApiResponse<RecordResponse>;
           if (refreshResponse?.success && refreshResponse?.data) {
             const data = refreshResponse.data;
             // Store current workflowState before updating (to preserve if API doesn't return it)
@@ -257,10 +261,10 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
       ) {
         sidebarRef.value.refreshYaml();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.add({
         title: 'Save failed',
-        description: err.message || 'Failed to save draft',
+        description: (err instanceof Error ? err.message : '') || 'Failed to save draft',
         color: 'error',
       });
       autosaveStatus.value = 'error';
@@ -284,7 +288,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         body: {
           status: targetStatus || form.status,
         },
-      })) as ApiResponse;
+      })) as ApiResponse<RecordResponse>;
 
       if (response?.success) {
         toast.add({
@@ -303,10 +307,10 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         // Navigate to view page
         navigateTo(`/records/${form.type}/${form.id}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.add({
         title: 'Publish failed',
-        description: err.message || 'Failed to publish record',
+        description: (err instanceof Error ? err.message : '') || 'Failed to publish record',
         color: 'error',
       });
     }
@@ -326,7 +330,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     try {
       const response = (await $civicApi(`/api/v1/records/${form.id}/draft`, {
         method: 'DELETE',
-      })) as ApiResponse;
+      })) as ApiResponse<RecordResponse>;
 
       if (response?.success) {
         toast.add({
@@ -339,9 +343,9 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         // and will no longer appear in the drafts list
         navigateTo('/records/drafts');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage =
-        err.message || t('records.editor.failedToDeleteUnpublishedChanges');
+        (err instanceof Error ? err.message : '') || t('records.editor.failedToDeleteUnpublishedChanges');
       toast.add({
         title: t('common.error'),
         description: errorMessage,
@@ -360,7 +364,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         body: {
           status: 'draft',
         },
-      })) as ApiResponse;
+      })) as ApiResponse<RecordResponse>;
 
       if (response?.success) {
         toast.add({
@@ -382,7 +386,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           try {
             const refreshResponse = (await $civicApi(
               `/api/v1/records/${form.id}?edit=true`
-            )) as ApiResponse;
+            )) as ApiResponse<RecordResponse>;
             if (refreshResponse?.success && refreshResponse?.data) {
               const data = refreshResponse.data;
               form.status = data.status;
@@ -393,10 +397,10 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           }
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.add({
         title: 'Unpublish failed',
-        description: err.message || 'Failed to unpublish record',
+        description: (err instanceof Error ? err.message : '') || 'Failed to unpublish record',
         color: 'error',
       });
     }
@@ -412,7 +416,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
         body: {
           status: 'archived',
         },
-      })) as ApiResponse;
+      })) as ApiResponse<RecordResponse>;
 
       if (response?.success) {
         toast.add({
@@ -428,7 +432,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           try {
             const refreshResponse = (await $civicApi(
               `/api/v1/records/${form.id}`
-            )) as ApiResponse;
+            )) as ApiResponse<RecordResponse>;
             if (refreshResponse?.success && refreshResponse?.data) {
               const data = refreshResponse.data;
               form.status = data.status;
@@ -439,10 +443,10 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           }
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.add({
         title: 'Archive failed',
-        description: err.message || 'Failed to archive record',
+        description: (err instanceof Error ? err.message : '') || 'Failed to archive record',
         color: 'error',
       });
     }
@@ -461,7 +465,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
 
     try {
       // Fetch the current record
-      const response = (await $civicApi(`/api/v1/records/${form.id}`)) as ApiResponse;
+      const response = (await $civicApi(`/api/v1/records/${form.id}`)) as ApiResponse<RecordResponse>;
 
       if (response?.success && response?.data) {
         const record = response.data;
@@ -491,7 +495,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
             linkedRecords: record.linkedRecords || [],
             linkedGeographyFiles: record.linkedGeographyFiles || [],
           },
-        })) as ApiResponse;
+        })) as ApiResponse<RecordResponse>;
 
         if (duplicateResponse?.success && duplicateResponse?.data) {
           toast.add({
@@ -506,10 +510,10 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           );
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.add({
         title: 'Duplicate failed',
-        description: err.message || 'Failed to duplicate record',
+        description: (err instanceof Error ? err.message : '') || 'Failed to duplicate record',
         color: 'error',
       });
     }
@@ -522,7 +526,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     try {
       const response = (await $civicApi(`/api/v1/records/${form.id}/export`, {
         method: 'GET',
-      })) as ApiResponse;
+      })) as ApiResponse<RecordExportResponse>;
 
       if (response?.success && response?.data?.markdown) {
         // Create a blob and download
@@ -544,12 +548,12 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           color: 'primary',
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Fallback: construct markdown manually if API doesn't support export
       try {
         const fullResponse = (await $civicApi(
           `/api/v1/records/${form.id}/frontmatter`
-        )) as ApiResponse;
+        )) as unknown as string;
         const frontmatter = fullResponse || '';
         const markdown = `---\n${frontmatter}\n---\n\n${form.markdownBody}`;
 

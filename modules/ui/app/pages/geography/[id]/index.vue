@@ -412,7 +412,7 @@ const loadGeographyFile = async () => {
     const id = route.params.id as string;
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography/${id}`
-    )) as ApiResponse;
+    )) as ApiResponse<GeographyFile>;
 
     if (response.success) {
       geographyFile.value = response.data;
@@ -441,7 +441,7 @@ const loadRawContent = async () => {
     // In the future, we could fetch the raw file content
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography/${geographyFile.value.id}`
-    )) as ApiResponse;
+    )) as ApiResponse<{ content?: string }>;
     if (response.success && response.data.content) {
       rawContent.value = response.data.content;
     }
