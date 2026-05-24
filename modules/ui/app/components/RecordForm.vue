@@ -39,7 +39,7 @@ const props = withDefaults(defineProps<Props>(), {
 // Emits
 const emit = defineEmits<{
   delete: [recordId: string];
-  saved: [recordData: any];
+  saved: [recordData: Record<string, unknown>];
 }>();
 
 // Composables
@@ -63,7 +63,9 @@ const form = reactive({
   workflowState: 'draft', // Internal editorial status (DB-only, never in YAML)
   tags: [] as string[],
   description: '',
-  geography: undefined as any,
+  geography: undefined as
+    | { srid?: number; zone_ref?: string; bbox?: number[]; center?: { lon: number; lat: number } }
+    | undefined,
   attachedFiles: [] as Array<{
     id: string;
     path: string;
@@ -258,34 +260,48 @@ onMounted(async () => {
       console.error('Failed to load record:', err);
       // Fallback to props.record if API fails
       if (props.record) {
-        form.id = props.record.id;
-        form.type = props.record.type;
-        form.status = props.record.status; // Legal status (stored in YAML + DB)
+        // CivicRecord doesn't model workflowState / geography / attachedFiles /
+        // linkedRecords / linkedGeographyFiles directly; the record is a loose
+        // server payload here. Narrow once via a structural type.
+        const r = props.record as typeof props.record & {
+          workflowState?: string;
+          geography?: typeof form.geography;
+          attachedFiles?: typeof form.attachedFiles;
+          linkedRecords?: typeof form.linkedRecords;
+          linkedGeographyFiles?: typeof form.linkedGeographyFiles;
+        };
+        form.id = r.id;
+        form.type = r.type;
+        form.status = r.status; // Legal status (stored in YAML + DB)
         // Initialize workflowState from props, default to 'draft' only if not provided
         form.workflowState =
-          (props.record as any).workflowState !== undefined &&
-          (props.record as any).workflowState !== null
-            ? (props.record as any).workflowState
+          r.workflowState !== undefined && r.workflowState !== null
+            ? r.workflowState
             : 'draft'; // Internal editorial status (DB-only, never in YAML)
 
         // Extract title from markdown content if first line is H1, otherwise use props.record.title
-        const rawContent = props.record.content || '';
+        const rawContent = r.content || '';
         const extractedTitle = extractTitleFromMarkdown(rawContent);
-        form.title = extractedTitle || props.record.title || '';
+        form.title = extractedTitle || r.title || '';
         form.markdownBody = extractedTitle
           ? stripFirstLineFromMarkdown(rawContent)
           : rawContent;
-        form.description = (props.record.metadata as any)?.description || '';
-        form.tags = props.record.metadata?.tags || [];
-        form.geography = (props.record as any).geography;
-        form.attachedFiles = (props.record as any).attachedFiles || [];
-        form.linkedRecords = (props.record as any).linkedRecords || [];
-        form.linkedGeographyFiles =
-          (props.record as any).linkedGeographyFiles || [];
-        const metadata = props.record.metadata || {};
+        form.description =
+          (typeof r.metadata?.description === 'string'
+            ? r.metadata.description
+            : '') || '';
+        form.tags = r.metadata?.tags || [];
+        form.geography = r.geography;
+        form.attachedFiles = r.attachedFiles || [];
+        form.linkedRecords = r.linkedRecords || [];
+        form.linkedGeographyFiles = r.linkedGeographyFiles || [];
+        const metadata = r.metadata || {};
         form.metadata = {
           tags: metadata.tags || [],
-          description: (metadata as any).description || '',
+          description:
+            (typeof metadata.description === 'string'
+              ? metadata.description
+              : '') || '',
         };
 
         // Store metadata for YAML display

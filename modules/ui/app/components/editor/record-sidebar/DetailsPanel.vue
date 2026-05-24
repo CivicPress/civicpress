@@ -1,4 +1,14 @@
 <script setup lang="ts">
+/**
+ * USelect's v-model contract differs slightly across the three selects
+ * here (each option type has different optional fields — color, icon,
+ * description) — TS picks distinct anonymous types for each that don't
+ * unify under a single SelectOption interface. The proxies bridge prop
+ * ↔ emit through `any` to avoid a per-select-shape type each. Runtime
+ * is identical; the cost is per-form type fidelity, which the parent
+ * (RecordSidebar) already enforces.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface Props {
   selectedType: any;
   recordTypeOptions: any[];
@@ -20,6 +30,7 @@ const emit = defineEmits<{
   'update:selectedWorkflowState': [value: any];
   'update:tags': [value: string[]];
 }>();
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 const { t } = useI18n();
 

@@ -40,7 +40,7 @@
       >
         <GeographyMap
           :geography-data="allGeographyData"
-          :bounds="combinedBounds as any"
+          :bounds="combinedBounds as unknown as BoundsObject | undefined"
           :interactive="true"
           height="100%"
         />
@@ -61,7 +61,7 @@
                 {{ link.name }}
               </h4>
               <UBadge
-                :color="getCategoryColor(link.category || '') as any"
+                :color="getCategoryColor(link.category || '')"
                 variant="soft"
               >
                 {{ link.category }}
@@ -101,9 +101,9 @@
                 <UIcon name="i-lucide-calendar" class="w-3 h-3" />
                 {{ link.created_at ? formatDate(link.created_at) : 'Unknown' }}
               </span>
-              <span v-if="(link as any).stats" class="flex items-center gap-1">
+              <span v-if="link.stats" class="flex items-center gap-1">
                 <UIcon name="i-lucide-map-pin" class="w-3 h-3" />
-                {{ (link as any).stats.featureCount }} features
+                {{ link.stats.featureCount }} features
               </span>
             </div>
           </div>
@@ -114,7 +114,7 @@
               size="sm"
               color="primary"
               variant="outline"
-              @click="viewFullMap(link as any)"
+              @click="viewFullMap(link)"
             >
               <UIcon name="i-lucide-map" class="w-4 h-4" />
               Full Map
@@ -152,6 +152,35 @@ import type { ApiResponse } from '~/utils/api-response';
 import type { GeographyFile } from '~/types/geography';
 import GeographyMap from './GeographyMap.vue';
 
+/** Bounds-as-object shape (alternative to the [minLon, minLat, maxLon, maxLat] array). */
+interface BoundsObject {
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}
+
+/** GeoJSON-ish feature collection the map preview consumes. */
+interface GeographyData {
+  type?: string;
+  features?: unknown[];
+}
+
+/** Stats overlay shown next to each linked-file row. */
+interface LinkStats {
+  featureCount?: number;
+}
+
+/** Linked file merged with its full GeographyFile record. */
+type LinkedFile = {
+  id: string;
+  name: string;
+  description?: string;
+} & Partial<GeographyFile> & {
+    geographyData?: GeographyData;
+    stats?: LinkStats;
+  };
+
 // Composables
 const { t } = useI18n();
 
@@ -183,7 +212,7 @@ const error = ref<string | null>(null);
 const geographyFiles = ref<GeographyFile[]>([]);
 
 // Computed
-const linkedFiles = computed(() => {
+const linkedFiles = computed<LinkedFile[]>(() => {
   return props.linkedGeographyFiles.map((link) => {
     const geographyFile = geographyFiles.value.find(
       (file) => file.id === link.id
@@ -191,21 +220,19 @@ const linkedFiles = computed(() => {
     return {
       ...link,
       ...geographyFile, // This includes geographyData, bounds, stats, etc.
-    };
+    } as LinkedFile;
   });
 });
 
 // Combined map data for multiple files
 const allGeographyData = computed(() => {
-  const filesWithData = linkedFiles.value.filter(
-    (file) => (file as any).geographyData
-  );
+  const filesWithData = linkedFiles.value.filter((file) => file.geographyData);
   if (filesWithData.length === 0) return null;
 
   // Combine all GeoJSON features into a single FeatureCollection
-  const allFeatures: any[] = [];
+  const allFeatures: unknown[] = [];
   filesWithData.forEach((file) => {
-    const geoData = (file as any).geographyData;
+    const geoData = file.geographyData;
     if (geoData && geoData.features) {
       allFeatures.push(...geoData.features);
     }
@@ -235,10 +262,11 @@ const combinedBounds = computed(() => {
       maxLon = Math.max(maxLon, bounds[2]);
       maxLat = Math.max(maxLat, bounds[3]);
     } else if (bounds && typeof bounds === 'object' && 'minLon' in bounds) {
-      minLon = Math.min(minLon, (bounds as any).minLon);
-      minLat = Math.min(minLat, (bounds as any).minLat);
-      maxLon = Math.max(maxLon, (bounds as any).maxLon);
-      maxLat = Math.max(maxLat, (bounds as any).maxLat);
+      const b = bounds as BoundsObject;
+      minLon = Math.min(minLon, b.minLon);
+      minLat = Math.min(minLat, b.minLat);
+      maxLon = Math.max(maxLon, b.maxLon);
+      maxLat = Math.max(maxLat, b.maxLat);
     }
   });
 
@@ -246,8 +274,9 @@ const combinedBounds = computed(() => {
 });
 
 // Methods
-const getCategoryColor = (category: string): string => {
-  const colors: Record<string, string> = {
+type UiBadgeColor = 'error' | 'primary' | 'neutral';
+const getCategoryColor = (category: string): UiBadgeColor => {
+  const colors: Record<string, UiBadgeColor> = {
     Reference: 'primary',
     Financial: 'primary',
     Legal: 'primary',
@@ -262,12 +291,12 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
 };
 
-const viewFile = (file: GeographyFile) => {
+const viewFile = (file: { id: string }) => {
   // Navigate to the geography file view page
   navigateTo(`/geography/${file.id}`);
 };
 
-const viewFullMap = (file: GeographyFile) => {
+const viewFullMap = (file: { id: string }) => {
   // Navigate to the geography file view page
   navigateTo(`/geography/${file.id}`);
 };

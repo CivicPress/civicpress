@@ -155,14 +155,34 @@
 
 <script setup lang="ts">
 import { getFieldMeta } from '~/utils/config';
+
+/**
+ * Schema for a configuration field as returned by the configuration service.
+ * The shape is loose because configs are user-supplied YAML with arbitrary
+ * `options`, `hint`, `placeholder` keys; only `type` is load-bearing.
+ */
+interface ConfigField {
+  type?: string;
+  placeholder?: string;
+  hint?: string;
+  options?: Array<{ label?: string; value: string | number | boolean }>;
+  [key: string]: unknown;
+}
+
 interface Props {
   fieldKey: string;
-  field: any;
+  field: ConfigField;
+  // Loose: configs are dynamic YAML; the template binds `value` to many
+  // Nuxt UI inputs (UInput, UTextarea, USwitch, USelect, ...) each
+  // expecting a different `AcceptableValue` type. `unknown` would force
+  // a per-binding cast for no real safety win.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see note
   value: any;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors `value` typing
   update: [key: string, value: any];
 }>();
 
@@ -178,7 +198,7 @@ const fieldLabel = computed(() => {
 const meta = computed(() => getFieldMeta(props.field));
 
 const fieldType = computed(() => {
-  const f: any = props.field || {};
+  const f = props.field || {};
   if (!f.type) return 'string';
 
   const type = f.type;
@@ -190,7 +210,7 @@ const fieldType = computed(() => {
 });
 
 // Helper functions
-const getPlaceholder = (field: any) => {
+const getPlaceholder = (field: ConfigField) => {
   if (field.placeholder) return field.placeholder;
 
   // Generate placeholder based on field type
@@ -208,7 +228,7 @@ const getPlaceholder = (field: any) => {
   }
 };
 
-const getInputType = (field: any) => {
+const getInputType = (field: ConfigField) => {
   if (field.type && field.type.startsWith('string:')) {
     const subtype = field.type.split(':')[1];
     switch (subtype) {
@@ -225,17 +245,17 @@ const getInputType = (field: any) => {
   return 'text';
 };
 
-const getSelectOptions = (field: any) => {
+const getSelectOptions = (field: ConfigField) => {
   if (field.options && Array.isArray(field.options)) {
-    return field.options.map((option: any) => ({
-      label: option.label || option.value,
+    return field.options.map((option) => ({
+      label: option.label || String(option.value),
       value: option.value,
     }));
   }
   return [];
 };
 
-const getFieldHint = (field: any) => {
+const getFieldHint = (field: ConfigField) => {
   if (field.hint) return field.hint;
 
   // Generate hints based on field type
@@ -252,6 +272,7 @@ const getFieldHint = (field: any) => {
 };
 
 // Event handlers
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors `value` typing
 const updateValue = (newValue: any) => {
   emit('update', props.fieldKey, newValue);
 };
