@@ -67,30 +67,10 @@ export function registerWriteRoutes(
         }
 
         // Extract username correctly - handle case where user.username might be the full object
-        let username = 'unknown';
-        if (typeof user.username === 'string') {
-          username = user.username;
-        } else if (
-          typeof user.username === 'object' &&
-          user.username !== null
-        ) {
-          // If user.username is an object, try to extract the username from it
-          const usernameObj = user.username as any;
-          if (typeof usernameObj.username === 'string') {
-            username = usernameObj.username;
-          } else if (typeof usernameObj === 'object' && usernameObj !== null) {
-            // Try to find any string property that might be the username
-            for (const [key, value] of Object.entries(usernameObj)) {
-              if (
-                typeof value === 'string' &&
-                (key === 'username' || key === 'name' || key === 'id')
-              ) {
-                username = value;
-                break;
-              }
-            }
-          }
-        }
+        // AuthUser.username is typed as string; the previous code defensively
+        // unwrapped an object-shaped username from legacy middleware paths. The
+        // shape is now load-bearing on AuthUser, so this is a one-line fallback.
+        const username = user.username || 'unknown';
 
         // Ensure user object has correct structure
         const cleanUser = {
@@ -126,14 +106,14 @@ export function registerWriteRoutes(
           source: 'api',
           actor: {
             id: user.id,
-            username: (user as any).username,
+            username: user.username,
             role: user.role,
           },
           action: 'records:create',
           target: {
             type: 'record',
-            id: (record as any)?.id,
-            name: (record as any)?.title,
+            id: record.id,
+            name: record.title,
           },
           outcome: 'success',
         });
@@ -208,7 +188,7 @@ export function registerWriteRoutes(
           source: 'api',
           actor: {
             id: user.id,
-            username: (user as any).username,
+            username: user.username,
             role: user.role,
           },
           action: 'records:update',
@@ -288,7 +268,7 @@ export function registerWriteRoutes(
             source: 'api',
             actor: {
               id: user.id,
-              username: (user as any).username,
+              username: user.username,
               role: user.role,
             },
             action: 'records:delete',

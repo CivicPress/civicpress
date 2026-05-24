@@ -27,6 +27,7 @@ import {
 import { requireDiagnosticAuth } from '../middleware/diagnostic-auth.js';
 import { validateDiagnosticParams } from '../middleware/diagnostic-validation.js';
 import { sanitizeDiagnosticReport } from '@civicpress/core';
+import type { DiagnosticReport } from '@civicpress/core';
 
 const logger = new Logger();
 
@@ -117,7 +118,7 @@ export function createDiagnoseRouter() {
       };
 
       // Run diagnostics
-      let result: any;
+      let result: DiagnosticReport;
       if (component) {
         const componentResult = await diagnosticService.runComponent(
           component as string,
@@ -131,17 +132,15 @@ export function createDiagnoseRouter() {
           components: [componentResult],
           summary: {
             totalChecks: componentResult.checks.length,
-            passed: componentResult.checks.filter(
-              (c: any) => c.status === 'pass'
-            ).length,
+            passed: componentResult.checks.filter((c) => c.status === 'pass')
+              .length,
             warnings: componentResult.checks.filter(
-              (c: any) => c.status === 'warning'
+              (c) => c.status === 'warning'
             ).length,
-            errors: componentResult.checks.filter(
-              (c: any) => c.status === 'error'
-            ).length,
+            errors: componentResult.checks.filter((c) => c.status === 'error')
+              .length,
             skipped: componentResult.checks.filter(
-              (c: any) => c.status === 'skipped'
+              (c) => c.status === 'skipped'
             ).length,
           },
           issues: componentResult.issues,

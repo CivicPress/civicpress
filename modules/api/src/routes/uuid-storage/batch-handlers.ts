@@ -38,7 +38,9 @@ export function registerBatchRoutes(router: Router): void {
       try {
         const storageService = await getStorageService(req);
         // Type assertion for multer files array - multer provides Express.Multer.File[] type
-        const files = (Array.isArray(req.files) ? req.files : []) as any[];
+        const files: Express.Multer.File[] = Array.isArray(req.files)
+          ? req.files
+          : [];
         const folder = req.body.folder as string;
         const userId = req.user?.id?.toString();
 
@@ -52,7 +54,7 @@ export function registerBatchRoutes(router: Router): void {
         }
 
         // Convert multer files to MulterFile format
-        const multerFiles: MulterFile[] = files.map((file: any) => ({
+        const multerFiles: MulterFile[] = files.map((file) => ({
           fieldname: file.fieldname,
           originalname: file.originalname,
           encoding: file.encoding,

@@ -80,7 +80,7 @@ export function registerStatusRoutes(
             source: 'api',
             actor: {
               id: user.id,
-              username: (user as any).username,
+              username: user.username,
               role: user.role,
             },
             action: 'records:status',
@@ -140,8 +140,8 @@ export function registerStatusRoutes(
       }
 
       try {
-        const { id } = req.params as any;
-        const user = req.user as any;
+        const { id } = req.params;
+        const user = req.user;
 
         if (!user) {
           throw new HttpError(401, 'User authentication required');

@@ -181,10 +181,10 @@ export function registerAuthenticationRoutes(router: Router): void {
       );
     } catch (error) {
       // Set 401 status code for authentication failures
-      const authError = new Error(
+      const authError = new HttpError(
+        401,
         error instanceof Error ? error.message : 'Password authentication failed'
       );
-      (authError as any).statusCode = 401;
       handleApiError(
         'password_auth',
         authError,

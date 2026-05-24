@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { userCan } from '@civicpress/core';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
@@ -23,7 +23,7 @@ export function registerSingleFileRoutes(router: Router): void {
     upload.single('file'),
     body('folder').isString().notEmpty(),
     body('description').optional().isString(),
-    (error: any, req: AuthenticatedRequest, res: Response, next: any) => {
+    (error: Error, req: AuthenticatedRequest, res: Response, next: NextFunction) => {
       if (error) {
         return handleStorageError(
           'upload_file',
@@ -190,10 +190,7 @@ export function registerSingleFileRoutes(router: Router): void {
             return;
           }
         } else if (!isPublicFolder) {
-          const hasPermission = await userCan(req.user, 'storage:download', {
-            action: 'download',
-            folder: fileInfo.folder,
-          } as any);
+          const hasPermission = await userCan(req.user, 'storage:download', { action: 'view' });
 
           if (!hasPermission) {
             res.status(403).json({
@@ -306,10 +303,7 @@ export function registerSingleFileRoutes(router: Router): void {
             return;
           }
         } else if (!isPublicFolder) {
-          const hasPermission = await userCan(req.user, 'storage:download', {
-            action: 'download',
-            folder: fileInfo.folder,
-          } as any);
+          const hasPermission = await userCan(req.user, 'storage:download', { action: 'view' });
 
           if (!hasPermission) {
             res.status(403).json({

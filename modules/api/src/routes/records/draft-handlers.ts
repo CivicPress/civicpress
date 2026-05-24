@@ -127,7 +127,7 @@ export function registerDraftRoutes(
           source: 'api',
           actor: {
             id: user.id,
-            username: (user as any).username,
+            username: user.username,
             role: user.role,
           },
           action: 'records:delete_draft',
@@ -231,7 +231,7 @@ export function registerDraftRoutes(
           source: 'api',
           actor: {
             id: user.id,
-            username: (user as any).username,
+            username: user.username,
             role: user.role,
           },
           action: 'records:save_draft',
@@ -293,7 +293,7 @@ export function registerDraftRoutes(
           source: 'api',
           actor: {
             id: user.id,
-            username: (user as any).username,
+            username: user.username,
             role: user.role,
           },
           action: 'records:publish',

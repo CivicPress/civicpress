@@ -5,7 +5,7 @@ const logger = new Logger();
 
 export interface StorageSuccessResponse {
   success: boolean;
-  data: any;
+  data: unknown;
   message?: string;
   timestamp: string;
 }
@@ -15,7 +15,7 @@ export interface StorageErrorResponse {
   error: {
     message: string;
     code: string;
-    details?: any;
+    details?: unknown;
   };
   timestamp: string;
 }
@@ -25,7 +25,7 @@ export interface StorageErrorResponse {
  */
 export const handleStorageSuccess = (
   operation: string,
-  data: any,
+  data: unknown,
   req: Request,
   res: Response,
   message?: string
@@ -118,7 +118,12 @@ export const handleStorageError = (
  */
 export const handleStorageValidationError = (
   operation: string,
-  errors: any[],
+  errors: Array<{
+    msg: string;
+    param?: string;
+    path?: string;
+    value?: unknown;
+  }>,
   req: Request,
   res: Response
 ): Response => {

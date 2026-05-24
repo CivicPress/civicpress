@@ -14,6 +14,7 @@ import {
   getGeographyPreset,
   applyGeographyPreset,
 } from '@civicpress/core';
+import type { GeographyCategory, GeographyFileType } from '@civicpress/core';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import {
   handleApiError,
@@ -29,7 +30,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   // Helper function to handle API responses
   const handleSuccess = (
     operation: string,
-    data: any,
+    data: unknown,
     res: Response,
     statusCode: number = 200
   ) => {
@@ -42,7 +43,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
   const handleError = (
     operation: string,
-    error: any,
+    error: unknown,
     req: Request,
     res: Response,
     statusCode: number = 500
@@ -56,7 +57,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
   const handleValidationError = (
     operation: string,
-    errors: any[],
+    errors: unknown[],
     res: Response
   ) => {
     res.status(400).json({
@@ -86,8 +87,8 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         const { category, type, page = 1, limit = 10 } = req.query;
 
         const result = await geographyManager.listGeographyFiles(
-          category as any,
-          type as any,
+          category as GeographyCategory | undefined,
+          type as GeographyFileType | undefined,
           parseInt(page as string),
           parseInt(limit as string)
         );
@@ -152,7 +153,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           req.user
         );
 
-        logApiSuccess('create_geography', req as any, {
+        logApiSuccess('create_geography', req, {
           geographyFileId: geographyFile.id,
         });
 
@@ -457,9 +458,11 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         // Get all records and filter those that link to this geography file
         const allRecords = await recordsService.listRecords({ limit: 1000 });
-        const linkedRecords = allRecords.records.filter((record: any) =>
-          record.linkedGeographyFiles?.some((link: any) => link.id === id)
-        );
+        const linkedRecords = allRecords.records.filter((record) => {
+          const links = (record as { linkedGeographyFiles?: Array<{ id: string }> })
+            .linkedGeographyFiles;
+          return links?.some((link) => link.id === id);
+        });
 
         handleSuccess('get_linked_records', linkedRecords, res);
       } catch (error) {

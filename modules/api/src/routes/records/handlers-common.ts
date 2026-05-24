@@ -8,7 +8,7 @@ export const audit = new AuditLogger();
 // Custom validation error handler for records API
 export function handleRecordsValidationError(
   operation: string,
-  errors: any[],
+  errors: unknown[],
   req: Request,
   res: Response
 ): void {

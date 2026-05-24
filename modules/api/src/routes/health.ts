@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Logger } from '@civicpress/core';
+import { HttpError } from '../utils/http-error.js';
 import {
   sendSuccess,
   handleApiError,
@@ -83,33 +84,14 @@ healthRouter.post('/test-error', (req: Request, res: Response) => {
     const { errorType = 'generic' } = req.body;
 
     switch (errorType) {
-      case 'validation': {
-        const validationError = new Error('Validation error test');
-        (validationError as any).statusCode = 400;
-        (validationError as any).code = 'VALIDATION_ERROR';
-        throw validationError;
-      }
-
-      case 'not_found': {
-        const notFoundError = new Error('Not found error test');
-        (notFoundError as any).statusCode = 404;
-        (notFoundError as any).code = 'NOT_FOUND_ERROR';
-        throw notFoundError;
-      }
-
-      case 'server_error': {
-        const serverError = new Error('Server error test');
-        (serverError as any).statusCode = 500;
-        (serverError as any).code = 'TEST_ERROR';
-        throw serverError;
-      }
-
-      default: {
-        const genericError = new Error('Generic error test');
-        (genericError as any).statusCode = 500;
-        (genericError as any).code = 'TEST_ERROR';
-        throw genericError;
-      }
+      case 'validation':
+        throw new HttpError(400, 'Validation error test', 'VALIDATION_ERROR');
+      case 'not_found':
+        throw new HttpError(404, 'Not found error test', 'NOT_FOUND_ERROR');
+      case 'server_error':
+        throw new HttpError(500, 'Server error test', 'TEST_ERROR');
+      default:
+        throw new HttpError(500, 'Generic error test', 'TEST_ERROR');
     }
   } catch (error) {
     handleApiError('Error Test', error, req, res);

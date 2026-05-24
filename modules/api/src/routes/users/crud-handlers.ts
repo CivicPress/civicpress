@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { HttpError } from '../../utils/http-error.js';
 import { CivicPress } from '@civicpress/core';
+import type { AuthUser } from '@civicpress/core';
 import {
   logApiRequest,
   sendSuccess,
@@ -170,7 +171,7 @@ export function registerCrudRoutes(router: Router): void {
 
       // Log audit event BEFORE sending response
       try {
-        const actor: any = req.user || {};
+        const actor: Partial<AuthUser> = req.user ?? {};
         await audit.log({
           source: 'api',
           actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -199,7 +200,7 @@ export function registerCrudRoutes(router: Router): void {
       });
     } catch (error) {
       try {
-        const actor: any = req.user || {};
+        const actor: Partial<AuthUser> = req.user ?? {};
         const body = req.body || {};
         await audit.log({
           source: 'api',
@@ -230,7 +231,7 @@ export function registerCrudRoutes(router: Router): void {
 
       const identifier = req.params.id;
       let userId: number | undefined;
-      let targetUser: any;
+      let targetUser: AuthUser | null | undefined;
 
       // Try username lookup first, then fall back to ID if not found
       targetUser = await authService.getUserByUsername(identifier);
@@ -309,7 +310,7 @@ export function registerCrudRoutes(router: Router): void {
 
       const identifier = req.params.id;
       let userId: number | undefined;
-      let targetUser: any;
+      let targetUser: AuthUser | null | undefined;
 
       // Try username lookup first, then fall back to ID if not found
       targetUser = await authService.getUserByUsername(identifier);
@@ -425,7 +426,7 @@ export function registerCrudRoutes(router: Router): void {
         res,
         { operation: 'update_user' }
       );
-      const actor: any = req.user || {};
+      const actor: Partial<AuthUser> = req.user ?? {};
       await audit.log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -438,7 +439,7 @@ export function registerCrudRoutes(router: Router): void {
         outcome: 'success',
       });
     } catch (error) {
-      const actor: any = req.user || {};
+      const actor: Partial<AuthUser> = req.user ?? {};
       const idParam = req.params?.id;
       await audit.log({
         source: 'api',
@@ -466,7 +467,7 @@ export function registerCrudRoutes(router: Router): void {
 
       const identifier = req.params.id;
       let userId: number | undefined;
-      let targetUser: any;
+      let targetUser: AuthUser | null | undefined;
 
       // Try username lookup first, then fall back to ID if not found
       targetUser = await authService.getUserByUsername(identifier);
@@ -534,7 +535,7 @@ export function registerCrudRoutes(router: Router): void {
         res,
         { operation: 'delete_user' }
       );
-      const actor: any = req.user || {};
+      const actor: Partial<AuthUser> = req.user ?? {};
       await audit.log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
@@ -543,7 +544,7 @@ export function registerCrudRoutes(router: Router): void {
         outcome: 'success',
       });
     } catch (error) {
-      const actor: any = req.user || {};
+      const actor: Partial<AuthUser> = req.user ?? {};
       const idParam = req.params?.id;
       await audit.log({
         source: 'api',

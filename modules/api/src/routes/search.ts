@@ -191,7 +191,13 @@ searchRouter.get(
       const recordManager = civicPress.getRecordManager();
       const searchService = civicPress.getDatabaseService().getSearchService();
 
-      let suggestions: any[] = [];
+      interface SuggestionResponse {
+        text: string;
+        source: string;
+        type: 'word' | 'title';
+        frequency?: number;
+      }
+      let suggestions: SuggestionResponse[] = [];
       if (searchService) {
         // Use search service to get structured suggestions (words + titles)
         const structuredSuggestions = await searchService.getSuggestions(
@@ -200,7 +206,7 @@ searchRouter.get(
           true // enableTypoTolerance
         );
         // Ensure all suggestions have type field
-        suggestions = structuredSuggestions.map((s: any) => ({
+        suggestions = structuredSuggestions.map((s) => ({
           text: s.text,
           source: s.source,
           type: s.type || ('title' as const), // Default to 'title' if type is missing

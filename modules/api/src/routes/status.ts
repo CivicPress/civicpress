@@ -131,7 +131,7 @@ export function createStatusRouter() {
         deleted: gitStatus.deleted,
         renamed: gitStatus.renamed,
         untracked: gitStatus.untracked || [],
-        recentCommits: recentCommits.map((commit: any) => ({
+        recentCommits: recentCommits.map((commit) => ({
           hash: commit.hash,
           shortHash: commit.hash.substring(0, 8),
           message: commit.message,
@@ -318,15 +318,35 @@ async function getRecordStatistics(
   return stats;
 }
 
+interface ConfigFileSummary {
+  exists: boolean;
+  size?: number;
+  lastModified?: string;
+  count?: number;
+  files?: string[];
+  error?: string;
+}
+
+interface ConfigurationStatus {
+  exists: boolean;
+  files: string[];
+  workflows: ConfigFileSummary | null;
+  templates: ConfigFileSummary | null;
+  hooks: ConfigFileSummary | null;
+  error?: string;
+}
+
 // Helper function to get configuration status
-async function getConfigurationStatus(dataDir: string): Promise<any> {
+async function getConfigurationStatus(
+  dataDir: string
+): Promise<ConfigurationStatus> {
   const configDir = path.join(dataDir, '.civic');
-  const config = {
+  const config: ConfigurationStatus = {
     exists: fs.existsSync(configDir),
-    files: [] as string[],
-    workflows: null as any,
-    templates: null as any,
-    hooks: null as any,
+    files: [],
+    workflows: null,
+    templates: null,
+    hooks: null,
   };
 
   if (config.exists) {
@@ -377,7 +397,7 @@ async function getConfigurationStatus(dataDir: string): Promise<any> {
         }
       }
     } catch (error) {
-      (config as any).error = (error as Error).message;
+      config.error = (error as Error).message;
     }
   }
 

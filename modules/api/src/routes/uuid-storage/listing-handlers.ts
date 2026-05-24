@@ -132,10 +132,11 @@ export function registerListingRoutes(router: Router): void {
             return;
           }
         } else if (!isPublicFolder) {
+          // Note: folder isn't part of userCan's context schema — the prior
+          // `folder: folderName` field was a no-op masked by `as any`.
           const hasPermission = await userCan(req.user, 'storage:download', {
-            action: 'download',
-            folder: folderName,
-          } as any);
+            action: 'view',
+          });
 
           if (!hasPermission) {
             res.status(403).json({

@@ -25,9 +25,9 @@ export interface RequestContext {
   userAgent: string;
   method: string;
   path: string;
-  query: Record<string, any>;
-  body?: any;
-  headers: Record<string, any>;
+  query: Record<string, unknown>;
+  body?: unknown;
+  headers: Record<string, unknown>;
 }
 
 // Generate unique request ID for tracing
@@ -56,7 +56,7 @@ function extractRequestContext(req: Request): RequestContext {
 }
 
 // Categorize errors for better handling
-export function categorizeError(error: any): {
+export function categorizeError(error: unknown): {
   category: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   actionable: boolean;
@@ -104,25 +104,26 @@ export function categorizeError(error: any): {
   }
 
   // Fallback to old error name-based categorization
-  if (error.name === 'ValidationError' || error.name === 'SyntaxError') {
+  const e = error as { name?: string; code?: string };
+  if (e.name === 'ValidationError' || e.name === 'SyntaxError') {
     return { category: 'validation', severity: 'low', actionable: true };
   }
-  if (error.name === 'UnauthorizedError') {
+  if (e.name === 'UnauthorizedError') {
     return { category: 'authentication', severity: 'medium', actionable: true };
   }
-  if (error.name === 'ForbiddenError') {
+  if (e.name === 'ForbiddenError') {
     return { category: 'authorization', severity: 'medium', actionable: true };
   }
-  if (error.name === 'NotFoundError') {
+  if (e.name === 'NotFoundError') {
     return { category: 'not_found', severity: 'low', actionable: true };
   }
-  if (error.code === 'ENOENT') {
+  if (e.code === 'ENOENT') {
     return { category: 'file_system', severity: 'medium', actionable: true };
   }
-  if (error.code === 'ECONNREFUSED') {
+  if (e.code === 'ECONNREFUSED') {
     return { category: 'database', severity: 'high', actionable: true };
   }
-  if (error.code === 'EADDRINUSE') {
+  if (e.code === 'EADDRINUSE') {
     return { category: 'system', severity: 'high', actionable: true };
   }
 
@@ -276,7 +277,7 @@ export function createApiError(
 // Utility function to create validation errors
 export function createValidationError(
   message: string,
-  details?: any
+  details?: unknown
 ): ApiError {
   return createApiError(message, 400, 'VALIDATION_ERROR', { details });
 }

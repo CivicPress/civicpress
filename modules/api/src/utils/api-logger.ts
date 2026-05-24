@@ -15,10 +15,10 @@ export interface LogContext {
   userRole?: string;
   method?: string;
   path?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-export interface SuccessResponse<T = any> {
+export interface SuccessResponse<T = unknown> {
   success: true;
   data: T;
   message?: string;
@@ -26,7 +26,7 @@ export interface SuccessResponse<T = any> {
     total?: number;
     page?: number;
     limit?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -35,7 +35,7 @@ export interface ErrorResponse {
   error: {
     message: string;
     code?: string;
-    details?: any;
+    details?: unknown;
   };
 }
 
@@ -160,7 +160,7 @@ export class ApiLogger {
   // Log validation errors
   logValidationError(
     operation: string,
-    errors: any[],
+    errors: unknown[],
     req: Request,
     context: LogContext = {}
   ): void {
@@ -245,7 +245,19 @@ export class ApiLogger {
     error: unknown,
     req: Request,
     defaultMessage: string = 'Operation failed'
-  ): { statusCode: number; success: false; error: any } {
+  ): {
+    statusCode: number;
+    success: false;
+    error: {
+      message: string;
+      code?: string;
+      statusCode?: number;
+      details?: unknown;
+      operation?: string;
+      timestamp?: string;
+      correlationId?: string;
+    };
+  } {
     // Prioritize CivicPressError
     if (isCivicPressError(error)) {
       const outputDetails = error.getOutputDetails();
@@ -320,7 +332,7 @@ export class ApiLogger {
   // Handle validation errors
   handleValidationError(
     operation: string,
-    errors: any[],
+    errors: unknown[],
     req: Request,
     res: Response
   ): void {
@@ -414,7 +426,7 @@ export function handleApiError(
 
 export function handleValidationError(
   operation: string,
-  errors: any[],
+  errors: unknown[],
   req: Request,
   res: Response
 ): void {

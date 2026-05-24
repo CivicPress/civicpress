@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { apiLogger } from '../utils/api-logger.js';
+import type { CivicPress } from '@civicpress/core';
 
 // Middleware to automatically log all API requests and responses
 export function apiLoggingMiddleware(
@@ -44,6 +45,7 @@ export function authLoggingMiddleware(
 ): void {
   const originalEnd = res.end;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express res.end has 3 overloads (cb / chunk+cb / chunk+encoding+cb); a single typed signature can't satisfy all three, so we delegate to the original with the same args.
   res.end = function (chunk?: any, encoding?: any) {
     const statusCode = res.statusCode;
 
@@ -132,7 +134,7 @@ export function requestContextMiddleware(
 
 // Database context middleware - to be used with CivicPress instance
 export function createDatabaseContextMiddleware(
-  civicPress: any,
+  civicPress: CivicPress | undefined,
   dataDir?: string
 ) {
   return (req: Request, res: Response, next: NextFunction): void => {

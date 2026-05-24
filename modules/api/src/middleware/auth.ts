@@ -282,9 +282,9 @@ export function requireStoragePermission(
       // Use our comprehensive userCan() system with context
       const hasPermission = await userCan(
         req.user,
-        `storage:${action}` as any,
+        `storage:${action}`,
         {
-          action: action as any,
+          action: action as 'create' | 'edit' | 'delete' | 'view',
         }
       );
 

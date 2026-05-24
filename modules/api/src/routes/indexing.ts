@@ -379,7 +379,7 @@ export function createIndexingRouter() {
             results: {
               query,
               total: results.length,
-              records: results.map((entry: any) => ({
+              records: results.map((entry) => ({
                 title: entry.title,
                 type: entry.type,
                 status: entry.status,

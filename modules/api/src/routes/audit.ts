@@ -31,7 +31,7 @@ export function createAuditRouter() {
       const sinceMs = parseTs(since);
       const beforeMs = parseTs(before);
 
-      const filtered = items.filter((e: any) => {
+      const filtered = items.filter((e) => {
         if (source && e.source !== source) return false;
         if (outcome && e.outcome !== outcome) return false;
         if (action && e.action !== action) return false;
