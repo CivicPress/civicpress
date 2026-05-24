@@ -26,7 +26,8 @@ export class RetryManager {
     this.logger = logger;
 
     // Get retry config from storage config or use defaults
-    const storageConfig = (config as any)?.global || {};
+    const storageConfig: Partial<NonNullable<StorageConfig['global']>> =
+      config?.global ?? {};
     this.defaultConfig = {
       maxAttempts: storageConfig.retry_attempts || 3,
       initialDelay: storageConfig.retry_initial_delay || 1000, // 1 second

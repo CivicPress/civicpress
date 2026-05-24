@@ -9,7 +9,12 @@
 
 import { Logger } from '@civicpress/core';
 import { OrphanedFileError } from '../errors/storage-errors.js';
-import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
+import type {
+  StorageFile,
+  StorageProvider,
+  StorageDatabaseService,
+  StorageConfig,
+} from '../types/storage.types.js';
 import fs from 'fs-extra';
 import path from 'path';
 import {
@@ -42,11 +47,11 @@ export class OrphanedFileCleaner {
   private databaseService: StorageDatabaseService;
   private s3Client: S3Client | null = null;
   private azureContainerClient: ContainerClient | null = null;
-  private config: any;
+  private config: StorageConfig;
 
   constructor(
     databaseService: StorageDatabaseService,
-    config: any,
+    config: StorageConfig,
     s3Client?: S3Client | null,
     azureContainerClient?: ContainerClient | null,
     logger?: Logger

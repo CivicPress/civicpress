@@ -45,6 +45,12 @@ export interface GlobalStorageSettings {
   health_checks: boolean;
   health_check_interval: number;
   retry_attempts: number;
+  // Optional retry-manager knobs. Read by `RetryManager` (defaults applied
+  // when omitted). Surfaced here so the config object is fully typed.
+  retry_initial_delay?: number; // ms
+  retry_max_delay?: number; // ms
+  retry_backoff_multiplier?: number;
+  retryable_errors?: string[];
   cross_provider_backup: boolean;
   backup_providers: string[];
   max_concurrent_uploads?: number;

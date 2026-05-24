@@ -163,7 +163,7 @@ export function generateErrorSummary(
 /**
  * Convert database record to StorageFile
  */
-export function dbRecordToStorageFile(record: any): StorageFile {
+export function dbRecordToStorageFile(record: StorageFile): StorageFile {
   return {
     id: record.id,
     original_name: record.original_name,
@@ -175,8 +175,8 @@ export function dbRecordToStorageFile(record: any): StorageFile {
     mime_type: record.mime_type,
     description: record.description,
     uploaded_by: record.uploaded_by,
-    created_at: new Date(record.created_at),
-    updated_at: new Date(record.updated_at),
+    created_at: record.created_at ? new Date(record.created_at) : undefined,
+    updated_at: record.updated_at ? new Date(record.updated_at) : undefined,
   };
 }
 

@@ -315,7 +315,7 @@ export class StreamingOps {
     const command = new PutObjectCommand({
       Bucket: provider.bucket,
       Key: key,
-      Body: stream as any, // AWS SDK accepts streams
+      Body: stream,
       ContentType: contentType,
       Metadata: {
         originalName: path.basename(relativePath),
@@ -351,7 +351,7 @@ export class StreamingOps {
       host.azureContainerClient.getBlockBlobClient(blobName);
 
     // Azure SDK supports uploadStream
-    await blockBlobClient.uploadStream(stream as any, undefined, undefined, {
+    await blockBlobClient.uploadStream(stream, undefined, undefined, {
       blobHTTPHeaders: {
         blobContentType: contentType,
       },

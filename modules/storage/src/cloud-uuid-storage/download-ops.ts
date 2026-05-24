@@ -197,8 +197,12 @@ export class DownloadOps {
       const chunks: Uint8Array[] = [];
 
       if (response.Body) {
-        // Use the streamToUint8Array helper or handle the readable stream
-        const stream = response.Body as any;
+        // AWS SDK v3 `Body` is a `SdkStream` union of Readable / ReadableStream /
+        // Blob with an SDK-added `transformToByteArray` helper. Narrow to the
+        // subset we use so we don't drag in the full SDK union type.
+        const stream = response.Body as AsyncIterable<Uint8Array> & {
+          transformToByteArray?: () => Promise<Uint8Array>;
+        };
 
         if (typeof stream.transformToByteArray === 'function') {
           // Use AWS SDK's built-in method if available
@@ -350,7 +354,7 @@ export class DownloadOps {
 
         const fileRecords =
           await host.databaseService.getStorageFilesByFolder(folderName);
-        const files = fileRecords.map((record: any) =>
+        const files = fileRecords.map((record) =>
           dbRecordToStorageFile(record)
         );
 

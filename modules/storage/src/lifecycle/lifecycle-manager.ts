@@ -68,7 +68,7 @@ export class LifecycleManager {
       files = [];
       // For now, we'll need to get files from database directly
       const allFiles = await this.databaseService.getAllStorageFiles();
-      files = allFiles.map((record: any) => this.dbRecordToStorageFile(record));
+      files = allFiles.map((record) => this.dbRecordToStorageFile(record));
     }
 
     // Apply policies to each file. Evaluate every applicable enabled policy
@@ -277,7 +277,7 @@ export class LifecycleManager {
   /**
    * Convert database record to StorageFile
    */
-  private dbRecordToStorageFile(record: any): StorageFile {
+  private dbRecordToStorageFile(record: StorageFile): StorageFile {
     return {
       id: record.id,
       original_name: record.original_name,
@@ -289,8 +289,8 @@ export class LifecycleManager {
       mime_type: record.mime_type,
       description: record.description,
       uploaded_by: record.uploaded_by,
-      created_at: new Date(record.created_at),
-      updated_at: new Date(record.updated_at),
+      created_at: record.created_at ? new Date(record.created_at) : undefined,
+      updated_at: record.updated_at ? new Date(record.updated_at) : undefined,
     };
   }
 }
