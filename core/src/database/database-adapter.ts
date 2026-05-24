@@ -62,6 +62,12 @@ export interface DatabaseAdapter {
   beginTransaction(): Promise<Transaction>;
   commitTransaction(transaction: Transaction): Promise<void>;
   rollbackTransaction(transaction: Transaction): Promise<void>;
+  /**
+   * Return the configuration this adapter was constructed with. Lets
+   * diagnostics + health-checks read backend-specific settings (e.g. the
+   * SQLite file path) without leaking through `(adapter as any).config`.
+   */
+  getConfig(): DatabaseConfig;
 }
 
 export interface DatabaseConfig {
@@ -272,15 +278,26 @@ export class SQLiteAdapter implements DatabaseAdapter {
       });
     });
   }
+
+  getConfig(): DatabaseConfig {
+    return this.config;
+  }
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // Placeholder for PostgreSQL adapter (future implementation)
 export class PostgresAdapter implements DatabaseAdapter {
+  private config: DatabaseConfig;
+
   constructor(_config: DatabaseConfig) {
+    this.config = _config;
     throw new Error(
       'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
     );
+  }
+
+  getConfig(): DatabaseConfig {
+    return this.config;
   }
 
   async connect(): Promise<void> {

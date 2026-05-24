@@ -19,6 +19,17 @@ import {
 import { BackupService } from '../../backup/backup-service.js';
 import * as path from 'path';
 
+/**
+ * Structural probe of optional cache state on the search service. The
+ * search service does not declare these on its public type; this checker
+ * intentionally treats them as optional and reads only the surface needed
+ * to report stats or clear them.
+ */
+interface SearchServiceCacheProbe {
+  searchCache?: { getStats?: () => unknown; clear?: () => void };
+  suggestionsCache?: { getStats?: () => unknown; clear?: () => void };
+}
+
 export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
   name = 'search';
   component = 'search';
@@ -448,9 +459,10 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         );
       }
 
-      // Access cache statistics if available (via private property access)
-      // Note: This is a bit of a hack, but necessary to check cache health
-      const searchService = this.searchService as any;
+      // Access cache statistics via structural probing of optional internal
+      // caches. The search service does not expose these in its public type;
+      // this checker treats them as optional and probes by shape.
+      const searchService = this.searchService as SearchServiceCacheProbe;
 
       // Check if caches exist
       if (!searchService.searchCache && !searchService.suggestionsCache) {
@@ -460,7 +472,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
       }
 
       // Try to get cache stats if available
-      let cacheStats: any = {};
+      const cacheStats: Record<string, unknown> = {};
 
       if (searchService.searchCache) {
         try {
@@ -579,7 +591,8 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
         if (options?.backup !== false) {
           try {
             const adapter = this.databaseService.getAdapter();
-            const dbPath = (adapter as any).config?.sqlite?.file;
+            const adapterConfig = adapter.getConfig();
+            const dbPath = adapterConfig.sqlite?.file;
             const backupDir = path.join(this.dataDir, 'exports', 'backups');
 
             const backup = await BackupService.createBackup({
@@ -594,7 +607,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
                 issueId: issue.id,
               },
               logger: this.logger,
-              databaseConfig: (adapter as any).config,
+              databaseConfig: adapterConfig,
             });
             backupId = backup.timestamp;
           } catch (error: unknown) {
@@ -736,7 +749,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
       return;
     }
 
-    const searchService = this.searchService as any;
+    const searchService = this.searchService as SearchServiceCacheProbe;
 
     if (searchService.searchCache) {
       try {

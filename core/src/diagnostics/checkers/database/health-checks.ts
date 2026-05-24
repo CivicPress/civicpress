@@ -20,7 +20,7 @@ export async function checkDatabaseFile(
 ): Promise<CheckResult> {
   try {
     const adapter = databaseService.getAdapter();
-    const dbPath = (adapter as any).config?.sqlite?.file;
+    const dbPath = adapter.getConfig().sqlite?.file;
 
     if (!dbPath) {
       return error('Database path not configured');
@@ -96,7 +96,7 @@ export async function checkFragmentation(
 ): Promise<CheckResult> {
   try {
     const adapter = databaseService.getAdapter();
-    const dbPath = (adapter as any).config?.sqlite?.file;
+    const dbPath = adapter.getConfig().sqlite?.file;
 
     if (!dbPath || !fs.existsSync(dbPath)) {
       return warning('Cannot check fragmentation: database file not found');

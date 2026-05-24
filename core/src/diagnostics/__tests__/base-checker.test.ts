@@ -172,11 +172,18 @@ describe('BaseDiagnosticChecker', () => {
         }
       );
 
+      // createFixResult now narrows raw caught errors into the typed
+      // DiagnosticError shape before storing (previously stored verbatim
+      // via an `any` field; FixResult.error is typed as DiagnosticError).
       expect(result).toMatchObject({
         issueId: 'issue-1',
         success: false,
         message: 'Fix failed',
-        error,
+        error: {
+          message: 'Fix failed',
+          category: 'unknown',
+          severity: 'medium',
+        },
       });
     });
   });

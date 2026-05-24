@@ -23,6 +23,7 @@ import { CentralConfigManager } from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
 import { AuditLogger } from '../audit/audit-logger.js';
 import { DiagnosticCircuitBreaker } from './circuit-breaker.js';
+import type { CircuitBreakerStats } from './types.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { DiagnosticCacheAdapter } from './diagnostic-cache-adapter.js';
 import { CheckExecutor } from './check-executor.js';
@@ -495,7 +496,7 @@ export class DiagnosticService {
   /**
    * Get circuit breaker statistics
    */
-  getCircuitBreakerStats(checkName?: string): any {
+  getCircuitBreakerStats(checkName?: string): CircuitBreakerStats | Record<string, never> {
     if (checkName) {
       return this.circuitBreaker.getStats(checkName);
     }
@@ -506,7 +507,7 @@ export class DiagnosticService {
   /**
    * Get cache statistics
    */
-  async getCacheStats(): Promise<any> {
+  async getCacheStats(): Promise<{ size: number; maxSize: number; keys: string[] }> {
     return await this.cache.getStats();
   }
 }

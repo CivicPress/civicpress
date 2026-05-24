@@ -185,7 +185,9 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
       backupId?: string;
       rollbackAvailable?: boolean;
       duration?: number;
-      error?: any;
+      // Accepts a raw caught error (unknown) or a pre-built DiagnosticError;
+      // narrowed via buildDiagnosticError before storing on FixResult.
+      error?: unknown;
     }
   ): FixResult {
     return {
@@ -195,7 +197,10 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
       backupId: options?.backupId,
       rollbackAvailable: options?.rollbackAvailable || false,
       duration: options?.duration || 0,
-      error: options?.error,
+      error:
+        options?.error !== undefined
+          ? this.buildDiagnosticError(options.error, message)
+          : undefined,
     };
   }
 }

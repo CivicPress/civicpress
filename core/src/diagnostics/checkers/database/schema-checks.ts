@@ -48,14 +48,14 @@ export async function checkSchema(
   databaseService: DatabaseService
 ): Promise<CheckResult> {
   try {
-    const existingTables = await databaseService.query(
+    const existingTables = await databaseService.query<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
     );
-    const tableNames = existingTables.map((t: any) => t.name);
+    const tableNames = existingTables.map((t) => t.name);
 
     const missingTables = REQUIRED_TABLES.filter((t) => !tableNames.includes(t));
     const extraTables = tableNames.filter(
-      (t: string) =>
+      (t) =>
         !REQUIRED_TABLES.includes(t) && !t.startsWith('search_index_fts5')
     );
 
@@ -92,10 +92,10 @@ export async function checkTableColumns(
   databaseService: DatabaseService
 ): Promise<CheckResult> {
   try {
-    const searchIndexInfo = await databaseService.query(
+    const searchIndexInfo = await databaseService.query<{ name: string }>(
       'PRAGMA table_info(search_index)'
     );
-    const searchIndexColumns = searchIndexInfo.map((c: any) => c.name);
+    const searchIndexColumns = searchIndexInfo.map((c) => c.name);
 
     const missingColumns = REQUIRED_SEARCH_INDEX_COLUMNS.filter(
       (c) => !searchIndexColumns.includes(c)
@@ -121,14 +121,14 @@ export async function checkIndexes(
   databaseService: DatabaseService
 ): Promise<CheckResult> {
   try {
-    const indexes = await databaseService.query(
+    const indexes = await databaseService.query<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'"
     );
-    const indexNames = indexes.map((i: any) => i.name);
+    const indexNames = indexes.map((i) => i.name);
 
     const missingIndexes = IMPORTANT_INDEXES.filter(
       (idx) =>
-        !indexNames.some((name: string) =>
+        !indexNames.some((name) =>
           name.includes(idx.split('_').slice(1).join('_'))
         )
     );
@@ -172,10 +172,10 @@ export async function checkFTS5(
       // Other errors (e.g. empty-table edge case) are OK.
     }
 
-    const triggers = await databaseService.query(
+    const triggers = await databaseService.query<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'search_index_fts5_%'"
     );
-    const triggerNames = triggers.map((t: any) => t.name);
+    const triggerNames = triggers.map((t) => t.name);
 
     const missingTriggers = REQUIRED_FTS5_TRIGGERS.filter(
       (t) => !triggerNames.includes(t)

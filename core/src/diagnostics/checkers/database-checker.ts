@@ -404,7 +404,7 @@ export class DatabaseDiagnosticChecker extends BaseDiagnosticChecker {
           issueId: issue.id,
         },
         logger: this.logger,
-        databaseConfig: (adapter as any).config,
+        databaseConfig: adapter.getConfig(),
       });
 
       this.logger.info('Backup created before fix', {

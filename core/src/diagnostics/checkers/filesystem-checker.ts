@@ -387,8 +387,15 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
       try {
         // Check if statfs is available (Node 18.11.0+)
         const fsPromises = await import('fs/promises');
-        if ('statfs' in fsPromises) {
-          const fsStats = await (fsPromises as any).statfs(this.dataDir);
+        // Narrow the dynamic shape: `statfs` was added in Node 18.11 but is
+        // typed in newer @types/node; we probe by `in` first.
+        const fsWithStatfs = fsPromises as {
+          statfs?: (
+            path: string
+          ) => Promise<{ blocks: number; bavail: number; bsize: number }>;
+        };
+        if (fsWithStatfs.statfs) {
+          const fsStats = await fsWithStatfs.statfs(this.dataDir);
           totalBytes = fsStats.blocks * fsStats.bsize;
           freeBytes = fsStats.bavail * fsStats.bsize;
           freePercentage =
