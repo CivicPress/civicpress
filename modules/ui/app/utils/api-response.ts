@@ -18,7 +18,7 @@ export interface ApiResponse<T = any> {
     | {
         message: string;
         code?: string;
-        details?: any[];
+        details?: unknown[];
         correlationId?: string;
       };
   timestamp?: string;
@@ -43,7 +43,7 @@ export interface ApiResponse<T = any> {
  * @throws Error if response is invalid or missing required fields
  */
 export function validateApiResponse<T = any>(
-  response: any,
+  response: unknown,
   requiredFields?: string[]
 ): T {
   // Basic response structure validation
@@ -51,11 +51,11 @@ export function validateApiResponse<T = any>(
     typeof response === 'object' &&
     response !== null &&
     'success' in response &&
-    response.success &&
+    (response as { success: unknown }).success &&
     'data' in response &&
-    response.data
+    (response as { data: unknown }).data
   ) {
-    const data = response.data as T;
+    const data = (response as { data: unknown }).data as T;
 
     // Validate required fields if specified
     if (requiredFields && Array.isArray(requiredFields)) {
@@ -85,7 +85,10 @@ export function validateApiResponse<T = any>(
  * @param defaultValue - Default value to return if response is invalid
  * @returns The data or default value
  */
-export function safeExtractData<T = any>(response: any, defaultValue: T): T {
+export function safeExtractData<T = any>(
+  response: unknown,
+  defaultValue: T
+): T {
   try {
     return validateApiResponse<T>(response);
   } catch (error) {
@@ -99,13 +102,23 @@ export function safeExtractData<T = any>(response: any, defaultValue: T): T {
  * @param response - The response to check
  * @returns True if the response has the expected structure
  */
-export function isValidApiResponse(response: any): response is ApiResponse {
+export function isValidApiResponse(response: unknown): response is ApiResponse {
   return (
     typeof response === 'object' &&
     response !== null &&
     'success' in response &&
-    typeof response.success === 'boolean'
+    typeof (response as { success: unknown }).success === 'boolean'
   );
+}
+
+/**
+ * Narrow access for a structural-shaped api error/response without re-casting.
+ * Returns `undefined` if the response isn't an object.
+ */
+function asRecord(response: unknown): Record<string, unknown> | undefined {
+  return response && typeof response === 'object'
+    ? (response as Record<string, unknown>)
+    : undefined;
 }
 
 /**
@@ -115,32 +128,34 @@ export function isValidApiResponse(response: any): response is ApiResponse {
  * @returns The error message
  */
 export function extractErrorMessage(
-  response: any,
+  response: unknown,
   defaultMessage: string = 'API request failed'
 ): string {
-  if (response && typeof response === 'object') {
-    // Try to get error from response.error
-    if ('error' in response && response.error) {
-      // Server's structured error
-      if (typeof response.error === 'object' && response.error?.message) {
-        return response.error.message;
-      }
-      // Legacy: some endpoints return a bare string for `error`
-      if (typeof response.error === 'string') {
-        return response.error;
-      }
-    }
+  const r = asRecord(response);
+  if (!r) return defaultMessage;
 
-    // Try to get error from response.data.error
-    if ('data' in response && response.data?.error?.message) {
-      return response.data.error.message;
+  // Try to get error from response.error
+  const err = r.error;
+  if (err) {
+    if (typeof err === 'object' && err !== null) {
+      const m = (err as { message?: unknown }).message;
+      if (typeof m === 'string') return m;
     }
+    if (typeof err === 'string') return err;
+  }
 
-    // Try to get error from response.message
-    if ('message' in response && response.message) {
-      return response.message;
+  // Try to get error from response.data.error
+  const data = r.data;
+  if (data && typeof data === 'object') {
+    const dataErr = (data as { error?: unknown }).error;
+    if (dataErr && typeof dataErr === 'object') {
+      const m = (dataErr as { message?: unknown }).message;
+      if (typeof m === 'string') return m;
     }
   }
+
+  // Try to get error from response.message
+  if (typeof r.message === 'string' && r.message) return r.message;
 
   return defaultMessage;
 }
@@ -150,24 +165,26 @@ export function extractErrorMessage(
  * @param response - The API response
  * @returns The correlation ID if present, undefined otherwise
  */
-export function extractCorrelationId(response: any): string | undefined {
-  if (response && typeof response === 'object') {
-    // Try to get correlation ID from response.error
-    if ('error' in response && response.error?.correlationId) {
-      return response.error.correlationId;
-    }
+export function extractCorrelationId(response: unknown): string | undefined {
+  const r = asRecord(response);
+  if (!r) return undefined;
 
-    // Try to get correlation ID from response.data.error
-    if ('data' in response && response.data?.error?.correlationId) {
-      return response.data.error.correlationId;
-    }
+  const err = r.error;
+  if (err && typeof err === 'object') {
+    const cid = (err as { correlationId?: unknown }).correlationId;
+    if (typeof cid === 'string') return cid;
+  }
 
-    // Try to get correlation ID from response.correlationId
-    if ('correlationId' in response) {
-      return response.correlationId;
+  const data = r.data;
+  if (data && typeof data === 'object') {
+    const dataErr = (data as { error?: unknown }).error;
+    if (dataErr && typeof dataErr === 'object') {
+      const cid = (dataErr as { correlationId?: unknown }).correlationId;
+      if (typeof cid === 'string') return cid;
     }
   }
 
+  if (typeof r.correlationId === 'string') return r.correlationId;
   return undefined;
 }
 
@@ -176,23 +193,25 @@ export function extractCorrelationId(response: any): string | undefined {
  * @param response - The API response
  * @returns The error code if present, undefined otherwise
  */
-export function extractErrorCode(response: any): string | undefined {
-  if (response && typeof response === 'object') {
-    // Try to get error code from response.error
-    if ('error' in response && response.error?.code) {
-      return response.error.code;
-    }
+export function extractErrorCode(response: unknown): string | undefined {
+  const r = asRecord(response);
+  if (!r) return undefined;
 
-    // Try to get error code from response.data.error
-    if ('data' in response && response.data?.error?.code) {
-      return response.data.error.code;
-    }
+  const err = r.error;
+  if (err && typeof err === 'object') {
+    const code = (err as { code?: unknown }).code;
+    if (typeof code === 'string') return code;
+  }
 
-    // Try to get error code from response.code
-    if ('code' in response) {
-      return response.code;
+  const data = r.data;
+  if (data && typeof data === 'object') {
+    const dataErr = (data as { error?: unknown }).error;
+    if (dataErr && typeof dataErr === 'object') {
+      const code = (dataErr as { code?: unknown }).code;
+      if (typeof code === 'string') return code;
     }
   }
 
+  if (typeof r.code === 'string') return r.code;
   return undefined;
 }
