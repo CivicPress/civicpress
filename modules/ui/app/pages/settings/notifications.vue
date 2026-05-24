@@ -86,6 +86,7 @@ import { ref } from 'vue';
 import SystemFooter from '~/components/SystemFooter.vue';
 import { useAuthStore } from '~/stores/auth';
 import { useNuxtApp } from '#imports';
+import { errorMessage } from '~/utils/errors';
 
 definePageMeta({
   layout: 'default',
@@ -118,7 +119,7 @@ async function sendTest() {
   }
   loading.value = true;
   try {
-    const res: any = await $civicApi('/api/v1/notifications/test', {
+    const res = (await $civicApi('/api/v1/notifications/test', {
       method: 'POST',
       body: {
         to: form.value.to,
@@ -127,7 +128,7 @@ async function sendTest() {
         provider:
           form.value.provider === 'auto' ? undefined : form.value.provider,
       },
-    });
+    })) as { success?: boolean; error?: string };
     if (res?.success) {
       useToast().add({
         title: t('settings.notifications.testEmailSent'),
@@ -139,10 +140,10 @@ async function sendTest() {
         res?.error || t('settings.notifications.failedToSendTestEmail')
       );
     }
-  } catch (e: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+  } catch (e: unknown) {
     useToast().add({
       title: t('settings.notifications.failedToSendTestEmail'),
-      description: e?.message || String(e),
+      description: errorMessage(e),
       color: 'error',
     });
   } finally {

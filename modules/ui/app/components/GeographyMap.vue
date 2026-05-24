@@ -14,8 +14,10 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import markerRetina from 'leaflet/dist/images/marker-icon-2x.png';
 
-// Fix default marker icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+// Fix default marker icons. Leaflet's IconDefault prototype has a private
+// `_getIconUrl` that ships in CJS bundlers' resolution; deleting it forces
+// the merged-options path below. Cast strictly to the private field.
+delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerRetina,
   iconUrl: markerIcon,
@@ -24,8 +26,21 @@ L.Icon.Default.mergeOptions({
 
 import type { ColorMapping, IconMapping, IconConfig } from '~/types/geography';
 
+/** Minimal GeoJSON feature shape — Leaflet supports the full spec, we only
+ *  read .geometry.type / .properties / .id here, so a narrow contract is enough. */
+type GeoJsonGeometryType = 'Point' | 'LineString' | 'Polygon';
+interface GeoJsonFeature {
+  id?: string | number;
+  geometry: { type: GeoJsonGeometryType | string; coordinates?: unknown };
+  properties?: Record<string, unknown>;
+}
+interface GeoJsonFeatureCollection {
+  type?: string;
+  features?: GeoJsonFeature[];
+}
+
 interface Props {
-  geographyData?: any;
+  geographyData?: GeoJsonFeatureCollection;
   bounds?: {
     minLon: number;
     minLat: number;
@@ -128,7 +143,7 @@ const resolveIconUrl = async (url: string): Promise<string | null> => {
 /**
  * Get color for a feature based on color mapping
  */
-const getFeatureColor = (feature: any): string => {
+const getFeatureColor = (feature: GeoJsonFeature): string => {
   if (!props.colorMapping) {
     return getDefaultColorByGeometry(feature.geometry.type);
   }
@@ -177,15 +192,18 @@ const resolvedIconCache = new Map<string, string>();
 /**
  * Pre-resolve all icon URLs from icon mapping
  */
-const preResolveIcons = async (data: any) => {
+const preResolveIcons = async (data: GeoJsonFeatureCollection | undefined) => {
   if (!props.iconMapping || !data?.features) return;
 
   const mapping = props.iconMapping;
   const urlsToResolve = new Set<string>();
 
   // Collect all URLs that need resolution
-  data.features.forEach((feature: any) => {
-    if (!mapping.apply_to || mapping.apply_to.includes(feature.geometry.type)) {
+  data.features.forEach((feature) => {
+    if (
+      !mapping.apply_to ||
+      mapping.apply_to.includes(feature.geometry.type as GeoJsonGeometryType)
+    ) {
       // Check feature override
       if (feature.id && mapping.feature_overrides?.[feature.id]) {
         const iconConfig = mapping.feature_overrides[feature.id];
@@ -266,7 +284,7 @@ const preResolveIcons = async (data: any) => {
 /**
  * Get icon for a feature based on icon mapping (synchronous, uses pre-resolved cache)
  */
-const getFeatureIcon = (feature: any): L.Icon | null => {
+const getFeatureIcon = (feature: GeoJsonFeature): L.Icon | null => {
   if (!props.iconMapping) {
     return null; // Use default circle marker
   }
@@ -274,7 +292,10 @@ const getFeatureIcon = (feature: any): L.Icon | null => {
   const mapping = props.iconMapping;
 
   // 1. Check if icons apply to this geometry type
-  if (mapping.apply_to && !mapping.apply_to.includes(feature.geometry.type)) {
+  if (
+    mapping.apply_to &&
+    !mapping.apply_to.includes(feature.geometry.type as GeoJsonGeometryType)
+  ) {
     return null; // Icons don't apply to this geometry type
   }
 
@@ -456,7 +477,7 @@ const initializeMap = async () => {
   }
 };
 
-const addGeographyData = async (data: any) => {
+const addGeographyData = async (data: GeoJsonFeatureCollection) => {
   if (!map) return;
 
   // Remove existing layer
@@ -468,12 +489,16 @@ const addGeographyData = async (data: any) => {
     // Pre-resolve all icon URLs before creating the layer
     await preResolveIcons(data);
 
-    // Parse and add GeoJSON data
-    geoJsonLayer = L.geoJSON(data, {
-      style: (feature: any) => {
+    // Parse and add GeoJSON data. L.geoJSON's callback types use the full
+    // GeoJSON spec; cast at the boundary since our narrowed shape captures
+    // only what this component reads.
+    geoJsonLayer = L.geoJSON(data as never, {
+      style: (feature) => {
+        if (!feature) return {};
+        const f = feature as unknown as GeoJsonFeature;
         // Get color from mapping or use default
-        const featureColor = getFeatureColor(feature);
-        const geometryType = feature?.geometry?.type;
+        const featureColor = getFeatureColor(f);
+        const geometryType = f.geometry?.type;
 
         // For Point features, styling is handled by pointToLayer
         if (geometryType === 'Point') {
@@ -506,9 +531,10 @@ const addGeographyData = async (data: any) => {
         }
       },
       pointToLayer: (feature, latlng) => {
+        const f = feature as unknown as GeoJsonFeature;
         try {
           // Check if custom icon is available (now synchronous)
-          const customIcon = getFeatureIcon(feature);
+          const customIcon = getFeatureIcon(f);
           if (customIcon) {
             return L.marker(latlng, { icon: customIcon });
           }
@@ -521,7 +547,7 @@ const addGeographyData = async (data: any) => {
         }
 
         // Use circle marker with custom color
-        const featureColor = getFeatureColor(feature);
+        const featureColor = getFeatureColor(f);
         // Darken color for border (simple darkening)
         const borderColor = darkenColor(featureColor, 0.2);
 

@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/**
+ * USelectMenu's v-model contract is generic over the option type; here it's
+ * easier to keep `any` than to mirror the anonymous-object shape RecordSidebar
+ * passes in — that would couple this presentational component to the parent.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface Props {
   recordType?: string;
   templateOptions: any[];
@@ -19,6 +25,7 @@ const emit = defineEmits<{
   'preview-template': [];
   'load-template': [];
 }>();
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 const { t } = useI18n();
 

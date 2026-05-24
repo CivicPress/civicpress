@@ -82,6 +82,15 @@ const copyAuthHeader = async () => {
   }
 };
 
+// SecuritySettings expects an emailVerified-typed shape; userInfo is the
+// loose User payload from /auth/me with an optional `emailVerified` flag.
+const userSecurityData = computed(() => ({
+  email: userInfo.value?.email ?? '',
+  email_verified:
+    (userInfo.value as unknown as { emailVerified?: boolean })?.emailVerified ||
+    false,
+}));
+
 // Format date
 const formatDate = (dateString: string) => {
   if (!dateString) return t('settings.unknown');
@@ -136,16 +145,20 @@ const handleEmailVerification = async () => {
           ? '/api/v1/users/verify-current-email'
           : '/api/v1/users/verify-email-change';
 
-      const response = await $civicApi(endpoint, {
+      const response = (await $civicApi(endpoint, {
         method: 'POST',
         body: { token },
-      });
+      })) as {
+        success?: boolean;
+        message?: string;
+        data?: { message?: string };
+        error?: { message?: string };
+      };
 
-      if ((response as any).success) {
+      if (response.success) {
         useToast().add({
           title: t('settings.emailVerified'),
-          description:
-            (response as any).data?.message || t('settings.emailVerified'),
+          description: response.data?.message || t('settings.emailVerified'),
           color: 'primary',
         });
 
@@ -159,8 +172,8 @@ const handleEmailVerification = async () => {
         await fetchUserInfo();
       } else {
         throw new Error(
-          (response as any).error?.message ||
-            (response as any).message ||
+          response.error?.message ||
+            response.message ||
             t('settings.verificationFailed')
         );
       }
@@ -238,7 +251,7 @@ const breadcrumbItems = computed(() => [
             </UButton>
 
             <UButton
-              :color="'red' as any"
+              color="error"
               variant="outline"
               @click="navigateTo('/auth/logout')"
             >
@@ -327,7 +340,7 @@ const breadcrumbItems = computed(() => [
                   >{{ t('common.role') }}</label
                 >
                 <div class="mt-1">
-                  <UBadge :color="getRoleColor(userInfo.role) as any">
+                  <UBadge :color="getRoleColor(userInfo.role) as 'error' | 'primary' | 'neutral'">
                     {{ getRoleDisplayName(userInfo.role) }}
                   </UBadge>
                 </div>
@@ -387,7 +400,7 @@ const breadcrumbItems = computed(() => [
                 />
                 <UButton
                   @click="copyToken"
-                  :color="(tokenCopied ? 'green' : 'primary') as any"
+                  color="primary"
                   variant="soft"
                   size="sm"
                   :disabled="!authStore.token"
@@ -417,7 +430,7 @@ const breadcrumbItems = computed(() => [
                 />
                 <UButton
                   @click="copyAuthHeader"
-                  :color="(tokenCopied ? 'green' : 'primary') as any"
+                  color="primary"
                   variant="soft"
                   size="sm"
                   :disabled="!authStore.token"
@@ -469,7 +482,7 @@ const breadcrumbItems = computed(() => [
             <UBadge
               v-for="permission in userInfo.permissions"
               :key="permission"
-              :color="'blue' as any"
+              color="primary"
               variant="subtle"
               size="sm"
               class="border border-gray-200 dark:border-gray-800"
@@ -491,7 +504,7 @@ const breadcrumbItems = computed(() => [
                 >{{ t('settings.sessionStatus') }}</label
               >
               <div class="mt-1">
-                <UBadge :color="'green' as any" variant="soft">
+                <UBadge color="primary" variant="soft">
                   <template #leading>
                     <UIcon name="i-lucide-check-circle" class="w-3 h-3" />
                   </template>
@@ -516,10 +529,7 @@ const breadcrumbItems = computed(() => [
         <div class="md:col-span-2">
           <SecuritySettings
             :user-id="userInfo.id"
-            :user-data="{
-              email: userInfo.email,
-              email_verified: (userInfo as any).emailVerified || false,
-            }"
+            :user-data="userSecurityData"
           />
         </div>
       </div>

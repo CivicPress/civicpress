@@ -31,7 +31,13 @@ onMounted(async () => {
   await fetchAttachmentTypes();
 });
 
-const handleFilesSelected = (files: any[]) => {
+interface SelectedFile {
+  id: string;
+  relative_path: string;
+  original_name: string;
+}
+
+const handleFilesSelected = (files: SelectedFile[]) => {
   const newFiles = files.map((file) => ({
     id: file.id,
     path: file.relative_path,
@@ -45,6 +51,9 @@ const handleFilesSelected = (files: any[]) => {
 
   toast.add({
     title: t('records.filesAdded'),
+    // vue-i18n's `t()` has overloads but TS picks the simplest; cast to access
+    // the (key, count, named-params) pluralization overload.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     description: (t as any)('records.filesAttachedToRecord', files.length, {
       count: files.length,
     }),
@@ -58,7 +67,10 @@ const removeFile = (index: number) => {
   emit('update:attachedFiles', updated);
 };
 
-const updateFileCategory = (index: number, category: any) => {
+const updateFileCategory = (
+  index: number,
+  category: string | { value?: string } | null | undefined
+) => {
   const updated = [...props.attachedFiles];
   const file = updated[index];
   if (file) {

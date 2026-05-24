@@ -39,7 +39,7 @@
         class="h-80 rounded-lg overflow-hidden border bg-gray-50 dark:bg-gray-800"
       >
         <GeographyMap
-          :geography-data="allGeographyData"
+          :geography-data="(allGeographyData as never)"
           :bounds="combinedBounds as unknown as BoundsObject | undefined"
           :interactive="true"
           height="100%"
@@ -81,7 +81,7 @@
                 class="h-64 rounded-lg overflow-hidden border bg-gray-50 dark:bg-gray-800"
               >
                 <GeographyMap
-                  :geography-data="link.content"
+                  :geography-data="(link.content as never)"
                   :bounds="link.bounds"
                   :interactive="true"
                   height="100%"

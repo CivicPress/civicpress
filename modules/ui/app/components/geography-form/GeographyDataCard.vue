@@ -12,7 +12,7 @@
           >
             <USelectMenu
               :model-value="form.type"
-              @update:model-value="(val: any) => (form.type = val)"
+              @update:model-value="(val: string | SelectOption | null | undefined) => (form.type = val as typeof form.type)"
               :items="typeOptions"
               :placeholder="t('geography.selectFileType')"
               :disabled="saving"
@@ -41,10 +41,7 @@
               <p class="text-sm text-gray-600">
                 {{
                   t('geography.contentHelp', {
-                    type: (typeof form.type === 'string'
-                      ? form.type
-                      : (form.type as any)?.value || 'geojson'
-                    ).toUpperCase(),
+                    type: formTypeLabel.toUpperCase(),
                   })
                 }}
               </p>
@@ -231,7 +228,7 @@ interface SelectOption {
   value: string;
 }
 
-defineProps({
+const props = defineProps({
   form: {
     type: Object as PropType<GeographyFormData>,
     required: true,
@@ -253,7 +250,14 @@ defineProps({
     required: true,
   },
   formatBounds: {
-    type: Function as PropType<(bounds: any) => string>,
+    type: Function as PropType<
+      (bounds: {
+        minLon: number;
+        minLat: number;
+        maxLon: number;
+        maxLat: number;
+      }) => string
+    >,
     required: true,
   },
 });
@@ -266,4 +270,12 @@ defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+// Display label for the help text — `form.type` may be a plain string
+// or a SelectOption-shaped object emitted by USelectMenu.
+const formTypeLabel = computed(() => {
+  const ft = props.form.type as string | { value?: string } | null | undefined;
+  if (typeof ft === 'string') return ft;
+  return ft?.value || 'geojson';
+});
 </script>

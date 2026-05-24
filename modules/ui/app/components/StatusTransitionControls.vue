@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMediaQuery } from '@vueuse/core';
 import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import { errorMessage } from '~/utils/errors';
 
 interface StatusHistoryEntry {
   status: string;
@@ -17,8 +18,26 @@ interface Props {
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
-  changed: [{ newStatus: string; record?: any }];
+  changed: [{ newStatus: string; record?: Record<string, unknown> }];
 }>();
+
+interface StatusOption {
+  label: string;
+  value: string;
+  icon?: string;
+  description?: string;
+}
+
+interface TimelineItem {
+  value: string;
+  title: string;
+  icon?: string;
+  description?: string;
+  status: string;
+  isCurrent: boolean;
+  isTransition: boolean;
+  color: 'primary' | 'neutral';
+}
 
 const { getStatusColor, getStatusLabel, getStatusIcon, formatDate } =
   useRecordUtils();
@@ -39,7 +58,7 @@ const showConfirm = ref(false);
 const saving = ref(false);
 const inlineError = ref<string | null>(null);
 
-const timelineEntries = computed<any[]>(() => {
+const timelineEntries = computed<TimelineItem[]>(() => {
   const historyEntries = Array.isArray(props.statusHistory)
     ? props.statusHistory
     : [];
@@ -50,12 +69,12 @@ const timelineEntries = computed<any[]>(() => {
     }
   });
 
-  const options = recordStatusOptions();
+  const options = recordStatusOptions() as StatusOption[];
   const availableSet = new Set(
-    availableTargets.value.map((opt: any) => opt.value as string)
+    (availableTargets.value as StatusOption[]).map((opt) => opt.value)
   );
 
-  const items = options.map((opt: any) => {
+  const items = options.map<TimelineItem>((opt) => {
     const history = historyMap.get(opt.value);
     const formattedDate = history?.date ? formatDate(history.date) : undefined;
     const details = [formattedDate, history?.user].filter(Boolean).join(' · ');
@@ -112,7 +131,7 @@ onMounted(async () => {
     } catch (e) {
       // Ignore; will fall back to status list
     }
-  } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
+  } catch {
     // handled via statusesError
   }
 });
@@ -120,11 +139,11 @@ onMounted(async () => {
 // Allowed transitions fetched from API, fall back to system status transitions if API call fails
 const allowedTargets = ref<string[] | null>(null);
 
-const availableTargets = computed(() => {
-  const options = recordStatusOptions();
-  const base = options.filter((opt: any) => opt.value !== props.currentStatus);
+const availableTargets = computed<StatusOption[]>(() => {
+  const options = recordStatusOptions() as StatusOption[];
+  const base = options.filter((opt) => opt.value !== props.currentStatus);
   if (Array.isArray(allowedTargets.value) && allowedTargets.value.length > 0) {
-    return base.filter((opt: any) => allowedTargets.value!.includes(opt.value));
+    return base.filter((opt) => allowedTargets.value!.includes(opt.value));
   }
   return base;
 });
@@ -170,8 +189,8 @@ const confirmChange = async () => {
       inlineError.value =
         extractErrorMessage(response) || 'Failed to change status';
     }
-  } catch (err: any) { // eslint-disable-line -eslint/no-explicit-any -- legacy multi-field error access (.message, .data, .response); migrate via ~/utils/errors helpers
-    inlineError.value = err?.message || 'Failed to change status';
+  } catch (err: unknown) {
+    inlineError.value = errorMessage(err, 'Failed to change status');
   } finally {
     saving.value = false;
   }
@@ -185,11 +204,11 @@ const confirmChange = async () => {
       :orientation="timelineOrientation"
       color="neutral"
       size="sm"
-      :items="timelineEntries"
+      :items="(timelineEntries as never)"
       :default-value="currentStatus"
       class="mt-2"
     >
-      <template #default="{ item }">
+      <template #default="{ item }: { item: TimelineItem }">
         <div class="flex flex-col gap-1 w-full max-w-xs lg:max-w-sm">
           <div class="flex items-center justify-between">
             <span
@@ -230,7 +249,7 @@ const confirmChange = async () => {
             <UButton
               :data-test="`transition-button-${item.status}`"
               size="xs"
-              :color="getStatusColor(item.status) as any"
+              :color="(getStatusColor(item.status) as 'error' | 'primary' | 'neutral')"
               :icon="getStatusIcon(item.status)"
               variant="outline"
               :disabled="!showStatusTransitions"

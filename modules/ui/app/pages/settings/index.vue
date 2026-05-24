@@ -78,18 +78,18 @@ const settingsItems = computed<NavigationMenuItem[]>(() => {
 });
 
 // Helpers for routes
-const toPath = (to: any): string => {
+type RouteLike = string | { path?: string } | null | undefined;
+
+const toPath = (to: RouteLike): string => {
   if (typeof to === 'string') return to;
   if (to && typeof to === 'object') {
-    // Prefer path if present; fallback to string
-    // @ts-ignore
     return to.path ?? String(to);
   }
   return String(to ?? '');
 };
 
 // Check if current route is active
-const isActive = (to: any) => route.path === toPath(to);
+const isActive = (to: RouteLike) => route.path === toPath(to);
 
 // Navigation helper
 const navigateTo = (path: string) => {
@@ -119,7 +119,10 @@ const needsSetup = computed(() => {
 async function loadConfigStatus() {
   if (!authStore.hasPermission('system:admin')) return;
   try {
-    const res: any = await $civicApi('/api/v1/config/status');
+    const res = (await $civicApi('/api/v1/config/status')) as {
+      success?: boolean;
+      data?: Record<string, 'default' | 'user' | 'missing'>;
+    };
     if (res?.success) {
       configStatus.value = res.data || {};
     }
