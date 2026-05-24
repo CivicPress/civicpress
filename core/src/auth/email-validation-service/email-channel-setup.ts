@@ -5,6 +5,7 @@ import {
   EmailChannel,
   type EmailChannelOptions,
 } from '../../notifications/channels/email-channel.js';
+import type { ChannelRequest } from '../../notifications/notification-channel.js';
 
 /**
  * Register an `email` channel on the given NotificationService.
@@ -39,23 +40,41 @@ export function registerEmailChannelOn(
     }
 
     // Normalize the configuration (handle metadata format).
-    const normalizeValue = (obj: any) =>
-      obj && typeof obj === 'object' && 'value' in obj ? obj.value : obj;
+    // Loose `unknown` input: either the raw value, or `{ value: ... }` wrapper.
+    // Returns `unknown` so callsites narrow explicitly per-field.
+    const normalizeValue = (obj: unknown): unknown =>
+      obj && typeof obj === 'object' && 'value' in obj
+        ? (obj as { value: unknown }).value
+        : obj;
 
-    const smtpConfig = normalizeValue(emailConfig.smtp || emailConfig);
-    const host = normalizeValue(smtpConfig.host);
+    type SmtpShape = {
+      host?: unknown;
+      port?: unknown;
+      secure?: unknown;
+      auth?: { user?: unknown; pass?: unknown };
+      from?: unknown;
+      tls?: unknown;
+    };
+    const smtpConfig = normalizeValue(
+      emailConfig.smtp || emailConfig
+    ) as SmtpShape;
+    const host = String(normalizeValue(smtpConfig.host) ?? '');
     const port = Number(normalizeValue(smtpConfig.port) ?? 587);
     const secure = Boolean(normalizeValue(smtpConfig.secure));
     const auth = {
-      user: normalizeValue(smtpConfig.auth?.user),
-      pass: normalizeValue(smtpConfig.auth?.pass),
+      user: String(normalizeValue(smtpConfig.auth?.user) ?? ''),
+      pass: String(normalizeValue(smtpConfig.auth?.pass) ?? ''),
     };
-    const from = normalizeValue(smtpConfig.from);
-    const tlsRaw = normalizeValue(smtpConfig.tls);
-    const rejectUnauthorized =
-      tlsRaw && tlsRaw.rejectUnauthorized
+    const from = String(normalizeValue(smtpConfig.from) ?? '');
+    const tlsRaw = normalizeValue(smtpConfig.tls) as
+      | { rejectUnauthorized?: unknown }
+      | null
+      | undefined;
+    const rejectUnauthorized = Boolean(
+      tlsRaw?.rejectUnauthorized
         ? normalizeValue(tlsRaw.rejectUnauthorized)
-        : false;
+        : false
+    );
 
     const options: EmailChannelOptions = {
       smtp: {
@@ -77,7 +96,7 @@ export function registerEmailChannelOn(
       isEnabled() {
         return true;
       },
-      async send(request: any) {
+      async send(request: ChannelRequest) {
         try {
           const { messageId } = await canonical.send({
             to: request.to,
@@ -100,8 +119,16 @@ export function registerEmailChannelOn(
       },
     };
 
-    // Register the channel
-    notificationService.registerChannel('email', emailChannel as any);
+    // Register the channel. NotificationChannel is an abstract class but
+    // the duck-typed adapter above implements the surface the service uses
+    // (send/getName/isEnabled); structural cast through `unknown` to satisfy
+    // the abstract-class parameter without re-declaring the class.
+    notificationService.registerChannel(
+      'email',
+      emailChannel as unknown as Parameters<
+        NotificationService['registerChannel']
+      >[1]
+    );
 
     logger.info('Email channel registered successfully');
   } catch (error) {

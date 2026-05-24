@@ -15,7 +15,11 @@ export class NotificationSecurity {
   /**
    * Validate notification request
    */
-  async validateRequest(request: any): Promise<SecurityValidationResult> {
+  async validateRequest(request: {
+    channels?: unknown;
+    template?: unknown;
+    data?: unknown;
+  }): Promise<SecurityValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -43,7 +47,7 @@ export class NotificationSecurity {
     }
 
     // Check rate limits (basic validation)
-    if (request.channels && request.channels.length > 10) {
+    if (Array.isArray(request.channels) && request.channels.length > 10) {
       errors.push('Too many channels specified (max 10)');
     }
 
@@ -74,12 +78,13 @@ export class NotificationSecurity {
   /**
    * Recursively sanitize object
    */
-  private sanitizeObject(obj: any): void {
+  private sanitizeObject(obj: Record<string, unknown>): void {
     for (const key in obj) {
-      if (typeof obj[key] === 'string') {
-        obj[key] = this.sanitizeString(obj[key]);
-      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-        this.sanitizeObject(obj[key]);
+      const value = obj[key];
+      if (typeof value === 'string') {
+        obj[key] = this.sanitizeString(value);
+      } else if (typeof value === 'object' && value !== null) {
+        this.sanitizeObject(value as Record<string, unknown>);
       }
     }
   }

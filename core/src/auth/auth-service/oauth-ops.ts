@@ -1,6 +1,6 @@
 import { DatabaseService } from '../../database/database-service.js';
 import { Logger } from '../../utils/logger.js';
-import { OAuthProviderManager } from '../oauth-provider.js';
+import { OAuthProviderManager, type OAuthUser } from '../oauth-provider.js';
 import type { AuthUser, Session } from '../auth-service.js';
 import type { AuthAuditEvent } from './user-ops.js';
 
@@ -106,7 +106,7 @@ export class OAuthOps {
   async authenticateWithOAuth(
     provider: string,
     token: string,
-    oauthUserData?: any
+    oauthUserData?: OAuthUser
   ): Promise<{
     success: boolean;
     token: string;
@@ -114,7 +114,7 @@ export class OAuthOps {
     expiresAt: Date;
   }> {
     try {
-      let oauthUser: any;
+      let oauthUser: OAuthUser;
 
       // In test mode, use provided data instead of validating token
       if (process.env.NODE_ENV === 'test' && oauthUserData) {
@@ -138,7 +138,7 @@ export class OAuthOps {
         });
       } else {
         // Update existing user's information on re-authentication
-        const updateData: any = {
+        const updateData: Parameters<DatabaseService['updateUser']>[1] = {
           auth_provider: provider,
           email_verified: true,
         };

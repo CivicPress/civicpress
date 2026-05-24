@@ -129,7 +129,7 @@ export class UserOps {
   async listUsers(): Promise<AuthUser[]> {
     try {
       const result = await this.deps.db.listUsers();
-      return result.users.map((user: any) => ({
+      return result.users.map((user) => ({
         id: user.id,
         username: user.username,
         role: user.role,

@@ -67,13 +67,13 @@ export class NotificationAudit {
   async logConfigChange(
     userId: string,
     action: string,
-    details: any
+    details: Record<string, unknown>
   ): Promise<void> {
     const auditEntry: AuditEntry = {
       id: this.generateAuditId(),
       timestamp: new Date(),
       userId,
-      action: 'config_updated' as any,
+      action: 'config_updated',
       details: {
         action,
         ...details,

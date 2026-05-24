@@ -1,5 +1,8 @@
 import { NotificationChannel } from './notification-channel.js';
-import { NotificationTemplate } from './notification-template.js';
+import {
+  NotificationTemplate,
+  type ProcessedTemplate,
+} from './notification-template.js';
 import { NotificationConfig } from './notification-config.js';
 import { NotificationAudit } from './notification-audit.js';
 import { NotificationQueue } from './notification-queue.js';
@@ -43,9 +46,7 @@ export class NotificationService {
     this.audit = new NotificationAudit();
     this.queue = new NotificationQueue();
     this.security = new NotificationSecurity();
-    this.rateLimiter = new NotificationRateLimiter(
-      config.getRateLimits() as any
-    );
+    this.rateLimiter = new NotificationRateLimiter(config.getRateLimits());
     this.logger = new NotificationLogger();
   }
 
@@ -237,7 +238,10 @@ export class NotificationService {
    */
   private async sendToChannel(
     channelName: string,
-    request: NotificationRequest & { content: any; data: Record<string, any> }
+    request: NotificationRequest & {
+      content: ProcessedTemplate;
+      data: Record<string, unknown>;
+    }
   ): Promise<void> {
     const channel = this.channels.get(channelName);
 
