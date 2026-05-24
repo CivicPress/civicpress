@@ -39,7 +39,7 @@ export interface CustomValidator {
   name: string;
   field: string;
   validator: string;
-  params?: any[];
+  params?: unknown[];
   message?: string;
 }
 

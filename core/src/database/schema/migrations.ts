@@ -7,14 +7,15 @@
 
 import { coreError, coreInfo, coreDebug } from '../../utils/core-output.js';
 import { errorMessage, errorStack, errorCode, errorName } from '../../utils/error-narrow.js';
+import type { SqlParam, ExecuteResult } from '../database-adapter.js';
 
 /**
  * Minimal executor surface used by migrations: query (for column
  * existence checks) + execute (for ALTER TABLE).
  */
 export interface DDLExecutor {
-  query(sql: string, params?: any[]): Promise<any[]>;
-  execute(sql: string, params?: any[]): Promise<any>;
+  query<T = unknown>(sql: string, params?: SqlParam[]): Promise<T[]>;
+  execute(sql: string, params?: SqlParam[]): Promise<ExecuteResult>;
 }
 
 /**
@@ -66,8 +67,10 @@ export async function ensureWorkflowStateColumn(
       return;
     }
 
-    const tableInfo = await exec.query(`PRAGMA table_info(${tableName})`);
-    const columnNames = tableInfo.map((col: any) => col.name);
+    const tableInfo = await exec.query<{ name: string }>(
+      `PRAGMA table_info(${tableName})`
+    );
+    const columnNames = tableInfo.map((col) => col.name);
     const hasWorkflowState = columnNames.includes('workflow_state');
 
     coreDebug(`Checking workflow_state column in ${tableName}`, {
@@ -92,8 +95,10 @@ export async function ensureWorkflowStateColumn(
       `ALTER TABLE ${tableName} ADD COLUMN workflow_state TEXT DEFAULT 'draft'`
     );
 
-    const verifyInfo = await exec.query(`PRAGMA table_info(${tableName})`);
-    const verifyColumns = verifyInfo.map((col: any) => col.name);
+    const verifyInfo = await exec.query<{ name: string }>(
+      `PRAGMA table_info(${tableName})`
+    );
+    const verifyColumns = verifyInfo.map((col) => col.name);
     const verifyHasWorkflowState = verifyColumns.includes('workflow_state');
 
     if (verifyHasWorkflowState) {

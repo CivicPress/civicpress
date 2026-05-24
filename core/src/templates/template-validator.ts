@@ -188,7 +188,7 @@ export class TemplateValidator {
   validateFrontmatter(content: string): {
     valid: boolean;
     errors: string[];
-    frontmatter?: any;
+    frontmatter?: Record<string, unknown>;
   } {
     const errors: string[] = [];
 

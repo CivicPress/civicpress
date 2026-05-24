@@ -68,7 +68,7 @@ export class SQLiteSearchService implements SearchService {
         );
       } else {
         this.searchCache = new SearchCacheAdapter<SearchResult>(
-          undefined as any,
+          undefined,
           'search',
           { ttl: 5 * 60 * 1000, maxSize: 500 }
         );

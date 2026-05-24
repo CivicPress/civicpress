@@ -76,7 +76,7 @@ export class AuthConfigManager {
 
     try {
       const centralConfig = await CentralConfigManager.getConfig();
-      const authConfig = centralConfig?.auth as AuthConfig;
+      const authConfig = centralConfig?.auth as unknown as AuthConfig;
 
       if (!authConfig) {
         logger.warn('No auth configuration found, using defaults');

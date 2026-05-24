@@ -30,23 +30,28 @@ import {
 } from './module-manifest.js';
 import { ModuleManifestInvalid } from '../errors/domain-errors.js';
 
-// Handle default export for ajv (matches record-schema-validator.ts pattern)
-const Ajv = (AjvModule as any).default || AjvModule;
+// Handle default export for ajv (matches record-schema-validator.ts pattern).
+// Older ajv builds ship as a CJS default-export under `.default`; newer ESM
+// builds expose the constructor directly. Probe both via a structural cast.
+const AjvCtor =
+  (AjvModule as unknown as { default?: typeof AjvModule.default })
+    .default || (AjvModule as unknown as typeof AjvModule.default);
 
 // Locate module.schema.json relative to this file at runtime
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const MODULE_SCHEMA_PATH = join(__dirname, 'module.schema.json');
 
-let cachedValidator: ((data: unknown) => boolean) & {
+type ManifestValidator = ((data: unknown) => boolean) & {
   errors?: unknown[];
-} = null as any;
+};
+let cachedValidator: ManifestValidator | null = null;
 
-function getManifestValidator() {
+function getManifestValidator(): ManifestValidator {
   if (!cachedValidator) {
-    const ajv = new Ajv({ allErrors: true, strict: false });
+    const ajv = new AjvCtor({ allErrors: true, strict: false });
     const schemaJson = JSON.parse(readFileSync(MODULE_SCHEMA_PATH, 'utf-8'));
-    cachedValidator = ajv.compile(schemaJson);
+    cachedValidator = ajv.compile(schemaJson) as ManifestValidator;
   }
   return cachedValidator;
 }

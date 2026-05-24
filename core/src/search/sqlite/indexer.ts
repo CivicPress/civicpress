@@ -14,7 +14,7 @@ export interface IndexRecordInput {
   title: string;
   content?: string;
   tags?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 /**

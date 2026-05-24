@@ -220,7 +220,10 @@ export class TemplateRecordValidator {
       case 'semantic_version':
         return { valid: this.isValidSemanticVersion(fieldValue) };
       case 'required_if': {
-        const [conditionField, conditionValue] = validator.params || [];
+        const [conditionField, conditionValue] = (validator.params ?? []) as [
+          string,
+          unknown,
+        ];
         if (frontmatter[conditionField] === conditionValue) {
           return {
             valid:

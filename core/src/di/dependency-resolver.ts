@@ -25,9 +25,9 @@ export class DependencyResolver {
    * @throws CircularDependencyError if a circular dependency is detected
    */
   resolveDependencies(
-    dependencies: Array<string | Class<any>>,
+    dependencies: Array<string | Class>,
     container: ServiceContainer
-  ): any[] {
+  ): unknown[] {
     return dependencies.map((dep) => {
       // Check if dependency is registered
       if (!container.isRegistered(dep)) {

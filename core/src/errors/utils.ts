@@ -125,8 +125,8 @@ export function reportError(
   outputFn: (
     message: string,
     code?: string,
-    details?: any,
-    context?: Record<string, any>
+    details?: unknown,
+    context?: Record<string, unknown>
   ) => void,
   operation?: string
 ): void {

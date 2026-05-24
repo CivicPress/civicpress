@@ -25,7 +25,9 @@ export interface CivicIndexEntry {
   source?: string;
   slug?: string;
   // Cached parsed record data to avoid re-parsing during sync
-  _parsedRecord?: any; // RecordData - cached from index generation
+  // Cached parsed record data — `import type` is erased at compile time so
+  // it does not reintroduce the runtime circular import.
+  _parsedRecord?: import('../records/record-manager.js').RecordData;
 }
 
 export interface CivicIndex {
@@ -485,7 +487,7 @@ export class IndexingService {
    */
   private async createRecordFromFile(
     entry: CivicIndexEntry,
-    recordManager: any,
+    recordManager: import('../records/record-manager.js').RecordManager,
     recordId: string
   ): Promise<void> {
     // Use cached parsed record if available (from index generation) to avoid re-parsing
@@ -525,7 +527,12 @@ export class IndexingService {
         skipHooks: true, // Skip hooks during sync
       },
       {
-        id: 'admin',
+        // Sync-time sentinel user: indexing rehydrates records from disk and
+        // doesn't have an authenticated DB user available. ID 0 is reserved
+        // for "system" — never a real user. Previously was `'admin'` (string)
+        // which violated AuthUser.id: number; the `any` typing on
+        // recordManager hid the mismatch from the type system.
+        id: 0,
         username: record.author || 'admin',
         name: record.authors?.[0]?.name || 'admin',
         email: record.authors?.[0]?.email,
@@ -540,8 +547,8 @@ export class IndexingService {
    */
   private async updateRecordFromFile(
     entry: CivicIndexEntry,
-    existingRecord: any,
-    recordManager: any
+    existingRecord: import('../records/record-manager.js').RecordData,
+    recordManager: import('../records/record-manager.js').RecordManager
   ): Promise<void> {
     // Use cached parsed record if available (from index generation) to avoid re-parsing
     let record = entry._parsedRecord;
@@ -578,7 +585,12 @@ export class IndexingService {
         relativePath: ['records', entry.file].join('/'),
       },
       {
-        id: 'admin',
+        // Sync-time sentinel user: indexing rehydrates records from disk and
+        // doesn't have an authenticated DB user available. ID 0 is reserved
+        // for "system" — never a real user. Previously was `'admin'` (string)
+        // which violated AuthUser.id: number; the `any` typing on
+        // recordManager hid the mismatch from the type system.
+        id: 0,
         username: record.author || 'admin',
         name: record.authors?.[0]?.name || 'admin',
         email: record.authors?.[0]?.email,
@@ -592,7 +604,7 @@ export class IndexingService {
    */
   private async shouldUpdateRecord(
     entry: CivicIndexEntry,
-    existingRecord: any,
+    existingRecord: import('../records/record-manager.js').RecordData,
     strategy: 'file-wins' | 'database-wins' | 'manual' | 'timestamp'
   ): Promise<boolean> {
     switch (strategy) {

@@ -205,15 +205,23 @@ export type SearchRow = Record<string, unknown>;
  * Map a database row from the search query to a SearchResult.
  */
 export function mapRowToSearchResult(row: SearchRow): SearchResult {
-  let metadata: unknown = null;
+  let metadata: Record<string, unknown> | undefined;
   if (typeof row.metadata === 'string' && row.metadata) {
     try {
-      metadata = JSON.parse(row.metadata);
+      const parsed = JSON.parse(row.metadata) as unknown;
+      metadata =
+        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : undefined;
     } catch {
-      metadata = null;
+      metadata = undefined;
     }
-  } else if (row.metadata && typeof row.metadata === 'object') {
-    metadata = row.metadata;
+  } else if (
+    row.metadata &&
+    typeof row.metadata === 'object' &&
+    !Array.isArray(row.metadata)
+  ) {
+    metadata = row.metadata as Record<string, unknown>;
   }
 
   return {

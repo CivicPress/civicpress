@@ -63,7 +63,7 @@ export class RecordStore {
           title: recordData.title,
           content: recordData.content,
           tags: recordData.tags,
-          metadata,
+          metadata: metadata ?? undefined,
         });
         return;
       } catch (error) {

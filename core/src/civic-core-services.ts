@@ -296,8 +296,10 @@ export async function completeServiceInitialization(
     // Try to import storage services registration from main package export
     // Use a try-catch around the import to handle cases where the module is not available
     // Type assertion is needed because storage module is optional and may not be in core's dependencies
-    let storageModule: any = null;
-    let importError: any = null;
+    // The storage module isn't declared in core's dependencies (optional);
+    // we structurally probe `registerStorageServices` from the loaded module.
+    let storageModule: { registerStorageServices?: unknown } | null = null;
+    let importError: unknown = null;
     try {
       // Import from main package (storage-services is re-exported from index)
       // Using type assertion to handle optional module (not in core's dependencies)
@@ -364,9 +366,17 @@ export async function completeServiceInitialization(
       }
     }
 
-    if (storageModule?.registerStorageServices) {
+    if (
+      storageModule?.registerStorageServices &&
+      typeof storageModule.registerStorageServices === 'function'
+    ) {
       const config = container.resolve<CivicPressConfig>('config');
-      storageModule.registerStorageServices(container, config);
+      (
+        storageModule.registerStorageServices as (
+          c: typeof container,
+          cfg: CivicPressConfig
+        ) => void
+      )(container, config);
       const logger = container.resolve<Logger>('logger');
       if (logger.isVerbose()) {
         logger.debug('Storage services registered successfully');
