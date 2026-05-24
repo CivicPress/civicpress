@@ -5,6 +5,8 @@
  * `records-service.ts`. No behavior change; bodies match the original.
  */
 
+import type { SqlParam } from '@civicpress/core';
+
 /**
  * Normalize date string from database format to ISO format with UTC indicator.
  * Converts "YYYY-MM-DD HH:MM:SS" (SQLite format, UTC but no timezone) to
@@ -35,7 +37,9 @@ export function normalizeDateString(
  * Priority: record (no kind) = 1, chapter = 2, root = 3.
  * Lower priority number = appears first in list.
  */
-export function getKindPriority(record: any): number {
+export function getKindPriority(record: {
+  metadata?: { kind?: string; metadata?: { kind?: string } } | null;
+}): number {
   // Check both direct and nested metadata paths
   // Some records have kind at metadata.kind, others at metadata.metadata.kind
   const kind = record.metadata?.kind || record.metadata?.metadata?.kind;
@@ -53,9 +57,9 @@ export function getKindPriority(record: any): number {
  */
 export function buildFilterClause(
   filters: { type?: string; status?: string } = {}
-): { whereClause: string; params: any[] } {
+): { whereClause: string; params: SqlParam[] } {
   const clauses: string[] = [];
-  const params: any[] = [];
+  const params: SqlParam[] = [];
 
   // Defensive: Filter out internal_only records (shouldn't be in records table, but just in case)
   clauses.push('(workflow_state IS NULL OR workflow_state != ?)');

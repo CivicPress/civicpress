@@ -54,7 +54,7 @@ export class RecordsService {
     db?: DatabaseService
   ) {
     this.civicPress = civicPress;
-    const dataDir = (civicPress as any).config?.dataDir || './data';
+    const dataDir = civicPress.getDataDir() || './data';
     this.dataDir = dataDir;
 
     this.workflowManager =

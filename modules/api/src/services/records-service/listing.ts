@@ -7,7 +7,57 @@ import {
   DatabaseService,
   Logger,
 } from '@civicpress/core';
+import type { AuthUser, RecordRow } from '@civicpress/core';
 import { normalizeDateString, buildFilterClause } from './helpers.js';
+
+/**
+ * Shape returned by `recordManager.listRecords` / `searchRecords` —
+ * mostly `RecordRow` but a few transformed fields the API layer expects.
+ */
+type ListedRecord = RecordRow & {
+  workflowState?: string;
+  commit_ref?: string;
+  commit_signature?: string;
+};
+
+/**
+ * Coerce a metadata column (JSON-string from SQLite or an already-parsed
+ * object from upstream) into a plain `Record<string, unknown>`. Returns
+ * `{}` on parse failure rather than throwing — the api response should
+ * surface gracefully even if a row's metadata is malformed.
+ */
+function parseMetadata(
+  value: string | Record<string, unknown> | undefined | null
+): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'object') return value as Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Transformed record shape returned by API endpoints. */
+interface ApiRecord {
+  id: string;
+  title: string;
+  type: string;
+  status?: string;
+  workflowState?: string;
+  content?: string;
+  metadata: Record<string, unknown>;
+  path?: string;
+  created_at: string | null | undefined;
+  updated_at: string | null | undefined;
+  author?: string;
+  commit_ref?: string;
+  commit_signature?: string;
+  hasUnpublishedChanges?: boolean;
+  /** Tag used by read-handlers to distinguish draft envelopes returned by getDraftOrRecord. */
+  isDraft?: boolean;
+}
 
 export interface RecordsListingDeps {
   civicPress: CivicPress;
@@ -34,9 +84,23 @@ export class RecordsListing {
   async changeRecordStatus(
     id: string,
     newStatus: string,
-    user: any,
+    user: AuthUser,
     comment?: string
-  ): Promise<{ success: boolean; record?: any; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    record?: {
+      id: string;
+      title: string;
+      type: string;
+      status: string;
+      content?: string;
+      metadata: Record<string, unknown>;
+      path?: string;
+      created: string;
+      author?: string;
+    };
+    error?: string;
+  }> {
     // Get the current record to validate permissions
     const record = await this.deps.recordManager.getRecord(id);
     if (!record) {
@@ -116,7 +180,7 @@ export class RecordsListing {
   /**
    * Get allowed transitions for a record based on current status and user role
    */
-  async getAllowedTransitions(id: string, user: any): Promise<string[]> {
+  async getAllowedTransitions(id: string, user: AuthUser): Promise<string[]> {
     // Get the current record
     const record = await this.deps.recordManager.getRecord(id);
     if (!record) {
@@ -144,9 +208,9 @@ export class RecordsListing {
       page?: number;
       sort?: string;
     } = {},
-    user?: any
+    user?: AuthUser
   ): Promise<{
-    records: any[];
+    records: ApiRecord[];
     totalCount: number;
     currentPage: number;
     totalPages: number;
@@ -182,22 +246,18 @@ export class RecordsListing {
     const totalPages = Math.ceil(totalCount / limit);
 
     // Check if user has permission and if there are drafts for these records
-    let draftIds = new Set<string>();
-    // Only check drafts if user exists and is a valid user object (not null, has required properties)
-    // Additional safety: ensure user is defined and has all required properties before calling userCan
-    const hasValidUser =
-      user !== undefined &&
-      user !== null &&
-      typeof user === 'object' &&
-      'role' in user &&
-      typeof (user as any).role === 'string' &&
-      ((user as any).role as string).length > 0 &&
-      'username' in user &&
-      typeof (user as any).username === 'string' &&
-      ((user as any).username as string).length > 0 &&
-      records.length > 0;
+    const draftIds = new Set<string>();
+    // Only check drafts if user exists and has a non-empty role + username
+    const hasValidUser = !!(
+      user &&
+      user.role &&
+      user.role.length > 0 &&
+      user.username &&
+      user.username.length > 0 &&
+      records.length > 0
+    );
 
-    if (hasValidUser) {
+    if (hasValidUser && user) {
       try {
         const hasPermission = await userCan(user, 'records:edit', {
           action: 'edit',
@@ -214,8 +274,11 @@ export class RecordsListing {
               const placeholders = batch.map(() => '?').join(',');
               const query = `SELECT id FROM record_drafts WHERE id IN (${placeholders})`;
 
-              const rows = await this.deps.db.query(query, batch);
-              rows.forEach((row: any) => draftIds.add(row.id));
+              const rows = await this.deps.db.query<{ id: string }>(
+                query,
+                batch
+              );
+              rows.forEach((row) => draftIds.add(row.id));
             }
           }
         }
@@ -228,28 +291,29 @@ export class RecordsListing {
     }
 
     // Transform records for API response
-    const transformedRecords = records.map((record: any) => {
-      const base = {
-        id: record.id,
-        title: record.title,
-        type: record.type,
-        status: record.status, // Legal status (stored in YAML + DB)
-        workflowState: record.workflowState, // Internal editorial status (DB-only)
-        content: record.content,
-        metadata: record.metadata || {},
-        path: record.path,
-        created_at: normalizeDateString(record.created_at),
-        updated_at: normalizeDateString(record.updated_at),
-        author: record.author,
-        commit_ref: record.commit_ref,
-        commit_signature: record.commit_signature,
+    const transformedRecords = records.map((record): ApiRecord => {
+      const r = record as ListedRecord;
+      const base: ApiRecord = {
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        status: r.status, // Legal status (stored in YAML + DB)
+        workflowState: r.workflowState, // Internal editorial status (DB-only)
+        content: r.content,
+        metadata: parseMetadata(r.metadata),
+        path: r.path,
+        created_at: normalizeDateString(r.created_at),
+        updated_at: normalizeDateString(r.updated_at),
+        author: r.author,
+        commit_ref: r.commit_ref,
+        commit_signature: r.commit_signature,
       };
 
       // Include hasUnpublishedChanges if user has edit permission (was checked)
       if (hasValidUser) {
         return {
           ...base,
-          hasUnpublishedChanges: draftIds.has(record.id),
+          hasUnpublishedChanges: draftIds.has(r.id),
         };
       }
 
@@ -278,9 +342,9 @@ export class RecordsListing {
       page?: number;
       sort?: string;
     } = {},
-    user?: any
+    user?: AuthUser
   ): Promise<{
-    records: any[];
+    records: ApiRecord[];
     totalCount: number;
     currentPage: number;
     totalPages: number;
@@ -310,22 +374,17 @@ export class RecordsListing {
     const totalPages = Math.ceil(totalCount / limit);
 
     // Check if user has permission and if there are drafts for these records
-    let draftIds = new Set<string>();
-    // Only check drafts if user exists and is a valid user object (not null, has required properties)
-    // Additional safety: ensure user is defined and has all required properties before calling userCan
-    const hasValidUser =
-      user !== undefined &&
-      user !== null &&
-      typeof user === 'object' &&
-      'role' in user &&
-      typeof (user as any).role === 'string' &&
-      ((user as any).role as string).length > 0 &&
-      'username' in user &&
-      typeof (user as any).username === 'string' &&
-      ((user as any).username as string).length > 0 &&
-      records.length > 0;
+    const draftIds = new Set<string>();
+    const hasValidUser = !!(
+      user &&
+      user.role &&
+      user.role.length > 0 &&
+      user.username &&
+      user.username.length > 0 &&
+      records.length > 0
+    );
 
-    if (hasValidUser) {
+    if (hasValidUser && user) {
       try {
         const hasPermission = await userCan(user, 'records:edit', {
           action: 'edit',
@@ -342,8 +401,11 @@ export class RecordsListing {
               const placeholders = batch.map(() => '?').join(',');
               const query = `SELECT id FROM record_drafts WHERE id IN (${placeholders})`;
 
-              const rows = await this.deps.db.query(query, batch);
-              rows.forEach((row: any) => draftIds.add(row.id));
+              const rows = await this.deps.db.query<{ id: string }>(
+                query,
+                batch
+              );
+              rows.forEach((row) => draftIds.add(row.id));
             }
           }
         }
@@ -356,25 +418,26 @@ export class RecordsListing {
     }
 
     // Transform records for API response
-    const transformedRecords = records.map((record: any) => {
-      const base = {
-        id: record.id,
-        title: record.title,
-        type: record.type,
-        status: record.status,
-        content: record.content,
-        metadata: record.metadata || {},
-        path: record.path,
-        created_at: normalizeDateString(record.created_at),
-        updated_at: normalizeDateString(record.updated_at),
-        author: record.author,
+    const transformedRecords = records.map((record): ApiRecord => {
+      const r = record as ListedRecord;
+      const base: ApiRecord = {
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        status: r.status,
+        content: r.content,
+        metadata: parseMetadata(r.metadata),
+        path: r.path,
+        created_at: normalizeDateString(r.created_at),
+        updated_at: normalizeDateString(r.updated_at),
+        author: r.author,
       };
 
       // Include hasUnpublishedChanges if user has edit permission (was checked)
       if (hasValidUser) {
         return {
           ...base,
-          hasUnpublishedChanges: draftIds.has(record.id),
+          hasUnpublishedChanges: draftIds.has(r.id),
         };
       }
 
@@ -402,28 +465,28 @@ export class RecordsListing {
     const db = this.deps.civicPress.getDatabaseService();
     const { whereClause, params } = buildFilterClause(filters || {});
 
-    const typeRows = await db.query(
+    const typeRows = await db.query<{ type?: string; count: number }>(
       `SELECT type, COUNT(*) as count FROM records ${whereClause} GROUP BY type`,
       [...params]
     );
-    const statusRows = await db.query(
+    const statusRows = await db.query<{ status?: string; count: number }>(
       `SELECT status, COUNT(*) as count FROM records ${whereClause} GROUP BY status`,
       [...params]
     );
-    const totalRows = await db.query(
+    const totalRows = await db.query<{ count: number }>(
       `SELECT COUNT(*) as count FROM records ${whereClause}`,
       [...params]
     );
 
     const types: Record<string, number> = {};
-    typeRows.forEach((row: any) => {
+    typeRows.forEach((row) => {
       if (row.type) {
         types[row.type] = Number(row.count) || 0;
       }
     });
 
     const statuses: Record<string, number> = {};
-    statusRows.forEach((row: any) => {
+    statusRows.forEach((row) => {
       if (row.status) {
         statuses[row.status] = Number(row.count) || 0;
       }

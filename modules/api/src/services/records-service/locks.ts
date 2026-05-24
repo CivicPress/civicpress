@@ -6,6 +6,7 @@
  */
 
 import { DatabaseService } from '@civicpress/core';
+import type { AuthUser, RecordLockRow } from '@civicpress/core';
 
 export interface RecordsLocksDeps {
   db: DatabaseService;
@@ -16,7 +17,7 @@ export class RecordsLocks {
 
   async acquireLock(
     recordId: string,
-    user: any,
+    user: AuthUser,
     lockDurationMinutes = 30
   ): Promise<boolean> {
     const expiresAt = new Date();
@@ -26,18 +27,18 @@ export class RecordsLocks {
     return await this.deps.db.acquireLock(recordId, lockedBy, expiresAt);
   }
 
-  async releaseLock(recordId: string, user: any): Promise<boolean> {
+  async releaseLock(recordId: string, user: AuthUser): Promise<boolean> {
     const lockedBy = user.id?.toString() || user.username;
     return await this.deps.db.releaseLock(recordId, lockedBy);
   }
 
-  async getLock(recordId: string): Promise<any | null> {
+  async getLock(recordId: string): Promise<RecordLockRow | null> {
     return await this.deps.db.getLock(recordId);
   }
 
   async refreshLock(
     recordId: string,
-    user: any,
+    user: AuthUser,
     lockDurationMinutes = 30
   ): Promise<boolean> {
     const expiresAt = new Date();

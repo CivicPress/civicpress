@@ -7,17 +7,94 @@ import {
   coreError,
   Logger,
 } from '@civicpress/core';
+import type { AuthUser, Geography } from '@civicpress/core';
 import fs from 'fs';
 import path from 'path';
 import { normalizeDateString } from './helpers.js';
+
+/**
+ * The shape returned by RecordsCrud's create/read/update endpoints —
+ * the API record envelope (a transformation of `RecordData` with
+ * normalized dates + safe metadata defaults).
+ */
+interface ApiRecord {
+  id: string;
+  title: string;
+  type: string;
+  status?: string;
+  workflowState?: string;
+  content?: string;
+  metadata: Record<string, unknown>;
+  authors?: Array<{
+    name: string;
+    username: string;
+    role?: string;
+    email?: string;
+  }>;
+  source?: {
+    reference: string;
+    original_title?: string;
+    original_filename?: string;
+    url?: string;
+    type?: 'legacy' | 'import' | 'external';
+    imported_at?: string;
+    imported_by?: string;
+  };
+  geography?: Geography;
+  attachedFiles: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | { label: string; value: string; description: string };
+  }>;
+  linkedRecords: Array<{
+    id: string;
+    type: string;
+    description: string;
+    path?: string;
+    category?: string;
+  }>;
+  linkedGeographyFiles: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
+  path?: string;
+  created_at: string | null | undefined;
+  updated_at: string | null | undefined;
+  author?: string;
+  commit_ref?: string;
+  commit_signature?: string;
+  /** Tag used by callers to distinguish draft envelopes from published-record envelopes. */
+  isDraft?: boolean;
+  /** Set by listing endpoints to flag records with pending drafts. */
+  hasUnpublishedChanges?: boolean;
+}
+
+/** Raw-file variant returned by getRawRecord (no list arrays). */
+interface RawApiRecord {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  content?: string;
+  metadata: Record<string, unknown>;
+  path?: string;
+  created: string;
+  author?: string;
+}
 
 export interface RecordsCrudDeps {
   civicPress: CivicPress;
   recordManager: RecordManager;
   logger: Logger;
   /**
-   * Resolved data directory used to read raw record files from disk. Sourced
-   * from `(civicPress as any).config?.dataDir || './data'` in the orchestrator.
+   * Resolved data directory used to read raw record files from disk. The
+   * orchestrator reads this off the CivicPress instance's config and passes
+   * it in (`config.dataDir || './data'`).
    */
   dataDir: string | null;
 }
@@ -41,8 +118,8 @@ export class RecordsCrud {
       content?: string;
       status?: string; // Legal status (stored in YAML + DB)
       workflowState?: string; // Internal editorial status (DB-only, never in YAML)
-      metadata?: Record<string, any>;
-      geography?: any;
+      metadata?: Record<string, unknown>;
+      geography?: Geography;
       attachedFiles?: Array<{
         id: string;
         path: string;
@@ -84,8 +161,8 @@ export class RecordsCrud {
         imported_by?: string;
       };
     },
-    user: any
-  ): Promise<any> {
+    user: AuthUser
+  ): Promise<ApiRecord> {
     // Validate permissions using the same system as API middleware
     const hasPermission = await userCan(user, 'records:create', {
       recordType: data.type,
@@ -142,7 +219,7 @@ export class RecordsCrud {
   /**
    * Get a specific record
    */
-  async getRecord(id: string): Promise<any | null> {
+  async getRecord(id: string): Promise<ApiRecord | null> {
     const record = await this.deps.recordManager.getRecord(id);
     if (!record) {
       return null;
@@ -174,7 +251,7 @@ export class RecordsCrud {
   /**
    * Get raw file content for a record (including frontmatter)
    */
-  async getRawRecord(id: string): Promise<any | null> {
+  async getRawRecord(id: string): Promise<RawApiRecord | null> {
     const record = await this.deps.recordManager.getRecord(id);
     if (!record) {
       return null;
@@ -241,8 +318,8 @@ export class RecordsCrud {
       content?: string;
       status?: string; // Legal status (stored in YAML + DB)
       workflowState?: string; // Internal editorial status (DB-only, never in YAML)
-      metadata?: Record<string, any>;
-      geography?: any;
+      metadata?: Record<string, unknown>;
+      geography?: Geography;
       attachedFiles?: Array<{
         id: string;
         path: string;
@@ -284,8 +361,8 @@ export class RecordsCrud {
         imported_by?: string;
       };
     },
-    user: any
-  ): Promise<any | null> {
+    user: AuthUser
+  ): Promise<ApiRecord | null> {
     // Get the current record to validate permissions
     const currentRecord = await this.deps.recordManager.getRecord(id);
     if (!currentRecord) {
@@ -356,7 +433,7 @@ export class RecordsCrud {
   /**
    * Delete (archive) a record
    */
-  async deleteRecord(id: string, user: any): Promise<boolean> {
+  async deleteRecord(id: string, user: AuthUser): Promise<boolean> {
     // Get the current record to validate permissions
     const record = await this.deps.recordManager.getRecord(id);
     if (!record) {

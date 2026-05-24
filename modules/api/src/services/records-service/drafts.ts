@@ -5,7 +5,87 @@ import {
   DatabaseService,
   Logger,
 } from '@civicpress/core';
+import type {
+  AuthUser,
+  DraftRow,
+  Geography,
+  RecordRow,
+  SqlParam,
+} from '@civicpress/core';
 import { normalizeDateString } from './helpers.js';
+
+/** Shape returned by RecordsDrafts endpoints (draft envelope for API). */
+interface ApiDraft {
+  id: string;
+  title?: string;
+  type?: string;
+  status?: string;
+  workflowState?: string;
+  markdownBody?: string;
+  content?: string;
+  metadata: Record<string, unknown>;
+  geography?: Geography;
+  attachedFiles: unknown[];
+  linkedRecords: unknown[];
+  linkedGeographyFiles: unknown[];
+  author?: string;
+  created_by?: string;
+  created_at: string | null | undefined;
+  updated_at: string | null | undefined;
+  last_draft_saved_at: string | null | undefined;
+  isDraft?: boolean;
+  isUnpublished?: boolean;
+}
+
+/** Subset of DraftRow's columns that updateDraft is permitted to write. */
+type DraftUpdates = Partial<
+  Pick<
+    DraftRow,
+    | 'title'
+    | 'type'
+    | 'status'
+    | 'workflow_state'
+    | 'markdown_body'
+    | 'metadata'
+    | 'geography'
+    | 'attached_files'
+    | 'linked_records'
+    | 'linked_geography_files'
+  >
+>;
+
+function parseJsonObject(
+  value: string | undefined | null
+): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseJsonArray(value: string | undefined | null): unknown[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseGeography(
+  value: string | undefined | null
+): Geography | undefined {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as Geography;
+  } catch {
+    return undefined;
+  }
+}
 
 export interface RecordsDraftsDeps {
   civicPress: CivicPress;
@@ -35,8 +115,8 @@ export class RecordsDrafts {
       status?: string; // Legal status (stored in YAML + DB)
       workflowState?: string; // Internal editorial status (DB-only, never in YAML)
       markdownBody?: string;
-      metadata?: Record<string, any>;
-      geography?: any;
+      metadata?: Record<string, unknown>;
+      geography?: Geography;
       attachedFiles?: Array<{
         id: string;
         path: string;
@@ -63,9 +143,9 @@ export class RecordsDrafts {
         description?: string;
       }>;
     },
-    user: any,
+    user: AuthUser,
     recordId?: string // Optional ID - if not provided, will be generated
-  ): Promise<any> {
+  ): Promise<ApiDraft> {
     // Validate permissions
     const hasPermission = await userCan(user, 'records:create', {
       recordType: data.type,
@@ -80,25 +160,11 @@ export class RecordsDrafts {
 
     // Use provided ID or generate one
     const finalRecordId = recordId || `record-${Date.now()}`;
-    const createdAt = new Date().toISOString();
 
-    // Extract username safely
-    let username = 'unknown';
-    if (typeof user.username === 'string') {
-      username = user.username;
-    } else if (user.name && typeof user.name === 'string') {
-      username = user.name;
-    } else if (user.id) {
-      username = user.id.toString();
-    }
-
-    // Extract user ID safely
-    let userId = username;
-    if (user.id) {
-      userId = user.id.toString();
-    } else if (typeof user.username === 'string') {
-      userId = user.username;
-    }
+    // Extract username (AuthUser.username is required; name/id provide fallbacks
+    // for non-standard AuthUser shapes received from older middleware paths).
+    const username = user.username || user.name || user.id?.toString() || 'unknown';
+    const userId = user.id ? user.id.toString() : username;
 
     // Save to draft table
     try {
@@ -149,14 +215,14 @@ export class RecordsDrafts {
 
     // Get the created draft
     const draft = await this.deps.db.getDraft(finalRecordId);
+    if (!draft) {
+      throw new Error(`Draft not found after create: ${finalRecordId}`);
+    }
 
     // workflowState: Prioritize the value we sent if it's non-default, otherwise use DB value
     // This ensures that when we create a draft with a specific workflowState, it's honored
     // even if the DB has a default 'draft' value (which can happen if column was added with DEFAULT)
-    const dbWorkflowState =
-      draft.workflow_state !== undefined
-        ? draft.workflow_state
-        : (draft as any).workflowState;
+    const dbWorkflowState = draft.workflow_state;
 
     // Priority: 1) Value we sent (if non-default), 2) DB value, 3) 'draft' default
     const finalWorkflowState =
@@ -187,17 +253,11 @@ export class RecordsDrafts {
       status: draft.status, // Legal status (stored in YAML + DB)
       workflowState: finalWorkflowState, // Internal editorial status (DB-only)
       markdownBody: draft.markdown_body,
-      metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
-      geography: draft.geography ? JSON.parse(draft.geography) : undefined,
-      attachedFiles: draft.attached_files
-        ? JSON.parse(draft.attached_files)
-        : [],
-      linkedRecords: draft.linked_records
-        ? JSON.parse(draft.linked_records)
-        : [],
-      linkedGeographyFiles: draft.linked_geography_files
-        ? JSON.parse(draft.linked_geography_files)
-        : [],
+      metadata: parseJsonObject(draft.metadata),
+      geography: parseGeography(draft.geography),
+      attachedFiles: parseJsonArray(draft.attached_files),
+      linkedRecords: parseJsonArray(draft.linked_records),
+      linkedGeographyFiles: parseJsonArray(draft.linked_geography_files),
       author: draft.author,
       created_by: draft.created_by,
       created_at: normalizeDateString(draft.created_at),
@@ -217,8 +277,8 @@ export class RecordsDrafts {
       status?: string; // Legal status (stored in YAML + DB)
       workflowState?: string; // Internal editorial status (DB-only, never in YAML)
       markdownBody?: string;
-      metadata?: Record<string, any>;
-      geography?: any;
+      metadata?: Record<string, unknown>;
+      geography?: Geography;
       attachedFiles?: Array<{
         id: string;
         path: string;
@@ -245,8 +305,8 @@ export class RecordsDrafts {
         description?: string;
       }>;
     },
-    user: any
-  ): Promise<any> {
+    user: AuthUser
+  ): Promise<ApiDraft> {
     // Check if draft exists
     const draft = await this.deps.db.getDraft(id);
     if (!draft) {
@@ -284,9 +344,7 @@ export class RecordsDrafts {
 
     // Get existing draft to preserve workflowState if not being updated
     const existingDraft = await this.deps.db.getDraft(id);
-    // Get workflow_state from existing draft - handle both snake_case (DB) and camelCase (API)
-    const existingWorkflowState =
-      existingDraft?.workflow_state || existingDraft?.workflowState;
+    const existingWorkflowState = existingDraft?.workflow_state;
 
     // Log for debugging
     this.deps.logger.info(
@@ -303,7 +361,7 @@ export class RecordsDrafts {
 
     // Update draft
     // Only include workflow_state if it's explicitly provided (not undefined)
-    const draftUpdates: any = {
+    const draftUpdates: DraftUpdates = {
       title: data.title,
       type: data.type,
       status: data.status,
@@ -354,6 +412,9 @@ export class RecordsDrafts {
 
     // Get updated draft
     const updatedDraft = await this.deps.db.getDraft(id);
+    if (!updatedDraft) {
+      throw new Error(`Draft not found after update: ${id}`);
+    }
 
     // Debug: Log workflow_state value to verify it's being saved
     if (updatedDraft) {
@@ -450,19 +511,11 @@ export class RecordsDrafts {
       status: updatedDraft.status, // Legal status (stored in YAML + DB)
       workflowState: workflowStateValue, // Internal editorial status (DB-only)
       markdownBody: updatedDraft.markdown_body,
-      metadata: updatedDraft.metadata ? JSON.parse(updatedDraft.metadata) : {},
-      geography: updatedDraft.geography
-        ? JSON.parse(updatedDraft.geography)
-        : undefined,
-      attachedFiles: updatedDraft.attached_files
-        ? JSON.parse(updatedDraft.attached_files)
-        : [],
-      linkedRecords: updatedDraft.linked_records
-        ? JSON.parse(updatedDraft.linked_records)
-        : [],
-      linkedGeographyFiles: updatedDraft.linked_geography_files
-        ? JSON.parse(updatedDraft.linked_geography_files)
-        : [],
+      metadata: parseJsonObject(updatedDraft.metadata),
+      geography: parseGeography(updatedDraft.geography),
+      attachedFiles: parseJsonArray(updatedDraft.attached_files),
+      linkedRecords: parseJsonArray(updatedDraft.linked_records),
+      linkedGeographyFiles: parseJsonArray(updatedDraft.linked_geography_files),
       author: updatedDraft.author,
       created_by: updatedDraft.created_by,
       created_at: normalizeDateString(updatedDraft.created_at),
@@ -483,11 +536,11 @@ export class RecordsDrafts {
       limit?: number;
       offset?: number;
     } = {}
-  ): Promise<{ drafts: any[]; total: number }> {
+  ): Promise<{ drafts: ApiDraft[]; total: number }> {
     const result = await this.deps.db.listDrafts(options);
 
     // Transform drafts to match record format
-    const drafts = result.drafts.map((draft) => ({
+    const drafts: ApiDraft[] = result.drafts.map((draft) => ({
       id: draft.id,
       title: draft.title,
       type: draft.type,
@@ -498,17 +551,11 @@ export class RecordsDrafts {
           : 'draft', // Internal editorial status (DB-only)
       markdownBody: draft.markdown_body,
       content: draft.markdown_body, // Alias for compatibility
-      metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
-      geography: draft.geography ? JSON.parse(draft.geography) : undefined,
-      attachedFiles: draft.attached_files
-        ? JSON.parse(draft.attached_files)
-        : [],
-      linkedRecords: draft.linked_records
-        ? JSON.parse(draft.linked_records)
-        : [],
-      linkedGeographyFiles: draft.linked_geography_files
-        ? JSON.parse(draft.linked_geography_files)
-        : [],
+      metadata: parseJsonObject(draft.metadata),
+      geography: parseGeography(draft.geography),
+      attachedFiles: parseJsonArray(draft.attached_files),
+      linkedRecords: parseJsonArray(draft.linked_records),
+      linkedGeographyFiles: parseJsonArray(draft.linked_geography_files),
       author: draft.author,
       created_by: draft.created_by,
       created_at: normalizeDateString(draft.created_at),
@@ -534,7 +581,7 @@ export class RecordsDrafts {
       cursor?: string;
     } = {}
   ): Promise<{
-    records: any[];
+    records: ApiDraft[];
     nextCursor: string | null;
     hasMore: boolean;
     total: number;
@@ -556,7 +603,7 @@ export class RecordsDrafts {
         .map(() => '?')
         .join(',')})
     `;
-    const params: any[] = [...unpublishedWorkflowStates];
+    const params: SqlParam[] = [...unpublishedWorkflowStates];
 
     if (type) {
       const types = type.split(',').map((t) => t.trim());
@@ -567,10 +614,10 @@ export class RecordsDrafts {
     // Order by updated_at descending
     query += ' ORDER BY updated_at DESC';
 
-    const allRecords = await db.query(query, params);
+    const allRecords = await db.query<RecordRow>(query, params);
 
     // Transform records
-    let records = allRecords.map((record: any) => ({
+    const records: ApiDraft[] = allRecords.map((record) => ({
       id: record.id,
       title: record.title,
       type: record.type,
@@ -578,31 +625,24 @@ export class RecordsDrafts {
       workflowState:
         record.workflow_state !== undefined && record.workflow_state !== null
           ? record.workflow_state
-          : null, // Internal editorial status
+          : undefined, // Internal editorial status
       content: record.content,
-      metadata: record.metadata ? JSON.parse(record.metadata) : {},
-      geography: record.geography ? JSON.parse(record.geography) : undefined,
-      attachedFiles: record.attached_files
-        ? JSON.parse(record.attached_files)
-        : [],
-      linkedRecords: record.linked_records
-        ? JSON.parse(record.linked_records)
-        : [],
-      linkedGeographyFiles: record.linked_geography_files
-        ? JSON.parse(record.linked_geography_files)
-        : [],
+      metadata: parseJsonObject(record.metadata),
+      geography: parseGeography(record.geography),
+      attachedFiles: parseJsonArray(record.attached_files),
+      linkedRecords: parseJsonArray(record.linked_records),
+      linkedGeographyFiles: parseJsonArray(record.linked_geography_files),
       author: record.author,
       created_at: normalizeDateString(record.created_at),
       updated_at: normalizeDateString(record.updated_at),
+      last_draft_saved_at: undefined,
       isUnpublished: true,
     }));
 
     // Find starting index based on cursor
     let startIndex = 0;
     if (cursor) {
-      const cursorIndex = records.findIndex(
-        (record: any) => record.id === cursor
-      );
+      const cursorIndex = records.findIndex((record) => record.id === cursor);
       if (cursorIndex !== -1) {
         startIndex = cursorIndex + 1;
       }

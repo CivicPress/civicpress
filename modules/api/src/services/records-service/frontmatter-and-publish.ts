@@ -16,7 +16,74 @@ import {
   DatabaseService,
   Logger,
 } from '@civicpress/core';
+import type {
+  AuthUser,
+  Geography,
+  TableInfoRow,
+} from '@civicpress/core';
 import { normalizeDateString } from './helpers.js';
+
+/** Hybrid envelope returned by getDraftOrRecord — covers both draft + record paths. */
+interface DraftOrRecord {
+  id: string;
+  title?: string;
+  type?: string;
+  status?: string;
+  workflowState?: string;
+  markdownBody?: string;
+  content?: string;
+  metadata: Record<string, unknown>;
+  geography?: Geography;
+  attachedFiles: unknown[];
+  linkedRecords: unknown[];
+  linkedGeographyFiles: unknown[];
+  authors?: RecordData['authors'];
+  source?: RecordData['source'];
+  author?: string;
+  created_by?: string;
+  created_at: string | null | undefined;
+  updated_at: string | null | undefined;
+  last_draft_saved_at?: string | null;
+  path?: string;
+  commit_ref?: string;
+  commit_signature?: string;
+  isDraft: boolean;
+}
+
+function parseJsonObject(
+  value: string | undefined | null
+): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseJsonArray<T = unknown>(
+  value: string | undefined | null
+): T[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseGeography(
+  value: string | undefined | null
+): Geography | undefined {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as Geography;
+  } catch {
+    return undefined;
+  }
+}
 
 export interface RecordsFrontmatterAndPublishDeps {
   civicPress: CivicPress;
@@ -27,14 +94,19 @@ export interface RecordsFrontmatterAndPublishDeps {
    * Callback to RecordsCrud.getRecord — required because
    * getDraftOrRecord falls back to the published-record path when no
    * draft is found, and we don't want to thread the entire CRUD collab.
+   * Returns the published-record api envelope shape; we re-narrow into
+   * DraftOrRecord at the call site since the field set is a superset.
    */
-  getRecord: (id: string) => Promise<any | null>;
+  getRecord: (id: string) => Promise<unknown>;
 }
 
 export class RecordsFrontmatterAndPublish {
   constructor(private readonly deps: RecordsFrontmatterAndPublishDeps) {}
 
-  async getFrontmatterYaml(id: string, user: any): Promise<string | null> {
+  async getFrontmatterYaml(
+    id: string,
+    user: AuthUser | undefined
+  ): Promise<string | null> {
     const recordData = await this.getDraftOrRecord(id, user);
     if (!recordData) {
       return null;
@@ -42,16 +114,17 @@ export class RecordsFrontmatterAndPublish {
 
     const record: RecordData = {
       id: recordData.id,
-      title: recordData.title,
-      type: recordData.type,
-      status: recordData.status,
+      title: recordData.title || '',
+      type: recordData.type || '',
+      status: recordData.status || 'draft',
       workflowState: recordData.workflowState,
       content: recordData.markdownBody || recordData.content || '',
       metadata: recordData.metadata || {},
       geography: recordData.geography,
-      attachedFiles: recordData.attachedFiles || [],
-      linkedRecords: recordData.linkedRecords || [],
-      linkedGeographyFiles: recordData.linkedGeographyFiles || [],
+      attachedFiles: recordData.attachedFiles as RecordData['attachedFiles'],
+      linkedRecords: recordData.linkedRecords as RecordData['linkedRecords'],
+      linkedGeographyFiles:
+        recordData.linkedGeographyFiles as RecordData['linkedGeographyFiles'],
       author: recordData.author || recordData.created_by || 'unknown',
       authors: recordData.authors,
       created_at:
@@ -80,16 +153,20 @@ export class RecordsFrontmatterAndPublish {
    * Get a draft or published record. Checks drafts first when the user
    * can edit; falls back to the published record path.
    */
-  async getDraftOrRecord(id: string, user: any): Promise<any | null> {
-    const canEdit = await userCan(user, 'records:edit', { action: 'edit' });
+  async getDraftOrRecord(
+    id: string,
+    user: AuthUser | undefined
+  ): Promise<DraftOrRecord | null> {
+    // Anonymous callers can't access drafts; skip the userCan check and
+    // fall through to the published-record path.
+    const canEdit = user
+      ? await userCan(user, 'records:edit', { action: 'edit' })
+      : false;
 
     if (canEdit) {
       const draft = await this.deps.db.getDraft(id);
       if (draft) {
-        const dbWorkflowState =
-          draft.workflow_state !== undefined
-            ? draft.workflow_state
-            : (draft as any).workflowState;
+        const dbWorkflowState = draft.workflow_state;
 
         if (dbWorkflowState === undefined && !('workflow_state' in draft)) {
           this.deps.logger.warn(
@@ -97,31 +174,48 @@ export class RecordsFrontmatterAndPublish {
             { id: draft.id }
           );
           try {
-            const dbService = this.deps.civicPress.getDatabaseService();
-            const adapter = (dbService as any).adapter;
-            if (adapter) {
-              const tableInfo = await adapter.query(
-                'PRAGMA table_info(record_drafts)'
+            const adapter = this.deps.civicPress
+              .getDatabaseService()
+              .getAdapter();
+            const tableInfo = await adapter.query<TableInfoRow>(
+              'PRAGMA table_info(record_drafts)'
+            );
+            const hasColumn = tableInfo.some(
+              (col) => col.name === 'workflow_state'
+            );
+            if (!hasColumn) {
+              await adapter.execute(
+                "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
               );
-              const hasColumn = tableInfo.some(
-                (col: any) => col.name === 'workflow_state'
+              this.deps.logger.info(
+                'Added workflow_state column to record_drafts in getDraftOrRecord',
+                { id: draft.id }
               );
-              if (!hasColumn) {
-                await adapter.execute(
-                  "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
-                );
-                this.deps.logger.info(
-                  'Added workflow_state column to record_drafts in getDraftOrRecord',
-                  { id: draft.id }
-                );
-              }
             }
             const refreshedDraft = await this.deps.db.getDraft(draft.id);
             if (refreshedDraft && 'workflow_state' in refreshedDraft) {
               const refreshedValue = refreshedDraft.workflow_state || 'draft';
               return {
-                ...draft,
+                id: refreshedDraft.id,
+                title: refreshedDraft.title,
+                type: refreshedDraft.type,
+                status: refreshedDraft.status,
                 workflowState: refreshedValue,
+                markdownBody: refreshedDraft.markdown_body,
+                metadata: parseJsonObject(refreshedDraft.metadata),
+                geography: parseGeography(refreshedDraft.geography),
+                attachedFiles: parseJsonArray(refreshedDraft.attached_files),
+                linkedRecords: parseJsonArray(refreshedDraft.linked_records),
+                linkedGeographyFiles: parseJsonArray(
+                  refreshedDraft.linked_geography_files
+                ),
+                author: refreshedDraft.author,
+                created_by: refreshedDraft.created_by,
+                created_at: normalizeDateString(refreshedDraft.created_at),
+                updated_at: normalizeDateString(refreshedDraft.updated_at),
+                last_draft_saved_at: normalizeDateString(
+                  refreshedDraft.last_draft_saved_at
+                ),
                 isDraft: true,
               };
             }
@@ -145,17 +239,11 @@ export class RecordsFrontmatterAndPublish {
               ? dbWorkflowState
               : 'draft',
           markdownBody: draft.markdown_body,
-          metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
-          geography: draft.geography ? JSON.parse(draft.geography) : undefined,
-          attachedFiles: draft.attached_files
-            ? JSON.parse(draft.attached_files)
-            : [],
-          linkedRecords: draft.linked_records
-            ? JSON.parse(draft.linked_records)
-            : [],
-          linkedGeographyFiles: draft.linked_geography_files
-            ? JSON.parse(draft.linked_geography_files)
-            : [],
+          metadata: parseJsonObject(draft.metadata),
+          geography: parseGeography(draft.geography),
+          attachedFiles: parseJsonArray(draft.attached_files),
+          linkedRecords: parseJsonArray(draft.linked_records),
+          linkedGeographyFiles: parseJsonArray(draft.linked_geography_files),
           author: draft.author,
           created_by: draft.created_by,
           created_at: normalizeDateString(draft.created_at),
@@ -166,7 +254,9 @@ export class RecordsFrontmatterAndPublish {
       }
     }
 
-    const record = await this.deps.getRecord(id);
+    const record = (await this.deps.getRecord(id)) as
+      | (DraftOrRecord & { workflowState?: string; content?: string })
+      | null;
     if (record) {
       return {
         ...record,
@@ -185,9 +275,29 @@ export class RecordsFrontmatterAndPublish {
    */
   async publishDraft(
     id: string,
-    user: any,
+    user: AuthUser,
     targetStatus?: string
-  ): Promise<any> {
+  ): Promise<{
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    workflowState?: string | null;
+    content?: string;
+    metadata: Record<string, unknown>;
+    authors?: RecordData['authors'];
+    source?: RecordData['source'];
+    geography?: Geography;
+    attachedFiles: RecordData['attachedFiles'];
+    linkedRecords: RecordData['linkedRecords'];
+    linkedGeographyFiles: RecordData['linkedGeographyFiles'];
+    path?: string;
+    created_at: string | null | undefined;
+    updated_at: string | null | undefined;
+    author?: string;
+    commit_ref?: string;
+    commit_signature?: string;
+  }> {
     const draft = await this.deps.db.getDraft(id);
     if (!draft) {
       throw new Error(`Draft not found: ${id}`);
