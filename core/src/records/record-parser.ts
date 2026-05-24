@@ -489,12 +489,14 @@ ${record.content || ''}`;
   private static normalizeFormat(
     frontmatter: Record<string, unknown>
   ): FrontmatterData {
-    // `normalized` stays `any` here because the metadata spread idiom
-    // below uses `(normalized.X && { X: normalized.X })` which doesn't
-    // type-check against `unknown` (spread of `unknown` is disallowed).
-    // The function boundaries are typed; only the local scratch object
-    // is loose. Properly typing this would require rewriting ~15 spread
-    // lines to ternary-style guards — deferred as a future polish.
+    // `normalized` stays loose because the migration idiom below reassigns
+    // fields by name without per-shape narrowing (`normalized.created =
+    // normalized.created_at`, `instanceof Date` checks on the same slot,
+    // `linkedRecords → linked_records` renames). The function boundaries
+    // are typed (in: Record<string, unknown>; out: FrontmatterData via final
+    // cast); only this local scratch object is loose. Typing each branch
+    // would mean ~15 ternary-style guards — deferred as a future polish.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const normalized: any = { ...frontmatter };
 
     // Normalize author field - ensure it's a string

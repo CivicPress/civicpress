@@ -19,6 +19,13 @@ import { AuthUser } from '../../auth/auth-service.js';
 import { CreateRecordRequest, UpdateRecordRequest } from '../../civic-core.js';
 import { AuditChannel } from '../../audit/audit-channel.js';
 import { RecordData, RecordManager } from '../record-manager.js';
+// `import type` is erased at compile time so it does not reintroduce the
+// runtime circular import these methods originally avoided via `any`.
+import type { SagaExecutor } from '../../saga/saga-executor.js';
+import type { IndexingService } from '../../indexing/indexing-service.js';
+import type { UpdateRecordContext } from '../../saga/update-record-saga.js';
+import type { ArchiveRecordContext } from '../../saga/archive-record-saga.js';
+import type { CreateRecordContext } from '../../saga/create-record-saga.js';
 
 export interface RecordSagasDeps {
   db: DatabaseService;
@@ -50,8 +57,8 @@ export class RecordSagas {
     id: string,
     request: UpdateRecordRequest,
     user: AuthUser,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
-    indexingService?: any, // IndexingService - injected to avoid circular dependency
+    sagaExecutor?: SagaExecutor,
+    indexingService?: IndexingService | null,
     correlationId?: string
   ): Promise<RecordData | null> {
     // Import saga components dynamically to avoid circular dependencies
@@ -95,7 +102,10 @@ export class RecordSagas {
     };
 
     // Execute saga
-    const result = await executor.execute(saga, context);
+    const result = await executor.execute<UpdateRecordContext, RecordData | null>(
+      saga,
+      context
+    );
 
     return result.result;
   }
@@ -107,7 +117,7 @@ export class RecordSagas {
   async archiveRecordSaga(
     id: string,
     user: AuthUser,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
+    sagaExecutor?: SagaExecutor,
     correlationId?: string
   ): Promise<boolean> {
     // Import saga components dynamically to avoid circular dependencies
@@ -151,7 +161,10 @@ export class RecordSagas {
     };
 
     // Execute saga
-    const result = await executor.execute(saga, context);
+    const result = await executor.execute<ArchiveRecordContext, boolean>(
+      saga,
+      context
+    );
 
     return result.result;
   }
@@ -174,8 +187,8 @@ export class RecordSagas {
     request: CreateRecordRequest,
     user: AuthUser,
     recordId?: string,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
-    indexingService?: any, // IndexingService - injected to avoid circular dependency
+    sagaExecutor?: SagaExecutor,
+    indexingService?: IndexingService | null,
     correlationId?: string
   ): Promise<RecordData> {
     // Import saga components dynamically to avoid circular dependencies
@@ -220,7 +233,10 @@ export class RecordSagas {
     };
 
     // Execute saga
-    const result = await executor.execute(saga, context);
+    const result = await executor.execute<CreateRecordContext, RecordData>(
+      saga,
+      context
+    );
 
     return result.result;
   }

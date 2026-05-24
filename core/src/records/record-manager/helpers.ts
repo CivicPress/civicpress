@@ -22,34 +22,33 @@ export function createMarkdownContent(record: RecordData): string {
  * gray-matter automatically parses ISO 8601 dates as Date objects, but schema
  * expects strings.
  */
-export function normalizeFrontmatterForValidation(frontmatter: any): any {
-  const normalized = { ...frontmatter };
+export function normalizeFrontmatterForValidation(
+  frontmatter: Record<string, unknown>
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...frontmatter };
 
   // Convert Date objects to ISO strings
-  if (normalized.created instanceof Date) {
-    normalized.created = normalized.created.toISOString();
-  }
-  if (normalized.updated instanceof Date) {
-    normalized.updated = normalized.updated.toISOString();
-  }
-  if (normalized.date instanceof Date) {
-    normalized.date = normalized.date.toISOString();
+  for (const key of ['created', 'updated', 'date'] as const) {
+    const value = normalized[key];
+    if (value instanceof Date) {
+      normalized[key] = value.toISOString();
+    }
   }
 
   // Normalize source: if it's a string (old format), convert to object
-  if (normalized.source) {
-    if (typeof normalized.source === 'string') {
-      normalized.source = {
-        reference: normalized.source,
-      };
-    } else if (typeof normalized.source === 'object') {
-      normalized.source = normalizeDatesInObject(normalized.source);
+  const source = normalized.source;
+  if (source) {
+    if (typeof source === 'string') {
+      normalized.source = { reference: source };
+    } else if (typeof source === 'object') {
+      normalized.source = normalizeDatesInObject(source);
     }
   }
 
   // Recursively normalize nested objects (e.g., metadata fields)
-  if (normalized.metadata && typeof normalized.metadata === 'object') {
-    normalized.metadata = normalizeDatesInObject(normalized.metadata);
+  const metadata = normalized.metadata;
+  if (metadata && typeof metadata === 'object') {
+    normalized.metadata = normalizeDatesInObject(metadata);
   }
 
   return normalized;
@@ -58,7 +57,7 @@ export function normalizeFrontmatterForValidation(frontmatter: any): any {
 /**
  * Recursively convert Date objects to ISO strings in an object.
  */
-export function normalizeDatesInObject(obj: any): any {
+export function normalizeDatesInObject(obj: unknown): unknown {
   if (obj === null || obj === undefined) {
     return obj;
   }
@@ -72,7 +71,7 @@ export function normalizeDatesInObject(obj: any): any {
   }
 
   if (typeof obj === 'object') {
-    const normalized: any = {};
+    const normalized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       normalized[key] = normalizeDatesInObject(value);
     }

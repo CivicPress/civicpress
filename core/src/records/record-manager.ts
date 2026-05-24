@@ -19,6 +19,11 @@ import {
   normalizeFrontmatterForValidation,
 } from './record-manager/helpers.js';
 import { RecordSagas } from './record-manager/sagas.js';
+// `import type` is erased at compile time so it does not reintroduce the
+// runtime circular import these methods originally avoided via `any`.
+import type { SagaExecutor } from '../saga/saga-executor.js';
+import type { IndexingService } from '../indexing/indexing-service.js';
+import type { PublishDraftContext } from '../saga/publish-draft-saga.js';
 import { RecordSearch } from './record-manager/search.js';
 import { RecordFileOps } from './record-manager/file-ops.js';
 
@@ -742,7 +747,7 @@ export class RecordManager {
     }
 
     // Prepare database updates
-    const dbUpdates: any = {};
+    const dbUpdates: Record<string, unknown> = {};
     if (request.title !== undefined) dbUpdates.title = request.title;
     if (request.content !== undefined) dbUpdates.content = request.content;
     if (request.status !== undefined) dbUpdates.status = request.status;
@@ -871,8 +876,8 @@ export class RecordManager {
     draftId: string,
     user: AuthUser,
     targetStatus?: string,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
-    indexingService?: any, // IndexingService - injected to avoid circular dependency
+    sagaExecutor?: SagaExecutor,
+    indexingService?: IndexingService | null,
     correlationId?: string
   ): Promise<RecordData> {
     // Import saga components dynamically to avoid circular dependencies
@@ -917,7 +922,10 @@ export class RecordManager {
     };
 
     // Execute saga
-    const result = await executor.execute(saga, context);
+    const result = await executor.execute<PublishDraftContext, RecordData>(
+      saga,
+      context
+    );
 
     return result.result;
   }

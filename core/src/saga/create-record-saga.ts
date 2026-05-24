@@ -359,14 +359,15 @@ class CreateFileStep extends BaseSagaStep<CreateRecordContext, string> {
     return RecordParser.serializeToMarkdown(record);
   }
 
-  private normalizeFrontmatterForValidation(frontmatter: any): any {
-    const normalized = { ...frontmatter };
-    // Convert Date objects to ISO strings
-    if (normalized.created && normalized.created instanceof Date) {
-      normalized.created = normalized.created.toISOString();
-    }
-    if (normalized.updated && normalized.updated instanceof Date) {
-      normalized.updated = normalized.updated.toISOString();
+  private normalizeFrontmatterForValidation(
+    frontmatter: Record<string, unknown>
+  ): Record<string, unknown> {
+    const normalized: Record<string, unknown> = { ...frontmatter };
+    for (const key of ['created', 'updated'] as const) {
+      const value = normalized[key];
+      if (value instanceof Date) {
+        normalized[key] = value.toISOString();
+      }
     }
     return normalized;
   }
@@ -418,7 +419,7 @@ class QueueIndexingStep extends BaseSagaStep<CreateRecordContext, void> {
   isCompensatable = false; // Derived state
   timeout = 5000; // 5 seconds
 
-  constructor(private indexingService: IndexingService) {
+  constructor(private indexingService: IndexingService | null) {
     super(5000);
   }
 
@@ -426,6 +427,13 @@ class QueueIndexingStep extends BaseSagaStep<CreateRecordContext, void> {
     this.logStep('start', context);
 
     if (!context.record) {
+      return;
+    }
+
+    // Indexing is fire-and-forget derived state; skip cleanly when no
+    // indexing service is wired (callers may legitimately run without one).
+    if (!this.indexingService) {
+      this.logStep('complete', context);
       return;
     }
 
@@ -546,7 +554,7 @@ export class CreateRecordSaga implements Saga<CreateRecordContext, RecordData> {
     recordManager: RecordManager,
     git: GitEngine,
     hooks: HookSystem,
-    indexingService: IndexingService,
+    indexingService: IndexingService | null,
     dataDir: string
   ) {
     this.steps = [

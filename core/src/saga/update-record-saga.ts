@@ -430,7 +430,7 @@ class QueueReIndexingStep extends BaseSagaStep<UpdateRecordContext, void> {
   isCompensatable = false; // Derived state
   timeout = 5000; // 5 seconds
 
-  constructor(private indexingService: IndexingService) {
+  constructor(private indexingService: IndexingService | null) {
     super(5000);
   }
 
@@ -438,6 +438,13 @@ class QueueReIndexingStep extends BaseSagaStep<UpdateRecordContext, void> {
     this.logStep('start', context);
 
     if (!context.updatedRecord) {
+      return;
+    }
+
+    // Indexing is fire-and-forget derived state; skip cleanly when no
+    // indexing service is wired (callers may legitimately run without one).
+    if (!this.indexingService) {
+      this.logStep('complete', context);
       return;
     }
 
@@ -521,7 +528,7 @@ export class UpdateRecordSaga implements Saga<UpdateRecordContext, RecordData> {
     recordManager: RecordManager,
     git: GitEngine,
     hooks: HookSystem,
-    indexingService: IndexingService,
+    indexingService: IndexingService | null,
     dataDir: string
   ) {
     this.steps = [
