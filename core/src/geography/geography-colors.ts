@@ -6,6 +6,18 @@
  */
 
 /**
+ * Minimal structural GeoJSON shapes — we don't ship @types/geojson but the
+ * helpers below only need feature.properties access, so a narrow probe is
+ * enough.
+ */
+interface GeoJsonFeatureLike {
+  properties?: Record<string, unknown>;
+}
+interface GeoJsonFeatureCollectionLike {
+  features?: GeoJsonFeatureLike[];
+}
+
+/**
  * Validate color format (hex, rgb, rgba, or named color)
  */
 export function validateColor(color: string): boolean {
@@ -159,7 +171,7 @@ export function assignDefaultColors(
  * Extract unique property values from GeoJSON features
  */
 export function extractPropertyValues(
-  geoJson: any,
+  geoJson: GeoJsonFeatureCollectionLike | null | undefined,
   propertyName: string
 ): string[] {
   if (!geoJson || !geoJson.features || !Array.isArray(geoJson.features)) {
@@ -167,9 +179,10 @@ export function extractPropertyValues(
   }
 
   const values = new Set<string>();
-  geoJson.features.forEach((feature: any) => {
-    if (feature.properties && feature.properties[propertyName]) {
-      const value = String(feature.properties[propertyName]);
+  geoJson.features.forEach((feature) => {
+    const propValue = feature.properties?.[propertyName];
+    if (propValue !== undefined && propValue !== null) {
+      const value = String(propValue);
       if (value) {
         values.add(value);
       }
@@ -182,7 +195,9 @@ export function extractPropertyValues(
 /**
  * Suggest property name for color/icon mapping based on common patterns
  */
-export function suggestPropertyName(geoJson: any): string | null {
+export function suggestPropertyName(
+  geoJson: GeoJsonFeatureCollectionLike | null | undefined
+): string | null {
   if (!geoJson || !geoJson.features || !Array.isArray(geoJson.features)) {
     return null;
   }
@@ -200,7 +215,7 @@ export function suggestPropertyName(geoJson: any): string | null {
 
   // Check which properties exist in the features
   const availableProperties = new Set<string>();
-  geoJson.features.forEach((feature: any) => {
+  geoJson.features.forEach((feature) => {
     if (feature.properties) {
       Object.keys(feature.properties).forEach((key) => {
         availableProperties.add(key);
