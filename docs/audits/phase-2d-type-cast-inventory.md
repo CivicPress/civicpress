@@ -200,6 +200,40 @@ Per the W3 commit chain `a7cca51` → `fc8d322`: 1,621 → 839 (48% cleared via 
 
 - `(pending)` (W3-T3 saga-error-context) — closes deferred follow-up #2 from W3-T3 session of 2026-05-22. The 4 saga error subclasses (`SagaStepError`, `SagaCompensationError`, `UncompensatableFailureError`, `SagaContextError`) each redeclared `public context: any`, shadowing the now-typed `CivicPressError.context: Record<string, unknown>` from `106c19b`. Resolution: each subclass is now generic on `TContext extends SagaContext = SagaContext` and the shadowing field is renamed `sagaContext: TContext`. Rename was the correct call (not just typing the existing field) because the subclass field is semantically distinct from the base — it holds the saga's runtime working state (the executor's `TContext`), not the error-metadata bag that flows into `super(message, {step, ...})`. Naming the two separately removes the collision permanently and lets the base field tighten further in the future without re-tangling. Two collateral `Record<string, any>` → `Record<string, unknown>` tightenings on the `additionalContext?` params (SagaStepError, SagaCompensationError) for consistency (didn't match the regex, so they're not part of the -4 tally). `saga-executor.ts` updated in one place: `compensate()`'s `originalError: SagaStepError` parametrized to `SagaStepError<TContext>`. No external readers of `.context`/`.sagaContext` on these error instances anywhere in the repo, so the rename was contained to `errors.ts` + the one signature in `saga-executor.ts`. Gap vs. -16 inventory estimate: the doc's "+ propagation" never materialized — the executor never reads the field off the thrown error, only constructs them, so callers needed zero updates. Repo-wide `tsc --noEmit` clean across all workspaces; `pnpm vitest run core/src/saga` 32/32 green.
 
+### 2026-05-24 (W3-T5 ui/app sweep — partial)
+
+4 commits, 583 → 459 (-124 casts). W3-T5 ~38% done; foundation + bulk error narrowing + key component types landed.
+
+- `a60bd8d` (W3-T5 foundation) — three new/tightened modules: `utils/api-response.ts` (validateApiResponse / safeExtractData / extractErrorMessage / extractCorrelationId / extractErrorCode all switched from `(response: any)` to `(response: unknown)` with structural `asRecord` narrowing); `utils/errors.ts` (new — `errorMessage(err: unknown, fallback)` + `isApiError` + `errorStatus` for the api-error shape thrown by civicApi); `types/api-responses.ts` (new — RecordResponse, RecordListResponse, DraftListResponse, RecordExportResponse, RecordLockResponse, AuthUserResponse, SessionResponse, UserListResponse mirroring api/src service envelopes).
+
+- `3e8f042` (W3-T5 sweep 1) — **bulk catch + typed envelope sweep, -66**. Two mechanical passes: (1) `catch ((err|error|e): any)` → `: unknown` across ~30 files with `(err instanceof Error ? err.message : '') || fallback` for the common `err.message ||` pattern; complex multi-field error handlers (SecuritySettings, useTemplates, useRecordSidebar, raw.vue, setup.vue, notifications.vue, register.vue, StatusTransitionControls) kept `: any` with eslint-disable + migration TODO. (2) Typed the named-response sites: stores/auth.ts (handleLoginResponse, validateApiResponse<{session: SessionResponse}>), stores/records.ts (RecordResponse/RecordListResponse/DraftListResponse imports + CivicRecord boundary cast), useErrorHandler (5 handlers take unknown + asErrorRecord helper), useRecordEditorActions (10× ApiResponse<RecordResponse> + 1× RecordExportResponse), useRecordLock (RecordLockResponse), useSecurity (8× ApiResponse<SecurityResponse>), useUserRoles (dynamic shape narrow), useRecordDetail (CivicRecord boundary cast), 13+ pages typed their endpoint responses. cli/src/commands/users.ts gained an updatedUser null guard.
+
+- `3a23731` (W3-T5 sweep 2) — **editor + form structural typing, -59**. RecordForm.vue: 6× `(props.record as any).<field>` collapse to one structural cast block. ConfigurationField.vue: ConfigField interface + ConfigField-typed helpers (4 sites). GeographyLinkDisplay.vue: 4 new local types (BoundsObject, GeographyData, LinkStats, LinkedFile) clear all 12 casts; viewFullMap widened to `{ id: string }`; getCategoryColor return tightened to `UiBadgeColor`. DetailsPanel.vue: typed recordTypeOptions/statusOptions/workflowStateOptions; the 3 v-model `selected*` props kept with eslint-disable (USelect type unification needs parent refactor). EditorHeader.vue: StatusOption + DropdownItem interfaces; 4× array-literal `any[]` typed; vue-i18n pluralization cast documented.
+
+- `59cd93b` (W3-T5 sweep 3) — **search + user-form + geography-link structural typing, -36**. RecordSearch.vue: FacetOption + FacetItem unions for the facet-pickers + select set-trap. UserForm.vue: UserFormSubmitData formalizes the submit emit; validateForm returns typed `Partial<Record<string, string>>`; the formErrors clear-loop goes through an aliased Record reference. GeographyLinkForm.vue: LinkStats + GeographyLink interfaces extracted (was duplicated inline 3×); template `(previewFile as any).geographyData` moved into a typed `previewGeographyData` computed (template `&`-intersection casts aren't valid TS expressions); getCategoryColor returns UiBadgeColor.
+
+**Per-surface state at end of session:**
+
+| Surface | Session start | Session end | Notes |
+|---|---:|---:|---|
+| core/src | 146 | 146 | untouched |
+| modules/api/src | 32 | 32 | untouched |
+| modules/ui/app | 325 | 201 | -124 (38% of W3-T5 done) |
+| modules/storage/src | 80 | 80 | untouched |
+| **Total** | **583** | **459** | |
+
+`pnpm tsc --noEmit` clean repo-wide; `pnpm exec nuxt typecheck` clean across all surfaces. Vitest sweep on tests/core: 337 pass, 3 skipped, 1 pre-existing failure (same `2025-12-31` expired-session flake on main).
+
+**What's left in ui/app (201 casts):**
+
+Remaining hot-spots:
+- `pages/settings/profile.vue` (11) — security-settings interleaved with auth flow; needs api-responses for /security-info, /change-password, /set-password, /verify-email
+- `composables/useRecordSidebar.ts` (11), `composables/useTemplates.ts` (8), `pages/settings/setup.vue` (8), `components/StatusTransitionControls.vue` (8) — all marked eslint-disable in sweep 1; their error-handlers access 3+ fields per catch and need the errorMessage/errorStatus helpers used in dedicated edit sites.
+- `pages/settings/configuration/[configFile]/edit.vue` (11) — heavy config-form access patterns; would benefit from per-config-file typed schemas.
+- `components/GeographyMap.vue` (8) — Leaflet types are a separate effort; geographyData / feature accesses need GeoJSON-typed shapes.
+- `composables/useDiagnostics.ts` (6) — diagnostic-report consumer; needs the core DiagnosticReport type that the api side now exports.
+- `composables/useRecordEditorActions.ts` (5), `components/SecuritySettings.vue` (5), `components/UserForm.vue` (5 leftover form-validation accesses), `utils/geography-colors.ts` (4), `plugins/01-civicApi.ts` (4 — Headers/ofetch interop), `composables/useGeographyForm.ts` (4).
+
 ### 2026-05-22 / 2026-05-23 (W3-T4 api/src sweep)
 
 3 commits, 743 → 583 (-160 casts). W3-T4 (api surface) essentially done — production code at 0; remaining 32 are test-mock + docstring residue.
@@ -284,22 +318,43 @@ These three sub-tasks were attempted during the session and surfaced as needing 
 | ~~Per-table Row typing (database)~~ | ✅ closed `ad84b31`+`818fc23` (-26) | done |
 | ~~Saga error context refactor~~ | ✅ closed `11c8f06` (-4) | done |
 | ~~Diagnostics details narrowing~~ | ✅ closed `698d823` (-15) | done |
-| ~~W3-T4 modules/api/src~~ | ✅ closed `0127e86`+`a709031`+`db5eca7` (-158); 32 test-mock + docstring residue left | done |
+| ~~W3-T4 modules/api/src~~ | ✅ closed `0127e86`+`a709031`+`db5eca7` (-158) | done |
 | Remaining core/src per-file batches | ~146 casts (records, indexing, geography, defaults, migrations, ajv/ts-expect-error allowlist, etc.) | 4-6 hours |
-| W3-T5 modules/ui/app | 325 → 0 | 8-10 hours |
+| W3-T5 modules/ui/app | ~201 remaining (was 325 at start; -124 cleared 2026-05-24) | 5-7 hours |
 | W3-T6 modules/storage/src | 80 → annotated allowlist | 2-3 hours |
 | Enable lint rule + test override | per-workspace ESLint config + `**/*.test.ts` override to `warn` | 1-2 hours |
 | CI gate | `.github/workflows/*.yml` update | 30 min |
 | W3 closure (this doc + registry + commit) | append final per-surface table; flip api-009, ui-011, storage-015, core-type-safety | 1 hour |
-| **W3 total remaining** | | **~18-24 hours** |
+| **W3 total remaining** | | **~14-20 hours** |
 
 Then W4 (3 tasks, ~3-5 days) + Phase 2d closure (~1 day).
 
 ### Next session pickup
 
-**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `0127e86` → `a709031` → `db5eca7` (W3-T4 sweep). Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
+**Branch:** `refactor/phase-2d-structural-hardening` (local, not pushed). Last code commits: `a60bd8d` → `3e8f042` → `3a23731` → `59cd93b` (W3-T5 sweeps 1-3). Working tree clean except `.vscode/settings.json` (unrelated, carried across sessions).
 
-**Recommended next slice — W3-T5 (modules/ui/app, 325 casts):**
+**Recommended next slice — continue W3-T5 (modules/ui/app, 201 casts remaining):**
+
+The foundation (typed api-response, errors helper, per-endpoint types) is in place. Remaining ui/app casts are concentrated in a few file types:
+
+1. **Eslint-disabled error handlers (~40 casts across SecuritySettings, useTemplates, useRecordSidebar, setup.vue, notifications.vue, StatusTransitionControls, raw.vue, edit.vue, register.vue)** — these all access 3+ fields per catch (`.message`, `.data`, `.response`, `.status`, `.details`). The `~/utils/errors` module's `errorMessage` / `isApiError` / `errorStatus` helpers cover most of these; migration is mostly mechanical but per-file.
+2. **Profile / settings pages (~30 casts)** — need typed responses for /security-info, /change-password, /verify-email, /metadata, /reset endpoints. Mirror the pattern from `~/types/api-responses.ts`.
+3. **GeographyMap.vue (8)** — Leaflet types are their own effort; `feature: any`, `data: any` GeoJSON-shaped params need typed shapes.
+4. **useDiagnostics.ts (6)** — DiagnosticReport already exported from core (used in api/src/routes/diagnose.ts); just needs to be imported and used.
+5. **utils/geography-colors.ts (4)** — colour-mapping helpers; structural shape.
+6. **plugins/01-civicApi.ts (4)** — Headers / ofetch interop; this is the lowest priority since the casts are at the Nuxt plugin boundary where ofetch's types are themselves loose.
+
+Estimated 5-7 hours to drive 201 → 0.
+
+**Alternatives if scope feels wrong:**
+- **W3-T6 (storage/src, 80 casts)** — smallest surface, mostly DI-handle types. 2-3 h. Quick win.
+- **Remaining core/src long tail** (~146 casts) — records, indexing, geography, diagnostics-config-access. 4-6 h.
+
+Baseline to confirm at session start: `grep -rnE "\bas any\b|: any\b" core/src modules/api/src modules/ui/app modules/storage/src --include="*.ts" --include="*.vue" | wc -l` should report **459**.
+
+---
+
+### (older) Original W3-T5 plan
 
 Largest remaining surface. UI casts cluster differently than api: there's no single seam like express-augment that knocks out 80% with one type augmentation. Expected high-leverage batches:
 
