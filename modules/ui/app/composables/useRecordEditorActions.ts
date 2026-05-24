@@ -33,6 +33,12 @@ interface SidebarCommands {
 }
 
 interface RecordEditorProps {
+  /**
+   * Loose record payload — RecordForm.vue passes either a CivicRecord
+   * (store shape) or an api response envelope; the composable only reads
+   * `record.id` here. The full destructure happens in RecordForm itself.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   record?: any;
   isEditing?: boolean;
   error?: string | null;
@@ -44,10 +50,17 @@ interface RecordEditorProps {
 
 interface RecordEditorEmit {
   (event: 'delete', recordId: string): void;
-  (event: 'saved', recordData: any): void;
+  (event: 'saved', recordData: Record<string, unknown>): void;
 }
 
 export interface UseRecordEditorActionsDeps {
+  /**
+   * Reactive form state. Bound to RecordForm.vue's `reactive({...})`
+   * which has fields mutated dynamically through many code paths
+   * (form.title, form.metadata.tags, form.attachedFiles, ...); the
+   * shape is captured at the SFC, not here, so `any` is intentional.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any;
   props: RecordEditorProps;
   emit: RecordEditorEmit;
@@ -572,10 +585,12 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           description: 'The record has been exported as Markdown',
           color: 'primary',
         });
-      } catch (fallbackErr: any) {
+      } catch (fallbackErr: unknown) {
         toast.add({
           title: 'Export failed',
-          description: fallbackErr.message || 'Failed to export record',
+          description:
+            (fallbackErr instanceof Error ? fallbackErr.message : '') ||
+            'Failed to export record',
           color: 'error',
         });
       }
@@ -583,7 +598,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
   };
 
   // Toolbar actions
-  const handleToolbarAction = (action: string, ...args: any[]) => {
+  const handleToolbarAction = (action: string, ...args: unknown[]) => {
     if (!editorRef.value) return;
 
     switch (action) {
