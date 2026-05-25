@@ -104,12 +104,16 @@ export class SagaExecutor {
   ): Promise<void> {
     if (!this.auditChannel) return;
     try {
+      const ctx = context as SagaContext & {
+        userId?: unknown;
+        user?: { id?: unknown };
+      };
       const userId =
-        typeof (context as any).userId === 'number'
-          ? (context as any).userId
-          : typeof (context as any).user?.id === 'number'
-          ? (context as any).user.id
-          : undefined;
+        typeof ctx.userId === 'number'
+          ? ctx.userId
+          : typeof ctx.user?.id === 'number'
+            ? ctx.user.id
+            : undefined;
       await this.auditChannel.record({
         action: `saga:${saga.name}:${phase}`,
         resourceType: 'saga',
@@ -352,7 +356,7 @@ export class SagaExecutor {
     context: TContext,
     sagaId: string
   ): Promise<TResult> {
-    const stepResults: any[] = [];
+    const stepResults: unknown[] = [];
     let currentStepIndex = 0;
 
     try {
@@ -434,11 +438,11 @@ export class SagaExecutor {
    * Compensate for failed saga
    */
   private async compensate<TContext extends SagaContext>(
-    saga: Saga<TContext, any>,
+    saga: Saga<TContext, unknown>,
     context: TContext,
     sagaId: string,
     failedStepName: string,
-    originalError: SagaStepError
+    originalError: SagaStepError<TContext>
   ): Promise<CompensationResult> {
     const failedStepIndex = saga.steps.findIndex(
       (s) => s.name === failedStepName

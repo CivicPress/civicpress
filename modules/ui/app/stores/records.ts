@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia';
 import { validateApiResponse } from '~/utils/api-response';
+import type {
+  RecordResponse,
+  RecordListResponse,
+  DraftListResponse,
+} from '~/types/api-responses';
 
 export interface CivicRecord {
   id: string;
@@ -86,7 +91,8 @@ export interface CivicRecord {
     source?: string;
     file_path?: string;
     updated_by?: string;
-    [key: string]: any; // Allow additional metadata fields
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- metadata is freeform user-supplied JSON; consumers (RecordList) need direct .summary / .description access without per-site narrowing
+    [key: string]: any;
   };
 }
 
@@ -312,7 +318,11 @@ export const useRecordsStore = defineStore('records', {
           queryString ? `?${queryString}` : ''
         }`;
         const response = await useNuxtApp().$civicApi(url);
-        const data = validateApiResponse(response);
+        const data = validateApiResponse<{
+          total?: number;
+          types?: Record<string, number>;
+          statuses?: Record<string, number>;
+        }>(response);
         this.summaryCounts = {
           total: data.total || 0,
           types: data.types || {},
@@ -352,10 +362,12 @@ export const useRecordsStore = defineStore('records', {
         const url = `/api/v1/records?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
-        const data = validateApiResponse(response);
+        const data = validateApiResponse<RecordListResponse>(response);
 
         // Replace records with current page's records (not accumulating)
-        this.replaceRecords(data.records || []);
+        this.replaceRecords(
+          (data.records || []) as unknown as CivicRecord[]
+        );
 
         // Update pagination state
         this.currentPage = data.currentPage || page;
@@ -371,7 +383,7 @@ export const useRecordsStore = defineStore('records', {
           type: params?.type,
           status: params?.status,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Failed to Load Records',
@@ -456,11 +468,13 @@ export const useRecordsStore = defineStore('records', {
         const url = `/api/v1/search?${queryParams.toString()}`;
         const response = await useNuxtApp().$civicApi(url);
 
-        const data = validateApiResponse(response);
+        const data = validateApiResponse<
+          RecordListResponse & { results?: RecordResponse[] }
+        >(response);
         const apiResults = data.results || [];
 
         // Replace records with search results (not accumulating - paginated)
-        this.replaceRecords(apiResults);
+        this.replaceRecords(apiResults as unknown as CivicRecord[]);
 
         // Update pagination state from API response
         this.currentPage = data.currentPage || pageToLoad;
@@ -474,11 +488,13 @@ export const useRecordsStore = defineStore('records', {
           search: query,
         };
 
-        this.summaryCounts = calculateCountsFromRecords(apiResults);
+        this.summaryCounts = calculateCountsFromRecords(
+          apiResults as unknown as CivicRecord[]
+        );
 
         // Clear any previous errors on successful search
         this.error = null;
-      } catch (error: any) {
+      } catch (error: unknown) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Search Failed',
@@ -503,30 +519,43 @@ export const useRecordsStore = defineStore('records', {
       try {
         const response = await useNuxtApp().$civicApi(`/api/v1/records/${id}`);
 
-        const apiRecord = validateApiResponse(response);
+        const apiRecord = validateApiResponse<RecordResponse>(response);
 
-        // Transform API response to match CivicRecord interface
-        const civicRecord: CivicRecord = {
+        // Transform API response to match CivicRecord interface. The API
+        // returns broad `string` for type/status while CivicRecord uses
+        // tight literal-union enums for in-store narrowing; cast at the
+        // row → domain boundary since the API contract is the source
+        // of truth at runtime.
+        const civicRecord = {
           id: apiRecord.id,
           title: apiRecord.title,
-          type: apiRecord.type,
+          type: apiRecord.type as CivicRecord['type'],
           content: apiRecord.content || '',
-          status: apiRecord.status,
-          path: apiRecord.path,
+          status: (apiRecord.status || 'draft') as CivicRecord['status'],
+          path: apiRecord.path || '',
           author: apiRecord.author || 'unknown',
           authors: apiRecord.authors,
-          created_at: apiRecord.created_at || apiRecord.created,
-          updated_at: apiRecord.updated_at || apiRecord.updated,
+          created_at:
+            apiRecord.created_at ||
+            (apiRecord.created as string | undefined) ||
+            '',
+          updated_at:
+            apiRecord.updated_at ||
+            (apiRecord.updated as string | undefined) ||
+            '',
           source: apiRecord.source,
-          geography: apiRecord.geography,
-          attachedFiles: apiRecord.attachedFiles,
-          linkedRecords: apiRecord.linkedRecords,
-          linkedGeographyFiles: apiRecord.linkedGeographyFiles,
-          metadata: apiRecord.metadata || {},
-        };
+          geography: apiRecord.geography as CivicRecord['geography'],
+          attachedFiles:
+            apiRecord.attachedFiles as CivicRecord['attachedFiles'],
+          linkedRecords: apiRecord.linkedRecords as CivicRecord['linkedRecords'],
+          linkedGeographyFiles:
+            apiRecord.linkedGeographyFiles as CivicRecord['linkedGeographyFiles'],
+          metadata: (apiRecord.metadata ||
+            {}) as CivicRecord['metadata'],
+        } satisfies CivicRecord;
 
         return civicRecord;
-      } catch (error: any) {
+      } catch (error: unknown) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Failed to Fetch Record',

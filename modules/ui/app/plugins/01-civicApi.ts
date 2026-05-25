@@ -21,8 +21,14 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         url.includes('/api/v1/docs') ||
         url.includes('/api/v1/auth/csrf-token'); // CSRF endpoint is public
 
-      // Get headers object and normalize to plain object
-      const headers = options.headers as any;
+      // Get headers object and normalize to plain object.
+      // ofetch types `options.headers` as a union including `HeadersInit`
+      // (object-literal / Headers / [string, string][]); the narrowing
+      // below covers all three branches.
+      const headers = options.headers as
+        | HeadersInit
+        | Record<string, string>
+        | undefined;
       const headersObj: Record<string, string> = {};
 
       // Convert headers to object format
@@ -64,8 +70,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         }
       }
 
-      // Update headers (use 'as any' to handle type compatibility)
-      options.headers = headersObj as any;
+      // Update headers — ofetch's typed `options.headers` is `Headers` after
+      // normalization in this onRequest hook; assign through HeadersInit which
+      // covers the `Record<string, string>` case at the runtime boundary.
+      options.headers = headersObj as unknown as typeof options.headers;
     },
     async onResponseError({ request, options, response, error }) {
       // Enhanced error handling with automatic user feedback
@@ -89,7 +97,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       };
 
       // Determine if the request attempted authenticated access
-      const headers = options?.headers as any;
+      const headers = options?.headers as
+        | HeadersInit
+        | Record<string, string>
+        | undefined;
       const hasAuthHeader = (() => {
         if (!headers) return false;
         if (headers instanceof Headers) return headers.has('Authorization');

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import type { AuthUserResponse } from '~/types/api-responses';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Page metadata
@@ -49,16 +51,16 @@ const fetchUser = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/users/${username}`
-    )) as any;
+    )) as ApiResponse<{ user: AuthUserResponse }>;
 
     if (response.success) {
-      user.value = response.data.user;
+      user.value = response.data.user as unknown as User;
     } else {
-      error.value = response.message || 'Failed to fetch user';
+      error.value = extractErrorMessage(response) || 'Failed to fetch user';
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error fetching user:', err);
-    error.value = err.message || 'Failed to fetch user';
+    error.value = (err instanceof Error ? err.message : '') || 'Failed to fetch user';
   } finally {
     loading.value = false;
   }

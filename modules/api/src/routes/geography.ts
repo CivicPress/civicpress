@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { HttpError } from '../utils/http-error.js';
 import { body, param, query, validationResult } from 'express-validator';
 import {
   GeographyManager,
@@ -13,6 +14,7 @@ import {
   getGeographyPreset,
   applyGeographyPreset,
 } from '@civicpress/core';
+import type { GeographyCategory, GeographyFileType } from '@civicpress/core';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import {
   handleApiError,
@@ -28,7 +30,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   // Helper function to handle API responses
   const handleSuccess = (
     operation: string,
-    data: any,
+    data: unknown,
     res: Response,
     statusCode: number = 200
   ) => {
@@ -41,19 +43,21 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
   const handleError = (
     operation: string,
-    error: any,
+    error: unknown,
     req: Request,
     res: Response,
     statusCode: number = 500
   ) => {
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-    (errorObj as any).statusCode = statusCode;
+    const message = error instanceof Error ? error.message : String(error);
+    const errorObj = new HttpError(statusCode, message, undefined, {
+      cause: error,
+    });
     handleApiError(operation, errorObj, req, res, `${operation} failed`);
   };
 
   const handleValidationError = (
     operation: string,
-    errors: any[],
+    errors: unknown[],
     res: Response
   ) => {
     res.status(400).json({
@@ -83,8 +87,8 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         const { category, type, page = 1, limit = 10 } = req.query;
 
         const result = await geographyManager.listGeographyFiles(
-          category as any,
-          type as any,
+          category as GeographyCategory | undefined,
+          type as GeographyFileType | undefined,
           parseInt(page as string),
           parseInt(limit as string)
         );
@@ -149,7 +153,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           req.user
         );
 
-        logApiSuccess('create_geography', req as any, {
+        logApiSuccess('create_geography', req, {
           geographyFileId: geographyFile.id,
         });
 
@@ -409,11 +413,16 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         await geographyManager.deleteGeographyFile(id, req.user);
 
         handleSuccess('delete_geography', { id }, res);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Check if it's a GeographyNotFoundError
+        const errorCode =
+          error instanceof Error
+            ? (error as Error & { code?: string }).code
+            : undefined;
+        const errorName = error instanceof Error ? error.name : undefined;
         if (
-          error?.code === 'NOT_FOUND' ||
-          error?.name === 'GeographyNotFoundError'
+          errorCode === 'NOT_FOUND' ||
+          errorName === 'GeographyNotFoundError'
         ) {
           return handleError('delete_geography', error, req, res, 404);
         }
@@ -436,7 +445,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
         const { id } = req.params;
 
         // Get CivicPress instance from request (injected by middleware)
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress instance not available');
         }
@@ -449,9 +458,11 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
         // Get all records and filter those that link to this geography file
         const allRecords = await recordsService.listRecords({ limit: 1000 });
-        const linkedRecords = allRecords.records.filter((record: any) =>
-          record.linkedGeographyFiles?.some((link: any) => link.id === id)
-        );
+        const linkedRecords = allRecords.records.filter((record) => {
+          const links = (record as { linkedGeographyFiles?: Array<{ id: string }> })
+            .linkedGeographyFiles;
+          return links?.some((link) => link.id === id);
+        });
 
         handleSuccess('get_linked_records', linkedRecords, res);
       } catch (error) {

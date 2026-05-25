@@ -284,7 +284,7 @@ export class TemplateService implements ITemplateService {
     }
 
     // Build frontmatter
-    const frontmatter: any = {
+    const frontmatter: Record<string, unknown> = {
       template: templateId,
       type: data.type,
     };

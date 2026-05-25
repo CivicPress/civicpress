@@ -400,8 +400,17 @@ const props = withDefaults(defineProps<Props>(), {
   canDelete: false,
 });
 
+interface UserFormSubmitData {
+  username: string;
+  email: string;
+  name?: string;
+  role: string;
+  password?: string;
+  avatar_url?: string;
+}
+
 const emit = defineEmits<{
-  submit: [userData: any];
+  submit: [userData: UserFormSubmitData];
   delete: [];
 }>();
 
@@ -509,8 +518,9 @@ const userCanSetPassword = computed(() => {
 });
 
 const userAuthProviderDisplay = computed(() => {
-  if (!(props.user as any)?.authProvider) return null;
-  return getAuthProviderDisplayName((props.user as any).authProvider);
+  const u = props.user as { authProvider?: string } | null | undefined;
+  if (!u?.authProvider) return null;
+  return getAuthProviderDisplayName(u.authProvider);
 });
 
 // Form validation
@@ -531,8 +541,8 @@ const isFormValid = computed(() => {
 });
 
 // Validate form and return errors
-const validateForm = () => {
-  const errors: any = {};
+const validateForm = (): Partial<Record<string, string>> => {
+  const errors: Partial<Record<string, string>> = {};
 
   // Username validation
   if (!form.username) {
@@ -589,8 +599,9 @@ const generatePassword = () => {
 // Handle form submission
 const handleSubmit = () => {
   // Clear previous errors
-  Object.keys(formErrors).forEach((key) => {
-    (formErrors as any)[key] = '';
+  const errs = formErrors as Record<string, string>;
+  Object.keys(errs).forEach((key) => {
+    errs[key] = '';
   });
 
   // Validate form

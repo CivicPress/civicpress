@@ -18,8 +18,25 @@ export interface OAuthProvider {
   getUserInfo(token: string): Promise<OAuthUser>;
 }
 
-// Import Octokit dynamically to avoid the problematic @octokit/app subpackage
-let Octokit: any = null;
+// Import Octokit dynamically to avoid the problematic @octokit/app subpackage.
+// The cached value is the Octokit constructor (a class); we only `new` it +
+// call `octokit.rest.users.getAuthenticated()` so the structural shape is
+// narrow.
+interface OctokitUser {
+  id: number;
+  login: string;
+  email?: string | null;
+  name?: string | null;
+  avatar_url?: string;
+}
+type OctokitCtor = new (options: { auth: string }) => {
+  rest: {
+    users: {
+      getAuthenticated: () => Promise<{ data: OctokitUser }>;
+    };
+  };
+};
+let Octokit: OctokitCtor | null = null;
 
 async function getOctokit() {
   if (Octokit) return Octokit;

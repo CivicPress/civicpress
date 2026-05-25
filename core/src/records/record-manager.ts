@@ -1,4 +1,5 @@
 import { DatabaseService } from '../database/database-service.js';
+import type { RecordRow } from '../database/types/row-types.js';
 import { GitEngine } from '../git/git-engine.js';
 import { HookSystem } from '../hooks/hook-system.js';
 import { WorkflowEngine } from '../workflows/workflow-engine.js';
@@ -6,24 +7,25 @@ import { TemplateEngine } from '../utils/template-engine.js';
 import { AuthUser } from '../auth/auth-service.js';
 import { Logger } from '../utils/logger.js';
 import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
-import { RecordValidationError } from '../errors/domain-errors.js';
 import { AuditChannel } from '../audit/audit-channel.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { RecordParser } from './record-parser.js';
-import { RecordSchemaValidator } from './record-schema-validator.js';
 import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
-import matter from 'gray-matter';
-import {
-  buildArchiveRelativePath,
-  buildRecordRelativePath,
-  ensureDirectoryForRecordPath,
-  parseRecordRelativePath,
-} from '../utils/record-paths.js';
-import type { ICacheStrategy } from '../cache/types.js';
+import { buildRecordRelativePath } from '../utils/record-paths.js';
 import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
-import { MemoryCache } from '../cache/strategies/memory-cache.js';
-import type { CacheConfig } from '../cache/types.js';
+import {
+  createMarkdownContent,
+  normalizeFrontmatterForValidation,
+} from './record-manager/helpers.js';
+import { RecordSagas } from './record-manager/sagas.js';
+// `import type` is erased at compile time so it does not reintroduce the
+// runtime circular import these methods originally avoided via `any`.
+import type { SagaExecutor } from '../saga/saga-executor.js';
+import type { IndexingService } from '../indexing/indexing-service.js';
+import type { PublishDraftContext } from '../saga/publish-draft-saga.js';
+import { RecordSearch } from './record-manager/search.js';
+import { RecordFileOps } from './record-manager/file-ops.js';
 
 const logger = new Logger();
 
@@ -96,6 +98,20 @@ export interface RecordData {
   commit_signature?: string; // Cryptographic or GPG signature reference associated with the commit
 }
 
+/**
+ * RecordManager — thin orchestrator (Phase 2d W2-T6 decomposition).
+ *
+ * Heavy lifting now lives in four focused collaborators under
+ * `./record-manager/`:
+ *   - `helpers.ts` — pure functions (markdown serialization, date normalization)
+ *   - `sagas.ts` — `RecordSagas` (saga-orchestration entry points)
+ *   - `search.ts` — `RecordSearch` (search + suggestions + cache)
+ *   - `file-ops.ts` — `RecordFileOps` (filesystem write + git commit + schema-validate-before-save)
+ *
+ * The orchestrator keeps the original public surface intact so external
+ * consumers don't need to change: every method that used to be on
+ * `RecordManager` is still on `RecordManager`, with the same signature.
+ */
 export class RecordManager {
   private db: DatabaseService;
   private git: GitEngine;
@@ -105,6 +121,10 @@ export class RecordManager {
   private dataDir: string;
   private cacheManager?: UnifiedCacheManager;
   private auditChannel?: AuditChannel;
+
+  private sagas: RecordSagas;
+  private search: RecordSearch;
+  private fileOps: RecordFileOps;
 
   constructor(
     db: DatabaseService,
@@ -124,6 +144,28 @@ export class RecordManager {
     this.dataDir = dataDir;
     this.cacheManager = cacheManager;
     this.auditChannel = auditChannel;
+
+    this.sagas = new RecordSagas({
+      db: this.db,
+      git: this.git,
+      hooks: this.hooks,
+      workflows: this.workflows,
+      templates: this.templates,
+      dataDir: this.dataDir,
+      auditChannel: this.auditChannel,
+      recordManager: this,
+      writeAudit: this.writeAudit.bind(this),
+    });
+
+    this.search = new RecordSearch({
+      db: this.db,
+      cacheManager: this.cacheManager,
+    });
+
+    this.fileOps = new RecordFileOps({
+      git: this.git,
+      dataDir: this.dataDir,
+    });
   }
 
   /**
@@ -162,36 +204,6 @@ export class RecordManager {
       resourceId: event.resourceId,
       details: event.message,
     });
-  }
-
-  /**
-   * Get or create suggestions cache (lazy initialization)
-   */
-  private getSuggestionsCache(): ICacheStrategy<{
-    suggestions: string[];
-    timestamp: number;
-  }> {
-    if (!this.suggestionsCache) {
-      if (this.cacheManager) {
-        this.suggestionsCache = this.cacheManager.getCache<{
-          suggestions: string[];
-          timestamp: number;
-        }>('recordSuggestions');
-      } else {
-        // Fallback: create MemoryCache directly (for backward compatibility)
-        const cacheConfig: CacheConfig = {
-          strategy: 'memory',
-          enabled: true,
-          defaultTTL: 5 * 60 * 1000, // 5 minutes
-          maxSize: 1000,
-        };
-        this.suggestionsCache = new MemoryCache<{
-          suggestions: string[];
-          timestamp: number;
-        }>(cacheConfig, logger);
-      }
-    }
-    return this.suggestionsCache;
   }
 
   /**
@@ -338,7 +350,7 @@ export class RecordManager {
 
     // Create file in git repository (unless explicitly skipped)
     if (!request.skipFileGeneration) {
-      await this.createRecordFile(record);
+      await this.fileOps.createRecordFile(record);
     }
 
     // Log audit event (routed through unified AuditChannel — closes core-001)
@@ -466,7 +478,7 @@ export class RecordManager {
 
     // Create file in git repository unless explicitly skipped
     if (!request.skipFileGeneration) {
-      await this.createRecordFile(record);
+      await this.fileOps.createRecordFile(record);
     }
 
     // Log audit event (routed through unified AuditChannel — closes core-001)
@@ -636,57 +648,9 @@ export class RecordManager {
    * This orchestrates the multi-step process of updating a published record
    */
   async updateRecordSaga(
-    id: string,
-    request: UpdateRecordRequest,
-    user: AuthUser,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
-    indexingService?: any, // IndexingService - injected to avoid circular dependency
-    correlationId?: string
+    ...args: Parameters<RecordSagas['updateRecordSaga']>
   ): Promise<RecordData | null> {
-    // Import saga components dynamically to avoid circular dependencies
-    const { UpdateRecordSaga } = await import('../saga/update-record-saga.js');
-    const {
-      SagaExecutor,
-      SagaStateStore,
-      IdempotencyManager,
-      ResourceLockManager,
-    } = await import('../saga/index.js');
-
-    // Create saga executor if not provided
-    let executor = sagaExecutor;
-    if (!executor) {
-      const stateStore = new SagaStateStore(this.db);
-      const idempotencyManager = new IdempotencyManager(stateStore);
-      const lockManager = new ResourceLockManager(this.db);
-      executor = new SagaExecutor(stateStore, idempotencyManager, lockManager);
-    }
-
-    // Create saga instance
-    const saga = new UpdateRecordSaga(
-      this.db,
-      this,
-      this.git,
-      this.hooks,
-      indexingService || null,
-      this.dataDir
-    );
-
-    // Create context
-    const context = {
-      correlationId: correlationId || `update-${id}-${Date.now()}`,
-      startedAt: new Date(),
-      recordId: id,
-      request,
-      user,
-      metadata: {
-        recordId: id,
-      },
-    };
-
-    // Execute saga
-    const result = await executor.execute(saga, context);
-
-    return result.result;
+    return this.sagas.updateRecordSaga(...args);
   }
 
   /**
@@ -783,7 +747,7 @@ export class RecordManager {
     }
 
     // Prepare database updates
-    const dbUpdates: any = {};
+    const dbUpdates: Record<string, unknown> = {};
     if (request.title !== undefined) dbUpdates.title = request.title;
     if (request.content !== undefined) dbUpdates.content = request.content;
     if (request.status !== undefined) dbUpdates.status = request.status;
@@ -815,7 +779,7 @@ export class RecordManager {
 
     // Update file in git repository (skip during sync operations)
     if (!request.skipFileGeneration) {
-      await this.updateRecordFile(updatedRecord);
+      await this.fileOps.updateRecordFile(updatedRecord);
     }
 
     // Log audit event (skip during sync operations)
@@ -848,55 +812,9 @@ export class RecordManager {
    * This orchestrates the multi-step process of archiving a record
    */
   async archiveRecordSaga(
-    id: string,
-    user: AuthUser,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
-    correlationId?: string
+    ...args: Parameters<RecordSagas['archiveRecordSaga']>
   ): Promise<boolean> {
-    // Import saga components dynamically to avoid circular dependencies
-    const { ArchiveRecordSaga } = await import(
-      '../saga/archive-record-saga.js'
-    );
-    const {
-      SagaExecutor,
-      SagaStateStore,
-      IdempotencyManager,
-      ResourceLockManager,
-    } = await import('../saga/index.js');
-
-    // Create saga executor if not provided
-    let executor = sagaExecutor;
-    if (!executor) {
-      const stateStore = new SagaStateStore(this.db);
-      const idempotencyManager = new IdempotencyManager(stateStore);
-      const lockManager = new ResourceLockManager(this.db);
-      executor = new SagaExecutor(stateStore, idempotencyManager, lockManager);
-    }
-
-    // Create saga instance
-    const saga = new ArchiveRecordSaga(
-      this.db,
-      this,
-      this.git,
-      this.hooks,
-      this.dataDir
-    );
-
-    // Create context
-    const context = {
-      correlationId: correlationId || `archive-${id}-${Date.now()}`,
-      startedAt: new Date(),
-      recordId: id,
-      user,
-      metadata: {
-        recordId: id,
-      },
-    };
-
-    // Execute saga
-    const result = await executor.execute(saga, context);
-
-    return result.result;
+    return this.sagas.archiveRecordSaga(...args);
   }
 
   /**
@@ -904,9 +822,10 @@ export class RecordManager {
    *
    * Note: This method uses the saga pattern for better error handling and compensation.
    */
-  async archiveRecord(id: string, user: AuthUser): Promise<boolean> {
-    // Use saga for all archive operations
-    return this.archiveRecordSaga(id, user);
+  async archiveRecord(
+    ...args: Parameters<RecordSagas['archiveRecord']>
+  ): Promise<boolean> {
+    return this.sagas.archiveRecord(...args);
   }
 
   /**
@@ -920,7 +839,7 @@ export class RecordManager {
       offset?: number;
       sort?: string;
     } = {}
-  ): Promise<{ records: any[]; total: number }> {
+  ): Promise<{ records: RecordRow[]; total: number }> {
     const result = await this.db.listRecords(options);
 
     return {
@@ -933,419 +852,21 @@ export class RecordManager {
    * Search records with pagination, filtering, and sorting
    */
   async searchRecords(
-    query: string,
-    options: {
-      type?: string;
-      status?: string;
-      limit?: number;
-      offset?: number;
-      sort?: string;
-    } = {}
-  ): Promise<{ records: any[]; total: number }> {
-    // Use search service if available (includes pagination and relevance ranking)
-    const searchService = this.db.getSearchService();
-    if (searchService) {
-      try {
-        const searchResult = await searchService.search(query, {
-          type: options.type,
-          status: options.status,
-          limit: options.limit || 20,
-          offset: options.offset || 0,
-          sort: options.sort,
-        });
-
-        if (searchResult.results.length === 0) {
-          return { records: [], total: searchResult.total };
-        }
-
-        // Batch fetch records (no N+1 queries!)
-        const recordIds = searchResult.results.map((r) => r.record_id);
-        const records = await this.batchGetRecords(recordIds);
-
-        // Map search results to records, preserving relevance scores
-        const recordsMap = new Map(records.map((r) => [r.id, r]));
-        const resultRecords = searchResult.results
-          .map((searchResultItem) => {
-            const record = recordsMap.get(searchResultItem.record_id);
-            if (!record) return null;
-
-            // Add search metadata (relevance score, excerpt, etc.)
-            return {
-              ...record,
-              _search: {
-                relevance_score: searchResultItem.relevance_score,
-                excerpt: searchResultItem.excerpt,
-                match_highlights: searchResultItem.match_highlights,
-              },
-            };
-          })
-          .filter((r) => r !== null);
-
-        return {
-          records: resultRecords,
-          total: searchResult.total,
-        };
-      } catch (error) {
-        // Fall back to old method if search service fails
-        logger.warn('Search service failed, falling back to basic search', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    // Fallback: Old method (with N+1 fix)
-    const searchResults = await this.db.searchRecords(query, {
-      type: options.type,
-      status: options.status,
-      limit: options.limit || 20,
-      offset: options.offset || 0,
-      sort: options.sort,
-    });
-
-    if (searchResults.length === 0) {
-      return { records: [], total: 0 };
-    }
-
-    // Batch fetch records (no N+1 queries!)
-    const recordIds = searchResults.map((r: any) => r.record_id);
-    const records = await this.batchGetRecords(recordIds);
-
-    // Map search results to records
-    const recordsMap = new Map(records.map((r) => [r.id, r]));
-    const resultRecords = searchResults
-      .map((searchResult: any) => {
-        const record = recordsMap.get(searchResult.record_id);
-        if (!record) return null;
-        return record;
-      })
-      .filter((r) => r !== null);
-
-    return {
-      records: resultRecords,
-      total: resultRecords.length, // Approximate total
-    };
-  }
-
-  /**
-   * Batch fetch records to avoid N+1 query problem
-   */
-  private async batchGetRecords(recordIds: string[]): Promise<any[]> {
-    if (recordIds.length === 0) return [];
-
-    // Handle SQLite IN clause limit (999)
-    const BATCH_SIZE = 999;
-    const records: any[] = [];
-
-    for (let i = 0; i < recordIds.length; i += BATCH_SIZE) {
-      const batch = recordIds.slice(i, i + BATCH_SIZE);
-      const placeholders = batch.map(() => '?').join(',');
-      const sql = `SELECT * FROM records WHERE id IN (${placeholders})`;
-
-      const batchRecords = await this.db.query(sql, batch);
-      records.push(...batchRecords);
-    }
-
-    return records;
+    ...args: Parameters<RecordSearch['searchRecords']>
+  ): ReturnType<RecordSearch['searchRecords']> {
+    return this.search.searchRecords(...args);
   }
 
   /**
    * Get search suggestions based on record titles and content
    * Optimized: Uses lightweight query + caching (no full record fetches)
    */
-  private suggestionsCache?: ICacheStrategy<{
-    suggestions: string[];
-    timestamp: number;
-  }>;
-
   async getSearchSuggestions(
-    query: string,
-    options: {
-      limit?: number;
-    } = {}
+    ...args: Parameters<RecordSearch['getSearchSuggestions']>
   ): Promise<string[]> {
-    const limit = options.limit || 10;
-    const normalized = query.toLowerCase().trim();
-
-    if (normalized.length < 2) {
-      return [];
-    }
-
-    // Check cache
-    const cached = await this.getSuggestionsCache().get(normalized);
-    if (cached) {
-      return cached.suggestions.slice(0, limit);
-    }
-
-    // Use search service if available (lightweight query with typo tolerance)
-    const searchService = this.db.getSearchService();
-    if (searchService) {
-      try {
-        // Enable typo tolerance for better UX
-        const suggestions = await searchService.getSuggestions(
-          normalized,
-          limit,
-          true // enableTypoTolerance
-        );
-        // Return full suggestions with type information
-        // The API will handle formatting
-        const suggestionTexts = suggestions.map((s) => s.text);
-
-        // Update cache
-        await this.getSuggestionsCache().set(normalized, {
-          suggestions: suggestionTexts,
-          timestamp: Date.now(),
-        });
-
-        return suggestionTexts;
-      } catch (error) {
-        // Fall back to old method if search service fails
-        logger.warn(
-          'Search service suggestions failed, falling back to basic method',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          }
-        );
-      }
-    }
-
-    // Fallback: Old method (lightweight query - no full record fetches)
-    const sql = `
-      SELECT DISTINCT si.title as suggestion
-      FROM search_index si
-      INNER JOIN records r ON si.record_id = r.id
-      WHERE (COALESCE(si.title_normalized, LOWER(si.title)) LIKE '%' || ? || '%')
-        AND (r.workflow_state IS NULL OR r.workflow_state != 'internal_only')
-      ORDER BY si.updated_at DESC
-      LIMIT ?
-    `;
-
-    const results = await this.db.query(sql, [normalized, limit]);
-    const suggestions = results.map((r: any) => r.suggestion);
-
-    // Update cache
-    await this.getSuggestionsCache().set(normalized, {
-      suggestions,
-      timestamp: Date.now(),
-    });
-
-    return suggestions;
+    return this.search.getSearchSuggestions(...args);
   }
 
-  /**
-   * Create record file in git repository
-   */
-  private async createRecordFile(record: RecordData): Promise<void> {
-    const filePath = record.path;
-    if (!filePath) return;
-
-    // Normalize source field before creating markdown (if it's a string, convert to object)
-    const normalizedRecord = { ...record };
-    if (
-      normalizedRecord.source &&
-      typeof normalizedRecord.source === 'string'
-    ) {
-      normalizedRecord.source = {
-        reference: normalizedRecord.source,
-      };
-    }
-
-    // Create markdown content
-    const content = this.createMarkdownContent(normalizedRecord);
-
-    // Validate schema before saving (fail fast)
-    const { data: frontmatter } = matter(content);
-
-    // Normalize frontmatter: convert Date objects back to ISO strings (gray-matter parses dates)
-    const normalizedFrontmatter =
-      this.normalizeFrontmatterForValidation(frontmatter);
-
-    const schemaValidation = RecordSchemaValidator.validate(
-      normalizedFrontmatter,
-      record.type,
-      {
-        includeModuleExtensions: true,
-        includeTypeExtensions: true,
-        strict: false,
-      }
-    );
-
-    if (!schemaValidation.isValid && schemaValidation.errors.length > 0) {
-      const errorMessages = schemaValidation.errors
-        .map((err) => `${err.field}: ${err.message}`)
-        .join('; ');
-      throw new RecordValidationError(
-        `Schema validation failed before saving record ${record.id}: ${errorMessages}`,
-        { recordId: record.id, validationErrors: schemaValidation.errors }
-      );
-    }
-
-    // Ensure directory exists
-    ensureDirectoryForRecordPath(this.dataDir, filePath);
-    const fullPath = path.join(this.dataDir, filePath);
-
-    // Write file
-    await fs.writeFile(fullPath, content, 'utf8');
-
-    // Commit to git
-    await this.git.commit(`Create record: ${record.title}`, [filePath]);
-  }
-
-  /**
-   * Update record file in git repository
-   */
-  private async updateRecordFile(record: RecordData): Promise<void> {
-    const filePath = record.path;
-    if (!filePath) return;
-
-    // Normalize source field before creating markdown (if it's a string, convert to object)
-    const normalizedRecord = { ...record };
-    if (
-      normalizedRecord.source &&
-      typeof normalizedRecord.source === 'string'
-    ) {
-      normalizedRecord.source = {
-        reference: normalizedRecord.source,
-      };
-    }
-
-    // Create markdown content
-    const content = this.createMarkdownContent(normalizedRecord);
-
-    // Validate schema before saving (fail fast)
-    const { data: frontmatter } = matter(content);
-
-    // Normalize frontmatter: convert Date objects back to ISO strings (gray-matter parses dates)
-    const normalizedFrontmatter =
-      this.normalizeFrontmatterForValidation(frontmatter);
-
-    const schemaValidation = RecordSchemaValidator.validate(
-      normalizedFrontmatter,
-      record.type,
-      {
-        includeModuleExtensions: true,
-        includeTypeExtensions: true,
-        strict: false,
-      }
-    );
-
-    if (!schemaValidation.isValid && schemaValidation.errors.length > 0) {
-      const errorMessages = schemaValidation.errors
-        .map((err) => `${err.field}: ${err.message}`)
-        .join('; ');
-      throw new RecordValidationError(
-        `Schema validation failed before updating record ${record.id}: ${errorMessages}`,
-        { recordId: record.id, validationErrors: schemaValidation.errors }
-      );
-    }
-
-    // Write file
-    ensureDirectoryForRecordPath(this.dataDir, filePath);
-    const fullPath = path.join(this.dataDir, filePath);
-    await fs.writeFile(fullPath, content, 'utf8');
-
-    // Commit to git
-    await this.git.commit(`Update record: ${record.title}`, [filePath]);
-  }
-
-  /**
-   * Archive record file in git repository
-   */
-  private async archiveRecordFile(record: RecordData): Promise<void> {
-    const filePath = record.path;
-    if (!filePath) return;
-
-    // Determine archive path (preserve original year if present)
-    const parsedPath = parseRecordRelativePath(filePath);
-    const archivePath =
-      parsedPath.year && parsedPath.type === record.type
-        ? path
-            .join('archive', record.type, parsedPath.year, `${record.id}.md`)
-            .replace(/\\/g, '/')
-        : buildArchiveRelativePath(record.type, record.id, record.created_at);
-    const sourcePath = path.join(this.dataDir, filePath);
-    const targetPath = path.join(this.dataDir, archivePath);
-
-    // Ensure archive directory exists
-    ensureDirectoryForRecordPath(this.dataDir, archivePath);
-
-    // Move file
-    await fs.rename(sourcePath, targetPath);
-
-    // Commit to git
-    await this.git.commit(`Archive record: ${record.title}`, [archivePath]);
-  }
-
-  /**
-   * Create markdown content for a record
-   * Uses RecordParser for standardized formatting
-   */
-  private createMarkdownContent(record: RecordData): string {
-    return RecordParser.serializeToMarkdown(record);
-  }
-
-  /**
-   * Normalize frontmatter for validation: convert Date objects to ISO strings
-   * gray-matter automatically parses ISO 8601 dates as Date objects, but schema expects strings
-   */
-  private normalizeFrontmatterForValidation(frontmatter: any): any {
-    const normalized = { ...frontmatter };
-
-    // Convert Date objects to ISO strings
-    if (normalized.created instanceof Date) {
-      normalized.created = normalized.created.toISOString();
-    }
-    if (normalized.updated instanceof Date) {
-      normalized.updated = normalized.updated.toISOString();
-    }
-    if (normalized.date instanceof Date) {
-      normalized.date = normalized.date.toISOString();
-    }
-
-    // Normalize source: if it's a string (old format), convert to object
-    if (normalized.source) {
-      if (typeof normalized.source === 'string') {
-        normalized.source = {
-          reference: normalized.source,
-        };
-      } else if (typeof normalized.source === 'object') {
-        normalized.source = this.normalizeDatesInObject(normalized.source);
-      }
-    }
-
-    // Recursively normalize nested objects (e.g., metadata fields)
-    if (normalized.metadata && typeof normalized.metadata === 'object') {
-      normalized.metadata = this.normalizeDatesInObject(normalized.metadata);
-    }
-
-    return normalized;
-  }
-
-  /**
-   * Recursively convert Date objects to ISO strings in an object
-   */
-  private normalizeDatesInObject(obj: any): any {
-    if (obj === null || obj === undefined) {
-      return obj;
-    }
-
-    if (obj instanceof Date) {
-      return obj.toISOString();
-    }
-
-    if (Array.isArray(obj)) {
-      return obj.map((item) => this.normalizeDatesInObject(item));
-    }
-
-    if (typeof obj === 'object') {
-      const normalized: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        normalized[key] = this.normalizeDatesInObject(value);
-      }
-      return normalized;
-    }
-
-    return obj;
-  }
 
   /**
    * Publish a draft record using the saga pattern
@@ -1355,8 +876,8 @@ export class RecordManager {
     draftId: string,
     user: AuthUser,
     targetStatus?: string,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
-    indexingService?: any, // IndexingService - injected to avoid circular dependency
+    sagaExecutor?: SagaExecutor,
+    indexingService?: IndexingService | null,
     correlationId?: string
   ): Promise<RecordData> {
     // Import saga components dynamically to avoid circular dependencies
@@ -1401,7 +922,10 @@ export class RecordManager {
     };
 
     // Execute saga
-    const result = await executor.execute(saga, context);
+    const result = await executor.execute<PublishDraftContext, RecordData>(
+      saga,
+      context
+    );
 
     return result.result;
   }
@@ -1411,57 +935,8 @@ export class RecordManager {
    * This orchestrates the multi-step process of creating a published record
    */
   async createRecordSaga(
-    request: CreateRecordRequest,
-    user: AuthUser,
-    recordId?: string,
-    sagaExecutor?: any, // SagaExecutor - injected to avoid circular dependency
-    indexingService?: any, // IndexingService - injected to avoid circular dependency
-    correlationId?: string
+    ...args: Parameters<RecordSagas['createRecordSaga']>
   ): Promise<RecordData> {
-    // Import saga components dynamically to avoid circular dependencies
-    const { CreateRecordSaga } = await import('../saga/create-record-saga.js');
-    const {
-      SagaExecutor,
-      SagaStateStore,
-      IdempotencyManager,
-      ResourceLockManager,
-    } = await import('../saga/index.js');
-
-    // Create saga executor if not provided
-    let executor = sagaExecutor;
-    if (!executor) {
-      const stateStore = new SagaStateStore(this.db);
-      const idempotencyManager = new IdempotencyManager(stateStore);
-      const lockManager = new ResourceLockManager(this.db);
-      executor = new SagaExecutor(stateStore, idempotencyManager, lockManager);
-    }
-
-    // Create saga instance
-    const saga = new CreateRecordSaga(
-      this.db,
-      this,
-      this.git,
-      this.hooks,
-      indexingService || null, // Will be set if provided
-      this.dataDir
-    );
-
-    // Create context
-    const context = {
-      correlationId:
-        correlationId || `create-${recordId || 'record'}-${Date.now()}`,
-      startedAt: new Date(),
-      request,
-      user,
-      recordId,
-      metadata: {
-        recordType: request.type,
-      },
-    };
-
-    // Execute saga
-    const result = await executor.execute(saga, context);
-
-    return result.result;
+    return this.sagas.createRecordSaga(...args);
   }
 }

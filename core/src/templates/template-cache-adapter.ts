@@ -40,13 +40,14 @@ export class TemplateCacheAdapter {
       this.listCache =
         cacheManager.getCache<TemplateResponse[]>('templateLists');
 
-      // Set up key mapper for file paths to template IDs (if FileWatcherCache)
-      // Note: We need to check if it's actually a FileWatcherCache instance
-      if (
-        'setKeyMapper' in templateCacheFromManager &&
-        typeof (templateCacheFromManager as any).setKeyMapper === 'function'
-      ) {
-        (templateCacheFromManager as any).setKeyMapper((filePath: string) => {
+      // Set up key mapper for file paths to template IDs (if FileWatcherCache).
+      // Structural probe: setKeyMapper is on FileWatcherCache only, not on
+      // the base ICacheStrategy interface.
+      const withKeyMapper = templateCacheFromManager as {
+        setKeyMapper?: (mapper: (filePath: string) => string) => void;
+      };
+      if (typeof withKeyMapper.setKeyMapper === 'function') {
+        withKeyMapper.setKeyMapper((filePath: string) => {
           // Convert file path to template ID
           // Example: /path/to/.civic/templates/bylaw/test.md -> bylaw/test
           const relativePath = path.relative(

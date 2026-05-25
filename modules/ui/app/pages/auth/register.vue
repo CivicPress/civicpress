@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { errorMessage } from '~/utils/errors';
+
 const authStore = useAuthStore();
 const { t } = useI18n();
 
@@ -108,7 +110,7 @@ const handleRegister = async () => {
       }
     );
 
-    if ((response as any).success) {
+    if ((response as { success?: boolean }).success) {
       success.value = t('auth.registrationSuccessful');
       // Clear form
       state.username = '';
@@ -122,9 +124,8 @@ const handleRegister = async () => {
         navigateTo('/auth/login');
       }, 2000);
     }
-  } catch (err: any) {
-    error.value =
-      err.data?.error?.message || err.message || t('auth.registrationFailed');
+  } catch (err: unknown) {
+    error.value = errorMessage(err, t('auth.registrationFailed'));
   } finally {
     loading.value = false;
   }

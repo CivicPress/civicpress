@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { StorageDatabaseService } from '../types/storage.types.js';
 import {
   LifecycleManager,
   type LifecyclePolicy,
@@ -62,8 +63,8 @@ describe('LifecycleManager', () => {
     databaseService = new MockDatabaseService();
     storageService = new MockStorageService();
     manager = new LifecycleManager(
-      databaseService,
-      storageService,
+      databaseService as unknown as StorageDatabaseService,
+      storageService as unknown as import("../cloud-uuid-storage-service.js").CloudUuidStorageService,
       [],
       mockLogger
     );
@@ -364,8 +365,8 @@ describe('LifecycleManager', () => {
       };
 
       const deleteSpy = vi
-        .spyOn(storageService, 'deleteFile')
-        .mockResolvedValue(undefined);
+        .spyOn(storageService as unknown as import("../cloud-uuid-storage-service.js").CloudUuidStorageService, 'deleteFile')
+        .mockResolvedValue(true as unknown as boolean);
 
       const actions = [
         {
@@ -397,7 +398,7 @@ describe('LifecycleManager', () => {
         updated_at: new Date(),
       };
 
-      vi.spyOn(storageService, 'deleteFile').mockRejectedValue(
+      vi.spyOn(storageService as unknown as import("../cloud-uuid-storage-service.js").CloudUuidStorageService, 'deleteFile').mockRejectedValue(
         new Error('Delete failed')
       );
 

@@ -61,9 +61,9 @@ export const useSearchSuggestions = () => {
           titles.value = response.data?.suggestions || [];
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch search suggestions:', err);
-      error.value = err.message || 'Failed to fetch suggestions';
+      error.value = (err instanceof Error ? err.message : '') || 'Failed to fetch suggestions';
       // Only clear if this is still the current query
       if (currentQuery.value === query.trim()) {
         suggestions.value = [];

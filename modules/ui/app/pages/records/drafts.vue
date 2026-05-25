@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
+import type { DraftListResponse } from '~/types/api-responses';
 import { useRecordsStore } from '~/stores/records';
 import { useAuthStore } from '~/stores/auth';
 
@@ -34,7 +36,9 @@ const fetchDrafts = async () => {
 
   try {
     // Fetch only from drafts endpoint - all drafts, unpublished changes, and internal docs are in record_drafts table
-    const response = (await $civicApi('/api/v1/records/drafts')) as any;
+    const response = (await $civicApi(
+      '/api/v1/records/drafts'
+    )) as ApiResponse<DraftListResponse>;
 
     if (response?.success && response?.data?.drafts) {
       // All drafts are in record_drafts table - no need to combine multiple sources
@@ -49,8 +53,8 @@ const fetchDrafts = async () => {
     } else {
       throw new Error('Failed to load drafts');
     }
-  } catch (err: any) {
-    error.value = err.message || 'Failed to load drafts';
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || 'Failed to load drafts';
     console.error('Error fetching drafts:', err);
   } finally {
     loading.value = false;
@@ -58,12 +62,12 @@ const fetchDrafts = async () => {
 };
 
 // Navigate to edit page
-const editDraft = (draft: any) => {
+const editDraft = (draft: { id: string; type?: string }) => {
   navigateTo(`/records/${draft.type}/${draft.id}/edit`);
 };
 
 // Delete draft
-const deleteDraft = async (draft: any) => {
+const deleteDraft = async (draft: { id: string; title?: string }) => {
   if (!confirm(`Are you sure you want to delete "${draft.title}"?`)) {
     return;
   }
@@ -77,13 +81,13 @@ const deleteDraft = async (draft: any) => {
 
     // Remove from list
     drafts.value = drafts.value.filter((d) => d.id !== draft.id);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error deleting draft:', err);
     // Show error toast
     const toast = useToast();
     toast.add({
       title: 'Delete failed',
-      description: err.message || 'Failed to delete draft',
+      description: (err instanceof Error ? err.message : '') || 'Failed to delete draft',
       color: 'error',
     });
   }

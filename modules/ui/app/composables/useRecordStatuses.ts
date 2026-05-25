@@ -64,17 +64,22 @@ export function useRecordStatuses() {
       };
 
       if (response.success && response.data) {
-        const unwrap = (v: any) =>
-          v && typeof v === 'object' && 'value' in v ? v.value : v;
+        const unwrap = (v: unknown): unknown =>
+          v && typeof v === 'object' && 'value' in v
+            ? (v as { value: unknown }).value
+            : v;
         const newRecordStatuses = (response.data.record_statuses || []).map(
-          (rs: any) => ({
-            ...rs,
-            label: unwrap(rs?.label),
-            description: unwrap(rs?.description),
-            source_name: unwrap(rs?.source_name),
-            priority: unwrap(rs?.priority),
-          })
-        ) as RecordStatusMetadata[];
+          (rs) => {
+            const r = rs as unknown as Record<string, unknown>;
+            return {
+              ...r,
+              label: unwrap(r?.label),
+              description: unwrap(r?.description),
+              source_name: unwrap(r?.source_name),
+              priority: unwrap(r?.priority),
+            };
+          }
+        ) as unknown as RecordStatusMetadata[];
         recordStatuses.value = newRecordStatuses;
         fetched.value = true;
 
@@ -84,8 +89,8 @@ export function useRecordStatuses() {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to fetch record statuses';
+    } catch (err: unknown) {
+      const errorMessage = (err instanceof Error ? err.message : '') || 'Failed to fetch record statuses';
       error.value = errorMessage;
       globalError = errorMessage;
       console.error('Error fetching record statuses:', err);

@@ -128,6 +128,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRouter, useRoute } from 'vue-router';
 import type { GeographyFile } from '~/types/geography';
 import GeographyForm from '~/components/GeographyForm.vue';
@@ -178,13 +179,13 @@ const deleteFile = async () => {
       {
         method: 'DELETE',
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success) {
       // Redirect to geography list after successful deletion
       router.push('/geography');
     } else {
-      error.value = response.error || t('geography.failedToDelete');
+      error.value = extractErrorMessage(response) || t('geography.failedToDelete');
     }
   } catch (err) {
     console.error('Error deleting geography file:', err);

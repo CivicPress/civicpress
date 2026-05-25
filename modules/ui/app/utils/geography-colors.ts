@@ -51,11 +51,19 @@ export function assignDefaultColors(
   return colorMap;
 }
 
+/** Minimal GeoJSON-ish shape consumed by extractPropertyValues / suggestPropertyName. */
+interface GeoJsonFeature {
+  properties?: Record<string, unknown>;
+}
+interface GeoJsonLike {
+  features?: GeoJsonFeature[];
+}
+
 /**
  * Extract unique property values from GeoJSON features
  */
 export function extractPropertyValues(
-  geoJson: any,
+  geoJson: GeoJsonLike | null | undefined,
   propertyName: string
 ): string[] {
   if (!geoJson || !geoJson.features || !Array.isArray(geoJson.features)) {
@@ -63,8 +71,8 @@ export function extractPropertyValues(
   }
 
   const values = new Set<string>();
-  geoJson.features.forEach((feature: any) => {
-    if (feature.properties && feature.properties[propertyName]) {
+  geoJson.features.forEach((feature) => {
+    if (feature.properties && feature.properties[propertyName] != null) {
       const value = String(feature.properties[propertyName]);
       if (value) {
         values.add(value);
@@ -78,7 +86,9 @@ export function extractPropertyValues(
 /**
  * Suggest property name for color/icon mapping based on common patterns
  */
-export function suggestPropertyName(geoJson: any): string | null {
+export function suggestPropertyName(
+  geoJson: GeoJsonLike | null | undefined
+): string | null {
   if (!geoJson || !geoJson.features || !Array.isArray(geoJson.features)) {
     return null;
   }
@@ -96,7 +106,7 @@ export function suggestPropertyName(geoJson: any): string | null {
 
   // Check which properties exist in the features
   const availableProperties = new Set<string>();
-  geoJson.features.forEach((feature: any) => {
+  geoJson.features.forEach((feature) => {
     if (feature.properties) {
       Object.keys(feature.properties).forEach((key) => {
         availableProperties.add(key);

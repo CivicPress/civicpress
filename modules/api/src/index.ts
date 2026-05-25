@@ -1,4 +1,5 @@
 import express from 'express';
+import { HttpError } from './utils/http-error.js';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
@@ -76,15 +77,22 @@ export class CivicPressAPI {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(
       (
-        err: any,
+        err: Error,
         req: express.Request,
         res: express.Response,
         next: express.NextFunction
       ) => {
         if (err instanceof SyntaxError && 'body' in err) {
-          (err as any).statusCode = 400;
-          (err as any).message = 'Malformed JSON';
-          return errorHandler(err, req, res, next);
+          // Wrap the underlying SyntaxError in a typed HttpError so the
+          // error handler can read statusCode without `as any`.
+          return errorHandler(
+            new HttpError(400, 'Malformed JSON', 'MALFORMED_JSON', {
+              cause: err,
+            }),
+            req,
+            res,
+            next
+          );
         }
         next(err);
       }
@@ -228,7 +236,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('info'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       infoRouter
@@ -238,7 +246,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('auth'),
       (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       authRouter
@@ -255,7 +263,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('users/auth'),
       (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       authenticationRouter
@@ -272,7 +280,7 @@ export class CivicPressAPI {
       apiPath('geography'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createGeographyRouter(geographyManager)
@@ -281,7 +289,7 @@ export class CivicPressAPI {
       apiPath('search'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       searchRouter
@@ -292,7 +300,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('status'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createStatusRouter()
@@ -303,7 +311,7 @@ export class CivicPressAPI {
       apiPath('cache'),
       authMiddleware(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createCacheRouter(this.civicPress.getCacheManager())
@@ -313,7 +321,7 @@ export class CivicPressAPI {
       apiPath('diagnose'),
       authMiddleware(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createDiagnoseRouter()
@@ -326,7 +334,7 @@ export class CivicPressAPI {
       apiPath('validation'),
       authMiddleware(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createValidationRouter()
@@ -334,7 +342,7 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('config'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       // Config router has its own auth middleware, CSRF applies to browser requests
@@ -410,7 +418,7 @@ export class CivicPressAPI {
       optionalAuth(this.civicPress),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       uuidStorageRouter

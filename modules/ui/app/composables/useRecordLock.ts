@@ -1,4 +1,6 @@
 import { ref, onMounted, onUnmounted, getCurrentInstance } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
+import type { RecordLockResponse } from '~/types/api-responses';
 import { useNuxtApp } from '#app';
 
 interface LockInfo {
@@ -51,7 +53,7 @@ export function useRecordLock(options: UseRecordLockOptions) {
     try {
       const response = (await $civicApi(`/api/v1/records/${recordId}/lock`, {
         method: 'POST',
-      })) as any;
+      })) as ApiResponse<RecordLockResponse>;
 
       if (response?.success) {
         await checkLock();
@@ -66,8 +68,9 @@ export function useRecordLock(options: UseRecordLockOptions) {
       error.value = lockError;
 
       // Check if it's a lock conflict
-      if ((err as any)?.statusCode === 409) {
-        const lockData = (err as any)?.data;
+      const e = err as { statusCode?: number; data?: RecordLockResponse };
+      if (e?.statusCode === 409) {
+        const lockData = e.data;
         if (lockData) {
           lockInfo.value = {
             locked: true,
@@ -114,7 +117,7 @@ export function useRecordLock(options: UseRecordLockOptions) {
     try {
       const response = (await $civicApi(
         `/api/v1/records/${recordId}/lock`
-      )) as any;
+      )) as ApiResponse<RecordLockResponse>;
 
       if (response?.success && response?.data) {
         const data = response.data;
@@ -126,9 +129,9 @@ export function useRecordLock(options: UseRecordLockOptions) {
 
         lockInfo.value = {
           locked: data.locked || false,
-          lockedBy: data.lockedBy,
-          lockedAt: data.lockedAt,
-          expiresAt: data.expiresAt,
+          lockedBy: data.lockedBy ?? null,
+          lockedAt: data.lockedAt ?? null,
+          expiresAt: data.expiresAt ?? null,
         };
 
         // Check if we lost the lock

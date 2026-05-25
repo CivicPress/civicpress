@@ -5,20 +5,23 @@
  */
 
 import { CivicPressError } from '../errors/index.js';
+import type { SagaContext } from './types.js';
 
 /**
  * Saga step execution error
  * Thrown when a saga step fails during execution
  */
-export class SagaStepError extends CivicPressError {
+export class SagaStepError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'SAGA_STEP_ERROR';
   statusCode = 500;
 
   constructor(
     public step: string,
-    public context: any,
+    public sagaContext: TContext,
     public originalError: Error,
-    public additionalContext?: Record<string, any>
+    public additionalContext?: Record<string, unknown>
   ) {
     super(`Saga step '${step}' failed: ${originalError.message}`, {
       step,
@@ -33,15 +36,17 @@ export class SagaStepError extends CivicPressError {
  * Saga compensation error
  * Thrown when compensation fails
  */
-export class SagaCompensationError extends CivicPressError {
+export class SagaCompensationError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'SAGA_COMPENSATION_ERROR';
   statusCode = 500;
 
   constructor(
     public step: string,
-    public context: any,
+    public sagaContext: TContext,
     public originalError: Error,
-    public additionalContext?: Record<string, any>
+    public additionalContext?: Record<string, unknown>
   ) {
     super(
       `Saga compensation failed for step '${step}': ${originalError.message}`,
@@ -59,13 +64,15 @@ export class SagaCompensationError extends CivicPressError {
  * Uncompensatable failure error
  * Thrown when a step fails and cannot be compensated
  */
-export class UncompensatableFailureError extends CivicPressError {
+export class UncompensatableFailureError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'UNCOMPENSATABLE_FAILURE';
   statusCode = 500;
 
   constructor(
     public step: string,
-    public context: any,
+    public sagaContext: TContext,
     public reason?: string
   ) {
     super(
@@ -82,13 +89,15 @@ export class UncompensatableFailureError extends CivicPressError {
  * Saga context error
  * Thrown when saga context is invalid
  */
-export class SagaContextError extends CivicPressError {
+export class SagaContextError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'SAGA_CONTEXT_ERROR';
   statusCode = 400;
 
   constructor(
     public sagaName: string,
-    public context: any,
+    public sagaContext: TContext,
     public validationErrors: string[]
   ) {
     super(

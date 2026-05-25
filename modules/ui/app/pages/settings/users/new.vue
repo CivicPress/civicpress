@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
@@ -32,7 +33,7 @@ const handleSubmit = async (userData: any) => {
     const response = (await useNuxtApp().$civicApi('/api/v1/users', {
       method: 'POST',
       body: userData,
-    })) as any;
+    })) as ApiResponse;
 
     if (response.success) {
       // Show success message
@@ -45,11 +46,11 @@ const handleSubmit = async (userData: any) => {
       // Navigate back to users list
       await navigateTo('/settings/users');
     } else {
-      error.value = response.message || t('settings.users.failedToCreateUser');
+      error.value = extractErrorMessage(response) || t('settings.users.failedToCreateUser');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error creating user:', err);
-    error.value = err.message || t('settings.users.failedToCreateUser');
+    error.value = (err instanceof Error ? err.message : '') || t('settings.users.failedToCreateUser');
   } finally {
     saving.value = false;
   }

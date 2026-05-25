@@ -49,8 +49,8 @@ const handleCredentialsLogin = async () => {
     await authStore.login(state.username, state.password);
     // Redirect to dashboard on success
     await navigateTo('/');
-  } catch (err: any) {
-    error.value = err.message || t('auth.loginFailed');
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || t('auth.loginFailed');
   } finally {
     loading.value = false;
   }
@@ -64,8 +64,8 @@ const handleTokenLogin = async () => {
     await authStore.loginWithToken(state.gitToken);
     // Redirect to dashboard on success
     await navigateTo('/');
-  } catch (err: any) {
-    error.value = err.message || t('auth.loginFailed');
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || t('auth.loginFailed');
   } finally {
     loading.value = false;
   }

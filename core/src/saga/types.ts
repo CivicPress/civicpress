@@ -63,7 +63,7 @@ export interface Saga<TContext extends SagaContext, TFinalResult> {
   /** Optional context validation */
   validateContext?(context: TContext): ValidationResult;
   /** Optional context migration for version changes */
-  migrateContext?(oldContext: any, fromVersion: string): TContext;
+  migrateContext?(oldContext: unknown, fromVersion: string): TContext;
 }
 
 /**

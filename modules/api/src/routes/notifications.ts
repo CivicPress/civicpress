@@ -15,21 +15,22 @@ const audit = new AuditLogger();
 router.use(requirePermission('system:admin'));
 
 // Normalize metadata-shaped values { value, type, ... } to plain scalars
-function normalizeMetadata<T = any>(input: any): T {
+function normalizeMetadata<T = unknown>(input: unknown): T {
   if (input == null) return input as T;
   if (Array.isArray(input))
-    return input.map((i) => normalizeMetadata(i)) as any;
+    return input.map((i) => normalizeMetadata(i)) as unknown as T;
   if (typeof input === 'object') {
+    const obj = input as Record<string, unknown>;
     if (
-      'value' in input &&
-      Object.keys(input).some((k) =>
+      'value' in obj &&
+      Object.keys(obj).some((k) =>
         ['type', 'description', 'required', 'options', 'value'].includes(k)
       )
     ) {
-      return normalizeMetadata((input as any).value) as T;
+      return normalizeMetadata(obj.value) as T;
     }
-    const out: any = {};
-    for (const [k, v] of Object.entries(input)) out[k] = normalizeMetadata(v);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) out[k] = normalizeMetadata(v);
     return out as T;
   }
   return input as T;
@@ -59,9 +60,11 @@ router.post('/test', async (req, res) => {
     // Build the canonical EmailChannel for this test send (Phase 2c.5 T3 —
     // closes the 4th ad-hoc EmailChannel impl that Phase 2c T6 missed).
     const effectiveProvider = provider || emailConfig.provider || 'sendgrid';
-    const rawCreds =
-      (emailConfig as any)[effectiveProvider] || (emailConfig as any).sendgrid;
-    const credentials = normalizeMetadata<any>(rawCreds);
+    // Provider-specific credential blocks (sendgrid / smtp / nodemailer / etc.)
+    // are stored as siblings of the typed channel fields; lookup is dynamic.
+    const cfgRecord = emailConfig as unknown as Record<string, unknown>;
+    const rawCreds = cfgRecord[effectiveProvider] ?? cfgRecord.sendgrid;
+    const credentials = normalizeMetadata<Record<string, unknown>>(rawCreds);
 
     let channel: EmailChannel;
     if (effectiveProvider === 'smtp' || effectiveProvider === 'nodemailer') {
@@ -70,20 +73,27 @@ router.post('/test', async (req, res) => {
           host: String(credentials.host || ''),
           port: Number(credentials.port ?? 587),
           secure: Boolean(credentials.secure),
-          auth: credentials.auth,
-          tls: credentials.tls || { rejectUnauthorized: false },
+          auth: credentials.auth as { user: string; pass: string } | undefined,
+          tls: (credentials.tls as { rejectUnauthorized: boolean } | undefined) || {
+            rejectUnauthorized: false,
+          },
         },
-        defaultFrom: credentials.from,
+        defaultFrom: credentials.from as string | undefined,
       });
     } else {
       channel = new EmailChannel({
-        sendgrid: { apiKey: credentials.apiKey },
-        defaultFrom: credentials.from,
+        sendgrid: { apiKey: String(credentials.apiKey || '') },
+        defaultFrom: credentials.from as string | undefined,
       });
     }
 
     // Wrap the canonical EmailChannel in a NotificationChannel-shaped adapter
     // so NotificationService.registerChannel + sendNotification keeps working.
+    // NotificationChannel is an abstract class, not an interface — the adapter
+    // is structurally compatible with the subset NotificationService actually
+    // calls (getName, isEnabled, send), so we cast through `unknown` rather
+    // than subclass it (subclassing would require implementing abstract `test`,
+    // `validateConfig`, `getCapabilities` which the test endpoint doesn't use).
     const notificationChannel = {
       getName() {
         return 'email';
@@ -91,7 +101,9 @@ router.post('/test', async (req, res) => {
       isEnabled() {
         return true;
       },
-      async send(request: any) {
+      async send(request: {
+        content?: { subject?: string; text?: string; body?: string; html?: string };
+      }) {
         const subj =
           request?.content?.subject || subject || 'CivicPress Notification';
         const bodyText =
@@ -108,7 +120,12 @@ router.post('/test', async (req, res) => {
     };
 
     const service = new NotificationService(config);
-    service.registerChannel('email', notificationChannel as any);
+    service.registerChannel(
+      'email',
+      notificationChannel as unknown as Parameters<
+        NotificationService['registerChannel']
+      >[1]
+    );
 
     // Register a simple template and send
     const tmpl = new AuthTemplate(
@@ -123,10 +140,10 @@ router.post('/test', async (req, res) => {
       data: {},
     });
 
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',
       target: { type: 'notification', name: 'test_email' },
       outcome: result.success ? 'success' : 'failure',
@@ -134,19 +151,20 @@ router.post('/test', async (req, res) => {
     });
 
     return res.json({ success: true, data: result });
-  } catch (error: any) {
-    const actor = (req as any).user || {};
+  } catch (error: unknown) {
+    const actor = req.user;
+    const errorMessage = error instanceof Error ? error.message : String(error);
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',
       target: { type: 'notification', name: 'test_email' },
       outcome: 'failure',
-      message: String(error?.message || error),
+      message: errorMessage,
     });
     return res.status(500).json({
       success: false,
-      error: error?.message || 'Failed to send test email',
+      error: errorMessage || 'Failed to send test email',
     });
   }
 });

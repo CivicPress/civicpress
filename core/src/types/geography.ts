@@ -431,7 +431,10 @@ export interface GeographyValidationResult {
 
 export interface ParsedGeographyData {
   type: GeographyFileType;
-  content: any;
+  // Parsed GeoJSON FeatureCollection, KML Document, or other format-specific
+  // structure. Loose-typed because the shape varies per `type`; consumers
+  // narrow locally when they read it.
+  content: unknown;
   bounds: BoundingBox;
   srid: SRID;
   featureCount: number;
@@ -470,7 +473,7 @@ export class GeographyError extends Error {
   constructor(
     message: string,
     public code: string,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = 'GeographyError';

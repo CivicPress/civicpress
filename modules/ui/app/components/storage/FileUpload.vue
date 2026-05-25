@@ -172,6 +172,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 
 // Props
 interface Props {
@@ -408,7 +409,7 @@ const uploadFiles = async () => {
       const response = (await useNuxtApp().$civicApi(`/api/v1/storage/files`, {
         method: 'POST',
         body: formData,
-      })) as any;
+      })) as ApiResponse;
 
       clearInterval(progressInterval);
 
@@ -432,7 +433,7 @@ const uploadFiles = async () => {
           },
         ]);
       } else {
-        throw new Error(response.error?.message || t('settings.storage.uploadFailed'));
+        throw new Error(extractErrorMessage(response) || t('settings.storage.uploadFailed'));
       }
     } catch (error) {
       item.status = 'error' as 'pending' | 'uploading' | 'completed' | 'error';

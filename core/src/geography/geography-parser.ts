@@ -130,7 +130,7 @@ export class GeographyParser {
    */
   static serializeToMarkdown(geographyFile: GeographyFile): string {
     // Build frontmatter object
-    const frontmatter: any = {
+    const frontmatter: Record<string, unknown> = {
       id: geographyFile.id,
       name: geographyFile.name,
       type: geographyFile.type,
@@ -281,49 +281,72 @@ ${rawContent}
    * @param callback - Callback for each coordinate pair (lon, lat)
    */
   private static extractBoundsFromGeometry(
-    geometry: any,
+    geometry: GeoJsonGeometryLike | null | undefined,
     callback: (lon: number, lat: number) => void
   ): void {
-    if (!geometry || !geometry.coordinates) {
+    if (!geometry) {
       return;
     }
 
-    const coords = geometry.coordinates;
-
     switch (geometry.type) {
-      case 'Point':
-        callback(coords[0], coords[1]);
+      case 'Point': {
+        const coord = geometry.coordinates as number[] | undefined;
+        if (coord) callback(coord[0], coord[1]);
         break;
+      }
       case 'LineString':
-      case 'MultiPoint':
-        coords.forEach((coord: number[]) => {
+      case 'MultiPoint': {
+        const coords = geometry.coordinates as number[][] | undefined;
+        coords?.forEach((coord) => {
           callback(coord[0], coord[1]);
         });
         break;
+      }
       case 'Polygon':
-      case 'MultiLineString':
-        coords.forEach((ring: number[][]) => {
-          ring.forEach((coord: number[]) => {
+      case 'MultiLineString': {
+        const coords = geometry.coordinates as number[][][] | undefined;
+        coords?.forEach((ring) => {
+          ring.forEach((coord) => {
             callback(coord[0], coord[1]);
           });
         });
         break;
-      case 'MultiPolygon':
-        coords.forEach((polygon: number[][][]) => {
-          polygon.forEach((ring: number[][]) => {
-            ring.forEach((coord: number[]) => {
+      }
+      case 'MultiPolygon': {
+        const coords = geometry.coordinates as number[][][][] | undefined;
+        coords?.forEach((polygon) => {
+          polygon.forEach((ring) => {
+            ring.forEach((coord) => {
               callback(coord[0], coord[1]);
             });
           });
         });
         break;
+      }
       case 'GeometryCollection':
-        if (geometry.geometries) {
-          geometry.geometries.forEach((geom: any) => {
-            this.extractBoundsFromGeometry(geom, callback);
-          });
-        }
+        geometry.geometries?.forEach((geom) => {
+          this.extractBoundsFromGeometry(geom, callback);
+        });
         break;
     }
   }
+}
+
+/**
+ * Structural GeoJSON geometry probe. We don't ship @types/geojson, so this
+ * captures only the shape `extractBoundsFromGeometry` actually inspects.
+ * `coordinates` is left as `unknown` because the shape varies per geometry
+ * type — each case narrows locally.
+ */
+interface GeoJsonGeometryLike {
+  type:
+    | 'Point'
+    | 'LineString'
+    | 'MultiPoint'
+    | 'Polygon'
+    | 'MultiLineString'
+    | 'MultiPolygon'
+    | 'GeometryCollection';
+  coordinates?: unknown;
+  geometries?: GeoJsonGeometryLike[];
 }

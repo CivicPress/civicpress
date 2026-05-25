@@ -146,6 +146,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
 const { t } = useI18n();
 
 definePageMeta({
@@ -196,25 +197,30 @@ const load = async (goTo?: number) => {
     if (filters.action) params.set('action', filters.action);
     const res = (await useNuxtApp().$civicApi(
       `/api/v1/audit?${params.toString()}`
-    )) as any;
+    )) as ApiResponse<{
+      entries: unknown[];
+      pagination?: { total?: number };
+    }>;
     if (res?.success && res?.data?.entries) {
       items.value = res.data.entries;
       total.value = res.data.pagination?.total || items.value.length;
     } else {
       throw new Error('Unexpected response');
     }
-  } catch (e: any) {
-    error.value = e.message || t('settings.activity.failedToLoad');
+  } catch (e: unknown) {
+    error.value = (e instanceof Error ? e.message : '') || t('settings.activity.failedToLoad');
   } finally {
     loading.value = false;
   }
 };
 
 const formatTime = (ts: string) => new Date(ts).toLocaleString();
-const formatActor = (a: any) =>
-  a ? `${a.username || a.id || ''}${a.role ? ` (${a.role})` : ''}` : '';
-const formatTarget = (t: any) =>
-  t ? `${t.type}${t.id ? `:${t.id}` : ''}` : '';
+const formatActor = (
+  a: { username?: string; id?: string | number; role?: string } | null | undefined
+) => (a ? `${a.username || a.id || ''}${a.role ? ` (${a.role})` : ''}` : '');
+const formatTarget = (
+  t: { type?: string; id?: string | number } | null | undefined
+) => (t ? `${t.type}${t.id ? `:${t.id}` : ''}` : '');
 
 const pageStart = computed(() => page.value * limit.value);
 const pageEnd = computed(() =>

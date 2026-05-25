@@ -1,4 +1,5 @@
 import { readFile, writeFile, access, mkdir } from 'fs/promises';
+import { errorMessage, errorStack, errorCode, errorName } from '../utils/error-narrow.js';
 import { join, dirname } from 'path';
 import { existsSync } from 'fs';
 import { parse, stringify } from 'yaml';
@@ -17,9 +18,17 @@ export interface ConfigurationMetadata {
   source: 'default' | 'user' | 'system';
 }
 
+/**
+ * Generic shape of a parsed YAML configuration document. Configuration
+ * files are polymorphic (workflows, hooks, notifications, etc.) and each
+ * has its own per-type validator; this is the loose envelope shared by
+ * the load/save plumbing.
+ */
+export type ConfigurationContent = Record<string, unknown>;
+
 export interface ConfigurationFile {
   path: string;
-  content: any;
+  content: ConfigurationContent;
   metadata: ConfigurationMetadata;
   exists: boolean;
   lastModified: Date;
@@ -137,7 +146,10 @@ export class ConfigurationService {
   /**
    * Save a configuration file
    */
-  async saveConfiguration(configType: string, content: any): Promise<void> {
+  async saveConfiguration(
+    configType: string,
+    content: ConfigurationContent
+  ): Promise<void> {
     const { userPath } = this.resolvePaths(configType);
 
     try {
@@ -151,8 +163,12 @@ export class ConfigurationService {
       const newFormatConfig = this.transformToNewFormat(content, metadata);
 
       // Update the updated timestamp
-      if (newFormatConfig._metadata) {
-        newFormatConfig._metadata.updated = new Date().toISOString();
+      if (
+        newFormatConfig._metadata &&
+        typeof newFormatConfig._metadata === 'object'
+      ) {
+        (newFormatConfig._metadata as ConfigurationContent).updated =
+          new Date().toISOString();
       }
 
       // Write to data/.civic/
@@ -161,9 +177,9 @@ export class ConfigurationService {
         lineWidth: 0,
       });
       await writeFile(userPath, yamlContent, 'utf-8');
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMsg =
-        error?.message || error?.toString() || String(error) || 'Unknown error';
+        errorMessage(error) || error?.toString() || String(error) || 'Unknown error';
       throw new Error(
         `Failed to save configuration ${configType}: ${errorMsg}`
       );
@@ -191,25 +207,23 @@ export class ConfigurationService {
         await mkdir(dirname(userPath), { recursive: true });
       }
       await this.saveConfiguration(configType, defaultConfig);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Extract detailed error information
+      const msg = errorMessage(error);
+      const stack = errorStack(error);
+      const code = errorCode(error);
+      const name = errorName(error);
       let errorMsg = 'Unknown error';
-      if (error?.message && error.message.trim()) {
-        errorMsg = error.message;
+      if (msg && msg.trim()) {
+        errorMsg = msg;
       } else if (typeof error === 'string' && error.trim()) {
         errorMsg = error;
-      } else if (
-        error?.toString &&
-        error.toString() !== '[object Object]' &&
-        error.toString().trim()
-      ) {
-        errorMsg = error.toString();
-      } else if (error?.stack) {
-        errorMsg = error.stack.split('\n')[0];
-      } else if (error?.code) {
-        errorMsg = `Error code: ${error.code}`;
-      } else if (error?.name) {
-        errorMsg = `Error: ${error.name}`;
+      } else if (stack) {
+        errorMsg = stack.split('\n')[0];
+      } else if (code) {
+        errorMsg = `Error code: ${code}`;
+      } else if (name && name !== 'UnknownError') {
+        errorMsg = `Error: ${name}`;
       }
       throw new Error(
         `Failed to reset configuration ${configType}: ${errorMsg}`
@@ -334,19 +348,19 @@ export class ConfigurationService {
     content?: string
   ): Promise<{ valid: boolean; errors: string[] }> {
     try {
-      let config: any;
+      let config: ConfigurationContent;
 
       // If content is provided, parse and validate it directly
       if (content !== undefined) {
         try {
           const parsed = parse(content);
           config = this.transformToLegacyFormat(parsed);
-        } catch (parseError: any) {
+        } catch (parseError: unknown) {
           // YAML parsing error - this is a syntax error
           return {
             valid: false,
             errors: [
-              `YAML syntax error: ${parseError.message || String(parseError)}`,
+              `YAML syntax error: ${errorMessage(parseError) || String(parseError)}`,
             ],
           };
         }
@@ -409,17 +423,20 @@ export class ConfigurationService {
   /**
    * Transform new metadata format to legacy format for backward compatibility
    */
-  private transformToLegacyFormat(config: any): any {
-    if (!config._metadata) {
+  private transformToLegacyFormat(
+    config: ConfigurationContent
+  ): ConfigurationContent {
+    const meta = config._metadata as ConfigurationContent | undefined;
+    if (!meta) {
       // Already in legacy format
       return config;
     }
 
-    const legacyConfig: any = {};
+    const legacyConfig: ConfigurationContent = {};
 
     // Extract metadata
-    if (config._metadata.version) {
-      legacyConfig.version = config._metadata.version;
+    if (meta.version) {
+      legacyConfig.version = meta.version;
     }
 
     // Transform fields
@@ -428,10 +445,12 @@ export class ConfigurationService {
 
       if (field && typeof field === 'object' && 'value' in field) {
         // New format field
-        legacyConfig[key] = field.value;
+        legacyConfig[key] = (field as { value: unknown }).value;
       } else if (field && typeof field === 'object') {
         // Nested object - recursively transform
-        legacyConfig[key] = this.transformToLegacyFormat(field);
+        legacyConfig[key] = this.transformToLegacyFormat(
+          field as ConfigurationContent
+        );
       } else {
         // Direct value
         legacyConfig[key] = field;
@@ -445,12 +464,12 @@ export class ConfigurationService {
    * Transform legacy format to new metadata format
    */
   private transformToNewFormat(
-    config: any,
-    metadata: any,
+    config: ConfigurationContent,
+    metadata: ConfigurationContent | undefined,
     includeHeader: boolean = true
-  ): any {
+  ): ConfigurationContent {
     // Only store the header metadata at top level
-    const newConfig: any = includeHeader
+    const newConfig: ConfigurationContent = includeHeader
       ? { _metadata: metadata && metadata._metadata ? metadata._metadata : {} }
       : {};
 
@@ -465,12 +484,14 @@ export class ConfigurationService {
         continue;
       }
 
-      const metaForKey = metadata ? (metadata as any)[key] : undefined;
+      const metaForKey = metadata
+        ? (metadata as ConfigurationContent)[key]
+        : undefined;
       const normalizedValue =
         fieldValue &&
         typeof fieldValue === 'object' &&
-        'value' in (fieldValue as any)
-          ? (fieldValue as any).value
+        'value' in fieldValue
+          ? (fieldValue as { value: unknown }).value
           : fieldValue;
 
       // Leaf field with metadata
@@ -498,8 +519,8 @@ export class ConfigurationService {
         !Array.isArray(fieldValue)
       ) {
         newConfig[key] = this.transformToNewFormat(
-          fieldValue,
-          metaForKey,
+          fieldValue as ConfigurationContent,
+          metaForKey as ConfigurationContent,
           /* includeHeader */ false
         );
         continue;

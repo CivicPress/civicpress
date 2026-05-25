@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue';
+import type { IconName } from '~/composables/useIcons';
 
 export interface RecordStatusConfig {
   label: string;
@@ -13,7 +14,11 @@ export const useRecordUtils = () => {
   // Get translation functions at top level
   const { translateRecordType, translateStatus } = useConfigTranslations();
 
-  // Status color mapping with validation
+  // Status color mapping with validation.
+  // The string values intentionally include semantic names ('success',
+  // 'warning', 'danger') that don't all match Nuxt UI's strict prop enum;
+  // call sites translate via `as never` / `as 'primary' | ...` at the
+  // template boundary, which is documented per-callsite.
   const STATUS_COLORS: Record<string, string> = {
     draft: 'neutral',
     proposed: 'primary',
@@ -42,7 +47,9 @@ export const useRecordUtils = () => {
     };
 
     const iconKey = typeIconMap[type];
-    return iconKey ? getIcon(iconKey as any) : getIcon('file');
+    return iconKey
+      ? getIcon(iconKey as IconName)
+      : getIcon('file' as IconName);
   };
 
   // Type label mapping
@@ -87,7 +94,9 @@ export const useRecordUtils = () => {
     };
 
     const iconKey = statusIconMap[status];
-    return iconKey ? getIcon(iconKey as any) : getIcon('info');
+    return iconKey
+      ? getIcon(iconKey as IconName)
+      : getIcon('info' as IconName);
   };
 
   /**

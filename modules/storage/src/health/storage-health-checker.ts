@@ -219,11 +219,14 @@ export class StorageHealthChecker {
    * Stop health checks
    */
   stopHealthChecks(): void {
+    const providers = Array.from(this.checkIntervals.keys());
     for (const interval of this.checkIntervals.values()) {
       clearInterval(interval);
     }
     this.checkIntervals.clear();
-    this.logger.debug('Stopped health checks for storage providers');
+    this.logger.debug('Stopped health checks for storage providers', {
+      providers,
+    });
   }
 
   /**

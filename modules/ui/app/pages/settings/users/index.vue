@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import type { AuthUserResponse } from '~/types/api-responses';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Composables
@@ -22,15 +24,17 @@ const fetchUsers = async () => {
     loading.value = true;
     error.value = '';
 
-    const response = (await $civicApi('/api/v1/users')) as any;
+    const response = (await $civicApi('/api/v1/users')) as ApiResponse<{
+      users: AuthUserResponse[];
+    }>;
 
     if (response.success) {
-      users.value = response.data.users || [];
+      users.value = (response.data.users || []) as unknown as User[];
     } else {
-      error.value = response.error || t('settings.users.failedToFetchUsers');
+      error.value = extractErrorMessage(response) || t('settings.users.failedToFetchUsers');
     }
-  } catch (err: any) {
-    error.value = err.message || t('settings.users.failedToFetchUsers');
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || t('settings.users.failedToFetchUsers');
     console.error('Error fetching users:', err);
   } finally {
     loading.value = false;

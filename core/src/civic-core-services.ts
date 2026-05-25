@@ -6,6 +6,7 @@
  */
 
 import * as path from 'path';
+import { errorMessage, errorStack, errorCode, errorName } from './utils/error-narrow.js';
 import { ServiceContainer } from './di/container.js';
 import { CivicPressConfig } from './civic-core.js';
 import { Logger } from './utils/logger.js';
@@ -35,6 +36,8 @@ import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { SecretsManager } from './security/secrets.js';
 import { AuditLogger } from './audit/audit-logger.js';
 import { AuditChannel } from './audit/audit-channel.js';
+import { ModuleResolver } from './modules/module-resolver.js';
+import { setModuleResolver as setRecordSchemaModuleResolver } from './records/record-schema-builder.js';
 
 /**
  * Register all CivicPress services in the dependency injection container
@@ -91,6 +94,23 @@ export function registerCivicPressServices(
   }
 
   container.registerInstance('dbConfig', dbConfig);
+
+  // Step 2.5: Register ModuleResolver (Phase 2d W1-T2) — replaces the
+  // prior process.cwd()-based filesystem discovery in record-schema-builder
+  // and the storage-module fallback below. ModulesRoot resolves relative
+  // to the project root (parent of dataDir) so production and test runs
+  // both find the modules/ directory deterministically.
+  container.singleton('moduleResolver', (c) => {
+    const config = c.resolve<CivicPressConfig>('config');
+    const projectRoot = path.isAbsolute(config.dataDir)
+      ? path.dirname(config.dataDir)
+      : path.resolve(process.cwd(), path.dirname(config.dataDir));
+    const resolver = new ModuleResolver(path.join(projectRoot, 'modules'));
+    // Wire into RecordSchemaBuilder so schema-extension lookup uses the
+    // same resolver instance (singleton across the request lifecycle).
+    setRecordSchemaModuleResolver(resolver);
+    return resolver;
+  });
 
   // Step 3: Register database service (depends on: logger, dbConfig)
   // Note: cacheManager is registered later, but DatabaseService can work without it initially
@@ -240,6 +260,11 @@ export async function completeServiceInitialization(
   container: ServiceContainer,
   civicPress: CivicPress
 ): Promise<void> {
+  // Force-resolve ModuleResolver early so its factory side-effect (wiring
+  // RecordSchemaBuilder via setModuleResolver) runs before any schema
+  // build attempts. Phase 2d W1-T2.
+  container.resolve<ModuleResolver>('moduleResolver');
+
   // Initialize secrets manager first (before other services that depend on it)
   const secretsManager = container.resolve<SecretsManager>('secretsManager');
   await secretsManager.initialize();
@@ -271,8 +296,10 @@ export async function completeServiceInitialization(
     // Try to import storage services registration from main package export
     // Use a try-catch around the import to handle cases where the module is not available
     // Type assertion is needed because storage module is optional and may not be in core's dependencies
-    let storageModule: any = null;
-    let importError: any = null;
+    // The storage module isn't declared in core's dependencies (optional);
+    // we structurally probe `registerStorageServices` from the loaded module.
+    let storageModule: { registerStorageServices?: unknown } | null = null;
+    let importError: unknown = null;
     try {
       // Import from main package (storage-services is re-exported from index)
       // Using type assertion to handle optional module (not in core's dependencies)
@@ -280,7 +307,7 @@ export async function completeServiceInitialization(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       try {
         storageModule = await import('@civicpress/storage' as string);
-      } catch (e1: any) {
+      } catch (e1: unknown) {
         // Fallback to file:// URL import if package import fails
         // This helps in test environments where module resolution might differ
         const path = await import('path');
@@ -299,11 +326,11 @@ export async function completeServiceInitialization(
           storageModule = await import(storageUrl);
           // Fallback succeeded - exit early, don't let outer catch interfere
           importError = null;
-        } catch (e2: any) {
+        } catch (e2: unknown) {
           // File path import also failed - storage module not available
           const logger = container.resolve<Logger>('logger');
           if (process.env.NODE_ENV === 'test') {
-            logger.warn(`Fallback import failed: ${e2?.message || e2}`);
+            logger.warn(`Fallback import failed: ${errorMessage(e2) || e2}`);
             logger.warn(`Storage path attempted: ${storagePath}`);
           }
           // Both imports failed - set error for outer catch
@@ -311,7 +338,7 @@ export async function completeServiceInitialization(
           storageModule = null;
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Only set error if not already set by inner catch
       if (!importError) {
         importError = err;
@@ -321,9 +348,9 @@ export async function completeServiceInitialization(
         // Module not found - this is expected in some environments
         // Check if it's a module not found error vs other errors
         if (
-          err?.code === 'ERR_MODULE_NOT_FOUND' ||
-          err?.message?.includes('Cannot find module') ||
-          err?.message?.includes('Cannot find package')
+          errorCode(err) === 'ERR_MODULE_NOT_FOUND' ||
+          errorMessage(err)?.includes('Cannot find module') ||
+          errorMessage(err)?.includes('Cannot find package')
         ) {
           // Expected - storage module not available
           storageModule = null;
@@ -332,16 +359,24 @@ export async function completeServiceInitialization(
           const logger = container.resolve<Logger>('logger');
           logger.warn(
             'Storage module import failed (non-standard error):',
-            err?.message || err
+            errorMessage(err) || err
           );
           storageModule = null;
         }
       }
     }
 
-    if (storageModule?.registerStorageServices) {
+    if (
+      storageModule?.registerStorageServices &&
+      typeof storageModule.registerStorageServices === 'function'
+    ) {
       const config = container.resolve<CivicPressConfig>('config');
-      storageModule.registerStorageServices(container, config);
+      (
+        storageModule.registerStorageServices as (
+          c: typeof container,
+          cfg: CivicPressConfig
+        ) => void
+      )(container, config);
       const logger = container.resolve<Logger>('logger');
       if (logger.isVerbose()) {
         logger.debug('Storage services registered successfully');
@@ -357,14 +392,14 @@ export async function completeServiceInitialization(
       // Always log in test environment to help debug
       if (process.env.NODE_ENV === 'test') {
         logger.warn(
-          `Storage module import failed: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+          `Storage module import failed: ${errorCode(importError) || 'unknown'} - ${errorMessage(importError) || 'no message'}`
         );
-        if (importError?.stack) {
-          logger.warn('Storage import stack:', importError.stack);
+        if (errorStack(importError)) {
+          logger.warn('Storage import stack:', errorStack(importError));
         }
       } else if (logger.isVerbose()) {
         logger.debug(
-          `Storage module not available: ${importError?.code || 'unknown'} - ${importError?.message || 'no message'}`
+          `Storage module not available: ${errorCode(importError) || 'unknown'} - ${errorMessage(importError) || 'no message'}`
         );
       }
     }

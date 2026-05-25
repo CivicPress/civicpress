@@ -36,7 +36,7 @@ export interface PublishDraftContext extends SagaContext {
   /** User performing the publish (overrides SagaContext user with AuthUser) */
   user: AuthUser;
   /** Draft data (loaded in step 1) */
-  draft?: any;
+  draft?: Record<string, unknown>;
   /** Record data (created/updated in step 1) */
   record?: RecordData;
   /** File path (created in step 2) */
@@ -74,8 +74,8 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
 
       context.draft = draft;
 
-      // Use target status or draft's current status
-      const finalStatus = context.targetStatus || draft.status;
+      // Use target status or draft's current status (schema default: 'draft')
+      const finalStatus = context.targetStatus || draft.status || 'draft';
 
       // Check if record already exists
       const existingRecord = await this.db.getRecord(context.draftId);
@@ -89,6 +89,8 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
         // So we'll update the DB directly
         const updatedRecord: RecordData = {
           ...existingRecord,
+          author: existingRecord.author || draft.author || '',
+          created_at: existingRecord.created_at || new Date().toISOString(),
           title: draft.title,
           content: draft.markdown_body,
           status: finalStatus,
@@ -120,7 +122,7 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
         }
 
         // Update in database directly (without file operations)
-        const dbUpdates: any = {
+        const dbUpdates: Record<string, unknown> = {
           title: updatedRecord.title,
           content: updatedRecord.content,
           status: updatedRecord.status,
@@ -342,7 +344,9 @@ class CreateOrUpdateFileStep extends BaseSagaStep<PublishDraftContext, string> {
     return RecordParser.serializeToMarkdown(record);
   }
 
-  private normalizeFrontmatterForValidation(frontmatter: any): any {
+  private normalizeFrontmatterForValidation(
+    frontmatter: Record<string, unknown>
+  ): Record<string, unknown> {
     const normalized = { ...frontmatter };
     // Convert Date objects to ISO strings
     if (normalized.created && normalized.created instanceof Date) {
@@ -441,7 +445,7 @@ class QueueIndexingStep extends BaseSagaStep<PublishDraftContext, void> {
   isCompensatable = false; // Derived state
   timeout = 5000; // 5 seconds
 
-  constructor(private indexingService: IndexingService) {
+  constructor(private indexingService: IndexingService | null) {
     super(5000);
   }
 
@@ -450,6 +454,13 @@ class QueueIndexingStep extends BaseSagaStep<PublishDraftContext, void> {
 
     if (!context.record) {
       // No record, nothing to index
+      return;
+    }
+
+    // Indexing is fire-and-forget derived state; skip cleanly when no
+    // indexing service is wired (callers may legitimately run without one).
+    if (!this.indexingService) {
+      this.logStep('complete', context);
       return;
     }
 
@@ -537,7 +548,7 @@ export class PublishDraftSaga implements Saga<PublishDraftContext, RecordData> {
     recordManager: RecordManager,
     git: GitEngine,
     hooks: HookSystem,
-    indexingService: IndexingService,
+    indexingService: IndexingService | null,
     dataDir: string
   ) {
     this.steps = [

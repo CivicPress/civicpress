@@ -46,6 +46,16 @@ export interface OAuthProviderConfig {
   allowedDomains: string[];
 }
 
+/**
+ * Deep-partial helper for mergeWithDefaults: callers may supply any subset
+ * of `AuthConfig` (loaded from civic.yml); defaults fill the rest.
+ */
+type DeepPartial<T> = T extends Array<infer _U>
+  ? T
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
 export class AuthConfigManager {
   private static instance: AuthConfigManager;
   private config: AuthConfig | null = null;
@@ -66,7 +76,7 @@ export class AuthConfigManager {
 
     try {
       const centralConfig = await CentralConfigManager.getConfig();
-      const authConfig = centralConfig?.auth as AuthConfig;
+      const authConfig = centralConfig?.auth as unknown as AuthConfig;
 
       if (!authConfig) {
         logger.warn('No auth configuration found, using defaults');
@@ -102,7 +112,7 @@ export class AuthConfigManager {
     return {
       jwt: {
         secret:
-          (globalThis as any).process?.env?.JWT_SECRET ||
+          process.env.JWT_SECRET ||
           'default-jwt-secret-change-in-production',
         expiresIn: '24h',
       },
@@ -153,7 +163,7 @@ export class AuthConfigManager {
     };
   }
 
-  private mergeWithDefaults(userConfig: any): AuthConfig {
+  private mergeWithDefaults(userConfig: DeepPartial<AuthConfig>): AuthConfig {
     const defaults = this.getDefaultConfig();
 
     return {

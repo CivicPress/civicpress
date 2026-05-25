@@ -164,6 +164,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import { useDebounceFn } from '@vueuse/core';
 import type { GeographyFile, GeographyCategory } from '~/types/geography';
 
@@ -303,7 +304,7 @@ const loadGeographyFiles = async () => {
     loading.value = true;
     error.value = null;
 
-    const response = (await useNuxtApp().$civicApi('/api/v1/geography')) as any;
+    const response = (await useNuxtApp().$civicApi('/api/v1/geography')) as ApiResponse;
 
     if (response.success && response.data?.files) {
       geographyFiles.value = response.data.files;

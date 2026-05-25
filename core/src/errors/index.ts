@@ -29,7 +29,7 @@ function generateCorrelationId(): string {
 export abstract class CivicPressError extends Error {
   abstract code: string;
   abstract statusCode: number;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   readonly correlationId: string;
 
   constructor(message: string, context?: Record<string, any>) {
@@ -52,7 +52,7 @@ export abstract class CivicPressError extends Error {
     code: string;
     message: string;
     statusCode: number;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
     correlationId: string;
   } {
     return {
@@ -73,8 +73,8 @@ export abstract class CivicPressError extends Error {
   getOutputDetails(): {
     message: string;
     code: string;
-    details: any;
-    context: Record<string, any>;
+    details: unknown;
+    context: Record<string, unknown>;
   } {
     return {
       message: this.message,
@@ -98,7 +98,7 @@ export class ValidationError extends CivicPressError {
   code = 'VALIDATION_ERROR';
   statusCode = 400;
 
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, { details });
   }
 }
@@ -163,10 +163,10 @@ export class DatabaseError extends CivicPressError {
   code = 'DATABASE_ERROR';
   statusCode = 500;
 
-  constructor(message: string, operation?: string, details?: any) {
+  constructor(message: string, operation?: string, details?: unknown) {
     super(message, {
       operation,
-      ...(details && { details }),
+      ...(details !== undefined ? { details } : {}),
     });
   }
 }
@@ -197,5 +197,23 @@ export class InternalError extends CivicPressError {
 
   constructor(message: string, context?: Record<string, any>) {
     super(message, context);
+  }
+}
+
+/**
+ * Optional Dependency Missing Error (500)
+ * Thrown when a code path requires an optional npm package that wasn't installed.
+ * Used by storage cloud providers (S3/Azure/GCS SDKs in optionalDependencies).
+ */
+export class OptionalDependencyMissing extends CivicPressError {
+  code = 'OPTIONAL_DEPENDENCY_MISSING';
+  statusCode = 500;
+
+  constructor(packageName: string, feature: string) {
+    super(
+      `Optional dependency "${packageName}" is required for ${feature} but is not installed. ` +
+        `Run \`pnpm add ${packageName}\` (or your workspace install equivalent) to enable this feature.`,
+      { packageName, feature }
+    );
   }
 }

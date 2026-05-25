@@ -139,7 +139,7 @@ class UpdateInRecordsStep extends BaseSagaStep<
       }
 
       // Prepare database updates
-      const dbUpdates: any = {};
+      const dbUpdates: Record<string, unknown> = {};
       if (request.title !== undefined) dbUpdates.title = request.title;
       if (request.content !== undefined) dbUpdates.content = request.content;
       if (request.status !== undefined) dbUpdates.status = request.status;
@@ -187,7 +187,7 @@ class UpdateInRecordsStep extends BaseSagaStep<
     if (context.originalRecord && result) {
       try {
         const original = context.originalRecord;
-        const dbUpdates: any = {
+        const dbUpdates: Record<string, unknown> = {
           title: original.title,
           content: original.content,
           status: original.status,
@@ -370,7 +370,9 @@ class UpdateFileStep extends BaseSagaStep<UpdateRecordContext, string> {
     return RecordParser.serializeToMarkdown(record);
   }
 
-  private normalizeFrontmatterForValidation(frontmatter: any): any {
+  private normalizeFrontmatterForValidation(
+    frontmatter: Record<string, unknown>
+  ): Record<string, unknown> {
     const normalized = { ...frontmatter };
     if (normalized.created && normalized.created instanceof Date) {
       normalized.created = normalized.created.toISOString();
@@ -428,7 +430,7 @@ class QueueReIndexingStep extends BaseSagaStep<UpdateRecordContext, void> {
   isCompensatable = false; // Derived state
   timeout = 5000; // 5 seconds
 
-  constructor(private indexingService: IndexingService) {
+  constructor(private indexingService: IndexingService | null) {
     super(5000);
   }
 
@@ -436,6 +438,13 @@ class QueueReIndexingStep extends BaseSagaStep<UpdateRecordContext, void> {
     this.logStep('start', context);
 
     if (!context.updatedRecord) {
+      return;
+    }
+
+    // Indexing is fire-and-forget derived state; skip cleanly when no
+    // indexing service is wired (callers may legitimately run without one).
+    if (!this.indexingService) {
+      this.logStep('complete', context);
       return;
     }
 
@@ -519,7 +528,7 @@ export class UpdateRecordSaga implements Saga<UpdateRecordContext, RecordData> {
     recordManager: RecordManager,
     git: GitEngine,
     hooks: HookSystem,
-    indexingService: IndexingService,
+    indexingService: IndexingService | null,
     dataDir: string
   ) {
     this.steps = [

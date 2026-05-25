@@ -28,7 +28,7 @@ export class DiagnosticCache {
   /**
    * Generate cache key from component and options
    */
-  generateKey(component: string, options?: any): string {
+  generateKey(component: string, options?: unknown): string {
     const optionsStr = options ? JSON.stringify(options) : '';
     return `${component}:${optionsStr}`;
   }

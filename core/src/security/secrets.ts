@@ -177,7 +177,10 @@ export class SecretsManager {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const yaml = await import('js-yaml');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-      const data = yaml.load(content) as any;
+      const data = yaml.load(content) as
+        | { secret?: string; created?: string }
+        | null
+        | undefined;
 
       if (data?.secret && this.validateSecret(data.secret)) {
         return {

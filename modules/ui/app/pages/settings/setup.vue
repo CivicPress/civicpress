@@ -109,6 +109,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import SystemFooter from '~/components/SystemFooter.vue';
+import { errorMessage } from '~/utils/errors';
+
+/** Standard envelope for config status / reset / validate endpoints. */
+interface ConfigEnvelope<T = unknown> {
+  success?: boolean;
+  data?: T;
+  error?: string;
+}
 
 definePageMeta({
   layout: 'default',
@@ -125,7 +133,9 @@ const validatingAll = ref(false);
 async function loadStatus() {
   loading.value = true;
   try {
-    const res: any = await $civicApi('/api/v1/config/status');
+    const res = (await $civicApi(
+      '/api/v1/config/status'
+    )) as ConfigEnvelope<Record<string, 'default' | 'user' | 'missing'>>;
     if (res?.success) status.value = res.data || {};
   } catch {
   } finally {
@@ -136,10 +146,10 @@ async function loadStatus() {
 async function createFromDefaults(type: string) {
   busy.value = type;
   try {
-    const res: any = await $civicApi(
+    const res = (await $civicApi(
       `/api/v1/config/${encodeURIComponent(type)}/reset`,
       { method: 'POST' }
-    );
+    )) as ConfigEnvelope;
     if (res?.success) {
       useToast().add({
         title: `Created ${type} from defaults`,
@@ -149,10 +159,10 @@ async function createFromDefaults(type: string) {
     } else {
       throw new Error(res?.error || 'Failed to create from defaults');
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     useToast().add({
       title: `Failed to create ${type}`,
-      description: e?.message || String(e),
+      description: errorMessage(e),
       color: 'error',
     });
   } finally {
@@ -163,19 +173,19 @@ async function createFromDefaults(type: string) {
 async function validateOne(type: string) {
   busy.value = 'validate:' + type;
   try {
-    const res: any = await $civicApi(
+    const res = (await $civicApi(
       `/api/v1/config/${encodeURIComponent(type)}/validate`,
       { method: 'POST' }
-    );
+    )) as ConfigEnvelope<{ valid?: boolean }>;
     const valid = res?.data?.valid;
     useToast().add({
       title: valid ? `Valid: ${type}` : `Invalid: ${type}`,
       color: valid ? 'primary' : 'error',
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     useToast().add({
       title: `Validation failed: ${type}`,
-      description: e?.message || String(e),
+      description: errorMessage(e),
       color: 'error',
     });
   } finally {
@@ -186,11 +196,13 @@ async function validateOne(type: string) {
 async function validateAll() {
   validatingAll.value = true;
   try {
-    const res: any = await $civicApi('/api/v1/config/validate/all');
+    const res = (await $civicApi(
+      '/api/v1/config/validate/all'
+    )) as ConfigEnvelope<Record<string, { valid?: boolean }>>;
     if (res?.success) {
       const results = res.data || {};
       const invalid = Object.entries(results).filter(
-        ([, r]: any) => r && r.valid === false
+        ([, r]) => r && r.valid === false
       );
       if (invalid.length === 0) {
         useToast().add({
@@ -204,10 +216,10 @@ async function validateAll() {
         });
       }
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     useToast().add({
       title: 'Validation failed',
-      description: e?.message || String(e),
+      description: errorMessage(e),
       color: 'error',
     });
   } finally {

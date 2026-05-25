@@ -174,6 +174,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
@@ -214,14 +215,14 @@ const fetchConfigurations = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/config/list'
-    )) as any;
+    )) as ApiResponse<unknown[]>;
     if (response.success) {
       configurations.value = response.data || [];
     } else {
-      error.value = response.message || 'Failed to load configurations';
+      error.value = extractErrorMessage(response) || 'Failed to load configurations';
     }
-  } catch (err: any) {
-    error.value = err.message || 'Failed to load configurations';
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || 'Failed to load configurations';
   } finally {
     loading.value = false;
   }
@@ -242,7 +243,7 @@ const validateConfiguration = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/config/validate/all'
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success && response.data) {
       // response.data is an object keyed by type → { valid, errors[] }

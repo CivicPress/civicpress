@@ -350,7 +350,7 @@ export default function setupUsersCommand(cli: CAC) {
         if (name) updates.name = name;
         if (role) updates.role = role;
         if (password) {
-          // SECURITY GUARD: Check if user can set password
+          // SECURITY GUARD: Check if user can set password.
           if (!authService.canSetPassword(targetUser)) {
             const provider = authService.getUserAuthProvider(targetUser);
             cliError(
@@ -383,6 +383,15 @@ export default function setupUsersCommand(cli: CAC) {
 
         // Get the updated user data
         const updatedUser = await dbService.getUserById(targetUser.id);
+        if (!updatedUser) {
+          cliError(
+            'User not found after update',
+            'USER_NOT_FOUND',
+            undefined,
+            'users:update'
+          );
+          process.exit(1);
+        }
 
         const message = role
           ? `User updated successfully: ${targetUser.username} (role: ${role})`

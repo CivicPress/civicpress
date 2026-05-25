@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
+import type { RecordResponse } from '~/types/api-responses';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route parameters
@@ -64,29 +66,31 @@ const fetchRecord = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/records/${id}/raw`
-    )) as any;
+    )) as ApiResponse<RecordResponse & { created?: string; updated?: string }>;
 
     if (response && response.success && response.data) {
       const apiRecord = response.data;
 
-      // Transform API response to match CivicRecord interface
+      // Transform API response to match CivicRecord interface. The API
+      // returns broad `string` for type/status; CivicRecord uses narrow
+      // literal unions for in-store narrowing. Cast at the boundary.
       record.value = {
         id: apiRecord.id,
         title: apiRecord.title,
-        type: apiRecord.type,
+        type: apiRecord.type as CivicRecord['type'],
         content: apiRecord.content || '', // This now contains the complete file including frontmatter
-        status: apiRecord.status,
-        path: apiRecord.path,
-        author: apiRecord.author,
-        created_at: apiRecord.created || apiRecord.created_at,
-        updated_at: apiRecord.updated || apiRecord.updated_at,
-        metadata: apiRecord.metadata || {},
-      };
+        status: (apiRecord.status || 'draft') as CivicRecord['status'],
+        path: apiRecord.path || '',
+        author: apiRecord.author || '',
+        created_at: apiRecord.created || apiRecord.created_at || '',
+        updated_at: apiRecord.updated || apiRecord.updated_at || '',
+        metadata: (apiRecord.metadata || {}) as CivicRecord['metadata'],
+      } as CivicRecord;
     } else {
       throw new Error(t('records.raw.failedToFetch'));
     }
-  } catch (err: any) {
-    const errorMessage = err.message || t('records.failedToLoadRecord');
+  } catch (err: unknown) {
+    const errorMessage = (err instanceof Error ? err.message : '') || t('records.failedToLoadRecord');
     error.value = errorMessage;
     toast.add({
       title: t('common.error'),

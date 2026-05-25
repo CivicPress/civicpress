@@ -5,7 +5,18 @@
  */
 
 import { Logger } from '@civicpress/core';
-import type { UnifiedCacheManager } from '@civicpress/core';
+import type {
+  StorageProvider,
+  StorageDatabaseService,
+  StorageFile,
+} from '../types/storage.types.js';
+import type { UnifiedCacheManager, ICacheStrategy } from '@civicpress/core';
+
+// The usage cache stores either a full overall report or a single-folder
+// usage record; type the strategy to the union so both `set` paths typecheck.
+type StorageUsageCacheValue =
+  | StorageUsageReport
+  | StorageUsageReport['byFolder'][string];
 
 export interface StorageUsageReport {
   total: {
@@ -37,12 +48,12 @@ export interface StorageUsageReport {
  */
 export class StorageUsageReporter {
   private logger: Logger;
-  private databaseService: any; // Will be injected
-  private cache?: any; // Cache for usage reports
+  private databaseService: StorageDatabaseService; // Will be injected
+  private cache?: ICacheStrategy<StorageUsageCacheValue> | null;
   private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
 
   constructor(
-    databaseService: any,
+    databaseService: StorageDatabaseService,
     cacheManager?: UnifiedCacheManager,
     logger?: Logger
   ) {
@@ -52,7 +63,7 @@ export class StorageUsageReporter {
     // Initialize cache if cache manager provided
     if (cacheManager) {
       this.cache = cacheManager.hasCache('storageMetadata')
-        ? cacheManager.getCache<StorageUsageReport>('storageMetadata')
+        ? cacheManager.getCache<StorageUsageCacheValue>('storageMetadata')
         : null;
     }
   }
@@ -67,7 +78,7 @@ export class StorageUsageReporter {
     if (this.cache) {
       try {
         const cached = await this.cache.get(cacheKey);
-        if (cached) {
+        if (cached && 'total' in cached) {
           this.logger.debug('Returning cached storage usage report');
           return cached;
         }
@@ -82,7 +93,7 @@ export class StorageUsageReporter {
     // Cache the result
     if (this.cache) {
       try {
-        await this.cache.set(cacheKey, report, this.cacheTTL);
+        await this.cache.set(cacheKey, report, { ttl: this.cacheTTL });
       } catch (error) {
         this.logger.debug('Failed to cache usage report:', error);
       }
@@ -103,7 +114,7 @@ export class StorageUsageReporter {
     if (this.cache) {
       try {
         const cached = await this.cache.get(cacheKey);
-        if (cached) {
+        if (cached && !('total' in cached)) {
           return cached;
         }
       } catch (error) {
@@ -125,7 +136,7 @@ export class StorageUsageReporter {
 
     const folderUsage = {
       files: files.length,
-      size: files.reduce((sum: number, file: any) => sum + (file.size || 0), 0),
+      size: files.reduce((sum: number, file: StorageFile) => sum + (file.size || 0), 0),
       sizeFormatted: '',
     };
 
@@ -134,7 +145,7 @@ export class StorageUsageReporter {
     // Cache the result
     if (this.cache) {
       try {
-        await this.cache.set(cacheKey, folderUsage, this.cacheTTL);
+        await this.cache.set(cacheKey, folderUsage, { ttl: this.cacheTTL });
       } catch (error) {
         // Ignore cache errors
       }
@@ -158,7 +169,7 @@ export class StorageUsageReporter {
     const total = {
       files: allFiles.length,
       size: allFiles.reduce(
-        (sum: number, file: any) => sum + (file.size || 0),
+        (sum: number, file: StorageFile) => sum + (file.size || 0),
         0
       ),
       sizeFormatted: '',

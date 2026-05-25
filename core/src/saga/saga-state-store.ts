@@ -5,9 +5,28 @@
  */
 
 import { DatabaseService } from '../database/database-service.js';
+import { SqlParam, SqlRow } from '../database/database-adapter.js';
 import { SagaState, SagaStatus, CompensationStatus } from './types.js';
 import { Logger } from '../utils/logger.js';
 import { coreError, coreDebug } from '../utils/core-output.js';
+
+interface SagaStateRow extends SqlRow {
+  id: string;
+  saga_type: string;
+  saga_version?: string | null;
+  context: string;
+  status: string;
+  current_step: number;
+  step_results?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+  error?: string | null;
+  compensation_status?: string | null;
+  compensation_completed_at?: string | null;
+  compensation_error?: string | null;
+  idempotency_key?: string | null;
+  correlation_id?: string | null;
+}
 
 const logger = new Logger();
 
@@ -86,7 +105,9 @@ export class SagaStateStore {
     try {
       const rows = await this.db
         .getAdapter()
-        .query('SELECT * FROM saga_states WHERE id = ?', [sagaId]);
+        .query<SagaStateRow>('SELECT * FROM saga_states WHERE id = ?', [
+          sagaId,
+        ]);
 
       if (rows.length === 0) {
         return null;
@@ -116,9 +137,10 @@ export class SagaStateStore {
     try {
       const rows = await this.db
         .getAdapter()
-        .query('SELECT * FROM saga_states WHERE idempotency_key = ?', [
-          idempotencyKey,
-        ]);
+        .query<SagaStateRow>(
+          'SELECT * FROM saga_states WHERE idempotency_key = ?',
+          [idempotencyKey]
+        );
 
       if (rows.length === 0) {
         return null;
@@ -150,7 +172,7 @@ export class SagaStateStore {
   ): Promise<void> {
     try {
       const updates: string[] = ['status = ?'];
-      const params: any[] = [status];
+      const params: SqlParam[] = [status];
 
       if (currentStep !== undefined) {
         updates.push('current_step = ?');
@@ -235,7 +257,7 @@ export class SagaStateStore {
   ): Promise<void> {
     try {
       const updates: string[] = ['compensation_status = ?'];
-      const params: any[] = [status];
+      const params: SqlParam[] = [status];
 
       if (error !== undefined) {
         updates.push('compensation_error = ?');
@@ -273,7 +295,7 @@ export class SagaStateStore {
   async getStuckSagas(timeoutMs: number): Promise<SagaState[]> {
     try {
       const timeoutDate = new Date(Date.now() - timeoutMs);
-      const rows = await this.db.getAdapter().query(
+      const rows = await this.db.getAdapter().query<SagaStateRow>(
         `SELECT * FROM saga_states 
          WHERE status = 'executing' 
          AND started_at < ?`,
@@ -299,7 +321,7 @@ export class SagaStateStore {
    */
   async getFailedSagas(): Promise<SagaState[]> {
     try {
-      const rows = await this.db.getAdapter().query(
+      const rows = await this.db.getAdapter().query<SagaStateRow>(
         `SELECT * FROM saga_states 
          WHERE status = 'failed' 
          AND compensation_status IS NULL OR compensation_status != 'completed'`
@@ -322,7 +344,7 @@ export class SagaStateStore {
   /**
    * Convert database row to SagaState
    */
-  private rowToState(row: any): SagaState {
+  private rowToState(row: SagaStateRow): SagaState {
     return {
       id: row.id,
       sagaType: row.saga_type,
@@ -342,7 +364,7 @@ export class SagaStateStore {
         : undefined,
       compensationError: row.compensation_error || undefined,
       idempotencyKey: row.idempotency_key || undefined,
-      correlationId: row.correlation_id,
+      correlationId: row.correlation_id ?? '',
     };
   }
 }

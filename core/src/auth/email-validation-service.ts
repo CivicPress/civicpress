@@ -1,15 +1,17 @@
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database-service.js';
+import type { SqlParam } from '../database/database-adapter.js';
+import type {
+  UserRow,
+  EmailVerificationRow,
+} from '../database/types/row-types.js';
 import { Logger } from '../utils/logger.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { NotificationConfig } from '../notifications/notification-config.js';
-import {
-  EmailChannel,
-  type EmailChannelOptions,
-} from '../notifications/channels/email-channel.js';
 import { coreError, coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
 import { AuditChannel } from '../audit/audit-channel.js';
+import { registerEmailChannelOn } from './email-validation-service/email-channel-setup.js';
 
 const logger = new Logger();
 
@@ -164,92 +166,14 @@ export class EmailValidationService {
   /**
    * Register email channel with notification service.
    *
-   * Uses the canonical `EmailChannel` from
-   * `core/src/notifications/channels/email-channel.ts`. The thin object below
-   * is a `NotificationChannel`-shaped adapter that translates the
-   * notification system's `ChannelRequest` envelope into the canonical
-   * channel's `EmailMessage` envelope.
+   * Delegates to the extracted `registerEmailChannelOn` helper which builds
+   * a canonical {@link EmailChannel} and wraps it in a
+   * `NotificationChannel`-shaped adapter that translates the notification
+   * system's `ChannelRequest` envelope into the canonical channel's
+   * `EmailMessage` envelope.
    */
   private registerEmailChannel(): void {
-    try {
-      // Create notification config to get email configuration
-      const notificationConfig = new NotificationConfig();
-      const emailConfig = notificationConfig.getChannelConfig('email');
-
-      if (!emailConfig || !emailConfig.enabled) {
-        logger.warn('Email channel not enabled in configuration');
-        return;
-      }
-
-      // Normalize the configuration (handle metadata format).
-      const normalizeValue = (obj: any) =>
-        obj && typeof obj === 'object' && 'value' in obj ? obj.value : obj;
-
-      const smtpConfig = normalizeValue(emailConfig.smtp || emailConfig);
-      const host = normalizeValue(smtpConfig.host);
-      const port = Number(normalizeValue(smtpConfig.port) ?? 587);
-      const secure = Boolean(normalizeValue(smtpConfig.secure));
-      const auth = {
-        user: normalizeValue(smtpConfig.auth?.user),
-        pass: normalizeValue(smtpConfig.auth?.pass),
-      };
-      const from = normalizeValue(smtpConfig.from);
-      const tlsRaw = normalizeValue(smtpConfig.tls);
-      const rejectUnauthorized =
-        tlsRaw && tlsRaw.rejectUnauthorized
-          ? normalizeValue(tlsRaw.rejectUnauthorized)
-          : false;
-
-      const options: EmailChannelOptions = {
-        smtp: {
-          host,
-          port,
-          secure,
-          auth,
-          tls: { rejectUnauthorized },
-        },
-        defaultFrom: from,
-      };
-
-      const canonical = new EmailChannel(options);
-
-      const emailChannel = {
-        getName() {
-          return 'email';
-        },
-        isEnabled() {
-          return true;
-        },
-        async send(request: any) {
-          try {
-            const { messageId } = await canonical.send({
-              to: request.to,
-              subject:
-                request.content?.subject || 'Verify your CivicPress account',
-              text: request.content?.text || request.content?.body,
-              html: request.content?.html,
-            });
-            return {
-              success: true,
-              messageId: messageId || `smtp_${Date.now()}`,
-            };
-          } catch (error) {
-            return {
-              success: false,
-              error:
-                error instanceof Error ? error.message : 'Email send failed',
-            };
-          }
-        },
-      };
-
-      // Register the channel
-      this.notificationService.registerChannel('email', emailChannel as any);
-
-      logger.info('Email channel registered successfully');
-    } catch (error) {
-      logger.error('Error registering email channel:', error);
-    }
+    registerEmailChannelOn(this.notificationService, logger);
   }
 
   /**
@@ -279,14 +203,14 @@ export class EmailValidationService {
   async isEmailInUse(email: string, excludeUserId?: number): Promise<boolean> {
     try {
       let query = 'SELECT COUNT(*) as count FROM users WHERE email = ?';
-      const params: any[] = [email];
+      const params: SqlParam[] = [email];
 
       if (excludeUserId) {
         query += ' AND id != ?';
         params.push(excludeUserId);
       }
 
-      const result = await this.db.query(query, params);
+      const result = await this.db.query<{ count: number }>(query, params);
       return result[0].count > 0;
     } catch (error) {
       logger.error('Error checking email uniqueness:', error);
@@ -634,7 +558,7 @@ export class EmailValidationService {
   async cleanupExpiredTokens(): Promise<number> {
     try {
       // Check if email_verifications table exists
-      const tableCheck = await this.db.query(
+      const tableCheck = await this.db.query<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='email_verifications'"
       );
 
@@ -654,7 +578,7 @@ export class EmailValidationService {
         'UPDATE users SET pending_email = NULL, pending_email_token = NULL, pending_email_expires = NULL WHERE datetime(pending_email_expires) <= datetime("now")'
       );
 
-      const deletedCount = (result as any).changes || 0;
+      const deletedCount = result.changes || 0;
 
       if (deletedCount > 0) {
         logger.info(
@@ -686,10 +610,11 @@ export class EmailValidationService {
     expiresAt: Date | null;
   }> {
     try {
-      const result = await this.db.query(
-        'SELECT pending_email, pending_email_expires FROM users WHERE id = ?',
-        [userId]
-      );
+      const result = await this.db.query<
+        Pick<UserRow, 'pending_email' | 'pending_email_expires'>
+      >('SELECT pending_email, pending_email_expires FROM users WHERE id = ?', [
+        userId,
+      ]);
 
       if (result.length === 0) {
         return { pendingEmail: null, expiresAt: null };

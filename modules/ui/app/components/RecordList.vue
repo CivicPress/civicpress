@@ -13,7 +13,8 @@ interface Props {
     statuses?: string[];
   };
   searchQuery?: string;
-  breadcrumbsRef?: Ref<HTMLElement | undefined>;
+  /** HTMLElement (Vue auto-unwraps the parent's Ref<HTMLElement>). */
+  breadcrumbsRef?: HTMLElement;
   isSearching?: boolean; // True when user is typing or search is in progress
   currentPage?: number; // Current page number (from parent)
   pageSize?: number; // Records per page
@@ -136,8 +137,8 @@ const navigateToRecord = (record: CivicRecord) => {
 // Pagination helpers
 const scrollToTop = () => {
   // Scroll to the breadcrumbs instead of the very top
-  if (props.breadcrumbsRef?.value) {
-    props.breadcrumbsRef.value.scrollIntoView({
+  if (props.breadcrumbsRef) {
+    props.breadcrumbsRef.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
     });

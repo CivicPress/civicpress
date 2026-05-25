@@ -2,10 +2,10 @@
 // These will be implemented when the core module is properly set up
 
 export interface DefaultConfigs {
-  roles: any;
-  hooks: any;
-  workflows: any;
-  notifications: any;
+  roles: Record<string, unknown>;
+  hooks: Record<string, unknown>;
+  workflows: Record<string, unknown>;
+  notifications: Record<string, unknown>;
 }
 
 /**

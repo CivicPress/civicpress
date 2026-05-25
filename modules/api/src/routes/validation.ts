@@ -21,8 +21,41 @@ import * as yaml from 'js-yaml';
 import matter from 'gray-matter';
 
 type Severity = 'error' | 'warning' | 'info';
-function isSeverity(val: any): val is Severity {
+function isSeverity(val: unknown): val is Severity {
   return val === 'error' || val === 'warning' || val === 'info';
+}
+
+interface ValidationIssue {
+  type?: string;
+  severity?: Severity;
+  message: string;
+  code?: string;
+  field?: string;
+  line?: number;
+  details?: unknown;
+  metadata?: Record<string, unknown>;
+  file?: string;
+}
+
+interface RecordValidationMetadata {
+  schemaValid: boolean;
+  schemaErrors: number;
+  schemaWarnings: number;
+  title?: string;
+  type?: string;
+  status?: string;
+  author?: string;
+  created?: string;
+  updated?: string;
+}
+
+interface RecordValidationReport {
+  recordId: string;
+  isValid: boolean;
+  issues: ValidationIssue[];
+  metadata?: RecordValidationMetadata;
+  content?: string;
+  error?: string;
 }
 
 const logger = new Logger();
@@ -55,7 +88,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -69,7 +102,7 @@ export function createValidationRouter() {
           recordId,
           isValid: result.isValid,
           issues: result.issues.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(result, req, res, {
@@ -117,7 +150,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -136,7 +169,7 @@ export function createValidationRouter() {
           totalRecords: validationResults.results.length,
           validRecords: validationResults.summary.validCount,
           invalidRecords: validationResults.summary.invalidCount,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(validationResults, req, res, {
@@ -188,7 +221,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -205,7 +238,7 @@ export function createValidationRouter() {
         logger.info('Validation status retrieved', {
           totalIssues: validationStatus.summary.totalIssues,
           bySeverity: validationStatus.summary.bySeverity,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(validationStatus, req, res, {
@@ -251,7 +284,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -270,7 +303,7 @@ export function createValidationRouter() {
           recordId,
           isValid: result.isValid,
           issues: result.issues.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(result, req, res, {
@@ -300,8 +333,8 @@ async function validateSingleRecord(
   dataDir: string,
   recordId: string,
   type?: string
-): Promise<any> {
-  const issues: any[] = [];
+): Promise<RecordValidationReport> {
+  const issues: ValidationIssue[] = [];
   let recordContent: string | null = null;
 
   const normalizedInput = recordId.replace(/\.md$/, '');
@@ -362,7 +395,7 @@ async function validateSingleRecord(
       recordId,
       isValid: false,
       issues,
-      content: null,
+      content: undefined,
     };
   }
 
@@ -382,7 +415,7 @@ async function validateSingleRecord(
         recordId,
         isValid: false,
         issues,
-        content: null,
+        content: undefined,
       };
     }
 
@@ -398,7 +431,7 @@ async function validateSingleRecord(
       recordId,
       isValid: false,
       issues,
-      content: null,
+      content: undefined,
     };
   }
 
@@ -453,14 +486,14 @@ async function validateRecordContent(
 
     // Combine schema and business rule validation results
     // Schema errors are already included in RecordValidator results, but we track them separately for clarity
-    const issues: any[] = [
+    const issues: ValidationIssue[] = [
       ...validationResult.errors,
       ...validationResult.warnings,
       ...validationResult.info,
     ];
 
     // Extract metadata from parsed record (if parsing succeeded)
-    const metadata: any = {
+    const metadata: RecordValidationMetadata = {
       schemaValid: schemaValidation.isValid,
       schemaErrors: schemaValidation.errors.length,
       schemaWarnings: schemaValidation.warnings.length,
@@ -594,7 +627,9 @@ async function getValidationStatus(
   }
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
-  const allIssues: any[] = [];
+  const allIssues: Array<
+    ValidationIssue & { recordId?: string; recordType?: string }
+  > = [];
   const summary = {
     totalIssues: 0,
     bySeverity: {

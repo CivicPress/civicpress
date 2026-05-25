@@ -262,7 +262,13 @@ export class NotificationConfig {
   /**
    * Get channel configuration
    */
-  getChannelConfig(channelName: string): any {
+  getChannelConfig<K extends keyof NotificationConfigData['channels']>(
+    channelName: K
+  ): NotificationConfigData['channels'][K];
+  getChannelConfig(
+    channelName: string
+  ): NotificationConfigData['channels'][keyof NotificationConfigData['channels']];
+  getChannelConfig(channelName: string) {
     return this.config.channels[
       channelName as keyof typeof this.config.channels
     ];
@@ -273,7 +279,7 @@ export class NotificationConfig {
    */
   getEmailProviderConfig(): {
     provider: 'sendgrid' | 'ses' | 'smtp' | 'nodemailer';
-    config: any;
+    config: Record<string, unknown>;
   } {
     const emailConfig = this.config.channels.email;
     if (!emailConfig) {
@@ -281,20 +287,20 @@ export class NotificationConfig {
     }
 
     const provider = emailConfig.provider;
-    let config: any;
+    let config: Record<string, unknown> | undefined;
 
     switch (provider) {
       case 'sendgrid':
-        config = emailConfig.sendgrid;
+        config = emailConfig.sendgrid as Record<string, unknown> | undefined;
         break;
       case 'ses':
-        config = emailConfig.ses;
+        config = emailConfig.ses as Record<string, unknown> | undefined;
         break;
       case 'smtp':
-        config = emailConfig.smtp;
+        config = emailConfig.smtp as Record<string, unknown> | undefined;
         break;
       case 'nodemailer':
-        config = emailConfig.nodemailer;
+        config = emailConfig.nodemailer as Record<string, unknown> | undefined;
         break;
       default:
         throw new Error(`Unsupported email provider: ${provider}`);
@@ -325,13 +331,12 @@ export class NotificationConfig {
             config.from
           );
         case 'smtp':
-        case 'nodemailer':
-          return !!(
-            config.host &&
-            config.auth?.user &&
-            config.auth?.pass &&
-            config.from
-          );
+        case 'nodemailer': {
+          const auth = config.auth as
+            | { user?: string; pass?: string }
+            | undefined;
+          return !!(config.host && auth?.user && auth?.pass && config.from);
+        }
         default:
           return false;
       }
@@ -343,7 +348,15 @@ export class NotificationConfig {
   /**
    * Get auth template
    */
-  getAuthTemplate(templateName: string): any {
+  getAuthTemplate<K extends keyof NotificationConfigData['auth_templates']>(
+    templateName: K
+  ): NotificationConfigData['auth_templates'][K];
+  getAuthTemplate(
+    templateName: string
+  ):
+    | NotificationConfigData['auth_templates'][keyof NotificationConfigData['auth_templates']]
+    | undefined;
+  getAuthTemplate(templateName: string) {
     return this.config.auth_templates[
       templateName as keyof typeof this.config.auth_templates
     ];
@@ -376,18 +389,23 @@ export class NotificationConfig {
   /**
    * Update channel configuration
    */
-  updateChannelConfig(channelName: string, config: any): void {
-    this.config.channels[channelName as keyof typeof this.config.channels] =
-      config;
+  updateChannelConfig<K extends keyof NotificationConfigData['channels']>(
+    channelName: K,
+    config: NonNullable<NotificationConfigData['channels'][K]>
+  ): void {
+    this.config.channels[channelName] = config;
   }
 
   /**
    * Update auth template
    */
-  updateAuthTemplate(templateName: string, template: any): void {
-    this.config.auth_templates[
-      templateName as keyof typeof this.config.auth_templates
-    ] = template;
+  updateAuthTemplate<
+    K extends keyof NotificationConfigData['auth_templates'],
+  >(
+    templateName: K,
+    template: NotificationConfigData['auth_templates'][K]
+  ): void {
+    this.config.auth_templates[templateName] = template;
   }
 
   /**

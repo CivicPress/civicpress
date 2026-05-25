@@ -9,10 +9,13 @@ import {
   DiagnosticChecker,
   CheckResult,
   DiagnosticIssue,
+  DiagnosticDetails,
+  DiagnosticError,
   FixResult,
   FixOptions,
   CheckStatus,
   DiagnosticSeverity,
+  DiagnosticOptions,
 } from './types.js';
 import { Logger } from '../utils/logger.js';
 
@@ -32,7 +35,7 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
   /**
    * Run the diagnostic check (must be implemented by subclasses)
    */
-  abstract check(options?: any): Promise<CheckResult>;
+  abstract check(options?: DiagnosticOptions): Promise<CheckResult>;
 
   /**
    * Attempt to auto-fix issues (optional, can be overridden)
@@ -51,7 +54,10 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
   /**
    * Create a successful check result
    */
-  protected createSuccessResult(message?: string, details?: any): CheckResult {
+  protected createSuccessResult(
+    message?: string,
+    details?: DiagnosticDetails
+  ): CheckResult {
     return {
       name: this.name,
       status: 'pass',
@@ -63,7 +69,10 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
   /**
    * Create a warning check result
    */
-  protected createWarningResult(message: string, details?: any): CheckResult {
+  protected createWarningResult(
+    message: string,
+    details?: DiagnosticDetails
+  ): CheckResult {
     return {
       name: this.name,
       status: 'warning',
@@ -77,27 +86,55 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
    */
   protected createErrorResult(
     message: string,
-    error?: any,
-    details?: any
+    error?: unknown,
+    details?: DiagnosticDetails
   ): CheckResult {
     return {
       name: this.name,
       status: 'error',
       message,
       error: error
-        ? {
-            category: 'unknown',
-            severity: 'medium',
-            actionable: false,
-            recoverable: true,
-            retryable: true,
-            message: error.message || message,
-            code: error.code,
-            details: error.details || details,
-            stack: error.stack,
-          }
+        ? this.buildDiagnosticError(error, message, details)
         : undefined,
       details,
+    };
+  }
+
+  /**
+   * Narrow an unknown error payload into a DiagnosticError shape.
+   * Replaces direct `.message` / `.code` / `.details` / `.stack` access
+   * on `unknown` with typed reads via `instanceof Error` + `in` checks.
+   */
+  private buildDiagnosticError(
+    error: unknown,
+    fallbackMessage: string,
+    detailsFallback?: DiagnosticDetails
+  ): DiagnosticError {
+    const errObj = error instanceof Error ? error : null;
+    const recordLike =
+      typeof error === 'object' && error !== null
+        ? (error as Record<string, unknown>)
+        : null;
+    const rawDetails = recordLike?.details ?? detailsFallback;
+    const details: DiagnosticDetails | undefined =
+      rawDetails && typeof rawDetails === 'object' && !Array.isArray(rawDetails)
+        ? (rawDetails as DiagnosticDetails)
+        : rawDetails !== undefined
+          ? { value: rawDetails }
+          : undefined;
+    return {
+      category: 'unknown',
+      severity: 'medium',
+      actionable: false,
+      recoverable: true,
+      retryable: true,
+      message: errObj?.message || fallbackMessage,
+      code:
+        recordLike && typeof recordLike.code === 'string'
+          ? recordLike.code
+          : undefined,
+      details,
+      stack: errObj?.stack,
     };
   }
 
@@ -116,7 +153,7 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
         estimatedDuration?: number;
       };
       recommendations?: string[];
-      details?: any;
+      details?: DiagnosticDetails;
     }
   ): DiagnosticIssue {
     return {
@@ -148,7 +185,9 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
       backupId?: string;
       rollbackAvailable?: boolean;
       duration?: number;
-      error?: any;
+      // Accepts a raw caught error (unknown) or a pre-built DiagnosticError;
+      // narrowed via buildDiagnosticError before storing on FixResult.
+      error?: unknown;
     }
   ): FixResult {
     return {
@@ -158,7 +197,10 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
       backupId: options?.backupId,
       rollbackAvailable: options?.rollbackAvailable || false,
       duration: options?.duration || 0,
-      error: options?.error,
+      error:
+        options?.error !== undefined
+          ? this.buildDiagnosticError(options.error, message)
+          : undefined,
     };
   }
 }

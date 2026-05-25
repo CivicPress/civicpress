@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { validateApiResponse } from '~/utils/api-response';
+import type { SessionResponse } from '~/types/api-responses';
 
 export interface User {
   id: number;
@@ -125,19 +126,24 @@ export const useAuthStore = defineStore('auth', {
 
     // Private method to handle common login logic
     async handleLoginResponse(
-      response: any,
+      response: unknown,
       errorMessage: string = 'Login failed'
     ) {
       // Safely extract user and token from the response
-      const data = validateApiResponse(response, ['session']);
+      const data = validateApiResponse<{ session: SessionResponse }>(
+        response,
+        ['session']
+      );
       const { session } = data;
 
-      // Update user info
+      // Update user info. AuthUserResponse types email/name as optional
+      // (server doesn't always populate them on legacy users) but the User
+      // type requires them — default to empty strings at the boundary.
       const user: User = {
         id: session.user.id,
         username: session.user.username,
-        email: session.user.email,
-        name: session.user.name,
+        email: session.user.email || '',
+        name: session.user.name || '',
         role: session.user.role,
         avatar_url: session.user.avatar_url,
         permissions: Array.isArray(session.user.permissions)
@@ -148,7 +154,12 @@ export const useAuthStore = defineStore('auth', {
       // Update user, token and auth state
       this.user = user;
       this.token = session.token;
-      this.sessionExpiresAt = session.expiresAt;
+      this.sessionExpiresAt =
+        typeof session.expiresAt === 'string'
+          ? session.expiresAt
+          : session.expiresAt
+            ? new Date(session.expiresAt).toISOString()
+            : null;
       this.isAuthenticated = true;
 
       // Save auth state to localStorage
@@ -167,7 +178,7 @@ export const useAuthStore = defineStore('auth', {
         });
 
         return await this.handleLoginResponse(response, 'Login failed');
-      } catch (error: any) {
+      } catch (error: unknown) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Login Failed',
@@ -190,7 +201,7 @@ export const useAuthStore = defineStore('auth', {
         });
 
         return await this.handleLoginResponse(response, 'Token login failed');
-      } catch (error: any) {
+      } catch (error: unknown) {
         const { handleError } = useErrorHandler();
         const errorMessage = handleError(error, {
           title: 'Token Login Failed',
@@ -303,7 +314,7 @@ export const useAuthStore = defineStore('auth', {
           headers: {
             Authorization: `Bearer ${this.token}`,
           },
-        })) as any;
+        })) as ApiResponse<{ user: User }>;
 
         if (response.success) {
           // Update user data from server
@@ -316,10 +327,14 @@ export const useAuthStore = defineStore('auth', {
           this.clearAuth();
           return false;
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.warn('Token validation failed:', error);
         // Only clear auth for explicit invalid token responses; keep session on network/other errors
-        const status = error?.status ?? error?.response?.status;
+        const eRec = (error && typeof error === 'object' ? error : {}) as {
+          status?: number;
+          response?: { status?: number };
+        };
+        const status = eRec.status ?? eRec.response?.status;
         if (status === 401) {
           this.clearAuth();
           return false;
@@ -342,7 +357,7 @@ export const useAuthStore = defineStore('auth', {
           headers: {
             Authorization: `Bearer ${this.token}`,
           },
-        })) as any;
+        })) as ApiResponse<{ user: User }>;
 
         if (response.success) {
           // Update user data from server
@@ -354,7 +369,7 @@ export const useAuthStore = defineStore('auth', {
           console.warn('Failed to refresh user data:', response);
           return false;
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.warn('Failed to refresh user data:', error);
         return false;
       }

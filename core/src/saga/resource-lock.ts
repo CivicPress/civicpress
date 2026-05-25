@@ -5,10 +5,18 @@
  */
 
 import { DatabaseService } from '../database/database-service.js';
+import { SqlRow } from '../database/database-adapter.js';
 import { ResourceLock } from './types.js';
 import { SagaLockError } from './errors.js';
 import { coreDebug, coreError, coreWarn } from '../utils/core-output.js';
 import { Logger } from '../utils/logger.js';
+
+interface SagaResourceLockRow extends SqlRow {
+  resource_key: string;
+  saga_id: string;
+  acquired_at: string;
+  expires_at: string;
+}
 
 const logger = new Logger();
 
@@ -64,7 +72,7 @@ export class ResourceLockManager {
         timeout,
         expiresAt,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if lock already exists
       const existingLock = await this.getLock(resourceKey);
 
@@ -149,9 +157,10 @@ export class ResourceLockManager {
     try {
       const rows = await this.db
         .getAdapter()
-        .query('SELECT * FROM saga_resource_locks WHERE resource_key = ?', [
-          resourceKey,
-        ]);
+        .query<SagaResourceLockRow>(
+          'SELECT * FROM saga_resource_locks WHERE resource_key = ?',
+          [resourceKey]
+        );
 
       if (rows.length === 0) {
         return null;
@@ -192,7 +201,7 @@ export class ResourceLockManager {
           new Date().toISOString(),
         ]);
 
-      const deletedCount = (result as any).changes || 0;
+      const deletedCount = result.changes || 0;
 
       if (deletedCount > 0) {
         coreDebug(

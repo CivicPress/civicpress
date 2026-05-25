@@ -91,6 +91,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRouter } from 'vue-router';
 import { useNuxtApp } from '#imports';
 
@@ -150,12 +151,12 @@ const fetchLinkedRecords = async () => {
   try {
     const response = (await $civicApi(
       `/api/v1/geography/${props.geographyId}/linked-records`
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success) {
       linkedRecords.value = response.data || [];
     } else {
-      error.value = response.error || t('geography.failedToFetchLinkedRecords');
+      error.value = extractErrorMessage(response) || t('geography.failedToFetchLinkedRecords');
     }
   } catch (err) {
     console.error('Error fetching linked records:', err);

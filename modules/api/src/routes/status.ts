@@ -1,4 +1,5 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
+import { HttpError } from '../utils/http-error.js';
 import { query, validationResult } from 'express-validator';
 import {
   Logger,
@@ -20,11 +21,11 @@ export function createStatusRouter() {
   const router = Router();
 
   // GET /api/status - Get comprehensive system status
-  router.get('/', async (req: any, res: Response) => {
+  router.get('/', async (req: Request, res: Response) => {
     logApiRequest(req, { operation: 'get_system_status' });
 
     try {
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         throw new Error('CivicPress not initialized');
       }
@@ -79,7 +80,7 @@ export function createStatusRouter() {
       logger.info('System status retrieved successfully', {
         totalRecords: recordStats.totalRecords,
         pendingChanges: gitStatus?.modified?.length || 0,
-        requestId: (req as any).requestId,
+        requestId: req.requestId,
       });
 
       sendSuccess(status, req, res, {
@@ -101,21 +102,18 @@ export function createStatusRouter() {
   });
 
   // GET /api/status/git - Get detailed Git status
-  router.get('/git', async (req: any, res: Response) => {
+  router.get('/git', async (req: Request, res: Response) => {
     logApiRequest(req, { operation: 'get_git_status' });
 
     try {
-      const civicPress = (req as any).civicPress;
+      const civicPress = req.civicPress;
       if (!civicPress) {
         throw new Error('CivicPress not initialized');
       }
 
       const gitEngine = civicPress.getGitEngine();
       if (!gitEngine) {
-        const error = new Error('Git engine not available');
-        (error as any).statusCode = 503;
-        (error as any).code = 'GIT_ENGINE_UNAVAILABLE';
-        throw error;
+        throw new HttpError(503, 'Git engine not available', 'GIT_ENGINE_UNAVAILABLE');
       }
 
       const gitStatus = await gitEngine.status();
@@ -133,7 +131,7 @@ export function createStatusRouter() {
         deleted: gitStatus.deleted,
         renamed: gitStatus.renamed,
         untracked: gitStatus.untracked || [],
-        recentCommits: recentCommits.map((commit: any) => ({
+        recentCommits: recentCommits.map((commit) => ({
           hash: commit.hash,
           shortHash: commit.hash.substring(0, 8),
           message: commit.message,
@@ -154,7 +152,7 @@ export function createStatusRouter() {
 
       logger.info('Git status retrieved successfully', {
         totalChanges: status.summary.totalChanges,
-        requestId: (req as any).requestId,
+        requestId: req.requestId,
       });
 
       sendSuccess(status, req, res, {
@@ -178,7 +176,7 @@ export function createStatusRouter() {
   router.get(
     '/records',
     [query('type').optional().isString().withMessage('Type must be a string')],
-    async (req: any, res: Response) => {
+    async (req: Request, res: Response) => {
       logApiRequest(req, { operation: 'get_record_status' });
 
       try {
@@ -192,7 +190,7 @@ export function createStatusRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -204,7 +202,7 @@ export function createStatusRouter() {
 
         logger.info('Record status retrieved successfully', {
           totalRecords: recordStats.totalRecords,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(recordStats, req, res, {
@@ -320,15 +318,35 @@ async function getRecordStatistics(
   return stats;
 }
 
+interface ConfigFileSummary {
+  exists: boolean;
+  size?: number;
+  lastModified?: string;
+  count?: number;
+  files?: string[];
+  error?: string;
+}
+
+interface ConfigurationStatus {
+  exists: boolean;
+  files: string[];
+  workflows: ConfigFileSummary | null;
+  templates: ConfigFileSummary | null;
+  hooks: ConfigFileSummary | null;
+  error?: string;
+}
+
 // Helper function to get configuration status
-async function getConfigurationStatus(dataDir: string): Promise<any> {
+async function getConfigurationStatus(
+  dataDir: string
+): Promise<ConfigurationStatus> {
   const configDir = path.join(dataDir, '.civic');
-  const config = {
+  const config: ConfigurationStatus = {
     exists: fs.existsSync(configDir),
-    files: [] as string[],
-    workflows: null as any,
-    templates: null as any,
-    hooks: null as any,
+    files: [],
+    workflows: null,
+    templates: null,
+    hooks: null,
   };
 
   if (config.exists) {
@@ -379,7 +397,7 @@ async function getConfigurationStatus(dataDir: string): Promise<any> {
         }
       }
     } catch (error) {
-      (config as any).error = (error as Error).message;
+      config.error = (error as Error).message;
     }
   }
 
