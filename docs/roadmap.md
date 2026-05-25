@@ -4,7 +4,7 @@ _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha toward a stable, production-grade civic infrastructure platform._
 
 **Current Version:** v0.2.0 (Alpha)
-**Status:** v0.2.0 shipped; **post-audit base refactor in progress** (2026-05-20 snapshot). Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 merged to local `dev`; Phase 2d W0 (storage tests) + W1 (module contract + legal-register rename) + W2 (21 god-files decomposed) closed on `refactor/phase-2d-structural-hardening` (local-only, not yet merged). 53 of 205 original audit findings closed + 40 refactor-surfaced closures = 93 total measurable progress items. Remaining inside Phase 2d: W3 (type-safety, ~1,581 casts) + W4 (deps hygiene). After 2d: Phase 3 (realtime), 4 (hardware audit), 5 (broadcast-box reintegration). v0.3.x scope rebalanced to follow the refactor master plan at `docs/plans/2026-05-17-base-refactor-master-plan.md`. See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the full registry, `docs/audits/phase-2a-closure-report.md` for what landed in 2a, and the phase-2b/2c/2c.5 closure reports under `docs/audits/` for subsequent phases.
+**Status:** v0.2.0 shipped; **post-audit base refactor in progress** (2026-05-25 snapshot). Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 merged to local `dev`; **Phase 2d (Structural Hardening) fully closed** on `refactor/phase-2d-structural-hardening` (W0 storage tests + W1 module contract + W2 21 god-files + W3 type-safety 1,621→223 + W4 deps hygiene; 89 commits; closure report at `docs/audits/phase-2d-closure-report.md`). **64 of 205 original audit findings closed (31%) + 46 refactor-surfaced closures = 110 total measurable progress items.** Phase 2d branch pending local merge to `dev`. After 2d: Phase 3 (realtime, Yjs-only) is next, then Phase 4 (hardware audit) and Phase 5 (broadcast-box reintegration). v0.3.x scope rebalanced to follow the refactor master plan at `docs/plans/2026-05-17-base-refactor-master-plan.md`. See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the full registry and the per-phase closure reports under `docs/audits/`.
 
 ---
 
@@ -299,13 +299,15 @@ ships its truth meter:
 
 | Phase | Findings closed | Findings deferred (with target phase) |
 |---|---|---|
-| 2a Bleed-Stop | 18 (15 Critical + 3 High) | 5 Critical (broadcast-box-002/007 → Phase 5; BB-HW-001/3 → Phase 4; ui-002 → 2d, may promote earlier) |
-| 2b Truth Restoration | _in progress_ — 3 closed so far (legal-register-001, legal-register-006, notifications-007); the spec-frontmatter sweep demoted 39 of 61 stable-claiming specs to honest `partial`/`planned` status | _pending closure report_ |
-| 2c Foundation Cleanup | _pending_ | _pending_ |
-| 2d Structural Hardening | _pending_ | _pending_ |
-| 3 Reintroduce realtime | _pending_ | _pending_ |
+| 2a Bleed-Stop | 18 (15 Critical + 3 High) | 5 Critical (broadcast-box-002/007 → Phase 5; BB-HW-001/3 → Phase 4; ui-002 → 2d-followup post-closure) |
+| 2b Truth Restoration | 9 (legal-register-001/006, notifications-007, site-001/003, BB-HW-008, ui-005, cli-001, site-002 → wontfix-by-phase) + 6 surfaced closures | spec-frontmatter sweep demoted 39 of 61 stable-claiming specs to honest `partial`/`planned` |
+| 2c Foundation Cleanup | 17 (core-001/4/5/6/10/13, api-008, storage-003/4/9, notifications-005/6/8/13, plus realtime-007/8 → Phase 3, BB-003 → Phase 4/5, BB-013 → Phase 5) + 4 Phase-2c.5-surfaced | _closed 2026-05-19; report at `docs/audits/phase-2c-closure-report.md`_ |
+| 2d Structural Hardening | **13** (W1: legal-register-002/005; W2: core-008/api-013/ui-008; W3: api-009/ui-011/storage-015; W4: storage-006/deps-008/api-007/deps-010/deps-011) + 9 W0-surfaced + 21 W2-decomp + 6 W3-latent-bugs | _closed 2026-05-25; report at `docs/audits/phase-2d-closure-report.md`._ Carry-forwards: lint-rule rollout (dedicated session); ui-002 v3→v4 migration (dedicated session); realtime-012 → Phase 3 |
+| 3 Reintroduce realtime | _next phase_ | _pending_ |
 | 4 Audit + fix broadcast-box hardware | _pending_ | _pending_ |
 | 5 Reintroduce broadcast-box to monorepo | _pending_ | _pending_ |
+
+**Cumulative (end of Phase 2d):** 64 of 205 original-audit findings closed (31%). Plus 46 refactor-surfaced closures (separately tracked) for 110 total measurable progress items.
 
 See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the per-finding
 tracker (Status column on every finding row); each closure includes a commit

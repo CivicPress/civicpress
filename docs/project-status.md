@@ -1,10 +1,10 @@
 # CivicPress Project Status
 
-**Last Updated**: 2026-05-20 (Phase 2d W2 close — god-file decomposition)
+**Last Updated**: 2026-05-25 (Phase 2d closure — full W0+W1+W2+W3+W4 complete)
 **Current Version**: v0.2.0 (Alpha)
-**Overall Status**: Alpha — refactor in progress. Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 merged to local `dev`; Phase 2d W0 (storage test rescue) + W1 (module contract + legal-register rename) + W2 (21 god-files decomposed) closed on `refactor/phase-2d-structural-hardening` (local-only, not yet merged). W3 (type-safety) + W4 (deps hygiene) still ahead.
-**Test Suite**: 1305 passing / 1 known date-bomb (§9.1 session-mgmt, hardcoded 2025 expiry) / 19 skipped — post-Phase-2d-W2 verified run. UI workspace 114/114 passing under `vitest.config.ui.mjs`. Storage workspace 216/216 passing under `pnpm -C modules/storage test:run`.
-**Implementation**: v0.2.0 shipped; 2026-05 audit identified 205 findings (20 Critical, 65 High, 79 Medium, 41 Low). Base refactor cumulative state: **53 of 205 original findings closed** (~26%); plus **40 refactor-surfaced closures** (6 Phase-2b + 4 Phase-2c.5 + 9 Phase-2d-W0 + 21 Phase-2d-W2-decomp) for **93 total measurable progress items**.
+**Overall Status**: Alpha — refactor in progress. Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 merged to local `dev`; **Phase 2d (Structural Hardening) fully closed** on `refactor/phase-2d-structural-hardening` (W0 storage tests + W1 module contract + W2 21 god-files decomposed + W3 1,621→223 casts + W4 deps hygiene). Branch pending local merge to `dev`. Phase 3 (realtime reintroduction, Yjs-only) is next.
+**Test Suite**: 1305+ passing / 1 known date-bomb (§9.1 session-mgmt, hardcoded 2025 expiry) / 19 skipped — post-Phase-2d verified. UI workspace 138/138 passing under `vitest.config.ui.mjs`. Storage workspace 216/216 passing under `pnpm -C modules/storage test:run`. API workspace 270/270 passing.
+**Implementation**: v0.2.0 shipped; 2026-05 audit identified 205 findings (20 Critical, 65 High, 79 Medium, 41 Low). Base refactor cumulative state: **64 of 205 original findings closed** (31%); plus **46 refactor-surfaced closures** (6 Phase-2b + 4 Phase-2c.5 + 9 Phase-2d-W0 + 21 Phase-2d-W2-decomp + 6 Phase-2d-W3-latent-bugs) for **110 total measurable progress items**.
 
 **Website:** [civicpress.io](https://civicpress.io) | **Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
@@ -15,21 +15,24 @@ The 2026-05 manifesto-fit audit identified **205 findings (20 Critical, 65 High,
 
 - `docs/audits/2026-05-16-manifesto-fit-findings.md` — full registry with Status column
 - `docs/audits/phase-2a-closure-report.md` — Phase 2a Bleed-Stop summary (18 closed, 5 deferred by design)
+- `docs/audits/phase-2c-closure-report.md` — Phase 2c Foundation Cleanup summary
+- `docs/audits/phase-2c.5-closure-note.md` — Phase 2c.5 cleanup follow-ups
+- `docs/audits/phase-2d-closure-report.md` — Phase 2d Structural Hardening summary (13 closed across W0+W1+W2+W3+W4)
+- `docs/audits/phase-2d-type-cast-inventory.md` — Phase 2d W3 type-safety inventory + progress log (1,621 → 223 casts, 86% cleared)
 - `docs/audits/spec-stability-triage.md` — spec-by-spec honest status (61 specs reviewed in Phase 2b Task 1)
 - `docs/plans/2026-05-17-base-refactor-master-plan.md` — 7-phase roadmap (~3-5 months total)
-- `docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md` — current sub-phase plan
 
 This file is **the public answer to "is it ready?"** The honest answer for v0.2.x is: **functional for early pilots; not yet production-grade by municipal procurement standards; expect breaking changes through v0.3.x as the refactor lands.**
 
 ## Current Status
 
-CivicPress is a **working alpha** civic technology platform. The core record-management, Git-engine, CLI, API, and UI surfaces function for the v0.2.0 feature set. Post-audit refactor progress to date (2026-05-17 through 2026-05-20):
+CivicPress is a **working alpha** civic technology platform. The core record-management, Git-engine, CLI, API, and UI surfaces function for the v0.2.0 feature set. Post-audit refactor progress to date (2026-05-17 through 2026-05-25):
 
 - **Phase 2a (Bleed-Stop)** closed 15 Critical findings (auth gates wired, XSS sanitized, quotas enforced, audit logs made truthful, stub routers demoted to 501). Merged to local `main`.
 - **Phase 2b (Truth Restoration)** + **Phase 2c (Foundation Cleanup)** + **Phase 2c.5 (cleanup followups)** merged to local `dev`. Truth meter advanced from 18 → 51 of 205 findings closed; orphaned subsystems delete-or-wired; audit-trail unified via the `AuditChannel`.
-- **Phase 2d (Structural Hardening) W0 + W1 + W2** complete on a local-only branch. W0 cleared all 28 carry-forward storage test failures and surfaced + fixed 9 reliability-primitive bugs. W1 shipped the canonical module contract + `ModuleResolver`. W2 decomposed all 18 named god-files + 3 surfaced extras (largest: `cloud-uuid-storage-service.ts` 2,711 → 539 LoC). The full 6-file / 122-test characterization suite pins post-decomposition behavior for the 3 highest-regression-risk surfaces.
+- **Phase 2d (Structural Hardening) fully closed** on a local-only branch (89 commits). W0 cleared all 28 carry-forward storage test failures and surfaced + fixed 9 reliability-primitive bugs. W1 shipped the canonical module contract + `ModuleResolver`. W2 decomposed all 18 named god-files + 3 surfaced extras (largest: `cloud-uuid-storage-service.ts` 2,711 → 539 LoC). W3 drove 1,621 `: any`/`as any` casts to an annotated-allowlist 223 (86% cleared) and surfaced + fixed 6 latent bugs in the process. W4 made every workspace declare every imported package + flipped `.npmrc` to strict hoist + moved cloud SDKs to `optionalDependencies` (with lazy SDK loader) + generated `docs/licenses.md` (1,460 packages catalogued). Closure report at `docs/audits/phase-2d-closure-report.md`.
 
-The platform is suitable for early pilots and development; it is not yet production-grade by the standards a municipal procurement reviewer would apply. The remaining Phase 2d workstreams — W3 (type-safety elimination, ~1,581 `as any` casts) and W4 (deps hygiene) — and Phases 3-5 (realtime reintroduction, hardware audit, broadcast-box reintegration) are all still ahead. Branch is local-only per the `refactor-push-policy` — nothing in the refactor pushes to any origin until all 7 phases finish.
+The platform is suitable for early pilots and development; it is not yet production-grade by the standards a municipal procurement reviewer would apply. **Phase 3 (realtime reintroduction, Yjs-only)** is next per the master plan, with Phases 4 (hardware audit) and 5 (broadcast-box reintegration) to follow. Phase 2d carry-forwards (none blocking Phase 3): lint-rule enforcement (`@typescript-eslint/no-explicit-any: error`), ui-002 Nuxt UI Pro v3→v4 migration (free + OSS in v4), realtime-012 (handled inside Phase 3), test-suite repair session (date-bomb + lock-endpoints flake). Branch is local-only per the `refactor-push-policy` — nothing in the refactor pushes to any origin until all 7 phases finish.
 
 ### What's Working
 
@@ -400,15 +403,15 @@ The platform is suitable for early pilots and development; it is not yet product
 
 ### Test Coverage Summary
 
-Post Phase 2d W2 (2026-05-20):
+Post Phase 2d closure (2026-05-25):
 
 | Component | Test files | Cases | Component coverage |
 | --------- | ---------- | ----- | ------------------ |
 | **CLI**   | 12 (`cli/src/commands/__tests__/`) + 10 integration (`tests/cli/`) | ~84 unit + integration cases | Phase 2b Tasks 10+11 closed `cli-001` (test theatre): 13 → 84 honest cases. Tier 1/2 commands covered; rest still uneven. |
-| **API**   | ~50 integration files (`tests/api/`) | bundled in the 1305 root-runner total | Integration coverage strong; per-route unit coverage uneven. 22 retroactive characterization tests added in Phase 2d for `records-service.ts` post-decomposition. |
-| **Core**  | bundled with API in `tests/` + `core/src/**/__tests__/` | bundled in the 1305 root-runner total | Integration coverage strong; Phase 2d W2 added characterization tests for `template-engine`, `database-checker`, `sqlite-search` (26 + 5 + 8 = 39 cases). Storage W0 triage added 4 rewritten unit tests + closed 9 reliability bugs. |
-| **UI**    | 7+ component/composable files (`tests/ui/`) | 114 passing under `vitest.config.ui.mjs` | Phase 2b Tasks 8+9 closed `ui-005` (test theatre): 47 new component tests for forms + record viewing. Phase 2d added 24 char-tests for `useFileBrowser` (T14). |
-| **Storage** | 17 unit files (`modules/storage/src/__tests__/`) + 1 char-test (`tests/storage/characterization/`) | 216 unit-runner passing + 37 char-tests | Phase 2d W0 cleared all 28 carry-forward failures + surfaced/closed 9 reliability bugs (retry, timeout, circuit-breaker, batch ops, lifecycle, stream errors, error inheritance). W2 added 37 char-tests for `cloud-uuid-storage-service` post-decomposition. |
+| **API**   | ~50 integration files (`tests/api/`) | 270 passing in workspace runner | Integration coverage strong; per-route unit coverage uneven. 22 retroactive characterization tests added in Phase 2d for `records-service.ts` post-decomposition. |
+| **Core**  | bundled with API in `tests/` + `core/src/**/__tests__/` | 357+ passing | Integration coverage strong; Phase 2d W2 added characterization tests for `template-engine`, `database-checker`, `sqlite-search` (26 + 5 + 8 = 39 cases). Phase 2d W3 added 17 indexing integration tests. Storage W0 triage added 4 rewritten unit tests + closed 9 reliability bugs. |
+| **UI**    | 7+ component/composable files (`tests/ui/`) | 138 passing under `vitest.config.ui.mjs` | Phase 2b Tasks 8+9 closed `ui-005` (test theatre): 47 new component tests for forms + record viewing. Phase 2d added 24 char-tests for `useFileBrowser` (T14). |
+| **Storage** | 17 unit files (`modules/storage/src/__tests__/`) + 1 char-test (`tests/storage/characterization/`) | 216 unit-runner passing + 37 char-tests | Phase 2d W0 cleared all 28 carry-forward failures + surfaced/closed 9 reliability bugs (retry, timeout, circuit-breaker, batch ops, lifecycle, stream errors, error inheritance). W2 added 37 char-tests for `cloud-uuid-storage-service` post-decomposition. W3 + W4 maintained 216/216 throughout. |
 | **Notifications** | 1 integration | (audited 2026-05) | Phase 2c routed notifications through the unified `AuditChannel`; Phase 2b Task 7 added ~10 unit cases. No new Phase 2d work. |
 
 > **Note:** The previous version of this table claimed CLI 120+ / 90%, API 200+ / 90%, Core 160+ / 90%, UI 80+ / 85%, Total 600+ / 90%. The 2026-05 manifesto-fit audit (findings `cli-001`, `ui-005`) showed those numbers were not substantiated by files on disk. The honest counts above replace them. See `docs/audits/2026-05-16-manifesto-fit-findings.md` and `docs/audits/phase-2a-closure-report.md` for the full audit trail.
