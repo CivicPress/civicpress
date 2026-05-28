@@ -3,7 +3,7 @@
 ## Overview
 
 The UI module provides a modern, responsive frontend for CivicPress using Nuxt 4
-with Nuxt UI Pro. This module serves as the primary user interface for
+with Nuxt UI. This module serves as the primary user interface for
 interacting with the CivicPress API.
 
 ## Architecture
@@ -11,16 +11,18 @@ interacting with the CivicPress API.
 ### Technology Stack
 
 - **Framework**: Nuxt 4 (Vue 3)
-- **UI Library**: Nuxt UI Pro (built on Tailwind CSS)
+- **UI Library**: Nuxt UI (built on Tailwind CSS)
 - **Mode**: SPA (Single Page Application)
 - **Port**: 3030
 - **API Integration**: RESTful API calls to CivicPress backend
 
 ### Key Decisions
 
-1. **Nuxt UI Pro**: Chosen over standard Nuxt UI for enhanced components and
-   features
-   - Note: Planned to become free soon
+1. **Nuxt UI v4**: Single MIT-licensed package that folds the former Pro
+   components (Dashboard\*, NavigationMenu, etc.) into the free `@nuxt/ui`
+   package as of v4.0.0. Migrated from paid `@nuxt/ui-pro` v3 + free
+   `@nuxt/ui` v3 to single `@nuxt/ui ^4.8.0` on 2026-05-28 (closure
+   commit `ec5a9a0`; finding `ui-002`).
    - Provides advanced components and better styling out of the box
 
 2. **SPA Mode**: No SSR since we're API-driven
@@ -38,7 +40,7 @@ interacting with the CivicPress API.
 ### Working
 
 - Nuxt 4 development server running on port 3030
-- Nuxt UI Pro components available
+- Nuxt UI components available
 - API server integration fully implemented
 - Authentication system (JWT, OAuth, simulated)
 - Dynamic content loading
@@ -147,8 +149,8 @@ modules/ui/
 
 ### Current Approach
 
-- Using Nuxt UI Pro components
-- Tailwind CSS included via Nuxt UI Pro
+- Using Nuxt UI components
+- Tailwind CSS included via Nuxt UI
 - No custom CSS files needed initially
 
 ### Future Enhancements
@@ -204,7 +206,7 @@ modules/ui/
 
 1. **Port conflicts**: Ensure port 3030 is available
 2. **API connection**: Verify API server is running on port 3000
-3. **Styling issues**: Nuxt UI Pro handles most styling automatically
+3. **Styling issues**: Nuxt UI handles most styling automatically
 
 ### Debug Commands
 
@@ -244,7 +246,7 @@ pnpm dev:ui --verbose
 When contributing to the UI module:
 
 1. Follow Vue 3 composition API patterns
-2. Use Nuxt UI Pro components when possible
+2. Use Nuxt UI components when possible
 3. Test API integration thoroughly
 4. Maintain responsive design
 5. Document new features
@@ -253,8 +255,8 @@ When contributing to the UI module:
 
 ### Core
 
-- `nuxt`: ^4.2.1 (Nuxt 4 - latest stable)
-- `@nuxt/ui-pro`: ^3.3.7 (Nuxt UI Pro 3 - Nuxt 4 compatible)
+- `nuxt`: ^4.4.5 (Nuxt 4)
+- `@nuxt/ui`: ^4.8.0 (Nuxt UI v4 — MIT; includes former Pro components)
 - `vue`: ^3.5.18
 - `@pinia/nuxt`: ^0.11.3
 - `pinia`: ^3.0.4
@@ -266,6 +268,6 @@ When contributing to the UI module:
 
 ### Notes
 
-- Nuxt UI Pro is currently paid but planned to go free
-- All styling handled by Nuxt UI Pro components
-- No custom Tailwind configuration needed initially
+- `@nuxt/ui` v4 is MIT-licensed and free (Pro components folded into the free package as of v4.0.0)
+- Most styling handled by Nuxt UI components; custom theme tokens set via CSS variables in `app/assets/css/main.css`
+- Tailwind v4 already wired via CSS-first `@import "tailwindcss"`; no `tailwind.config.ts` needed

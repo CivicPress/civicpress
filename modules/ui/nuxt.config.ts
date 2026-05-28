@@ -1,6 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  // SSR mode - works better with Nuxt UI Pro
+  // SPA mode — historically chosen against Nuxt UI v3 + Pro v3; revisit for v4 + SSR
+  // when public-read prerender lands (ui-003).
   ssr: false,
 
   // Development server configuration

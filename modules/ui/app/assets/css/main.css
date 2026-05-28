@@ -26,7 +26,7 @@ html {
     font-size: 16px;
   }
 
-  /* Target Nuxt UI Pro UInput components specifically */
+  /* Target Nuxt UI UInput components specifically */
   /* UInput renders a native input element, so the above should work */
   /* But we add this for extra specificity if needed */
   [data-headlessui-state] input,
