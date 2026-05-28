@@ -11,31 +11,34 @@
 
 Audit finding `ui-002` flagged `@nuxt/ui-pro ^3.3.7` as a manifesto-fit failure: it was a paid commercial dep with a runtime license hook (`theme.env: "NUXT_UI_PRO_LICENSE"`), violating the project's "no vendor lock-in" hard constraint. Originally Critical, deferred to Phase 2d, then carried forward when the 2026-05-17 disclosure that Nuxt UI Pro v4 had been re-licensed as free and open source changed the remediation path from "rip out and replace" to "upgrade v3 → v4". Phase 2d W4-T2 already added the free `@nuxt/ui ^3.3.7` as a sibling dependency to set up the migration; this work completes the cutover.
 
+**T0 finding (2026-05-28):** v4 went further than re-licensing — the separate `@nuxt/ui-pro` package was dropped entirely. Pro components (Dashboard*, Auth*, Page*, Pricing*, etc.) are folded into the single MIT-licensed `@nuxt/ui` v4. Both v3 packages (paid `@nuxt/ui-pro` + free `@nuxt/ui`) are replaced by one v4 package. License verified MIT, zero `NUXT_UI_PRO_LICENSE` references in v4 tarball or our repo. See `docs/notes/ui-002-v4-breaking-change-inventory.md` (commit `3ce9962`).
+
 The migration is the *whole* unit of work for this branch. The deferred lint-rule rollout, the test-suite-repair session, and Phase 3 realtime work each get their own session.
 
 ## Decisions
 
 Captured during the brainstorming session that produced this spec:
 
-1. **Target package:** `@nuxt/ui-pro` v4 (free). Keeps the Pro shell components (`UDashboard*`, `UNavigationMenu` Pro variant) that the app shell depends on. Drops the paid v3 dep.
+1. **Target package:** `@nuxt/ui` v4 (single MIT package containing former Pro components). Drops BOTH paid `@nuxt/ui-pro` v3 AND free `@nuxt/ui` v3. The separate `@nuxt/ui-pro` v4 package the brainstorm assumed does not exist (T0 finding).
 2. **Cadence:** atomic version bump followed by a per-component-family sweep. v3 + v4 cannot coexist (single Nuxt UI module, global CSS import), so a staged migration is structurally impossible.
 3. **Commit slicing:** one commit per breaking-change category from the v3→v4 changelog. Reviewable in isolation, trivially bisectable.
 4. **Definition of done:** named verification gates only — `pnpm test:ui:run` ≥ 138/138, `pnpm -r build` clean, `pnpm run audit:imports` ✓, `make audit-truth-check` PASS, `pnpm -C modules/storage test:run` 216/216. No manual smoke or screenshot diffs required at closure.
 
-## Current state (verified 2026-05-27)
+## Current state (verified 2026-05-28, post-T0)
 
-- Branch `dev` is clean at `c27baad`.
-- `modules/ui/package.json` declares both `@nuxt/ui ^3.3.7` (free, added W4-T2 in `881f95d`) and `@nuxt/ui-pro ^3.3.7` (paid v3 — to drop).
-- `modules/ui/nuxt.config.ts:13` registers `'@nuxt/ui-pro'` as a Nuxt module.
-- `modules/ui/app/assets/css/main.css:2` imports `@nuxt/ui-pro` for theme styles.
-- `modules/ui/nuxt.config.ts:15-20` carries a minimal `ui.theme.colors` config flagged as a workaround for `useHead` issues; revisit after the bump.
-- Tailwind v4 is already installed (`tailwindcss ^4.3.0`) with CSS-first `@import "tailwindcss"` and no `tailwind.config.ts`. The "Tailwind v4 jump" risk flagged at kickoff is already absorbed.
-- Nuxt 4.4.5.
-- 30 unique Nuxt UI components in use across `modules/ui/app/**/*.vue`. Pro-only surface: `UDashboardGroup`, `UDashboardNavbar`, `UDashboardPanel`, `UDashboardSidebar`, `UDashboardSidebarCollapse`, `UNavigationMenu`.
+- Branch `dev` head at `7f08521` (Phase 2d W4-T2 follow-up merge, surfaced during T0 baseline). ui-002 branch rebased onto this.
+- `modules/ui/package.json` declares both `@nuxt/ui ^3.3.7` (free, added W4-T2 in `881f95d`) and `@nuxt/ui-pro ^3.3.7` (paid v3). T1 drops both, adds `@nuxt/ui ^4.8.0`.
+- `modules/ui/nuxt.config.ts:13` registers `'@nuxt/ui-pro'` as a Nuxt module. T1 changes to `'@nuxt/ui'`.
+- `modules/ui/app/assets/css/main.css:2` imports `@nuxt/ui-pro`. T1 changes to `@import "@nuxt/ui"`.
+- `modules/ui/nuxt.config.ts:15-20` carries a minimal `ui.theme.colors` config flagged as a workaround for `useHead` issues; T8 revisits whether v4 still needs it.
+- Tailwind v4 is already installed (`tailwindcss ^4.3.0`) with CSS-first `@import "tailwindcss"` and no `tailwind.config.ts`. Tailwind-v4 jump risk already absorbed.
+- Nuxt 4.4.5. v4 of `@nuxt/ui` requires Nuxt 4.x — match confirmed at T0.
+- 30 unique Nuxt UI components in use across `modules/ui/app/**/*.vue`. Of those, **only `UNotification` is removed in v4** — replaced by `<UToaster />` + the same `useToast()` composable. Our sole `UNotification` reference is a commented-out element in `app.vue:196`, so call-site impact is minimal.
+- Baseline (T0 observed): UI tests **138/138**, storage tests **216/216**, full repo build clean.
 
 ## Architecture / shape
 
-- **Branch:** `refactor/ui-002-nuxt-ui-v4-migration`, cut from `dev` at `c27baad`.
+- **Branch:** `refactor/ui-002-nuxt-ui-v4-migration`, cut from `dev` at `c27baad`, rebased onto `7f08521` (W4-T2 follow-up merge) on 2026-05-28.
 - **Scope ceiling:** v3→v4 migration only. Opportunistic cleanup is allowed only when a v4 change makes a current workaround obsolete (notably the `useHead` workaround above).
 - **Push policy:** local-only, per `refactor-push-policy`. Closure commit lands on the branch; user decides at closure whether to merge to `dev`.
 - **Commit policy:** every commit uses `--no-verify` per `refactor-no-verify-policy` (master plan §9.1).
@@ -43,18 +46,20 @@ Captured during the brainstorming session that produced this spec:
 
 ## Sequenced commits
 
-### T0 — Pre-flight (no commit)
+### T0 — Pre-flight (1 commit, docs only) ✅ DONE 2026-05-28
 
-- Verify `@nuxt/ui-pro` v4 is published on npm, OSI-licensed, and has no runtime license hook (no `NUXT_UI_PRO_LICENSE` env requirement, no telemetry phone-home at boot).
-- Read the official v3→v4 migration guide. Produce a breaking-change inventory keyed to the 30 components actually used in `modules/ui`. Capture component renames, prop renames, slot renames, event renames, removed components, and any new required peers.
-- Baseline: `pnpm test:ui:run` → confirm 138/138 on `dev` head; `pnpm -r build` clean.
+- Verified `@nuxt/ui` v4.8.0 is MIT-licensed, no runtime license hook, peers align with our Nuxt 4.4.5 / Vue 3.5 / Tailwind 4 / TS 5.9 stack.
+- Produced `docs/notes/ui-002-v4-breaking-change-inventory.md` covering all 30 used components and v4 changelog entries.
+- Baseline: UI 138/138, storage 216/216, full repo build clean.
+- Surfaced + closed a pre-existing W4-T2 audit-coverage gap (root workspace not scanned) before baselines could be captured — fix landed on `dev` at `7f08521`.
+- T0 commit: `3ce9962`.
 
 ### T1 — Atomic bump (1 commit, expected RED)
 
-- `modules/ui/package.json`: drop `@nuxt/ui-pro ^3.3.7` (paid v3), add `@nuxt/ui-pro ^4.x` (free v4), align `@nuxt/ui` to whatever peer v4 expects.
-- `modules/ui/nuxt.config.ts`: keep `'@nuxt/ui-pro'` module registration. The `ui.theme.colors` workaround stays for now — T8 revisits.
-- `modules/ui/app/assets/css/main.css`: keep `@import "@nuxt/ui-pro"` (still the v4 entry point per Pro v4 docs as of T0 verification).
-- `pnpm install`, then commit. `pnpm test:ui:run` and `pnpm -r build` are expected to break. Commit message documents the expected red state and points at the sweep plan.
+- `modules/ui/package.json`: drop `@nuxt/ui-pro ^3.3.7` (paid v3) AND `@nuxt/ui ^3.3.7` (free v3). Add `@nuxt/ui ^4.8.0` (single MIT package containing former Pro components).
+- `modules/ui/nuxt.config.ts:13`: change module registration `'@nuxt/ui-pro'` → `'@nuxt/ui'`. Keep the `ui.theme.colors` workaround at lines 15-20 — T8 revisits.
+- `modules/ui/app/assets/css/main.css:2`: change `@import "@nuxt/ui-pro"` → `@import "@nuxt/ui"`.
+- `pnpm install`, then commit. `pnpm test:ui:run` and `pnpm -r build` are expected to break. Commit message documents the expected red state and the starting test pass count.
 
 ### T2..Tn — Sweep commits (one per breaking-change category)
 
@@ -65,10 +70,10 @@ Provisional list, refined after T0 inventory. Order is by blast radius — bigge
 - **T4 — Overlays:** `UModal`, `UPopover`, `UDropdownMenu` (v4 unified Reka UI overlays).
 - **T5 — Forms:** `UForm`, `UFormField`, `UInput`, `USelect`, `USelectMenu`, `UInputTags`, `UCheckbox`, `UTextarea`.
 - **T6 — Display components:** `UCard`, `UButton`, `UBadge`, `UAlert`, `UIcon`, `UAvatar`, `UAccordion`, `UTabs`, `UTimeline`, `UPagination`, `UBreadcrumb`.
-- **T7 — Toasts/notifications:** `UNotification` + `useToast` API.
-- **T8 — Root wiring:** `useHead` / `UApp`. Remove the `ui.theme.colors` workaround if v4 fixes the underlying useHead bug.
-- **T9 — i18n compat:** verify `@nuxtjs/i18n 10.2.1` against v4's locale-aware components (calendar, formatters).
-- **T10 — Leaflet wrappers:** verify nothing in our Leaflet code consumes Nuxt UI type exports that moved.
+- **T7 — Toasts/notifications:** uncomment `app.vue:196` and replace `<!-- <UNotification /> -->` with `<UToaster />`. `useToast()` composable + all 30+ call sites stay unchanged.
+- **T8 — Root wiring:** `useHead` / `UApp`. Remove the `ui.theme.colors` workaround at `nuxt.config.ts:15-20` if v4 fixes the underlying useHead bug.
+- **T9 — i18n compat (verification-only):** smoke-verify `@nuxtjs/i18n 10.2.1` locale switch in dev mode. T0 found zero documented v4 breaks affecting our usage (we don't pass `:locale` props directly to U* components). Commit notes the verification result even if no code change is needed.
+- **T10 — Leaflet wrappers:** verify nothing in our Leaflet code consumes Nuxt UI type exports that moved (v4.2.0 standardized type interface naming).
 
 Each sweep commit ends green for its slice but the suite as a whole may still be red until Tn. Acceptance for the sweep is the suite turning green again across all gates — not each commit individually. Commit messages track the passing trend (e.g. `tests: 47/138 → 89/138`) so progress is grep-able.
 
@@ -81,7 +86,7 @@ Single commit, contents:
 - `docs/audits/2026-05-16-manifesto-fit-findings.md`: flip `ui-002` from `wontfix-pending-phase-2d-followup` to `closed-with-commit-SHA: <Tn-last SHA>` — the SHA of the last sweep commit (the one that turned the suite green), which is the actual migration-completion anchor. Avoids the self-reference problem of citing T-close's own SHA. Bump closed-with-commit-SHA counter 45 → 46. Bump truth-meter line 64 → 65 of 205.
 - `docs/licenses.md`: regenerated via `pnpm run licenses:gen`. Paid `@nuxt/ui-pro` v3 row should be gone.
 - `docs/project-status.md` + `docs/roadmap.md`: short status update — Phase 2d carry-forward `ui-002` closed; one less Critical from the original 20.
-- Commit message: `refactor(ui-002): migrate @nuxt/ui-pro v3 paid → v4 free + drop vendor lock-in` with `Closes: ui-002` footer.
+- Commit message: `refactor(ui-002): migrate @nuxt/ui-pro v3 paid → @nuxt/ui v4 free + drop vendor lock-in` with `Closes: ui-002` footer.
 
 ## Verification gates
 
@@ -101,15 +106,18 @@ Single commit, contents:
 
 ## Risk register
 
-| Risk | Mitigation | When surfaced |
-|---|---|---|
-| v4 isn't actually free / has a runtime license hook | Abort at T0. Add a deferral note to `ui-002`. Branch is closed without commits. | T0 |
-| `@nuxtjs/i18n 10.2.1` incompat with v4 locale-aware components | T9; locale-aware components are calendar + formatters (low-blast in this codebase) | T9 |
-| Leaflet wrappers consume Nuxt UI type exports that moved | T10; type-only rename, isolated to a few files | T10 |
-| `theme.colors` useHead workaround still needed in v4 | Leave the workaround; surface as carry-forward to the test-suite-repair session | T8 |
-| Sweep balloons past ~14 commits | Cap at 20; if breaking surface is wider, pause and re-scope with user | mid-sweep |
-| Pro v4 removed a Pro component we depend on without migration path | Document rename map in T0 inventory; if no path exists, abort with deferral note | T0 |
-| Pro v4 requires a Nuxt version we don't have | We're on Nuxt 4.4.5; v4 expected to support it. Verify at T0. | T0 |
+T0 (2026-05-28) resolved the three T0-gated rows: v4 is MIT, peers align with Nuxt 4.4.5, and only `UNotification` is removed (with a trivial single-file fix in T7). The remaining open risks are T4-T10 surfaces.
+
+| Risk | Mitigation | When surfaced | Status |
+|---|---|---|---|
+| v4 isn't actually free / has a runtime license hook | Abort at T0. Add a deferral note to `ui-002`. Branch is closed without commits. | T0 | RESOLVED — MIT, zero license-hook refs |
+| `@nuxtjs/i18n 10.2.1` incompat with v4 locale-aware components | T9; locale-aware components are calendar + formatters (low-blast in this codebase) | T9 | OPEN — verification-only, expected no-op |
+| Leaflet wrappers consume Nuxt UI type exports that moved | T10; type-only rename, isolated to a few files | T10 | OPEN |
+| `theme.colors` useHead workaround still needed in v4 | T8: try removing it; if regression returns, leave it + carry-forward to test-suite-repair session | T8 | OPEN |
+| Sweep balloons past ~14 commits | Cap at 20; if breaking surface is wider, pause and re-scope with user | mid-sweep | LOW — T0 estimates 8-9 sweeps |
+| v4 removed a Pro component we depend on without migration path | T0 inventory documents rename map | T0 | RESOLVED — only UNotification removed; trivial single-site fix in T7 |
+| v4 requires a Nuxt version we don't have | We're on Nuxt 4.4.5; v4 supports it | T0 | RESOLVED — peers align |
+| Form-stack silent-behavior breaks (Form transformations, `v-model.nullify`, nested forms) | T5; pre-step greps for `v-model.nullify`, nested `<UForm>`, Form `transform` props before applying changes | T5 | OPEN — largest open risk per T0 inventory |
 
 ## Abort conditions
 

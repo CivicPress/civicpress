@@ -2,13 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate `modules/ui` from paid `@nuxt/ui-pro` v3 to free `@nuxt/ui-pro` v4, dropping the vendor-lock-in dep that originally triggered audit finding ui-002 (Critical).
+**Goal:** Migrate `modules/ui` from paid `@nuxt/ui-pro` v3 + free `@nuxt/ui` v3 to the single MIT-licensed `@nuxt/ui` v4 (which folds the former Pro components into the free package), dropping the vendor-lock-in dep that originally triggered audit finding ui-002 (Critical).
 
-**Architecture:** Atomic version bump on a dedicated branch (`refactor/ui-002-nuxt-ui-v4-migration`, already cut from `dev` at `c27baad`), followed by a per-component-family sweep that brings the 138-test UI suite + `pnpm -r build` back to green. Truth meter advances 64 → 65 of 205 at closure.
+**Architecture:** Atomic version bump on a dedicated branch (`refactor/ui-002-nuxt-ui-v4-migration`, cut from `dev` at `c27baad`, rebased onto `7f08521` on 2026-05-28 after a W4-T2 follow-up landed), followed by a per-component-family sweep that brings the 138-test UI suite + `pnpm -r build` back to green. Truth meter advances 64 → 65 of 205 at closure.
 
-**Tech Stack:** Nuxt 4.4.5, `@nuxt/ui-pro` v3 → v4, `@nuxt/ui` ^3.3.7 → peer-aligned, Tailwind v4 (already in place), Vue 3.5, TypeScript strict, Vitest, pnpm workspaces with strict-hoist (`shamefully-hoist=false`).
+**Tech Stack:** Nuxt 4.4.5; drop `@nuxt/ui-pro ^3.3.7` (paid v3) AND `@nuxt/ui ^3.3.7` (free v3); add `@nuxt/ui ^4.8.0` (single MIT package containing former Pro components — v4 dropped the separate `@nuxt/ui-pro` package per T0 finding). Tailwind v4 (already in place), Vue 3.5, TypeScript 5.9, Vitest, pnpm workspaces with strict-hoist (`shamefully-hoist=false`).
 
-**Companion design spec:** `docs/specs/2026-05-27-ui-002-nuxt-ui-v4-migration-design.md` (commit `298e8e8` on this branch).
+**Companion design spec:** `docs/specs/2026-05-27-ui-002-nuxt-ui-v4-migration-design.md` (latest revision on this branch).
+
+**T0 outcome (2026-05-28):** Done, no abort. v4 license verified MIT, peers align, baseline gates all green. T0 commit `3ce9962`. Inventory at `docs/notes/ui-002-v4-breaking-change-inventory.md` drives the per-family changes in T2..T10.
 
 **Branch policy:**
 - All commits use `--no-verify` per `refactor-no-verify-policy` (master plan §9.1).
@@ -25,10 +27,11 @@
 - `docs/notes/ui-002-v4-breaking-change-inventory.md` — T0 research output, drives T2..Tn slicing.
 
 **Modified:**
-- `modules/ui/package.json` — drop paid v3, add free v4 (T1). Possibly minor peer bumps (T1).
-- `modules/ui/nuxt.config.ts` — module registration stays; T8 revisits the `ui.theme.colors` useHead workaround.
-- `modules/ui/app/assets/css/main.css` — `@import "@nuxt/ui-pro"` stays (T1 verify); may change if v4 entry point moved.
-- `modules/ui/app/**/*.vue` and `modules/ui/app/**/*.ts` — per-component-family API fixes (T2..T10).
+- `modules/ui/package.json` — drop both v3 packages (paid `@nuxt/ui-pro` + free `@nuxt/ui`), add `@nuxt/ui ^4.8.0` (T1). Possibly minor peer bumps (T1).
+- `modules/ui/nuxt.config.ts` — module registration `'@nuxt/ui-pro'` → `'@nuxt/ui'` (T1); T8 revisits the `ui.theme.colors` useHead workaround at lines 15-20.
+- `modules/ui/app/assets/css/main.css` — `@import "@nuxt/ui-pro"` → `@import "@nuxt/ui"` (T1).
+- `modules/ui/app/app.vue` — uncomment line 196 and replace `<UNotification />` placeholder with `<UToaster />` (T7).
+- `modules/ui/app/**/*.vue` and `modules/ui/app/**/*.ts` — per-component-family API fixes (T2..T10). Form-stack changes (T5) carry the largest risk.
 - `docs/audits/2026-05-16-manifesto-fit-findings.md` — finding flip + counters (T-close).
 - `docs/licenses.md` — regenerated via `pnpm run licenses:gen` (T-close).
 - `docs/project-status.md` and `docs/roadmap.md` — short status update (T-close).
@@ -41,173 +44,120 @@
 
 ---
 
-## Task 0: Pre-flight verification + breaking-change inventory
+## Task 0: Pre-flight verification + breaking-change inventory ✅ DONE 2026-05-28
 
-**Files:**
-- Create: `docs/notes/ui-002-v4-breaking-change-inventory.md`
-- Read: `modules/ui/package.json`, `modules/ui/app/**/*.vue` (no changes)
+**Status:** Complete. Commit `3ce9962`. No abort triggered.
 
-**Purpose:** This task does no source-code changes. Its deliverable is a written inventory that drives the per-family slicing in T2..Tn. If T0 surfaces an abort condition (no free v4, missing peer, removed component with no path), the plan stops here and the engineer reports back to the user.
+**Outcome:**
+- v4 license: MIT (OSI-approved), zero `NUXT_UI_PRO_LICENSE` refs anywhere.
+- v4 peer alignment: Nuxt 4 (we're on 4.4.5), Tailwind 4 (have), TS ≥5.6 (we're on 5.9.3), Vue Router 4.5+/5 (Nuxt ships). All PASS.
+- Baseline gates: UI **138/138**, storage **216/216**, `pnpm -r build` clean across 5 build-capable workspaces (6th has no build script).
+- **Material plan deviation**: v4 dropped the separate `@nuxt/ui-pro` package entirely; Pro components live in the single MIT `@nuxt/ui` v4. Plan + spec updated to match.
+- Pre-existing W4-T2 audit-coverage gap surfaced during baseline (root workspace not scanned by `audit-package-imports.mjs`) → fixed on a sibling branch + merged to `dev` at `7f08521` before T0 could complete; ui-002 branch rebased onto that.
+- Sweep count: 9 (or 8 if T9 collapsed) — well under the spec's cap of 20.
+- Inventory: `docs/notes/ui-002-v4-breaking-change-inventory.md` (306 lines).
 
-- [ ] **Step 1: Confirm working tree state**
+**Files (historical):**
+- Created: `docs/notes/ui-002-v4-breaking-change-inventory.md`
+- Read: `modules/ui/package.json`, `modules/ui/app/**/*.vue`
 
-Run:
-```bash
-git status
-git log --oneline -3
-```
-Expected: clean working tree on `refactor/ui-002-nuxt-ui-v4-migration`, top commit `298e8e8 docs(ui-002): brainstormed design ...`.
-
-- [ ] **Step 2: Capture baseline test + build state**
-
-Run (in order):
-```bash
-pnpm test:ui:run 2>&1 | tail -20
-pnpm -r build 2>&1 | tail -20
-pnpm -C modules/storage test:run 2>&1 | tail -5
-```
-Expected:
-- `pnpm test:ui:run` → 138/138 passing.
-- `pnpm -r build` → clean across all 6 workspaces.
-- `pnpm -C modules/storage test:run` → 216/216 passing.
-
-Record the exact passing counts in `docs/notes/ui-002-v4-breaking-change-inventory.md` under a "Baseline" heading. If any of these are not at the expected number, **stop and report to user** — a pre-existing red gate would contaminate the migration.
-
-- [ ] **Step 3: Verify v4 license + publication**
-
-Check via npm:
-```bash
-npm view @nuxt/ui-pro versions --json 2>/dev/null | tail -30
-npm view @nuxt/ui-pro@latest license repository.url
-npm view @nuxt/ui-pro@latest peerDependencies dependencies
-```
-
-Then read the package's installed license file or its repo LICENSE to confirm OSI-approved (MIT or similar, not a custom "Pro License").
-
-Write findings into the inventory file under "v4 license verification":
-- Latest v4 version on npm.
-- License string (must be an OSI-approved SPDX id like `MIT`).
-- Whether the package source contains any `NUXT_UI_PRO_LICENSE` env reads or telemetry calls (search the installed package or the public repo).
-- Required peer versions (Nuxt, @nuxt/ui, vue).
-
-**Abort condition:** if license is not OSI-approved, or a runtime license hook exists, or v4 requires a Nuxt version we don't have, write a closure note in the inventory file ("ABORT: <reason>") and stop. Do not proceed to T1.
-
-- [ ] **Step 4: Inventory used components**
-
-Run:
-```bash
-grep -rhE "<U[A-Z][a-zA-Z]+" modules/ui/app --include="*.vue" | grep -oE "<U[A-Z][a-zA-Z]+" | sort -u
-```
-
-Expected output is the 30-component list captured in the spec (UAccordion, UAlert, UApp, UAvatar, UBadge, UBreadcrumb, UButton, UCard, UCheckbox, UDashboard{Group,Navbar,Panel,Sidebar,SidebarCollapse}, UDropdownMenu, UForm, UFormField, UIcon, UInput, UInputTags, UModal, UNavigationMenu, UNotification, UPagination, UPopover, USelect, USelectMenu, UTabs, UTextarea, UTimeline).
-
-Confirm or update against current state. Record in the inventory file under "Components in use".
-
-- [ ] **Step 5: Build the breaking-change inventory**
-
-Read the official `@nuxt/ui-pro` v3→v4 migration guide (and the underlying `@nuxt/ui` v3→v4 guide if Pro inherits from it). For each component in Step 4's list, capture in the inventory file:
-
-| Component | Status (kept / renamed / removed) | Breaking changes | Migration notes |
-
-Group changes by family (matching the T2..T10 slicing in the spec). Note any cross-cutting concerns:
-- Composable signature changes (`useToast()`, `useUI()`, etc.).
-- Theme/app.config changes.
-- CSS entry-point changes.
-- `useHead` interactions (the workaround in `nuxt.config.ts:15-20` may or may not be needed in v4).
-
-- [ ] **Step 6: Validate the plan slicing**
-
-Compare the inventory's family grouping against the spec's T2..T10 slicing. If a category has zero breaking changes, the corresponding sweep commit can be skipped. If a new cross-cutting concern surfaces (e.g. a new "use-X" composable bridge needed across all forms), add it as a new sweep task and note the addition in the inventory.
-
-If the total estimated sweep count exceeds 20, **stop and report to user** for re-scoping per the spec's cap.
-
-- [ ] **Step 7: Commit the inventory**
-
-```bash
-git add docs/notes/ui-002-v4-breaking-change-inventory.md
-git commit --no-verify -m "$(cat <<'EOF'
-docs(ui-002 T0): v4 breaking-change inventory + baseline verification
-
-Pre-flight artifact for the v3 → v4 migration. Captures:
-- baseline state (138 UI tests, 216 storage tests, full repo build clean)
-- v4 license verification (free / OSI / peer alignment)
-- 30 components in use across modules/ui/app
-- breaking-change inventory grouped by T2..T10 family
-
-Refs: ui-002
-EOF
-)"
-```
-
-Expected: commit lands; `git log --oneline -2` shows T0 commit + spec commit.
+**Steps (historical, complete):** Confirm working tree state → capture baselines → verify v4 license + peers → enumerate components → harvest changelog breaking changes → validate plan slicing → commit inventory.
 
 ---
 
-## Task 1: Atomic version bump (expected RED)
+## Task 1: Atomic package swap (expected RED)
 
 **Files:**
-- Modify: `modules/ui/package.json`
-- Modify: `modules/ui/nuxt.config.ts` (only if T0 inventory shows the module registration string changed)
-- Modify: `modules/ui/app/assets/css/main.css` (only if T0 inventory shows the CSS entry point changed)
+- Modify: `modules/ui/package.json` (drop two v3 deps, add one v4 dep)
+- Modify: `modules/ui/nuxt.config.ts:13` (module registration rename)
+- Modify: `modules/ui/app/assets/css/main.css:2` (CSS @import rename)
 - Read: `pnpm-lock.yaml` after install
 
-**Purpose:** Single commit that drops paid v3 and brings in free v4. Tests + build go red intentionally. Subsequent sweep commits bring them back to green.
+**Purpose:** Single commit that swaps v3 → v4 wiring. Tests + build go red intentionally. Subsequent sweep commits bring them back to green.
 
-- [ ] **Step 1: Edit package.json — drop paid v3, add free v4**
+**Key fact (from T0):** v4 dropped the separate `@nuxt/ui-pro` package. The migration replaces TWO v3 packages with ONE v4 package, and renames both the Nuxt module registration string and the CSS @import target.
 
-Modify `modules/ui/package.json` dependencies:
-- Remove the `@nuxt/ui-pro: "^3.3.7"` line entirely if it's the paid v3 entry, OR change its version to the free v4 (e.g. `"^4.0.0"` — use the exact major.minor from T0 Step 3).
-- Keep `@nuxt/ui` aligned to the peer version v4 expects (from T0 Step 3). If unchanged, leave as `"^3.3.7"`; otherwise bump.
+- [ ] **Step 1: Edit package.json — swap deps**
+
+Modify `modules/ui/package.json` `dependencies` block:
+- Remove `"@nuxt/ui-pro": "^3.3.7"` line entirely.
+- Replace `"@nuxt/ui": "^3.3.7"` with `"@nuxt/ui": "^4.8.0"`.
 - Touch no other dependency lines in this commit.
 
-Exact edit (substitute the verified v4 version from T0):
+After edit, the relevant section should look like (only the changed lines shown):
 ```json
-"@nuxt/ui": "^<peer-version-from-T0>",
-"@nuxt/ui-pro": "^<v4-version-from-T0>",
+"@nuxt/ui": "^4.8.0",
+```
+(No `@nuxt/ui-pro` line at all.)
+
+- [ ] **Step 2: Edit nuxt.config.ts — rename module registration**
+
+Edit `modules/ui/nuxt.config.ts:13`:
+```diff
+-  modules: ['@nuxt/ui-pro', '@pinia/nuxt', '@nuxtjs/i18n'],
++  modules: ['@nuxt/ui', '@pinia/nuxt', '@nuxtjs/i18n'],
+```
+Do NOT remove the `ui: { theme: { colors: ['primary', 'error'] } }` workaround block at lines 15-20 in this task. T8 revisits it.
+
+- [ ] **Step 3: Edit main.css — rename CSS @import**
+
+Edit `modules/ui/app/assets/css/main.css:2`:
+```diff
+ @import "tailwindcss";
+-@import "@nuxt/ui-pro";
++@import "@nuxt/ui";
 ```
 
-- [ ] **Step 2: Install + verify resolution**
+- [ ] **Step 4: Install + verify resolution**
 
-Run:
+From repo root:
 ```bash
-pnpm install 2>&1 | tail -30
+pnpm install 2>&1 | tail -10
 ```
-Expected: install completes; no `ERR_PNPM_OUTDATED_LOCKFILE` or peer-dep errors that block resolution. Peer-dep warnings are acceptable.
+Expected: install completes; no `ERR_PNPM_OUTDATED_LOCKFILE` or peer-dep errors that block resolution. Peer-dep warnings (especially around `@typescript-eslint/*` and TS 5.9 vs 5.8) are pre-existing and acceptable.
 
-If install fails: read the error, check if a peer is missing, add it to `modules/ui/package.json`, re-run. Do NOT use `--shamefully-hoist=true` or any flag that bypasses the project's strict-hoist policy (`.npmrc` has `shamefully-hoist=false`).
+If pnpm offers to "remove and reinstall from scratch" interactively, decline (answer N). Surgical adds via `pnpm add` are preferred over full reinstall. If install legitimately needs more than the one package change (e.g. v4 added a new peer like `@internationalized/date`), add the peer to `modules/ui/package.json` and re-run install. Do NOT use `--shamefully-hoist=true`.
 
-- [ ] **Step 3: Verify dev server boots without runtime crash**
+- [ ] **Step 5: Verify dev server boots without runtime crash**
 
-Run:
 ```bash
 timeout 30 pnpm -C modules/ui dev 2>&1 | head -60 || true
 ```
-Expected: server reaches "Nuxt ready" (or equivalent) without an unhandled-exception stack trace at boot. Compile-time errors and red TS diagnostics are EXPECTED at this stage; a runtime crash on boot is NOT and indicates a missing peer or a CSS/module-registration mismatch.
+Expected: server reaches "Nuxt ready" (or equivalent) without an unhandled-exception stack trace at boot. Compile-time errors and red TS diagnostics in component files are EXPECTED at this stage; a runtime crash on boot is NOT and means either Step 2 or Step 3 wasn't applied, or there's an unanticipated peer/runtime requirement to add.
 
-If runtime crash: read the stack, check if `nuxt.config.ts:13` module name changed in v4 or if `main.css:2` `@import "@nuxt/ui-pro"` needs to change. Update only those two files as needed to clear the boot. Do NOT touch component code in this task.
+If runtime crash on boot: read the stack, fix only the boot blocker (peer, module registration, CSS entry), do NOT touch any component-level code. Component fixes happen in T2..T10.
 
-- [ ] **Step 4: Capture the expected-red state**
+- [ ] **Step 6: Capture the expected-red state**
 
-Run (and capture passing counts):
 ```bash
 pnpm test:ui:run 2>&1 | tail -5
 pnpm -r build 2>&1 | tail -10
 ```
 Both are expected to be red. Record the passing test count (e.g. `X/138`) in the upcoming commit message — that's the starting point for the sweep's "passing trend" tracking.
 
-- [ ] **Step 5: Commit the bump**
+- [ ] **Step 7: Commit the swap**
 
 ```bash
-git add modules/ui/package.json pnpm-lock.yaml
-# Add nuxt.config.ts and/or main.css only if Step 3 required edits to them
+git add modules/ui/package.json modules/ui/nuxt.config.ts modules/ui/app/assets/css/main.css pnpm-lock.yaml
 git commit --no-verify -m "$(cat <<'EOF'
-refactor(ui-002 T1): bump @nuxt/ui-pro v3 paid → v4 free (RED)
+refactor(ui-002 T1): swap @nuxt/ui-pro v3 + @nuxt/ui v3 → @nuxt/ui v4 (RED)
 
-Drops the paid commercial @nuxt/ui-pro ^3.3.7 entry and brings in
-@nuxt/ui-pro ^4.x (free, OSI-licensed per T0 verification).
+v4 dropped the separate @nuxt/ui-pro package; Pro components are now in
+the single MIT-licensed @nuxt/ui v4. This task swaps the two v3 deps for
+the one v4 dep and updates the Nuxt module registration + CSS @import
+to match.
 
-Tests + build expected RED at this commit; the sweep commits T2..Tn
-bring them back to green per the per-family slicing in
+- modules/ui/package.json: drop @nuxt/ui-pro ^3.3.7 (paid v3) and
+  @nuxt/ui ^3.3.7 (free v3); add @nuxt/ui ^4.8.0.
+- modules/ui/nuxt.config.ts:13: 'nuxt/ui-pro' → '@nuxt/ui'.
+- modules/ui/app/assets/css/main.css:2: @import "@nuxt/ui-pro" →
+  @import "@nuxt/ui".
+
+ui.theme.colors workaround at nuxt.config.ts:15-20 stays for now; T8
+revisits whether v4 still needs it.
+
+Tests + build expected RED at this commit; the sweep commits T2..T10
+bring them back to green per the per-family changes documented in
 docs/notes/ui-002-v4-breaking-change-inventory.md.
 
 Starting test state: X/138 passing.
@@ -217,9 +167,9 @@ EOF
 )"
 ```
 
-(Substitute `X/138` with the actual count from Step 4.)
+(Substitute `X/138` with the actual count from Step 6.)
 
-Expected: commit lands. `git log --oneline -3` shows T1, T0, spec.
+Expected: commit lands. `git log --oneline -3` shows T1, T0, the W4-T2 follow-up merge.
 
 ---
 
@@ -412,19 +362,25 @@ Subject: `refactor(ui-002 T6): display components v4 API migration (UCard/UButto
 ### Task 7: Toasts / notifications migration
 
 **Files:**
-- Find: `grep -rlnE '<UNotification|useToast' modules/ui/app modules/ui/app/composables --include='*.vue' --include='*.ts'`
+- Modify: `modules/ui/app/app.vue:196` — single line change.
 
-- [ ] **Step 1: Locate call sites + inventory entries**
+**T0 finding:** Per inventory T7 section, our only `UNotification` reference is a commented-out element at `app.vue:196`. `useToast()` API is unchanged in v4. The migration is a single-file uncomment-and-replace. All 30+ `useToast()` call sites stay as-is.
+
+- [ ] **Step 1: Confirm the sole call site**
 
 ```bash
-grep -rlnE '<UNotification|useToast' modules/ui/app --include='*.vue' --include='*.ts'
+grep -rnE '<UNotification' modules/ui/app --include='*.vue'
 ```
+Expected: one match, `modules/ui/app/app.vue:196`, commented out (`<!-- <UNotification /> -->`). If anywhere else, stop and reconcile with the inventory before editing.
 
-Read T7 family section of the inventory.
+- [ ] **Step 2: Replace with UToaster**
 
-- [ ] **Step 2: Apply migrations**
-
-Apply the inventory's documented changes for `UNotification` and `useToast`. v4 may unify these under a single toast composable; verify in the inventory whether `UNotification` is still a component or removed in favor of a programmatic API.
+Edit `modules/ui/app/app.vue:196`:
+```diff
+-      <!-- <UNotification /> -->
++      <UToaster />
+```
+(Adjust indentation to match surrounding markup. If the commented element had attributes, drop them — `UToaster` takes its config from the runtime `useToast()` calls.)
 
 - [ ] **Step 3: Run tests + record trend**
 
@@ -434,7 +390,7 @@ pnpm test:ui:run 2>&1 | tail -5
 
 - [ ] **Step 4: Commit**
 
-Subject: `refactor(ui-002 T7): toast/notification v4 API migration`.
+Subject: `refactor(ui-002 T7): UNotification → UToaster + useToast unchanged`.
 
 ### Task 8: Root wiring + useHead workaround review
 
@@ -455,7 +411,7 @@ pnpm test:ui:run 2>&1 | tail -5
 ```
 
 - If boot is clean AND tests still pass: leave the workaround removed.
-- If boot fails OR tests regress: revert the removal. Add a comment above the `ui:` block: `// v4 retest 2026-05-27: workaround still required for useHead — surface in test-suite-repair session.`
+- If boot fails OR tests regress: revert the removal. Add a comment above the `ui:` block: `// v4 retest 2026-05-28: workaround still required for useHead — surface in test-suite-repair session.`
 
 - [ ] **Step 2: Apply UApp migrations if any**
 
@@ -478,26 +434,42 @@ Subject (variant B — workaround retained):
 refactor(ui-002 T8): root wiring v4 + retain useHead workaround (still required)
 ```
 
-### Task 9: i18n compat verification
+### Task 9: i18n compat verification (verification-only)
 
 **Files:**
-- Read: `modules/ui/nuxt.config.ts:51-69` (i18n config), `@nuxtjs/i18n` interaction sites.
-- Find: `grep -rln 'useI18n\|t(' modules/ui/app --include='*.vue' --include='*.ts'`
+- No code changes expected.
+- Read: `modules/ui/nuxt.config.ts:51-69` (i18n config).
 
-**Purpose:** verify `@nuxtjs/i18n 10.2.1` cooperates with v4's locale-aware components (calendar widgets, date/number formatters). Blast radius is low in this codebase.
+**T0 finding:** Per inventory T9 section, v4.2.0 removed the `:locale` / `:dir` prop proxy on components, but we use `@nuxtjs/i18n` at the Nuxt layer — we do NOT pass `:locale` props directly to U* components. Effectively a no-op for our usage. This task is a smoke-verification checkpoint; absence of issues here is the success condition.
 
-- [ ] **Step 1: Check inventory for v4 locale-aware components in use**
+- [ ] **Step 1: Confirm no `:locale=` prop usage on U* components**
 
-Read T9 family section of the inventory. List any v4 locale-aware components used in `modules/ui/app` (e.g. `UCalendar`, `UInputNumber` with locale formatting).
-
-- [ ] **Step 2: Verify each locale-aware component renders correctly**
-
-For each, run the relevant test file:
 ```bash
-pnpm test:ui:run -- <path/to/component.test.ts>
+grep -rnE ':locale\s*=' modules/ui/app --include='*.vue' || echo "NO MATCHES (expected)"
+```
+Expected: `NO MATCHES`. If matches surface, treat as a real fix and apply per inventory; otherwise proceed.
+
+- [ ] **Step 2: Smoke-verify locale switch in dev mode**
+
+```bash
+timeout 30 pnpm -C modules/ui dev 2>&1 | head -30 &
+sleep 15
+```
+Open `http://localhost:3030/` in a browser, switch language via the language switcher, and visually confirm no console errors. Kill the dev server with `kill %1` when done.
+
+(If no manual browser session is available in this environment, run the i18n-related tests as the proxy: `pnpm test:ui:run -- tests/ui/i18n` or similar — and accept that an interactive smoke is logged as deferred to the next user-driven verification pass.)
+
+- [ ] **Step 3: Run tests + record trend**
+
+```bash
+pnpm test:ui:run 2>&1 | tail -5
 ```
 
-Also boot the dev server and switch locale via the language switcher; confirm no console errors.
+- [ ] **Step 4: Commit**
+
+If no code changes were needed (the expected case), commit a small note appended to the inventory file recording "T9: no-op, no `:locale=` on U*, smoke ok". Subject: `docs(ui-002 T9): i18n compat verified, no edits needed`.
+
+If a real `:locale=` usage was found and fixed, subject: `refactor(ui-002 T9): drop v4-removed :locale proxy from U* call sites`.
 
 - [ ] **Step 3: Apply fixes if needed**
 
@@ -603,13 +575,13 @@ Also in the same file:
 ```bash
 pnpm run licenses:gen 2>&1 | tail -10
 ```
-Expected: `docs/licenses.md` regenerated; paid `@nuxt/ui-pro` v3 row gone; the `@nuxt/ui-pro` row that remains shows the v4 license (e.g. `MIT`).
+Expected: `docs/licenses.md` regenerated. The `@nuxt/ui-pro` row is entirely GONE (v4 dropped the package — Pro components live in `@nuxt/ui` now). The `@nuxt/ui` row remains and reflects `MIT` (v4.8.0).
 
 Verify:
 ```bash
 grep -i 'nuxt/ui' docs/licenses.md
 ```
-Expected: at most one `@nuxt/ui-pro` row, showing the v4 license, not "commercial" or similar.
+Expected: a single `@nuxt/ui` row with `MIT`. No `@nuxt/ui-pro` row. No "commercial" or "Proprietary" license string anywhere in the file.
 
 - [ ] **Step 4: Update project-status.md and roadmap.md**
 
