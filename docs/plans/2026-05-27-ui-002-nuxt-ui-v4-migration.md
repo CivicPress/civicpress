@@ -173,6 +173,105 @@ Expected: commit lands. `git log --oneline -3` shows T1, T0, the W4-T2 follow-up
 
 ---
 
+## Task 1.5: Scaffold-fix — restore test/build signal under Nuxt 4 + @nuxt/ui v4
+
+**Inserted 2026-05-28** after T1 surfaced two scaffold-level blockers that neither T0 inventory nor the original brainstorm anticipated. Both block the sweep commits T2..T10 from producing useful signal.
+
+**Files:** TBD (likely `vitest.config.ui.mjs`, possibly `modules/ui/package.json` for `vue-tsc` bump, possibly a small `.nuxt`-symlink/shim file).
+
+**Blockers from T1 (commit `231c8b5`):**
+
+1. **`.nuxt/tsconfig.server.json` ENOENT.** Nuxt 4 + v4 emits `tsconfig.app.json`, `tsconfig.node.json`, `tsconfig.shared.json` from `nuxt prepare` instead of the v3-era `tsconfig.server.json`. The `tsconfck` library — invoked by some downstream consumer (likely `@vitejs/plugin-vue` or `vite-tsconfig-paths` in our test runner, OR `vite-builder` during build) — still hardcodes the old name. All 20 UI test files fail with `TSConfckParseError`. The build trips on the same error before reaching any component-level transforms.
+2. **`vue-router/volar/sfc-route-blocks` plugin loader failure** in `vue-tsc` 2.2.12. `@vue/language-core` 2.2.12 may not yet support the plugin path Nuxt 4 / Vue 3.5 emit. Likely needs a `vue-tsc` (and probably `@vue/language-core`) bump.
+
+**Out of scope for T1.5:** any component-level fixes (T2..T10), the `ui.theme.colors` workaround (T8).
+
+- [ ] **Step 1: Diagnose tsconfig.server.json consumer**
+
+```bash
+grep -rn "tsconfig.server" node_modules/.pnpm/*/node_modules/{tsconfck,vite-tsconfig-paths,@vitejs}/ 2>/dev/null | head
+grep -rn "tsconfig.server" node_modules/.pnpm/*/node_modules/@nuxt/vite-builder/ 2>/dev/null | head
+```
+
+Identify which library does the hardcoded `tsconfig.server.json` lookup. Capture findings in the commit message so future engineers don't have to redo this dig.
+
+- [ ] **Step 2: Pick the smallest fix**
+
+Three candidate strategies, in preference order:
+
+a) **Library-level config knob:** if the consumer (e.g. tsconfck) accepts a `tsconfigName` option or similar, pass it from our `vitest.config.ui.mjs` to point at one of the new `.app.json` / `.node.json` files. Surgical, no shim files. Preferred.
+
+b) **`.gitignore`d shim:** generate a `.nuxt/tsconfig.server.json` that `extends` `tsconfig.shared.json` (or whatever lines up). Tiny file. Add a Vitest/Vite `setupFiles` step that emits it before tests run, OR add a `postinstall` step in `modules/ui/package.json`. Less surgical, but resilient to library churn.
+
+c) **Upstream issue + downgrade:** if neither (a) nor (b) is clean, file a note in `docs/notes/ui-002-v4-breaking-change-inventory.md` and pin the consuming library to a version that doesn't hardcode the old name.
+
+- [ ] **Step 3: Diagnose vue-tsc plugin loader failure**
+
+```bash
+grep -rn "vue-router/volar/sfc-route-blocks" node_modules/.pnpm/*/node_modules/{vue-tsc,@vue/language-core}/ 2>/dev/null | head
+npm view vue-tsc versions --json | tail -10
+```
+
+Identify whether v4 / Nuxt 4 expects a newer `vue-tsc` (the package was at 2.2.12 in `modules/ui/package.json` from v3 era). If a newer minor exists that ships the missing plugin path, bump to it. Cap at compatible majors.
+
+- [ ] **Step 4: Apply minimal fixes**
+
+Apply whatever Step 2 + Step 3 pointed to. Likely candidates:
+- `modules/ui/package.json`: bump `vue-tsc` to its v4-compatible minor (e.g. `^2.5.x` or whatever Nuxt 4 / Vue 3.5 docs recommend).
+- `vitest.config.ui.mjs`: tweak tsconfck/plugin-vue options if a knob exists.
+- Possibly a small shim/symlink (only if Step 2 says no knob exists).
+
+Do NOT make broader test-config changes; this task is the minimum to restore signal. Larger test-infrastructure work is a separate session per master plan §9.1.
+
+- [ ] **Step 5: Re-run gates and capture the new state**
+
+```bash
+pnpm install 2>&1 | tail -5
+pnpm test:ui:run 2>&1 | tail -10
+pnpm -r build 2>&1 | tail -15
+```
+
+Acceptance for T1.5 is NOT all-green. It's: tests can load + run (failures are now component-level, not scaffold-level) AND build proceeds past the tsconfck failure into actual component compilation (errors are now component-level TS errors in `*.vue`, not scaffold-level `tsconfck` errors).
+
+Capture the new "first useful failure" categories — these become the per-component-family work for T2..T10.
+
+If you cannot restore signal with minimal changes, STOP and report — escalate as BLOCKED, possibly needing a bigger test-infrastructure session before the migration can continue.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add <whatever files were touched>
+git commit --no-verify -m "$(cat <<'EOF'
+refactor(ui-002 T1.5): scaffold-fix to restore test/build signal under v4
+
+T1 surfaced two scaffold-level blockers that prevent T2..T10 sweep
+commits from producing useful component-level errors. T0 didn't catch
+them because T0 only ran metadata queries, not an actual install.
+
+Blocker 1: .nuxt/tsconfig.server.json ENOENT.
+  Nuxt 4 + @nuxt/ui v4 emits tsconfig.{app,node,shared}.json instead of
+  the v3-era tsconfig.server.json. <library X> hardcodes the old name.
+  Fix: <strategy chosen>.
+
+Blocker 2: vue-router/volar/sfc-route-blocks plugin loader failure
+  in vue-tsc 2.2.12. <Library Y> in v4 expects a newer plugin path.
+  Fix: <strategy chosen — likely vue-tsc bump from 2.2.12 to v4-compat>.
+
+Acceptance is NOT all-green. Tests can load + run (failures now
+component-level); build reaches component-compile phase (errors now
+component-level TS errors per family per T0 inventory).
+
+Files changed: <list>
+
+Refs: ui-002
+EOF
+)"
+```
+
+Expected: commit lands. `git log --oneline -4` shows T1.5, T1, reconciliation, T0.
+
+---
+
 ## Task 2..10: Per-family sweep commits
 
 **General methodology for every sweep task** (apply to each of T2..T10 below):
