@@ -1,6 +1,6 @@
 # Third-Party Dependency Licenses
 
-**Generated:** 2026-05-24
+**Generated:** 2026-05-28
 
 **Source:** `pnpm licenses ls --json` (regenerate via `pnpm run licenses:gen`).
 
@@ -10,37 +10,30 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 
 | License | Package count |
 |---|---|
-| (AFL-2.1 OR BSD-3-Clause) | 1 |
 | (BSD-2-Clause OR MIT OR Apache-2.0) | 2 |
 | (BSD-3-Clause OR GPL-2.0) | 1 |
 | (MIT OR CC0-1.0) | 1 |
 | (MIT OR WTFPL) | 1 |
 | (MPL-2.0 OR Apache-2.0) | 1 |
 | 0BSD | 1 |
-| Apache-2.0 | 103 |
+| Apache-2.0 | 98 |
 | BlueOak-1.0.0 | 13 |
 | BSD | 1 |
 | BSD-2-Clause | 22 |
-| BSD-3-Clause | 26 |
+| BSD-3-Clause | 25 |
 | CC-BY-3.0 | 1 |
 | CC-BY-4.0 | 1 |
 | CC0-1.0 | 3 |
-| ISC | 66 |
-| MIT | 1205 |
+| ISC | 65 |
+| MIT | 1242 |
 | MIT OR Apache-2.0 | 1 |
 | MIT-0 | 3 |
 | MPL-2.0 | 2 |
 | Python-2.0 | 1 |
-| Unknown | 4 |
-| **Total (unique)** | **1460** |
+| Unknown | 3 |
+| **Total (unique)** | **1488** |
 
 ## Packages by license
-
-### (AFL-2.1 OR BSD-3-Clause) (1)
-
-| Package | Version(s) | Homepage |
-|---|---|---|
-| `json-schema` | 0.4.0 | [link](https://github.com/kriszyp/json-schema#readme) |
 
 ### (BSD-2-Clause OR MIT OR Apache-2.0) (2)
 
@@ -79,14 +72,10 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 |---|---|---|
 | `tslib` | 2.8.1 | [link](https://www.typescriptlang.org/) |
 
-### Apache-2.0 (103)
+### Apache-2.0 (98)
 
 | Package | Version(s) | Homepage |
 |---|---|---|
-| `@ai-sdk/provider` | 1.1.3 | [link](https://sdk.vercel.ai/docs) |
-| `@ai-sdk/provider-utils` | 2.2.8 | [link](https://ai-sdk.dev/docs) |
-| `@ai-sdk/ui-utils` | 1.2.11 | [link](https://ai-sdk.dev/docs) |
-| `@ai-sdk/vue` | 1.2.12 | [link](https://ai-sdk.dev/docs) |
 | `@ampproject/remapping` | 2.3.0 | [link](https://github.com/ampproject/remapping#readme) |
 | `@aws-crypto/crc32` | 5.2.0 | [link](https://github.com/aws/aws-sdk-js-crypto-helpers/tree/master/packages/crc32) |
 | `@aws-crypto/crc32c` | 5.2.0 | [link](https://github.com/aws/aws-sdk-js-crypto-helpers/tree/master/packages/crc32c) |
@@ -179,7 +168,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `readdir-glob` | 1.1.3 | [link](https://github.com/Yqnn/node-readdir-glob) |
 | `rxjs` | 7.8.2 | [link](https://rxjs.dev) |
 | `swagger-ui-dist` | 5.32.6 | [link](https://github.com/swagger-api/swagger-ui#readme) |
-| `swrv` | 1.2.0 | [link](https://github.com/Kong/swrv#readme) |
 | `teeny-request` | 9.0.0 | [link](https://github.com/googleapis/teeny-request#readme) |
 | `text-decoder` | 1.2.7 | [link](https://github.com/holepunchto/text-decoder#readme) |
 | `tunnel-agent` | 0.6.0 | [link](https://github.com/mikeal/tunnel-agent#readme) |
@@ -238,7 +226,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `uri-js` | 4.4.1 | [link](https://github.com/garycourt/uri-js) |
 | `webidl-conversions` | 8.0.1 | [link](https://github.com/jsdom/webidl-conversions#readme) |
 
-### BSD-3-Clause (26)
+### BSD-3-Clause (25)
 
 | Package | Version(s) | Homepage |
 |---|---|---|
@@ -260,7 +248,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `istanbul-reports` | 3.2.0 | [link](https://istanbul.js.org/) |
 | `makeerror` | 1.0.12 | [link](https://github.com/daaku/nodejs-makeerror#readme) |
 | `qs` | 6.15.2 | [link](https://github.com/ljharb/qs) |
-| `secure-json-parse` | 2.7.0 | [link](https://github.com/fastify/secure-json-parse#readme) |
 | `serialize-javascript` | 7.0.5 | [link](https://github.com/yahoo/serialize-javascript) |
 | `source-map` | 0.7.6 | [link](https://github.com/mozilla/source-map) |
 | `source-map-js` | 1.2.1 | [link](https://github.com/7rulnik/source-map-js) |
@@ -289,7 +276,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `mdn-data` | 2.27.1 | [link](https://developer.mozilla.org) |
 | `spdx-license-ids` | 3.0.23 | [link](https://github.com/jslicense/spdx-license-ids#readme) |
 
-### ISC (66)
+### ISC (65)
 
 | Package | Version(s) | Homepage |
 |---|---|---|
@@ -358,15 +345,13 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `y18n` | 5.0.8 | [link](https://github.com/yargs/y18n) |
 | `yaml` | 2.9.0 | [link](https://eemeli.org/yaml/) |
 | `yargs-parser` | 22.0.0 | [link](https://github.com/yargs/yargs-parser#readme) |
-| `zod-to-json-schema` | 3.25.2 | [link](https://github.com/StefanTerdell/zod-to-json-schema#readme) |
 
-### MIT (1205)
+### MIT (1242)
 
 | Package | Version(s) | Homepage |
 |---|---|---|
 | `@alloc/quick-lru` | 5.2.0 | [link](https://github.com/sindresorhus/quick-lru#readme) |
 | `@antfu/install-pkg` | 1.1.0 | [link](https://github.com/antfu/install-pkg#readme) |
-| `@antfu/utils` | 8.1.1 | [link](https://github.com/antfu/utils#readme) |
 | `@apidevtools/json-schema-ref-parser` | 14.2.1 | [link](https://apidevtools.com/json-schema-ref-parser/) |
 | `@asamuzakjp/css-color` | 5.1.11 | [link](https://github.com/asamuzaK/cssColor#readme) |
 | `@asamuzakjp/dom-selector` | 7.1.1 | [link](https://github.com/asamuzaK/domSelector#readme) |
@@ -430,8 +415,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@bcoe/v8-coverage` | 1.0.2 | [link](https://github.com/bcoe/v8-coverage#readme) |
 | `@bomb.sh/tab` | 0.0.15 | [link](https://github.com/bombshell-dev/tab#readme) |
 | `@bramus/specificity` | 2.4.2 | [link](https://github.com/bramus/specificity#readme) |
-| `@capsizecss/metrics` | 3.7.0 | [link](https://github.com/seek-oss/capsize#readme) |
-| `@capsizecss/unpack` | 2.4.0 | [link](https://github.com/seek-oss/capsize#readme) |
+| `@capsizecss/unpack` | 4.0.0 | [link](https://github.com/seek-oss/capsize#readme) |
 | `@clack/core` | 1.3.1 | [link](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) |
 | `@clack/prompts` | 1.4.0 | [link](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) |
 | `@codemirror/autocomplete` | 6.20.0 | [link](https://github.com/codemirror/autocomplete#readme) |
@@ -469,7 +453,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@gar/promisify` | 1.1.3 | [link](https://github.com/wraithgar/gar-promisify#readme) |
 | `@iconify/collections` | 1.0.684 | — |
 | `@iconify/types` | 2.0.0 | [link](https://github.com/iconify/iconify) |
-| `@iconify/utils` | 2.3.0 | [link](https://iconify.design/docs/libraries/utils/) |
+| `@iconify/utils` | 3.1.3 | [link](https://iconify.design/docs/libraries/utils/) |
 | `@iconify/vue` | 5.0.1 | [link](https://iconify.design/) |
 | `@inquirer/external-editor` | 1.0.3 | [link](https://github.com/SBoudrias/Inquirer.js/blob/main/packages/external-editor/README.md) |
 | `@inquirer/figures` | 1.0.15 | [link](https://github.com/SBoudrias/Inquirer.js#readme) |
@@ -530,15 +514,15 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@nuxt/eslint` | 1.15.2 | [link](https://github.com/nuxt/eslint#readme) |
 | `@nuxt/eslint-config` | 1.15.2 | [link](https://github.com/nuxt/eslint#readme) |
 | `@nuxt/eslint-plugin` | 1.15.2 | [link](https://github.com/nuxt/eslint#readme) |
-| `@nuxt/fonts` | 0.11.4 | [link](https://github.com/nuxt/fonts#readme) |
-| `@nuxt/icon` | 1.15.0 | [link](https://github.com/nuxt/icon#readme) |
-| `@nuxt/kit` | 4.4.5 | [link](https://nuxt.com/docs/4.x/api/kit) |
+| `@nuxt/fonts` | 0.14.0 | [link](https://github.com/nuxt/fonts#readme) |
+| `@nuxt/icon` | 2.2.2 | [link](https://github.com/nuxt/icon#readme) |
+| `@nuxt/kit` | 4.4.6 | [link](https://nuxt.com/docs/4.x/api/kit) |
 | `@nuxt/nitro-server` | 4.4.5 | [link](https://nuxt.com) |
-| `@nuxt/schema` | 4.4.5 | [link](https://nuxt.com) |
+| `@nuxt/schema` | 4.4.6 | [link](https://nuxt.com) |
 | `@nuxt/scripts` | 0.13.4 | [link](https://github.com/nuxt/scripts#readme) |
 | `@nuxt/telemetry` | 2.8.0 | [link](https://github.com/nuxt/telemetry#readme) |
 | `@nuxt/test-utils` | 3.23.0 | [link](https://github.com/nuxt/test-utils#readme) |
-| `@nuxt/ui` | 3.3.7 | [link](https://ui3.nuxt.com) |
+| `@nuxt/ui` | 4.8.1 | [link](https://ui.nuxt.com) |
 | `@nuxt/vite-builder` | 4.4.5 | [link](https://nuxt.com) |
 | `@nuxtjs/color-mode` | 3.5.2 | [link](https://github.com/nuxt-modules/color-mode#readme) |
 | `@nuxtjs/i18n` | 10.2.1 | [link](https://i18n.nuxtjs.org) |
@@ -613,9 +597,47 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@tailwindcss/postcss` | 4.3.0 | [link](https://tailwindcss.com) |
 | `@tailwindcss/vite` | 4.3.0 | [link](https://tailwindcss.com) |
 | `@tanstack/table-core` | 8.21.3 | [link](https://tanstack.com/table) |
-| `@tanstack/virtual-core` | 3.14.0 | [link](https://tanstack.com/virtual) |
+| `@tanstack/virtual-core` | 3.16.0 | [link](https://tanstack.com/virtual) |
 | `@tanstack/vue-table` | 8.21.3 | [link](https://tanstack.com/table) |
-| `@tanstack/vue-virtual` | 3.13.24 | [link](https://tanstack.com/virtual) |
+| `@tanstack/vue-virtual` | 3.13.26 | [link](https://tanstack.com/virtual) |
+| `@tiptap/core` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-blockquote` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-bold` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-bubble-menu` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-bullet-list` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-code` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-code-block` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-collaboration` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-document` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-drag-handle` | 3.23.6 | [link](https://tiptap.dev/docs/editor/extensions/functionality/drag-handle) |
+| `@tiptap/extension-drag-handle-vue-3` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-dropcursor` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-floating-menu` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-gapcursor` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-hard-break` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-heading` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-horizontal-rule` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-image` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-italic` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-link` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-list` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-list-item` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-list-keymap` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-mention` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-node-range` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-ordered-list` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-paragraph` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-placeholder` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-strike` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-text` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extension-underline` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/extensions` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/markdown` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/pm` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/starter-kit` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/suggestion` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/vue-3` | 3.23.6 | [link](https://tiptap.dev) |
+| `@tiptap/y-tiptap` | 3.0.4 | [link](https://github.com/ueberdosis/y-tiptap#readme) |
 | `@tootallnate/once` | 2.0.1 | [link](https://github.com/TooTallNate/once#readme) |
 | `@types/aws-lambda` | 8.10.161 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/aws-lambda) |
 | `@types/babel__core` | 7.20.5 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/babel__core) |
@@ -664,7 +686,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@types/node` | 20.19.41 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) |
 | `@types/node-fetch` | 2.6.13 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node-fetch) |
 | `@types/nodemailer` | 6.4.17 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/nodemailer) |
-| `@types/parse-path` | 7.1.0 | — |
 | `@types/picomatch` | 4.0.3 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/picomatch) |
 | `@types/qs` | 6.15.1 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/qs) |
 | `@types/range-parser` | 1.2.7 | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/range-parser) |
@@ -712,7 +733,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@vitest/utils` | 3.2.4 | [link](https://github.com/vitest-dev/vitest/tree/main/packages/utils#readme) |
 | `@volar/language-core` | 2.4.28 | [link](https://github.com/volarjs/volar.js#readme) |
 | `@volar/source-map` | 2.4.28 | [link](https://github.com/volarjs/volar.js#readme) |
-| `@volar/typescript` | 2.4.15 | [link](https://github.com/volarjs/volar.js#readme) |
+| `@volar/typescript` | 2.4.28 | [link](https://github.com/volarjs/volar.js#readme) |
 | `@vue-macros/common` | 3.1.2 | [link](https://vue-macros.dev) |
 | `@vue/babel-helper-vue-transform-on` | 2.0.1 | [link](https://github.com/vuejs/babel-plugin-jsx#readme) |
 | `@vue/babel-plugin-jsx` | 2.0.1 | [link](https://github.com/vuejs/babel-plugin-jsx/tree/dev/packages/babel-plugin-jsx#readme) |
@@ -721,12 +742,11 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@vue/compiler-dom` | 3.5.34 | [link](https://github.com/vuejs/core/tree/main/packages/compiler-dom#readme) |
 | `@vue/compiler-sfc` | 3.5.34 | [link](https://github.com/vuejs/core/tree/main/packages/compiler-sfc#readme) |
 | `@vue/compiler-ssr` | 3.5.34 | [link](https://github.com/vuejs/core/tree/main/packages/compiler-ssr#readme) |
-| `@vue/compiler-vue2` | 2.7.16 | [link](https://github.com/vuejs/vue/tree/dev/packages/vue-template-compiler#readme) |
 | `@vue/devtools-api` | 8.1.2 | [link](https://github.com/vuejs/devtools#readme) |
 | `@vue/devtools-core` | 8.1.2 | [link](https://github.com/vuejs/devtools#readme) |
 | `@vue/devtools-kit` | 8.1.2 | [link](https://github.com/vuejs/devtools#readme) |
 | `@vue/devtools-shared` | 8.1.2 | [link](https://github.com/vuejs/devtools#readme) |
-| `@vue/language-core` | 3.2.9 | [link](https://github.com/vuejs/language-tools#readme) |
+| `@vue/language-core` | 3.3.2 | [link](https://github.com/vuejs/language-tools#readme) |
 | `@vue/reactivity` | 3.5.34 | [link](https://github.com/vuejs/core/tree/main/packages/reactivity#readme) |
 | `@vue/runtime-core` | 3.5.34 | [link](https://github.com/vuejs/core/tree/main/packages/runtime-core#readme) |
 | `@vue/runtime-dom` | 3.5.34 | [link](https://github.com/vuejs/core/tree/main/packages/runtime-dom#readme) |
@@ -734,7 +754,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `@vue/shared` | 3.5.34 | [link](https://github.com/vuejs/core/tree/main/packages/shared#readme) |
 | `@vue/test-utils` | 2.4.6 | [link](https://github.com/vuejs/test-utils) |
 | `@vueuse/core` | 14.3.0 | [link](https://github.com/vueuse/vueuse#readme) |
-| `@vueuse/integrations` | 13.9.0 | [link](https://github.com/vueuse/vueuse/tree/main/packages/integrations#readme) |
+| `@vueuse/integrations` | 14.3.0 | [link](https://github.com/vueuse/vueuse/tree/main/packages/integrations#readme) |
 | `@vueuse/metadata` | 14.3.0 | [link](https://github.com/vueuse/vueuse/tree/main/packages/metadata#readme) |
 | `@vueuse/shared` | 14.3.0 | [link](https://github.com/vueuse/vueuse/tree/main/packages/shared#readme) |
 | `abort-controller` | 3.0.0 | [link](https://github.com/mysticatea/abort-controller#readme) |
@@ -784,13 +804,11 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `bindings` | 1.5.0 | [link](https://github.com/TooTallNate/node-bindings) |
 | `birpc` | 4.0.0 | [link](https://github.com/antfu-collective/birpc#readme) |
 | `bl` | 4.1.0 | [link](https://github.com/rvagg/bl) |
-| `blob-to-buffer` | 1.2.9 | [link](https://github.com/feross/blob-to-buffer) |
 | `body-parser` | 1.20.5 | [link](https://github.com/expressjs/body-parser#readme) |
 | `bottleneck` | 2.19.5 | [link](https://github.com/SGrondin/bottleneck#readme) |
 | `bowser` | 2.14.1 | [link](https://github.com/bowser-js/bowser) |
 | `brace-expansion` | 5.0.6 | [link](https://github.com/juliangruber/brace-expansion#readme) |
 | `braces` | 3.0.3 | [link](https://github.com/micromatch/braces) |
-| `brotli` | 1.3.3 | [link](https://github.com/devongovett/brotli.js) |
 | `browserslist` | 4.28.2 | [link](https://github.com/browserslist/browserslist#readme) |
 | `buffer` | 6.0.3 | [link](https://github.com/feross/buffer) |
 | `buffer-crc32` | 1.0.0 | [link](https://github.com/brianloveswords/buffer-crc32) |
@@ -822,7 +840,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `cli-cursor` | 5.0.0 | [link](https://github.com/sindresorhus/cli-cursor#readme) |
 | `cli-spinners` | 2.9.2 | [link](https://github.com/sindresorhus/cli-spinners#readme) |
 | `cli-truncate` | 5.2.0 | [link](https://github.com/sindresorhus/cli-truncate#readme) |
-| `clone` | 2.1.2 | [link](https://github.com/pvorb/node-clone#readme) |
+| `clone` | 1.0.4 | [link](https://github.com/pvorb/node-clone#readme) |
 | `co` | 4.6.0 | [link](https://github.com/tj/co#readme) |
 | `codemirror` | 6.0.2 | [link](https://github.com/codemirror/basic-setup#readme) |
 | `collect-v8-coverage` | 1.0.3 | [link](https://github.com/SimenB/collect-v8-coverage#readme) |
@@ -860,7 +878,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `crelt` | 1.0.6 | [link](https://github.com/marijnh/crelt#readme) |
 | `croner` | 10.0.1 | [link](https://croner.56k.guru) |
 | `cross-env` | 10.0.0 | [link](https://github.com/kentcdodds/cross-env#readme) |
-| `cross-fetch` | 3.2.0 | [link](https://github.com/lquixada/cross-fetch) |
 | `cross-spawn` | 7.0.6 | [link](https://github.com/moxystudio/node-cross-spawn) |
 | `crossws` | 0.4.5 | [link](https://crossws.h3.dev) |
 | `css-tree` | 3.2.1 | [link](https://github.com/csstree/csstree#readme) |
@@ -874,7 +891,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `data-urls` | 7.0.0 | [link](https://github.com/jsdom/data-urls#readme) |
 | `date-fns` | 2.30.0 | [link](https://github.com/date-fns/date-fns#readme) |
 | `db0` | 0.3.4 | [link](https://github.com/unjs/db0#readme) |
-| `de-indent` | 1.0.2 | [link](https://github.com/yyx990803/de-indent#readme) |
 | `debug` | 4.4.3 | [link](https://github.com/debug-js/debug#readme) |
 | `decimal.js` | 10.6.0 | [link](https://github.com/MikeMcl/decimal.js#readme) |
 | `decompress-response` | 6.0.0 | [link](https://github.com/sindresorhus/decompress-response#readme) |
@@ -896,7 +912,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `detect-file` | 1.0.0 | [link](https://github.com/doowb/detect-file) |
 | `detect-newline` | 3.1.0 | [link](https://github.com/sindresorhus/detect-newline#readme) |
 | `devalue` | 5.8.1 | [link](https://github.com/sveltejs/devalue#readme) |
-| `dfa` | 1.2.0 | [link](https://github.com/devongovett/dfa#readme) |
 | `diff-sequences` | 29.6.3 | [link](https://github.com/jestjs/jest#readme) |
 | `dlv` | 1.1.3 | [link](https://github.com/developit/dlv#readme) |
 | `dom-serializer` | 2.0.0 | [link](https://github.com/cheeriojs/dom-serializer#readme) |
@@ -992,8 +1007,9 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `flagged-respawn` | 2.0.0 | [link](https://github.com/gulpjs/flagged-respawn#readme) |
 | `flat-cache` | 4.0.1 | [link](https://github.com/jaredwray/flat-cache#readme) |
 | `follow-redirects` | 1.16.0 | [link](https://github.com/follow-redirects/follow-redirects) |
-| `fontaine` | 0.6.0 | [link](https://github.com/unjs/fontaine#readme) |
-| `fontkit` | 2.0.4 | [link](https://github.com/foliojs/fontkit#readme) |
+| `fontaine` | 0.8.0 | [link](https://github.com/unjs/fontaine#readme) |
+| `fontkitten` | 1.0.3 | [link](https://github.com/delucis/fontkitten#readme) |
+| `fontless` | 0.2.1 | [link](https://github.com/unjs/fontaine#readme) |
 | `for-in` | 1.0.2 | [link](https://github.com/jonschlinkert/for-in) |
 | `for-own` | 1.0.0 | [link](https://github.com/jonschlinkert/for-own) |
 | `form-data` | 4.0.5 | [link](https://github.com/form-data/form-data#readme) |
@@ -1017,8 +1033,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `get-stream` | 8.0.1 | [link](https://github.com/sindresorhus/get-stream#readme) |
 | `get-tsconfig` | 4.14.0 | [link](https://github.com/privatenumber/get-tsconfig#readme) |
 | `giget` | 3.2.0 | [link](https://github.com/unjs/giget#readme) |
-| `git-up` | 8.1.1 | [link](https://github.com/IonicaBizau/git-up) |
-| `git-url-parse` | 16.1.0 | [link](https://github.com/IonicaBizau/git-url-parse) |
 | `github-from-package` | 0.0.0 | [link](https://github.com/substack/github-from-package) |
 | `global-directory` | 4.0.1 | [link](https://github.com/sindresorhus/global-directory#readme) |
 | `global-modules` | 1.0.0 | [link](https://github.com/jonschlinkert/global-modules) |
@@ -1037,7 +1051,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `has-symbols` | 1.1.0 | [link](https://github.com/ljharb/has-symbols#readme) |
 | `has-tostringtag` | 1.0.2 | [link](https://github.com/inspect-js/has-tostringtag#readme) |
 | `hasown` | 2.0.3 | [link](https://github.com/inspect-js/hasOwn#readme) |
-| `he` | 1.2.0 | [link](https://mths.be/he) |
 | `helmet` | 7.2.0 | [link](https://helmetjs.github.io/) |
 | `hey-listen` | 1.0.8 | [link](https://github.com/Popmotion/hey-listen#readme) |
 | `homedir-polyfill` | 1.0.3 | [link](https://github.com/doowb/homedir-polyfill) |
@@ -1057,6 +1070,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `image-meta` | 0.2.2 | [link](https://github.com/unjs/image-meta#readme) |
 | `import-fresh` | 3.3.1 | [link](https://github.com/sindresorhus/import-fresh#readme) |
 | `import-local` | 3.2.0 | [link](https://github.com/sindresorhus/import-local#readme) |
+| `import-meta-resolve` | 4.2.0 | [link](https://github.com/wooorm/import-meta-resolve#readme) |
 | `impound` | 1.1.5 | [link](https://github.com/unjs/impound#readme) |
 | `imurmurhash` | 0.1.4 | [link](https://github.com/jensyt/imurmurhash-js) |
 | `indent-string` | 5.0.0 | [link](https://github.com/sindresorhus/indent-string#readme) |
@@ -1087,7 +1101,6 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `is-potential-custom-element-name` | 1.0.1 | [link](https://github.com/mathiasbynens/is-potential-custom-element-name) |
 | `is-reference` | 1.2.1 | [link](https://github.com/Rich-Harris/is-reference#readme) |
 | `is-relative` | 1.0.0 | [link](https://github.com/jonschlinkert/is-relative) |
-| `is-ssh` | 1.4.1 | [link](https://github.com/IonicaBizau/node-is-ssh) |
 | `is-stream` | 3.0.0 | [link](https://github.com/sindresorhus/is-stream#readme) |
 | `is-unc-path` | 1.0.0 | [link](https://github.com/jonschlinkert/is-unc-path) |
 | `is-unicode-supported` | 0.1.0 | [link](https://github.com/sindresorhus/is-unicode-supported#readme) |
@@ -1098,6 +1111,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `isbinaryfile` | 5.0.7 | [link](https://github.com/gjtorikian/isBinaryFile#readme) |
 | `isobject` | 3.0.1 | [link](https://github.com/jonschlinkert/isobject) |
 | `isomorphic-dompurify` | 3.13.0 | [link](https://github.com/kkomelin/isomorphic-dompurify#readme) |
+| `isomorphic.js` | 0.2.5 | [link](https://github.com/dmonad/isomorphic.js#readme) |
 | `jest` | 29.7.0 | [link](https://jestjs.io/) |
 | `jest-changed-files` | 29.7.0 | [link](https://github.com/jestjs/jest#readme) |
 | `jest-circus` | 29.7.0 | [link](https://github.com/jestjs/jest#readme) |
@@ -1151,20 +1165,21 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `kleur` | 4.1.5 | [link](https://github.com/lukeed/kleur#readme) |
 | `klona` | 2.0.6 | [link](https://github.com/lukeed/klona#readme) |
 | `knitwork` | 1.3.0 | [link](https://github.com/unjs/knitwork#readme) |
-| `kolorist` | 1.8.0 | [link](https://github.com/marvinhagemeister/kolorist#readme) |
 | `launch-editor` | 2.13.2 | [link](https://github.com/yyx990803/launch-editor#readme) |
 | `lazystream` | 1.0.1 | [link](https://github.com/jpommerening/node-lazystream) |
 | `leven` | 3.1.0 | [link](https://github.com/sindresorhus/leven#readme) |
 | `levn` | 0.4.1 | [link](https://github.com/gkz/levn) |
+| `lib0` | 0.2.117 | [link](https://github.com/dmonad/lib0#readme) |
 | `liftoff` | 5.0.1 | [link](https://github.com/gulpjs/liftoff#readme) |
 | `lilconfig` | 3.1.3 | [link](https://github.com/antonk52/lilconfig#readme) |
 | `lines-and-columns` | 1.2.4 | [link](https://github.com/eventualbuddha/lines-and-columns#readme) |
 | `linkify-it` | 4.0.1 | [link](https://github.com/markdown-it/linkify-it#readme) |
+| `linkifyjs` | 4.3.3 | [link](https://linkify.js.org) |
 | `lint-staged` | 16.1.5 | [link](https://github.com/lint-staged/lint-staged#readme) |
 | `listhen` | 1.10.0 | [link](https://github.com/unjs/listhen#readme) |
 | `listr2` | 9.0.5 | [link](https://github.com/listr2/listr2#readme) |
 | `load-tsconfig` | 0.2.5 | — |
-| `local-pkg` | 1.1.2 | [link](https://github.com/antfu-collective/local-pkg#readme) |
+| `local-pkg` | 1.2.1 | [link](https://github.com/antfu-collective/local-pkg#readme) |
 | `locate-path` | 8.0.0 | [link](https://github.com/sindresorhus/locate-path#readme) |
 | `lodash` | 4.18.1 | [link](https://lodash.com/) |
 | `lodash.defaults` | 4.2.0 | [link](https://lodash.com/) |
@@ -1192,7 +1207,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `markdownlint` | 0.31.1 | [link](https://github.com/DavidAnson/markdownlint) |
 | `markdownlint-cli` | 0.37.0 | [link](https://github.com/igorshubovych/markdownlint-cli#readme) |
 | `markdownlint-micromark` | 0.1.7 | [link](https://github.com/DavidAnson/markdownlint) |
-| `marked` | 16.1.1 | [link](https://marked.js.org) |
+| `marked` | 17.0.6 | [link](https://marked.js.org) |
 | `math-intrinsics` | 1.1.0 | [link](https://github.com/es-shims/math-intrinsics#readme) |
 | `mdurl` | 1.0.1 | [link](https://github.com/markdown-it/mdurl#readme) |
 | `media-typer` | 0.3.0 | [link](https://github.com/jshttp/media-typer#readme) |
@@ -1218,7 +1233,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `morgan` | 1.10.1 | [link](https://github.com/expressjs/morgan#readme) |
 | `motion-dom` | 12.38.0 | [link](https://github.com/motiondivision/motion#readme) |
 | `motion-utils` | 12.36.0 | [link](https://github.com/motiondivision/motion#readme) |
-| `motion-v` | 1.10.3 | [link](https://github.com/motiondivision/motion-vue) |
+| `motion-v` | 2.2.1 | [link](https://github.com/motiondivision/motion-vue) |
 | `mrmime` | 2.0.1 | [link](https://github.com/lukeed/mrmime#readme) |
 | `ms` | 2.1.3 | [link](https://github.com/vercel/ms#readme) |
 | `muggle-string` | 0.4.1 | [link](https://github.com/johnsoncodehk/muggle-string#readme) |
@@ -1265,6 +1280,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `open` | 11.0.0 | [link](https://github.com/sindresorhus/open#readme) |
 | `optionator` | 0.9.4 | [link](https://github.com/gkz/optionator) |
 | `ora` | 5.4.1 | [link](https://github.com/sindresorhus/ora#readme) |
+| `orderedmap` | 2.1.1 | [link](https://github.com/marijnh/orderedmap#readme) |
 | `oxc-minify` | 0.128.0 | [link](https://oxc.rs/docs/guide/usage/minifier) |
 | `oxc-parser` | 0.128.0 | [link](https://oxc.rs/docs/guide/usage/parser) |
 | `oxc-transform` | 0.128.0 | [link](https://oxc.rs/docs/guide/usage/transformer) |
@@ -1274,15 +1290,12 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `p-map` | 4.0.0 | [link](https://github.com/sindresorhus/p-map#readme) |
 | `p-try` | 2.2.0 | [link](https://github.com/sindresorhus/p-try#readme) |
 | `package-manager-detector` | 1.6.0 | [link](https://github.com/antfu-collective/package-manager-detector#readme) |
-| `pako` | 0.2.9 | [link](https://github.com/nodeca/pako) |
 | `parent-module` | 1.0.1 | [link](https://github.com/sindresorhus/parent-module#readme) |
 | `parse-filepath` | 1.0.2 | [link](https://github.com/jonschlinkert/parse-filepath) |
 | `parse-imports-exports` | 0.2.4 | [link](https://github.com/joomcode/parse-imports-exports#readme) |
 | `parse-json` | 5.2.0 | [link](https://github.com/sindresorhus/parse-json#readme) |
 | `parse-passwd` | 1.0.0 | [link](https://github.com/doowb/parse-passwd) |
-| `parse-path` | 7.1.0 | [link](https://github.com/IonicaBizau/parse-path) |
 | `parse-statements` | 1.0.11 | [link](https://github.com/joomcode/parse-statements#readme) |
-| `parse-url` | 9.2.0 | [link](https://github.com/IonicaBizau/parse-url) |
 | `parse5` | 8.0.1 | [link](https://parse5.js.org) |
 | `parseurl` | 1.3.3 | [link](https://github.com/pillarjs/parseurl#readme) |
 | `path-browserify` | 1.0.1 | [link](https://github.com/browserify/path-browserify) |
@@ -1347,7 +1360,18 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `promise-retry` | 2.0.1 | [link](https://github.com/IndigoUnited/node-promise-retry#readme) |
 | `prompts` | 2.4.2 | [link](https://github.com/terkelg/prompts#readme) |
 | `proper-lockfile` | 4.1.2 | [link](https://github.com/moxystudio/node-proper-lockfile) |
-| `protocols` | 2.0.2 | [link](https://github.com/IonicaBizau/protocols) |
+| `prosemirror-changeset` | 2.4.1 | — |
+| `prosemirror-commands` | 1.7.1 | [link](https://github.com/prosemirror/prosemirror-commands#readme) |
+| `prosemirror-dropcursor` | 1.8.2 | [link](https://github.com/prosemirror/prosemirror-dropcursor#readme) |
+| `prosemirror-gapcursor` | 1.4.1 | [link](https://github.com/prosemirror/prosemirror-gapcursor#readme) |
+| `prosemirror-history` | 1.5.0 | [link](https://github.com/prosemirror/prosemirror-history#readme) |
+| `prosemirror-keymap` | 1.2.3 | [link](https://github.com/prosemirror/prosemirror-keymap#readme) |
+| `prosemirror-model` | 1.25.7 | — |
+| `prosemirror-schema-list` | 1.5.1 | [link](https://github.com/prosemirror/prosemirror-schema-list#readme) |
+| `prosemirror-state` | 1.4.4 | [link](https://github.com/prosemirror/prosemirror-state#readme) |
+| `prosemirror-tables` | 1.8.5 | [link](https://github.com/ProseMirror/prosemirror-tables#readme) |
+| `prosemirror-transform` | 1.12.0 | [link](https://github.com/prosemirror/prosemirror-transform#readme) |
+| `prosemirror-view` | 1.41.8 | — |
 | `proxy-addr` | 2.0.7 | [link](https://github.com/jshttp/proxy-addr#readme) |
 | `proxy-from-env` | 2.1.0 | [link](https://github.com/Rob--W/proxy-from-env#readme) |
 | `pump` | 3.0.4 | [link](https://github.com/mafintosh/pump#readme) |
@@ -1368,7 +1392,7 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `refa` | 0.12.1 | [link](https://github.com/RunDevelopment/refa#readme) |
 | `regexp-ast-analysis` | 0.7.1 | [link](https://github.com/RunDevelopment/regexp-ast-analysis#readme) |
 | `regexp-tree` | 0.1.27 | [link](https://github.com/DmitrySoshnikov/regexp-tree) |
-| `reka-ui` | 2.6.0 | [link](https://github.com/unovue/reka-ui) |
+| `reka-ui` | 2.9.8 | [link](https://github.com/unovue/reka-ui) |
 | `require-directory` | 2.1.1 | [link](https://github.com/troygoode/node-require-directory/) |
 | `require-from-string` | 2.0.2 | [link](https://github.com/floatdrop/require-from-string#readme) |
 | `reserved-identifiers` | 1.2.0 | [link](https://github.com/sindresorhus/reserved-identifiers#readme) |
@@ -1379,13 +1403,13 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `resolve-pkg-maps` | 1.0.0 | [link](https://github.com/privatenumber/resolve-pkg-maps#readme) |
 | `resolve.exports` | 2.0.3 | [link](https://github.com/lukeed/resolve.exports#readme) |
 | `restore-cursor` | 5.1.0 | [link](https://github.com/sindresorhus/restore-cursor#readme) |
-| `restructure` | 3.0.2 | [link](https://github.com/devongovett/restructure) |
 | `retry` | 0.13.1 | [link](https://github.com/tim-kos/node-retry) |
 | `retry-request` | 7.0.2 | [link](https://github.com/stephenplusplus/retry-request#readme) |
 | `reusify` | 1.1.0 | [link](https://github.com/mcollina/reusify#readme) |
 | `rfdc` | 1.4.1 | [link](https://github.com/davidmarkclements/rfdc#readme) |
 | `rollup` | 4.60.4 | [link](https://rollupjs.org/) |
 | `rollup-plugin-visualizer` | 7.0.1 | [link](https://github.com/btd/rollup-plugin-visualizer) |
+| `rope-sequence` | 1.3.4 | [link](https://github.com/marijnh/rope-sequence#readme) |
 | `rou3` | 0.8.1 | [link](https://github.com/h3js/rou3#readme) |
 | `run-applescript` | 7.1.0 | [link](https://github.com/sindresorhus/run-applescript#readme) |
 | `run-async` | 3.0.0 | [link](https://github.com/SBoudrias/run-async#readme) |
@@ -1497,18 +1521,16 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `undici-types` | 6.21.0 | [link](https://undici.nodejs.org) |
 | `unenv` | 2.0.0-rc.24 | [link](https://github.com/unjs/unenv#readme) |
 | `unhead` | 2.1.15 | [link](https://unhead.unjs.io) |
-| `unicode-properties` | 1.4.1 | [link](https://github.com/devongovett/unicode-properties) |
-| `unicode-trie` | 2.0.0 | [link](https://github.com/devongovett/unicode-trie) |
 | `unicorn-magic` | 0.4.0 | [link](https://github.com/sindresorhus/unicorn-magic#readme) |
-| `unifont` | 0.4.1 | [link](https://github.com/unjs/unifont#readme) |
+| `unifont` | 0.7.4 | [link](https://github.com/unjs/unifont#readme) |
 | `unimport` | 6.3.0 | [link](https://github.com/unjs/unimport#readme) |
 | `universal-github-app-jwt` | 2.2.2 | [link](https://github.com/gr2m/universal-github-app-jwt#readme) |
 | `universalify` | 2.0.1 | [link](https://github.com/RyanZim/universalify#readme) |
 | `unpipe` | 1.0.0 | [link](https://github.com/stream-utils/unpipe#readme) |
 | `unplugin` | 3.0.0 | [link](https://unplugin.unjs.io) |
-| `unplugin-auto-import` | 20.3.0 | [link](https://github.com/unplugin/unplugin-auto-import#readme) |
+| `unplugin-auto-import` | 21.0.0 | [link](https://github.com/unplugin/unplugin-auto-import#readme) |
 | `unplugin-utils` | 0.3.1 | [link](https://github.com/sxzz/unplugin-utils#readme) |
-| `unplugin-vue-components` | 30.0.0 | [link](https://github.com/unplugin/unplugin-vue-components#readme) |
+| `unplugin-vue-components` | 32.1.0 | [link](https://github.com/unplugin/unplugin-vue-components#readme) |
 | `unplugin-vue-router` | 0.16.2 | [link](https://uvr.esm.is) |
 | `unrouting` | 0.1.7 | [link](https://github.com/unjs/unrouting#readme) |
 | `unrs-resolver` | 1.11.1 | [link](https://github.com/unrs/unrs-resolver#readme) |
@@ -1537,13 +1559,13 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `vscode-uri` | 3.1.0 | [link](https://github.com/microsoft/vscode-uri#readme) |
 | `vue` | 3.5.34 | [link](https://vuejs.org/) |
 | `vue-bundle-renderer` | 2.2.0 | [link](https://github.com/nuxt-contrib/vue-bundle-renderer#readme) |
-| `vue-component-type-helpers` | 3.2.9 | [link](https://github.com/vuejs/language-tools#readme) |
+| `vue-component-type-helpers` | 3.3.2 | [link](https://github.com/vuejs/language-tools#readme) |
 | `vue-demi` | 0.14.10 | [link](https://github.com/antfu/vue-demi#readme) |
 | `vue-devtools-stub` | 0.1.0 | [link](https://github.com/nuxt-contrib/vue-devtools-stub#readme) |
 | `vue-eslint-parser` | 10.4.0 | [link](https://github.com/vuejs/vue-eslint-parser#readme) |
 | `vue-i18n` | 11.4.4 | [link](https://github.com/intlify/vue-i18n/tree/master/packages/vue-i18n#readme) |
 | `vue-router` | 5.0.7 | [link](https://router.vuejs.org) |
-| `vue-tsc` | 2.2.12 | [link](https://github.com/vuejs/language-tools#readme) |
+| `vue-tsc` | 3.3.2 | [link](https://github.com/vuejs/language-tools#readme) |
 | `w3c-keyname` | 2.2.8 | [link](https://github.com/marijnh/w3c-keyname#readme) |
 | `w3c-xmlserializer` | 5.0.0 | [link](https://github.com/jsdom/w3c-xmlserializer#readme) |
 | `wcwidth` | 1.0.1 | [link](https://github.com/timoxley/wcwidth#readme) |
@@ -1561,14 +1583,15 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 | `xml-naming` | 0.1.0 | [link](https://github.com/NaturalIntelligence/xml-naming#readme) |
 | `xmlchars` | 2.2.0 | [link](https://github.com/lddubeau/xmlchars#readme) |
 | `xtend` | 4.0.2 | [link](https://github.com/Raynos/xtend) |
+| `y-protocols` | 1.0.7 | [link](https://github.com/yjs/y-protocols#readme) |
 | `yaml-eslint-parser` | 1.3.2 | [link](https://github.com/ota-meshi/yaml-eslint-parser#readme) |
 | `yargs` | 18.0.0 | [link](https://yargs.js.org/) |
+| `yjs` | 13.6.30 | [link](https://docs.yjs.dev) |
 | `yocto-queue` | 1.2.2 | [link](https://github.com/sindresorhus/yocto-queue#readme) |
 | `yoctocolors-cjs` | 2.1.3 | [link](https://github.com/sindresorhus/yoctocolors#readme) |
 | `youch` | 4.1.1 | [link](https://github.com/poppinss/youch#readme) |
 | `youch-core` | 0.3.3 | [link](https://github.com/poppinss/youch-core#readme) |
 | `zip-stream` | 6.0.1 | [link](https://github.com/archiverjs/node-zip-stream) |
-| `zod` | 3.25.76 | [link](https://zod.dev) |
 
 ### MIT OR Apache-2.0 (1)
 
@@ -1597,11 +1620,10 @@ Covers every npm package resolved into the workspace `node_modules` tree, includ
 |---|---|---|
 | `argparse` | 2.0.1 | [link](https://github.com/nodeca/argparse#readme) |
 
-### Unknown (4)
+### Unknown (3)
 
 | Package | Version(s) | Homepage |
 |---|---|---|
-| `@nuxt/ui-pro` | 3.3.7 | [link](https://ui3.nuxt.com/pro) |
 | `spawn-command` | 0.0.2 | — |
 | `tosource` | 2.0.0-alpha.3 | [link](https://github.com/marcello3d/node-tosource) |
 | `vaul-vue` | 0.4.1 | [link](https://github.com/Elliot-Alexander/vaul-vue#readme) |
