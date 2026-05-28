@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@nuxt/ui-pro";
+@import "@nuxt/ui";
 
 /* Prevent iOS Safari auto-zoom on input focus */
 /* iOS Safari automatically zooms inputs when font-size < 16px */

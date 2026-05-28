@@ -10,7 +10,7 @@ export default defineNuxtConfig({
   },
 
   // Modules
-  modules: ['@nuxt/ui-pro', '@pinia/nuxt', '@nuxtjs/i18n'],
+  modules: ['@nuxt/ui', '@pinia/nuxt', '@nuxtjs/i18n'],
   css: ['~/assets/css/main.css'],
   ui: {
     // Minimal theme configuration to prevent useHead issues
