@@ -12,12 +12,6 @@ export default defineNuxtConfig({
   // Modules
   modules: ['@nuxt/ui', '@pinia/nuxt', '@nuxtjs/i18n'],
   css: ['~/assets/css/main.css'],
-  ui: {
-    // Minimal theme configuration to prevent useHead issues
-    theme: {
-      colors: ['primary', 'error'],
-    },
-  },
 
   // Runtime configuration
   runtimeConfig: {
