@@ -36,6 +36,27 @@ const WORKSPACES = [
     root: 'modules/schema-extensions/legal',
     src: ['src'],
   },
+  // The workspace root itself: vitest configs run from here under strict-hoist
+  // and need every bare-spec import declared in the root package.json. Scans:
+  //   - explicit top-level config files (vitest.config*.mjs)
+  //   - scripts/ and tools/ (root-owned utility code)
+  //   - tests/ui/ (run by vitest.config.ui.mjs from root; setup files +
+  //     test files both resolve from root under strict-hoist)
+  // Other tests/ subtrees (api, cli, core, e2e, integration, storage) are
+  // also run from root by the default vitest config but use the broader
+  // sub-workspace API surface; auditing them here would surface noise rather
+  // than truly missing root deps. Treat as a known follow-up surface.
+  {
+    name: 'civicpress (root)',
+    root: '.',
+    src: [
+      'vitest.config.mjs',
+      'vitest.config.ui.mjs',
+      'scripts',
+      'tools',
+      'tests/ui',
+    ],
+  },
 ];
 
 const SOURCE_EXTS = new Set([
@@ -83,11 +104,16 @@ function getBaseSpec(spec) {
   return spec.split('/')[0];
 }
 
-function collectSourceFiles(dir, out = []) {
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+function collectSourceFiles(target, out = []) {
+  if (!fs.existsSync(target)) return out;
+  const stat = fs.statSync(target);
+  if (stat.isFile()) {
+    if (SOURCE_EXTS.has(path.extname(target))) out.push(target);
+    return out;
+  }
+  for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.nuxt' || entry.name === '.output') continue;
-    const full = path.join(dir, entry.name);
+    const full = path.join(target, entry.name);
     if (entry.isDirectory()) {
       collectSourceFiles(full, out);
     } else if (SOURCE_EXTS.has(path.extname(entry.name))) {
