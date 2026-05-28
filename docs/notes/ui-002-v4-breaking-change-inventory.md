@@ -288,6 +288,30 @@ The plan's T2..T10 slicing is **9 sweep tasks**, plus T0 (this) and T1 (package 
 
 ---
 
+## Verification log — T2–T10 outcomes (post-T1.5 stabilization)
+
+T1.5 (commit `d40bebf`) determined that v4 is essentially a drop-in for our usage: gates were 138/138 + build clean immediately after a clean install. The per-family sweep tasks T2..T10 reduced to verification rather than fixes. Audit performed 2026-05-28.
+
+| Task | Predicted in T0 | Verified outcome | Audit command |
+|---|---|---|---|
+| T2 Dashboard shell (UDashboard*) | medium verification work | **no-op** — all 5 components render; 138/138 green; build clean | `pnpm test:ui:run` + `pnpm -r build` |
+| T3 UNavigationMenu | low; props unchanged | **no-op** | (covered by gate runs) |
+| T4 Overlays (UModal/UPopover/UDropdownMenu) | low-medium | **no-op** | (covered by gate runs) |
+| T5 Form stack | largest — silent runtime breaks possible | **no-op** — audit confirmed none of the at-risk patterns exist in source | greps below |
+| T5a `v-model.nullify` | rename to `.nullable` | **no matches** | `grep -rn "v-model\.nullify" modules/ui/app --include='*.vue'` |
+| T5b nested `<UForm>` (no word-boundary on UFormField) | needs `nested` + `name` props | **no matches** | `find modules/ui/app -name "*.vue" -exec sh -c 'n=$(grep -cE "<UForm[> ]" "$1"); [ "$n" -gt 1 ] && echo "$n  $1"' _ {} \;` → 0 files |
+| T5c `<UForm transform=...>` | transformations no longer mutate state | **no matches** | `grep -rnE '<UForm[^>]*\btransform' modules/ui/app --include='*.vue'` |
+| T5d `<USelect :by=...>` | `:by` semantics changed | **no matches** | `grep -rnE '<USelect[^>]*:by=' modules/ui/app --include='*.vue'` |
+| T6 Display components | low | **no-op** | (covered by gate runs) |
+| T7 Toasts | UNotification removed; useToast unchanged | **no-op** — only ref is the commented-out placeholder at `app.vue:196`; leaving it preserves v3 behavior (useToast() silently no-ops without a mount) | `grep -rnE '<UNotification' modules/ui/app --include='*.vue'` → 1 match, commented |
+| T8 Root wiring + useHead workaround | check whether v4 still needs it | **real fix** — removed `ui.theme.colors` block at nuxt.config.ts:15-20; 138/138 + build still green. Commit `cd725d5`. | edit + re-run gates |
+| T9 i18n / locale-aware | verification-only, expected no-op | **no-op** — no `<U* :locale=...>` usage in our codebase | `grep -rnE '<U[A-Z][a-zA-Z]+[^>]*:locale=' modules/ui/app --include='*.vue'` |
+| T10 Leaflet / type exports | low; type-only | **no-op** — `pnpm -r build` clean (typecheck included via nuxt build path); T1.5 also independently ran `vue-tsc -p .nuxt/tsconfig.app.json` → 0 errors across 93 .vue files | (covered by gate runs) |
+
+**Net outcome:** T2–T7 + T9 + T10 are all no-ops. Only T8 produced a real source change. Migration is a near-drop-in upgrade.
+
+---
+
 ## Appendix: commands run
 
 ```sh
