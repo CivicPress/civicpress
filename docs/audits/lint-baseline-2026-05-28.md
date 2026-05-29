@@ -18,7 +18,7 @@
 
 ## Per-rule histogram (aggregate across runnable workspaces)
 
-Top contributors:
+**Top 10 of 1,500 total problems (1,488 errors + 12 warnings):**
 - `no-unused-vars` — 648
 - `no-undef` — 324
 - `(parse)` — 317
@@ -32,7 +32,7 @@ Top contributors:
 
 ### Per-workspace rule breakdown
 
-**core (827 total):**
+**core (827 total = 817 errors + 10 warnings):**
 - `no-unused-vars` — 433
 - `(parse)` — 197
 - `no-undef` — 174
@@ -45,13 +45,13 @@ Top contributors:
 - `@typescript-eslint/no-var-requires` — 1
 - `no-redeclare` — 1
 
-**cli (504 total):**
+**cli (504 total = 504 errors + 0 warnings):**
 - `no-undef` — 280
 - `no-unused-vars` — 167
 - `(parse)` — 47
 - `no-empty` — 10
 
-**modules/api (169 total):**
+**modules/api (169 total = 167 errors + 2 warnings):**
 - `(parse)` — 73
 - `no-unused-vars` — 48
 - `no-undef` — 44
