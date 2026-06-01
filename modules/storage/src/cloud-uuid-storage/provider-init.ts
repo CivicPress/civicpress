@@ -301,7 +301,7 @@ export class ProviderInit {
     // For Azure: try to list blobs (with limit 1)
 
     switch (provider.type) {
-      case 'local':
+      case 'local': {
         // Check if storage path exists
         const localPath = getLocalStoragePath(host);
         const exists = await fs.pathExists(localPath);
@@ -309,7 +309,8 @@ export class ProviderInit {
           throw new Error(`Local storage path does not exist: ${localPath}`);
         }
         break;
-      case 's3':
+      }
+      case 's3': {
         if (!host.s3Client) {
           await this.initializeS3Storage(provider);
         }
@@ -321,7 +322,8 @@ export class ProviderInit {
         });
         await host.s3Client!.send(listCommand);
         break;
-      case 'azure':
+      }
+      case 'azure': {
         if (!host.azureContainerClient) {
           await this.initializeAzureStorage(provider);
         }
@@ -329,7 +331,8 @@ export class ProviderInit {
         const blobs = host.azureContainerClient!.listBlobsFlat();
         await blobs.next(); // Just check if we can access the container
         break;
-      case 'gcs':
+      }
+      case 'gcs': {
         if (!host.gcsBucket) {
           await this.initializeGCSStorage(provider);
         }
@@ -337,6 +340,7 @@ export class ProviderInit {
         const [files] = await host.gcsBucket!.getFiles({ maxResults: 1 });
         // Just check if we can access the bucket
         break;
+      }
       default:
         throw new Error(
           `Unsupported provider type for health check: ${provider.type}`

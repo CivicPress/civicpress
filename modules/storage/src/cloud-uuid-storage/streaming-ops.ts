@@ -101,7 +101,7 @@ export class StreamingOps {
 
       // Upload to provider using stream
       switch (provider.type) {
-        case 'local':
+        case 'local': {
           providerPath = await this.uploadStreamToLocal(
             request.stream,
             relativePath
@@ -111,6 +111,7 @@ export class StreamingOps {
           const stats = await fs.stat(fullPath);
           actualSize = stats.size;
           break;
+        }
         case 's3':
           providerPath = await this.uploadStreamToS3(
             request.stream,
