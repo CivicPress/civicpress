@@ -20,6 +20,10 @@ const NODE_GLOBALS = {
   clearImmediate: 'readonly',
   URL: 'readonly',
   URLSearchParams: 'readonly',
+  // @types/node TypeScript namespace (type-level, no-undef can't distinguish)
+  NodeJS: 'readonly',
+  // @types/express TypeScript namespace (type-level, no-undef can't distinguish)
+  Express: 'readonly',
 };
 
 const VITEST_GLOBALS = {
