@@ -45,6 +45,7 @@ export const useUserRoles = () => {
           const rolesMap = data.roles as Record<string, Record<string, unknown> | undefined>;
           const result: Role[] = [];
           for (const key of Object.keys(rolesMap)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const r = (rolesMap[key] || {}) as Record<string, any>;
             const name = r?.name?.value ?? r?.name ?? key;
             const description = r?.description?.value ?? r?.description ?? '';
@@ -155,6 +156,7 @@ export const useUserRoles = () => {
   // Get available status transitions for a role
   const getStatusTransitions = (roleKey: string): string[] => {
     const role = getRoleByKey(roleKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (role as any)?.status_transitions || [];
   };
 

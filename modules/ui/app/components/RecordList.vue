@@ -172,6 +172,7 @@ const handlePageChange = (newPage: number) => {
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handlePageSizeChange = (value: any) => {
   // USelectMenu passes SelectMenuItem, but with simple number options it may be the number directly
   // Extract number value - handle both direct number and SelectMenuItem object

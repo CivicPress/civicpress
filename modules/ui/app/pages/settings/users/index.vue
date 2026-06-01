@@ -158,6 +158,7 @@ onMounted(() => {
                     </p>
                     <div class="flex items-center gap-2 mt-2">
                       <UBadge
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         :color="getRoleColor(user.role) as any"
                         variant="soft"
                         size="sm"

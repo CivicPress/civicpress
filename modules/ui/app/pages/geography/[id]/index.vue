@@ -357,6 +357,7 @@ interface GeographyFile {
   };
   created_at: string;
   updated_at: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: any;
   file_path?: string;
   content?: string;
@@ -376,6 +377,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const geographyFile = ref<GeographyFile | null>(null);
 const rawContent = ref('');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parsedData = ref<any>(null);
 
 // Computed properties
@@ -460,6 +462,7 @@ const parseContent = async () => {
       parsedData.value = {
         featureCount: data.features?.length || 0,
         geometryTypes:
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           data.features?.map((f: any) => f.geometry?.type).filter(Boolean) ||
           [],
       };

@@ -155,6 +155,7 @@ definePageMeta({
   middleware: ['require-auth', 'require-config-manage'],
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const items = ref<any[]>([]);
 const loading = ref(false);
 const error = ref('');

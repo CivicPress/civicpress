@@ -56,6 +56,7 @@
               {{ record.title }}
             </h4>
             <UBadge
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               :color="getStatusColor(record.status) as any"
               variant="soft"
               size="xs"
@@ -108,6 +109,7 @@ const { $civicApi } = useNuxtApp();
 const { t } = useI18n();
 
 // Reactive state
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const linkedRecords = ref<any[]>([]);
 const loading = ref(false);
 const error = ref('');
@@ -167,6 +169,7 @@ const fetchLinkedRecords = async () => {
 };
 
 // View record
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const viewRecord = (record: any) => {
   router.push(`/records/${record.type}/${record.id}`);
 };

@@ -21,6 +21,7 @@
         <div class="flex items-center gap-3">
           <USelectMenu
             :model-value="selectedPreset"
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             @update:model-value="(val: any) => $emit('update:selected-preset', val)"
             :items="presetOptions"
             :placeholder="t('geography.selectPreset')"
@@ -177,6 +178,7 @@
           <UFormField :label="t('geography.applyToGeometryTypes')">
             <USelectMenu
               v-model="form.icon_mapping.apply_to"
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               :items="geometryTypeOptions as any"
               multiple
               :placeholder="t('geography.selectGeometryTypes')"

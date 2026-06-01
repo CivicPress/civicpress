@@ -3,6 +3,7 @@ import { useDebounceFn } from '@vueuse/core';
 
 interface AutosaveOptions {
   debounceMs?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSave: (data: any) => Promise<void>;
   onError?: (error: Error) => void;
   enabled?: boolean;

@@ -24,6 +24,7 @@ const {
 } = useSearchSuggestions();
 
 // Reactive state
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const organizationInfo = ref<any>(null);
 const recentRecords = ref<CivicRecord[]>([]);
 const loading = ref(true);

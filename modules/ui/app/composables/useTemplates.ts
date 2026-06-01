@@ -154,6 +154,7 @@ export function useTemplates() {
    */
   const previewTemplate = async (
     templateId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ) => {
     loading.value = true;

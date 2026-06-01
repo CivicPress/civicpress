@@ -284,8 +284,11 @@ const canManageConfiguration = computed(() =>
 // Configuration state
 const loading = ref(true);
 const error = ref<string | null>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const configMetadata = ref<any>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const originalConfig = ref<any>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const config = ref<any>({});
 
 // Computed properties
@@ -395,6 +398,7 @@ const getNestedValue = (
   sectionKey: string,
   nestedKey: string,
   subKey: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any => {
   const cfg = config.value?.[sectionKey]?.[nestedKey]?.[subKey];
   if (cfg !== undefined) return normalizeValue(cfg);

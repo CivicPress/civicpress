@@ -5,6 +5,7 @@
  * and reduce code duplication across stores and components.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
@@ -42,6 +43,7 @@ export interface ApiResponse<T = any> {
  * @returns The validated data from the response
  * @throws Error if response is invalid or missing required fields
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function validateApiResponse<T = any>(
   response: unknown,
   requiredFields?: string[]
@@ -85,6 +87,7 @@ export function validateApiResponse<T = any>(
  * @param defaultValue - Default value to return if response is invalid
  * @returns The data or default value
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function safeExtractData<T = any>(
   response: unknown,
   defaultValue: T

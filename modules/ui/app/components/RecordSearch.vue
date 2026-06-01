@@ -85,7 +85,9 @@ const { t } = useI18n();
 
 // Reactive data
 const searchQuery = ref(props.initialFilters.search || '');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const selectedRecordTypes = ref<any[]>([]);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const selectedRecordStatuses = ref<any[]>([]);
 const selectedSort = ref(
   props.sort || (props.isSearching ? 'relevance' : 'created_desc')

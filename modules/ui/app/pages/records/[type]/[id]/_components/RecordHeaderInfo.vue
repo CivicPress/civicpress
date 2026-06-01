@@ -5,6 +5,7 @@ import { useAuthStore } from '~/stores/auth';
 interface Props {
   record: CivicRecord;
   statusDisplay: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formatDate: (input: any) => string;
   getTypeIcon: (type: string) => string;
 }

@@ -212,6 +212,7 @@ defineEmits<{
   'update:show-preview-modal': [value: boolean];
   'update:show-delete-modal': [value: boolean];
   'update:show-bulk-delete-modal': [value: boolean];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   'upload-complete': [files: any[]];
   'upload-error': [error: string];
   'copy-clipboard': [text: string];

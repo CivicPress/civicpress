@@ -282,6 +282,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
     }
 
     return source
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((entry: any) => ({
         status: entry?.status || entry?.value || entry?.name,
         user: entry?.user || entry?.by || entry?.actor || entry?.updated_by,
@@ -464,6 +465,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
 
   const handleStatusChanged = (payload: {
     newStatus: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     record?: any;
   }) => {
     if (record.value) {

@@ -201,6 +201,7 @@ const storageStats = ref({
 });
 const refreshing = ref(false);
 const showUploadModal = ref(false);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const folderConfigs = ref<Record<string, any>>({});
 const loadingFolders = ref(false);
 
@@ -330,6 +331,7 @@ const refreshFolderFiles = async () => {
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleUploadComplete = (uploadedFiles: any[]) => {
   toast.add({
     title: t('settings.storage.uploadComplete'),

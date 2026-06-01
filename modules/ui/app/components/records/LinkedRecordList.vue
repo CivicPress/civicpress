@@ -59,6 +59,7 @@
         <div class="space-y-2">
           <UFormField v-if="editable" :label="t('common.category')" size="xs">
             <USelectMenu
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               :model-value="linkedRecord.category as any"
               :items="getLinkCategoryOptions()"
               :placeholder="t('records.attachments.selectCategory')"
@@ -168,6 +169,7 @@ const updateLinkDescription = (index: number, newDescription: string) => {
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const updateLinkCategory = (index: number, newCategory: any) => {
   const updatedRecords = [...linkedRecords.value];
   const record = updatedRecords[index];

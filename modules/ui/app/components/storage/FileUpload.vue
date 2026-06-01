@@ -402,7 +402,9 @@ const uploadFiles = async () => {
       const formData = new FormData();
       formData.append('file', item.file);
       formData.append('folder', props.folder || '');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((item as any).description) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formData.append('description', (item as any).description);
       }
 

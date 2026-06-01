@@ -12,6 +12,7 @@ export const useLinkCategories = () => {
       )) as ApiResponse;
       if (response.success && response.data.categories) {
         linkCategories.value = Object.entries(response.data.categories).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ([key, category]: [string, any]) => ({
             label:
               key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),

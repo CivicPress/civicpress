@@ -87,6 +87,7 @@
       <div class="flex justify-between items-center">
         <span class="text-sm text-gray-500">
           {{
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (t as any)('common.selected', selectedRecords.length, {
               count: selectedRecords.length,
             })

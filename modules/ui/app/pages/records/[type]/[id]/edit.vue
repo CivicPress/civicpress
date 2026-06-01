@@ -98,6 +98,7 @@ const fetchRecord = async () => {
 };
 
 // Handle form submission (new RecordForm handles this internally via draft/publish)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleSubmit = async (recordData: any) => {
   // The new RecordForm handles draft updates and publishing internally
   // This is kept for backward compatibility but may not be called
@@ -105,6 +106,7 @@ const handleSubmit = async (recordData: any) => {
 };
 
 // Handle record saved - update local record state to reflect changes (e.g., type changes)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleRecordSaved = (recordData: any) => {
   // Mark that changes have been saved (this indicates we're working with a draft)
   hasSavedChanges.value = true;

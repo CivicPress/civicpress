@@ -33,6 +33,7 @@ const emit = defineEmits<{
   'update:linkedGeographyFiles': [value: LinkedGeographyFile[]];
   'update:selectedGeographyIds': [value: string[]];
   'update:showGeographySelector': [value: boolean];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   'geography-selection': [files: any[]];
 }>();
 

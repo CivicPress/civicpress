@@ -126,6 +126,7 @@ const autosaveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle');
 const lastSaved = ref<Date | null>(null);
 
 // Lock state
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const lockInfo = ref<any>(null);
 const isLocked = computed(() => lockInfo.value?.locked || false);
 const lockedBy = computed(() => lockInfo.value?.lockedBy || null);
