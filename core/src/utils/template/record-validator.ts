@@ -344,7 +344,7 @@ export class TemplateRecordValidator {
   private isValidPhone(phone: unknown): boolean {
     if (typeof phone !== 'string') return false;
     if (!phone) return true;
-    return /^[\+]?[1-9][\d]{0,15}$/.test(phone.replace(/[\s\-\(\)]/g, ''));
+    return /^[+]?[1-9][\d]{0,15}$/.test(phone.replace(/[\s\-()]/g, ''));
   }
 
   private isValidDate(date: unknown): boolean {
