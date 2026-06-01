@@ -29,6 +29,12 @@ export interface GeographyValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
+  metadata?: {
+    featureCount: number;
+    bounds: BoundingBox;
+    srid: SRID;
+    geometryTypes: string[];
+  };
 }
 
 /**
@@ -415,18 +421,6 @@ export interface UpdateGeographyRequest {
   metadata?: Partial<GeographyMetadata>;
   color_mapping?: ColorMapping;
   icon_mapping?: IconMapping;
-}
-
-export interface GeographyValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-  metadata?: {
-    featureCount: number;
-    bounds: BoundingBox;
-    srid: SRID;
-    geometryTypes: string[];
-  };
 }
 
 export interface ParsedGeographyData {
