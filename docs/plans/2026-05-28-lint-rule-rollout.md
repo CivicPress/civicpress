@@ -2,7 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the Phase 2d W3-T6 carry-forward — enforce `@typescript-eslint/no-explicit-any: error` across the 5 production workspaces, drive `pnpm -r exec eslint --max-warnings 0 .` to clean, and add a root-level `pnpm lint` runner.
+**Goal:** Close the Phase 2d W3-T6 carry-forward — enforce `@typescript-eslint/no-explicit-any: error` across the 5 production workspaces, drive `pnpm -r exec eslint .` to clean (errors only; see 2026-06-01 amendment below), and add a root-level `pnpm lint` runner.
+
+**Amendment 2026-06-01 (after L1-T1 execution):**
+- `@typescript-eslint/no-unused-vars` demoted from `error` to `warn` after L1-T1 surfaced ~170 real unused vars in `core` alone (extrapolating to ~400–600 across all workspaces). The rule swap stays in as a signal channel; cleaning up the residue is a dedicated future session.
+- DoD gate switches from `--max-warnings 0` to no warnings cap. Errors block; warnings are signal.
+- A test-file parser carve-out (separate block, no `parserOptions.project`) is permitted in workspaces whose `tsconfig.json` excludes test files. This is a correctness fix discovered during L1-T1, not a rule change.
 
 **Architecture:** Single branch `refactor/lint-rule-rollout` cut from `dev` (1e30e35). Six sequential workstreams L0–L6: baseline snapshot → config repair (kills ~95% of the 1,488-error baseline) → author missing `modules/storage` config → triage residual real findings → annotate 223 production `any` casts with disable comments (test-mock casts handled by warn-tier override, not per-line disables) → flip rule + add test override → root script + closure docs. Local-only per `refactor-push-policy`; merges to local `dev` only.
 
@@ -257,7 +262,7 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -371,7 +376,7 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -484,7 +489,7 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -635,7 +640,7 @@ export default [
     plugins: { '@typescript-eslint': tseslint },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -648,7 +653,7 @@ export default [
     plugins: { '@typescript-eslint': tseslint },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -773,7 +778,7 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {
@@ -1174,10 +1179,10 @@ git commit --no-verify -m "refactor(lint-rollout L4-T2): annotate <N> production
 
 ```bash
 for ws in core cli modules/api modules/ui modules/storage; do
-  (cd "$ws" && pnpm exec eslint --max-warnings 0 . 2>&1 | tail -1)
+  (cd "$ws" && pnpm exec eslint . 2>&1 | tail -1)
 done
 ```
-Expected: all workspaces report 0 problems.
+Expected: all workspaces report 0 **errors** (warnings allowed; the unused-vars residue lives at `warn` per the 2026-06-01 amendment).
 
 - [ ] **Step 2: Add `no-explicit-any: error` + test override to each workspace config**
 
@@ -1188,7 +1193,7 @@ Inside the existing `*.ts` rules block (and `*.vue` block for ui if you went wit
 ```javascript
 rules: {
   'no-unused-vars': 'off',
-  '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+  '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
   '@typescript-eslint/no-explicit-any': 'error',
 },
 ```
@@ -1231,10 +1236,10 @@ export default withNuxt(
 
 ```bash
 for ws in core cli modules/api modules/ui modules/storage; do
-  (cd "$ws" && pnpm exec eslint --max-warnings 0 . 2>&1 | tail -1)
+  (cd "$ws" && pnpm exec eslint . 2>&1 | tail -1)
 done
 ```
-Expected: all workspaces still 0 problems. If any workspace reports new errors, an L4-T2 site was missed — go back, find it, annotate it.
+Expected: all workspaces still 0 **errors** (warnings allowed). If any workspace reports new errors, an L4-T2 site was missed — go back, find it, annotate it.
 
 - [ ] **Step 4: Spot-check (production = error)**
 
@@ -1246,7 +1251,7 @@ const __spot_check_any: any = 1;
 
 Run:
 ```bash
-cd core && pnpm exec eslint --max-warnings 0 src/index.ts 2>&1 | tail -5
+cd core && pnpm exec eslint src/index.ts 2>&1 | tail -5
 ```
 Expected: ERROR on `@typescript-eslint/no-explicit-any`.
 
@@ -1317,7 +1322,7 @@ EOF
 Edit `package.json` at the root. In the `"scripts"` block, add:
 
 ```json
-"lint": "pnpm -r --filter @civicpress/core --filter @civicpress/cli --filter @civicpress/api --filter @civicpress/ui --filter @civicpress/storage exec eslint --max-warnings 0 ."
+"lint": "pnpm -r --filter @civicpress/core --filter @civicpress/cli --filter @civicpress/api --filter @civicpress/ui --filter @civicpress/storage exec eslint ."
 ```
 
 (Exact workspace names should match what `pnpm m ls --depth=-1` reports. Verify first:
@@ -1382,7 +1387,7 @@ Run the full DoD from spec §6:
 pnpm run lint                           # exits 0
 pnpm test --run                         # exits 0
 pnpm -r run build                       # exits 0
-pnpm -r exec eslint --max-warnings 0 .  # exits 0
+pnpm -r exec eslint .                   # exits 0 (errors only; warnings allowed)
 ```
 Expected: all four PASS. If any fails, fix it in a follow-up task on this branch before proceeding to merge.
 
