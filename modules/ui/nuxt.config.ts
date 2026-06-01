@@ -11,7 +11,16 @@ export default defineNuxtConfig({
   },
 
   // Modules
-  modules: ['@nuxt/ui', '@pinia/nuxt', '@nuxtjs/i18n'],
+  modules: ['@nuxt/ui', '@pinia/nuxt', '@nuxtjs/i18n', '@nuxt/eslint'],
+
+  // ESLint module configuration
+  // standalone: true (default) — generates full Vue + TypeScript config stack
+  // so withNuxt() can accept our overrides cleanly on top
+  eslint: {
+    config: {
+      standalone: true,
+    },
+  },
   css: ['~/assets/css/main.css'],
 
   // Runtime configuration
