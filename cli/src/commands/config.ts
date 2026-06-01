@@ -178,7 +178,9 @@ export function registerConfigCommands(cli: CAC) {
             options.token,
             globalOptions.json
           );
-        } catch {}
+        } catch {
+          // intentional: auth failure is non-fatal — continue as anonymous
+        }
       }
       try {
         const service = createConfigService();
@@ -265,7 +267,9 @@ export function registerConfigCommands(cli: CAC) {
             options.token,
             globalOptions.json
           );
-        } catch {}
+        } catch {
+          // intentional: auth failure is non-fatal — continue as anonymous
+        }
       }
       try {
         const service = createConfigService();
@@ -394,7 +398,9 @@ export function registerConfigCommands(cli: CAC) {
             options.token,
             globalOptions.json
           );
-        } catch {}
+        } catch {
+          // intentional: auth failure is non-fatal — continue as anonymous
+        }
       }
       try {
         const service = createConfigService();
@@ -462,7 +468,9 @@ export function registerConfigCommands(cli: CAC) {
             options.token,
             globalOptions.json
           );
-        } catch {}
+        } catch {
+          // intentional: auth failure is non-fatal — continue as anonymous
+        }
       }
       try {
         const service = createConfigService();
@@ -562,7 +570,9 @@ export function registerConfigCommands(cli: CAC) {
             options.token,
             globalOptions.json
           );
-        } catch {}
+        } catch {
+          // intentional: auth failure is non-fatal — continue as anonymous
+        }
       }
       try {
         const service = createConfigService();

@@ -198,7 +198,9 @@ router.get('/raw/:type', async (req, res) => {
     let yaml: string | null = null;
     try {
       yaml = await readFile(userPath, 'utf-8');
-    } catch {}
+    } catch {
+      // intentional: user config file may not exist; fall back to defaults below
+    }
     if (!yaml) {
       yaml = await readFile(defaultPath, 'utf-8');
     }
