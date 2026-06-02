@@ -98,7 +98,7 @@ Closed: `api-009`, `ui-011`, `storage-015`.
 
 **Deferred to dedicated lint-hygiene session** (NOT closed in 2d): enable `@typescript-eslint/no-explicit-any: error` per workspace. Reason: ~335 pre-existing lint errors across core/api/storage configs (no-unused-vars, missing `console` globals, missing `eslint.config.cjs` in storage); the lint baseline needs its own triage. Closure of the rule is a stand-alone session; it does not block W4 or Phase 3 entry.
 
-**CLOSED 2026-06-02** on branch `worktree-refactor-lint-rule-rollout` (plan calls it `refactor/lint-rule-rollout`; worktree harness assigned the prefixed name). Merge SHA: `<merge-sha>` (filled in at L-close).
+**CLOSED 2026-06-02** on branch `worktree-refactor-lint-rule-rollout` (plan calls it `refactor/lint-rule-rollout`; worktree harness assigned the prefixed name). Merged to local `dev` via `--no-ff` at `656adb5`.
 
 - Rule `@typescript-eslint/no-explicit-any: error` enforced across all 5 production workspaces (`core`, `cli`, `modules/api`, `modules/ui`, `modules/storage`); `warn` in `**/*.test.ts` + `**/__tests__/**` + `**/*.spec.ts` per-workspace overrides.
 - Baseline 1,488 errors → 0 errors across all workspaces. ~600 warnings remain — `@typescript-eslint/no-unused-vars` was swapped from the JS rule (was running against TS code, ~648 false positives) and demoted to `warn` after L1-T1 surfaced ~170 real unused vars in `core` alone. A dedicated unused-vars cleanup session is left for future work.
