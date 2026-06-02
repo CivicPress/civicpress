@@ -65,6 +65,7 @@ export function registerBackupCommand(cli: CAC): void {
     .option('--overwrite', 'Overwrite existing data when restoring')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (action: string, source: string | undefined, opts: any) => {
       const options = opts as BackupCommandOptions;
       const globalOpts = getGlobalOptionsFromArgs();

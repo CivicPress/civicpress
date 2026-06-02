@@ -74,7 +74,7 @@ export class CredentialManager {
     providerType: string
   ): ProviderCredentials | null {
     switch (providerType) {
-      case 's3':
+      case 's3': {
         const s3AccessKey =
           process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
         const s3SecretKey =
@@ -90,8 +90,9 @@ export class CredentialManager {
           } as S3Credentials;
         }
         break;
+      }
 
-      case 'azure':
+      case 'azure': {
         const azureConnectionString =
           process.env.AZURE_STORAGE_CONNECTION_STRING;
         const azureAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
@@ -110,8 +111,9 @@ export class CredentialManager {
           } as AzureCredentials;
         }
         break;
+      }
 
-      case 'gcs':
+      case 'gcs': {
         const gcsProjectId =
           process.env.GOOGLE_CLOUD_PROJECT || process.env.GCS_PROJECT_ID;
         const gcsKeyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -123,6 +125,7 @@ export class CredentialManager {
           } as GCSCredentials;
         }
         break;
+      }
     }
 
     return null;
@@ -356,6 +359,7 @@ export class CredentialManager {
   /**
    * Mask sensitive information in credentials for logging
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   maskCredentials(credentials: ProviderCredentials): Record<string, any> {
     if ('accessKeyId' in credentials) {
       // S3 credentials

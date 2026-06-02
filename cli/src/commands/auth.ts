@@ -276,6 +276,7 @@ export default function setupAuthCommand(cli: CAC) {
         }
 
         // Get OAuth provider manager to validate token
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const oauthManager = (authService as any).oauthManager;
         const user = await oauthManager.validateToken(
           options.provider,

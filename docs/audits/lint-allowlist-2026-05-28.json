@@ -1,0 +1,518 @@
+[
+  {
+    "file": "core/src/database/database-adapter.ts",
+    "line": 68,
+    "type": "as-any",
+    "snippet": "* SQLite file path) without leaking through `(adapter as any).config`."
+  },
+  {
+    "file": "core/src/records/record-parser.ts",
+    "line": 500,
+    "type": "colon-any",
+    "snippet": "const normalized: any = { ...frontmatter };"
+  },
+  {
+    "file": "core/src/records/record-schema-validator.ts",
+    "line": 27,
+    "type": "as-any",
+    "snippet": "// re-introducing `as any`. This loose shape captures the surface we use."
+  },
+  {
+    "file": "core/src/di/types.ts",
+    "line": 14,
+    "type": "colon-any",
+    "snippet": "export type Class<T = unknown> = new (...args: any[]) => T;"
+  },
+  {
+    "file": "core/src/config/central-config.ts",
+    "line": 305,
+    "type": "colon-any",
+    "snippet": "private static loadYamlIfExists(filePath: string): any | null {"
+  },
+  {
+    "file": "core/src/utils/error-narrow.ts",
+    "line": 4,
+    "type": "colon-any",
+    "snippet": "* Phase 2d W3-T3: introduced when the `catch (X: any)` sweep across"
+  },
+  {
+    "file": "core/src/utils/error-narrow.ts",
+    "line": 48,
+    "type": "as-any",
+    "snippet": "* re-introducing `as any`."
+  },
+  {
+    "file": "core/src/hooks/hook-system.ts",
+    "line": 554,
+    "type": "as-any",
+    "snippet": "* details without re-introducing `as any` access."
+  },
+  {
+    "file": "core/src/diagnostics/resource-monitor.ts",
+    "line": 14,
+    "type": "as-any",
+    "snippet": "* prior `(error as any).code = 'RESOURCE_LIMIT_EXCEEDED'; (error as any).resource = 'memory'`"
+  },
+  {
+    "file": "modules/api/src/middleware/logging.ts",
+    "line": 49,
+    "type": "colon-any",
+    "snippet": "res.end = function (chunk?: any, encoding?: any) {"
+  },
+  {
+    "file": "modules/api/src/types/express-augment.d.ts",
+    "line": 5,
+    "type": "as-any",
+    "snippet": "* the ~254 `(req as any).<X>` access patterns scattered across route"
+  },
+  {
+    "file": "modules/api/src/utils/http-error.ts",
+    "line": 4,
+    "type": "as-any",
+    "snippet": "* Phase 2d W3-T2: replaces the prior `(error as any).statusCode = N;"
+  },
+  {
+    "file": "modules/api/src/utils/http-error.ts",
+    "line": 5,
+    "type": "as-any",
+    "snippet": "* (error as any).code = 'X'; throw error;` mutation idiom that appeared"
+  },
+  {
+    "file": "modules/api/src/utils/http-error.ts",
+    "line": 7,
+    "type": "colon-any",
+    "snippet": "* mutation pattern silently typed `error` as `Error & { statusCode?: any;"
+  },
+  {
+    "file": "modules/api/src/utils/http-error.ts",
+    "line": 8,
+    "type": "colon-any",
+    "snippet": "* code?: any }`, which is exactly what the augmentation was trying to"
+  },
+  {
+    "file": "modules/api/src/utils/http-error.ts",
+    "line": 28,
+    "type": "as-any",
+    "snippet": "* `(error as any).statusCode` access)."
+  },
+  {
+    "file": "modules/api/src/index.ts",
+    "line": 87,
+    "type": "as-any",
+    "snippet": "// error handler can read statusCode without `as any`."
+  },
+  {
+    "file": "modules/api/src/routes/uuid-storage/listing-handlers.ts",
+    "line": 136,
+    "type": "as-any",
+    "snippet": "// `folder: folderName` field was a no-op masked by `as any`."
+  },
+  {
+    "file": "modules/ui/app/app.vue",
+    "line": 68,
+    "type": "colon-any",
+    "snippet": ".then((res: any) => {"
+  },
+  {
+    "file": "modules/ui/app/types/geography.ts",
+    "line": 89,
+    "type": "colon-any",
+    "snippet": "content: any;"
+  },
+  {
+    "file": "modules/ui/app/composables/useAutosave.ts",
+    "line": 6,
+    "type": "colon-any",
+    "snippet": "onSave: (data: any) => Promise<void>;"
+  },
+  {
+    "file": "modules/ui/app/composables/useRecordEditorActions.ts",
+    "line": 42,
+    "type": "colon-any",
+    "snippet": "record?: any;"
+  },
+  {
+    "file": "modules/ui/app/composables/useRecordEditorActions.ts",
+    "line": 64,
+    "type": "colon-any",
+    "snippet": "form: any;"
+  },
+  {
+    "file": "modules/ui/app/composables/useUserRoles.ts",
+    "line": 158,
+    "type": "as-any",
+    "snippet": "return (role as any)?.status_transitions || [];"
+  },
+  {
+    "file": "modules/ui/app/composables/useFileBrowser.ts",
+    "line": 80,
+    "type": "colon-any",
+    "snippet": "files.value = response.data.files.map((apiFile: any) => ({"
+  },
+  {
+    "file": "modules/ui/app/composables/useFileBrowser.ts",
+    "line": 291,
+    "type": "colon-any",
+    "snippet": "const handleUploadComplete = (uploadedFiles: any[]) => {"
+  },
+  {
+    "file": "modules/ui/app/composables/useRecordDetail.ts",
+    "line": 285,
+    "type": "colon-any",
+    "snippet": ".map((entry: any) => ({"
+  },
+  {
+    "file": "modules/ui/app/composables/useRecordDetail.ts",
+    "line": 467,
+    "type": "colon-any",
+    "snippet": "record?: any;"
+  },
+  {
+    "file": "modules/ui/app/stores/records.ts",
+    "line": 95,
+    "type": "colon-any",
+    "snippet": "[key: string]: any;"
+  },
+  {
+    "file": "modules/ui/app/utils/api-response.ts",
+    "line": 13,
+    "type": "as-any",
+    "snippet": "* of UI-side helpers historically expected a bare string (the `as any`"
+  },
+  {
+    "file": "modules/ui/app/utils/api-response.ts",
+    "line": 32,
+    "type": "as-any",
+    "snippet": "* without re-introducing `as any`. Field types are `unknown`, so"
+  },
+  {
+    "file": "modules/ui/app/components/GeographyForm.vue",
+    "line": 104,
+    "type": "colon-any",
+    "snippet": "emit: emit as (event: 'success' | 'cancel', ...args: any[]) => void,"
+  },
+  {
+    "file": "modules/ui/app/components/records/LinkedRecordList.vue",
+    "line": 62,
+    "type": "as-any",
+    "snippet": ":model-value=\"linkedRecord.category as any\""
+  },
+  {
+    "file": "modules/ui/app/components/records/LinkedRecordList.vue",
+    "line": 171,
+    "type": "colon-any",
+    "snippet": "const updateLinkCategory = (index: number, newCategory: any) => {"
+  },
+  {
+    "file": "modules/ui/app/components/records/RecordLinkSelector.vue",
+    "line": 90,
+    "type": "as-any",
+    "snippet": "(t as any)('common.selected', selectedRecords.length, {"
+  },
+  {
+    "file": "modules/ui/app/components/GeographyLinkedRecords.vue",
+    "line": 59,
+    "type": "as-any",
+    "snippet": ":color=\"getStatusColor(record.status) as any\""
+  },
+  {
+    "file": "modules/ui/app/components/GeographyLinkedRecords.vue",
+    "line": 170,
+    "type": "colon-any",
+    "snippet": "const viewRecord = (record: any) => {"
+  },
+  {
+    "file": "modules/ui/app/components/storage/FileUpload.vue",
+    "line": 405,
+    "type": "as-any",
+    "snippet": "if ((item as any).description) {"
+  },
+  {
+    "file": "modules/ui/app/components/storage/FileUpload.vue",
+    "line": 406,
+    "type": "as-any",
+    "snippet": "formData.append('description', (item as any).description);"
+  },
+  {
+    "file": "modules/ui/app/components/storage/FileBrowserPopover.vue",
+    "line": 94,
+    "type": "as-any",
+    "snippet": "{{ (t as any)('common.selected', selectedFiles.length, { count: selectedFiles.length }) }}"
+  },
+  {
+    "file": "modules/ui/app/components/storage/FileBrowserPopover.vue",
+    "line": 174,
+    "type": "as-any",
+    "snippet": ") as any;"
+  },
+  {
+    "file": "modules/ui/app/components/storage/file-browser/FileBrowserModals.vue",
+    "line": 215,
+    "type": "colon-any",
+    "snippet": "'upload-complete': [files: any[]];"
+  },
+  {
+    "file": "modules/ui/app/components/storage/file-browser/FileBrowserList.vue",
+    "line": 135,
+    "type": "as-any",
+    "snippet": "{{ (t as any)('settings.storage.filesSelected', selectedFiles.length, { count: selectedFiles.length }) }}"
+  },
+  {
+    "file": "modules/ui/app/components/RecordPreview.vue",
+    "line": 14,
+    "type": "as-any",
+    "snippet": "return () => clearTimeout(t as any);"
+  },
+  {
+    "file": "modules/ui/app/components/ConfigurationField.vue",
+    "line": 180,
+    "type": "colon-any",
+    "snippet": "value: any;"
+  },
+  {
+    "file": "modules/ui/app/components/ConfigurationField.vue",
+    "line": 186,
+    "type": "colon-any",
+    "snippet": "update: [key: string, value: any];"
+  },
+  {
+    "file": "modules/ui/app/components/ConfigurationField.vue",
+    "line": 276,
+    "type": "colon-any",
+    "snippet": "const updateValue = (newValue: any) => {"
+  },
+  {
+    "file": "modules/ui/app/components/geography-form/GeographyMappingCard.vue",
+    "line": 24,
+    "type": "colon-any",
+    "snippet": "@update:model-value=\"(val: any) => $emit('update:selected-preset', val)\""
+  },
+  {
+    "file": "modules/ui/app/components/geography-form/GeographyMappingCard.vue",
+    "line": 180,
+    "type": "as-any",
+    "snippet": ":items=\"geometryTypeOptions as any\""
+  },
+  {
+    "file": "modules/ui/app/components/geography-form/GeographyBasicInfoCard.vue",
+    "line": 49,
+    "type": "colon-any",
+    "snippet": "@update:model-value=\"(val: any) => (form.category = val)\""
+  },
+  {
+    "file": "modules/ui/app/components/geography-form/GeographyBasicInfoCard.vue",
+    "line": 65,
+    "type": "colon-any",
+    "snippet": "@update:model-value=\"(val: any) => (form.srid = typeof val === 'number' ? val : Number(val))\""
+  },
+  {
+    "file": "modules/ui/app/components/GeographySelector.vue",
+    "line": 81,
+    "type": "as-any",
+    "snippet": ":color=\"getCategoryColor(file.category) as any\""
+  },
+  {
+    "file": "modules/ui/app/components/GeographySelector.vue",
+    "line": 137,
+    "type": "as-any",
+    "snippet": "(t as any)('common.selected', selectedFiles.length, {"
+  },
+  {
+    "file": "modules/ui/app/components/editor/EditorHeader.vue",
+    "line": 300,
+    "type": "as-any",
+    "snippet": "return (t as any)('records.editor.minutesAgo', minutes, { count: minutes });"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/TemplatePanel.vue",
+    "line": 10,
+    "type": "colon-any",
+    "snippet": "templateOptions: any[];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/TemplatePanel.vue",
+    "line": 11,
+    "type": "colon-any",
+    "snippet": "selectedTemplate: any;"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/TemplatePanel.vue",
+    "line": 24,
+    "type": "colon-any",
+    "snippet": "'update:selectedTemplate': [value: any];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 13,
+    "type": "colon-any",
+    "snippet": "selectedType: any;"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 14,
+    "type": "colon-any",
+    "snippet": "recordTypeOptions: any[];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 15,
+    "type": "colon-any",
+    "snippet": "selectedStatus: any;"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 16,
+    "type": "colon-any",
+    "snippet": "statusOptions: any[];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 17,
+    "type": "colon-any",
+    "snippet": "selectedWorkflowState: any;"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 18,
+    "type": "colon-any",
+    "snippet": "workflowStateOptions: any[];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 28,
+    "type": "colon-any",
+    "snippet": "'update:selectedType': [value: any];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 29,
+    "type": "colon-any",
+    "snippet": "'update:selectedStatus': [value: any];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/DetailsPanel.vue",
+    "line": 30,
+    "type": "colon-any",
+    "snippet": "'update:selectedWorkflowState': [value: any];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/record-sidebar/RelationsPanel.vue",
+    "line": 36,
+    "type": "colon-any",
+    "snippet": "'geography-selection': [files: any[]];"
+  },
+  {
+    "file": "modules/ui/app/components/editor/EditorToolbar.vue",
+    "line": 31,
+    "type": "colon-any",
+    "snippet": "const handleAction = (action: string, ...args: any[]) => {"
+  },
+  {
+    "file": "modules/ui/app/components/editor/RecordSidebar.vue",
+    "line": 100,
+    "type": "as-any",
+    "snippet": "emit: emit as any,"
+  },
+  {
+    "file": "modules/ui/app/components/editor/EditorAttachments.vue",
+    "line": 57,
+    "type": "as-any",
+    "snippet": "description: (t as any)('records.filesAttachedToRecord', files.length, {"
+  },
+  {
+    "file": "modules/ui/app/components/RecordList.vue",
+    "line": 175,
+    "type": "colon-any",
+    "snippet": "const handlePageSizeChange = (value: any) => {"
+  },
+  {
+    "file": "modules/ui/app/pages/settings/configuration/index.vue",
+    "line": 251,
+    "type": "colon-any",
+    "snippet": "const items = entries.map(([type, result]: any) => ({"
+  },
+  {
+    "file": "modules/ui/app/pages/settings/configuration/index.vue",
+    "line": 262,
+    "type": "colon-any",
+    "snippet": "const allValid = items.every((i: any) => i.status === 'success');"
+  },
+  {
+    "file": "modules/ui/app/pages/settings/configuration/[configFile]/edit.vue",
+    "line": 398,
+    "type": "colon-any",
+    "snippet": "): any => {"
+  },
+  {
+    "file": "modules/ui/app/pages/settings/storage/index.vue",
+    "line": 333,
+    "type": "colon-any",
+    "snippet": "const handleUploadComplete = (uploadedFiles: any[]) => {"
+  },
+  {
+    "file": "modules/ui/app/pages/settings/users/index.vue",
+    "line": 161,
+    "type": "as-any",
+    "snippet": ":color=\"getRoleColor(user.role) as any\""
+  },
+  {
+    "file": "modules/ui/app/pages/settings/users/new.vue",
+    "line": 28,
+    "type": "colon-any",
+    "snippet": "const handleSubmit = async (userData: any) => {"
+  },
+  {
+    "file": "modules/ui/app/pages/settings/users/[username]/edit.vue",
+    "line": 81,
+    "type": "colon-any",
+    "snippet": "const handleSubmit = async (userData: any) => {"
+  },
+  {
+    "file": "modules/ui/app/pages/records/[type]/new.vue",
+    "line": 26,
+    "type": "colon-any",
+    "snippet": "const handleSubmit = async (recordData: any) => {"
+  },
+  {
+    "file": "modules/ui/app/pages/records/[type]/[id]/_components/RecordDetailAccordion.vue",
+    "line": 39,
+    "type": "colon-any",
+    "snippet": "statusChanged: [payload: { newStatus: string; record?: any }];"
+  },
+  {
+    "file": "modules/ui/app/pages/records/[type]/[id]/_components/AdditionalInfoPanel.vue",
+    "line": 40,
+    "type": "as-any",
+    "snippet": "v-for=\"(attendee, attendeeIndex) in (entry.value as any[])\""
+  },
+  {
+    "file": "modules/ui/app/pages/records/[type]/[id]/_components/RecordHeaderInfo.vue",
+    "line": 8,
+    "type": "colon-any",
+    "snippet": "formatDate: (input: any) => string;"
+  },
+  {
+    "file": "modules/ui/app/pages/records/[type]/[id]/edit.vue",
+    "line": 101,
+    "type": "colon-any",
+    "snippet": "const handleSubmit = async (recordData: any) => {"
+  },
+  {
+    "file": "modules/ui/app/pages/records/[type]/[id]/edit.vue",
+    "line": 108,
+    "type": "colon-any",
+    "snippet": "const handleRecordSaved = (recordData: any) => {"
+  },
+  {
+    "file": "modules/ui/app/pages/geography/[id]/index.vue",
+    "line": 360,
+    "type": "colon-any",
+    "snippet": "metadata?: any;"
+  },
+  {
+    "file": "modules/ui/app/pages/geography/[id]/index.vue",
+    "line": 463,
+    "type": "colon-any",
+    "snippet": "data.features?.map((f: any) => f.geometry?.type).filter(Boolean) ||"
+  }
+]

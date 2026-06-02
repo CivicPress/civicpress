@@ -542,7 +542,9 @@ async function getChangedFiles(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRecordMetadata(content: string): Record<string, any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   // Extract frontmatter

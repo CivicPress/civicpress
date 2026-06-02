@@ -148,6 +148,7 @@ export interface CacheConfig {
 /**
  * Unified cache interface for all caching implementations
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ICacheStrategy<T extends {} = any> {
   /**
    * Get value from cache

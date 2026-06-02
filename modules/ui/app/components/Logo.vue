@@ -22,6 +22,7 @@ const sizeClasses = {
 
 // Get organization info from the store or composable
 const { $civicApi } = useNuxtApp();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const organizationInfo = ref<any>(null);
 
 // Fetch organization info if not already available

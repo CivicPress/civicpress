@@ -8,6 +8,7 @@ export interface CliOutputOptions {
   verbose?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface CliSuccessOutput<T = any> {
   success: true;
   data: T;
@@ -15,6 +16,7 @@ export interface CliSuccessOutput<T = any> {
   meta?: {
     operation?: string;
     duration?: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
 }
@@ -24,6 +26,7 @@ export interface CliErrorOutput {
   error: {
     message: string;
     code?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     details?: any;
   };
 }
@@ -87,6 +90,7 @@ export class CliOutput {
   error(
     message: string,
     code?: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     details?: any,
     operation?: string
   ): void {
@@ -154,6 +158,7 @@ export class CliOutput {
   }
 
   // Debug output (only in verbose mode)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug(message: string, data?: any, operation?: string): void {
     if (this.options.silent || !this.options.verbose) return;
 
@@ -185,6 +190,7 @@ export class CliOutput {
   }
 
   // Table output (for structured data)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   table<T extends Record<string, any>>(
     data: T[],
     headers?: (keyof T)[],
@@ -294,6 +300,7 @@ export function cliSuccess<T>(
 export function cliError(
   message: string,
   code?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: any,
   operation?: string
 ): void {
@@ -310,6 +317,7 @@ export function cliWarn(message: string, operation?: string): void {
 
 export function cliDebug(
   message: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any,
   operation?: string
 ): void {
@@ -320,6 +328,7 @@ export function cliProgress(message: string, operation?: string): void {
   cliOutput.progress(message, operation);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function cliTable<T extends Record<string, any>>(
   data: T[],
   headers?: (keyof T)[],

@@ -138,6 +138,7 @@ async function loadStatus() {
     )) as ConfigEnvelope<Record<string, 'default' | 'user' | 'missing'>>;
     if (res?.success) status.value = res.data || {};
   } catch {
+    // intentional: config status fetch failure is non-fatal; status stays empty
   } finally {
     loading.value = false;
   }

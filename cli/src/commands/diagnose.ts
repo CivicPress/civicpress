@@ -47,6 +47,7 @@ export function registerDiagnoseCommand(cli: CAC) {
     .option('--no-cache', 'Disable result caching')
     .option('--force', 'Force fixes in production (use with caution)')
     .option('--dry-run', 'Simulate fixes without applying')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (component: string, options: any) => {
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
@@ -244,6 +245,7 @@ function registerComponentCommands(cli: CAC) {
       .option('--format <format>', 'Output format', { default: 'human' })
       .option('--force', 'Force fixes in production')
       .option('--dry-run', 'Simulate fixes without applying')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .action(async (options: any) => {
         const globalOptions = getGlobalOptionsFromArgs();
         initializeCliOutput(globalOptions);
@@ -367,8 +369,10 @@ function registerComponentCommands(cli: CAC) {
  * Output diagnostic result in specified format
  */
 async function outputDiagnosticResult(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
   format: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOptions: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): Promise<void> {
@@ -391,8 +395,10 @@ async function outputDiagnosticResult(
  * Output diagnostic report in specified format
  */
 async function outputDiagnosticReport(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   report: any,
   format: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOptions: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): Promise<void> {
@@ -415,6 +421,7 @@ async function outputDiagnosticReport(
  * Output human-readable diagnostic result
  */
 function outputHumanReadable(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): void {
@@ -514,12 +521,14 @@ function outputHumanReadable(
         }
         // Show memory details
         if (issue.details.systemMemory) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const mem = issue.details.systemMemory as any;
           cliRaw(
             `     System Memory: ${mem.usedGB}GB / ${mem.totalGB}GB used (${mem.usagePercent}), ${mem.freeGB}GB free`
           );
         }
         if (issue.details.processMemory) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const proc = issue.details.processMemory as any;
           if (proc.heapUsedMB && proc.heapTotalMB) {
             cliRaw(
@@ -532,6 +541,7 @@ function outputHumanReadable(
         }
         // Show CPU load details
         if (issue.details.loadAverage) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const load = issue.details.loadAverage as any;
           cliRaw(
             `     Load Average: ${load['1min']} (1min), ${load['5min']} (5min), ${load['15min']} (15min)`
@@ -581,6 +591,7 @@ function outputHumanReadable(
         cliRaw(`     ${check.message}`);
       }
       if (check.details && typeof check.details === 'object') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const details = check.details as any;
         if (details.missing && Array.isArray(details.missing)) {
           cliRaw(`     Missing: ${details.missing.join(', ')}`);
@@ -656,6 +667,7 @@ function outputHumanReadable(
  * Output human-readable diagnostic report
  */
 function outputHumanReadableReport(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   report: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): void {
@@ -696,8 +708,11 @@ function outputHumanReadableReport(
  */
 async function handleAutoFix(
   diagnosticService: DiagnosticService,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   issues: any[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOptions: any
 ): Promise<void> {
   if (globalOptions.json || globalOptions.silent) {
@@ -758,6 +773,7 @@ async function handleAutoFix(
         }
         // Check for recommendation property (may be in error.details or as a direct property)
         const recommendation =
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (result as any).recommendation ||
           result.error?.details?.recommendation;
         if (recommendation) {
@@ -780,6 +796,7 @@ async function handleAutoFix(
 /**
  * Prompt user for auto-fix confirmation
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function confirmAutoFix(issues: any[]): Promise<boolean> {
   return new Promise((resolve) => {
     const rl = readline.createInterface({

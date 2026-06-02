@@ -23,6 +23,7 @@ const { getRecordTypeLabel } = useRecordTypes();
 const recordTypeLabel = computed(() => getRecordTypeLabel(type));
 
 // Handle form submission
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleSubmit = async (recordData: any) => {
   saving.value = true;
   error.value = '';

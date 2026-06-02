@@ -77,6 +77,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
 
       if (response.success) {
         // Map API response to FileInfo interface
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         files.value = response.data.files.map((apiFile: any) => ({
           id: apiFile.id,
           name: apiFile.original_name,
@@ -288,6 +289,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
     openBulkDeleteModal();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleUploadComplete = (uploadedFiles: any[]) => {
     toast.add({
       title: t('settings.storage.uploadComplete'),

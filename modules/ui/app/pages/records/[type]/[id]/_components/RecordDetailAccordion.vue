@@ -36,6 +36,7 @@ defineProps<Props>();
 
 defineEmits<{
   download: [fileId: string, fileName: string];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   statusChanged: [payload: { newStatus: string; record?: any }];
 }>();
 </script>

@@ -20,9 +20,11 @@ import {
 } from '../utils/cli-output.js';
 
 // Deep-normalize metadata-shaped values { value, type, ... } -> value
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeMetadata<T = any>(input: any): T {
   if (input == null) return input as T;
   if (Array.isArray(input))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return input.map((i) => normalizeMetadata(i)) as any;
   if (typeof input === 'object') {
     // If this looks like a metadata field, unwrap its value
@@ -37,8 +39,10 @@ function normalizeMetadata<T = any>(input: any): T {
           k === 'value'
       )
     ) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return normalizeMetadata((input as any).value) as T;
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const out: any = {};
     for (const [k, v] of Object.entries(input)) {
       out[k] = normalizeMetadata(v);
@@ -60,7 +64,9 @@ function normalizeMetadata<T = any>(input: any): T {
 type CliEmailAdapterInput = {
   enabled: boolean;
   provider: 'sendgrid' | 'smtp' | 'nodemailer';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credentials: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   settings?: Record<string, any>;
 };
 
@@ -98,6 +104,7 @@ function buildEmailChannelAdapter(input: CliEmailAdapterInput) {
     isEnabled(): boolean {
       return normalized.enabled === true;
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async send(request: any) {
       try {
         const normalizedRequest = normalizeMetadata(request);
@@ -176,7 +183,9 @@ export default function notifyCommand(cli: CAC) {
         // Create and register email channel (adapter around canonical
         // EmailChannel from @civicpress/core).
         const rawCreds =
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (emailConfig as any)[provider as any] ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (emailConfig as any).sendgrid;
         const emailChannel = buildEmailChannelAdapter({
           enabled: emailConfig.enabled,
@@ -185,6 +194,7 @@ export default function notifyCommand(cli: CAC) {
           settings: {},
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         notificationService.registerChannel('email', emailChannel as any);
 
         // Handle template-based sending

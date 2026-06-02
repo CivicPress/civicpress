@@ -20,9 +20,6 @@ const NODE_GLOBALS = {
   clearImmediate: 'readonly',
   URL: 'readonly',
   URLSearchParams: 'readonly',
-  // Node.js 15+ / Web APIs also available in Node
-  AbortSignal: 'readonly',
-  performance: 'readonly',
   // @types/node TypeScript namespace (type-level, no-undef can't distinguish)
   NodeJS: 'readonly',
 };
@@ -89,4 +86,4 @@ module.exports = [
       globals: NODE_GLOBALS,
     },
   },
-]; 
+];

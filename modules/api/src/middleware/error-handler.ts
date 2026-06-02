@@ -14,6 +14,7 @@ export interface ApiError extends Error {
   statusCode?: number;
   isOperational?: boolean;
   code?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context?: Record<string, any>;
 }
 
@@ -144,6 +145,7 @@ export function errorHandler(
   let statusCode: number;
   let message: string;
   let errorCode: string | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let errorContext: Record<string, any> | undefined;
   let correlationId: string | undefined;
 
@@ -264,6 +266,7 @@ export function createApiError(
   message: string,
   statusCode: number = 500,
   code?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context?: Record<string, any>
 ): ApiError {
   const error = new Error(message) as ApiError;

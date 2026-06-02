@@ -355,6 +355,7 @@ class EmitHooksStep extends BaseSagaStep<ArchiveRecordContext, boolean> {
 export class ArchiveRecordSaga implements Saga<ArchiveRecordContext, boolean> {
   name = 'ArchiveRecord';
   version = '1.0.0';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps: SagaStep<ArchiveRecordContext, any>[];
 
   constructor(

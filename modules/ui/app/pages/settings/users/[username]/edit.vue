@@ -78,6 +78,7 @@ const fetchUser = async () => {
 };
 
 // Handle form submission
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleSubmit = async (userData: any) => {
   saving.value = true;
   formError.value = null;

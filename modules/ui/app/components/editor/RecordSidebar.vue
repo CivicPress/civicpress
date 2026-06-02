@@ -39,6 +39,7 @@ interface Props {
     name: string;
     description?: string;
   }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   disabled?: boolean;
   isEditing?: boolean;
@@ -97,6 +98,7 @@ const {
   accordionItems,
 } = useRecordSidebar({
   props,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emit: emit as any,
   t,
 });

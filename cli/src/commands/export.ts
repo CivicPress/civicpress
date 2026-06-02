@@ -50,6 +50,7 @@ interface ExportRecord {
   updated: string;
   author: string;
   content?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>;
 }
 

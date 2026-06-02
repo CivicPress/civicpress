@@ -101,6 +101,7 @@ const {
   applyPreset,
 } = useGeographyForm({
   props,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   emit: emit as (event: 'success' | 'cancel', ...args: any[]) => void,
   t,
 });

@@ -51,8 +51,6 @@ export interface IndexingOptions {
   conflictResolution?: 'file-wins' | 'database-wins' | 'manual' | 'timestamp';
 }
 
-/* global console */
-
 export class IndexingService {
   private civicPress: CivicPress;
   private dataDir: string;

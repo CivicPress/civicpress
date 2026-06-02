@@ -77,6 +77,7 @@
               >
                 {{ file.name }}
               </p>
+              <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
               <UBadge
                 :color="getCategoryColor(file.category) as any"
                 variant="soft"
@@ -132,6 +133,7 @@
       class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0"
     >
       <div class="flex justify-between items-center">
+        <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
         <span class="text-sm text-gray-500">
           {{
             (t as any)('common.selected', selectedFiles.length, {

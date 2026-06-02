@@ -7,6 +7,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const activities = ref<any[]>([]);
 const loading = ref(false);
 

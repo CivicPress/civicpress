@@ -36,6 +36,7 @@ const { t } = useI18n();
             "
           >
             <ul class="space-y-2">
+              <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
               <li
                 v-for="(attendee, attendeeIndex) in (entry.value as any[])"
                 :key="attendeeIndex"

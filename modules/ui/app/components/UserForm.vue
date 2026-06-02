@@ -457,6 +457,7 @@ const roleOptions = computed(() => {
   }));
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const roleOptionsSelect = ref<any>(null);
 
 // Initialize form with user data if editing

@@ -54,6 +54,7 @@ export class DependencyResolver {
    * @param constructor - Class constructor
    * @returns Array of dependency keys (empty for now, requires manual specification)
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   extractDependencies(constructor: Class<any>): Array<string | Class<any>> {
     // TODO: In the future, this could use:
     // - TypeScript decorators (@Inject('key'))
@@ -72,6 +73,7 @@ export class DependencyResolver {
    * @throws MissingDependencyError if any dependency is not registered
    */
   validateDependencies(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dependencies: Array<string | Class<any>>,
     container: ServiceContainer
   ): void {

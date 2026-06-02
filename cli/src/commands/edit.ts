@@ -27,6 +27,7 @@ export const editCommand = (cli: CAC) => {
     .option('--token <token>', 'Session token for authentication')
     .option('-e, --editor <editor>', 'Specify editor (code, vim, nano, etc.)')
     .option('--dry-run', 'Show what would be done without opening the editor')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (recordName: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();

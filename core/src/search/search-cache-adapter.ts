@@ -20,6 +20,7 @@ export interface CachedSearchResult<T> {
  * Search cache adapter - maintains backward compatibility with SearchCache API
  * while using unified cache from UnifiedCacheManager
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class SearchCacheAdapter<T = any> {
   private cache: ICacheStrategy<CachedSearchResult<T>>;
   private readonly defaultTTL: number;
@@ -49,6 +50,7 @@ export class SearchCacheAdapter<T = any> {
   /**
    * Generate cache key from query and options
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   generateKey(query: string, options: Record<string, any> = {}): string {
     const normalizedQuery = query.toLowerCase().trim();
     const optionsKey = JSON.stringify(
@@ -61,6 +63,7 @@ export class SearchCacheAdapter<T = any> {
             }
             return acc;
           },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {} as Record<string, any>
         )
     );

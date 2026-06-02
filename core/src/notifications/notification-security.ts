@@ -66,6 +66,7 @@ export class NotificationSecurity {
   /**
    * Sanitize content to remove PII
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sanitizeContent(data: Record<string, any>): Record<string, any> {
     const sanitized = { ...data };
 
@@ -140,7 +141,7 @@ export class NotificationSecurity {
    * Validate phone number
    */
   validatePhone(phone: string): boolean {
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
     return phoneRegex.test(phone);
   }
 

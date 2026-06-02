@@ -124,6 +124,7 @@ export class ServiceContainer {
   registerClass<T>(
     key: string | Class<T>,
     constructor: Class<T>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dependencies: Array<string | Class<any>> = [],
     lifetime: ServiceLifetime = ServiceLifetime.Singleton
   ): void {
@@ -239,6 +240,7 @@ export class ServiceContainer {
    * @param key - Service key
    * @returns True if service is registered
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   isRegistered(key: string | Class<any>): boolean {
     return this.registry.has(key);
   }
@@ -248,6 +250,7 @@ export class ServiceContainer {
    *
    * @returns Array of registered keys
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getRegisteredKeys(): Array<string | Class<any>> {
     return this.registry.getRegisteredKeys();
   }
@@ -286,6 +289,7 @@ export class ServiceContainer {
     const nodes: DependencyGraphNode[] = [];
     const edges: DependencyGraphEdge[] = [];
     const circular: Array<string[]> = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const keyToName = new Map<string | Class<any>, string>();
 
     // First pass: collect all nodes and create name mapping

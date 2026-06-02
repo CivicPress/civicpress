@@ -86,6 +86,7 @@ export interface GeographyValidationResult {
 
 export interface ParsedGeographyData {
   type: GeographyFileType;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any;
   bounds: BoundingBox;
   srid: number;

@@ -550,6 +550,7 @@ export class SagaExecutor {
    * Check if step is critical (compensation failure requires manual intervention)
    */
   private isCriticalStep<TContext extends SagaContext>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     step: SagaStep<TContext, any>
   ): boolean {
     // Git commits are always critical

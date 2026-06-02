@@ -65,6 +65,7 @@ onMounted(() => {
     if (!api) return;
 
     api('/api/v1/info')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((res: any) => {
         if (!res?.success || !res?.analytics) return;
 

@@ -25,6 +25,7 @@ const {
 } = useRecordUtils();
 
 // Reactive state
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const drafts = ref<any[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);

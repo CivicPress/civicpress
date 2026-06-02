@@ -19,6 +19,7 @@
       >
         <h4 class="text-md font-medium">{{ t('geography.applyPreset') }}</h4>
         <div class="flex items-center gap-3">
+          <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
           <USelectMenu
             :model-value="selectedPreset"
             @update:model-value="(val: any) => $emit('update:selected-preset', val)"
@@ -175,6 +176,7 @@
           </UFormField>
 
           <UFormField :label="t('geography.applyToGeometryTypes')">
+            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <USelectMenu
               v-model="form.icon_mapping.apply_to"
               :items="geometryTypeOptions as any"

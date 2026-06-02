@@ -230,6 +230,7 @@ export function createStatusRouter() {
 async function getRecordStatistics(
   dataDir: string,
   filterType?: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
   if (!fs.existsSync(recordsDir)) {
@@ -246,10 +247,13 @@ async function getRecordStatistics(
 
   const stats = {
     totalRecords: 0,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     byType: {} as Record<string, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     byStatus: {} as Record<string, any>,
     archive: {
       totalRecords: 0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       byType: {} as Record<string, any>,
     },
   };

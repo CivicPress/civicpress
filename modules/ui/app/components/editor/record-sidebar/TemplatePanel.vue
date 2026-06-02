@@ -7,7 +7,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface Props {
   recordType?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   templateOptions: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   selectedTemplate: any;
   disabled?: boolean;
   templatesLoading?: boolean;
@@ -21,6 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   'update:selectedTemplate': [value: any];
   'preview-template': [];
   'load-template': [];

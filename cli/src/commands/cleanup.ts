@@ -26,6 +26,7 @@ export const cleanupCommand = (cli: CAC) => {
 
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       // Initialize CLI output with global options
       const globalOpts = getGlobalOptionsFromArgs();

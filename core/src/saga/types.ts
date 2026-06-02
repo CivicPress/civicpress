@@ -29,6 +29,7 @@ export interface SagaContext {
   /** Timestamp when saga started */
   startedAt: Date;
   /** Additional metadata */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -59,6 +60,7 @@ export interface Saga<TContext extends SagaContext, TFinalResult> {
   /** Saga version for migration support */
   version?: string;
   /** Steps to execute in order */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps: SagaStep<TContext, any>[];
   /** Optional context validation */
   validateContext?(context: TContext): ValidationResult;

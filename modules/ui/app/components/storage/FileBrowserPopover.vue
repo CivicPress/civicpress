@@ -91,6 +91,7 @@
     <div class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
       <div class="flex items-center justify-between">
         <p class="text-sm text-gray-500">
+          <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
           {{ (t as any)('common.selected', selectedFiles.length, { count: selectedFiles.length }) }}
         </p>
         <div class="flex space-x-2">
@@ -143,6 +144,7 @@ const emit = defineEmits<{
 const loading = ref(false);
 const files = ref<FileInfo[]>([]);
 const selectedFiles = ref<string[]>([]);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const selectedFolder = ref<any>(null);
 
 // Composables
@@ -171,6 +173,7 @@ const loadFiles = async () => {
   try {
     const response = await useNuxtApp().$civicApi(
       `/api/v1/storage/folders/${selectedFolder.value.value}/files`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ) as any;
 
     if (response.success) {

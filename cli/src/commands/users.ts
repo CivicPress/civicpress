@@ -345,6 +345,7 @@ export default function setupUsersCommand(cli: CAC) {
         }
         const authService = civic.getAuthService();
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updates: any = {};
         if (email) updates.email = email;
         if (name) updates.name = name;
@@ -746,6 +747,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error changing password',
@@ -907,6 +909,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error setting password',
@@ -1060,6 +1063,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error requesting email change',
@@ -1123,6 +1127,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error verifying email',
@@ -1251,6 +1256,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error cancelling email change',
@@ -1374,6 +1380,7 @@ export default function setupUsersCommand(cli: CAC) {
         });
 
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error getting security info',

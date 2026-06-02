@@ -61,6 +61,7 @@ export interface CreateRecordRequest {
   title: string;
   type: string;
   content?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   status?: string; // Legal status (stored in YAML + DB)
   workflowState?: string; // Internal editorial status (DB-only, never in YAML)
@@ -119,6 +120,7 @@ export interface UpdateRecordRequest {
   skipFileGeneration?: boolean; // Skip file generation/updates
   skipAudit?: boolean; // Skip audit logging (for sync operations)
   skipHooks?: boolean; // Skip hook emissions (for sync operations)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   geography?: Geography;
   attachedFiles?: Array<{
@@ -378,6 +380,7 @@ export class CivicPress {
    * @param key - Service key (string or class constructor)
    * @returns Service instance
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getService<T>(key: string | any): T {
     return this.container.resolve<T>(key);
   }

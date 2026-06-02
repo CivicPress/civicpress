@@ -80,6 +80,7 @@ export function requireRecordPath(
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parseRecordMetadata(content: string): Record<string, any> {
   const metadataMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
   if (!metadataMatch) {
@@ -87,6 +88,7 @@ export function parseRecordMetadata(content: string): Record<string, any> {
   }
 
   const metadataLines = metadataMatch[1].split('\n');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   for (const line of metadataLines) {

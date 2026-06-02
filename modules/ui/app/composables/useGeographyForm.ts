@@ -471,6 +471,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
     }
 
     // Initialize icons with empty URLs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const icons: Record<string, any> = {};
     values.forEach((value) => {
       icons[value] = {
