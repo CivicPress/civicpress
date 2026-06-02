@@ -132,8 +132,7 @@
               class="w-5 h-5 text-blue-600"
             />
             <span class="text-sm font-medium text-blue-700">
-              <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
-              {{ (t as any)('settings.storage.filesSelected', selectedFiles.length, { count: selectedFiles.length }) }}
+              {{ tPlural('settings.storage.filesSelected', selectedFiles.length) }}
             </span>
           </div>
 
@@ -188,6 +187,7 @@
 
 <script setup lang="ts">
 import type { FileInfo } from '~/composables/useFileBrowser';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
 interface Props {
   loading: boolean;
@@ -224,7 +224,7 @@ defineEmits<{
   'page-change': [];
 }>();
 
-const { t } = useI18n();
+const { t, tPlural } = useTypedI18n();
 </script>
 
 <style scoped>

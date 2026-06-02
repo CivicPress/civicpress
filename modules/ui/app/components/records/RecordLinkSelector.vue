@@ -85,13 +85,8 @@
       class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0"
     >
       <div class="flex justify-between items-center">
-        <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
         <span class="text-sm text-gray-500">
-          {{
-            (t as any)('common.selected', selectedRecords.length, {
-              count: selectedRecords.length,
-            })
-          }}
+          {{ tPlural('common.selected', selectedRecords.length) }}
         </span>
         <div class="flex space-x-2">
           <UButton
@@ -118,6 +113,7 @@
 
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
 interface LinkedRecord {
   id: string;
@@ -141,7 +137,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 // Composables
-const { t } = useI18n();
+const { t, tPlural } = useTypedI18n();
 
 // Store
 const recordsStore = useRecordsStore();
