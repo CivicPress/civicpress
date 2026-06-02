@@ -55,9 +55,8 @@
             <h4 class="font-medium text-gray-900 dark:text-white truncate">
               {{ record.title }}
             </h4>
-            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <UBadge
-              :color="getStatusColor(record.status) as any"
+              :color="getStatusColor(record.status)"
               variant="soft"
               size="xs"
             >
@@ -93,6 +92,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import type { NuxtUiColor } from '~/types/nuxt-ui-bridge';
 import { useRouter } from 'vue-router';
 import { useNuxtApp } from '#imports';
 
@@ -129,16 +129,16 @@ const getTypeIcon = (type: string) => {
   return icons[type] || 'i-lucide-file';
 };
 
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    draft: 'gray',
-    published: 'green',
-    archived: 'orange',
-    pending: 'yellow',
-    approved: 'green',
-    rejected: 'red',
+const getStatusColor = (status: string): NuxtUiColor => {
+  const colors: Record<string, NuxtUiColor> = {
+    draft: 'neutral',
+    published: 'success',
+    archived: 'warning',
+    pending: 'warning',
+    approved: 'success',
+    rejected: 'error',
   };
-  return colors[status] || 'gray';
+  return colors[status] || 'neutral';
 };
 
 const formatDate = (dateString: string) => {

@@ -77,9 +77,8 @@
               >
                 {{ file.name }}
               </p>
-              <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
               <UBadge
-                :color="getCategoryColor(file.category) as any"
+                :color="getCategoryColor(file.category)"
                 variant="soft"
                 size="xs"
               >
@@ -167,6 +166,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import type { ApiResponse } from '~/utils/api-response';
+import type { NuxtUiColor } from '~/types/nuxt-ui-bridge';
 import { useDebounceFn } from '@vueuse/core';
 import type { GeographyFile, GeographyCategory } from '~/types/geography';
 
@@ -284,16 +284,16 @@ const clearSelection = () => {
   emit('update:selected-ids', []);
 };
 
-const getCategoryColor = (category: string) => {
-  const colors = {
-    Reference: 'blue',
-    Financial: 'green',
-    Legal: 'purple',
-    Planning: 'orange',
-    Environmental: 'emerald',
-    Infrastructure: 'gray',
+const getCategoryColor = (category: string): NuxtUiColor => {
+  const colors: Record<string, NuxtUiColor> = {
+    Reference: 'info',
+    Financial: 'success',
+    Legal: 'secondary',
+    Planning: 'warning',
+    Environmental: 'success',
+    Infrastructure: 'neutral',
   };
-  return colors[category as keyof typeof colors] || 'neutral';
+  return colors[category] || 'neutral';
 };
 
 const formatDate = (dateString: string) => {

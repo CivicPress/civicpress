@@ -157,9 +157,8 @@ onMounted(() => {
                       {{ user.email || user.username }}
                     </p>
                     <div class="flex items-center gap-2 mt-2">
-                      <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
                       <UBadge
-                        :color="getRoleColor(user.role) as any"
+                        :color="getRoleColor(user.role)"
                         variant="soft"
                         size="sm"
                       >
