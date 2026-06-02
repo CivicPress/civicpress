@@ -230,7 +230,7 @@ export class FileWatcherCache<T extends {} = any> implements ICacheStrategy<T> {
   /**
    * Handle file change event
    */
-  private handleFileChange(filePath: string, eventType: string): void {
+  private handleFileChange(filePath: string, _eventType: string): void {
     // Debounce rapid changes
     const existingTimer = this.debounceTimers.get(filePath);
     if (existingTimer) {

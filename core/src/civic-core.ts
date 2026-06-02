@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { ConfigDiscovery } from './config/config-discovery.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
 import { GitEngine } from './git/git-engine.js';
@@ -9,7 +8,6 @@ import { RecordManager } from './records/record-manager.js';
 import { TemplateEngine } from './utils/template-engine.js';
 import { IndexingService } from './indexing/indexing-service.js';
 import { Logger } from './utils/logger.js';
-import { coreOutput } from './utils/core-output.js';
 import {
   NotificationService,
   NotificationConfig,
@@ -17,10 +15,7 @@ import {
 import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { Geography } from './types/geography.js';
 import { ServiceContainer } from './di/container.js';
-import {
-  registerCivicPressServices,
-  completeServiceInitialization,
-} from './civic-core-services.js';
+import { registerCivicPressServices } from './civic-core-services.js';
 import { SecretsManager } from './security/secrets.js';
 
 export interface CivicPressConfig {

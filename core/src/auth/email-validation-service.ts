@@ -1,10 +1,7 @@
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database-service.js';
 import type { SqlParam } from '../database/database-adapter.js';
-import type {
-  UserRow,
-  EmailVerificationRow,
-} from '../database/types/row-types.js';
+import type { UserRow } from '../database/types/row-types.js';
 import { Logger } from '../utils/logger.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { NotificationConfig } from '../notifications/notification-config.js';

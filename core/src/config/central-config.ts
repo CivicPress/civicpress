@@ -13,7 +13,6 @@ import {
   DEFAULT_RECORD_STATUSES,
   validateRecordStatusConfig,
   mergeRecordStatuses,
-  getRecordStatusesWithMetadata,
 } from './record-statuses.js';
 
 export interface AnalyticsConfig {

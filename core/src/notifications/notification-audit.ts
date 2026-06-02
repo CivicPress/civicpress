@@ -122,7 +122,7 @@ export class NotificationAudit {
         return;
       }
 
-      const stats = fs.statSync(this.auditLogPath);
+      fs.statSync(this.auditLogPath);
       const lines = fs
         .readFileSync(this.auditLogPath, 'utf8')
         .split('\n')

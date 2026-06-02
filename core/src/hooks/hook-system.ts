@@ -3,7 +3,6 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import yaml from 'yaml';
 import {
-  coreSuccess,
   coreError,
   coreInfo,
   coreWarn,
@@ -400,7 +399,7 @@ export class HookSystem {
   private async executeWorkflow(
     workflowName: string,
     data: HookData,
-    context: HookContext
+    _context: HookContext
   ): Promise<void> {
     coreDebug(`Executing workflow: ${workflowName}`, {
       operation: 'workflow execution',

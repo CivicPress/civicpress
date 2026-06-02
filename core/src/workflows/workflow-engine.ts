@@ -9,7 +9,6 @@ import {
   coreInfo,
   coreWarn,
   coreError,
-  coreDebug,
 } from '../utils/core-output.js';
 
 /**
