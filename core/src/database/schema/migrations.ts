@@ -6,7 +6,7 @@
  */
 
 import { coreError, coreInfo, coreDebug } from '../../utils/core-output.js';
-import { errorMessage, errorStack, errorCode, errorName } from '../../utils/error-narrow.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import type { SqlParam, ExecuteResult } from '../database-adapter.js';
 
 /**

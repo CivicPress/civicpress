@@ -284,7 +284,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 }
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 // Placeholder for PostgreSQL adapter (future implementation)
 export class PostgresAdapter implements DatabaseAdapter {
   private config: DatabaseConfig;
@@ -348,7 +348,7 @@ export class PostgresAdapter implements DatabaseAdapter {
     );
   }
 }
-/* eslint-enable @typescript-eslint/no-unused-vars */
+ 
 
 /**
  * Factory: pick the adapter for the configured database type.

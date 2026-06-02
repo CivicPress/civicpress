@@ -11,7 +11,6 @@ import {
   ServiceNotFoundError,
   CircularDependencyError,
   DuplicateServiceError,
-  MissingDependencyError,
 } from '../index.js';
 
 describe('ServiceContainer', () => {

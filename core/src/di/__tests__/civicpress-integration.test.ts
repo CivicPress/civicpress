@@ -6,7 +6,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CivicPress, CivicPressConfig } from '../../civic-core.js';
-import { ServiceContainer } from '../container.js';
 import { DatabaseService } from '../../database/database-service.js';
 import { AuthService } from '../../auth/auth-service.js';
 import { RecordManager } from '../../records/record-manager.js';
@@ -49,13 +48,13 @@ describe('CivicPress DI Integration', () => {
     if (civic) {
       try {
         await civic.shutdown();
-      } catch (error) {
+      } catch {
         // Ignore shutdown errors
       }
     }
     try {
       await fs.rm(testDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });

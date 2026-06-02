@@ -5,7 +5,7 @@
  */
 
 import { coreDebug, coreError } from '../../utils/core-output.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
+import { errorMessage } from '../../utils/error-narrow.js';
 import type { DDLExecutor } from './migrations.js';
 
 const SAGA_INDEXES = [
