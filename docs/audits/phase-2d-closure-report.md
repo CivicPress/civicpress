@@ -98,6 +98,15 @@ Closed: `api-009`, `ui-011`, `storage-015`.
 
 **Deferred to dedicated lint-hygiene session** (NOT closed in 2d): enable `@typescript-eslint/no-explicit-any: error` per workspace. Reason: ~335 pre-existing lint errors across core/api/storage configs (no-unused-vars, missing `console` globals, missing `eslint.config.cjs` in storage); the lint baseline needs its own triage. Closure of the rule is a stand-alone session; it does not block W4 or Phase 3 entry.
 
+**CLOSED 2026-06-02** on branch `worktree-refactor-lint-rule-rollout` (plan calls it `refactor/lint-rule-rollout`; worktree harness assigned the prefixed name). Merge SHA: `<merge-sha>` (filled in at L-close).
+
+- Rule `@typescript-eslint/no-explicit-any: error` enforced across all 5 production workspaces (`core`, `cli`, `modules/api`, `modules/ui`, `modules/storage`); `warn` in `**/*.test.ts` + `**/__tests__/**` + `**/*.spec.ts` per-workspace overrides.
+- Baseline 1,488 errors → 0 errors across all workspaces. ~600 warnings remain — `@typescript-eslint/no-unused-vars` was swapped from the JS rule (was running against TS code, ~648 false positives) and demoted to `warn` after L1-T1 surfaced ~170 real unused vars in `core` alone. A dedicated unused-vars cleanup session is left for future work.
+- ~120 production cast sites annotated with `// eslint-disable-next-line @typescript-eslint/no-explicit-any` (and `<!-- ... -->` form inside Vue `<template>` blocks via L4-T2-followup). 13 disable comments pre-existed. 114 test-mock casts covered by the test-file `warn` override.
+- Root `pnpm lint` script added (no `--max-warnings 0` cap; errors block, warnings signal). No CI gate per `no-cicd-policy`. Pre-commit hook unchanged per spec §7.
+- `modules/ui` switched to `@nuxt/eslint`'s Option A integration (`withNuxt(...)` with `standalone: true`); ~30 Nuxt/Vue style + strictness rules were deferred via `STYLE_RULES_DEFERRED` map per spec §7 ("No new rules beyond `no-explicit-any`"). A future session can selectively enable.
+- Full closure plan: `docs/plans/2026-05-28-lint-rule-rollout.md`. Design spec: `docs/specs/2026-05-28-lint-rule-rollout-design.md`.
+
 Detailed log: `docs/audits/phase-2d-type-cast-inventory.md`.
 
 ### W4 — Deps Hygiene Structural ✓

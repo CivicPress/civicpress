@@ -29,6 +29,7 @@
     "start:api": "cd modules/api && pnpm run start",
     "start:ui": "cd modules/ui && PORT=3030 pnpm run preview",
     "start:serve": "cd modules/serve && pnpm run start",
+    "lint": "pnpm -r --filter @civicpress/core --filter @civicpress/cli --filter @civicpress/api --filter @civicpress/ui --filter @civicpress/storage exec eslint .",
     "format": "prettier --write \"**/*.{md,json,js,ts,jsx,tsx}\"",
     "format:check": "prettier --check \"**/*.{md,json,js,ts,jsx,tsx}\"",
     "registry:check": "node scripts/registry-check.mjs",
