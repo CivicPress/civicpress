@@ -9,7 +9,7 @@
  */
 
 import { DatabaseAdapter, SqlParam } from '../database-adapter.js';
-import { errorMessage, errorStack, errorCode, errorName } from '../../utils/error-narrow.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
 import type {
   DraftRow,

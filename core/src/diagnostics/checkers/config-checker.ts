@@ -5,7 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { CentralConfigManager } from '../../config/central-config.js';
 import { ConfigurationService } from '../../config/configuration-service.js';
 import { Logger } from '../../utils/logger.js';
@@ -54,7 +54,7 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
   /**
    * Run all configuration diagnostic checks
    */
-  async check(options?: DiagnosticOptions): Promise<CheckResult> {
+  async check(_options?: DiagnosticOptions): Promise<CheckResult> {
     const checks: CheckResult[] = [];
     const issues: DiagnosticIssue[] = [];
 
@@ -503,7 +503,7 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
       // Check read permission
       try {
         fs.accessSync(configPath, fs.constants.R_OK);
-      } catch (error) {
+      } catch {
         return this.createWarningResult('.civicrc file is not readable', {
           path: configPath,
         });
@@ -636,7 +636,7 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
    */
   async autoFix(
     issues: DiagnosticIssue[],
-    options?: FixOptions
+    _options?: FixOptions
   ): Promise<FixResult[]> {
     const results: FixResult[] = [];
 

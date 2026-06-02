@@ -91,13 +91,13 @@ describe('PublishDraftSaga Integration', () => {
     if (civic) {
       try {
         await civic.shutdown();
-      } catch (error) {
+      } catch {
         // Ignore shutdown errors
       }
     }
     try {
       await fs.rm(testDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -428,7 +428,6 @@ describe('PublishDraftSaga Integration', () => {
       const results = await Promise.allSettled([promise1, promise2]);
 
       const successes = results.filter((r) => r.status === 'fulfilled');
-      const failures = results.filter((r) => r.status === 'rejected');
 
       // At least one should succeed
       expect(successes.length).toBeGreaterThan(0);

@@ -4,7 +4,7 @@
  * Tests for the DI test utility functions.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   createTestContainer,
   createMockContainer,
@@ -14,7 +14,6 @@ import {
   createTestDatabase,
   createMockDatabase,
 } from '../test-utils.js';
-import { ServiceContainer } from '../container.js';
 import { Logger } from '../../utils/logger.js';
 import { DatabaseService } from '../../database/database-service.js';
 

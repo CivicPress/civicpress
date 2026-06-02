@@ -113,7 +113,7 @@ export class TemplateCache {
 
       // Watch partials directory
       if (fs.existsSync(this.partialsPath)) {
-        this.watchDirectory(this.partialsPath, (filePath) => {
+        this.watchDirectory(this.partialsPath, (_filePath) => {
           // Invalidate all templates when partials change
           this.clear();
         });

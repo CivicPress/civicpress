@@ -27,7 +27,6 @@ import {
   createDatabaseAdapter,
   SQLiteAdapter,
   SqlParam,
-  SqlRow,
   ExecuteResult,
 } from './database-adapter.js';
 import { Logger } from '../utils/logger.js';

@@ -11,7 +11,6 @@ import {
   SagaExecutionResult,
   CompensationResult,
   SagaState,
-  SagaStatus,
   CompensationStatus,
 } from './types.js';
 import { SagaStateStore } from './saga-state-store.js';
@@ -19,12 +18,9 @@ import { IdempotencyManager } from './idempotency.js';
 import { ResourceLockManager } from './resource-lock.js';
 import {
   SagaStepError,
-  SagaCompensationError,
   SagaContextError,
   SagaTimeoutError,
-  UncompensatableFailureError,
 } from './errors.js';
-import { Logger } from '../utils/logger.js';
 import {
   coreDebug,
   coreError,
@@ -38,8 +34,6 @@ import type { AuditChannel } from '../audit/audit-channel.js';
 function generateSagaId(): string {
   return `saga_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
-
-const logger = new Logger();
 
 /**
  * Saga executor configuration
@@ -442,7 +436,7 @@ export class SagaExecutor {
     context: TContext,
     sagaId: string,
     failedStepName: string,
-    originalError: SagaStepError<TContext>
+    _originalError: SagaStepError<TContext>
   ): Promise<CompensationResult> {
     const failedStepIndex = saga.steps.findIndex(
       (s) => s.name === failedStepName
@@ -595,7 +589,7 @@ export class SagaExecutor {
   /**
    * Create saga timeout promise
    */
-  private createSagaTimeout(sagaName: string, sagaId: string): Promise<never> {
+  private createSagaTimeout(sagaName: string, _sagaId: string): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(
@@ -611,7 +605,7 @@ export class SagaExecutor {
   private createStepTimeout(
     stepName: string,
     timeout: number,
-    sagaId: string
+    _sagaId: string
   ): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {

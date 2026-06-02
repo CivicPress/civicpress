@@ -6,7 +6,6 @@
 
 import { ResourceMetrics } from './types.js';
 import { Logger } from '../utils/logger.js';
-import * as os from 'os';
 
 /**
  * Thrown when ResourceMonitor.checkLimits() detects that a diagnostic
@@ -150,7 +149,7 @@ export class ResourceMonitor {
    * Calculate CPU usage percentage (simplified)
    * In a real implementation, this would track actual CPU time vs wall time
    */
-  private calculateCpuUsage(duration: number): number {
+  private calculateCpuUsage(_duration: number): number {
     // This is a simplified calculation
     // Real CPU usage tracking would require process.cpuUsage() and more complex logic
     // For now, return a placeholder

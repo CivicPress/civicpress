@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { coreError } from '../../utils/core-output.js';
-import { ValidationError, NotFoundError } from '../index.js';
+import { ValidationError } from '../index.js';
 import {
   TemplateNotFoundError,
   TemplateExistsError,

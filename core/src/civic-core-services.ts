@@ -6,7 +6,7 @@
  */
 
 import * as path from 'path';
-import { errorMessage, errorStack, errorCode, errorName } from './utils/error-narrow.js';
+import { errorMessage, errorStack, errorCode } from './utils/error-narrow.js';
 import { ServiceContainer } from './di/container.js';
 import { CivicPressConfig } from './civic-core.js';
 import { Logger } from './utils/logger.js';
@@ -137,8 +137,7 @@ export function registerCivicPressServices(
 
   // Step 6: Register services with no dependencies
   container.singleton('configDiscovery', () => new ConfigDiscovery());
-  container.singleton('workflow', (c) => {
-    const config = c.resolve<CivicPressConfig>('config');
+  container.singleton('workflow', () => {
     return new WorkflowEngine();
   });
   container.singleton('git', (c) => {
@@ -403,7 +402,7 @@ export async function completeServiceInitialization(
         );
       }
     }
-  } catch (error) {
+  } catch {
     // Storage module not available - that's okay, it's optional
     // This is expected in environments where storage module is not installed
     // We silently skip registration (no error logging needed)

@@ -18,7 +18,6 @@ import {
   ForbiddenError,
   ConflictError,
   InternalError,
-  CivicPressError,
 } from '../index.js';
 
 describe('isCivicPressError', () => {

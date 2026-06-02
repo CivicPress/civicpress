@@ -63,7 +63,7 @@ export class SecretsManager {
         logger.info('Loaded secret from file');
         return;
       }
-    } catch (error) {
+    } catch {
       // File doesn't exist or can't be read - will generate new one
     }
 
@@ -188,7 +188,7 @@ export class SecretsManager {
           created: data.created || new Date().toISOString(),
         };
       }
-    } catch (error) {
+    } catch {
       // File doesn't exist or is invalid
     }
     return null;

@@ -6,7 +6,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { ServiceContainer } from '../container.js';
-import { ServiceLifetime } from '../types.js';
 
 describe('DI Container Performance', () => {
   describe('Service Resolution Performance', () => {
@@ -92,7 +91,7 @@ describe('DI Container Performance', () => {
       try {
         container.resolve('A');
         expect.fail('Should have thrown');
-      } catch (error) {
+      } catch {
         const end = performance.now();
         const duration = end - start;
 

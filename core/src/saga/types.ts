@@ -54,7 +54,7 @@ export interface SagaStep<TContext extends SagaContext, TResult> {
  * Saga interface
  * Defines a complete saga with its steps
  */
-export interface Saga<TContext extends SagaContext, TFinalResult> {
+export interface Saga<TContext extends SagaContext, _TFinalResult> {
   /** Saga name for logging and identification */
   name: string;
   /** Saga version for migration support */

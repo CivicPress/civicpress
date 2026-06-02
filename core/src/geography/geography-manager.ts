@@ -18,7 +18,6 @@ import {
   ParsedGeographyData,
   BoundingBox,
   GeographyMetadata,
-  SRID,
 } from '../types/geography.js';
 import {
   GeographyNotFoundError,
@@ -46,7 +45,7 @@ export class GeographyManager {
    */
   async createGeographyFile(
     request: CreateGeographyRequest,
-    user: AuthUser
+    _user: AuthUser
   ): Promise<GeographyFile> {
     try {
       // Validate the content
@@ -196,12 +195,12 @@ export class GeographyManager {
                   }
                 }
               }
-            } catch (error) {
+            } catch {
               // Skip categories that can't be read
               continue;
             }
           }
-        } catch (error) {
+        } catch {
           // Skip types that can't be read
           continue;
         }
@@ -229,7 +228,7 @@ export class GeographyManager {
   async updateGeographyFile(
     id: string,
     request: UpdateGeographyRequest,
-    user: AuthUser
+    _user: AuthUser
   ): Promise<GeographyFile> {
     try {
       const existingFile = await this.getGeographyFile(id);
@@ -347,7 +346,7 @@ export class GeographyManager {
   /**
    * Delete a geography file
    */
-  async deleteGeographyFile(id: string, user: AuthUser): Promise<void> {
+  async deleteGeographyFile(id: string, _user: AuthUser): Promise<void> {
     try {
       const existingFile = await this.getGeographyFile(id);
       if (!existingFile) {
@@ -695,7 +694,7 @@ export class GeographyManager {
   private generateFilename(
     name: string,
     id: string,
-    type: GeographyFileType
+    _type: GeographyFileType
   ): string {
     const sanitizedName = name
       .toLowerCase()

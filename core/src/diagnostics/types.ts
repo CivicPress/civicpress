@@ -4,8 +4,6 @@
  * Core types and interfaces for the diagnostic system.
  */
 
-import { Logger } from '../utils/logger.js';
-
 /**
  * Severity levels for diagnostic issues
  */

@@ -14,10 +14,6 @@ import { RecordParser } from './record-parser.js';
 import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
 import { buildRecordRelativePath } from '../utils/record-paths.js';
 import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
-import {
-  createMarkdownContent,
-  normalizeFrontmatterForValidation,
-} from './record-manager/helpers.js';
 import { RecordSagas } from './record-manager/sagas.js';
 // `import type` is erased at compile time so it does not reintroduce the
 // runtime circular import these methods originally avoided via `any`.

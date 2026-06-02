@@ -10,7 +10,7 @@ import {
   DiagnosticOptions,
   DiagnosticProgress,
 } from './types.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../utils/error-narrow.js';
+import { errorMessage, errorStack, errorCode } from '../utils/error-narrow.js';
 import { DiagnosticCircuitBreaker } from './circuit-breaker.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { Logger } from '../utils/logger.js';

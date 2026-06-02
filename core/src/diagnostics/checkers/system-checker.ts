@@ -5,7 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
 import {
   CheckResult,
@@ -52,7 +52,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
   /**
    * Run all system diagnostic checks
    */
-  async check(options?: DiagnosticOptions): Promise<CheckResult> {
+  async check(_options?: DiagnosticOptions): Promise<CheckResult> {
     const checks: CheckResult[] = [];
     const issues: DiagnosticIssue[] = [];
 
@@ -391,7 +391,6 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       // Calculate free memory threshold based on total RAM
       // For large systems (>=32GB), use 10% of total RAM as threshold
       // For smaller systems, use fixed thresholds
-      const freeMemoryPercent = (freeGB / totalGB) * 100;
       const lowWarningFreeThreshold =
         totalGB >= 32 ? totalGB * 0.1 : totalGB >= 16 ? 2 : 0.5;
       const warningFreeThreshold = totalGB >= 32 ? totalGB * 0.1 : 1;
@@ -686,7 +685,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
    */
   async autoFix(
     issues: DiagnosticIssue[],
-    options?: FixOptions
+    _options?: FixOptions
   ): Promise<FixResult[]> {
     const results: FixResult[] = [];
 

@@ -7,7 +7,7 @@
  */
 
 import type { DatabaseService } from '../../../database/database-service.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../../../utils/error-narrow.js';
+import { errorMessage } from '../../../utils/error-narrow.js';
 import type { CheckResult } from '../../types.js';
 import { pass, warning, error } from './result-builders.js';
 

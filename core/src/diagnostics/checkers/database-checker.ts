@@ -16,7 +16,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { DatabaseService } from '../../database/database-service.js';
 import { Logger } from '../../utils/logger.js';
 import {

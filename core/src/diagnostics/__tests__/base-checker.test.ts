@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BaseDiagnosticChecker } from '../base-checker.js';
 import { Logger } from '../../utils/logger.js';
-import { CheckResult, DiagnosticIssue, FixResult } from '../types.js';
+import { CheckResult, DiagnosticIssue } from '../types.js';
 
 // Concrete implementation for testing
 class TestChecker extends BaseDiagnosticChecker {

@@ -5,14 +5,12 @@
  */
 
 import type {
-  DiagnosticChecker,
   CheckResult,
   DiagnosticIssue,
 } from '../types.js';
 import { BaseDiagnosticChecker } from '../base-checker.js';
 import { UnifiedCacheManager } from '../../cache/unified-cache-manager.js';
 import { Logger } from '../../utils/logger.js';
-import * as crypto from 'crypto';
 
 export interface CacheHealthCheckerOptions {
   cacheManager: UnifiedCacheManager;

@@ -8,7 +8,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CivicPress, CivicPressConfig } from '../../civic-core.js';
 import {
   PublishDraftSaga,
-  CreateRecordSaga,
   UpdateRecordSaga,
   ArchiveRecordSaga,
   SagaExecutor,
@@ -87,13 +86,13 @@ describe('Saga Pattern E2E Tests', () => {
     if (civic) {
       try {
         await civic.shutdown();
-      } catch (error) {
+      } catch {
         // Ignore
       }
     }
     try {
       await fs.rm(testDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore
     }
   });

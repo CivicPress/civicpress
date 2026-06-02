@@ -451,20 +451,20 @@ ${record.content || ''}`;
     // Carry over any additional metadata passthrough fields
     if (record.metadata) {
       const {
-        tags,
-        module,
-        slug,
-        version,
-        priority,
-        department,
-        category,
-        session_type,
-        date,
-        duration,
-        location,
-        attendees,
-        topics,
-        media,
+        tags: _tags,
+        module: _module,
+        slug: _slug,
+        version: _version,
+        priority: _priority,
+        department: _department,
+        category: _category,
+        session_type: _session_type,
+        date: _date,
+        duration: _duration,
+        location: _location,
+        attendees: _attendees,
+        topics: _topics,
+        media: _media,
         ...rest
       } = record.metadata;
 

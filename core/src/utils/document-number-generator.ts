@@ -177,8 +177,8 @@ export class DocumentNumberGenerator {
    * @returns Next sequence number
    */
   static async getNextSequence(
-    recordType: string,
-    year?: number
+    _recordType: string,
+    _year?: number
   ): Promise<number> {
     // TODO: Implement database query to find highest sequence for this type/year
     // For now, return 1 as placeholder

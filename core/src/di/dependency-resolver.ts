@@ -4,7 +4,7 @@
  * This module handles dependency extraction and resolution.
  */
 
-import { Class, ServiceMetadata } from './types.js';
+import { Class } from './types.js';
 import { ServiceContainer } from './container.js';
 import { CircularDependencyDetector } from './circular-dependency-detector.js';
 import { MissingDependencyError } from './errors.js';
@@ -55,7 +55,7 @@ export class DependencyResolver {
    * @returns Array of dependency keys (empty for now, requires manual specification)
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  extractDependencies(constructor: Class<any>): Array<string | Class<any>> {
+  extractDependencies(_constructor: Class<any>): Array<string | Class<any>> {
     // TODO: In the future, this could use:
     // - TypeScript decorators (@Inject('key'))
     // - Reflection metadata (reflect-metadata)
