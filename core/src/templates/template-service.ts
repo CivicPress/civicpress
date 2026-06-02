@@ -18,7 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
 import yaml from 'yaml';
-import { TemplateEngine, type Template } from '../utils/template-engine.js';
+import { TemplateEngine } from '../utils/template-engine.js';
 import { TemplateCacheAdapter } from './template-cache-adapter.js';
 import { TemplateValidator } from './template-validator.js';
 import { Logger } from '../utils/logger.js';

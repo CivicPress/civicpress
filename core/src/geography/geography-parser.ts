@@ -19,8 +19,6 @@ import {
   GeographyFileType,
   GeographyMetadata,
   BoundingBox,
-  ColorMapping,
-  IconMapping,
 } from '../types/geography.js';
 import { Logger } from '../utils/logger.js';
 

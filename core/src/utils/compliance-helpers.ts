@@ -7,10 +7,6 @@
  * @module utils/compliance-helpers
  */
 
-import { Logger } from './logger.js';
-
-const logger = new Logger();
-
 /**
  * ComplianceFieldHelpers - Utilities for compliance field validation
  */
