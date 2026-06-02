@@ -77,9 +77,8 @@
               >
                 {{ file.name }}
               </p>
-              <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
               <UBadge
-                :color="getCategoryColor(file.category) as any"
+                :color="getCategoryColor(file.category)"
                 variant="soft"
                 size="xs"
               >
@@ -133,13 +132,8 @@
       class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0"
     >
       <div class="flex justify-between items-center">
-        <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
         <span class="text-sm text-gray-500">
-          {{
-            (t as any)('common.selected', selectedFiles.length, {
-              count: selectedFiles.length,
-            })
-          }}
+          {{ tPlural('common.selected', selectedFiles.length) }}
         </span>
         <div class="flex space-x-2">
           <UButton
@@ -167,8 +161,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import type { ApiResponse } from '~/utils/api-response';
+import type { NuxtUiColor } from '~/types/nuxt-ui-bridge';
 import { useDebounceFn } from '@vueuse/core';
 import type { GeographyFile, GeographyCategory } from '~/types/geography';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
 // Props
 // Note: For v-model:selected-ids, Vue converts kebab-case to camelCase
@@ -200,8 +196,8 @@ const geographyFiles = ref<GeographyFile[]>([]);
 const searchQuery = ref('');
 const selectedCategory = ref<string | null>(null);
 
-// Computed
-const { t } = useI18n();
+// Composables
+const { t, tPlural } = useTypedI18n();
 
 const categoryOptions = computed(() => {
   const categories = new Set(
@@ -284,16 +280,16 @@ const clearSelection = () => {
   emit('update:selected-ids', []);
 };
 
-const getCategoryColor = (category: string) => {
-  const colors = {
-    Reference: 'blue',
-    Financial: 'green',
-    Legal: 'purple',
-    Planning: 'orange',
-    Environmental: 'emerald',
-    Infrastructure: 'gray',
+const getCategoryColor = (category: string): NuxtUiColor => {
+  const colors: Record<string, NuxtUiColor> = {
+    Reference: 'info',
+    Financial: 'success',
+    Legal: 'secondary',
+    Planning: 'warning',
+    Environmental: 'success',
+    Infrastructure: 'neutral',
   };
-  return colors[category as keyof typeof colors] || 'neutral';
+  return colors[category] || 'neutral';
 };
 
 const formatDate = (dateString: string) => {

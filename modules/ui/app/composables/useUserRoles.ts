@@ -1,5 +1,6 @@
 import type { Role } from '~/types/user';
 import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import type { NuxtUiColor } from '~/types/nuxt-ui-bridge';
 
 export const useUserRoles = () => {
   const { $civicApi } = useNuxtApp();
@@ -105,8 +106,8 @@ export const useUserRoles = () => {
   };
 
   // Get role color for badges
-  const getRoleColor = (roleKey: string): string => {
-    const colorMap: Record<string, string> = {
+  const getRoleColor = (roleKey: string): NuxtUiColor => {
+    const colorMap: Record<string, NuxtUiColor> = {
       admin: 'error',
       clerk: 'primary',
       public: 'neutral',

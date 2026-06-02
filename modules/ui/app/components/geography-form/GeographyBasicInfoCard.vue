@@ -44,10 +44,9 @@
             :error="formErrors.category"
             required
           >
-            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <USelectMenu
               :model-value="form.category"
-              @update:model-value="(val: any) => (form.category = val)"
+              @update:model-value="onCategoryUpdate"
               :items="categoryOptions"
               :placeholder="t('geography.selectCategory')"
               :disabled="saving"
@@ -61,10 +60,9 @@
             name="srid"
             :error="formErrors.srid"
           >
-            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <UInput
               :model-value="form.srid"
-              @update:model-value="(val: any) => (form.srid = typeof val === 'number' ? val : Number(val))"
+              @update:model-value="onSridUpdate"
               type="number"
               :placeholder="t('geography.sridPlaceholder')"
               :disabled="saving"
@@ -85,6 +83,7 @@
 <script setup lang="ts">
 import type { PropType } from 'vue';
 import type {
+  GeographyCategory,
   GeographyFormData,
   GeographyFormErrors,
 } from '~/types/geography';
@@ -94,7 +93,7 @@ interface SelectOption {
   value: string;
 }
 
-defineProps({
+const props = defineProps({
   form: {
     type: Object as PropType<GeographyFormData>,
     required: true,
@@ -114,4 +113,12 @@ defineProps({
 });
 
 const { t } = useI18n();
+
+const onCategoryUpdate = (val: GeographyCategory) => {
+  props.form.category = val;
+};
+
+const onSridUpdate = (val: string | number) => {
+  props.form.srid = typeof val === 'number' ? val : Number(val);
+};
 </script>

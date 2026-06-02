@@ -1,4 +1,10 @@
 <script setup lang="ts">
+interface Attendee {
+  name?: string;
+  role?: string;
+  status?: string;
+}
+
 interface MetadataEntry {
   key: string;
   value: unknown;
@@ -9,9 +15,17 @@ interface Props {
   getMetadataFieldLabel: (key: string) => string;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const { t } = useI18n();
+
+const attendees = computed<Attendee[]>(() => {
+  const entry = props.additionalMetadata.find((e) => e.key === 'attendees');
+  if (!entry || !Array.isArray(entry.value)) {
+    return [];
+  }
+  return entry.value as Attendee[];
+});
 </script>
 
 <template>
@@ -28,17 +42,10 @@ const { t } = useI18n();
           {{ getMetadataFieldLabel(entry.key) }}
         </dt>
         <dd class="text-sm">
-          <template
-            v-if="
-              entry.key === 'attendees' &&
-              Array.isArray(entry.value) &&
-              entry.value.length
-            "
-          >
+          <template v-if="entry.key === 'attendees' && attendees.length">
             <ul class="space-y-2">
-              <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
               <li
-                v-for="(attendee, attendeeIndex) in (entry.value as any[])"
+                v-for="(attendee, attendeeIndex) in attendees"
                 :key="attendeeIndex"
                 class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
               >
