@@ -5,6 +5,18 @@
 //        (b) lines already covered by an existing disable comment,
 //        (c) hot-spot files marked for file-level disable.
 // Defaults to dry-run; pass --apply to write changes.
+//
+// ⚠️  KNOWN LIMITATIONS — DO NOT REUSE WITHOUT REWORK:
+// - Emits `//`-form disable comments unconditionally. Inside Vue `<template>`
+//   blocks this is INVALID (Vue parses `//` as part of the tag, producing
+//   vue/no-parsing-error). The L4-T2 followup script
+//   `lint-rollout-fix-vue-disable-comments.mjs` cleans up the breakage —
+//   future re-use should emit `<!-- ... -->` HTML form for .vue template sites.
+// - Depends on the L4-T1 manifest, which under-counted cast sites by ~4x
+//   (see lint-rollout-find-allowlist.mjs header). For full coverage the
+//   manifest must be regenerated with an AST-based finder.
+// - The `FILE_LEVEL_DISABLE` set is intentionally empty in the committed
+//   version (no hot-spot files met the >20-site threshold in 2026-05-28).
 
 import { readFileSync, writeFileSync } from 'node:fs';
 

@@ -85,9 +85,7 @@
         class="w-full sm:w-48"
       />
       <!-- Validation error display -->
-      <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
       <div v-if="formErrors.role" class="text-red-500 text-sm mt-1">
-        <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
         {{ formErrors.role }}
       </div>
 

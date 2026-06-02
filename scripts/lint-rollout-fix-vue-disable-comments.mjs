@@ -1,6 +1,19 @@
 #!/usr/bin/env node
 // Convert `//` disable comments inside .vue <template> blocks to HTML-comment form.
 // Idempotent: skips lines that don't match the //-form.
+//
+// ⚠️  KNOWN LIMITATIONS — DO NOT REUSE WITHOUT REWORK:
+// - Only converts comments on their own line at the template root. During the
+//   2026-05-28 rollout, 9 sites needed MANUAL fixes because the //-comment sat
+//   INSIDE an element opening tag (between attributes) or inside `{{ }}`
+//   interpolations — neither position accepts `<!-- ... -->` either; the comment
+//   must be relocated to the line before the element, or to the script section.
+// - eslint-plugin-vue + @nuxt/eslint as configured in this repo does NOT
+//   actually fire @typescript-eslint/no-explicit-any on `as any` inside Vue
+//   template attribute values or `{{ }}` interpolations — many of the
+//   <!-- ... --> disable comments inserted by this script are inert (they
+//   document intent but suppress nothing). A future session could close that
+//   blind spot.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
