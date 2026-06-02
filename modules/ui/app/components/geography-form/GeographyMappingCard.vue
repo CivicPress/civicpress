@@ -19,10 +19,9 @@
       >
         <h4 class="text-md font-medium">{{ t('geography.applyPreset') }}</h4>
         <div class="flex items-center gap-3">
-          <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
           <USelectMenu
             :model-value="selectedPreset"
-            @update:model-value="(val: any) => $emit('update:selected-preset', val)"
+            @update:model-value="(val) => $emit('update:selected-preset', val)"
             :items="presetOptions"
             :placeholder="t('geography.selectPreset')"
             value-key="key"
@@ -176,10 +175,10 @@
           </UFormField>
 
           <UFormField :label="t('geography.applyToGeometryTypes')">
-            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <USelectMenu
-              v-model="form.icon_mapping.apply_to"
-              :items="geometryTypeOptions as any"
+              v-model="applyToValue"
+              :items="geometryTypeOptions"
+              value-key="value"
               multiple
               :placeholder="t('geography.selectGeometryTypes')"
             />
@@ -232,7 +231,7 @@
 
 <script setup lang="ts">
 import type { PropType } from 'vue';
-import type { GeographyFormData } from '~/types/geography';
+import type { GeographyFormData, IconMapping } from '~/types/geography';
 
 interface SelectOption {
   label: string;
@@ -246,7 +245,15 @@ interface PresetOption {
   description: string;
 }
 
-defineProps({
+// TODO(geography): `geometryTypeOptions` in useGeographyForm.ts also offers
+// MultiPoint / MultiLineString / MultiPolygon, but IconMapping['apply_to']
+// (~/types/geography.ts) is only typed for the three non-Multi geometry types.
+// The dropdown accepts the user's selection but the type rejects it. Surfaced
+// during lint-followup-2 (Pattern B) — fix by widening apply_to or narrowing
+// geometryTypeOptions in a dedicated follow-up.
+type ApplyToValue = NonNullable<IconMapping['apply_to']>[number];
+
+const props = defineProps({
   form: {
     type: Object as PropType<GeographyFormData>,
     required: true,
@@ -284,4 +291,13 @@ defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+const applyToValue = computed({
+  get: (): ApplyToValue[] => (props.form.icon_mapping?.apply_to ?? []) as ApplyToValue[],
+  set: (v: ApplyToValue[]) => {
+    if (props.form.icon_mapping) {
+      props.form.icon_mapping.apply_to = v;
+    }
+  },
+});
 </script>
