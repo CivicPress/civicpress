@@ -209,7 +209,7 @@ export class RecordSchemaBuilder {
         if: { properties: { type: { const: recordType } } },
         then: typeSchema,
       });
-    } catch (error) {
+    } catch {
       // Type-specific schema doesn't exist, that's okay
       logger.debug(
         `No type-specific schema found for ${recordType}, using base schema only`

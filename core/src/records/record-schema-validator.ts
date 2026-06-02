@@ -12,7 +12,7 @@
  */
 
 import AjvModule, { Ajv as AjvClass, type ErrorObject } from 'ajv';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../utils/error-narrow.js';
+import { errorMessage } from '../utils/error-narrow.js';
 import addFormatsModule from 'ajv-formats';
 import { RecordSchemaBuilder } from './record-schema-builder.js';
 import { Logger } from '../utils/logger.js';
@@ -281,7 +281,7 @@ export class RecordSchemaValidator {
    */
   private static validateBusinessRules(
     frontmatter: Record<string, unknown>,
-    recordType?: string
+    _recordType?: string
   ): ValidationResult {
     const result: ValidationResult = {
       isValid: true,
