@@ -9,7 +9,6 @@ import { SqlRow } from '../database/database-adapter.js';
 import { ResourceLock } from './types.js';
 import { SagaLockError } from './errors.js';
 import { coreDebug, coreError, coreWarn } from '../utils/core-output.js';
-import { Logger } from '../utils/logger.js';
 
 interface SagaResourceLockRow extends SqlRow {
   resource_key: string;
@@ -17,8 +16,6 @@ interface SagaResourceLockRow extends SqlRow {
   acquired_at: string;
   expires_at: string;
 }
-
-const logger = new Logger();
 
 /**
  * Resource lock manager for saga concurrency control

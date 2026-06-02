@@ -16,7 +16,6 @@ import {
 import { DatabaseService } from '../../database/database-service.js';
 import { RecordManager } from '../../records/record-manager.js';
 import { AuthUser } from '../../auth/auth-service.js';
-import { GitEngine } from '../../git/git-engine.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -87,13 +86,13 @@ describe('Saga Failure Injection Tests', () => {
     if (civic) {
       try {
         await civic.shutdown();
-      } catch (error) {
+      } catch {
         // Ignore
       }
     }
     try {
       await fs.rm(testDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore
     }
   });
@@ -208,7 +207,6 @@ describe('Saga Failure Injection Tests', () => {
 
       // Mock GitEngine to fail on commit
       const git = civic.getGitEngine();
-      const originalCommit = git.commit.bind(git);
       git.commit = vi.fn().mockRejectedValue(new Error('Git commit failed'));
 
       const saga = new PublishDraftSaga(
@@ -252,8 +250,6 @@ describe('Saga Failure Injection Tests', () => {
 
       // Mock IndexingService to fail
       const indexingService = civic.getIndexingService();
-      const originalGenerate =
-        indexingService.generateIndexes.bind(indexingService);
       indexingService.generateIndexes = vi
         .fn()
         .mockRejectedValue(new Error('Indexing failed'));
@@ -431,8 +427,6 @@ describe('Saga Failure Injection Tests', () => {
         // If it doesn't throw, that's also acceptable (compensation might have succeeded)
       } catch (error) {
         // Saga failed - verify state is tracked
-        const stateStore = new SagaStateStore(db);
-        const failedSagas = await stateStore.getFailedSagas();
         // State might be persisted or might not, depending on when it failed
         // Just verify the saga didn't complete successfully
         expect(error).toBeDefined();

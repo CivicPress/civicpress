@@ -12,16 +12,13 @@ import { GitEngine } from '../git/git-engine.js';
 import { HookSystem } from '../hooks/hook-system.js';
 import { IndexingService } from '../indexing/indexing-service.js';
 import { AuthUser } from '../auth/auth-service.js';
-import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
+import { CreateRecordRequest } from '../civic-core.js';
 import { coreDebug, coreError } from '../utils/core-output.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { RecordParser } from '../records/record-parser.js';
 import { RecordSchemaValidator } from '../records/record-schema-validator.js';
-import {
-  buildRecordRelativePath,
-  ensureDirectoryForRecordPath,
-} from '../utils/record-paths.js';
+import { ensureDirectoryForRecordPath } from '../utils/record-paths.js';
 import matter from 'gray-matter';
 import { RecordValidationError } from '../errors/domain-errors.js';
 

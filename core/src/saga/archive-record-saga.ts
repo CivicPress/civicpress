@@ -10,7 +10,6 @@ import { DatabaseService } from '../database/database-service.js';
 import { RecordManager, RecordData } from '../records/record-manager.js';
 import { GitEngine } from '../git/git-engine.js';
 import { HookSystem } from '../hooks/hook-system.js';
-import { IndexingService } from '../indexing/indexing-service.js';
 import { AuthUser } from '../auth/auth-service.js';
 import { coreDebug, coreError } from '../utils/core-output.js';
 import * as fs from 'fs/promises';

@@ -37,7 +37,7 @@ export abstract class BaseSagaStep<TContext extends SagaContext, TResult>
    * Optional compensation function
    * Default implementation does nothing
    */
-  async compensate(context: TContext, result: TResult): Promise<void> {
+  async compensate(context: TContext, _result: TResult): Promise<void> {
     // Default: no compensation needed
     coreDebug(
       `Step '${this.name}' has no compensation logic`,
@@ -59,14 +59,14 @@ export abstract class BaseSagaStep<TContext extends SagaContext, TResult>
 
     return Promise.race([
       this.execute(context),
-      this.createTimeout(this.timeout, context),
+      this.createTimeout(this.timeout),
     ]);
   }
 
   /**
    * Create a timeout promise
    */
-  private createTimeout(timeout: number, context: TContext): Promise<TResult> {
+  private createTimeout(timeout: number): Promise<TResult> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(new Error(`Step '${this.name}' timed out after ${timeout}ms`));

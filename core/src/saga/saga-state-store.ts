@@ -7,7 +7,6 @@
 import { DatabaseService } from '../database/database-service.js';
 import { SqlParam, SqlRow } from '../database/database-adapter.js';
 import { SagaState, SagaStatus, CompensationStatus } from './types.js';
-import { Logger } from '../utils/logger.js';
 import { coreError, coreDebug } from '../utils/core-output.js';
 
 interface SagaStateRow extends SqlRow {
@@ -27,8 +26,6 @@ interface SagaStateRow extends SqlRow {
   idempotency_key?: string | null;
   correlation_id?: string | null;
 }
-
-const logger = new Logger();
 
 /**
  * Store for saga state persistence
