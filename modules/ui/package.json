@@ -40,7 +40,6 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@eslint/js": "9.39.4",
     "@iconify-json/lucide": "^1.2.108",
     "@nuxt/test-utils": "^3.23.0",
     "@typescript-eslint/eslint-plugin": "8.60.0",
@@ -53,7 +52,6 @@
     "tailwindcss": "^4.3.0",
     "unplugin-auto-import": "20.3.0",
     "vitest": "^3.2.4",
-    "vue-eslint-parser": "10.4.0",
     "vue-tsc": "^3.3.2"
   }
 }
