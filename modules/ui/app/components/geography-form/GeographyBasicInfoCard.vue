@@ -44,9 +44,9 @@
             :error="formErrors.category"
             required
           >
+            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <USelectMenu
               :model-value="form.category"
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               @update:model-value="(val: any) => (form.category = val)"
               :items="categoryOptions"
               :placeholder="t('geography.selectCategory')"
@@ -61,9 +61,9 @@
             name="srid"
             :error="formErrors.srid"
           >
+            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <UInput
               :model-value="form.srid"
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               @update:model-value="(val: any) => (form.srid = typeof val === 'number' ? val : Number(val))"
               type="number"
               :placeholder="t('geography.sridPlaceholder')"

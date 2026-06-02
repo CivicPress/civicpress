@@ -55,8 +55,8 @@
             <h4 class="font-medium text-gray-900 dark:text-white truncate">
               {{ record.title }}
             </h4>
+            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <UBadge
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               :color="getStatusColor(record.status) as any"
               variant="soft"
               size="xs"

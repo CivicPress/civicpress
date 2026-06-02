@@ -58,8 +58,8 @@
         <!-- Bottom: Content (Full Width) -->
         <div class="space-y-2">
           <UFormField v-if="editable" :label="t('common.category')" size="xs">
+            <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
             <USelectMenu
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               :model-value="linkedRecord.category as any"
               :items="getLinkCategoryOptions()"
               :placeholder="t('records.attachments.selectCategory')"
