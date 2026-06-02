@@ -541,6 +541,7 @@ class EmitHooksStep extends BaseSagaStep<PublishDraftContext, RecordData> {
 export class PublishDraftSaga implements Saga<PublishDraftContext, RecordData> {
   name = 'PublishDraft';
   version = '1.0.0';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps: SagaStep<PublishDraftContext, any>[];
 
   constructor(

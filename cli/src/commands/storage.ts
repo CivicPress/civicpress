@@ -56,6 +56,7 @@ async function initializeStorageServices(
   const config = await configManager.loadConfig();
 
   // Get cache manager from CivicPress instance if available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cacheManager = (civic as any).getCacheManager?.();
   const storageService = new CloudUuidStorageService(
     config,
@@ -64,6 +65,7 @@ async function initializeStorageServices(
   );
 
   // Get database service from CivicPress instance
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const databaseService = (civic as any).getDatabaseService();
   if (!databaseService) {
     throw new Error('Database service not available');
@@ -130,6 +132,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (options.update) {
           // Update configuration
           const currentConfig = await configManager.loadConfig();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const updateData: any = { ...currentConfig };
 
           if (options.backend) {
@@ -201,6 +204,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error managing storage configuration',
@@ -354,6 +358,7 @@ export default function setupStorageCommand(cli: CAC) {
           );
           process.exit(1);
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error uploading file',
@@ -508,6 +513,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error listing files',
@@ -645,6 +651,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error downloading file',
@@ -773,6 +780,7 @@ export default function setupStorageCommand(cli: CAC) {
           );
           process.exit(1);
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error deleting file',
@@ -911,6 +919,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error adding storage folder',
@@ -1049,6 +1058,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error updating storage folder',
@@ -1165,6 +1175,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error removing storage folder',
@@ -1292,6 +1303,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error getting file information',

@@ -47,6 +47,7 @@ export default withNuxt(
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
       ...STYLE_RULES_DEFERRED,
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
   {
@@ -56,6 +57,7 @@ export default withNuxt(
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
       ...STYLE_RULES_DEFERRED,
+      '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
 );

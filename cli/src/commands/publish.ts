@@ -37,6 +37,7 @@ export const publishCommand = (cli: CAC) => {
       '--target-status <status>',
       'Override target status (default: draft status, typically "published")'
     )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (draftId: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -50,6 +51,7 @@ export const publishCommand = (cli: CAC) => {
         globalOptions.json
       );
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
 

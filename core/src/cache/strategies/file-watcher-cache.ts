@@ -19,6 +19,7 @@ import { Logger } from '../../utils/logger.js';
 /**
  * File watcher cache implementation
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class FileWatcherCache<T extends {} = any> implements ICacheStrategy<T> {
   private memoryCache: MemoryCache<T>;
   private readonly config: Required<

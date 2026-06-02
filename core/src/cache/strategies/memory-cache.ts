@@ -17,6 +17,7 @@ import { Logger } from '../../utils/logger.js';
 /**
  * Memory cache implementation using LRU eviction
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class MemoryCache<T extends {} = any> implements ICacheStrategy<T> {
   private cache: LRUCache<string, T, unknown>;
   private readonly config: Required<

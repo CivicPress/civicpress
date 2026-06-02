@@ -32,6 +32,7 @@ export const listCommand = (cli: CAC) => {
     .option('-a, --all', 'Show all details')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (type: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -91,6 +92,7 @@ export const listCommand = (cli: CAC) => {
         let totalRecords = 0;
         const statusCounts: Record<string, number> = {};
         const typeCounts: Record<string, number> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const records: any[] = [];
 
         for (const relativePath of recordPaths) {

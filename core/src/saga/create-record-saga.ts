@@ -547,6 +547,7 @@ class EmitHooksStep extends BaseSagaStep<CreateRecordContext, RecordData> {
 export class CreateRecordSaga implements Saga<CreateRecordContext, RecordData> {
   name = 'CreateRecord';
   version = '1.0.0';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps: SagaStep<CreateRecordContext, any>[];
 
   constructor(

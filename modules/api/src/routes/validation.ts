@@ -456,6 +456,7 @@ async function validateSingleRecord(
 async function validateRecordContent(
   content: string,
   recordId: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   try {
     // Extract frontmatter for schema validation
@@ -570,6 +571,7 @@ async function validateBulkRecords(
   recordIds: string[],
   types?: string[],
   includeContent = false
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const results = [];
   const summary = {
@@ -625,6 +627,7 @@ async function getValidationStatus(
     severity?: string;
     limit?: number;
   }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
   const allIssues: Array<

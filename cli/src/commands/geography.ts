@@ -29,7 +29,9 @@ interface GeographyValidationOptions {
 
 interface GeographyFile {
   path: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   geography: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validation: any;
 }
 
@@ -300,6 +302,7 @@ async function normalizeGeographyFile(
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractGeographyFromContent(content: string): any {
   // Look for YAML frontmatter
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
@@ -308,6 +311,7 @@ function extractGeographyFromContent(content: string): any {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     return frontmatter.geography || null;
   } catch {
@@ -315,6 +319,7 @@ function extractGeographyFromContent(content: string): any {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function updateGeographyInContent(content: string, geography: any): string {
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
   if (!frontmatterMatch) {
@@ -324,6 +329,7 @@ function updateGeographyInContent(content: string, geography: any): string {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     frontmatter.geography = geography;
     const newFrontmatter = stringifyYaml(frontmatter);
@@ -358,6 +364,7 @@ async function findMarkdownFiles(dirPath: string): Promise<string[]> {
 }
 
 function displayGeographyValidationResult(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
   options: GeographyValidationOptions
 ) {
@@ -366,6 +373,7 @@ function displayGeographyValidationResult(
 }
 
 function displayGeographyScanResults(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   results: any,
   options: GeographyValidationOptions
 ) {
@@ -374,6 +382,7 @@ function displayGeographyScanResults(
 }
 
 function displayGeographyNormalizationResult(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
   options: GeographyValidationOptions
 ) {

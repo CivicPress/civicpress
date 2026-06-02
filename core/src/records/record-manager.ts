@@ -38,6 +38,7 @@ export interface RecordData {
   status: string; // Legal status (stored in YAML + DB)
   workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   content?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   geography?: Geography;
   attachedFiles?: Array<{

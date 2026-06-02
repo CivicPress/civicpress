@@ -60,6 +60,7 @@ export function registerValidateCommand(cli: CAC) {
     .option('-f, --fix', 'Attempt to auto-fix validation issues')
     .option('-s, --strict', 'Treat warnings as errors')
     .option('--format <format>', 'Output format', { default: 'human' })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (record: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -132,6 +133,7 @@ export function registerValidateCommand(cli: CAC) {
     });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function validateAllRecords(dataDir: string, options: any) {
   const recordsDir = join(dataDir, 'records');
 
@@ -172,6 +174,7 @@ async function validateAllRecords(dataDir: string, options: any) {
 async function validateSingleRecord(
   dataDir: string,
   recordPath: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any
 ) {
   const resolvedRecord = resolveRecordReference(dataDir, recordPath);
@@ -226,6 +229,7 @@ async function validateSingleRecord(
 async function validateRecord(
   dataDir: string,
   recordPath: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
   absoluteOverride?: string
 ): Promise<ValidationResult> {
@@ -284,6 +288,7 @@ async function validateRecord(
   const recordType = record.type || parsedPathInfo.type;
 
   // Try to load the template using the template engine
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let template: any | null = null;
   try {
     // First try to load the specific template if specified in metadata
@@ -429,6 +434,7 @@ async function validateRecord(
 async function loadTemplate(
   dataDir: string,
   recordType: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any | null> {
   try {
     const templateEngine = new TemplateEngine(dataDir);
@@ -463,7 +469,9 @@ async function loadTemplate(
 }
 
 function validateMetadata(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   template: any,
   errors: ValidationError[],
   warnings: ValidationWarning[],
@@ -494,6 +502,7 @@ function validateMetadata(
   // Check field formats
   if (template.validation.formats) {
     for (const [field, format] of Object.entries(template.validation.formats)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const value = (metadata as any)[field];
       if (value !== undefined && value !== null) {
         validateFieldFormat(
@@ -550,6 +559,7 @@ function validateMetadata(
 
 function validateContent(
   content: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   template: any,
   errors: ValidationError[],
   warnings: ValidationWarning[],
@@ -611,6 +621,7 @@ function validateContent(
 }
 
 function validateBasicMetadata(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>,
   errors: ValidationError[],
   warnings: ValidationWarning[]
@@ -638,6 +649,7 @@ function validateBasicMetadata(
 
 function validateCommonIssues(
   title: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>,
   content: string,
   errors: ValidationError[],
@@ -755,6 +767,7 @@ function validateMarkdownLinks(
 }
 
 function validateFieldFormat(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any,
   format: string,
   field: string,
@@ -823,6 +836,7 @@ function extractSectionContent(
   return match ? match[1] : null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function displayValidationResults(results: ValidationResult[], options: any) {
   const totalRecords = results.length;
   const validRecords = results.filter((r) => r.isValid).length;

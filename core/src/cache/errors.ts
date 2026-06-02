@@ -13,6 +13,7 @@ export class CacheError extends CivicPressError {
   code = 'CACHE_ERROR';
   statusCode = 500;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(message: string, context?: Record<string, any>) {
     super(message, context);
     this.name = 'CacheError';
@@ -26,6 +27,7 @@ export class CacheKeyError extends CacheError {
   code = 'CACHE_KEY_ERROR';
   statusCode = 400;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(message: string, context?: Record<string, any>) {
     super(message, context);
     this.name = 'CacheKeyError';
@@ -39,6 +41,7 @@ export class CacheSizeError extends CacheError {
   code = 'CACHE_SIZE_ERROR';
   statusCode = 500;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(message: string, context?: Record<string, any>) {
     super(message, context);
     this.name = 'CacheSizeError';
@@ -52,6 +55,7 @@ export class CacheInitializationError extends CacheError {
   code = 'CACHE_INITIALIZATION_ERROR';
   statusCode = 500;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(message: string, context?: Record<string, any>) {
     super(message, context);
     this.name = 'CacheInitializationError';

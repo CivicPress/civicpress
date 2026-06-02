@@ -14,6 +14,7 @@ export interface HealthCheckResult {
   latency?: number; // milliseconds
   error?: string;
   timestamp: Date;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: Record<string, any>;
 }
 

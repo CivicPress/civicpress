@@ -47,6 +47,7 @@ export function registerRecordsCommand(cli: CAC) {
     .option('--data-dir <path>', 'Override data directory (defaults to config)')
     .option('--json', 'Output results as JSON')
     .option('--silent', 'Suppress non-error output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();

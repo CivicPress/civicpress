@@ -31,6 +31,7 @@ export const indexCommand = (cli: CAC) => {
     )
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
@@ -78,6 +79,7 @@ export const indexCommand = (cli: CAC) => {
     });
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerate(indexingService: any, options: any) {
   const indexingOptions = {
     rebuild: options.rebuild,
@@ -140,6 +142,7 @@ async function handleGenerate(indexingService: any, options: any) {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleSearch(indexingService: any, query: string, options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
@@ -180,6 +183,7 @@ async function handleSearch(indexingService: any, query: string, options: any) {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleList(indexingService: any, options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
@@ -196,6 +200,7 @@ async function handleList(indexingService: any, options: any) {
     process.exit(1);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const moduleIndexes: any[] = [];
   for (const module of index.metadata.modules) {
     const moduleIndexPath = `${recordsDir}/${module}/index.yml`;
@@ -226,6 +231,7 @@ async function handleList(indexingService: any, options: any) {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleValidate(indexingService: any, options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;

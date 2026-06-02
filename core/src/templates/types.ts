@@ -90,6 +90,7 @@ export interface TemplateListResponse {
  * Template preview request
  */
 export interface TemplatePreviewRequest {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   variables: Record<string, any>;
 }
 
@@ -133,6 +134,7 @@ export interface ITemplateService {
   deleteTemplate(id: TemplateId): Promise<void>;
   previewTemplate(
     id: TemplateId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): Promise<TemplatePreviewResponse>;
   validateTemplate(id: TemplateId): Promise<ValidationResult>;

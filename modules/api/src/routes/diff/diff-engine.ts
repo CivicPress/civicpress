@@ -88,7 +88,9 @@ export async function compareRecordVersions(
 }
 
 export function compareMetadata(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata1: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata2: Record<string, any>
 ): MetadataChange[] {
   const changes: MetadataChange[] = [];

@@ -37,6 +37,7 @@ export interface StorageProvider {
   // GCS provider config
   project_id?: string;
   // Provider-specific options
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options?: Record<string, any>;
 }
 
@@ -149,6 +150,7 @@ export interface FileInfo {
   mime_type: string;
   created: Date;
   modified: Date;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -167,6 +169,7 @@ export interface StorageOperation {
   timestamp: Date;
   success: boolean;
   error?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 

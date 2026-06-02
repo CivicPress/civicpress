@@ -14,6 +14,7 @@ export class ServiceRegistry {
   /**
    * Map of registered services
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private services = new Map<string | Class<any>, ServiceMetadata>();
 
   /**
@@ -47,6 +48,7 @@ export class ServiceRegistry {
    * @param key - Service key
    * @returns True if service is registered
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   has(key: string | Class<any>): boolean {
     return this.services.has(key);
   }
@@ -56,6 +58,7 @@ export class ServiceRegistry {
    *
    * @returns Array of all registered keys
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getRegisteredKeys(): Array<string | Class<any>> {
     return Array.from(this.services.keys());
   }

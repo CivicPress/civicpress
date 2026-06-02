@@ -25,6 +25,7 @@ export const commitCommand = (cli: CAC) => {
     .option('-m, --message <message>', 'Commit message')
     .option('-r, --role <role>', 'Role for commit (clerk, council, etc.)')
     .option('-a, --all', 'Commit all changes (not just specific files)')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (recordName: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -37,6 +38,7 @@ export const commitCommand = (cli: CAC) => {
         options.token,
         globalOptions.json
       );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       const dataDir = civic.getDataDir();

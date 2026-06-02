@@ -76,6 +76,7 @@ export class TemplateEngine {
 
   // ----- content generation (delegated to TemplateGenerator) -----
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   generateContent(template: Template, variables: Record<string, any> = {}): string {
     return this.generator.generateContent(template, variables);
   }

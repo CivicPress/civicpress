@@ -14,6 +14,7 @@ export class CircularDependencyDetector {
   /**
    * Stack tracking the current resolution path
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private resolutionStack: Array<string | Class<any>> = [];
 
   /**
@@ -22,6 +23,7 @@ export class CircularDependencyDetector {
    * @param key - Service key to check
    * @throws CircularDependencyError if a cycle is detected
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   check(key: string | Class<any>): void {
     if (this.resolutionStack.includes(key)) {
       const cycle = [...this.resolutionStack, key];
@@ -34,6 +36,7 @@ export class CircularDependencyDetector {
    *
    * @param key - Service key entering resolution
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   enter(key: string | Class<any>): void {
     this.resolutionStack.push(key);
   }
@@ -50,6 +53,7 @@ export class CircularDependencyDetector {
    *
    * @returns Copy of the current resolution stack
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getCycle(): Array<string | Class<any>> {
     return [...this.resolutionStack];
   }

@@ -442,6 +442,7 @@ export class TemplateService implements ITemplateService {
    */
   async previewTemplate(
     id: TemplateId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): Promise<TemplatePreviewResponse> {
     // Get template

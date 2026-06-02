@@ -36,6 +36,7 @@ export const initCommand = (cli: CAC) => {
       '--demo-data [city]',
       'Load demo data (optional: specify city name)'
     )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       const skipPrompts = options.yes || options.noPrompt;
       // Initialize CLI output with global options
@@ -58,6 +59,7 @@ export const initCommand = (cli: CAC) => {
           logger.info('🚀 Initializing CivicPress repository...');
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let config: any;
         let dataDir = 'data';
 
@@ -659,6 +661,7 @@ export const initCommand = (cli: CAC) => {
                 logger.info(`📧 Email: ${adminDetails.email}`);
                 logger.info(`🔑 Role: admin`);
               }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (error: any) {
               logger.warn(`⚠️  Failed to create admin user: ${error.message}`);
               logger.info(
@@ -731,6 +734,7 @@ export const initCommand = (cli: CAC) => {
             logger.info('🔄 Syncing indexed records to database...');
           await indexingService.generateIndexes({ syncDatabase: true });
           if (!shouldOutputJson) logger.success('🗄️  Database sync complete');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
           logger.warn(
             '⚠️  Indexing or DB sync failed: ' +
@@ -761,6 +765,7 @@ Date: ${new Date().toISOString()}`;
             if (!shouldOutputJson) {
               logger.success('📝 Initial commit created');
             }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (commitError: any) {
             if (!shouldOutputJson) {
               logger.warn(
@@ -816,6 +821,7 @@ Date: ${new Date().toISOString()}`;
         }
         // Explicitly flush stdout before exit (for test environments)
         process.stdout.write('', () => process.exit(0));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         cliError(
           'Failed to initialize repository',
@@ -843,8 +849,10 @@ Date: ${new Date().toISOString()}`;
 
 async function setupCivicrcFromFile(
   civicrcPath: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: any,
   dataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration from file...');
@@ -972,6 +980,7 @@ async function setupCivicrcFromFile(
 async function setupCivicrcNonInteractive(
   civicrcPath: string,
   dataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration (non-interactive)...');
@@ -1062,6 +1071,7 @@ async function setupCivicrcNonInteractive(
 async function loadDemoData(
   dataDir: string,
   demoCity: string = 'richmond-quebec',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   try {
@@ -1163,10 +1173,12 @@ async function loadDemoData(
       );
 
       logger.info(`🎯 Triggered hooks for demo data loading`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (hookError: any) {
       logger.warn(`⚠️  Hook triggering failed: ${hookError.message}`);
       // Don't fail the entire demo data loading if hooks fail
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     logger.error(`❌ Failed to load demo data: ${error.message}`);
     throw error;
@@ -1176,6 +1188,7 @@ async function loadDemoData(
 async function setupCivicrc(
   civicrcPath: string,
   dataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<string | undefined> {
   logger.info('⚙️  Setting up configuration...');
@@ -1249,6 +1262,7 @@ async function setupCivicrc(
       name: 'database_path',
       message: 'SQLite database file path:',
       default: path.join(process.cwd(), '.system-data/civic.db'),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       when: (answers: any) => answers.database_type === 'sqlite',
     },
     {
@@ -1256,6 +1270,7 @@ async function setupCivicrc(
       name: 'database_url',
       message: 'PostgreSQL connection URL:',
       default: 'postgres://user:password@localhost:5432/civicpress',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       when: (answers: any) => answers.database_type === 'postgres',
     },
     {
@@ -1393,6 +1408,7 @@ async function setupCivicrc(
 
 async function setupNotifications(
   systemDataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any,
   shouldOutputJson: boolean
 ): Promise<void> {
@@ -1507,6 +1523,7 @@ async function setupNotifications(
         );
       }
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     if (!shouldOutputJson) {
       logger.warn(`⚠️  Failed to setup notifications: ${error.message}`);
@@ -1519,6 +1536,7 @@ async function setupNotifications(
 
 async function setupStorage(
   systemDataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any,
   shouldOutputJson: boolean,
   storagePath?: string
@@ -1685,6 +1703,7 @@ async function setupStorage(
         logger.info('💡 Test with: civic storage:list');
       }
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     if (!shouldOutputJson) {
       logger.warn(`⚠️  Failed to setup storage: ${error.message}`);

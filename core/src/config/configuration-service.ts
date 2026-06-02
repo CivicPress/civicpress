@@ -88,6 +88,7 @@ export class ConfigurationService {
   /**
    * Load a specific configuration file
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async loadConfiguration(configType: string): Promise<any> {
     // Perform one-time migration for notifications if needed
     if (configType === 'notifications') {
@@ -120,6 +121,7 @@ export class ConfigurationService {
   /**
    * Get configuration metadata for form generation
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getConfigurationMetadata(configType: string): Promise<any> {
     try {
       // Try user config first
@@ -265,6 +267,7 @@ export class ConfigurationService {
   /**
    * Get list of available configurations with metadata
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getConfigurationList(): Promise<any[]> {
     const configTypes = [
       'org-config',

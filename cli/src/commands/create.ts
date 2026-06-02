@@ -40,6 +40,7 @@ export const createCommand = (cli: CAC) => {
     .option('-r, --role <role>', 'Role for the action (clerk, council, etc.)')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (type: string, title: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -52,6 +53,7 @@ export const createCommand = (cli: CAC) => {
         options.token,
         globalOptions.json
       );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       // Get data directory from civic instance

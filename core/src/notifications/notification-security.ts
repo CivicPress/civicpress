@@ -66,6 +66,7 @@ export class NotificationSecurity {
   /**
    * Sanitize content to remove PII
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sanitizeContent(data: Record<string, any>): Record<string, any> {
     const sanitized = { ...data };
 

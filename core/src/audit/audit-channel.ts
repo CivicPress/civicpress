@@ -41,6 +41,7 @@ export type AuditEvent = {
   /** Human-readable message. */
   message?: string;
   /** Free-form structured details (saga step, error class, etc.). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: Record<string, any>;
 };
 
@@ -106,6 +107,7 @@ export class AuditChannel {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private stringifyDetails(details?: Record<string, any>): string | undefined {
     if (!details) return undefined;
     try {

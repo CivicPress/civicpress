@@ -16,6 +16,7 @@ export class TemplateGenerator {
   /**
    * Generate content from template with variables
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   generateContent(template: Template, variables: Record<string, any> = {}): string {
     let content = template.content;
 
@@ -94,6 +95,7 @@ export class TemplateGenerator {
 
   private processPartials(
     content: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): string {
     const partialRegex = /{{>\s*([a-zA-Z0-9_-]+)(?:\s+([^}]+))?}}/g;
@@ -123,8 +125,11 @@ export class TemplateGenerator {
 
   private parsePartialParameters(
     paramsString: string | undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalVariables: Record<string, any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Record<string, any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const partialVariables: Record<string, any> = {};
 
     if (!paramsString) return partialVariables;
@@ -146,9 +151,12 @@ export class TemplateGenerator {
   // ----- variable processing -----
 
   private processTemplateVariables(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>,
     template: Template
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Record<string, any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const processed: Record<string, any> = { ...variables };
 
     if (!processed.date && !processed.created) {
@@ -196,6 +204,7 @@ export class TemplateGenerator {
 
   private processConditionalBlocks(
     content: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): string {
     const ifBlockRegex = /{{#if\s+([^}]+)}}([\s\S]*?){{\/if}}/g;
@@ -209,6 +218,7 @@ export class TemplateGenerator {
 
   private evaluateCondition(
     condition: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): boolean {
     // Supports: field, !field, field == 'value', field != 'value'

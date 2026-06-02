@@ -218,6 +218,7 @@ export class StorageConfigurationError extends ValidationError {
       field?: string;
       provider?: string;
       missing?: string[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       invalid?: Record<string, any>;
     }
   ) {

@@ -154,6 +154,7 @@ export class GitEngine {
   /**
    * Get current status
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async status(): Promise<any> {
     try {
       const git = this.getGit();

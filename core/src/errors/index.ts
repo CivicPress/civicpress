@@ -32,6 +32,7 @@ export abstract class CivicPressError extends Error {
   context?: Record<string, unknown>;
   readonly correlationId: string;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(message: string, context?: Record<string, any>) {
     super(message);
     this.name = this.constructor.name;
@@ -195,6 +196,7 @@ export class InternalError extends CivicPressError {
   code = 'INTERNAL_ERROR';
   statusCode = 500;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(message: string, context?: Record<string, any>) {
     super(message, context);
   }

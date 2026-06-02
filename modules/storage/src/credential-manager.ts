@@ -359,6 +359,7 @@ export class CredentialManager {
   /**
    * Mask sensitive information in credentials for logging
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   maskCredentials(credentials: ProviderCredentials): Record<string, any> {
     if ('accessKeyId' in credentials) {
       // S3 credentials

@@ -17,6 +17,7 @@ export class AuthUtils {
   static async validateAuth(
     token: string | undefined,
     shouldOutputJson: boolean = false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any> {
     // Check if token is provided
     if (!token) {
@@ -133,6 +134,7 @@ export class AuthUtils {
   static async requireAuth(
     token: string | undefined,
     shouldOutputJson: boolean = false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any> {
     const { user } = await this.validateAuth(token, shouldOutputJson);
     return user;
@@ -147,6 +149,7 @@ export class AuthUtils {
   static async requireAuthWithCivic(
     token: string | undefined,
     shouldOutputJson: boolean = false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<{ user: any; civic: CivicPress }> {
     return await this.validateAuth(token, shouldOutputJson);
   }

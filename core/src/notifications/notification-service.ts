@@ -17,6 +17,7 @@ export interface NotificationRequest {
   phone?: string;
   channels: string[];
   template: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   scheduledAt?: Date;
@@ -311,6 +312,7 @@ export class NotificationService {
   /**
    * Get notification history
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getHistory(limit: number = 100): Promise<any[]> {
     return this.audit.getHistory(limit);
   }

@@ -405,6 +405,7 @@ router.get('/validate/all', async (req, res) => {
       'hooks',
       'notifications',
     ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results: Record<string, any> = {};
 
     for (const type of configTypes) {

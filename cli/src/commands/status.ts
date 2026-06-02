@@ -55,6 +55,7 @@ export function statusCommand(cli: CAC) {
       '--dry-run-hooks <hooks>',
       'Dry-run specific hooks (comma-separated)'
     )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (recordName: string, newStatus: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -62,6 +63,7 @@ export function statusCommand(cli: CAC) {
 
       const endOperation = cliStartOperation('status');
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       try {
@@ -167,6 +169,7 @@ export function statusCommand(cli: CAC) {
         }
 
         // Update frontmatter
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updatedFrontmatter: any = {
           ...frontmatter,
           status: newStatus,
@@ -182,6 +185,7 @@ export function statusCommand(cli: CAC) {
         }
 
         // Create status color mapping
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const statusColors: Record<string, any> = {
           draft: chalk.yellow,
           proposed: chalk.blue,

@@ -19,6 +19,7 @@ export abstract class DependencyInjectionError extends Error {
  * Thrown when attempting to resolve a service that is not registered
  */
 export class ServiceNotFoundError extends DependencyInjectionError {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(public readonly key: string | any) {
     const keyName = typeof key === 'string' ? key : key.name || 'Unknown';
     super(`Service not found: ${keyName}`);
@@ -29,6 +30,7 @@ export class ServiceNotFoundError extends DependencyInjectionError {
  * Thrown when a circular dependency is detected during resolution
  */
 export class CircularDependencyError extends DependencyInjectionError {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(public readonly cycle: Array<string | any>) {
     const cyclePath = cycle
       .map((key) => (typeof key === 'string' ? key : key.name || 'Unknown'))
@@ -42,6 +44,7 @@ export class CircularDependencyError extends DependencyInjectionError {
  */
 export class ServiceRegistrationError extends DependencyInjectionError {
   constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public readonly key: string | any,
     public readonly reason: string
   ) {
@@ -54,6 +57,7 @@ export class ServiceRegistrationError extends DependencyInjectionError {
  * Thrown when attempting to register a service that is already registered
  */
 export class DuplicateServiceError extends ServiceRegistrationError {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(key: string | any) {
     super(key, 'Service is already registered');
   }
@@ -64,7 +68,9 @@ export class DuplicateServiceError extends ServiceRegistrationError {
  */
 export class MissingDependencyError extends DependencyInjectionError {
   constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public readonly serviceKey: string | any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public readonly missingDependency: string | any
   ) {
     const serviceName =
