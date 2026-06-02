@@ -5,7 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
 import {
   CheckResult,
@@ -16,7 +16,6 @@ import {
 } from '../types.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
   name = 'filesystem';
@@ -35,7 +34,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
   /**
    * Run all filesystem diagnostic checks
    */
-  async check(options?: DiagnosticOptions): Promise<CheckResult> {
+  async check(_options?: DiagnosticOptions): Promise<CheckResult> {
     const checks: CheckResult[] = [];
     const issues: DiagnosticIssue[] = [];
 
@@ -611,7 +610,7 @@ export class FilesystemDiagnosticChecker extends BaseDiagnosticChecker {
    */
   async autoFix(
     issues: DiagnosticIssue[],
-    options?: FixOptions
+    _options?: FixOptions
   ): Promise<FixResult[]> {
     const results: FixResult[] = [];
 

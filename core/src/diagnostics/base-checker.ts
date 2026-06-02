@@ -13,7 +13,6 @@ import {
   DiagnosticError,
   FixResult,
   FixOptions,
-  CheckStatus,
   DiagnosticSeverity,
   DiagnosticOptions,
 } from './types.js';
@@ -41,8 +40,8 @@ export abstract class BaseDiagnosticChecker implements DiagnosticChecker {
    * Attempt to auto-fix issues (optional, can be overridden)
    */
   async autoFix(
-    issues: DiagnosticIssue[],
-    options?: FixOptions
+    _issues: DiagnosticIssue[],
+    _options?: FixOptions
   ): Promise<FixResult[]> {
     // Default implementation: no auto-fix
     this.logger.warn(

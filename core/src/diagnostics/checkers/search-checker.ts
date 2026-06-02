@@ -5,7 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../../utils/error-narrow.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { DatabaseService } from '../../database/database-service.js';
 import { SearchService } from '../../search/search-service.js';
 import { Logger } from '../../utils/logger.js';
@@ -54,7 +54,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
   /**
    * Run all search diagnostic checks
    */
-  async check(options?: DiagnosticOptions): Promise<CheckResult> {
+  async check(_options?: DiagnosticOptions): Promise<CheckResult> {
     const checks: CheckResult[] = [];
     const issues: DiagnosticIssue[] = [];
 
@@ -401,7 +401,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
           await this.searchService.search(query, { limit: 10 });
           const duration = Date.now() - startTime;
           performanceResults.push(duration);
-        } catch (error: unknown) {
+        } catch {
           // If query fails, skip it
           continue;
         }
@@ -539,7 +539,7 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
           } else {
             errorCount++;
           }
-        } catch (error: unknown) {
+        } catch {
           errorCount++;
         }
       }
@@ -592,7 +592,6 @@ export class SearchDiagnosticChecker extends BaseDiagnosticChecker {
           try {
             const adapter = this.databaseService.getAdapter();
             const adapterConfig = adapter.getConfig();
-            const dbPath = adapterConfig.sqlite?.file;
             const backupDir = path.join(this.dataDir, 'exports', 'backups');
 
             const backup = await BackupService.createBackup({

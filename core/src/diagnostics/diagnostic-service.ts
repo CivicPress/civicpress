@@ -16,7 +16,7 @@ import {
   DiagnosticStatus,
   CheckResult,
 } from './types.js';
-import { errorMessage, errorStack, errorCode, errorName, toError } from '../utils/error-narrow.js';
+import { errorMessage, errorStack, errorCode } from '../utils/error-narrow.js';
 import { DatabaseService } from '../database/database-service.js';
 import { SearchService } from '../search/search-service.js';
 import { CentralConfigManager } from '../config/central-config.js';
@@ -27,7 +27,6 @@ import type { CircuitBreakerStats } from './types.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { DiagnosticCacheAdapter } from './diagnostic-cache-adapter.js';
 import { CheckExecutor } from './check-executor.js';
-import { sanitizeDiagnosticReport } from './utils/sanitizer.js';
 import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 import * as crypto from 'crypto';
 
