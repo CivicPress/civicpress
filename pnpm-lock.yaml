@@ -548,9 +548,6 @@ importers:
       '@typescript-eslint/eslint-plugin':
         specifier: 8.60.0
         version: 8.60.0(@typescript-eslint/parser@8.60.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
-      '@typescript-eslint/parser':
-        specifier: 8.60.0
-        version: 8.60.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       '@vitejs/plugin-vue':
         specifier: 6.0.3
         version: 6.0.3(vite@7.3.5(@types/node@20.19.41)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.35(typescript@5.9.3))
