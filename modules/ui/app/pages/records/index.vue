@@ -409,7 +409,7 @@ const scrollToTop = () => {
           :is-searching="isSearching"
           :current-page="page"
           :page-size="pageSize"
-          @resetFilters="resetAllFilters"
+          @reset-filters="resetAllFilters"
           @page-change="handlePageChange"
           @page-size-change="handlePageSizeChange"
         />

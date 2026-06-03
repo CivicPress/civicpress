@@ -45,7 +45,8 @@ export const useLoading = () => {
 
   const clearLoading = (key?: string) => {
     if (key) {
-      delete loadingStates.value[key];
+      const { [key]: _removed, ...rest } = loadingStates.value;
+      loadingStates.value = rest;
     } else {
       loadingStates.value = {};
     }

@@ -531,7 +531,7 @@ const breadcrumbItems = computed(() => [
           :is-searching="isSearching"
           :current-page="page"
           :page-size="pageSize"
-          @resetFilters="resetFilters"
+          @reset-filters="resetFilters"
           @page-change="handlePageChange"
           @page-size-change="handlePageSizeChange"
         />

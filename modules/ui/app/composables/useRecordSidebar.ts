@@ -29,9 +29,10 @@ export interface RecordSidebarProps {
 }
 
 export type RecordSidebarEmit = {
-  (e: 'update:recordType', value: string): void;
-  (e: 'update:status', value: string): void;
-  (e: 'update:workflowState', value: string): void;
+  (
+    e: 'update:recordType' | 'update:status' | 'update:workflowState',
+    value: string
+  ): void;
   (
     e: 'update:linkedGeographyFiles',
     value: RecordSidebarProps['linkedGeographyFiles']
