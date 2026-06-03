@@ -18,10 +18,7 @@ import type { GeographyCategory, GeographyFileType } from '@civicpress/core';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import {
   handleApiError,
-  logApiError,
   logApiSuccess,
-  sendSuccess,
-  handleValidationError as apiHandleValidationError,
 } from '../utils/api-logger.js';
 
 export function createGeographyRouter(geographyManager: GeographyManager) {

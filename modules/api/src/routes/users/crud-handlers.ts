@@ -179,7 +179,7 @@ export function registerCrudRoutes(router: Router): void {
           target: { type: 'user', id: newUser.id, name: newUser.username },
           outcome: 'success',
         });
-      } catch (auditError) {
+      } catch {
         // Continue with response even if audit logging fails
       }
 
@@ -210,7 +210,7 @@ export function registerCrudRoutes(router: Router): void {
           outcome: 'failure',
           message: String(error),
         });
-      } catch (auditError) {
+      } catch {
         // Continue even if audit logging fails
       }
       handleApiError('create_user', error, req, res, 'Failed to create user');

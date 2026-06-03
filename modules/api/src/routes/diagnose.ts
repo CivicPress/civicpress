@@ -58,7 +58,7 @@ export function createDiagnoseRouter() {
       }
 
       const dataDir = civicPress.getDataDir();
-      const { component, fix, format, timeout, maxConcurrency } = req.query;
+      const { component, fix, timeout, maxConcurrency } = req.query;
 
       // Initialize diagnostic service
       const diagnosticService = new DiagnosticService({

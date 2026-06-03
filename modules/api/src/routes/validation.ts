@@ -17,7 +17,6 @@ import {
 } from '../utils/api-logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 import matter from 'gray-matter';
 
 type Severity = 'error' | 'warning' | 'info';

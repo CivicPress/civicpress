@@ -184,7 +184,7 @@ export function generateContentDiff(
 export function generateUnifiedDiff(
   content1: string,
   content2: string,
-  context: number
+  _context: number
 ): string {
   const lines1 = content1.split('\n');
   const lines2 = content2.split('\n');
@@ -213,7 +213,7 @@ export function generateUnifiedDiff(
 export function generateSideBySideDiff(
   content1: string,
   content2: string,
-  context: number
+  _context: number
 ): { left: DiffLine[]; right: DiffLine[] } {
   const lines1 = content1.split('\n');
   const lines2 = content2.split('\n');

@@ -3,9 +3,6 @@ import {
   Logger,
   CivicPressError,
   isCivicPressError,
-  getErrorCode,
-  getStatusCode,
-  getCorrelationId,
 } from '@civicpress/core';
 
 const logger = new Logger();
@@ -135,7 +132,6 @@ export function errorHandler(
   err: ApiError | CivicPressError,
   req: Request,
   res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ): void {
   const context = extractRequestContext(req);

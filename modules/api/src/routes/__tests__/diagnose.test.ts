@@ -2,13 +2,9 @@
  * Unit Tests for Diagnose API Routes
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import { requireDiagnosticAuth } from '../../middleware/diagnostic-auth.js';
-import { validateDiagnosticParams } from '../../middleware/diagnostic-validation.js';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
 
 describe('Diagnose API Middleware', () => {
   let mockRequest: Partial<Request>;

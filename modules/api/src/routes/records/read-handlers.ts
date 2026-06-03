@@ -338,7 +338,7 @@ export function registerReadRoutes(
               } else {
                 record.hasUnpublishedChanges = false;
               }
-            } catch (error) {
+            } catch {
               // If permission check fails, assume no draft
               record.hasUnpublishedChanges = false;
             }
