@@ -8,7 +8,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
@@ -1084,7 +1083,7 @@ export default function setupUsersCommand(cli: CAC) {
     .command('users:verify-email <token>', 'Verify email change with token')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
-    .action(async (token, options) => {
+    .action(async (token, _options) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);

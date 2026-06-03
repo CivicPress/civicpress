@@ -9,7 +9,6 @@ import {
   cliSuccess,
   cliError,
   cliInfo,
-  cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
 import { AuthUtils } from '../utils/auth-utils.js';

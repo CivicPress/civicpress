@@ -10,7 +10,6 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -19,7 +18,6 @@ import matter from 'gray-matter';
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';

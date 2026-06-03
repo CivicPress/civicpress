@@ -17,7 +17,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliStartOperation,
 } from '../utils/cli-output.js';
 import { fileURLToPath } from 'url';
@@ -1106,7 +1105,7 @@ async function loadDemoData(
     let dbConfig;
     try {
       dbConfig = CentralConfigManager.getDatabaseConfig();
-    } catch (error) {
+    } catch {
       // Database config might not be available during init, that's okay
       logger.info(
         '⚠️  Database config not available, storage file metadata will not be restored'

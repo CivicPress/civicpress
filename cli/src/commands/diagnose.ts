@@ -20,7 +20,6 @@ import {
 import {
   CivicPress,
   DiagnosticService,
-  CentralConfigManager,
   Logger,
   AuditLogger,
   DatabaseDiagnosticChecker,
@@ -431,13 +430,6 @@ function outputHumanReadable(
       : result.status === 'warning'
         ? '⚠️'
         : '❌';
-  const statusColor =
-    result.status === 'healthy'
-      ? 'green'
-      : result.status === 'warning'
-        ? 'yellow'
-        : 'red';
-
   cliRaw(`\n${statusIcon} ${result.component.toUpperCase()}: ${result.status}`);
   cliRaw(`   Duration: ${result.duration}ms`);
   cliRaw(`   Checks: ${result.checks.length}`);

@@ -1,7 +1,7 @@
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { Logger, TemplateEngine, userCan } from '@civicpress/core';
+import { TemplateEngine, userCan } from '@civicpress/core';
 import * as yaml from 'yaml';
 import * as fs from 'fs';
 import {

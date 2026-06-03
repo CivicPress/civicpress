@@ -13,14 +13,12 @@ import {
 } from '@civicpress/core';
 import {
   getGlobalOptionsFromArgs,
-  initializeLogger,
   initializeCliOutput,
 } from '../utils/global-options.js';
 import {
   cliSuccess,
   cliError,
   cliInfo,
-  cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
 

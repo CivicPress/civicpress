@@ -306,7 +306,7 @@ async function getCommitChanges(
     if (diff.includes('R')) changes.push('renamed');
 
     return changes;
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -519,7 +519,7 @@ async function getFileContent(
   try {
     const content = await git.show([`${commit}:${filePath}`]);
     return content || null;
-  } catch (error) {
+  } catch {
     // File doesn't exist in this commit
     return null;
   }
