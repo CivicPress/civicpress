@@ -33,7 +33,24 @@ const STYLE_RULES_TIER_B = {
 // vue/require-default-prop 17). Future sessions can drive these to zero.
 const STYLE_RULES_TIER_C_DEFERRED = {
   'nuxt/prefer-import-meta': 'warn',
-  'vue/multi-word-component-names': 'warn',
+  // 'ignores' exempts Nuxt-convention filenames (file-based routing forces
+  // single-word names like `index`, `login`, `error`, etc.) plus the
+  // single-word brand component `Logo`. A future improvement is to use a
+  // file-pattern override that disables the rule under `pages/`, `layouts/`,
+  // and for `error.vue` automatically; for now, the static list is the
+  // simplest correct fix.
+  'vue/multi-word-component-names': ['warn', {
+    ignores: [
+      // Nuxt root special names
+      'error', 'default', 'index',
+      // Nuxt page filenames (single-word route segments)
+      'login', 'logout', 'register', 'edit', 'new', 'raw', 'create',
+      'activity', 'diagnostics', 'notifications', 'profile', 'setup',
+      'drafts',
+      // Single-word brand component (explicit allow)
+      'Logo',
+    ],
+  }],
   'vue/prop-name-casing': 'warn',
   'vue/require-default-prop': 'warn',
 };
