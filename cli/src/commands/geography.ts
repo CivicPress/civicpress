@@ -15,8 +15,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
-  cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
@@ -223,7 +221,7 @@ async function validateGeographyFile(
 
 async function scanDirectoryForGeography(
   dirPath: string,
-  options: GeographyValidationOptions
+  _options: GeographyValidationOptions
 ) {
   const fullPath = path.resolve(dirPath);
 
@@ -363,29 +361,3 @@ async function findMarkdownFiles(dirPath: string): Promise<string[]> {
   return files;
 }
 
-function displayGeographyValidationResult(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  result: any,
-  options: GeographyValidationOptions
-) {
-  // This function is deprecated - output is now handled by cliSuccess
-  // Keeping function signature for backward compatibility but it won't be called
-}
-
-function displayGeographyScanResults(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  results: any,
-  options: GeographyValidationOptions
-) {
-  // This function is deprecated - output is now handled by cliSuccess
-  // Keeping function signature for backward compatibility but it won't be called
-}
-
-function displayGeographyNormalizationResult(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  result: any,
-  options: GeographyValidationOptions
-) {
-  // This function is deprecated - output is now handled by cliSuccess
-  // Keeping function signature for backward compatibility but it won't be called
-}

@@ -7,14 +7,12 @@ import {
   type EmailChannelOptions,
 } from '@civicpress/core';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -163,9 +161,6 @@ export default function notifyCommand(cli: CAC) {
           provider,
           template,
           variables,
-          json,
-          silent,
-          verbose,
         } = options;
 
         // Initialize configuration
@@ -342,7 +337,7 @@ export default function notifyCommand(cli: CAC) {
     .command('notify:config', 'Show notification configuration')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    .action(async (options) => {
+    .action(async (_options) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);

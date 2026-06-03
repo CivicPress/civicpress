@@ -1,11 +1,9 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
 import { CivicPress, WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter = require('gray-matter');
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -16,7 +14,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -183,21 +180,6 @@ export function statusCommand(cli: CAC) {
         if (options.message) {
           updatedFrontmatter.status_message = options.message;
         }
-
-        // Create status color mapping
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const statusColors: Record<string, any> = {
-          draft: chalk.yellow,
-          proposed: chalk.blue,
-          approved: chalk.green,
-          active: chalk.green,
-          published: chalk.green,
-          archived: chalk.gray,
-          rejected: chalk.red,
-        };
-
-        const statusColor = statusColors[newStatus] || chalk.white;
-        const currentStatusColor = statusColors[currentStatus] || chalk.white;
 
         // Handle dry-run modes
         const isCompleteDryRun = options.dryRun;

@@ -1,7 +1,6 @@
 import { CAC } from 'cac';
 import { AuthUtils } from '../utils/auth-utils.js';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -13,7 +12,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';

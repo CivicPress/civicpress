@@ -164,7 +164,7 @@ export default function setupAuthCommand(cli: CAC) {
     .command('auth:providers', 'List available OAuth providers')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
-    .action(async (options) => {
+    .action(async (_options) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);

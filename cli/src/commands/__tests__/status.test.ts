@@ -23,7 +23,7 @@ describe('Status CLI Command', () => {
   let testDataDir: string;
   let recordsDir: string;
   let originalExit: typeof process.exit;
-  let exitCode: number | null = null;
+  let _exitCode: number | null = null;
 
   beforeEach(() => {
     testDataDir = fs.mkdtempSync(
@@ -39,9 +39,9 @@ describe('Status CLI Command', () => {
     );
 
     originalExit = process.exit;
-    exitCode = null;
+    _exitCode = null;
     process.exit = vi.fn((code?: number) => {
-      exitCode = code ?? 0;
+      _exitCode = code ?? 0;
       throw new Error(`process.exit(${code})`);
     }) as any;
 

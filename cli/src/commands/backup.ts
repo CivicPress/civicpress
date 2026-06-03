@@ -1,8 +1,5 @@
 import { CAC } from 'cac';
 import path from 'path';
-import os from 'os';
-import { promises as fs } from 'fs';
-import tar from 'tar';
 import { createRequire } from 'module';
 import {
   BackupService,
@@ -184,8 +181,8 @@ async function handleRestore(
 function outputCreateResult(
   result: BackupCreateResult,
   tarballPath: string | undefined,
-  jsonOutput: boolean | undefined,
-  logger: ReturnType<typeof initializeLogger>
+  _jsonOutput: boolean | undefined,
+  _logger: ReturnType<typeof initializeLogger>
 ): void {
   const payload = {
     success: true,
@@ -226,8 +223,8 @@ function outputCreateResult(
 
 function outputRestoreResult(
   result: BackupRestoreResult,
-  jsonOutput: boolean | undefined,
-  logger: ReturnType<typeof initializeLogger>
+  _jsonOutput: boolean | undefined,
+  _logger: ReturnType<typeof initializeLogger>
 ): void {
   const payload = {
     success: true,

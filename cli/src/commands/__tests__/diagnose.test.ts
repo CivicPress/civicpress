@@ -13,7 +13,7 @@ describe('Diagnose CLI Command', () => {
   let cli: any;
   let testDataDir: string;
   let originalExit: typeof process.exit;
-  let exitCode: number | null = null;
+  let _exitCode: number | null = null;
 
   beforeEach(() => {
     // Create temporary test directory
@@ -29,9 +29,9 @@ describe('Diagnose CLI Command', () => {
 
     // Mock process.exit
     originalExit = process.exit;
-    exitCode = null;
+    _exitCode = null;
     process.exit = vi.fn((code?: number) => {
-      exitCode = code ?? 0;
+      _exitCode = code ?? 0;
       throw new Error(`process.exit(${code})`);
     }) as any;
 

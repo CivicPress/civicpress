@@ -4,7 +4,6 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { HookSystem } from '@civicpress/core';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -318,7 +317,7 @@ async function listWorkflows(hookSystem: HookSystem) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function showLogs(dataDir: string, options: any) {
+async function showLogs(dataDir: string, _options: any) {
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 
   if (!existsSync(logPath)) {

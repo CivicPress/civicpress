@@ -1,7 +1,6 @@
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -184,7 +183,7 @@ async function handleSearch(indexingService: any, query: string, options: any) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleList(indexingService: any, options: any) {
+async function handleList(indexingService: any, _options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
 
@@ -232,7 +231,7 @@ async function handleList(indexingService: any, options: any) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleValidate(indexingService: any, options: any) {
+async function handleValidate(indexingService: any, _options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
 

@@ -17,7 +17,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -34,7 +33,7 @@ export const viewCommand = (cli: CAC) => {
       initializeCliOutput(globalOptions);
 
       const logger = initializeLogger();
-      const endOperation = cliStartOperation('view');
+      cliStartOperation('view');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
@@ -60,9 +59,6 @@ export const viewCommand = (cli: CAC) => {
 
       try {
         logger.info(`📖 Viewing record: ${recordName}`);
-
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
 
         if (!dataDir) {
           throw new Error('Data directory not found. Run "civic init" first.');

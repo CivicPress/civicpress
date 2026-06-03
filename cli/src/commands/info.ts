@@ -6,7 +6,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliStartOperation,
 } from '../utils/cli-output.js';
 

@@ -2,7 +2,6 @@ import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import * as fs from 'fs';
-import matter = require('gray-matter');
 import { glob } from 'glob';
 import {
   userCan,
@@ -10,7 +9,6 @@ import {
   parseRecordRelativePath,
 } from '@civicpress/core';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';

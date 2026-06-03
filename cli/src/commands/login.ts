@@ -1,17 +1,14 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
 import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import inquirer from 'inquirer';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -19,8 +16,6 @@ import {
 // Node.js globals
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const process: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const console: any;
 
 export const loginCommand = (cli: CAC) => {
   cli

@@ -120,13 +120,13 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
 
         // Initialize storage services
-        const { storageService, configManager } =
+        const { storageService: _storageService, configManager } =
           await initializeStorageServices(civic, dataDir);
 
         if (options.update) {
@@ -138,7 +138,7 @@ export default function setupStorageCommand(cli: CAC) {
           if (options.backend) {
             try {
               updateData.backend = JSON.parse(options.backend);
-            } catch (error) {
+            } catch {
               cliError(
                 'Invalid backend JSON format',
                 'INVALID_JSON',
@@ -152,7 +152,7 @@ export default function setupStorageCommand(cli: CAC) {
           if (options.folders) {
             try {
               updateData.folders = JSON.parse(options.folders);
-            } catch (error) {
+            } catch {
               cliError(
                 'Invalid folders JSON format',
                 'INVALID_JSON',
@@ -166,7 +166,7 @@ export default function setupStorageCommand(cli: CAC) {
           if (options.metadata) {
             try {
               updateData.metadata = JSON.parse(options.metadata);
-            } catch (error) {
+            } catch {
               cliError(
                 'Invalid metadata JSON format',
                 'INVALID_JSON',
@@ -218,7 +218,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -372,7 +372,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -433,7 +433,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -527,7 +527,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -586,7 +586,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -665,7 +665,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -794,7 +794,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -860,7 +860,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -933,7 +933,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -997,7 +997,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -1072,7 +1072,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -1129,7 +1129,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -1189,7 +1189,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -1247,7 +1247,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -1317,7 +1317,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
