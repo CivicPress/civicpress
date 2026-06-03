@@ -5,11 +5,9 @@ import * as path from 'path';
 import {
   ConfigurationService,
   CentralConfigManager,
-  Logger,
 } from '@civicpress/core';
 import { createRequire } from 'module';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -17,7 +15,6 @@ import { AuthUtils } from '../utils/auth-utils.js';
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
