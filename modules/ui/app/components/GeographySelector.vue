@@ -282,7 +282,6 @@ const getCategoryColor = (category: string): NuxtUiColor => {
   return colors[category] || 'neutral';
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in <template> via {{ formatDate(file.created_at) }}
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
 };

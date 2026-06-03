@@ -287,7 +287,6 @@ const getCategoryColor = (category: string): UiBadgeColor => {
   return colors[category] || 'neutral';
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in <template> via {{ formatDate(link.created_at) }}
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
 };

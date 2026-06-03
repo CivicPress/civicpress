@@ -2,7 +2,7 @@
 import withNuxt from './.nuxt/eslint.config.mjs';
 import pluginTs from '@typescript-eslint/eslint-plugin';
 
-const unusedVarsRule = ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }];
+const unusedVarsRule = ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }];
 
 // TODO(lint-style-rules): @nuxt/eslint pulls in many vue/nuxt style rules
 // outside the lint-rule-rollout's scope (spec §7 non-goals). Disabled here
