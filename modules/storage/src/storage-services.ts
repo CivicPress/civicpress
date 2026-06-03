@@ -9,7 +9,6 @@
 
 import path from 'path';
 import type { ServiceContainer, CivicPressConfig } from '@civicpress/core';
-import type { Logger } from '@civicpress/core';
 import type { UnifiedCacheManager } from '@civicpress/core';
 import type { DatabaseService } from '@civicpress/core';
 import { CloudUuidStorageService } from './cloud-uuid-storage-service.js';
@@ -133,9 +132,8 @@ export async function initializeStorageService(
 
   // Try to load actual configuration, but fall back to defaults if file doesn't exist
   // This is important for test environments where config files may not be created
-  let actualConfig;
   try {
-    actualConfig = await configManager.loadConfig();
+    await configManager.loadConfig();
   } catch (error: unknown) {
     // If config file doesn't exist, use default config (service was created with defaults)
     // This is expected in test environments and fresh installations
@@ -144,8 +142,7 @@ export async function initializeStorageService(
       errMessage.includes('not found') ||
       errMessage.includes('Storage configuration not found')
     ) {
-      // Use default config - service was already created with defaults during registration
-      actualConfig = configManager.getDefaultConfig();
+      // Default config already used during registration — nothing to do here
     } else {
       // Re-throw other errors (permission issues, invalid YAML, etc.)
       throw error;

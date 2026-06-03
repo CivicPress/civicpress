@@ -6,7 +6,6 @@
 
 import { Logger } from '@civicpress/core';
 import type {
-  StorageProvider,
   StorageDatabaseService,
   StorageFile,
 } from '../types/storage.types.js';
@@ -82,7 +81,7 @@ export class StorageUsageReporter {
           this.logger.debug('Returning cached storage usage report');
           return cached;
         }
-      } catch (error) {
+      } catch {
         this.logger.debug('Cache miss or error, fetching fresh usage data');
       }
     }
@@ -117,7 +116,7 @@ export class StorageUsageReporter {
         if (cached && !('total' in cached)) {
           return cached;
         }
-      } catch (error) {
+      } catch {
         // Cache miss, continue
       }
     }
@@ -146,7 +145,7 @@ export class StorageUsageReporter {
     if (this.cache) {
       try {
         await this.cache.set(cacheKey, folderUsage, { ttl: this.cacheTTL });
-      } catch (error) {
+      } catch {
         // Ignore cache errors
       }
     }

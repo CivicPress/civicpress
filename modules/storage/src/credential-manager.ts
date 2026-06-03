@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parse, stringify } from 'yaml';
 import {
-  StorageProvider,
   S3Credentials,
   AzureCredentials,
   GCSCredentials,
@@ -239,7 +238,7 @@ export class CredentialManager {
       // For now, we'll return null and let the AWS SDK handle it
       this.logger.info('AWS instance credentials will be handled by AWS SDK');
       return null;
-    } catch (error) {
+    } catch {
       this.logger.debug('No AWS instance credentials available');
       return null;
     }
@@ -254,7 +253,7 @@ export class CredentialManager {
       // For now, we'll return null and let the Azure SDK handle it
       this.logger.info('Azure managed identity will be handled by Azure SDK');
       return null;
-    } catch (error) {
+    } catch {
       this.logger.debug('No Azure managed identity available');
       return null;
     }
@@ -271,7 +270,7 @@ export class CredentialManager {
         'GCP instance credentials will be handled by Google SDK'
       );
       return null;
-    } catch (error) {
+    } catch {
       this.logger.debug('No GCP instance credentials available');
       return null;
     }

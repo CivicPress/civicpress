@@ -64,9 +64,7 @@ describe('StorageFailoverManager', () => {
     });
 
     it('should failover to backup provider on primary failure', async () => {
-      let callCount = 0;
       const operation = vi.fn().mockImplementation((provider: string) => {
-        callCount++;
         if (provider === 'primary') {
           throw new Error('Primary failed');
         }
@@ -89,9 +87,7 @@ describe('StorageFailoverManager', () => {
     });
 
     it('should try failover providers in order', async () => {
-      let callCount = 0;
       const operation = vi.fn().mockImplementation((provider: string) => {
-        callCount++;
         if (provider === 'primary' || provider === 'backup1') {
           throw new Error(`${provider} failed`);
         }

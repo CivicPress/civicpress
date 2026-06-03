@@ -52,7 +52,7 @@ export class BatchOps {
         // If validation fails completely, return all as failed
         return {
           successful: [],
-          failed: request.files.map((file) => ({
+          failed: request.files.map((_file) => ({
             file: {} as StorageFile,
             success: false,
             error: validation.errors.join(', '),

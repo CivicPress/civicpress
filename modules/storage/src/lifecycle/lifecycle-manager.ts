@@ -5,7 +5,7 @@
  */
 
 import { Logger } from '@civicpress/core';
-import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
+import type { StorageFile , StorageDatabaseService } from '../types/storage.types.js';
 
 export interface LifecyclePolicy {
   name: string;

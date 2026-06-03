@@ -6,7 +6,6 @@
 
 import { Logger } from '@civicpress/core';
 import type { StorageConfig } from '../types/storage.types.js';
-import { ProviderUnavailableError } from '../errors/storage-errors.js';
 
 export interface HealthCheckResult {
   provider: string;

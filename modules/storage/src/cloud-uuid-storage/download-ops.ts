@@ -8,7 +8,7 @@
 
 import fs from 'fs-extra';
 import { loadAwsS3Sdk } from './sdk-loader.js';
-import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
+import type { StorageFile , StorageProvider } from '../types/storage.types.js';
 import {
   withTimeout,
   getTimeoutForOperation,
@@ -51,7 +51,6 @@ export class DownloadOps {
   async getFileContent(id: string): Promise<Buffer | null> {
     const host = this.deps.host;
     const startTime = Date.now();
-    let error: string | undefined;
     let success = false;
     let provider: string = host.config.active_provider || 'local';
 
@@ -128,7 +127,6 @@ export class DownloadOps {
 
       return result;
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Unknown error';
       host.logger.error('Failed to get file content:', err);
 
       // Record metrics
@@ -336,7 +334,6 @@ export class DownloadOps {
     const startTime = Date.now();
     let provider: string | undefined;
     let success = false;
-    let error: string | undefined;
 
     try {
       const listOperation = async () => {
@@ -383,7 +380,6 @@ export class DownloadOps {
 
       return result;
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Unknown error';
       host.logger.error('Failed to list files:', err);
 
       // Record metrics

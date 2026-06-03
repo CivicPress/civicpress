@@ -8,7 +8,6 @@
  */
 
 import { Logger } from '@civicpress/core';
-import { OrphanedFileError } from '../errors/storage-errors.js';
 import type {
   StorageFile,
   StorageProvider,
@@ -227,7 +226,6 @@ export class OrphanedFileCleaner {
 
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
-        const relativePath = path.relative(basePath, fullPath);
 
         if (entry.isDirectory()) {
           await scanDirectory(fullPath, basePath);

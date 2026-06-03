@@ -9,7 +9,7 @@
 
 import fs from 'fs-extra';
 import { loadAwsS3Sdk } from './sdk-loader.js';
-import type { StorageFile , StorageProvider, StorageDatabaseService } from '../types/storage.types.js';
+import type { StorageFile , StorageProvider } from '../types/storage.types.js';
 import {
   withTimeout,
   getTimeoutForOperation,
