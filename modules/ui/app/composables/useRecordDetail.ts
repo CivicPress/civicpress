@@ -130,67 +130,6 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
     });
   };
 
-  const normalizeOrderedLists = (root: HTMLElement) => {
-    const olElements = root.querySelectorAll('ol');
-    olElements.forEach((ol) => {
-      const items = Array.from(ol.children).filter(
-        (child) => child.tagName === 'LI'
-      );
-      items.forEach((item) => {
-        const li = item as HTMLElement;
-        const rawSegments = li.innerHTML
-          .split(/<br\s*\/?>/i)
-          .map((segment) => segment.trim())
-          .filter((segment): segment is string => segment.length > 0);
-
-        if (rawSegments.length <= 1) {
-          return;
-        }
-
-        li.innerHTML = rawSegments[0] ?? '';
-
-        const parentStack: HTMLElement[] = [li];
-
-        rawSegments.slice(1).forEach((segment) => {
-          const match = segment.match(/^(\d+(?:\.\d+)*)(?:\.)?\s*(.*)$/);
-          if (!match) {
-            const wrapper = document.createElement('span');
-            wrapper.innerHTML = segment;
-            li.appendChild(document.createElement('br'));
-            li.appendChild(wrapper);
-            return;
-          }
-
-          const matchedNumber = match[1] ?? '';
-          const matchedText = match[2] ?? '';
-          const depth = matchedNumber.split('.').length;
-          const contentText = matchedText.trim() || matchedNumber.trim();
-
-          if (!contentText) {
-            return;
-          }
-
-          while (parentStack.length >= depth) {
-            parentStack.pop();
-          }
-
-          const currentParent = parentStack[parentStack.length - 1] ?? li;
-
-          let nestedOl = currentParent.querySelector(':scope > ol');
-          if (!nestedOl) {
-            nestedOl = document.createElement('ol');
-            currentParent.appendChild(nestedOl);
-          }
-
-          const newLi = document.createElement('li');
-          newLi.innerHTML = contentText;
-          nestedOl.appendChild(newLi);
-          parentStack.push(newLi);
-        });
-      });
-    });
-  };
-
   const applyLinkTransformations = () => {
     if (!process.client) {
       return;

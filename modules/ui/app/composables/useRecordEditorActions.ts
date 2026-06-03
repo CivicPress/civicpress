@@ -561,7 +561,7 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
           color: 'primary',
         });
       }
-    } catch (err: unknown) {
+    } catch {
       // Fallback: construct markdown manually if API doesn't support export
       try {
         const fullResponse = (await $civicApi(

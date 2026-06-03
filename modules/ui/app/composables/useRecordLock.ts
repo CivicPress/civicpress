@@ -22,7 +22,7 @@ interface UseRecordLockOptions {
 export function useRecordLock(options: UseRecordLockOptions) {
   const {
     recordId,
-    lockDurationMinutes = 30,
+    lockDurationMinutes: _lockDurationMinutes = 30,
     pollIntervalMs = 30000, // 30 seconds
     onLockAcquired,
     onLockLost,
