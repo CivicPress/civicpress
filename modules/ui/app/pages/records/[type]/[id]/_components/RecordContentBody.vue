@@ -25,11 +25,8 @@ defineExpose({ markdownContainer });
         @click="$emit('contentClick', $event)"
       >
         <!-- Render markdown content -->
-        <div
-          ref="markdownContainer"
-          class="prose prose-sm max-w-none prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
-          v-html="renderedContent"
-        />
+        <!-- eslint-disable-next-line vue/no-v-html -- sanitized via DOMPurify.sanitize() in renderMarkdown (useMarkdown composable), called from useRecordDetail before this prop is passed -->
+        <div ref="markdownContainer" class="prose prose-sm max-w-none prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline" v-html="renderedContent" />
       </div>
       <div v-else class="text-gray-500 dark:text-gray-400 italic">
         {{ t('records.noContentAvailable') }}
