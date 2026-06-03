@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRecordStatuses } from '~/composables/useRecordStatuses';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
-const { t } = useI18n();
+const { t, tPlural } = useTypedI18n();
 
 interface Props {
   title: string;
@@ -285,8 +286,7 @@ const formatTime = (date: Date) => {
   if (minutes < 60)
     // vue-i18n's `t()` has multiple overloads but TS picks the simplest;
     // cast to access the (key, count, named-params) overload for pluralization.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (t as any)('records.editor.minutesAgo', minutes, { count: minutes });
+    return tPlural('records.editor.minutesAgo', minutes);
   return date.toLocaleTimeString();
 };
 </script>

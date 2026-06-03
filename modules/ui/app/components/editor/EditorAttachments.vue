@@ -2,8 +2,9 @@
 import { ref, onMounted } from 'vue';
 import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
 import { useAttachmentTypes } from '~/composables/useAttachmentTypes';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
-const { t } = useI18n();
+const { t, tPlural } = useTypedI18n();
 
 interface Props {
   attachedFiles: Array<{
@@ -53,10 +54,7 @@ const handleFilesSelected = (files: SelectedFile[]) => {
     title: t('records.filesAdded'),
     // vue-i18n's `t()` has overloads but TS picks the simplest; cast to access
     // the (key, count, named-params) pluralization overload.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    description: (t as any)('records.filesAttachedToRecord', files.length, {
-      count: files.length,
-    }),
+    description: tPlural('records.filesAttachedToRecord', files.length),
     color: 'primary',
   });
 };
