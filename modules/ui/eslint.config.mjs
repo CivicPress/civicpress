@@ -13,8 +13,9 @@ const STYLE_RULES_TIER_A = {
 };
 
 // Tier B: code quality — `warn`, all sites cleaned (or zero sites) in
-// followup #4. Includes 4 zero-violation rules enabled for future
-// regression detection.
+// followup #4. Includes zero-violation rules enabled for regression
+// detection. Three former Tier C rules joined Tier B in the 2026-06-03
+// Tier C cleanup once their live sites reached zero.
 const STYLE_RULES_TIER_B = {
   'vue/require-explicit-emits': 'warn',
   'vue/no-template-shadow': 'warn',
@@ -25,15 +26,11 @@ const STYLE_RULES_TIER_B = {
   '@typescript-eslint/no-dynamic-delete': 'warn',
   '@typescript-eslint/unified-signatures': 'warn',
   'import/first': 'warn',
-};
-
-// Tier C: deferred — `warn`-signal, sites accumulate for a future focused
-// session. ~89 live warnings expected (nuxt/prefer-import-meta 33,
-// vue/multi-word-component-names 35, vue/prop-name-casing 4,
-// vue/require-default-prop 17). Future sessions can drive these to zero.
-const STYLE_RULES_TIER_C_DEFERRED = {
+  // Cleared in lint Tier-C cleanup 2026-06-03; kept as `warn`-level
+  // regression detection.
   'nuxt/prefer-import-meta': 'warn',
-  // 'ignores' exempts Nuxt-convention filenames (file-based routing forces
+  'vue/prop-name-casing': 'warn',
+  // `ignores` exempts Nuxt-convention filenames (file-based routing forces
   // single-word names like `index`, `login`, `error`, etc.) plus the
   // single-word brand component `Logo`. A future improvement is to use a
   // file-pattern override that disables the rule under `pages/`, `layouts/`,
@@ -51,8 +48,6 @@ const STYLE_RULES_TIER_C_DEFERRED = {
       'Logo',
     ],
   }],
-  'vue/prop-name-casing': 'warn',
-  'vue/require-default-prop': 'warn',
 };
 
 // Tier D: kept off — Prettier owns formatting; outdated for Vue 3; low
@@ -70,6 +65,11 @@ const STYLE_RULES_TIER_D_OFF = {
   'vue/attributes-order': 'off',
   'vue/no-multiple-template-root': 'off',
   'nuxt/nuxt-config-keys-order': 'off',
+  // Vue 2-era rule: with `defineProps<{ x?: T }>()` TypeScript already
+  // distinguishes required vs optional props. The rule asks for
+  // `withDefaults(...)` at every site, which is busywork for TS-first
+  // components. Relocated from Tier C 2026-06-03 (lint Tier-C cleanup).
+  'vue/require-default-prop': 'off',
 };
 
 export default withNuxt(
@@ -82,7 +82,6 @@ export default withNuxt(
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
       ...STYLE_RULES_TIER_A,
       ...STYLE_RULES_TIER_B,
-      ...STYLE_RULES_TIER_C_DEFERRED,
       ...STYLE_RULES_TIER_D_OFF,
       '@typescript-eslint/no-explicit-any': 'error',
     },
@@ -95,7 +94,6 @@ export default withNuxt(
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
       ...STYLE_RULES_TIER_A,
       ...STYLE_RULES_TIER_B,
-      ...STYLE_RULES_TIER_C_DEFERRED,
       ...STYLE_RULES_TIER_D_OFF,
       '@typescript-eslint/no-explicit-any': 'warn',
     },
