@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { CivicRecord } from '~/stores/records';
 import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
@@ -7,9 +6,6 @@ const { t } = useI18n();
 // Route parameters
 const route = useRoute();
 const type = route.params.type as string;
-
-// Store
-const recordsStore = useRecordsStore();
 
 // Reactive state
 const saving = ref(false);

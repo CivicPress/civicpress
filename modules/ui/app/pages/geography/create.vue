@@ -80,7 +80,7 @@ const breadcrumbItems = computed(() => [
 ]);
 
 // Event handlers
-const handleSuccess = (geographyFile: GeographyFile) => {
+const handleSuccess = (_geographyFile: GeographyFile) => {
   // Navigate to the geography list after successful creation
   router.push('/geography');
 };

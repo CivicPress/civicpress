@@ -220,7 +220,6 @@ import { ref, computed, onMounted } from 'vue';
 import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
-import { useToast } from '#imports';
 import { useDebounceFn } from '@vueuse/core';
 import type {
   GeographyFile,
@@ -232,7 +231,6 @@ import SystemFooter from '~/components/SystemFooter.vue';
 // Composables
 const router = useRouter();
 const authStore = useAuthStore();
-const toast = useToast();
 const { t } = useI18n();
 
 // Breadcrumbs
@@ -255,10 +253,6 @@ const totalPages = ref(1);
 // Computed properties
 const canCreateGeography = computed(() => {
   return authStore.isLoggedIn && authStore.hasPermission('geography:create');
-});
-
-const canEditGeography = computed(() => {
-  return authStore.user?.role === 'admin' || authStore.user?.role === 'clerk';
 });
 
 const categoryOptions = computed(() => [
@@ -368,10 +362,6 @@ const navigateToFile = (id: string) => {
   router.push(`/geography/${id}`);
 };
 
-const navigateToEdit = (id: string) => {
-  router.push(`/geography/${id}/edit`);
-};
-
 const getFileTypeIcon = (type: GeographyFileType): string => {
   const icons: Record<GeographyFileType, string> = {
     geojson: 'i-lucide-map',
@@ -409,26 +399,6 @@ const formatBounds = (bounds: {
   maxLat: number;
 }): string => {
   return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} ${t('geography.boundsTo')} ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
-};
-
-const getFileMenuItems = (file: GeographyFile) => {
-  const items = [
-    {
-      label: t('common.view'),
-      icon: 'i-lucide-eye',
-      onClick: () => navigateToFile(file.id),
-    },
-  ];
-
-  if (canEditGeography.value) {
-    items.push({
-      label: t('common.edit'),
-      icon: 'i-lucide-edit',
-      onClick: () => navigateToEdit(file.id),
-    });
-  }
-
-  return items;
 };
 
 // Lifecycle

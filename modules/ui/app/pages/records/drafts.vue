@@ -2,7 +2,6 @@
 import SystemFooter from '~/components/SystemFooter.vue';
 import type { ApiResponse } from '~/utils/api-response';
 import type { DraftListResponse } from '~/types/api-responses';
-import { useRecordsStore } from '~/stores/records';
 import { useAuthStore } from '~/stores/auth';
 
 // Page metadata - require authentication
@@ -20,8 +19,6 @@ const {
   formatRelativeTime,
   getTypeLabel,
   getTypeIcon,
-  getStatusLabel,
-  getStatusColor,
 } = useRecordUtils();
 
 // Reactive state

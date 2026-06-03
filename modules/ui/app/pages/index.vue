@@ -15,7 +15,6 @@ const { t } = useI18n();
 
 // Search suggestions composable
 const {
-  suggestions,
   words: suggestionWords,
   titles: suggestionTitles,
   isLoading: suggestionsLoading,
@@ -197,9 +196,6 @@ const navigateToCreate = () => {
 };
 const navigateToLogin = () => {
   navigateTo('/auth/login');
-};
-const navigateToSettings = () => {
-  navigateTo('/settings');
 };
 const navigateToProfile = () => {
   navigateTo('/settings/profile');
