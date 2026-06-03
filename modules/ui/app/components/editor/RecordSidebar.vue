@@ -19,8 +19,8 @@ interface Props {
   status?: string; // Legal status (stored in YAML + DB)
   workflowState?: string; // Internal editorial status (DB-only, never in YAML)
   author?: string;
-  created_at?: string;
-  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
   tags?: string[];
   attachedFiles?: Array<{
     id: string;
@@ -239,8 +239,8 @@ defineExpose({
             <TechnicalPanel
               v-else-if="item.value === 'technical'"
               :record-id="recordId"
-              :created_at="created_at"
-              :updated_at="updated_at"
+              :created-at="createdAt"
+              :updated-at="updatedAt"
               :format-date-time="formatDateTime"
             />
 
