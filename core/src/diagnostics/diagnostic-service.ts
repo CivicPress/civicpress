@@ -28,6 +28,7 @@ import { ResourceMonitor } from './resource-monitor.js';
 import { DiagnosticCacheAdapter } from './diagnostic-cache-adapter.js';
 import { CheckExecutor } from './check-executor.js';
 import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
+import { sanitizeDiagnosticReport } from './utils/sanitizer.js';
 import * as crypto from 'crypto';
 
 export interface DiagnosticServiceOptions {
@@ -202,7 +203,11 @@ export class DiagnosticService {
         operation: 'diagnose:run_all',
       });
 
-      return report;
+      // Sanitize sensitive data (passwords, tokens, credentials) out of
+      // the diagnostic report before it leaves this service. The
+      // sanitizer was imported but never wired prior to surfaced
+      // finding #1 from lint-followups.
+      return sanitizeDiagnosticReport(report);
     } catch (error: unknown) {
       const duration = Date.now() - startTime;
 

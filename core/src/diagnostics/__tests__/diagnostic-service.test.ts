@@ -180,6 +180,41 @@ describe('DiagnosticService', () => {
       });
     });
 
+    it('should sanitize sensitive fields out of the returned report', async () => {
+      // Surfaced finding #1 from lint-followups: sanitizeDiagnosticReport
+      // is now wired into runAll(). Verify that a sensitive value in a
+      // checker's check-result.details survives as redacted on the way
+      // out. The sanitizer's own tests cover redaction patterns
+      // exhaustively (__tests__/sanitizer.test.ts); this test only
+      // confirms the integration is wired.
+      class SensitiveChecker extends BaseDiagnosticChecker {
+        name = 'sensitive-check';
+        component = 'sensitive-component';
+
+        async check(): Promise<CheckResult> {
+          return this.createWarningResult('Found suspicious config', {
+            api_key: 'sk-live-PRIVATE-DO-NOT-LEAK',
+            normal_field: 'public-value',
+          });
+        }
+      }
+
+      service.registerChecker(new SensitiveChecker());
+      const report = await service.runAll({ components: ['sensitive-component'] });
+
+      const component = report.components.find(
+        (c) => c.component === 'sensitive-component'
+      );
+      expect(component).toBeDefined();
+      const checkDetails = component!.checks[0]?.details as
+        | Record<string, unknown>
+        | undefined;
+      expect(checkDetails).toBeDefined();
+      expect(checkDetails!.api_key).toBe('[REDACTED]');
+      // Non-sensitive fields pass through unchanged
+      expect(checkDetails!.normal_field).toBe('public-value');
+    });
+
     it('should audit log the run', async () => {
       const checker = new TestChecker();
       service.registerChecker(checker);

@@ -33,7 +33,7 @@ export const viewCommand = (cli: CAC) => {
       initializeCliOutput(globalOptions);
 
       const logger = initializeLogger();
-      cliStartOperation('view');
+      const endOperation = cliStartOperation('view');
 
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
@@ -199,6 +199,8 @@ export const viewCommand = (cli: CAC) => {
       } catch (error) {
         logger.error('❌ Failed to view record:', error);
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };
