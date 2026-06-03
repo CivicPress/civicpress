@@ -50,6 +50,9 @@ describe('Status CLI Command', () => {
   });
 
   afterEach(() => {
+    // Registration-only tests must not trigger process.exit. Surfaced
+    // finding #4 from lint-followups.
+    expect(process.exit).not.toHaveBeenCalled();
     process.exit = originalExit;
     if (fs.existsSync(testDataDir)) {
       fs.rmSync(testDataDir, { recursive: true, force: true });

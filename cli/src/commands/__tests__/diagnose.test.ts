@@ -41,6 +41,11 @@ describe('Diagnose CLI Command', () => {
   });
 
   afterEach(() => {
+    // Registration-only tests must not trigger process.exit (catches a
+    // regression where command registration accidentally executes an
+    // action). Surfaced finding #4 from lint-followups.
+    expect(process.exit).not.toHaveBeenCalled();
+
     // Restore process.exit
     process.exit = originalExit;
 
