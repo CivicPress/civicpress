@@ -135,7 +135,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import type { GeographyFile } from '~/types/geography';
-import GeographySelector from './GeographySelector.vue';
 import GeographyMap from './GeographyMap.vue';
 
 // Composables
@@ -178,7 +177,7 @@ const selectedIds = ref<string[]>([]);
 // Debug: watch selectedIds changes
 watch(
   selectedIds,
-  (newIds) => {
+  () => {
     // Watch for selectedIds changes
   },
   { deep: true }
@@ -208,10 +207,6 @@ const getCategoryColor = (category: string): UiBadgeColor => {
   return colors[category] || 'neutral';
 };
 
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString();
-};
-
 const updateLink = (index: number, link: GeographyLink) => {
   const updatedLinks = [...props.modelValue];
   updatedLinks[index] = { ...link };
@@ -223,44 +218,11 @@ const removeLink = (index: number) => {
   emit('update:modelValue', updatedLinks);
 };
 
-// Note: v-model:selected-ids automatically handles the binding
-// We don't need a separate handler for update:selected-ids
-
-const handleSelectionConfirm = (files: GeographyFile[]) => {
-  // Add selected files that aren't already linked
-  const newLinks = files
-    .filter((file) => !props.modelValue.some((link) => link.id === file.id))
-    .map((file) => ({
-      id: file.id,
-      name: file.name,
-      description: file.description || '',
-      type: file.type,
-      category: file.category,
-      created_at: file.created_at,
-      stats: (file as { stats?: LinkStats }).stats,
-    }));
-
-  if (newLinks.length > 0) {
-    const updatedLinks = [...props.modelValue, ...newLinks];
-    emit('update:modelValue', updatedLinks);
-  }
-
-  // Clear selection after adding
-  selectedIds.value = [];
-};
-
 const handlePreview = (file: GeographyFile | GeographyLink) => {
   // previewFile is typed as GeographyFile; the link shape doesn't include
   // all fields but only the ones the preview pane uses, so the cast is safe.
   previewFile.value = file as GeographyFile;
   showPreview.value = true;
-};
-
-const handleCreateNew = () => {
-  // Emit event to parent to handle creating new geography file
-  // This would typically navigate to the geography creation page
-  // For now, we'll navigate to the geography creation page
-  useRouter().push('/geography/create');
 };
 
 const selectPreviewFile = () => {

@@ -245,43 +245,12 @@ const computedImageUrl = computed(() => {
 });
 
 // Methods
-const extractFolderFromPath = (path: string): string => {
-  // Extract folder from full system path like "/Users/.../data/storage/public/filename.ext"
-  // or from relative path like "storage/public/filename.ext"
-  const parts = path.split('/');
-
-  // Look for "storage" in the path and get the next part as folder
-  const storageIndex = parts.findIndex((part) => part === 'storage');
-  if (storageIndex !== -1 && storageIndex + 1 < parts.length) {
-    const folder = parts[storageIndex + 1] || 'public';
-    return folder;
-  }
-
-  // Fallback: look for common storage folder names
-  const storageFolders = [
-    'public',
-    'private',
-    'documents',
-    'images',
-    'videos',
-    'audio',
-  ];
-  for (const folder of storageFolders) {
-    if (parts.includes(folder)) {
-      return folder;
-    }
-  }
-
-  // Default fallback
-  return 'public';
-};
-
 const onMediaLoaded = () => {
   loading.value = false;
   error.value = null;
 };
 
-const onMediaError = (e: Event) => {
+const onMediaError = (_e: Event) => {
   loading.value = false;
   error.value = 'Failed to load media file';
 };
@@ -296,9 +265,6 @@ const loadImage = async () => {
   imageData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();
@@ -357,9 +323,6 @@ const loadPDF = async () => {
   pdfData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();
@@ -400,9 +363,6 @@ const loadVideo = async () => {
   videoData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();
@@ -443,9 +403,6 @@ const loadAudio = async () => {
   audioData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();

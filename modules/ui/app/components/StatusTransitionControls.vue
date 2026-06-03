@@ -128,7 +128,7 @@ onMounted(async () => {
       if (res?.success && res?.data?.transitions) {
         allowedTargets.value = res.data.transitions as string[];
       }
-    } catch (e) {
+    } catch {
       // Ignore; will fall back to status list
     }
   } catch {

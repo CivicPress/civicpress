@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import RecordPreview from '~/components/RecordPreview.vue';
 
 interface Props {
@@ -7,7 +6,7 @@ interface Props {
   show?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   show: true,
 });
 </script>

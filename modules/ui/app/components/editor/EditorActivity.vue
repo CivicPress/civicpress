@@ -5,7 +5,7 @@ interface Props {
   recordId?: string;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const activities = ref<any[]>([]);

@@ -44,11 +44,10 @@ const emit = defineEmits<{
 
 // Composables
 const { t } = useI18n();
-const { getRecordTypeOptions, getRecordTypeLabel, fetchRecordTypes } =
+const { getRecordTypeOptions, fetchRecordTypes } =
   useRecordTypes();
-const { recordStatusOptions, getRecordStatusLabel, fetchRecordStatuses } =
+const { fetchRecordStatuses } =
   useRecordStatuses();
-const { getTemplateOptions, getTemplateById, processTemplate } = useTemplates();
 const toast = useToast();
 const $civicApi = useNuxtApp().$civicApi;
 const authStore = useAuthStore();

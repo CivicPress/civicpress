@@ -108,7 +108,6 @@
 </template>
 
 <script setup lang="ts">
-import RecordLinkSelector from './RecordLinkSelector.vue';
 
 // Composables
 const { t } = useI18n();
@@ -122,7 +121,7 @@ interface LinkedRecord {
 }
 
 // Composables
-const { getLinkCategoryOptions, getLinkCategoryLabel, fetchLinkCategories } =
+const { getLinkCategoryOptions, fetchLinkCategories } =
   useLinkCategories();
 
 interface Props {
@@ -149,10 +148,6 @@ const tempLinkedRecords = ref<LinkedRecord[]>([]);
 const linkedRecords = computed(() => props.modelValue);
 
 // Methods
-const closeSelector = () => {
-  tempLinkedRecords.value = [];
-};
-
 const updateLinkDescription = (index: number, newDescription: string) => {
   const updatedRecords = [...linkedRecords.value];
   const record = updatedRecords[index];

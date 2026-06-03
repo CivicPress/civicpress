@@ -162,7 +162,6 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import type { ApiResponse } from '~/utils/api-response';
 import type { NuxtUiColor } from '~/types/nuxt-ui-bridge';
-import { useDebounceFn } from '@vueuse/core';
 import type { GeographyFile, GeographyCategory } from '~/types/geography';
 import { useTypedI18n } from '~/composables/useTypedI18n';
 
@@ -263,15 +262,6 @@ const toggleSelection = (file: GeographyFile) => {
   }
 };
 
-const removeSelection = (fileId: string) => {
-  const newIds = props.selectedIds.filter((id) => id !== fileId);
-  emit('update:selected-ids', newIds);
-};
-
-const previewFile = (file: GeographyFile) => {
-  emit('preview', file);
-};
-
 const confirmSelection = () => {
   emit('selection-change', selectedFiles.value);
 };
@@ -292,6 +282,7 @@ const getCategoryColor = (category: string): NuxtUiColor => {
   return colors[category] || 'neutral';
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in <template> via {{ formatDate(file.created_at) }}
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
 };
@@ -320,7 +311,7 @@ const loadGeographyFiles = async () => {
 // Watch for changes in selectedIds prop
 watch(
   () => props.selectedIds,
-  (newIds) => {
+  () => {
     // Watch for prop changes
   },
   { deep: true, immediate: true }

@@ -48,31 +48,25 @@ const emit = defineEmits<{
 
 // Composables
 const {
-  recordTypes,
   loading: recordTypesLoading,
   error: recordTypesError,
   fetchRecordTypes,
-  getRecordTypeIcon,
   getRecordTypeLabel,
   getRecordTypeOptions,
 } = useRecordTypes();
 
 const {
-  recordStatuses,
   loading: recordStatusesLoading,
   error: recordStatusesError,
   fetchRecordStatuses,
-  getRecordStatusLabel,
   recordStatusOptions,
 } = useRecordStatuses();
 
 // Search suggestions composable
 const {
-  suggestions,
   words: suggestionWords,
   titles: suggestionTitles,
   isLoading: suggestionsLoading,
-  error: suggestionsError,
   fetchSuggestions,
   clearSuggestions,
 } = useSearchSuggestions();

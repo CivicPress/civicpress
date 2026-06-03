@@ -200,8 +200,8 @@ const props = withDefaults(defineProps<Props>(), {
   canEdit: false,
 });
 
-// Emits
-const emit = defineEmits<{
+// Emits — template uses $emit('edit-links') directly; binding not needed
+defineEmits<{
   'view-file': [file: GeographyFile];
   'edit-links': [];
 }>();
@@ -287,13 +287,9 @@ const getCategoryColor = (category: string): UiBadgeColor => {
   return colors[category] || 'neutral';
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in <template> via {{ formatDate(link.created_at) }}
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
-};
-
-const viewFile = (file: { id: string }) => {
-  // Navigate to the geography file view page
-  navigateTo(`/geography/${file.id}`);
 };
 
 const viewFullMap = (file: { id: string }) => {

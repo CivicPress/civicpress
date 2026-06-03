@@ -110,7 +110,6 @@ const downloadFile = async (fileId: string, fileName: string) => {
   if (!process.client) return;
 
   try {
-    const config = useRuntimeConfig();
     const authStore = useAuthStore();
 
     const response = await fetch(getFileUrl(fileId), {

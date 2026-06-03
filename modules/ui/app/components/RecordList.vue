@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
-import { useVirtualList } from '@vueuse/core';
 import { useRecordsStore } from '~/stores/records';
 import { useAuthStore } from '~/stores/auth';
 
@@ -52,9 +51,6 @@ const {
 
 // i18n
 const { t } = useI18n();
-
-// Reactive data
-const loading = ref(false);
 
 // Computed properties for better reactivity
 const displayRecords = computed(() => {
@@ -132,17 +128,6 @@ const goToCreateRecord = () => {
 const navigateToRecord = (record: CivicRecord) => {
   emit('recordClick', record);
   navigateTo(`/records/${record.type}/${record.id}`);
-};
-
-// Pagination helpers
-const scrollToTop = () => {
-  // Scroll to the breadcrumbs instead of the very top
-  if (props.breadcrumbsRef) {
-    props.breadcrumbsRef.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }
 };
 
 // Get pagination info from store

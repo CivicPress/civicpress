@@ -377,7 +377,6 @@ interface Props {
 const props = defineProps<Props>();
 
 // Composables
-const { $civicApi } = useNuxtApp();
 const toast = useToast();
 const { t } = useI18n();
 const {
