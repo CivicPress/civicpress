@@ -393,7 +393,7 @@ const getTopLevelValue = (key: string) => {
 // USwitch, ...) each expecting a different `AcceptableValue`; `unknown`
 // would force a per-binding cast for no real safety win — same pattern as
 // ConfigurationField.vue's `value` prop.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const getNestedValue = (
   sectionKey: string,
   nestedKey: string,

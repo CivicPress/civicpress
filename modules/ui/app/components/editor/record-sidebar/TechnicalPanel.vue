@@ -1,8 +1,8 @@
 <script setup lang="ts">
 interface Props {
   recordId?: string;
-  created_at?: string;
-  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
   formatDateTime: (value: string) => string;
 }
 
@@ -25,24 +25,24 @@ const { t } = useI18n();
         {{ recordId || t('common.noData') }}
       </p>
     </div>
-    <div v-if="created_at">
+    <div v-if="createdAt">
       <label
         class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
       >
         {{ t('records.metadataFields.created_at') }}
       </label>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        {{ formatDateTime(created_at) }}
+        {{ formatDateTime(createdAt) }}
       </p>
     </div>
-    <div v-if="updated_at">
+    <div v-if="updatedAt">
       <label
         class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5 block"
       >
         {{ t('records.metadataFields.updated_at') }}
       </label>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        {{ formatDateTime(updated_at) }}
+        {{ formatDateTime(updatedAt) }}
       </p>
     </div>
   </div>

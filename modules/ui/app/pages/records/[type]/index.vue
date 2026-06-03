@@ -382,7 +382,7 @@ const isLoading = ref(false); // Guard to prevent duplicate loads
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
   // Skip if not on client side (SSR)
-  if (!process.client) return;
+  if (!import.meta.client) return;
 
   // Prevent duplicate calls
   if (isLoading.value) return;

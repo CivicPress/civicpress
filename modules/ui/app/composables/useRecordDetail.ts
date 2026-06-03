@@ -131,7 +131,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
   };
 
   const applyLinkTransformations = () => {
-    if (!process.client) {
+    if (!import.meta.client) {
       return;
     }
 
@@ -160,7 +160,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
   watch(
     () => renderedContent.value,
     () => {
-      if (!process.client) {
+      if (!import.meta.client) {
         return;
       }
       nextTick(() => applyLinkTransformations());
@@ -170,7 +170,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
   watch(
     () => record.value?.path,
     () => {
-      if (!process.client) {
+      if (!import.meta.client) {
         return;
       }
       nextTick(() => applyLinkTransformations());
@@ -178,7 +178,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
   );
 
   const handleContentClick = (event: MouseEvent) => {
-    if (!process.client) {
+    if (!import.meta.client) {
       return;
     }
 
@@ -418,7 +418,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
   };
 
   const downloadFile = async (fileId: string, fileName: string) => {
-    if (!process.client) return;
+    if (!import.meta.client) return;
 
     try {
       const config = useRuntimeConfig();
@@ -461,7 +461,7 @@ export function useRecordDetail(deps: UseRecordDetailDeps) {
   };
 
   onMounted(() => {
-    if (process.client) {
+    if (import.meta.client) {
       nextTick(() => applyLinkTransformations());
     }
     fetchRecord();

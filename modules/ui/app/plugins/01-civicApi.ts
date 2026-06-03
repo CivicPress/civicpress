@@ -1,6 +1,6 @@
 export default defineNuxtPlugin(async (_nuxtApp) => {
   // Initialize CSRF token on plugin load (client-side only)
-  if (process.client) {
+  if (import.meta.client) {
     const { ensureCsrfToken } = useCsrf();
     // Fetch CSRF token asynchronously (don't block plugin initialization)
     ensureCsrfToken().catch((error) => {
@@ -44,7 +44,7 @@ export default defineNuxtPlugin(async (_nuxtApp) => {
 
       // Add CSRF token for state-changing methods (even if Bearer token bypasses it)
       // This ensures consistency and future-proofing for cookie-based sessions
-      if (!isPublicEndpoint && process.client) {
+      if (!isPublicEndpoint && import.meta.client) {
         const method = (options.method as string) || 'GET';
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
           const { getCsrfToken, ensureCsrfToken } = useCsrf();

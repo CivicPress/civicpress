@@ -55,7 +55,7 @@ const links = computed<NavigationMenuItem[][]>(() => {
 
 onMounted(async () => {
   // Open sidebar by default on desktop screens, keep closed on mobile
-  if (process.client && window.innerWidth >= 768) {
+  if (import.meta.client && window.innerWidth >= 768) {
     appStore.setSidebarOpen(true);
   }
 
