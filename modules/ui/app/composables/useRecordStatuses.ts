@@ -1,3 +1,5 @@
+import { ref, readonly } from 'vue';
+
 export interface RecordStatusMetadata {
   key: string;
   label: string;
@@ -14,8 +16,6 @@ export interface RecordStatusesResponse {
     total: number;
   };
 }
-
-import { ref, readonly } from 'vue';
 
 // Global cache for record statuses
 let globalRecordStatuses: RecordStatusMetadata[] = [];

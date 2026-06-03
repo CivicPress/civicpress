@@ -93,11 +93,9 @@ interface SelectOption {
   value: string;
 }
 
-const props = defineProps({
-  form: {
-    type: Object as PropType<GeographyFormData>,
-    required: true,
-  },
+const form = defineModel<GeographyFormData>('form', { required: true });
+
+defineProps({
   formErrors: {
     type: Object as PropType<GeographyFormErrors>,
     required: true,
@@ -115,10 +113,10 @@ const props = defineProps({
 const { t } = useI18n();
 
 const onCategoryUpdate = (val: GeographyCategory) => {
-  props.form.category = val;
+  form.value.category = val;
 };
 
 const onSridUpdate = (val: string | number) => {
-  props.form.srid = typeof val === 'number' ? val : Number(val);
+  form.value.srid = typeof val === 'number' ? val : Number(val);
 };
 </script>

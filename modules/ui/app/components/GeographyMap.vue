@@ -8,6 +8,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuthStore } from '@/stores/auth';
 import { useRuntimeConfig } from '#imports';
+import type { ColorMapping, IconMapping, IconConfig } from '~/types/geography';
 
 // Fix for default markers in Leaflet with Vite
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -23,8 +24,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
-
-import type { ColorMapping, IconMapping, IconConfig } from '~/types/geography';
 
 /** Minimal GeoJSON feature shape — Leaflet supports the full spec, we only
  *  read .geometry.type / .properties / .id here, so a narrow contract is enough. */

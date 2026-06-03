@@ -115,14 +115,15 @@ const getRoleDisplayName = (role: string) => {
 };
 
 // Get role color
-const getRoleColor = (role: string) => {
-  const colorMap: Record<string, string> = {
-    admin: 'red',
-    council: 'blue',
-    clerk: 'green',
-    public: 'gray',
+type UiBadgeColor = 'error' | 'primary' | 'neutral';
+const getRoleColor = (role: string): UiBadgeColor => {
+  const colorMap: Record<string, UiBadgeColor> = {
+    admin: 'error',
+    council: 'primary',
+    clerk: 'primary',
+    public: 'neutral',
   };
-  return colorMap[role] || 'gray';
+  return colorMap[role] ?? 'neutral';
 };
 
 // Handle email verification token from URL
@@ -340,7 +341,7 @@ const breadcrumbItems = computed(() => [
                   >{{ t('common.role') }}</label
                 >
                 <div class="mt-1">
-                  <UBadge :color="getRoleColor(userInfo.role) as 'error' | 'primary' | 'neutral'">
+                  <UBadge :color="getRoleColor(userInfo.role)">
                     {{ getRoleDisplayName(userInfo.role) }}
                   </UBadge>
                 </div>

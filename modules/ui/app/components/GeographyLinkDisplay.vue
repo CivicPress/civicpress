@@ -40,7 +40,7 @@
       >
         <GeographyMap
           :geography-data="(allGeographyData as never)"
-          :bounds="combinedBounds as unknown as BoundsObject | undefined"
+          :bounds="combinedBounds ?? undefined"
           :interactive="true"
           height="100%"
         />
@@ -270,7 +270,7 @@ const combinedBounds = computed(() => {
     }
   });
 
-  return [minLon, minLat, maxLon, maxLat];
+  return { minLon, minLat, maxLon, maxLat } satisfies BoundsObject;
 });
 
 // Methods

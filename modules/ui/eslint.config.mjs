@@ -4,20 +4,44 @@ import pluginTs from '@typescript-eslint/eslint-plugin';
 
 const unusedVarsRule = ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }];
 
-// TODO(lint-style-rules): @nuxt/eslint pulls in many vue/nuxt style rules
-// outside the lint-rule-rollout's scope (spec §7 non-goals). Disabled here
-// to keep the rollout focused on @typescript-eslint/no-explicit-any. A
-// future session should triage and enable selectively.
-const STYLE_RULES_DEFERRED = {
-  'vue/attributes-order': 'off',
-  'vue/html-self-closing': 'off',
-  'vue/multi-word-component-names': 'off',
-  'vue/no-multiple-template-root': 'off',
-  'vue/no-v-html': 'off',
-  'vue/require-default-prop': 'off',
-  'vue/require-explicit-emits': 'off',
-  'vue/component-definition-name-casing': 'off',
-  'vue/component-name-in-template-casing': 'off',
+// Tier A: safety / correctness — `error`-enforced, all sites cleaned in
+// lint-rollout followup #4 (spec
+// docs/specs/2026-06-03-lint-rollout-followup-4-style-rules-design.md).
+const STYLE_RULES_TIER_A = {
+  'vue/no-v-html': 'error',
+  'vue/no-mutating-props': 'error',
+};
+
+// Tier B: code quality — `warn`, all sites cleaned (or zero sites) in
+// followup #4. Includes 4 zero-violation rules enabled for future
+// regression detection.
+const STYLE_RULES_TIER_B = {
+  'vue/require-explicit-emits': 'warn',
+  'vue/no-template-shadow': 'warn',
+  'vue/v-on-event-hyphenation': 'warn',
+  'vue/no-deprecated-filter': 'warn',
+  'vue/component-definition-name-casing': 'warn',
+  'vue/component-name-in-template-casing': 'warn',
+  '@typescript-eslint/no-dynamic-delete': 'warn',
+  '@typescript-eslint/unified-signatures': 'warn',
+  'import/first': 'warn',
+};
+
+// Tier C: deferred — `warn`-signal, sites accumulate for a future focused
+// session. ~89 live warnings expected (nuxt/prefer-import-meta 33,
+// vue/multi-word-component-names 35, vue/prop-name-casing 4,
+// vue/require-default-prop 17). Future sessions can drive these to zero.
+const STYLE_RULES_TIER_C_DEFERRED = {
+  'nuxt/prefer-import-meta': 'warn',
+  'vue/multi-word-component-names': 'warn',
+  'vue/prop-name-casing': 'warn',
+  'vue/require-default-prop': 'warn',
+};
+
+// Tier D: kept off — Prettier owns formatting; outdated for Vue 3; low
+// value. Documented as intentional non-goals per the lint-rule-rollout
+// spec §7 + followup #4 spec §3.
+const STYLE_RULES_TIER_D_OFF = {
   'vue/html-indent': 'off',
   'vue/html-closing-bracket-newline': 'off',
   'vue/max-attributes-per-line': 'off',
@@ -25,17 +49,10 @@ const STYLE_RULES_DEFERRED = {
   'vue/multiline-html-element-content-newline': 'off',
   'vue/first-attribute-linebreak': 'off',
   'vue/html-quotes': 'off',
-  'vue/no-mutating-props': 'off',
-  'vue/prop-name-casing': 'off',
-  'vue/no-template-shadow': 'off',
-  'vue/v-on-event-hyphenation': 'off',
-  'vue/no-deprecated-filter': 'off',
-  'nuxt/prefer-import-meta': 'off',
+  'vue/html-self-closing': 'off',
+  'vue/attributes-order': 'off',
+  'vue/no-multiple-template-root': 'off',
   'nuxt/nuxt-config-keys-order': 'off',
-  '@typescript-eslint/no-explicit-any': 'off',
-  '@typescript-eslint/no-dynamic-delete': 'off',
-  '@typescript-eslint/unified-signatures': 'off',
-  'import/first': 'off',
 };
 
 export default withNuxt(
@@ -46,7 +63,10 @@ export default withNuxt(
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
-      ...STYLE_RULES_DEFERRED,
+      ...STYLE_RULES_TIER_A,
+      ...STYLE_RULES_TIER_B,
+      ...STYLE_RULES_TIER_C_DEFERRED,
+      ...STYLE_RULES_TIER_D_OFF,
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
@@ -56,7 +76,10 @@ export default withNuxt(
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': unusedVarsRule,
-      ...STYLE_RULES_DEFERRED,
+      ...STYLE_RULES_TIER_A,
+      ...STYLE_RULES_TIER_B,
+      ...STYLE_RULES_TIER_C_DEFERRED,
+      ...STYLE_RULES_TIER_D_OFF,
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },

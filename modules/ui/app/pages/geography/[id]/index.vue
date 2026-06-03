@@ -341,6 +341,9 @@ import { ref, computed, onMounted } from 'vue';
 import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
+import GeographyMap from '~/components/GeographyMap.vue';
+import GeographyLinkedRecords from '~/components/GeographyLinkedRecords.vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 // Define GeographyFile type locally to avoid import issues
 interface GeographyFile {
   id: string;
@@ -362,9 +365,6 @@ interface GeographyFile {
   file_path?: string;
   content?: string;
 }
-import GeographyMap from '~/components/GeographyMap.vue';
-import GeographyLinkedRecords from '~/components/GeographyLinkedRecords.vue';
-import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route and router
 const route = useRoute();
