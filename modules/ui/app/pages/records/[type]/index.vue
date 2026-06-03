@@ -11,7 +11,6 @@ const authStore = useAuthStore();
 
 // Route and router for URL state management
 const route = useRoute();
-const router = useRouter();
 
 // Get the record type from the route
 const type = route.params.type as string;

@@ -45,7 +45,7 @@ export function useConfigTranslations() {
       ) {
         return translated;
       }
-    } catch (e) {
+    } catch {
       // If translation fails, use fallback
     }
 

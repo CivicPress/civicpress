@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { User } from '~/types/user';
 import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 

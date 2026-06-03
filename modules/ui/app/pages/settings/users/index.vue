@@ -52,11 +52,6 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
 };
 
-// Navigation
-const navigateToUser = (user: User) => {
-  navigateTo(`/settings/users/${user.username}`);
-};
-
 const breadcrumbItems = computed(() => [
   {
     label: t('common.home'),

@@ -126,7 +126,7 @@ async function loadConfigStatus() {
     if (res?.success) {
       configStatus.value = res.data || {};
     }
-  } catch (e) {
+  } catch {
     // Non-blocking
   }
 }

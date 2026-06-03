@@ -16,26 +16,18 @@ const route = useRoute();
 const type = route.params.type as string;
 const id = route.params.id as string;
 
-// Store
-const recordsStore = useRecordsStore();
-
 // Reactive state
 const record = ref<CivicRecord | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
-const recordFormRef = ref<InstanceType<typeof RecordForm> | null>(null);
 const hasSavedChanges = ref(false); // Track if changes have been saved (indicates draft editing)
 
 // Toast notifications
 const toast = useToast();
 
-// Get record type display name
-const { getRecordTypeLabel } = useRecordTypes();
-const recordTypeLabel = computed(() => getRecordTypeLabel(type));
-
 // Get type label helper
-const { getTypeLabel, getStatusLabel, getTypeIcon, getStatusIcon } =
+const { getTypeLabel } =
   useRecordUtils();
 
 // Fetch record data
@@ -95,14 +87,6 @@ const fetchRecord = async () => {
   } finally {
     loading.value = false;
   }
-};
-
-// Handle form submission (new RecordForm handles this internally via draft/publish)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const handleSubmit = async (recordData: any) => {
-  // The new RecordForm handles draft updates and publishing internally
-  // This is kept for backward compatibility but may not be called
-  console.log('Form submitted:', recordData);
 };
 
 // Handle record saved - update local record state to reflect changes (e.g., type changes)

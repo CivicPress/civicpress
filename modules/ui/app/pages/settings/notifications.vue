@@ -84,7 +84,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import SystemFooter from '~/components/SystemFooter.vue';
-import { useAuthStore } from '~/stores/auth';
 import { useNuxtApp } from '#imports';
 import { errorMessage } from '~/utils/errors';
 
@@ -94,7 +93,6 @@ definePageMeta({
 });
 
 const { $civicApi } = useNuxtApp();
-const authStore = useAuthStore();
 const { t } = useI18n();
 
 const form = ref({

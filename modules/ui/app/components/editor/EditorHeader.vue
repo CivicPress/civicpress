@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRecordStatuses } from '~/composables/useRecordStatuses';
-import { useRecordUtils } from '~/composables/useRecordUtils';
 
 const { t } = useI18n();
 
@@ -41,8 +40,7 @@ const emit = defineEmits<{
   export: [];
 }>();
 
-const { getRecordStatusLabel, recordStatusOptions } = useRecordStatuses();
-const { getStatusConfig } = useRecordUtils();
+const { recordStatusOptions } = useRecordStatuses();
 
 // Modal states
 const showPublishModal = ref(false);
@@ -51,10 +49,6 @@ const showDeleteUnpublishedModal = ref(false);
 const showArchiveModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedPublishStatus = ref<string | null>(null);
-
-const statusConfig = computed(() => {
-  return getStatusConfig(props.status);
-});
 
 // Get available status transitions
 interface StatusOption {
@@ -222,11 +216,6 @@ const moreMenuItems = computed(() => {
 
   return sections;
 });
-
-const handlePublish = () => {
-  selectedPublishStatus.value = props.status;
-  showPublishModal.value = true;
-};
 
 const confirmPublish = () => {
   emit('publish', selectedPublishStatus.value || undefined);

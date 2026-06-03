@@ -9,9 +9,6 @@ const route = useRoute();
 const type = route.params.type as string;
 const id = route.params.id as string;
 
-// Store
-const recordsStore = useRecordsStore();
-
 // Reactive state
 const record = ref<CivicRecord | null>(null);
 const loading = ref(false);
@@ -23,7 +20,7 @@ const { t } = useI18n();
 
 // Get record type display name
 const { getRecordTypeLabel } = useRecordTypes();
-const { getStatusLabel, getTypeIcon, formatDate } = useRecordUtils();
+const { getStatusLabel, getTypeIcon } = useRecordUtils();
 const recordTypeLabel = computed(() => getRecordTypeLabel(type));
 
 // Copy to clipboard function
@@ -103,9 +100,7 @@ const fetchRecord = async () => {
 };
 
 // Check if user can view records (allow guests to view raw records)
-const authStore = useAuthStore();
 const canViewRecords = computed(() => {
-  const userRole = authStore.currentUser?.role;
   // Allow all users including guests to view raw records
   return true;
 });

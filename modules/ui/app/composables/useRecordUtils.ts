@@ -1,4 +1,3 @@
-import { ref, readonly } from 'vue';
 import type { IconName } from '~/composables/useIcons';
 
 export interface RecordStatusConfig {

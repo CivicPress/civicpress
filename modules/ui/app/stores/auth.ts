@@ -127,7 +127,7 @@ export const useAuthStore = defineStore('auth', {
     // Private method to handle common login logic
     async handleLoginResponse(
       response: unknown,
-      errorMessage: string = 'Login failed'
+      _errorMessage: string = 'Login failed'
     ) {
       // Safely extract user and token from the response
       const data = validateApiResponse<{ session: SessionResponse }>(

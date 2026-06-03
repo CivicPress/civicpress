@@ -382,7 +382,7 @@
 </template>
 
 <script setup lang="ts">
-import type { User, Role } from '~/types/user';
+import type { User } from '~/types/user';
 
 const { t } = useI18n();
 
@@ -414,7 +414,6 @@ const emit = defineEmits<{
   delete: [];
 }>();
 
-const router = useRouter();
 const toast = useToast();
 const { canUserSetPassword, getAuthProviderDisplayName } = useSecurity();
 

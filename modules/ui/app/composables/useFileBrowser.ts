@@ -274,7 +274,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
       clearSelection();
       showBulkDeleteModal.value = false;
       await loadFiles();
-    } catch (error) {
+    } catch {
       toast.add({
         title: t('common.error'),
         description: t('settings.storage.someFilesCouldNotBeDeleted'),
@@ -364,7 +364,7 @@ export function useFileBrowser(deps: UseFileBrowserDeps) {
         description: t('settings.storage.uuidCopiedToClipboard'),
         color: 'primary',
       });
-    } catch (error) {
+    } catch {
       toast.add({
         title: t('settings.storage.copyFailed'),
         description: t('settings.storage.failedToCopyUuid'),

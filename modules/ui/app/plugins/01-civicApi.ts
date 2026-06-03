@@ -1,4 +1,4 @@
-export default defineNuxtPlugin(async (nuxtApp) => {
+export default defineNuxtPlugin(async (_nuxtApp) => {
   // Initialize CSRF token on plugin load (client-side only)
   if (process.client) {
     const { ensureCsrfToken } = useCsrf();
@@ -75,7 +75,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       // covers the `Record<string, string>` case at the runtime boundary.
       options.headers = headersObj as unknown as typeof options.headers;
     },
-    async onResponseError({ request, options, response, error }) {
+    async onResponseError({ request: _request, options, response, error: _error }) {
       // Enhanced error handling with automatic user feedback
       const { handleError } = useErrorHandler();
 

@@ -291,7 +291,7 @@ const getFolderLabelFromName = (name: string): string => {
   return labelMap[name] || name.charAt(0).toUpperCase() + name.slice(1);
 };
 
-const getFolderIconColor = (folderName: string): string => {
+const getFolderIconColor = (_folderName: string): string => {
   return 'text-blue-500';
 };
 
@@ -320,7 +320,7 @@ const refreshFolderFiles = async () => {
       description: t('settings.storage.storageInformationRefreshed'),
       color: 'primary',
     });
-  } catch (error) {
+  } catch {
     toast.add({
       title: t('common.error'),
       description: t('settings.storage.failedToRefresh'),

@@ -3,7 +3,6 @@ import { validateApiResponse } from '~/utils/api-response';
 import type {
   RecordResponse,
   RecordListResponse,
-  DraftListResponse,
 } from '~/types/api-responses';
 
 export interface CivicRecord {
@@ -260,7 +259,7 @@ export const useRecordsStore = defineStore('records', {
     recordsError: (state) => state.error,
     currentFilters: (state) => state.filters,
     totalRecords: (state) => state.records.length,
-    totalFilteredRecords: (state) => {
+    totalFilteredRecords: (_state) => {
       // Use the filteredRecords getter to get the count
       const store = useRecordsStore();
       return store.filteredRecords.length;
@@ -328,7 +327,7 @@ export const useRecordsStore = defineStore('records', {
           types: data.types || {},
           statuses: data.statuses || {},
         };
-      } catch (error) {
+      } catch {
         // Fallback to counts derived from currently loaded records
         this.summaryCounts = calculateCountsFromRecords(this.records);
       }

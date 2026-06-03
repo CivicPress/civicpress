@@ -1,4 +1,4 @@
-import { ref, computed, type Ref } from 'vue';
+import { ref, computed } from 'vue';
 import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useDebounceFn } from '@vueuse/core';
 import {
@@ -236,7 +236,7 @@ export function useGeographyForm(deps: UseGeographyFormDeps) {
         description: 'Geography content has been copied to your clipboard.',
         color: 'primary',
       });
-    } catch (error) {
+    } catch {
       toast.add({
         title: 'Copy Failed',
         description: 'Failed to copy content to clipboard.',

@@ -2,13 +2,10 @@
 import type { NavigationMenuItem } from '@nuxt/ui';
 import { useAppStore } from '~/stores/app';
 
-const route = useRoute();
 const toast = useToast();
 const appStore = useAppStore();
 const authStore = useAuthStore(); // ⬅️ add this
 const { t } = useI18n();
-
-const collapsed = ref(true);
 
 const links = computed<NavigationMenuItem[][]>(() => {
   const primary: NavigationMenuItem[] = [
