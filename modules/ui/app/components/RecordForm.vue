@@ -90,12 +90,12 @@ const form = reactive({
 
 // UI State
 const showPreview = ref(
-  process.client
+  import.meta.client
     ? localStorage.getItem('editor-preview-visible') === 'true'
     : false
 );
 const previewWidth = ref(
-  process.client
+  import.meta.client
     ? parseInt(localStorage.getItem('editor-preview-width') || '50', 10)
     : 50
 );
@@ -106,11 +106,11 @@ const hasUnpublishedChanges = ref(false); // Track if there's an unpublished dra
 const showSidebar = ref(false);
 
 // Responsive state
-const windowWidth = ref(process.client ? window.innerWidth : 1920);
+const windowWidth = ref(import.meta.client ? window.innerWidth : 1920);
 const isMobile = computed(() => windowWidth.value <= 768);
 
 // Watch window resize
-if (process.client) {
+if (import.meta.client) {
   const updateWidth = () => {
     windowWidth.value = window.innerWidth;
   };
@@ -445,7 +445,7 @@ const {
 // Preview toggle
 const togglePreview = () => {
   showPreview.value = !showPreview.value;
-  if (process.client) {
+  if (import.meta.client) {
     localStorage.setItem('editor-preview-visible', String(showPreview.value));
   }
 };
@@ -466,7 +466,7 @@ const handleResize = (e: MouseEvent) => {
   const clampedWidth = Math.max(20, Math.min(80, newWidth));
 
   previewWidth.value = clampedWidth;
-  if (process.client) {
+  if (import.meta.client) {
     localStorage.setItem('editor-preview-width', String(clampedWidth));
   }
 };
@@ -476,14 +476,14 @@ const stopResize = () => {
 };
 
 onMounted(() => {
-  if (process.client) {
+  if (import.meta.client) {
     document.addEventListener('mousemove', handleResize);
     document.addEventListener('mouseup', stopResize);
   }
 });
 
 onUnmounted(() => {
-  if (process.client) {
+  if (import.meta.client) {
     document.removeEventListener('mousemove', handleResize);
     document.removeEventListener('mouseup', stopResize);
   }

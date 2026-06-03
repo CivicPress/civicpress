@@ -15,7 +15,7 @@ const { locale, locales, setLocale, t } = useI18n();
 
 // Load saved locale from localStorage on mount
 onMounted(async () => {
-  if (process.client) {
+  if (import.meta.client) {
     const savedLocale = localStorage.getItem('i18n_locale');
     if (savedLocale && (savedLocale === 'en' || savedLocale === 'fr')) {
       await setLocale(savedLocale);
@@ -25,7 +25,7 @@ onMounted(async () => {
 
 // Watch for locale changes and persist to localStorage
 watch(locale, (newLocale) => {
-  if (process.client) {
+  if (import.meta.client) {
     localStorage.setItem('i18n_locale', newLocale);
   }
 });

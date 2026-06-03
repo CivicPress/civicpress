@@ -10,17 +10,17 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface Props {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   selectedType: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   recordTypeOptions: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   selectedStatus: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   statusOptions: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   selectedWorkflowState: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   workflowStateOptions: any[];
   tags: string[];
   disabled?: boolean;
@@ -31,11 +31,11 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   'update:selectedType': [value: any];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   'update:selectedStatus': [value: any];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   'update:selectedWorkflowState': [value: any];
   'update:tags': [value: string[]];
 }>();

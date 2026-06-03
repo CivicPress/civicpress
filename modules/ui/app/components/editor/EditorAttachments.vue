@@ -99,13 +99,13 @@ const updateFileDescription = (index: number, description: string) => {
 };
 
 const getFileUrl = (fileId: string): string => {
-  if (!process.client) return '';
+  if (!import.meta.client) return '';
   const config = useRuntimeConfig();
   return `${config.public.civicApiUrl}/api/v1/storage/files/${fileId}`;
 };
 
 const downloadFile = async (fileId: string, fileName: string) => {
-  if (!process.client) return;
+  if (!import.meta.client) return;
 
   try {
     const authStore = useAuthStore();

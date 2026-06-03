@@ -42,7 +42,7 @@ export const useAuthStore = defineStore('auth', {
       initialized: false,
     };
 
-    if (process.client) {
+    if (import.meta.client) {
       try {
         const storedToken = localStorage.getItem('civic_auth_token');
         const storedExpiresAt = localStorage.getItem('civic_auth_expires_at');
@@ -110,7 +110,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     // Private method to save auth state to localStorage
     saveAuthState() {
-      if (process.client) {
+      if (import.meta.client) {
         try {
           localStorage.setItem('civic_auth_token', this.token || '');
           localStorage.setItem(
@@ -242,7 +242,7 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false;
       this.error = null;
 
-      if (process.client) {
+      if (import.meta.client) {
         localStorage.removeItem('civic_auth_token');
         localStorage.removeItem('civic_auth_expires_at');
         localStorage.removeItem('civic_auth_user');
