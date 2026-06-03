@@ -337,7 +337,7 @@ export class ProviderInit {
           await this.initializeGCSStorage(provider);
         }
         // Try to list files (limit 1)
-        const [files] = await host.gcsBucket!.getFiles({ maxResults: 1 });
+        const [_files] = await host.gcsBucket!.getFiles({ maxResults: 1 });
         // Just check if we can access the bucket
         break;
       }

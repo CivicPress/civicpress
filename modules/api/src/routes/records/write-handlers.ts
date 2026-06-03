@@ -57,8 +57,6 @@ export function registerWriteRoutes(
           attachedFiles,
           linkedRecords,
           linkedGeographyFiles,
-          authors,
-          source,
         } = req.body;
         const user = req.user;
 

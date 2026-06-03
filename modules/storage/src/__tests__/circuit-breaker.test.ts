@@ -36,7 +36,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -51,7 +51,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -76,7 +76,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(failingOp);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -109,7 +109,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(failingOp);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -139,7 +139,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(failingOp);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -161,7 +161,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 2; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -205,7 +205,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(failingOp);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -232,7 +232,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -304,7 +304,7 @@ describe('CircuitBreakerManager', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -328,7 +328,7 @@ describe('CircuitBreakerManager', () => {
         for (let i = 0; i < 5; i++) {
           try {
             await breaker.execute(operation);
-          } catch (error) {
+          } catch {
             // Expected
           }
         }

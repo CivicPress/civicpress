@@ -4,15 +4,14 @@
  * Tests the integration between CloudUuidStorageService and the cache adapter
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
-import { UnifiedCacheManager, DatabaseService, Logger } from '@civicpress/core';
+import { UnifiedCacheManager, Logger } from '@civicpress/core';
 import type {
   StorageConfig,
-  StorageFile,
   MulterFile,
 } from '../types/storage.types.js';
 

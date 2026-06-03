@@ -21,7 +21,6 @@ import type {
   StorageFile,
   MulterFile,
   StorageProvider,
-  StorageDatabaseService,
 } from '../types/storage.types.js';
 import {
   withTimeout,
@@ -64,7 +63,6 @@ export class UploadOps {
     const host = this.deps.host;
     const startTime = Date.now();
     let provider: string | undefined;
-    let success = false;
     let error: string | undefined;
     let fileData: MulterFile | undefined;
 
@@ -193,7 +191,6 @@ export class UploadOps {
       // Extract provider name for metrics
       const activeProvider = host.config.active_provider || 'local';
       provider = activeProvider;
-      success = true;
 
       // Log operation
       logOperation(host, {

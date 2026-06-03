@@ -37,11 +37,11 @@ class MockDatabaseService {
 
 // Mock storage service
 class MockStorageService {
-  async listFiles(folder: string): Promise<StorageFile[]> {
+  async listFiles(_folder: string): Promise<StorageFile[]> {
     return [];
   }
 
-  async deleteFile(id: string): Promise<void> {
+  async deleteFile(_id: string): Promise<void> {
     // Mock implementation
   }
 }

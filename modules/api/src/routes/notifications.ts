@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/auth.js';
 import {
   AuditLogger,
   NotificationService,

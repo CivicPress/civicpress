@@ -69,7 +69,7 @@ export async function getFileContent(
 ): Promise<string | null> {
   try {
     return await git.show([`${commit}:${filePath}`]);
-  } catch (error) {
+  } catch {
     // File doesn't exist in this commit
     return null;
   }

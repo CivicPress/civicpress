@@ -96,7 +96,7 @@ export function registerDiffRoutes(router: Router): void {
         try {
           await git.show([commit1 as string]);
           await git.show([commit2 as string]);
-        } catch (error) {
+        } catch {
           throw new HttpError(400, 'One or both commits not found', 'COMMIT_NOT_FOUND');
         }
 

@@ -8,7 +8,6 @@ import {
   CivicPressError,
   ValidationError,
   NotFoundError,
-  InternalError,
 } from '@civicpress/core';
 
 /**

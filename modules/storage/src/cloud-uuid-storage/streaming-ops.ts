@@ -20,7 +20,6 @@ import type {
   StreamUploadRequest,
   StreamDownloadOptions,
   StorageProvider,
-  StorageDatabaseService,
 } from '../types/storage.types.js';
 import { StorageFileNotFoundError } from '../errors/storage-errors.js';
 import {

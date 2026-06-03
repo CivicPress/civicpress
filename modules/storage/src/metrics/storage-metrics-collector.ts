@@ -283,7 +283,7 @@ export class StorageMetricsCollector {
     success: boolean,
     bytes: number,
     latency: number,
-    error?: string
+    _error?: string
   ): void {
     if (!this.metrics.providers[provider]) {
       this.metrics.providers[provider] = {

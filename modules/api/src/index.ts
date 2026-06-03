@@ -45,7 +45,7 @@ import configRouter from './routes/config.js';
 import systemRouter from './routes/system.js';
 import { createGeographyRouter } from './routes/geography.js';
 import { createCacheRouter } from './routes/cache.js';
-import { API_PREFIX, apiPath } from './constants.js';
+import { apiPath } from './constants.js';
 
 // Import middleware
 import {
