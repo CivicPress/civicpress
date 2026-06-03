@@ -253,11 +253,9 @@ interface PresetOption {
 // geometryTypeOptions in a dedicated follow-up.
 type ApplyToValue = NonNullable<IconMapping['apply_to']>[number];
 
-const props = defineProps({
-  form: {
-    type: Object as PropType<GeographyFormData>,
-    required: true,
-  },
+const form = defineModel<GeographyFormData>('form', { required: true });
+
+defineProps({
   selectedPreset: {
     type: String as PropType<string | null>,
     default: null,
@@ -293,10 +291,10 @@ defineEmits<{
 const { t } = useI18n();
 
 const applyToValue = computed({
-  get: (): ApplyToValue[] => (props.form.icon_mapping?.apply_to ?? []) as ApplyToValue[],
+  get: (): ApplyToValue[] => (form.value.icon_mapping?.apply_to ?? []) as ApplyToValue[],
   set: (v: ApplyToValue[]) => {
-    if (props.form.icon_mapping) {
-      props.form.icon_mapping.apply_to = v;
+    if (form.value.icon_mapping) {
+      form.value.icon_mapping.apply_to = v;
     }
   },
 });

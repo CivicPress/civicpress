@@ -228,11 +228,9 @@ interface SelectOption {
   value: string;
 }
 
-const props = defineProps({
-  form: {
-    type: Object as PropType<GeographyFormData>,
-    required: true,
-  },
+const form = defineModel<GeographyFormData>('form', { required: true });
+
+defineProps({
   formErrors: {
     type: Object as PropType<GeographyFormErrors>,
     required: true,
@@ -274,7 +272,7 @@ const { t } = useI18n();
 // Display label for the help text — `form.type` may be a plain string
 // or a SelectOption-shaped object emitted by USelectMenu.
 const formTypeLabel = computed(() => {
-  const ft = props.form.type as string | { value?: string } | null | undefined;
+  const ft = form.value.type as string | { value?: string } | null | undefined;
   if (typeof ft === 'string') return ft;
   return ft?.value || 'geojson';
 });

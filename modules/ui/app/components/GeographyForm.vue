@@ -2,7 +2,7 @@
   <UForm :state="form" @submit="handleSubmit" class="space-y-6">
     <!-- Basic Information Card -->
     <GeographyBasicInfoCard
-      :form="form"
+      v-model:form="form"
       :form-errors="formErrors"
       :saving="saving"
       :category-options="categoryOptions"
@@ -10,7 +10,7 @@
 
     <!-- Geography Data Card -->
     <GeographyDataCard
-      :form="form"
+      v-model:form="form"
       :form-errors="formErrors"
       :preview="preview"
       :saving="saving"
@@ -25,7 +25,7 @@
     <!-- Color & Icon Configuration Card -->
     <GeographyMappingCard
       v-if="preview.parsed && preview.parsed.content"
-      :form="form"
+      v-model:form="form"
       :selected-preset="selectedPreset"
       :preset-options="presetOptions"
       :geometry-type-options="geometryTypeOptions"
