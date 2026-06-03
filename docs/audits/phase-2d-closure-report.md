@@ -107,6 +107,16 @@ Closed: `api-009`, `ui-011`, `storage-015`.
 - `modules/ui` switched to `@nuxt/eslint`'s Option A integration (`withNuxt(...)` with `standalone: true`); ~30 Nuxt/Vue style + strictness rules were deferred via `STYLE_RULES_DEFERRED` map per spec §7 ("No new rules beyond `no-explicit-any`"). A future session can selectively enable.
 - Full closure plan: `docs/plans/2026-05-28-lint-rule-rollout.md`. Design spec: `docs/specs/2026-05-28-lint-rule-rollout-design.md`.
 
+**Sub-followups CLOSED 2026-06-03** (entire lint-rollout backlog complete):
+
+- `#1 unused-vars umbrella` — merge `82e3c1b`. 459 sites across all 5 workspaces; rule = `error` repo-wide.
+- `#2 Vue-template no-explicit-any blind spot` — merge `d7447b4`. 13 sites refactored; new `composables/useTypedI18n.ts` + `types/nuxt-ui-bridge.ts`.
+- `#3 modules/ui cruft deps + pnpm 8→9 prereq` — merge `3103a74`. Dropped `@eslint/js`, `vue-eslint-parser`, `@typescript-eslint/parser`; toolchain bump `pnpm@8.15.0 → 9.15.9`.
+- `#4 STYLE_RULES_DEFERRED triage` — merge `c30e62c`. 27 rules categorized into 4 tiers; 31 violations fixed.
+- **Tier C cleanup** — merge `3afd39a`. 89 deferred Tier C warnings → 0 across 4 dispositions (auto-fix `nuxt/prefer-import-meta` 33; config `ignores` `vue/multi-word-component-names` 35; rename `created_at`/`updated_at` props 4; relocate `vue/require-default-prop` to Tier D 17). `STYLE_RULES_TIER_C_DEFERRED` map removed. `modules/ui` ESLint output: **0 errors, 0 warnings** (from 102).
+
+Closure plans + specs: `docs/specs/2026-06-03-lint-tier-c-cleanup-design.md`, `docs/plans/2026-06-03-lint-tier-c-cleanup.md` (and the per-followup spec/plan pairs under `docs/specs/2026-06-0*` and `docs/plans/2026-06-0*`).
+
 Detailed log: `docs/audits/phase-2d-type-cast-inventory.md`.
 
 ### W4 — Deps Hygiene Structural ✓
