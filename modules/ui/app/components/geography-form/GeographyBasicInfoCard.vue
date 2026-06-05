@@ -112,8 +112,8 @@ defineProps({
 
 const { t } = useI18n();
 
-const onCategoryUpdate = (val: GeographyCategory) => {
-  form.value.category = val;
+const onCategoryUpdate = (val: string) => {
+  form.value.category = val as GeographyCategory;
 };
 
 const onSridUpdate = (val: string | number) => {
