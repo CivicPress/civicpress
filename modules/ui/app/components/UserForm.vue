@@ -329,7 +329,7 @@
           type="button"
           color="neutral"
           variant="outline"
-          @click="$router.back()"
+          @click="router.back()"
         >
           {{ t('common.cancel') }}
         </UButton>
@@ -415,6 +415,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const router = useRouter();
 const { canUserSetPassword, getAuthProviderDisplayName } = useSecurity();
 
 // Form data
