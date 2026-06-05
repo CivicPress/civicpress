@@ -8,6 +8,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 const authStore = useAuthStore();
 
 // Composables
+const router = useRouter();
 const { $civicApi } = useNuxtApp();
 const { formatDate } = useRecordUtils();
 const runtimeConfig = useRuntimeConfig();
@@ -465,7 +466,7 @@ watch(isAuthenticated, (newValue) => {
               <button
                 type="button"
                 class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
-                @click="navigateTo('/geography')"
+                @click="router.push('/geography')"
               >
                 <UIcon name="i-lucide-map" class="w-5 h-5 text-blue-600" />
                 <span>{{ t('home.geography') }}</span>
@@ -497,7 +498,7 @@ watch(isAuthenticated, (newValue) => {
               v-for="record in recentRecords"
               :key="record.id"
               class="hover:shadow-md transition-shadow cursor-pointer"
-              @click="navigateTo(`/records/${record.type}/${record.id}`)"
+              @click="router.push(`/records/${record.type}/${record.id}`)"
             >
               <div class="flex items-start space-x-4">
                 <UIcon

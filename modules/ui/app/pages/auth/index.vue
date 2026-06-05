@@ -1,8 +1,9 @@
 <script setup lang="ts">
+const router = useRouter();
 </script>
 
 <template>
     <div>
-        <UButton @click="navigateTo('/auth/login')">Login</UButton>
+        <UButton @click="router.push('/auth/login')">Login</UButton>
     </div>
 </template>

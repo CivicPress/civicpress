@@ -11,6 +11,7 @@ definePageMeta({
 const authStore = useAuthStore();
 
 // Composables
+const router = useRouter();
 const { $civicApi } = useNuxtApp();
 const { refreshUser } = useAuth();
 const { t } = useI18n();
@@ -243,7 +244,7 @@ const breadcrumbItems = computed(() => [
               "
               color="primary"
               variant="outline"
-              @click="navigateTo(`/settings/users/${userInfo?.username}/edit`)"
+              @click="router.push(`/settings/users/${userInfo?.username}/edit`)"
             >
               <template #leading>
                 <UIcon name="i-lucide-edit" class="w-4 h-4" />
@@ -254,7 +255,7 @@ const breadcrumbItems = computed(() => [
             <UButton
               color="error"
               variant="outline"
-              @click="navigateTo('/auth/logout')"
+              @click="router.push('/auth/logout')"
             >
               <template #leading>
                 <UIcon name="i-lucide-log-out" class="w-4 h-4" />
