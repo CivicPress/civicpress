@@ -26,8 +26,8 @@ withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  'update:linkedRecords': [records: Props['linkedRecords']];
-  'update:linkedGeographyFiles': [files: Props['linkedGeographyFiles']];
+  'update:linkedRecords': [records: NonNullable<Props['linkedRecords']>];
+  'update:linkedGeographyFiles': [files: NonNullable<Props['linkedGeographyFiles']>];
 }>();
 
 const showRecordSelector = ref(false);
