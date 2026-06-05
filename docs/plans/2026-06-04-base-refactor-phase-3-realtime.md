@@ -151,12 +151,40 @@ Expected: 0 lines (the source tree is absent on `dev`). Save this file; you'll d
 
 - [ ] **Step 5: Capture baseline test-suite green-list**
 
+**Revised 2026-06-05** (see `docs/audits/2026-06-04-dev-state-baseline-audit.md`). The original `pnpm -r test:run` invocation fails by construction in this repo: `core` and `cli` have a `"test": "jest"` script with no jest config (the suites all fail to parse), and `modules/api` has a `"test:run": "vitest run"` script with no per-workspace vitest config (finds zero test files). The Phase 2d closure report's per-workspace counts (357 core / 270 api / 138 ui) actually came from the **root vitest** picking up colocated `__tests__/` files via include patterns, NOT from per-workspace invocations. See `docs/audits/known-test-issues.md` W1, W2, W3.
+
 ```bash
-pnpm install --frozen-lockfile
+# 1. Sync deps and build all workspaces.
+pnpm install
 pnpm -r build 2>&1 | tail -20
-pnpm -r test:run 2>&1 | tee /tmp/phase-3-realtime-baseline-tests.txt | tail -50
+
+# 2. modules/storage has a working per-workspace vitest config.
+pnpm -C modules/storage test:run 2>&1 \
+  | tee /tmp/phase-3-baseline-storage.txt | tail -5
+
+# 3. Root vitest covers core + cli + api + ui colocated tests + tests/**.
+pnpm run test:run 2>&1 \
+  | tee /tmp/phase-3-baseline-root.txt | tail -10
+
+# 4. UI tests run under happy-dom via a separate config.
+pnpm run test:ui:run 2>&1 \
+  | tee /tmp/phase-3-baseline-ui.txt | tail -10
+
+# 5. modules/ui build is a separate step (Nuxt + vite TS).
+pnpm -C modules/ui build 2>&1 \
+  | tee /tmp/phase-3-baseline-ui-build.txt | tail -10
 ```
-Expected: build succeeds across all 6 existing workspaces; tests pass except the documented date-bomb `database-integration > Session Management` (per memory `[Refactor --no-verify policy]`). Capture the per-workspace test counts (e.g., `core 357/357`, `storage 216/216`, `api 270/270`, `ui 138/138`); these are the baseline numbers Phase 3 must not regress against.
+
+**Expected (the honest baseline at dev HEAD post-`36f5e79`):**
+
+- `pnpm -r build` and `pnpm -C modules/ui build` clean.
+- `modules/storage`: **216/216** ✓.
+- Root vitest (node): **11 expected failures** of 1025 tests. Breakdown: 5 EmailChannel `vi.mock` interception failures, 4 oauth-provider tests that hit the real GitHub API, 1 notification-system test that hits a real DNS lookup, 1 documented date-bomb in `database-integration > Session Management`. All four clusters are catalogued in `docs/audits/known-test-issues.md` (W4, W5, D1, plus master plan §9.1 for the date-bomb).
+- Root vitest (UI): **17 expected failures** of 122 tests. Breakdown: 6 `StatusTransitionControls` + 5 `RecordSearch` + 1 `RecordList` + 1 `UserForm` (all four are pre-existing Nuxt UI v3→v4 stub-bypass + test-authoring bugs reproducing at the test's introduction commit), 4 `PreviewPanel` (`useMarkdown` auto-import not mocked). All deferred to the UI test-infra triage session (`docs/audits/known-test-issues.md` W6, D2) — adjacent to `ui-002`.
+
+Phase 3 must not regress against these counts. If a new failure appears that is NOT in `docs/audits/known-test-issues.md`, stop and investigate before continuing — it is the new regression Phase 3 introduced.
+
+**Do NOT run** `pnpm -r test:run` for the baseline. It will exit non-zero on workspaces with broken scripts and obscure the actual failure signal.
 
 - [ ] **Step 6: Capture baseline LoC for the master-plan exit criterion**
 
