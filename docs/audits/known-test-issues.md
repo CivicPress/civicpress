@@ -188,6 +188,29 @@ The EmailChannel **source code** is correct: `core/src/notifications/channels/em
 
 **Deferred to:** vitest-mock-strategy session (combined with W4 + W5).
 
+### D3 — UI vitest: `vue-i18n` unresolvable from `useTypedI18n.ts` (2 files fail to transform)
+
+**Status:** pre-existing at dev `645bf8e`; first observed 2026-06-06 in a fresh worktree, then confirmed identical in the main checkout. Environmental drift — see `2026-06-04-dev-state-baseline-audit.md` §9.2.
+
+**Reproduction:**
+```bash
+pnpm run test:ui:run
+```
+
+**Result:** `2 files failed | 18 passed (20); 122 tests passed, 0 failed`. The two failing files:
+- `tests/ui/components/RecordForm.test.ts`
+- `tests/ui/editor/EditorHeader.test.ts`
+
+Both fail at transform time: `Failed to resolve import "vue-i18n" from "modules/ui/app/composables/useTypedI18n.ts"` (vite `import-analysis`).
+
+**Root cause (partial):** `useTypedI18n.ts` does `import { useI18n } from 'vue-i18n'`. `vue-i18n` is only a transitive dep of `@nuxtjs/i18n@10.2.1` (not a direct dep of `modules/ui`), so under strict hoisting it is not present at any resolvable `node_modules/vue-i18n`. Nuxt aliases `vue-i18n` at runtime, but the UI vitest config (`vitest.config.ui.mjs`, happy-dom) does not — so the raw import fails. Why this surfaced now but not in the 2026-06-04 run at the same SHA is not pinned (node_modules / `.nuxt` resolution drift).
+
+**Drift note:** the W6 + D2 failures above (PreviewPanel / StatusTransitionControls / RecordSearch / RecordList / UserForm) do NOT currently reproduce — those files are among the 18 that pass now. The whole UI-vitest picture needs reconciliation in the deferred session below.
+
+**Fix outline (for the future session):** add a `vue-i18n` alias (or a `useTypedI18n` stub) in `vitest.config.ui.mjs` / `tests/ui/setup.ts`, mirroring the `useMarkdown` stub pattern (W6); then re-baseline the whole UI suite and reconcile W6/D2.
+
+**Deferred to:** UI test-infra triage session (same session as W6, D2).
+
 ---
 
 ## Already-deferred elsewhere
@@ -197,6 +220,22 @@ The EmailChannel **source code** is correct: `core/src/notifications/channels/em
 **Status:** pre-existing; documented in master plan §9.1 since the original signoff (2026-05-17). Hardcoded `new Date('2025-12-31')`; today is past.
 
 **Deferred to:** dedicated test-suite-repair session per master plan §9.1. `--no-verify` continues to be the approved override.
+
+---
+
+## Resolved issues (kept for audit-trail)
+
+### B1 — repo did not build from a clean checkout: `express-augment.d.ts` gitignored
+
+**Status:** RESOLVED 2026-06-06 (the commit adding this entry).
+
+**Symptom:** in a fresh `git worktree` off dev `645bf8e`, `pnpm -r build` failed with 16 `TS2339 Property 'user'/'requestId' does not exist on type 'Request'` errors in `modules/api/src/utils/api-logger.ts`.
+
+**Root cause:** `modules/api/src/types/express-augment.d.ts` (the hand-written `Express.Request` global augmentation authored in `fe31a0b`) was matched by `.gitignore:28 *.d.ts` and never committed. It existed only in working trees where it was authored (e.g., the main checkout), so the main checkout built clean while the committed tree did not. The 2026-06-04 audit ran in the main checkout and so recorded "build clean" (that audit's §9.1 corrects this).
+
+**Fix:** added a `.gitignore` negation `!modules/api/src/types/express-augment.d.ts` (preserving the `*.d.ts` rule's intent for generated declarations in dist/) and committed the file.
+
+**Why it matters:** a clean clone / CI / a fresh contributor would have hit this immediately. Same class as F1 (missing `simple-git` devDep).
 
 ---
 

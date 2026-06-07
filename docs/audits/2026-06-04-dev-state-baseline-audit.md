@@ -243,3 +243,58 @@ Nothing pushed to any origin per `[Refactor push policy]`. Phase 3 worktree bran
 - 2026-06-04 16:00 — Phase 3 pre-flight discovered the noisy baseline. Phase 3 execution paused.
 - 2026-06-04 16:10 → 2026-06-05 — this audit: enumerate every failure, identify each as pre-existing or regression with commit SHA, decide disposition.
 - F1–F5 land as separate commits cited in §5.1.
+
+---
+
+## 9. Correction (2026-06-06) — two baseline claims revised
+
+A second Phase 3 pre-flight — this time exercising a **fresh `git worktree`**, not
+the main checkout — surfaced two inaccuracies in the §6 "honest baseline" above.
+Both are pre-existing at dev HEAD; neither is a Phase 3 regression. The worktree
+was the first clean checkout to exercise the *committed* tree, which is why these
+escaped the 2026-06-04 pass (run in the main checkout, whose working tree masked
+both).
+
+### 9.1 `pnpm -r build` did NOT build from a clean checkout (now fixed)
+
+§1 and §6 record `pnpm -r build` as clean. That held only because
+`modules/api/src/types/express-augment.d.ts` — the hand-written `Express.Request`
+global augmentation (`req.user`, `req.requestId`, …) authored in `fe31a0b` — sat
+in the main checkout's working tree. The file is matched by `.gitignore:28
+*.d.ts` and was **never committed**. A fresh worktree therefore lacks it, and
+`modules/api` fails to build with 16 `TS2339 Property 'user'/'requestId' does not
+exist on type 'Request'` errors in `src/utils/api-logger.ts`.
+
+Same class as F1 (`simple-git` missing from devDeps): the repo could not build
+from a clean clone. Fixed 2026-06-06 by adding a `.gitignore` negation
+(`!modules/api/src/types/express-augment.d.ts`) and tracking the file. See
+known-test-issues.md `B1`.
+
+### 9.2 UI-vitest baseline (§3.3 / §6 "17 failed") has drifted (still deferred)
+
+§3.3 and §6 record `pnpm run test:ui:run` as **17 failed / 105 passed (122
+tests); 7 files failed**. As of 2026-06-06, at the same dev HEAD, current reality
+— reproduced identically in the main checkout AND a fresh worktree — is **2 files
+failed / 18 passed; 122 tests passed, 0 test-failures**. The two failing files
+are `tests/ui/components/RecordForm.test.ts` and
+`tests/ui/editor/EditorHeader.test.ts`, both on `Failed to resolve import
+"vue-i18n"` from `modules/ui/app/composables/useTypedI18n.ts` (a vite transform
+error, not an assertion). The W6 + D2 failures documented above (PreviewPanel,
+StatusTransitionControls, RecordSearch, RecordList, UserForm) are among the 18
+passing files now — they do **not** currently reproduce.
+
+The shift is environmental (same SHA; node_modules / `.nuxt` resolution), not a
+source change, and is not root-caused here. It belongs to the already-deferred UI
+test-infra triage session. The new failing pair is tracked in
+known-test-issues.md `D3`.
+
+### 9.3 Net Phase 3 regression baseline (2026-06-06)
+
+Phase 3 is evaluated against this, not the §6 framing:
+
+| Surface | Baseline | 
+|---|---|
+| `pnpm -r build` / `pnpm -C modules/ui build` | clean (with `express-augment.d.ts` now tracked) |
+| `pnpm -C modules/storage test:run` | 216/216 |
+| `pnpm run test:run` (root vitest, node) | 11 failed / 1025 (5 EmailChannel + 4 oauth + 1 DNS + 1 date-bomb) |
+| `pnpm run test:ui:run` (root vitest, UI) | 2 files transform-fail (RecordForm, EditorHeader) / 122 pass, 0 test-fails |
