@@ -28,6 +28,13 @@ build/
 *.d.ts
 *.d.ts.map
 
+# Exception: hand-written source declaration, NOT a generated artifact.
+# The Express.Request global augmentation is real source and MUST be tracked —
+# otherwise the repo cannot build from a clean checkout (a fresh `git worktree`
+# exposes this). The `*.d.ts` rule above is for generated declarations, which
+# live in the already-ignored dist/.
+!modules/api/src/types/express-augment.d.ts
+
 # TypeScript build cache
 *.tsbuildinfo
 
