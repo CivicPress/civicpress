@@ -30,7 +30,6 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { MessageType, PresenceEvent, ControlEvent } from '../types/messages.js';
-import * as bcrypt from 'bcrypt';
 
 const YJS_MSG_SYNC = 0;
 const YJS_MSG_AWARENESS = 1;
@@ -172,8 +171,13 @@ describe('Realtime Module Integration', () => {
     // Trigger config load by calling a method that requires it
     await roleManager.getAvailableRoles();
 
-    // Create test users with password hashes
-    const passwordHash = await bcrypt.hash('password123', 12);
+    // Create test users with password hashes.
+    // The password is never validated in these tests (auth uses createSession
+    // directly), so a fixed bcrypt-format hash avoids a bcrypt dependency that
+    // this module does not (and should not) declare. The bcrypt import here was
+    // a leftover from the broadcast-box device-auth code excised in W1.
+    const passwordHash =
+      '$2b$12$abcdefghijklmnopqrstuuWz6Q1Z9x0y8w7v6u5t4s3r2q1p0o9n8';
     const user1 = await authService.createUserWithPassword({
       username: 'user1',
       email: 'user1@test.com',
