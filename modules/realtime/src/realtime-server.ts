@@ -46,14 +46,8 @@ import {
 } from './persistence/storage.js';
 import { YjsRoom } from './rooms/yjs-room.js';
 import {
-  YJS_MSG_SYNC,
-  YJS_MSG_AWARENESS,
-  readMessageType,
-  sendInitialSync,
-  sendInitialAwareness,
-  handleSyncMessage,
-  handleAwarenessMessage,
-  setupUpdateFanout,
+  dispatchYjsBinaryFrame,
+  setupYjsConnection,
 } from './yjs-sync.js';
 
 export class RealtimeServer {
@@ -447,7 +441,6 @@ export class RealtimeServer {
     },
     handler: RoomTypeHandler
   ): Promise<void> {
-    // Create connection context
     const connectionContext: ConnectionContext = {
       ws,
       clientId,
@@ -556,54 +549,74 @@ export class RealtimeServer {
     userSet.add(clientId);
     this.userConnections.set(userId, userSet);
 
-    // Initialize message rate limit tracking
     this.messageRateLimits.set(clientId, {
       count: 0,
       resetTime: Date.now() + 1000,
       warned: false,
     });
 
-    // Get or create room
+    // 5. Wire the SINGLE canonical disconnect path IMMEDIATELY, before any await
+    //    below — the counts are registered, so the teardown listener must cover
+    //    the WHOLE post-register window or a close mid-await leaks (realtime-002).
+    //    These vars start unset and fill in as setup progresses; runDisconnect()
+    //    reads them live and handleDisconnect tolerates partial setup (see doc).
+    let room: Room | undefined;
+    let roomReference: RoomReference | undefined;
+    let yjsUpdateCleanup: (() => void) | null = null;
+    let established = false;
+    const runDisconnect = (): void => {
+      this.handleDisconnect({
+        ws,
+        clientId,
+        clientIp,
+        userId,
+        fullRoomId,
+        roomType: roomInfo.roomType,
+        room,
+        roomReference,
+        authResult,
+        handler,
+        yjsUpdateCleanup,
+        established,
+      });
+      yjsUpdateCleanup = null;
+    };
+    ws.once('close', runDisconnect);
+
     if (!this.roomManager) {
       throw new Error('Room manager not initialized');
     }
 
-    const room = this.roomManager.getOrCreateRoom(
-      fullRoomId,
-      roomInfo.roomType,
-      {}
-    );
+    room = this.roomManager.getOrCreateRoom(fullRoomId, roomInfo.roomType, {});
+    // Non-undefined alias: closures below lose narrowing on the captured `room`.
+    const joinedRoom = room;
 
-    // Create room reference for handler. The room's RoomState (realtime.types)
-    // is structurally assignable to the handler-facing RoomState
-    // (handler-registry.types) — participants are loose ClientData in both.
-    const roomReference: RoomReference = {
+    // Room reference for the handler. The room's RoomState (realtime.types) is
+    // structurally assignable to the handler-facing RoomState — loose ClientData.
+    roomReference = {
       roomId: fullRoomId,
       roomType: roomInfo.roomType,
-      getState: (): HandlerRoomState => room.getState(),
+      getState: (): HandlerRoomState => joinedRoom.getState(),
       addClient: (cid: string, clientData: ClientData) =>
-        room.addClient(cid, clientData),
-      removeClient: (cid: string) => room.removeClient(cid),
+        joinedRoom.addClient(cid, clientData),
+      removeClient: (cid: string) => joinedRoom.removeClient(cid),
       updateActivity: () => {
-        const maybeActivity = (room as { updateActivity?: () => void })
+        const maybeActivity = (joinedRoom as { updateActivity?: () => void })
           .updateActivity;
         if (typeof maybeActivity === 'function') {
-          maybeActivity.call(room);
+          maybeActivity.call(joinedRoom);
         }
       },
     };
 
-    // Add client to room with metadata from auth
-    const clientConnection = {
+    joinedRoom.addClient(clientId, {
       id: clientId,
       roomId: fullRoomId,
       connectedAt: Date.now(),
       lastActivity: Date.now(),
       ...(authResult.clientMetadata || {}),
-    };
-    room.addClient(clientId, clientConnection);
+    });
 
-    // Send connection acknowledgment
     ws.send(
       JSON.stringify({
         type: 'control',
@@ -613,7 +626,7 @@ export class RealtimeServer {
       })
     );
 
-    // Call post-connect handler if available
+    // Call post-connect handler if available (async — see step 5's race note).
     if (handler.onPostConnect) {
       try {
         await handler.onPostConnect(connectionContext, authResult);
@@ -624,57 +637,34 @@ export class RealtimeServer {
           roomType: roomInfo.roomType,
           error: error instanceof Error ? error.message : String(error),
         });
-        // Continue anyway - post-connect is optional
+        // Continue anyway — post-connect is optional.
       }
     }
 
-    // Generic Yjs wire protocol: every Yjs-backed room speaks binary
-    // y-protocols (SYNC + AWARENESS). Room-type-agnostic — it runs for any
-    // room whose state is a Y.Doc, independent of the room's handler.
-    let yjsUpdateCleanup: (() => void) | null = null;
-    if (room instanceof YjsRoom) {
-      // Ensure the room's Y.Doc is hydrated before the first sync so the client
-      // receives the current document state.
-      const roomState = room.getState();
-      if (!roomState.yjsState || roomState.yjsState.length === 0) {
-        await this.initializeRoom(room, roomInfo.roomId);
-      }
-      const yjsDoc = room.getYjsDoc();
-      // Fan this room's doc updates out to this connection (skips own updates).
-      yjsUpdateCleanup = setupUpdateFanout(ws, yjsDoc, clientId);
-      // Initial handshake: SYNC step 1 + 2, then awareness participants.
-      sendInitialSync(ws, yjsDoc);
-      sendInitialAwareness(ws, yjsDoc);
+    // Generic Yjs wiring (hydrate + fan-out + initial handshake). Assigns the
+    // outer `yjsUpdateCleanup` so the close handler can tear it down mid-setup.
+    if (joinedRoom instanceof YjsRoom) {
+      yjsUpdateCleanup = await setupYjsConnection(ws, joinedRoom, clientId, () =>
+        this.initializeRoom(joinedRoom, roomInfo.roomId)
+      );
     }
 
-    // Setup message handlers
     ws.on('message', async (data: Buffer) => {
       try {
-        // Binary y-protocols frames (Yjs rooms only) are handled before the
-        // JSON control path. Anything else (ping, control) falls through.
-        if (room instanceof YjsRoom) {
-          const frame = new Uint8Array(data);
-          const messageType = readMessageType(frame);
-          if (messageType === YJS_MSG_SYNC) {
-            if (!this.enforceRateLimit(ws, clientId, roomInfo.roomType)) {
-              return;
-            }
-            handleSyncMessage(ws, room, frame, clientId);
-            return;
-          }
-          if (messageType === YJS_MSG_AWARENESS) {
-            if (!this.enforceRateLimit(ws, clientId, roomInfo.roomType)) {
-              return;
-            }
-            handleAwarenessMessage(
-              room.getYjsDoc(),
-              frame,
-              clientId,
-              (rawFrame, excludeId) =>
-                this.broadcastToRoom(room, rawFrame, excludeId)
-            );
-            return;
-          }
+        // Binary y-protocols frames are routed first; ping/control fall through.
+        if (
+          joinedRoom instanceof YjsRoom &&
+          dispatchYjsBinaryFrame(
+            ws,
+            joinedRoom,
+            data,
+            clientId,
+            () => this.enforceRateLimit(ws, clientId, roomInfo.roomType),
+            (rawFrame, excludeId) =>
+              this.broadcastToRoom(joinedRoom, rawFrame, excludeId)
+          )
+        ) {
+          return;
         }
 
         const message = JSON.parse(data.toString());
@@ -685,12 +675,11 @@ export class RealtimeServer {
           return;
         }
 
-        // Check message rate limit
         if (!this.enforceRateLimit(ws, clientId, roomInfo.roomType)) {
           return;
         }
 
-        // Delegate to handler
+        // Delegate to the room-type handler.
         if (handler.onMessage) {
           const messageContext: MessageContext = {
             ws,
@@ -706,7 +695,7 @@ export class RealtimeServer {
               }
             },
             broadcastToRoom: (msg: unknown, excludeClientId?: string) => {
-              this.broadcastToRoom(room, msg, excludeClientId);
+              this.broadcastToRoom(joinedRoom, msg, excludeClientId);
             },
             sendError: (error: Error) => {
               this.sendError(ws, error);
@@ -724,26 +713,16 @@ export class RealtimeServer {
       }
     });
 
-    // 5. Wire the SINGLE canonical disconnect path: exactly one 'close' listener
-    //    per connection, all teardown inside handleDisconnect.
-    ws.once('close', () => {
-      this.handleDisconnect({
-        ws,
-        clientId,
-        clientIp,
-        userId,
-        fullRoomId,
-        roomType: roomInfo.roomType,
-        room,
-        roomReference,
-        authResult,
-        handler,
-        yjsUpdateCleanup,
-      });
-      yjsUpdateCleanup = null;
-    });
+    // Setup complete: mark established so disconnect does full handler/room
+    // teardown (the step-5 'close' listener reads `established` live). If the
+    // socket already closed during setup, release now (idempotent) instead of
+    // waiting on the async 'close'.
+    established = true;
+    if (ws.readyState !== WebSocket.OPEN) {
+      runDisconnect();
+      return;
+    }
 
-    // Emit hook event
     this.emitHook('realtime:client:connected', {
       clientId,
       roomId: fullRoomId,
@@ -757,7 +736,6 @@ export class RealtimeServer {
       roomType: roomInfo.roomType,
     });
   }
-
 
   /**
    * Check connection limits for an authenticated connection. Pure read of the
@@ -794,11 +772,17 @@ export class RealtimeServer {
   }
 
   /**
-   * The single canonical disconnect path for every connection. All teardown
-   * lives here: Yjs fan-out removal, handler.onDisconnect, room/participant
-   * removal, rate-limit state, and release of BOTH count maps (per-IP +
-   * per-user), deleting the entry at zero. One path => the realtime-002 leak
-   * cannot recur.
+   * The single canonical disconnect path for every connection: Yjs fan-out
+   * removal, handler.onDisconnect, room/participant removal, rate-limit state,
+   * and release of BOTH count maps (deleting each entry at zero). One path =>
+   * the realtime-002 leak cannot recur.
+   *
+   * IDEMPOTENT + PARTIAL-SETUP-TOLERANT (close-during-setup race): the 'close'
+   * listener is wired synchronously-adjacent to register, so this can fire before
+   * setup completes, or twice. It ALWAYS releases the unconditionally-registered
+   * state (counts + connections + rate-limit), guarded against double-decrement by
+   * an early return once the connection leaves `connections` (the liveness gate);
+   * room/handler/fan-out teardown is gated on actually reaching those stages.
    */
   private handleDisconnect(params: {
     ws: WebSocket;
@@ -807,11 +791,12 @@ export class RealtimeServer {
     userId: string;
     fullRoomId: string;
     roomType: string;
-    room: Room;
-    roomReference: RoomReference;
+    room: Room | undefined;
+    roomReference: RoomReference | undefined;
     authResult: AuthResult;
     handler: RoomTypeHandler;
     yjsUpdateCleanup: (() => void) | null;
+    established: boolean;
   }): void {
     const {
       clientId,
@@ -824,15 +809,25 @@ export class RealtimeServer {
       authResult,
       handler,
       yjsUpdateCleanup,
+      established,
     } = params;
 
-    // Tear down this connection's Yjs doc-update fan-out, if any.
+    // Idempotency gate: live == present in `connections`. A duplicate fire
+    // (belt-and-suspenders after the listener already ran) returns before
+    // touching any count, so a socket close can never decrement twice.
+    if (!this.connections.has(clientId)) {
+      return;
+    }
+    this.connections.delete(clientId);
+
+    // Yjs fan-out teardown — null if the socket closed before fan-out was wired.
     if (yjsUpdateCleanup) {
       yjsUpdateCleanup();
     }
 
-    // Room-type-specific teardown.
-    if (handler.onDisconnect) {
+    // Handler teardown only for a fully established connection: one that closed
+    // mid-setup never became usable, so it gets no paired onDisconnect.
+    if (established && handler.onDisconnect && roomReference) {
       const disconnectContext: DisconnectContext = {
         clientId,
         room: roomReference,
@@ -841,9 +836,10 @@ export class RealtimeServer {
       handler.onDisconnect(disconnectContext);
     }
 
-    // Room + transport bookkeeping.
-    room.removeClient(clientId);
-    this.connections.delete(clientId);
+    // Room bookkeeping — `room` is undefined if the socket closed before join.
+    if (room) {
+      room.removeClient(clientId);
+    }
     this.messageRateLimits.delete(clientId);
 
     // Release per-IP count; delete the key at zero.
@@ -1350,6 +1346,10 @@ export class RealtimeServer {
     }
     this.connections.clear();
     this.messageRateLimits.clear();
+    // Release connection-limit bookkeeping too, for symmetry with the maps
+    // above (a fresh server must start with empty count state).
+    this.connectionCounts.clear();
+    this.userConnections.clear();
 
     // Cleanup rooms
     if (this.roomManager) {

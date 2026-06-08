@@ -228,6 +228,69 @@ export function handleAwarenessMessage(
 }
 
 /**
+ * Route an incoming binary frame for a Yjs room.
+ *
+ * Reads the top-level y-protocols message type and dispatches SYNC / AWARENESS
+ * (each gated by `enforceRateLimit`, which returns false to drop the frame).
+ * Returns true when the frame was a recognised Yjs binary frame (handled or
+ * rate-limited); false when it is not, so the caller can fall through to the
+ * JSON control path. Keeps the y-protocols wire logic out of the server.
+ *
+ * @param enforceRateLimit returns false (drops the frame) when over the limit
+ * @param broadcastRaw sends a raw binary frame to every other client in the room
+ */
+export function dispatchYjsBinaryFrame(
+  ws: WebSocket,
+  room: YjsRoom,
+  data: Buffer,
+  clientId: string,
+  enforceRateLimit: () => boolean,
+  broadcastRaw: (frame: Uint8Array, excludeClientId: string) => void
+): boolean {
+  const frame = new Uint8Array(data);
+  const messageType = readMessageType(frame);
+  if (messageType === YJS_MSG_SYNC) {
+    if (enforceRateLimit()) {
+      handleSyncMessage(ws, room, frame, clientId);
+    }
+    return true;
+  }
+  if (messageType === YJS_MSG_AWARENESS) {
+    if (enforceRateLimit()) {
+      handleAwarenessMessage(room.getYjsDoc(), frame, clientId, broadcastRaw);
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Wire a freshly-joined connection into a Yjs room: hydrate the doc if needed,
+ * register this connection's update fan-out, then send the initial SYNC +
+ * awareness handshake. Returns the fan-out cleanup (call on disconnect).
+ *
+ * `hydrate` performs the (server-owned) room hydration; it is awaited only when
+ * the doc currently has no persisted state.
+ */
+export async function setupYjsConnection(
+  ws: WebSocket,
+  room: YjsRoom,
+  clientId: string,
+  hydrate: () => Promise<void>
+): Promise<() => void> {
+  // TODO(W3/W4): hydration guard dead — empty Y.Doc state is length 2, not 0.
+  const yjsState = room.getState().yjsState;
+  if (!yjsState || yjsState.length === 0) {
+    await hydrate();
+  }
+  const yjsDoc = room.getYjsDoc();
+  const cleanup = setupUpdateFanout(ws, yjsDoc, clientId);
+  sendInitialSync(ws, yjsDoc);
+  sendInitialAwareness(ws, yjsDoc);
+  return cleanup;
+}
+
+/**
  * Register a per-connection fan-out of doc updates to this connection's socket.
  *
  * One handler is registered per connection on the shared room doc. For each
