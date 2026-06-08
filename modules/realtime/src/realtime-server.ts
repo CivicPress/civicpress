@@ -1,0 +1,1471 @@
+/**
+ * Realtime WebSocket Server
+ *
+ * Main WebSocket server for realtime collaborative editing
+ */
+
+import { WebSocketServer, WebSocket } from 'ws';
+import type {
+  Logger,
+  HookSystem,
+  AuthService,
+  RecordManager,
+  DatabaseService,
+} from '@civicpress/core';
+import type { CivicPressConfig } from '@civicpress/core';
+import {
+  coreError,
+  coreInfo,
+  coreWarn,
+  coreSuccess,
+  coreDebug,
+  isCivicPressError,
+} from '@civicpress/core';
+import type { RealtimeConfig } from './types/realtime.types.js';
+import { RealtimeConfigManager } from './realtime-config-manager.js';
+import { RoomManager } from './rooms/room-manager.js';
+import {
+  authenticateConnection,
+  extractToken,
+  parseRoomId,
+  type AuthenticatedConnection,
+} from './auth.js';
+import {
+  AuthenticationFailedError,
+  ConnectionLimitExceededError,
+} from './errors/realtime-errors.js';
+import type { RealtimeMessage } from './types/messages.js';
+import { MessageType } from './types/messages.js';
+import type {
+  HandlerRegistry,
+  RoomTypeHandler,
+  ConnectionContext,
+  MessageContext,
+  DisconnectContext,
+  AuthResult,
+  RoomReference,
+} from './types/handler-registry.types.js';
+import { createHandlerRegistry } from './handler-registry.js';
+import { PresenceManager } from './presence/presence-manager.js';
+import { SnapshotManager } from './persistence/snapshots.js';
+import {
+  DatabaseSnapshotStorage,
+  FilesystemSnapshotStorage,
+} from './persistence/storage.js';
+import { YjsRoom } from './rooms/yjs-room.js';
+import {
+  YJS_MSG_SYNC,
+  YJS_MSG_AWARENESS,
+  readMessageType,
+  sendInitialSync,
+  sendInitialAwareness,
+  handleSyncMessage,
+  handleAwarenessMessage,
+  setupUpdateFanout,
+} from './yjs-sync.js';
+
+/**
+ * Generate a consistent color for a user based on their ID
+ * Uses a predefined palette of distinct, accessible colors
+ */
+const PARTICIPANT_COLORS = [
+  '#F44336',
+  '#E91E63',
+  '#9C27B0',
+  '#673AB7',
+  '#3F51B5',
+  '#2196F3',
+  '#03A9F4',
+  '#00BCD4',
+  '#009688',
+  '#4CAF50',
+  '#8BC34A',
+  '#CDDC39',
+  '#FFC107',
+  '#FF9800',
+  '#FF5722',
+  '#795548',
+];
+
+function generateParticipantColor(userId: string | number): string {
+  // Convert to number and use modulo to pick from palette
+  const numericId =
+    typeof userId === 'number' ? userId : parseInt(String(userId), 10) || 0;
+  const index = Math.abs(numericId) % PARTICIPANT_COLORS.length;
+  return PARTICIPANT_COLORS[index] || '#3F51B5';
+}
+
+export class RealtimeServer {
+  private logger: Logger;
+  private hookSystem: HookSystem;
+  private authService: AuthService;
+  private recordManager: RecordManager | null = null;
+  private databaseService: DatabaseService | null = null;
+  private configManager: RealtimeConfigManager;
+  private config: CivicPressConfig;
+  private server: WebSocketServer | null = null;
+  private roomManager: RoomManager | null = null;
+  private presenceManager: PresenceManager;
+  private snapshotManager: SnapshotManager | null = null;
+  private connections: Map<string, WebSocket> = new Map();
+  private connectionCounts: Map<string, number> = new Map(); // IP -> count
+  private userConnections: Map<number, Set<string>> = new Map(); // userId -> clientIds
+  private clientToUser: Map<string, { userId: number; username: string }> =
+    new Map();
+  private realtimeConfig: RealtimeConfig | null = null;
+  private initialized: boolean = false;
+  private snapshotInterval: NodeJS.Timeout | null = null;
+  // Message rate limiting: clientId -> { count: number, resetTime: number }
+  private messageRateLimits: Map<
+    string,
+    { count: number; resetTime: number; warned: boolean }
+  > = new Map();
+  // Handler registry for room type handlers
+  private handlerRegistry: HandlerRegistry;
+
+  constructor(
+    logger: Logger,
+    hookSystem: HookSystem,
+    authService: AuthService,
+    configManager: RealtimeConfigManager,
+    config: CivicPressConfig
+  ) {
+    this.logger = logger;
+    this.hookSystem = hookSystem;
+    this.authService = authService;
+    this.configManager = configManager;
+    this.config = config;
+    this.presenceManager = new PresenceManager(logger);
+    this.handlerRegistry = createHandlerRegistry();
+  }
+
+  /**
+   * Set record manager (called after DI container initialization)
+   */
+  setRecordManager(recordManager: RecordManager): void {
+    this.recordManager = recordManager;
+  }
+
+  /**
+   * Set database service (for snapshot storage)
+   */
+  setDatabaseService(databaseService: DatabaseService): void {
+    this.databaseService = databaseService;
+  }
+
+  /**
+   * Set room manager (called by DI container)
+   */
+  setRoomManager(roomManager: RoomManager): void {
+    this.roomManager = roomManager;
+  }
+
+  /**
+   * Initialize the realtime server
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    coreInfo('Initializing realtime server...', {
+      operation: 'realtime:server:initialize',
+    });
+
+    // Load configuration
+    try {
+      this.realtimeConfig = await this.configManager.loadConfig();
+      this.configManager.validateConfig(this.realtimeConfig);
+    } catch (error) {
+      // Use default config if file doesn't exist
+      this.realtimeConfig = this.configManager.getDefaultConfig();
+      coreWarn('Using default realtime configuration', {
+        operation: 'realtime:server:initialize',
+      });
+    }
+
+    // Check if enabled
+    if (!this.realtimeConfig.enabled) {
+      coreInfo('Realtime server disabled in configuration', {
+        operation: 'realtime:server:initialize',
+      });
+      return;
+    }
+
+    // Room manager will be set by DI container via setRoomManager()
+    // If not set, create it directly (fallback)
+    if (!this.roomManager) {
+      this.roomManager = new RoomManager(this.logger, this);
+    }
+
+    // Initialize snapshot manager
+    if (this.realtimeConfig.snapshots.enabled) {
+      // Ensure database table exists if using database storage
+      if (
+        this.realtimeConfig.snapshots.storage === 'database' &&
+        this.databaseService
+      ) {
+        await this.ensureSnapshotTable();
+      }
+
+      const snapshotStorage =
+        this.realtimeConfig.snapshots.storage === 'database' &&
+        this.databaseService
+          ? new DatabaseSnapshotStorage(this.databaseService, this.logger)
+          : new FilesystemSnapshotStorage(
+              this.config.dataDir || '.system-data',
+              this.logger
+            );
+
+      this.snapshotManager = new SnapshotManager(this.logger, snapshotStorage);
+
+      // Start snapshot interval
+      if (this.realtimeConfig.snapshots.interval > 0) {
+        this.snapshotInterval = setInterval(() => {
+          this.createSnapshots();
+        }, this.realtimeConfig.snapshots.interval * 1000);
+      }
+    }
+
+    // Start WebSocket server
+    await this.startServer();
+
+    this.initialized = true;
+    coreSuccess(
+      {
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      },
+      'Realtime server initialized',
+      {
+        operation: 'realtime:server:initialized',
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      }
+    );
+  }
+
+  /**
+   * Start WebSocket server
+   */
+  private async startServer(): Promise<void> {
+    if (!this.realtimeConfig) {
+      throw new Error('Configuration not loaded');
+    }
+
+    coreInfo('Starting WebSocket server...', {
+      operation: 'realtime:server:start',
+      port: this.realtimeConfig.port,
+      host: this.realtimeConfig.host,
+      path: this.realtimeConfig.path,
+    });
+
+    try {
+      // Note: We don't use the 'path' option here because ws library requires exact match
+      // Instead, we handle path routing in handleConnection() via parseRoomId()
+      this.server = new WebSocketServer({
+        port: this.realtimeConfig.port,
+        host: this.realtimeConfig.host,
+        // Use verifyClient to ensure path starts with /realtime
+        verifyClient: (info: {
+          origin: string;
+          secure: boolean;
+          req: { url?: string };
+        }): boolean => {
+          const url = info.req.url || '';
+          const path = this.realtimeConfig!.path;
+          const isValid = url.startsWith(path);
+          if (!isValid) {
+            coreWarn('WebSocket connection rejected: invalid path', {
+              operation: 'realtime:server:verifyClient',
+              url,
+              expectedPath: path,
+            });
+          }
+          return isValid;
+        },
+      });
+    } catch (error) {
+      coreError(
+        error instanceof Error ? error : new Error(String(error)),
+        'REALTIME_SERVER_CREATE_ERROR',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          port: this.realtimeConfig.port,
+          host: this.realtimeConfig.host,
+        },
+        {
+          operation: 'realtime:server:create:error',
+        }
+      );
+      throw error;
+    }
+
+    this.server.on('connection', (ws: WebSocket, req) => {
+      // Convert IncomingMessage to our expected format
+      // Extract subprotocols from the request (for browser clients)
+      // The 'sec-websocket-protocol' header contains comma-separated protocols
+      const protocols = req.headers['sec-websocket-protocol']
+        ? req.headers['sec-websocket-protocol'].split(',').map((p) => p.trim())
+        : undefined;
+
+      const reqData = {
+        url: req.url,
+        socket: req.socket
+          ? { remoteAddress: req.socket.remoteAddress }
+          : undefined,
+        headers: req.headers as Record<string, string>,
+        protocols,
+      };
+      this.handleConnection(ws, reqData);
+    });
+
+    this.server.on('error', (error: Error) => {
+      coreError(
+        error instanceof Error ? error : new Error(String(error)),
+        'REALTIME_SERVER_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:error',
+        }
+      );
+    });
+
+    // Verify server is actually listening
+    this.server.on('listening', () => {
+      if (!this.realtimeConfig) {
+        return;
+      }
+      const address = this.server?.address();
+      const actualPort =
+        typeof address === 'object' && address
+          ? address.port
+          : this.realtimeConfig.port;
+      coreInfo('WebSocket server listening', {
+        operation: 'realtime:server:listening',
+        port: actualPort,
+        host:
+          typeof address === 'object' && address
+            ? address.address
+            : this.realtimeConfig.host,
+        path: this.realtimeConfig.path,
+      });
+    });
+
+    coreSuccess(
+      {
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      },
+      'WebSocket server started',
+      {
+        operation: 'realtime:server:started',
+        port: this.realtimeConfig.port,
+        path: this.realtimeConfig.path,
+      }
+    );
+  }
+
+  /**
+   * Handle new WebSocket connection
+   */
+  private async handleConnection(
+    ws: WebSocket,
+    req: {
+      url?: string;
+      socket?: { remoteAddress?: string };
+      headers?: Record<string, string>;
+      protocols?: string[];
+    }
+  ): Promise<void> {
+    const clientId = this.generateClientId();
+    const clientIp = req.socket?.remoteAddress || 'unknown';
+
+    coreDebug('WebSocket connection attempt', {
+      operation: 'realtime:server:connection:attempt',
+      clientId,
+      url: req.url,
+      ip: clientIp,
+    });
+
+    try {
+      // Check connection limits
+      await this.checkConnectionLimits(clientIp, null);
+
+      // Extract token and room info
+      const url = req.url || '';
+      const tokenResult = extractToken(url, req.headers, req.protocols);
+
+      // Log warning if using deprecated query string method
+      if (tokenResult.method === 'query') {
+        coreWarn(
+          'WebSocket authentication using deprecated query string method',
+          {
+            operation: 'realtime:auth:deprecated',
+            clientId,
+            ip: clientIp,
+            recommendation:
+              'Use Authorization header (Node.js) or subprotocol (browser) instead',
+          }
+        );
+      }
+
+      if (!tokenResult.token) {
+        coreWarn('WebSocket connection rejected: no token provided', {
+          operation: 'realtime:server:connection:no-token',
+          clientId,
+          url: req.url,
+          ip: clientIp,
+        });
+        this.sendError(ws, new AuthenticationFailedError());
+        ws.close();
+        return;
+      }
+
+      const token = tokenResult.token;
+
+      // Parse room ID
+      const roomInfo = parseRoomId(url);
+      if (!roomInfo) {
+        coreWarn('Invalid room URL format', {
+          operation: 'realtime:server:connection:invalid-url',
+          clientId,
+          url,
+        });
+        this.sendError(ws, new Error('Invalid room URL format'));
+        ws.close();
+        return;
+      }
+
+      const fullRoomId = `${roomInfo.roomType}:${roomInfo.roomId}`;
+
+      coreInfo('Routing WebSocket connection', {
+        operation: 'realtime:server:connection:routing',
+        clientId,
+        roomType: roomInfo.roomType,
+        roomId: roomInfo.roomId,
+        fullRoomId,
+      });
+
+      // Route to the registered handler for this room type
+      const customHandler = this.handlerRegistry.getHandler(roomInfo.roomType);
+      if (!customHandler) {
+        coreWarn('No handler registered for room type', {
+          operation: 'realtime:connection:no-handler',
+          roomType: roomInfo.roomType,
+        });
+        ws.close(4004, JSON.stringify({ code: 'ROOM_TYPE_NOT_REGISTERED', roomType: roomInfo.roomType }));
+        return;
+      }
+      await this.handleConnectionWithHandler(
+        ws,
+        clientId,
+        clientIp,
+        token,
+        roomInfo,
+        fullRoomId,
+        req,
+        customHandler
+      );
+    } catch (error) {
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_CONNECTION_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:connection:error',
+          clientId,
+        }
+      );
+
+      const errorToSend =
+        error instanceof Error ? error : new Error('Connection failed');
+      this.sendError(ws, errorToSend);
+
+      ws.close();
+    }
+  }
+
+  /**
+   * Handle connection using a custom room type handler
+   *
+   * This delegates authentication, message handling, and disconnect
+   * to the registered handler.
+   */
+  private async handleConnectionWithHandler(
+    ws: WebSocket,
+    clientId: string,
+    clientIp: string,
+    token: string,
+    roomInfo: { roomType: string; roomId: string },
+    fullRoomId: string,
+    req: {
+      url?: string;
+      socket?: { remoteAddress?: string };
+      headers?: Record<string, string>;
+      protocols?: string[];
+    },
+    handler: RoomTypeHandler
+  ): Promise<void> {
+    // Create connection context
+    const connectionContext: ConnectionContext = {
+      ws,
+      clientId,
+      clientIp,
+      token,
+      roomId: roomInfo.roomId,
+      fullRoomId,
+      url: req.url || '',
+      headers: req.headers,
+      protocols: req.protocols,
+    };
+
+    // Authenticate using handler
+    let authResult: AuthResult;
+    if (handler.onConnect) {
+      try {
+        authResult = await handler.onConnect(connectionContext);
+      } catch (error) {
+        coreError(
+          error instanceof Error ? error : new Error(String(error)),
+          'HANDLER_AUTH_ERROR',
+          { error: error instanceof Error ? error.message : String(error) },
+          {
+            operation: 'realtime:server:handler:auth:error',
+            clientId,
+            roomType: roomInfo.roomType,
+          }
+        );
+        this.sendError(
+          ws,
+          error instanceof Error ? error : new Error('Authentication failed')
+        );
+        ws.close();
+        return;
+      }
+
+      if (!authResult.success) {
+        coreWarn('Handler authentication failed', {
+          operation: 'realtime:server:handler:auth:failed',
+          clientId,
+          roomType: roomInfo.roomType,
+          error: authResult.error,
+          errorCode: authResult.errorCode,
+        });
+        this.sendError(
+          ws,
+          new AuthenticationFailedError({
+            message: authResult.error || 'Authentication failed',
+          })
+        );
+        ws.close();
+        return;
+      }
+    } else {
+      // No onConnect handler, allow connection with empty auth
+      authResult = { success: true };
+    }
+
+    // Track connection
+    this.connections.set(clientId, ws);
+
+    // Track IP connection count
+    const ipCount = this.connectionCounts.get(clientIp) || 0;
+    this.connectionCounts.set(clientIp, ipCount + 1);
+
+    // Initialize message rate limit tracking
+    this.messageRateLimits.set(clientId, {
+      count: 0,
+      resetTime: Date.now() + 1000,
+      warned: false,
+    });
+
+    // Get or create room
+    if (!this.roomManager) {
+      throw new Error('Room manager not initialized');
+    }
+
+    const room = this.roomManager.getOrCreateRoom(
+      fullRoomId,
+      roomInfo.roomType,
+      {}
+    );
+
+    // Create room reference for handler
+    const roomReference: RoomReference = {
+      roomId: fullRoomId,
+      roomType: roomInfo.roomType,
+      getState: () => room.getState() as any,
+      addClient: (cid: string, clientData: any) =>
+        room.addClient(cid, clientData),
+      removeClient: (cid: string) => room.removeClient(cid),
+      updateActivity: () => {
+        if (typeof (room as any).updateActivity === 'function') {
+          (room as any).updateActivity();
+        }
+      },
+    };
+
+    // Add client to room with metadata from auth
+    const clientConnection = {
+      id: clientId,
+      roomId: fullRoomId,
+      connectedAt: Date.now(),
+      lastActivity: Date.now(),
+      ...(authResult.clientMetadata || {}),
+    };
+    room.addClient(clientId, clientConnection);
+
+    // Send connection acknowledgment
+    ws.send(
+      JSON.stringify({
+        type: 'control',
+        event: 'connection.ack',
+        roomId: fullRoomId,
+        clientId,
+      })
+    );
+
+    // Call post-connect handler if available
+    if (handler.onPostConnect) {
+      try {
+        await handler.onPostConnect(connectionContext, authResult);
+      } catch (error) {
+        coreWarn('Handler post-connect failed', {
+          operation: 'realtime:server:handler:post-connect:error',
+          clientId,
+          roomType: roomInfo.roomType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue anyway - post-connect is optional
+      }
+    }
+
+    // Generic Yjs wire protocol: every Yjs-backed room speaks binary
+    // y-protocols (SYNC + AWARENESS). Room-type-agnostic — it runs for any
+    // room whose state is a Y.Doc, independent of the room's handler.
+    let yjsUpdateCleanup: (() => void) | null = null;
+    if (room instanceof YjsRoom) {
+      // Ensure the room's Y.Doc is hydrated before the first sync so the client
+      // receives the current document state.
+      const roomState = room.getState();
+      if (!roomState.yjsState || roomState.yjsState.length === 0) {
+        await this.initializeRoom(room, roomInfo.roomId);
+      }
+      const yjsDoc = room.getYjsDoc();
+      // Fan this room's doc updates out to this connection (skips own updates).
+      yjsUpdateCleanup = setupUpdateFanout(ws, yjsDoc, clientId);
+      // Initial handshake: SYNC step 1 + 2, then awareness participants.
+      sendInitialSync(ws, yjsDoc);
+      sendInitialAwareness(ws, yjsDoc);
+    }
+
+    // Setup message handlers
+    ws.on('message', async (data: Buffer) => {
+      try {
+        // Binary y-protocols frames (Yjs rooms only) are handled before the
+        // JSON control path. Anything else (ping, control) falls through.
+        if (room instanceof YjsRoom) {
+          const frame = new Uint8Array(data);
+          const messageType = readMessageType(frame);
+          if (messageType === YJS_MSG_SYNC) {
+            if (!this.enforceRateLimit(ws, clientId, roomInfo.roomType)) {
+              return;
+            }
+            handleSyncMessage(ws, room, frame, clientId);
+            return;
+          }
+          if (messageType === YJS_MSG_AWARENESS) {
+            if (!this.enforceRateLimit(ws, clientId, roomInfo.roomType)) {
+              return;
+            }
+            handleAwarenessMessage(
+              room.getYjsDoc(),
+              frame,
+              clientId,
+              (rawFrame, excludeId) =>
+                this.broadcastToRoom(room, rawFrame, excludeId)
+            );
+            return;
+          }
+        }
+
+        const message = JSON.parse(data.toString());
+
+        // Handle ping/pong (exempt from rate limiting)
+        if (message.type === 'ping' || message.type === MessageType.PING) {
+          this.sendPong(ws);
+          return;
+        }
+
+        // Check message rate limit
+        if (!this.enforceRateLimit(ws, clientId, roomInfo.roomType)) {
+          return;
+        }
+
+        // Delegate to handler
+        if (handler.onMessage) {
+          const messageContext: MessageContext = {
+            ws,
+            clientId,
+            message,
+            rawData: data,
+            room: roomReference,
+            auth: authResult,
+            sendToClient: (targetClientId: string, msg: unknown) => {
+              const targetWs = this.connections.get(targetClientId);
+              if (targetWs && targetWs.readyState === 1) {
+                targetWs.send(JSON.stringify(msg));
+              }
+            },
+            broadcastToRoom: (msg: unknown, excludeClientId?: string) => {
+              this.broadcastToRoom(room, msg, excludeClientId);
+            },
+            sendError: (error: Error) => {
+              this.sendError(ws, error);
+            },
+          };
+
+          await handler.onMessage(messageContext);
+        }
+      } catch (error) {
+        coreError(
+          error instanceof Error ? error : new Error(String(error)),
+          'HANDLER_MESSAGE_ERROR',
+          { error: error instanceof Error ? error.message : String(error) },
+          {
+            operation: 'realtime:server:handler:message:error',
+            clientId,
+            roomType: roomInfo.roomType,
+          }
+        );
+      }
+    });
+
+    // Setup disconnect handler
+    ws.on('close', () => {
+      // Tear down the per-connection Yjs doc-update fan-out, if any.
+      if (yjsUpdateCleanup) {
+        yjsUpdateCleanup();
+        yjsUpdateCleanup = null;
+      }
+
+      // Delegate to handler
+      if (handler.onDisconnect) {
+        const disconnectContext: DisconnectContext = {
+          clientId,
+          room: roomReference,
+          auth: authResult,
+        };
+        handler.onDisconnect(disconnectContext);
+      }
+
+      // Cleanup
+      room.removeClient(clientId);
+      this.connections.delete(clientId);
+      this.messageRateLimits.delete(clientId);
+
+      // Update IP connection count
+      const currentIpCount = this.connectionCounts.get(clientIp) || 0;
+      if (currentIpCount <= 1) {
+        this.connectionCounts.delete(clientIp);
+      } else {
+        this.connectionCounts.set(clientIp, currentIpCount - 1);
+      }
+
+      // Emit hook event
+      this.emitHook('realtime:client:disconnected', {
+        clientId,
+        roomId: fullRoomId,
+        roomType: roomInfo.roomType,
+        timestamp: Date.now(),
+      });
+
+      coreInfo('Handler client disconnected', {
+        operation: 'realtime:server:handler:client:disconnected',
+        clientId,
+        roomType: roomInfo.roomType,
+      });
+    });
+
+    // Emit hook event
+    this.emitHook('realtime:client:connected', {
+      clientId,
+      roomId: fullRoomId,
+      roomType: roomInfo.roomType,
+      timestamp: Date.now(),
+    });
+
+    coreInfo('Handler client connected', {
+      operation: 'realtime:server:handler:client:connected',
+      clientId,
+      roomType: roomInfo.roomType,
+    });
+  }
+
+
+  /**
+   * Check connection limits
+   *
+   * Enforces rate limiting based on connections per IP and per user.
+   * Throws ConnectionLimitExceededError if limits are exceeded.
+   */
+  private async checkConnectionLimits(
+    ip: string,
+    userId: number | null
+  ): Promise<void> {
+    const config = this.realtimeConfig;
+    if (!config) {
+      return;
+    }
+    const limitConfig = config;
+
+    // Check IP limit
+    const ipCount = this.connectionCounts.get(ip) || 0;
+    if (ipCount >= limitConfig.rate_limiting.connections_per_ip) {
+      throw new ConnectionLimitExceededError(
+        limitConfig.rate_limiting.connections_per_ip,
+        { limitType: 'ip', ip }
+      );
+    }
+
+    // Check user limit
+    if (userId !== null) {
+      const uid = userId as number;
+      const userConnections = this.userConnections.get(uid) || new Set();
+      if (
+        userConnections.size >= limitConfig.rate_limiting.connections_per_user
+      ) {
+        throw new ConnectionLimitExceededError(
+          limitConfig.rate_limiting.connections_per_user,
+          { limitType: 'user', userId: uid }
+        );
+      }
+    }
+  }
+
+  /**
+   * Check message rate limit for a client
+   * Returns whether message is allowed and remaining count
+   */
+  private checkMessageRateLimit(clientId: string): {
+    allowed: boolean;
+    remaining: number;
+    warning: boolean;
+  } {
+    if (!this.realtimeConfig) {
+      return { allowed: true, remaining: Infinity, warning: false };
+    }
+
+    const limit = this.realtimeConfig.rate_limiting.messages_per_second;
+    const now = Date.now();
+
+    let rateLimit = this.messageRateLimits.get(clientId);
+
+    // Initialize or reset if window expired
+    if (!rateLimit || rateLimit.resetTime <= now) {
+      rateLimit = {
+        count: 0,
+        resetTime: now + 1000, // 1 second window
+        warned: false,
+      };
+      this.messageRateLimits.set(clientId, rateLimit);
+    }
+
+    const remaining = Math.max(0, limit - rateLimit.count);
+    const allowed = remaining > 0;
+    const warning = remaining <= Math.ceil(limit * 0.2); // Warn at 20% remaining
+
+    if (allowed) {
+      rateLimit.count++;
+    }
+
+    return { allowed, remaining, warning };
+  }
+
+  /**
+   * Enforce the per-client message rate limit for one inbound message. Returns
+   * true when allowed; otherwise sends an error, closes with 1008, returns
+   * false. Shared by the binary y-protocols path and the JSON control path.
+   */
+  private enforceRateLimit(
+    ws: WebSocket,
+    clientId: string,
+    roomType: string
+  ): boolean {
+    if (this.checkMessageRateLimit(clientId).allowed) {
+      return true;
+    }
+    coreWarn('Message rate limit exceeded', {
+      operation: 'realtime:server:rate_limit',
+      clientId,
+      roomType,
+    });
+    this.sendError(
+      ws,
+      new Error(
+        `Rate limit exceeded: ${this.realtimeConfig?.rate_limiting.messages_per_second || 10} messages per second`
+      )
+    );
+    ws.close(1008, 'Rate limit exceeded');
+    return false;
+  }
+
+  /**
+   * Send error to client
+   */
+  private sendError(ws: WebSocket, error: Error): void {
+    const message = {
+      type: MessageType.CONTROL,
+      event: 'error',
+      error: {
+        code: (error as any).code || 'UNKNOWN_ERROR',
+        message: error.message,
+      },
+    };
+
+    ws.send(JSON.stringify(message));
+  }
+
+  /**
+   * Send pong response
+   */
+  private sendPong(ws: WebSocket): void {
+    const message = {
+      type: MessageType.PONG,
+      timestamp: Date.now(),
+    };
+
+    ws.send(JSON.stringify(message));
+  }
+
+  /**
+   * Generate unique client ID
+   */
+  private generateClientId(): string {
+    return `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+  /**
+   * Emit hook event
+   */
+  emitHook(event: string, data: any): void {
+    this.hookSystem.emit(event, data).catch((error) => {
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_HOOK_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:hook:error',
+          event,
+        }
+      );
+    });
+  }
+
+  /**
+   * Initialize room with content (from record or snapshot)
+   */
+  private async initializeRoom(room: YjsRoom, recordId: string): Promise<void> {
+    try {
+      // Try to load from snapshot first
+      if (this.snapshotManager) {
+        const snapshot = await this.snapshotManager.loadSnapshot(room.roomId);
+        if (snapshot) {
+          this.snapshotManager.applySnapshot(room.getYjsDoc(), snapshot);
+          coreInfo('Room initialized from snapshot', {
+            operation: 'realtime:server:room:initialized',
+            roomId: room.roomId,
+            source: 'snapshot',
+          });
+          return;
+        }
+      }
+
+      // Fallback to loading from record
+      if (this.recordManager) {
+        await room.initialize(recordId);
+        coreInfo('Room initialized from record', {
+          operation: 'realtime:server:room:initialized',
+          roomId: room.roomId,
+          source: 'record',
+        });
+      }
+    } catch (error) {
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_ROOM_INIT_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:room:initialize:error',
+          roomId: room.roomId,
+        }
+      );
+      // Continue with empty document
+    }
+  }
+
+  /**
+   * Broadcast a message to all clients in a room, except the sender.
+   *
+   * `Uint8Array` payloads are sent verbatim (binary y-protocols frames such as
+   * awareness); any other value is JSON-encoded.
+   */
+  private broadcastToRoom(
+    room: any,
+    message: any,
+    excludeClientId?: string
+  ): void {
+    const payload =
+      message instanceof Uint8Array ? message : JSON.stringify(message);
+    const state = room.getState();
+    for (const participant of state.participants) {
+      const ws = this.connections.get(participant.id);
+      if (ws && ws.readyState === 1 && participant.id !== excludeClientId) {
+        // WebSocket.OPEN = 1
+        try {
+          ws.send(payload);
+        } catch (error) {
+          coreError(
+            error instanceof Error ? error : new Error(String(error)),
+            'REALTIME_SEND_ERROR',
+            { error: error instanceof Error ? error.message : String(error) },
+            {
+              operation: 'realtime:server:broadcast:error',
+              clientId: participant.id,
+            }
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Ensure snapshot table exists in database
+   */
+  private async ensureSnapshotTable(): Promise<void> {
+    if (!this.databaseService) {
+      return;
+    }
+
+    try {
+      // Check if table exists by trying to query it
+      await this.databaseService.query(
+        'SELECT 1 FROM realtime_snapshots LIMIT 1'
+      );
+    } catch (error: any) {
+      // Table doesn't exist, create it
+      if (
+        error?.message?.includes('no such table') ||
+        error?.message?.includes('does not exist')
+      ) {
+        coreInfo('Creating realtime_snapshots table...', {
+          operation: 'realtime:server:migration',
+        });
+
+        try {
+          await this.databaseService.query(`
+            CREATE TABLE IF NOT EXISTS realtime_snapshots (
+              id TEXT PRIMARY KEY,
+              room_id TEXT NOT NULL,
+              snapshot_data BLOB NOT NULL,
+              version INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            )
+          `);
+
+          await this.databaseService.query(`
+            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_room_id 
+            ON realtime_snapshots(room_id)
+          `);
+
+          await this.databaseService.query(`
+            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_created_at 
+            ON realtime_snapshots(created_at)
+          `);
+
+          coreSuccess({}, 'realtime_snapshots table created', {
+            operation: 'realtime:server:migration',
+          });
+        } catch (createError: any) {
+          coreWarn(
+            'Failed to create realtime_snapshots table, snapshots will be disabled',
+            {
+              operation: 'realtime:server:migration:error',
+              error:
+                createError instanceof Error
+                  ? createError.message
+                  : String(createError),
+            }
+          );
+          // Disable snapshots if table creation fails
+          if (this.realtimeConfig) {
+            this.realtimeConfig.snapshots.enabled = false;
+          }
+        }
+      } else {
+        // Other error, log it but don't disable snapshots
+        coreWarn('Error checking realtime_snapshots table', {
+          operation: 'realtime:server:migration:check:error',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /**
+   * Create snapshot for a room
+   */
+  private async createRoomSnapshot(room: YjsRoom): Promise<void> {
+    if (!this.snapshotManager || !this.realtimeConfig) {
+      return;
+    }
+
+    try {
+      const state = room.getState();
+      const snapshot = this.snapshotManager.createSnapshot(
+        room.roomId,
+        room.getYjsDoc(),
+        state.version
+      );
+
+      await this.snapshotManager.saveSnapshot(snapshot);
+      room.resetUpdateCount();
+
+      // Emit hook event
+      this.emitHook('realtime:snapshot:saved', {
+        roomId: room.roomId,
+        snapshotId: `${room.roomId}-${snapshot.version}`,
+        timestamp: snapshot.timestamp,
+      });
+    } catch (error) {
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error) ? undefined : 'REALTIME_SNAPSHOT_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:server:snapshot:error',
+          roomId: room.roomId,
+        }
+      );
+    }
+  }
+
+  /**
+   * Create snapshots for all rooms that need them
+   */
+  private async createSnapshots(): Promise<void> {
+    if (!this.snapshotManager || !this.roomManager || !this.realtimeConfig) {
+      return;
+    }
+
+    const rooms = this.roomManager.getAllRooms();
+    const maxUpdates = this.realtimeConfig.snapshots.max_updates;
+    const intervalSeconds = this.realtimeConfig.snapshots.interval;
+
+    for (const room of rooms) {
+      if (room instanceof YjsRoom) {
+        if (room.needsSnapshot(maxUpdates, intervalSeconds)) {
+          await this.createRoomSnapshot(room);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get health status and metrics
+   */
+  getHealthStatus(): {
+    status: 'healthy' | 'unhealthy';
+    server: {
+      listening: boolean;
+      port: number | null;
+      host: string | null;
+    };
+    connections: {
+      total: number;
+      perUser: number;
+      perIP: number;
+    };
+    rooms: {
+      total: number;
+      maxRooms: number;
+    };
+    memory?: {
+      heapUsed: number;
+      heapTotal: number;
+      external: number;
+    };
+    rateLimiting: {
+      activeClients: number;
+      messagesPerSecond: number;
+    };
+  } {
+    const address = this.server?.address();
+    const port =
+      typeof address === 'object' && address
+        ? address.port
+        : this.realtimeConfig?.port || null;
+    const host =
+      typeof address === 'object' && address
+        ? address.address
+        : this.realtimeConfig?.host || null;
+
+    // Calculate unique IPs and users
+    const uniqueIPs = this.connectionCounts.size;
+    const uniqueUsers = this.userConnections.size;
+
+    // Get room count
+    const roomCount = this.roomManager?.getRoomCount() || 0;
+    const maxRooms = this.realtimeConfig?.rooms.max_rooms || 100;
+
+    // Get memory usage if available
+    let memory:
+      | { heapUsed: number; heapTotal: number; external: number }
+      | undefined;
+    if (typeof process.memoryUsage === 'function') {
+      const mem = process.memoryUsage();
+      memory = {
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal,
+        external: mem.external || 0,
+      };
+    }
+
+    // Determine overall status
+    const isListening = this.server !== null && this.initialized;
+    const isHealthy =
+      isListening &&
+      roomCount < maxRooms &&
+      this.connections.size <
+        (this.realtimeConfig?.rate_limiting.connections_per_ip || 100) * 10; // Reasonable upper bound
+
+    return {
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      server: {
+        listening: isListening,
+        port,
+        host,
+      },
+      connections: {
+        total: this.connections.size,
+        perUser: uniqueUsers,
+        perIP: uniqueIPs,
+      },
+      rooms: {
+        total: roomCount,
+        maxRooms,
+      },
+      memory,
+      rateLimiting: {
+        activeClients: this.messageRateLimits.size,
+        messagesPerSecond:
+          this.realtimeConfig?.rate_limiting.messages_per_second || 10,
+      },
+    };
+  }
+
+  /**
+   * Shutdown the realtime server
+   */
+  async shutdown(): Promise<void> {
+    coreInfo('Shutting down realtime server...', {
+      operation: 'realtime:server:shutdown',
+    });
+
+    // Stop snapshot interval
+    if (this.snapshotInterval) {
+      clearInterval(this.snapshotInterval);
+      this.snapshotInterval = null;
+    }
+
+    // Create final snapshots for all rooms
+    if (this.roomManager) {
+      const rooms = this.roomManager.getAllRooms();
+      for (const room of rooms) {
+        if (room instanceof YjsRoom) {
+          await this.createRoomSnapshot(room);
+        }
+      }
+    }
+
+    // Close all connections
+    for (const [clientId, ws] of this.connections.entries()) {
+      ws.close();
+    }
+    this.connections.clear();
+    this.messageRateLimits.clear();
+
+    // Cleanup rooms
+    if (this.roomManager) {
+      const rooms = this.roomManager.getAllRooms();
+      for (const room of rooms) {
+        await room.destroy();
+      }
+    }
+
+    // Close server
+    if (this.server) {
+      await new Promise<void>((resolve) => {
+        this.server!.close(() => {
+          resolve();
+        });
+      });
+      this.server = null;
+    }
+
+    this.initialized = false;
+    coreSuccess({}, 'Realtime server shut down', {
+      operation: 'realtime:server:shutdown:complete',
+    });
+  }
+
+  /**
+   * Get room manager (for DI container access)
+   */
+  getRoomManager(): RoomManager | null {
+    return this.roomManager;
+  }
+
+  /**
+   * Get handler registry for registering room type handlers
+   */
+  getHandlerRegistry(): HandlerRegistry {
+    return this.handlerRegistry;
+  }
+
+  /**
+   * Register a room type handler
+   *
+   * This allows external modules to handle specific room types.
+   * When a connection is made to a room of the registered type,
+   * the handler's methods will be called instead of default handling.
+   */
+  registerRoomTypeHandler(handler: RoomTypeHandler): void {
+    this.handlerRegistry.registerRoomTypeHandler(handler);
+    coreInfo('Room type handler registered via RealtimeServer', {
+      operation: 'realtime:server:handler:registered',
+      roomType: handler.roomType,
+    });
+  }
+
+  /**
+   * Get connection for a client ID (used by handlers for message routing)
+   */
+  getConnection(clientId: string): WebSocket | undefined {
+    return this.connections.get(clientId);
+  }
+
+  /**
+   * Get all connections map (used by handlers for broadcasting)
+   */
+  getConnections(): Map<string, WebSocket> {
+    return this.connections;
+  }
+
+  /**
+   * Trigger a snapshot for a specific record
+   *
+   * This is called by the API when collaborative editing autosave triggers.
+   * Creates a snapshot of the current Yjs document state and saves it.
+   *
+   * @param recordId The record ID to snapshot
+   * @returns Snapshot metadata or null if room doesn't exist
+   */
+  async triggerRecordSnapshot(
+    recordId: string
+  ): Promise<{ roomId: string; version: number; timestamp: number } | null> {
+    if (!this.roomManager || !this.snapshotManager) {
+      coreWarn(
+        'Cannot trigger snapshot: room manager or snapshot manager not initialized',
+        {
+          operation: 'realtime:snapshot:trigger:error',
+          recordId,
+        }
+      );
+      return null;
+    }
+
+    // Try both room ID formats (record: and records:)
+    const roomIdFormats = [`record:${recordId}`, `records:${recordId}`];
+    let room: YjsRoom | null = null;
+
+    for (const roomId of roomIdFormats) {
+      const foundRoom = this.roomManager.getRoom(roomId);
+      if (foundRoom instanceof YjsRoom) {
+        room = foundRoom;
+        break;
+      }
+    }
+
+    if (!room) {
+      coreDebug('No active room found for record snapshot', {
+        operation: 'realtime:snapshot:trigger:no-room',
+        recordId,
+        triedRoomIds: roomIdFormats,
+      });
+      return null;
+    }
+
+    try {
+      const state = room.getState();
+      const snapshot = this.snapshotManager.createSnapshot(
+        room.roomId,
+        room.getYjsDoc(),
+        state.version
+      );
+
+      await this.snapshotManager.saveSnapshot(snapshot);
+      room.resetUpdateCount();
+
+      coreInfo('Record snapshot triggered via API', {
+        operation: 'realtime:snapshot:triggered',
+        recordId,
+        roomId: room.roomId,
+        version: state.version,
+      });
+
+      // Emit hook event
+      this.emitHook('realtime:snapshot:saved', {
+        roomId: room.roomId,
+        recordId,
+        version: state.version,
+        timestamp: snapshot.timestamp,
+        triggeredBy: 'api',
+      });
+
+      return {
+        roomId: room.roomId,
+        version: state.version,
+        timestamp: snapshot.timestamp,
+      };
+    } catch (error) {
+      coreError(
+        error instanceof Error ? error : new Error(String(error)),
+        'REALTIME_SNAPSHOT_TRIGGER_ERROR',
+        { recordId, roomId: room.roomId },
+        {
+          operation: 'realtime:snapshot:trigger:error',
+          recordId,
+        }
+      );
+      throw error;
+    }
+  }
+}

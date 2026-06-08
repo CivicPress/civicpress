@@ -7,6 +7,7 @@ packages:
   - cli
   - core
   - modules/api
+  - modules/realtime
   - modules/ui
   - modules/schema-extensions/legal
   - modules/storage
