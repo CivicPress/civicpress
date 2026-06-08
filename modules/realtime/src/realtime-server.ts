@@ -23,18 +23,9 @@ import {
 } from '@civicpress/core';
 import type { RealtimeConfig } from './types/realtime.types.js';
 import { RealtimeConfigManager } from './realtime-config-manager.js';
-import { RoomManager } from './rooms/room-manager.js';
-import {
-  authenticateConnection,
-  extractToken,
-  parseRoomId,
-  type AuthenticatedConnection,
-} from './auth.js';
-import {
-  AuthenticationFailedError,
-  ConnectionLimitExceededError,
-} from './errors/realtime-errors.js';
-import type { RealtimeMessage } from './types/messages.js';
+import { RoomManager, type Room } from './rooms/room-manager.js';
+import { extractToken, parseRoomId } from './auth.js';
+import { AuthenticationFailedError } from './errors/realtime-errors.js';
 import { MessageType } from './types/messages.js';
 import type {
   HandlerRegistry,
@@ -44,9 +35,10 @@ import type {
   DisconnectContext,
   AuthResult,
   RoomReference,
+  RoomState as HandlerRoomState,
+  ClientData,
 } from './types/handler-registry.types.js';
 import { createHandlerRegistry } from './handler-registry.js';
-import { PresenceManager } from './presence/presence-manager.js';
 import { SnapshotManager } from './persistence/snapshots.js';
 import {
   DatabaseSnapshotStorage,
@@ -105,13 +97,13 @@ export class RealtimeServer {
   private config: CivicPressConfig;
   private server: WebSocketServer | null = null;
   private roomManager: RoomManager | null = null;
-  private presenceManager: PresenceManager;
   private snapshotManager: SnapshotManager | null = null;
   private connections: Map<string, WebSocket> = new Map();
-  private connectionCounts: Map<string, number> = new Map(); // IP -> count
-  private userConnections: Map<number, Set<string>> = new Map(); // userId -> clientIds
-  private clientToUser: Map<string, { userId: number; username: string }> =
-    new Map();
+  // Connection-limit bookkeeping (realtime-001/002). Both are maintained
+  // exclusively by handleConnectionWithHandler (register) and handleDisconnect
+  // (release); there is no other write path, so the counts cannot drift.
+  private connectionCounts: Map<string, number> = new Map(); // IP -> open count
+  private userConnections: Map<string, Set<string>> = new Map(); // userId -> clientIds
   private realtimeConfig: RealtimeConfig | null = null;
   private initialized: boolean = false;
   private snapshotInterval: NodeJS.Timeout | null = null;
@@ -135,7 +127,6 @@ export class RealtimeServer {
     this.authService = authService;
     this.configManager = configManager;
     this.config = config;
-    this.presenceManager = new PresenceManager(logger);
     this.handlerRegistry = createHandlerRegistry();
   }
 
@@ -389,8 +380,10 @@ export class RealtimeServer {
     });
 
     try {
-      // Check connection limits
-      await this.checkConnectionLimits(clientIp, null);
+      // NOTE: connection limits are intentionally NOT checked here. They are
+      // enforced in handleConnectionWithHandler AFTER authentication, once the
+      // userId is known (spec §6.4 — realtime-001). Checking pre-auth with a
+      // null userId made the per-user branch unreachable and was the bug.
 
       // Extract token and room info
       const url = req.url || '';
@@ -491,10 +484,17 @@ export class RealtimeServer {
   }
 
   /**
-   * Handle connection using a custom room type handler
+   * Handle connection using a custom room type handler.
    *
-   * This delegates authentication, message handling, and disconnect
-   * to the registered handler.
+   * Ordering follows spec §6.4 (realtime-001/002):
+   *   1. Authenticate (generic, server-side) — establishes userId.
+   *   2. Room-type authorization via handler.onConnect.
+   *   3. Connection limits — keyed on the now-known userId.
+   *   4. Register both per-IP and per-user counts.
+   *   5. Wire the SINGLE canonical disconnect path.
+   *   6. Room + Yjs wiring + message handling.
+   *
+   * Steps 1–3 never touch the count maps, so a rejected connection cannot leak.
    */
   private async handleConnectionWithHandler(
     ws: WebSocket,
@@ -524,7 +524,27 @@ export class RealtimeServer {
       protocols: req.protocols,
     };
 
-    // Authenticate using handler
+    // 1. Authenticate FIRST (generic, server-side). This is the authoritative
+    //    identity used for connection limits and per-user tracking. No counts
+    //    are touched until after this passes, so a failed auth never leaks.
+    const authUser = await this.authService.validateSession(token);
+    if (!authUser) {
+      coreWarn('WebSocket authentication failed: invalid session', {
+        operation: 'realtime:server:auth:failed',
+        clientId,
+        roomType: roomInfo.roomType,
+        ip: clientIp,
+      });
+      this.sendError(ws, new AuthenticationFailedError());
+      this.closeWithCode(ws, 4001, 'AUTH_FAILED');
+      return;
+    }
+    const userId = String(authUser.id);
+
+    // 2. Room-type authorization via the handler. Generic identity is already
+    //    established; the handler decides room-specific access (e.g. record
+    //    permissions). The authenticated user is surfaced in the context so
+    //    handlers do not re-validate the token.
     let authResult: AuthResult;
     if (handler.onConnect) {
       try {
@@ -544,12 +564,12 @@ export class RealtimeServer {
           ws,
           error instanceof Error ? error : new Error('Authentication failed')
         );
-        ws.close();
+        this.closeWithCode(ws, 4003, 'PERMISSION_DENIED');
         return;
       }
 
       if (!authResult.success) {
-        coreWarn('Handler authentication failed', {
+        coreWarn('Handler authorization failed', {
           operation: 'realtime:server:handler:auth:failed',
           clientId,
           roomType: roomInfo.roomType,
@@ -559,10 +579,10 @@ export class RealtimeServer {
         this.sendError(
           ws,
           new AuthenticationFailedError({
-            message: authResult.error || 'Authentication failed',
+            message: authResult.error || 'Authorization failed',
           })
         );
-        ws.close();
+        this.closeWithCode(ws, 4003, 'PERMISSION_DENIED');
         return;
       }
     } else {
@@ -570,12 +590,43 @@ export class RealtimeServer {
       authResult = { success: true };
     }
 
-    // Track connection
-    this.connections.set(clientId, ws);
+    // Ensure the authenticated identity is carried with the connection metadata
+    // (the room participant record + downstream handlers rely on it).
+    authResult.clientMetadata = {
+      userId: authUser.id,
+      username: authUser.username,
+      role: authUser.role,
+      ...(authResult.clientMetadata || {}),
+    };
 
-    // Track IP connection count
-    const ipCount = this.connectionCounts.get(clientIp) || 0;
-    this.connectionCounts.set(clientIp, ipCount + 1);
+    // 3. Connection limits — userId is known now (realtime-001). Still no count
+    //    mutation: this is a pure read of the current maps.
+    const limitCheck = this.checkConnectionLimits(clientIp, userId);
+    if (!limitCheck.ok) {
+      coreWarn('WebSocket connection rejected: connection limit exceeded', {
+        operation: 'realtime:server:connection:limit',
+        clientId,
+        ip: clientIp,
+        userId,
+        reason: limitCheck.reason,
+      });
+      this.closeWithCode(ws, 4029, 'CONNECTION_LIMIT_EXCEEDED', {
+        reason: limitCheck.reason,
+      });
+      return;
+    }
+
+    // 4. Register: increment per-IP count AND add to the per-user set. These two
+    //    maps are released together in handleDisconnect — the single write/erase
+    //    pairing is what makes the leak structurally impossible.
+    this.connections.set(clientId, ws);
+    this.connectionCounts.set(
+      clientIp,
+      (this.connectionCounts.get(clientIp) ?? 0) + 1
+    );
+    const userSet = this.userConnections.get(userId) ?? new Set<string>();
+    userSet.add(clientId);
+    this.userConnections.set(userId, userSet);
 
     // Initialize message rate limit tracking
     this.messageRateLimits.set(clientId, {
@@ -595,17 +646,33 @@ export class RealtimeServer {
       {}
     );
 
-    // Create room reference for handler
+    // Create room reference for handler. The room's native RoomState
+    // (realtime.types) is mapped to the handler-facing RoomState
+    // (handler-registry.types) — the participant records are structurally
+    // compatible (each carries a string `id`).
     const roomReference: RoomReference = {
       roomId: fullRoomId,
       roomType: roomInfo.roomType,
-      getState: () => room.getState() as any,
-      addClient: (cid: string, clientData: any) =>
+      getState: (): HandlerRoomState => {
+        const state = room.getState();
+        return {
+          roomId: state.roomId,
+          roomType: state.roomType,
+          participants: state.participants.map((p) => ({ ...p })),
+          createdAt: state.createdAt,
+          lastActivity: state.lastActivity,
+          version: state.version,
+          yjsState: state.yjsState,
+        };
+      },
+      addClient: (cid: string, clientData: ClientData) =>
         room.addClient(cid, clientData),
       removeClient: (cid: string) => room.removeClient(cid),
       updateActivity: () => {
-        if (typeof (room as any).updateActivity === 'function') {
-          (room as any).updateActivity();
+        const maybeActivity = (room as { updateActivity?: () => void })
+          .updateActivity;
+        if (typeof maybeActivity === 'function') {
+          maybeActivity.call(room);
         }
       },
     };
@@ -746,50 +813,25 @@ export class RealtimeServer {
       }
     });
 
-    // Setup disconnect handler
-    ws.on('close', () => {
-      // Tear down the per-connection Yjs doc-update fan-out, if any.
-      if (yjsUpdateCleanup) {
-        yjsUpdateCleanup();
-        yjsUpdateCleanup = null;
-      }
-
-      // Delegate to handler
-      if (handler.onDisconnect) {
-        const disconnectContext: DisconnectContext = {
-          clientId,
-          room: roomReference,
-          auth: authResult,
-        };
-        handler.onDisconnect(disconnectContext);
-      }
-
-      // Cleanup
-      room.removeClient(clientId);
-      this.connections.delete(clientId);
-      this.messageRateLimits.delete(clientId);
-
-      // Update IP connection count
-      const currentIpCount = this.connectionCounts.get(clientIp) || 0;
-      if (currentIpCount <= 1) {
-        this.connectionCounts.delete(clientIp);
-      } else {
-        this.connectionCounts.set(clientIp, currentIpCount - 1);
-      }
-
-      // Emit hook event
-      this.emitHook('realtime:client:disconnected', {
+    // 5. Wire the SINGLE canonical disconnect path. Every teardown concern —
+    //    Yjs fan-out, handler.onDisconnect, room/presence removal, rate-limit
+    //    state, and BOTH connection-count maps — flows through handleDisconnect.
+    //    There is exactly one 'close' listener per connection.
+    ws.once('close', () => {
+      this.handleDisconnect({
+        ws,
         clientId,
-        roomId: fullRoomId,
+        clientIp,
+        userId,
+        fullRoomId,
         roomType: roomInfo.roomType,
-        timestamp: Date.now(),
+        room,
+        roomReference,
+        authResult,
+        handler,
+        yjsUpdateCleanup,
       });
-
-      coreInfo('Handler client disconnected', {
-        operation: 'realtime:server:handler:client:disconnected',
-        clientId,
-        roomType: roomInfo.roomType,
-      });
+      yjsUpdateCleanup = null;
     });
 
     // Emit hook event
@@ -809,43 +851,164 @@ export class RealtimeServer {
 
 
   /**
-   * Check connection limits
+   * Check connection limits for an authenticated connection.
    *
-   * Enforces rate limiting based on connections per IP and per user.
-   * Throws ConnectionLimitExceededError if limits are exceeded.
+   * Pure read of the current count maps — never mutates them. `userId` is
+   * required (the caller authenticates first), so the per-user branch is always
+   * reachable (realtime-001). Returns a discriminated result rather than
+   * throwing so the connection flow can map it to a 4029 close frame.
    */
-  private async checkConnectionLimits(
+  private checkConnectionLimits(
     ip: string,
-    userId: number | null
-  ): Promise<void> {
+    userId: string
+  ): { ok: true } | { ok: false; reason: string } {
     const config = this.realtimeConfig;
     if (!config) {
-      return;
-    }
-    const limitConfig = config;
-
-    // Check IP limit
-    const ipCount = this.connectionCounts.get(ip) || 0;
-    if (ipCount >= limitConfig.rate_limiting.connections_per_ip) {
-      throw new ConnectionLimitExceededError(
-        limitConfig.rate_limiting.connections_per_ip,
-        { limitType: 'ip', ip }
-      );
+      return { ok: true };
     }
 
-    // Check user limit
-    if (userId !== null) {
-      const uid = userId as number;
-      const userConnections = this.userConnections.get(uid) || new Set();
-      if (
-        userConnections.size >= limitConfig.rate_limiting.connections_per_user
-      ) {
-        throw new ConnectionLimitExceededError(
-          limitConfig.rate_limiting.connections_per_user,
-          { limitType: 'user', userId: uid }
-        );
+    const ipCount = this.connectionCounts.get(ip) ?? 0;
+    if (ipCount >= config.rate_limiting.connections_per_ip) {
+      return {
+        ok: false,
+        reason: `per-ip connection limit reached (${config.rate_limiting.connections_per_ip})`,
+      };
+    }
+
+    const userCount = this.userConnections.get(userId)?.size ?? 0;
+    if (userCount >= config.rate_limiting.connections_per_user) {
+      return {
+        ok: false,
+        reason: `per-user connection limit reached (${config.rate_limiting.connections_per_user})`,
+      };
+    }
+
+    return { ok: true };
+  }
+
+  /**
+   * The single canonical disconnect path for every connection.
+   *
+   * All teardown lives here: Yjs fan-out removal, the room-type handler's
+   * onDisconnect, room/participant removal, rate-limit state, and the release of
+   * BOTH connection-count maps (per-IP and per-user) with the map entry deleted
+   * at zero. With broadcast-box deleted there is no second disconnect path to
+   * drift, so the realtime-002 leak cannot recur.
+   */
+  private handleDisconnect(params: {
+    ws: WebSocket;
+    clientId: string;
+    clientIp: string;
+    userId: string;
+    fullRoomId: string;
+    roomType: string;
+    room: Room;
+    roomReference: RoomReference;
+    authResult: AuthResult;
+    handler: RoomTypeHandler;
+    yjsUpdateCleanup: (() => void) | null;
+  }): void {
+    const {
+      clientId,
+      clientIp,
+      userId,
+      fullRoomId,
+      roomType,
+      room,
+      roomReference,
+      authResult,
+      handler,
+      yjsUpdateCleanup,
+    } = params;
+
+    // Tear down this connection's Yjs doc-update fan-out, if any.
+    if (yjsUpdateCleanup) {
+      yjsUpdateCleanup();
+    }
+
+    // Room-type-specific teardown.
+    if (handler.onDisconnect) {
+      const disconnectContext: DisconnectContext = {
+        clientId,
+        room: roomReference,
+        auth: authResult,
+      };
+      handler.onDisconnect(disconnectContext);
+    }
+
+    // Room + transport bookkeeping.
+    room.removeClient(clientId);
+    this.connections.delete(clientId);
+    this.messageRateLimits.delete(clientId);
+
+    // Release per-IP count; delete the key at zero.
+    const ipCount = (this.connectionCounts.get(clientIp) ?? 1) - 1;
+    if (ipCount <= 0) {
+      this.connectionCounts.delete(clientIp);
+    } else {
+      this.connectionCounts.set(clientIp, ipCount);
+    }
+
+    // Release per-user set; delete the key when the user has no more connections.
+    const userSet = this.userConnections.get(userId);
+    if (userSet) {
+      userSet.delete(clientId);
+      if (userSet.size === 0) {
+        this.userConnections.delete(userId);
       }
     }
+
+    this.emitHook('realtime:client:disconnected', {
+      clientId,
+      roomId: fullRoomId,
+      roomType,
+      timestamp: Date.now(),
+    });
+
+    coreInfo('Handler client disconnected', {
+      operation: 'realtime:server:handler:client:disconnected',
+      clientId,
+      roomType,
+    });
+  }
+
+  /**
+   * Close a connection with a numeric code and a JSON-encoded reason payload.
+   * Failure to send the close frame is logged, never thrown.
+   */
+  private closeWithCode(
+    ws: WebSocket,
+    code: number,
+    name: string,
+    context: Record<string, unknown> = {}
+  ): void {
+    try {
+      ws.close(code, JSON.stringify({ code: name, ...context }));
+    } catch (error) {
+      coreWarn('Failed to send close frame', {
+        operation: 'realtime:server:close:error',
+        code,
+        name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * @internal Per-IP open-connection counts. Exposed for the connection-limit
+   * regression tests; production code must not depend on this.
+   */
+  getConnectionCounts(): ReadonlyMap<string, number> {
+    return this.connectionCounts;
+  }
+
+  /**
+   * @internal Per-user open-connection sets (userId -> clientIds). Exposed for
+   * the connection-limit regression tests; production code must not depend on
+   * this.
+   */
+  getUserConnections(): ReadonlyMap<string, ReadonlySet<string>> {
+    return this.userConnections;
   }
 
   /**

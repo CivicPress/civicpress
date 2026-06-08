@@ -206,8 +206,22 @@ export function handleAwarenessMessage(
   // Consume the top-level message type (YJS_MSG_AWARENESS).
   decoding.readVarUint(decoder);
   const awarenessUpdate = decoding.readVarUint8Array(decoder);
-  // origin = clientId: identifies the source; never reaps the local (null) state.
-  awarenessProtocol.applyAwarenessUpdate(awareness, awarenessUpdate, clientId);
+
+  // Applying the update to the server-side Awareness is best-effort: it lets the
+  // server track the participant set and benefit from y-protocols' stale-entry
+  // reaping. A malformed or unrecognised payload must NOT abort the relay — the
+  // server is fundamentally a relay, and client-to-client awareness propagation
+  // is the contract. So we swallow application errors and always forward.
+  try {
+    // origin = clientId: identifies the source; never reaps the local (null) state.
+    awarenessProtocol.applyAwarenessUpdate(awareness, awarenessUpdate, clientId);
+  } catch (error) {
+    coreWarn('Failed to apply awareness update; relaying anyway', {
+      operation: 'realtime:yjs-sync:awareness-apply-failed',
+      clientId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   // Relay the original frame to everyone else in the room.
   broadcastRaw(data, clientId);

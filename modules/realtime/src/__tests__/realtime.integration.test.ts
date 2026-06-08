@@ -24,6 +24,7 @@ import {
 import { RealtimeConfigManager } from '../realtime-config-manager.js';
 import { RealtimeServer } from '../realtime-server.js';
 import { RoomManager } from '../rooms/room-manager.js';
+import { RecordRoomHandler } from '../rooms/record-room-handler.js';
 import { YjsRoom } from '../rooms/yjs-room.js';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
@@ -227,6 +228,11 @@ describe('Realtime Module Integration', () => {
     // Create room manager
     roomManager = new RoomManager(logger, realtimeServer);
     realtimeServer.setRoomManager(roomManager);
+
+    // W1 made connection routing handler-only: a records:* connection is closed
+    // with 4004 unless a handler is registered for the room type. Register the
+    // records handler so multi-client sync/awareness/reconnection paths run.
+    realtimeServer.registerRoomTypeHandler(new RecordRoomHandler());
 
     // Initialize realtime server
     await realtimeServer.initialize();

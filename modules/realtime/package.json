@@ -21,7 +21,7 @@
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint src",
     "clean": "rm -rf dist"
   },
   "keywords": [
