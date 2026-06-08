@@ -4,7 +4,7 @@
  * Manages a yjs document room for collaborative editing
  */
 
-import type { Logger, RecordManager, RecordData } from '@civicpress/core';
+import type { Logger, RecordManager } from '@civicpress/core';
 import {
   coreInfo,
   coreWarn,
@@ -13,11 +13,8 @@ import {
   isCivicPressError,
 } from '@civicpress/core';
 import type { RealtimeServer } from '../realtime-server.js';
-import type {
-  RoomConfig,
-  RoomState,
-  ClientConnection,
-} from '../types/realtime.types.js';
+import type { RoomConfig, RoomState } from '../types/realtime.types.js';
+import type { ClientData } from '../types/handler-registry.types.js';
 import type { Room } from './room-manager.js';
 import * as Y from 'yjs';
 import { InvalidYjsUpdateError } from '../errors/realtime-errors.js';
@@ -25,7 +22,7 @@ import { InvalidYjsUpdateError } from '../errors/realtime-errors.js';
 export class YjsRoom implements Room {
   public readonly roomId: string;
   public readonly roomType: string;
-  private clients: Map<string, ClientConnection> = new Map();
+  private clients: Map<string, ClientData> = new Map();
   private yjsDoc: Y.Doc;
   private yjsFragment: Y.XmlFragment;
   private logger: Logger;
@@ -58,7 +55,7 @@ export class YjsRoom implements Room {
     this.yjsFragment = this.yjsDoc.getXmlFragment('content');
 
     // Listen for yjs updates
-    this.yjsDoc.on('update', (update: Uint8Array, origin: any) => {
+    this.yjsDoc.on('update', (update: Uint8Array, origin: unknown) => {
       this.handleYjsUpdate(update, origin);
     });
 
@@ -178,7 +175,7 @@ export class YjsRoom implements Room {
   /**
    * Add client to room
    */
-  addClient(clientId: string, connection: ClientConnection): void {
+  addClient(clientId: string, connection: ClientData): void {
     this.clients.set(clientId, connection);
     this.lastActivity = Date.now();
 
@@ -205,11 +202,13 @@ export class YjsRoom implements Room {
   }
 
   /**
-   * Broadcast message to all clients in room
+   * Broadcast message to all clients in room.
+   *
+   * Broadcasting is performed by the server; this hook only bumps the room's
+   * activity timestamp. The arguments are part of the Room interface contract
+   * but unused here.
    */
-  broadcast(message: any, excludeClientId?: string): void {
-    // Broadcasting is handled by the server
-    // This method is called by the server to notify the room
+  broadcast(_message: unknown, _excludeClientId?: string): void {
     this.lastActivity = Date.now();
   }
 
@@ -231,7 +230,7 @@ export class YjsRoom implements Room {
   /**
    * Handle yjs update
    */
-  private handleYjsUpdate(update: Uint8Array, origin: any): void {
+  private handleYjsUpdate(_update: Uint8Array, origin: unknown): void {
     // Don't broadcast updates that originated from this server (already applied)
     if (origin && origin !== 'server') {
       this.version++;
@@ -312,7 +311,7 @@ export class YjsRoom implements Room {
   /**
    * Get all clients
    */
-  getClients(): Map<string, ClientConnection> {
+  getClients(): Map<string, ClientData> {
     return this.clients;
   }
 

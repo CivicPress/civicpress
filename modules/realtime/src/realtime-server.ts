@@ -68,9 +68,8 @@ export class RealtimeServer {
   private roomManager: RoomManager | null = null;
   private snapshotManager: SnapshotManager | null = null;
   private connections: Map<string, WebSocket> = new Map();
-  // Connection-limit bookkeeping (realtime-001/002). Both are maintained
-  // exclusively by handleConnectionWithHandler (register) and handleDisconnect
-  // (release); there is no other write path, so the counts cannot drift.
+  // Connection-limit bookkeeping (realtime-001/002): written only by
+  // handleConnectionWithHandler (register) + handleDisconnect (release).
   private connectionCounts: Map<string, number> = new Map(); // IP -> open count
   private userConnections: Map<string, Set<string>> = new Map(); // userId -> clientIds
   private realtimeConfig: RealtimeConfig | null = null;
@@ -99,23 +98,17 @@ export class RealtimeServer {
     this.handlerRegistry = createHandlerRegistry();
   }
 
-  /**
-   * Set record manager (called after DI container initialization)
-   */
+  /** Set record manager (called after DI container initialization). */
   setRecordManager(recordManager: RecordManager): void {
     this.recordManager = recordManager;
   }
 
-  /**
-   * Set database service (for snapshot storage)
-   */
+  /** Set database service (for snapshot storage). */
   setDatabaseService(databaseService: DatabaseService): void {
     this.databaseService = databaseService;
   }
 
-  /**
-   * Set room manager (called by DI container)
-   */
+  /** Set room manager (called by DI container). */
   setRoomManager(roomManager: RoomManager): void {
     this.roomManager = roomManager;
   }
@@ -136,7 +129,7 @@ export class RealtimeServer {
     try {
       this.realtimeConfig = await this.configManager.loadConfig();
       this.configManager.validateConfig(this.realtimeConfig);
-    } catch (error) {
+    } catch {
       // Use default config if file doesn't exist
       this.realtimeConfig = this.configManager.getDefaultConfig();
       coreWarn('Using default realtime configuration', {
@@ -205,9 +198,7 @@ export class RealtimeServer {
     );
   }
 
-  /**
-   * Start WebSocket server
-   */
+  /** Start WebSocket server. */
   private async startServer(): Promise<void> {
     if (!this.realtimeConfig) {
       throw new Error('Configuration not loaded');
@@ -246,17 +237,11 @@ export class RealtimeServer {
         },
       });
     } catch (error) {
-      coreError(
-        error instanceof Error ? error : new Error(String(error)),
+      this.logError(
+        error,
         'REALTIME_SERVER_CREATE_ERROR',
-        {
-          error: error instanceof Error ? error.message : String(error),
-          port: this.realtimeConfig.port,
-          host: this.realtimeConfig.host,
-        },
-        {
-          operation: 'realtime:server:create:error',
-        }
+        { operation: 'realtime:server:create:error' },
+        { port: this.realtimeConfig.port, host: this.realtimeConfig.host }
       );
       throw error;
     }
@@ -281,14 +266,9 @@ export class RealtimeServer {
     });
 
     this.server.on('error', (error: Error) => {
-      coreError(
-        error instanceof Error ? error : new Error(String(error)),
-        'REALTIME_SERVER_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:server:error',
-        }
-      );
+      this.logError(error, 'REALTIME_SERVER_ERROR', {
+        operation: 'realtime:server:error',
+      });
     });
 
     // Verify server is actually listening
@@ -326,9 +306,7 @@ export class RealtimeServer {
     );
   }
 
-  /**
-   * Handle new WebSocket connection
-   */
+  /** Handle new WebSocket connection. */
   private async handleConnection(
     ws: WebSocket,
     req: {
@@ -349,10 +327,8 @@ export class RealtimeServer {
     });
 
     try {
-      // NOTE: connection limits are intentionally NOT checked here. They are
-      // enforced in handleConnectionWithHandler AFTER authentication, once the
-      // userId is known (spec §6.4 — realtime-001). Checking pre-auth with a
-      // null userId made the per-user branch unreachable and was the bug.
+      // Connection limits are enforced post-auth in handleConnectionWithHandler
+      // (spec §6.4 — realtime-001), not here, so userId is known when checked.
 
       // Extract token and room info
       const url = req.url || '';
@@ -430,19 +406,10 @@ export class RealtimeServer {
         customHandler
       );
     } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error) ? undefined : 'REALTIME_CONNECTION_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:server:connection:error',
-          clientId,
-        }
-      );
+      this.logError(error, 'REALTIME_CONNECTION_ERROR', {
+        operation: 'realtime:server:connection:error',
+        clientId,
+      });
 
       const errorToSend =
         error instanceof Error ? error : new Error('Connection failed');
@@ -493,9 +460,9 @@ export class RealtimeServer {
       protocols: req.protocols,
     };
 
-    // 1. Authenticate FIRST (generic, server-side). This is the authoritative
-    //    identity used for connection limits and per-user tracking. No counts
-    //    are touched until after this passes, so a failed auth never leaks.
+    // 1. Authenticate FIRST (generic, server-side) — the authoritative identity
+    //    for limits + per-user tracking. No counts touched here, so failed auth
+    //    never leaks (realtime-001/002).
     const authUser = await this.authService.validateSession(token);
     if (!authUser) {
       coreWarn('WebSocket authentication failed: invalid session', {
@@ -510,25 +477,18 @@ export class RealtimeServer {
     }
     const userId = String(authUser.id);
 
-    // 2. Room-type authorization via the handler. Generic identity is already
-    //    established; the handler decides room-specific access (e.g. record
-    //    permissions). The authenticated user is surfaced in the context so
-    //    handlers do not re-validate the token.
+    // 2. Room-type authorization via the handler (room-specific access, e.g.
+    //    record permissions); identity is already established above.
     let authResult: AuthResult;
     if (handler.onConnect) {
       try {
         authResult = await handler.onConnect(connectionContext);
       } catch (error) {
-        coreError(
-          error instanceof Error ? error : new Error(String(error)),
-          'HANDLER_AUTH_ERROR',
-          { error: error instanceof Error ? error.message : String(error) },
-          {
-            operation: 'realtime:server:handler:auth:error',
-            clientId,
-            roomType: roomInfo.roomType,
-          }
-        );
+        this.logError(error, 'HANDLER_AUTH_ERROR', {
+          operation: 'realtime:server:handler:auth:error',
+          clientId,
+          roomType: roomInfo.roomType,
+        });
         this.sendError(
           ws,
           error instanceof Error ? error : new Error('Authentication failed')
@@ -585,9 +545,8 @@ export class RealtimeServer {
       return;
     }
 
-    // 4. Register: increment per-IP count AND add to the per-user set. These two
-    //    maps are released together in handleDisconnect — the single write/erase
-    //    pairing is what makes the leak structurally impossible.
+    // 4. Register: increment per-IP count AND add to the per-user set. Both are
+    //    released together in handleDisconnect (the write/erase pairing).
     this.connections.set(clientId, ws);
     this.connectionCounts.set(
       clientIp,
@@ -615,25 +574,13 @@ export class RealtimeServer {
       {}
     );
 
-    // Create room reference for handler. The room's native RoomState
-    // (realtime.types) is mapped to the handler-facing RoomState
-    // (handler-registry.types) — the participant records are structurally
-    // compatible (each carries a string `id`).
+    // Create room reference for handler. The room's RoomState (realtime.types)
+    // is structurally assignable to the handler-facing RoomState
+    // (handler-registry.types) — participants are loose ClientData in both.
     const roomReference: RoomReference = {
       roomId: fullRoomId,
       roomType: roomInfo.roomType,
-      getState: (): HandlerRoomState => {
-        const state = room.getState();
-        return {
-          roomId: state.roomId,
-          roomType: state.roomType,
-          participants: state.participants.map((p) => ({ ...p })),
-          createdAt: state.createdAt,
-          lastActivity: state.lastActivity,
-          version: state.version,
-          yjsState: state.yjsState,
-        };
-      },
+      getState: (): HandlerRoomState => room.getState(),
       addClient: (cid: string, clientData: ClientData) =>
         room.addClient(cid, clientData),
       removeClient: (cid: string) => room.removeClient(cid),
@@ -769,23 +716,16 @@ export class RealtimeServer {
           await handler.onMessage(messageContext);
         }
       } catch (error) {
-        coreError(
-          error instanceof Error ? error : new Error(String(error)),
-          'HANDLER_MESSAGE_ERROR',
-          { error: error instanceof Error ? error.message : String(error) },
-          {
-            operation: 'realtime:server:handler:message:error',
-            clientId,
-            roomType: roomInfo.roomType,
-          }
-        );
+        this.logError(error, 'HANDLER_MESSAGE_ERROR', {
+          operation: 'realtime:server:handler:message:error',
+          clientId,
+          roomType: roomInfo.roomType,
+        });
       }
     });
 
-    // 5. Wire the SINGLE canonical disconnect path. Every teardown concern —
-    //    Yjs fan-out, handler.onDisconnect, room/presence removal, rate-limit
-    //    state, and BOTH connection-count maps — flows through handleDisconnect.
-    //    There is exactly one 'close' listener per connection.
+    // 5. Wire the SINGLE canonical disconnect path: exactly one 'close' listener
+    //    per connection, all teardown inside handleDisconnect.
     ws.once('close', () => {
       this.handleDisconnect({
         ws,
@@ -820,12 +760,10 @@ export class RealtimeServer {
 
 
   /**
-   * Check connection limits for an authenticated connection.
-   *
-   * Pure read of the current count maps — never mutates them. `userId` is
-   * required (the caller authenticates first), so the per-user branch is always
-   * reachable (realtime-001). Returns a discriminated result rather than
-   * throwing so the connection flow can map it to a 4029 close frame.
+   * Check connection limits for an authenticated connection. Pure read of the
+   * count maps; `userId` is always known (caller authenticates first) so the
+   * per-user branch is reachable (realtime-001). Returns a discriminated result
+   * the caller maps to a 4029 close frame.
    */
   private checkConnectionLimits(
     ip: string,
@@ -856,13 +794,11 @@ export class RealtimeServer {
   }
 
   /**
-   * The single canonical disconnect path for every connection.
-   *
-   * All teardown lives here: Yjs fan-out removal, the room-type handler's
-   * onDisconnect, room/participant removal, rate-limit state, and the release of
-   * BOTH connection-count maps (per-IP and per-user) with the map entry deleted
-   * at zero. With broadcast-box deleted there is no second disconnect path to
-   * drift, so the realtime-002 leak cannot recur.
+   * The single canonical disconnect path for every connection. All teardown
+   * lives here: Yjs fan-out removal, handler.onDisconnect, room/participant
+   * removal, rate-limit state, and release of BOTH count maps (per-IP +
+   * per-user), deleting the entry at zero. One path => the realtime-002 leak
+   * cannot recur.
    */
   private handleDisconnect(params: {
     ws: WebSocket;
@@ -963,19 +899,12 @@ export class RealtimeServer {
     }
   }
 
-  /**
-   * @internal Per-IP open-connection counts. Exposed for the connection-limit
-   * regression tests; production code must not depend on this.
-   */
+  /** @internal Per-IP open-connection counts — connection-limit tests only. */
   getConnectionCounts(): ReadonlyMap<string, number> {
     return this.connectionCounts;
   }
 
-  /**
-   * @internal Per-user open-connection sets (userId -> clientIds). Exposed for
-   * the connection-limit regression tests; production code must not depend on
-   * this.
-   */
+  /** @internal Per-user clientId sets — connection-limit tests only. */
   getUserConnections(): ReadonlyMap<string, ReadonlySet<string>> {
     return this.userConnections;
   }
@@ -1048,14 +977,38 @@ export class RealtimeServer {
   }
 
   /**
-   * Send error to client
+   * Normalize and log an error through coreError, coalescing the repeated
+   * boilerplate. Non-Error throwables are wrapped; a CivicPressError keeps its
+   * own structured code (pass `undefined`, coreError extracts it) while plain
+   * Errors get `fallbackCode`. The error message is added to the details; any
+   * `extraDetails` are merged in, and `opContext` is forwarded verbatim.
    */
+  private logError(
+    error: unknown,
+    fallbackCode: string,
+    opContext: Record<string, unknown>,
+    extraDetails: Record<string, unknown> = {}
+  ): void {
+    const err = error instanceof Error ? error : new Error(String(error));
+    coreError(
+      err,
+      isCivicPressError(err) ? undefined : fallbackCode,
+      { error: err.message, ...extraDetails },
+      opContext
+    );
+  }
+
+  /** Send error to client. */
   private sendError(ws: WebSocket, error: Error): void {
+    // Domain errors (CivicPressError subclasses) carry a structured `code`;
+    // plain Errors do not. Read it structurally without widening to `any`.
+    const maybeCode = (error as unknown as { code?: unknown }).code;
+    const code = typeof maybeCode === 'string' ? maybeCode : 'UNKNOWN_ERROR';
     const message = {
       type: MessageType.CONTROL,
       event: 'error',
       error: {
-        code: (error as any).code || 'UNKNOWN_ERROR',
+        code,
         message: error.message,
       },
     };
@@ -1063,9 +1016,7 @@ export class RealtimeServer {
     ws.send(JSON.stringify(message));
   }
 
-  /**
-   * Send pong response
-   */
+  /** Send pong response. */
   private sendPong(ws: WebSocket): void {
     const message = {
       type: MessageType.PONG,
@@ -1075,37 +1026,22 @@ export class RealtimeServer {
     ws.send(JSON.stringify(message));
   }
 
-  /**
-   * Generate unique client ID
-   */
+  /** Generate unique client ID. */
   private generateClientId(): string {
     return `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
-  /**
-   * Emit hook event
-   */
-  emitHook(event: string, data: any): void {
+  /** Emit hook event. */
+  emitHook(event: string, data: unknown): void {
     this.hookSystem.emit(event, data).catch((error) => {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error) ? undefined : 'REALTIME_HOOK_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:server:hook:error',
-          event,
-        }
-      );
+      this.logError(error, 'REALTIME_HOOK_ERROR', {
+        operation: 'realtime:server:hook:error',
+        event,
+      });
     });
   }
 
-  /**
-   * Initialize room with content (from record or snapshot)
-   */
+  /** Initialize room with content (from record or snapshot). */
   private async initializeRoom(room: YjsRoom, recordId: string): Promise<void> {
     try {
       // Try to load from snapshot first
@@ -1132,19 +1068,10 @@ export class RealtimeServer {
         });
       }
     } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error) ? undefined : 'REALTIME_ROOM_INIT_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:server:room:initialize:error',
-          roomId: room.roomId,
-        }
-      );
+      this.logError(error, 'REALTIME_ROOM_INIT_ERROR', {
+        operation: 'realtime:server:room:initialize:error',
+        roomId: room.roomId,
+      });
       // Continue with empty document
     }
   }
@@ -1156,8 +1083,8 @@ export class RealtimeServer {
    * awareness); any other value is JSON-encoded.
    */
   private broadcastToRoom(
-    room: any,
-    message: any,
+    room: Room,
+    message: unknown,
     excludeClientId?: string
   ): void {
     const payload =
@@ -1165,28 +1092,24 @@ export class RealtimeServer {
     const state = room.getState();
     for (const participant of state.participants) {
       const ws = this.connections.get(participant.id);
-      if (ws && ws.readyState === 1 && participant.id !== excludeClientId) {
-        // WebSocket.OPEN = 1
+      if (
+        ws &&
+        ws.readyState === WebSocket.OPEN &&
+        participant.id !== excludeClientId
+      ) {
         try {
           ws.send(payload);
         } catch (error) {
-          coreError(
-            error instanceof Error ? error : new Error(String(error)),
-            'REALTIME_SEND_ERROR',
-            { error: error instanceof Error ? error.message : String(error) },
-            {
-              operation: 'realtime:server:broadcast:error',
-              clientId: participant.id,
-            }
-          );
+          this.logError(error, 'REALTIME_SEND_ERROR', {
+            operation: 'realtime:server:broadcast:error',
+            clientId: participant.id,
+          });
         }
       }
     }
   }
 
-  /**
-   * Ensure snapshot table exists in database
-   */
+  /** Ensure snapshot table exists in database. */
   private async ensureSnapshotTable(): Promise<void> {
     if (!this.databaseService) {
       return;
@@ -1197,11 +1120,12 @@ export class RealtimeServer {
       await this.databaseService.query(
         'SELECT 1 FROM realtime_snapshots LIMIT 1'
       );
-    } catch (error: any) {
+    } catch (error) {
       // Table doesn't exist, create it
+      const errorMessage = error instanceof Error ? error.message : '';
       if (
-        error?.message?.includes('no such table') ||
-        error?.message?.includes('does not exist')
+        errorMessage.includes('no such table') ||
+        errorMessage.includes('does not exist')
       ) {
         coreInfo('Creating realtime_snapshots table...', {
           operation: 'realtime:server:migration',
@@ -1231,7 +1155,7 @@ export class RealtimeServer {
           coreSuccess({}, 'realtime_snapshots table created', {
             operation: 'realtime:server:migration',
           });
-        } catch (createError: any) {
+        } catch (createError) {
           coreWarn(
             'Failed to create realtime_snapshots table, snapshots will be disabled',
             {
@@ -1257,9 +1181,7 @@ export class RealtimeServer {
     }
   }
 
-  /**
-   * Create snapshot for a room
-   */
+  /** Create snapshot for a room. */
   private async createRoomSnapshot(room: YjsRoom): Promise<void> {
     if (!this.snapshotManager || !this.realtimeConfig) {
       return;
@@ -1283,25 +1205,14 @@ export class RealtimeServer {
         timestamp: snapshot.timestamp,
       });
     } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error) ? undefined : 'REALTIME_SNAPSHOT_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:server:snapshot:error',
-          roomId: room.roomId,
-        }
-      );
+      this.logError(error, 'REALTIME_SNAPSHOT_ERROR', {
+        operation: 'realtime:server:snapshot:error',
+        roomId: room.roomId,
+      });
     }
   }
 
-  /**
-   * Create snapshots for all rooms that need them
-   */
+  /** Create snapshots for all rooms that need them. */
   private async createSnapshots(): Promise<void> {
     if (!this.snapshotManager || !this.roomManager || !this.realtimeConfig) {
       return;
@@ -1320,9 +1231,7 @@ export class RealtimeServer {
     }
   }
 
-  /**
-   * Get health status and metrics
-   */
+  /** Get health status and metrics. */
   getHealthStatus(): {
     status: 'healthy' | 'unhealthy';
     server: {
@@ -1413,9 +1322,7 @@ export class RealtimeServer {
     };
   }
 
-  /**
-   * Shutdown the realtime server
-   */
+  /** Shutdown the realtime server. */
   async shutdown(): Promise<void> {
     coreInfo('Shutting down realtime server...', {
       operation: 'realtime:server:shutdown',
@@ -1438,7 +1345,7 @@ export class RealtimeServer {
     }
 
     // Close all connections
-    for (const [clientId, ws] of this.connections.entries()) {
+    for (const ws of this.connections.values()) {
       ws.close();
     }
     this.connections.clear();
@@ -1468,16 +1375,12 @@ export class RealtimeServer {
     });
   }
 
-  /**
-   * Get room manager (for DI container access)
-   */
+  /** Get room manager (for DI container access). */
   getRoomManager(): RoomManager | null {
     return this.roomManager;
   }
 
-  /**
-   * Get handler registry for registering room type handlers
-   */
+  /** Get handler registry for registering room type handlers. */
   getHandlerRegistry(): HandlerRegistry {
     return this.handlerRegistry;
   }
@@ -1497,16 +1400,12 @@ export class RealtimeServer {
     });
   }
 
-  /**
-   * Get connection for a client ID (used by handlers for message routing)
-   */
+  /** Get connection for a client ID (used by handlers for message routing). */
   getConnection(clientId: string): WebSocket | undefined {
     return this.connections.get(clientId);
   }
 
-  /**
-   * Get all connections map (used by handlers for broadcasting)
-   */
+  /** Get all connections map (used by handlers for broadcasting). */
   getConnections(): Map<string, WebSocket> {
     return this.connections;
   }
@@ -1588,14 +1487,11 @@ export class RealtimeServer {
         timestamp: snapshot.timestamp,
       };
     } catch (error) {
-      coreError(
-        error instanceof Error ? error : new Error(String(error)),
+      this.logError(
+        error,
         'REALTIME_SNAPSHOT_TRIGGER_ERROR',
-        { recordId, roomId: room.roomId },
-        {
-          operation: 'realtime:snapshot:trigger:error',
-          recordId,
-        }
+        { operation: 'realtime:snapshot:trigger:error', recordId },
+        { recordId, roomId: room.roomId }
       );
       throw error;
     }

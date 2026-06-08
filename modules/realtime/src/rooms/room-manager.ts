@@ -8,6 +8,7 @@ import type { Logger } from '@civicpress/core';
 import { coreInfo } from '@civicpress/core';
 import type { RealtimeServer } from '../realtime-server.js';
 import type { RoomConfig, RoomState } from '../types/realtime.types.js';
+import type { ClientData } from '../types/handler-registry.types.js';
 import { RoomNotFoundError } from '../errors/realtime-errors.js';
 import { YjsRoom } from './yjs-room.js';
 
@@ -19,9 +20,9 @@ export interface RoomFactory {
 export interface Room {
   roomId: string;
   roomType: string;
-  addClient(clientId: string, connection: any): void;
+  addClient(clientId: string, connection: ClientData): void;
   removeClient(clientId: string): void;
-  broadcast(message: any, excludeClientId?: string): void;
+  broadcast(message: unknown, excludeClientId?: string): void;
   getState(): RoomState;
   destroy(): Promise<void>;
 }

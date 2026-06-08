@@ -4,14 +4,14 @@
  * Handles authentication and authorization for WebSocket connections
  */
 
-import type { AuthService, AuthUser } from '@civicpress/core';
-import type { Logger } from '@civicpress/core';
-import {
-  coreWarn,
-  coreInfo,
-  coreDebug,
-  isCivicPressError,
+import type {
+  AuthService,
+  AuthUser,
+  Logger,
+  RecordManager,
+  DatabaseService,
 } from '@civicpress/core';
+import { coreWarn, coreInfo } from '@civicpress/core';
 import {
   AuthenticationFailedError,
   PermissionDeniedError,
@@ -26,25 +26,20 @@ export interface AuthenticatedConnection {
 }
 
 /**
- * Device authentication result
- * Used for device WebSocket connections (Broadcast Box, etc.)
- */
-export interface AuthenticatedDeviceConnection {
-  deviceId: string;
-  deviceUuid: string;
-  organizationId: string;
-}
-
-/**
- * Authenticate WebSocket connection
+ * Authenticate a user WebSocket connection to a record room.
+ *
+ * Validates the session, confirms the record exists (published or draft), and
+ * checks view/edit permission. Record-room authorization is being re-homed into
+ * RecordRoomHandler.onConnect in W5; this helper is the reference implementation
+ * the handler will call.
  */
 export async function authenticateConnection(
   token: string,
   recordId: string,
   authService: AuthService,
-  recordManager: any, // RecordManager - avoiding circular dependency
+  recordManager: RecordManager,
   logger: Logger,
-  databaseService?: any // DatabaseService - for draft record lookup
+  databaseService?: DatabaseService
 ): Promise<AuthenticatedConnection> {
   // Validate token
   const user = await authService.validateSession(token);
@@ -55,8 +50,10 @@ export async function authenticateConnection(
     throw new AuthenticationFailedError();
   }
 
-  // Check if record exists (published records or drafts)
-  let record = await recordManager.getRecord(recordId);
+  // Check if record exists (published records or drafts). Only `type` is read
+  // downstream, and a published record and a draft row expose it differently,
+  // so the lookup is narrowed to the shared shape.
+  let record: { type: string } | null = await recordManager.getRecord(recordId);
   if (!record && databaseService?.getDraft) {
     // Record may be a draft that hasn't been published yet
     record = await databaseService.getDraft(recordId);
@@ -137,18 +134,6 @@ export function extractToken(
     }
   }
 
-  // 1b. Try X-Device-Token header (Broadcast Box device connections)
-  if (headers) {
-    const deviceToken = headers['x-device-token'] || headers['X-Device-Token'];
-    if (
-      deviceToken &&
-      typeof deviceToken === 'string' &&
-      deviceToken.length > 0
-    ) {
-      return { token: deviceToken, method: 'header' };
-    }
-  }
-
   // 2. Try subprotocol (browser-compatible, secure)
   // Format: "auth.<token>" or just the token if it's the only protocol
   if (protocols && protocols.length > 0) {
@@ -176,173 +161,6 @@ export function extractToken(
   }
 
   return { token: null, method: null };
-}
-
-/**
- * Authenticate device WebSocket connection
- *
- * Validates device tokens and verifies device exists and is in valid status.
- * This is used for Broadcast Box device connections.
- */
-export async function authenticateDeviceConnection(
-  token: string,
-  deviceUuid: string,
-  deviceAuthService: any, // DeviceAuthService - avoiding circular dependency
-  deviceManager: any, // DeviceManager - avoiding circular dependency
-  logger: Logger
-): Promise<AuthenticatedDeviceConnection> {
-  coreDebug('Authenticating device connection', {
-    operation: 'realtime:auth:device:start',
-    deviceUuid,
-    tokenLength: token.length,
-    tokenPreview: token.substring(0, 30) + '...',
-  });
-
-  // Validate device token
-  const tokenPayload = await deviceAuthService.validateToken(token);
-  if (!tokenPayload) {
-    coreWarn('Device WebSocket authentication failed: invalid token', {
-      operation: 'realtime:auth:device:invalid-token',
-      deviceUuid,
-      tokenLength: token.length,
-    });
-    throw new AuthenticationFailedError();
-  }
-
-  coreDebug('Device token validated', {
-    operation: 'realtime:auth:device:token-validated',
-    deviceUuid,
-    tokenDeviceUuid: tokenPayload.deviceUuid,
-    tokenDeviceId: tokenPayload.deviceId,
-  });
-
-  // Critical security check: Verify device UUID in URL matches token payload
-  // This prevents token reuse for different devices
-  if (tokenPayload.deviceUuid !== deviceUuid) {
-    coreWarn('Device WebSocket authentication failed: UUID mismatch', {
-      operation: 'realtime:auth:device:uuid-mismatch',
-      tokenDeviceUuid: tokenPayload.deviceUuid,
-      urlDeviceUuid: deviceUuid,
-    });
-    throw new AuthenticationFailedError();
-  }
-
-  // Verify device exists in database
-  const device = await deviceManager.getDeviceByUuid(deviceUuid);
-  if (!device) {
-    coreWarn('Device WebSocket connection failed: device not found', {
-      operation: 'realtime:auth:device:not-found',
-      deviceUuid,
-    });
-    throw new AuthenticationFailedError();
-  }
-
-  coreDebug('Device found in database', {
-    operation: 'realtime:auth:device:device-found',
-    deviceUuid,
-    deviceId: device.id,
-    deviceStatus: device.status,
-  });
-
-  // Verify device is in a valid status for connections
-  // Only 'active' and 'enrolled' devices can connect
-  if (device.status !== 'active' && device.status !== 'enrolled') {
-    coreWarn('Device WebSocket connection denied: invalid device status', {
-      operation: 'realtime:auth:device',
-      deviceUuid,
-      deviceId: device.id,
-      status: device.status,
-    });
-    throw new AuthenticationFailedError();
-  }
-
-  coreInfo('Device WebSocket connection authenticated', {
-    operation: 'realtime:auth:device',
-    deviceId: device.id,
-    deviceUuid: device.deviceUuid,
-    organizationId: device.organizationId,
-    status: device.status,
-  });
-
-  return {
-    deviceId: device.id,
-    deviceUuid: device.deviceUuid,
-    organizationId: device.organizationId,
-  };
-}
-
-/**
- * Authenticate user observing device room
- *
- * Allows users to connect to device rooms as observers (read-only).
- * Checks user permissions for broadcast-box:devices:view.
- */
-export async function authenticateUserObservingDevice(
-  token: string,
-  deviceUuid: string,
-  authService: AuthService,
-  deviceManager: any, // DeviceManager - avoiding circular dependency
-  logger: Logger
-): Promise<AuthenticatedConnection> {
-  // Validate user token
-  const user = await authService.validateSession(token);
-  if (!user) {
-    coreWarn('User device observation failed: invalid token', {
-      operation: 'realtime:auth:user-device',
-    });
-    throw new AuthenticationFailedError();
-  }
-
-  // Verify device exists
-  const device = await deviceManager.getDeviceByUuid(deviceUuid);
-  if (!device) {
-    coreWarn('User device observation failed: device not found', {
-      operation: 'realtime:auth:user-device',
-      userId: user.id,
-      deviceUuid,
-    });
-    throw new PermissionDeniedError(deviceUuid, {
-      userId: user.id,
-      deviceUuid,
-      reason: 'device_not_found',
-    });
-  }
-
-  // Check user permissions (users need broadcast-box:devices:view permission)
-  const canView = await authService.userCan(
-    user,
-    'broadcast-box:devices:view',
-    {
-      action: 'view',
-    }
-  );
-
-  if (!canView) {
-    coreWarn('User device observation denied: no view access', {
-      operation: 'realtime:auth:user-device',
-      userId: user.id,
-      deviceUuid,
-    });
-    throw new PermissionDeniedError(deviceUuid, {
-      userId: user.id,
-      deviceUuid,
-    });
-  }
-
-  coreInfo('User device observation authenticated', {
-    operation: 'realtime:auth:user-device',
-    userId: user.id,
-    username: user.username,
-    deviceUuid,
-  });
-
-  return {
-    user,
-    permissions: {
-      canView: true,
-      canEdit: false, // Users observing device rooms are read-only
-    },
-  };
 }
 
 /**
@@ -374,7 +192,7 @@ export function parseRoomId(
     }
 
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

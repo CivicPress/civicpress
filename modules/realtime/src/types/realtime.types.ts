@@ -4,6 +4,8 @@
  * TypeScript interfaces and types for the realtime module
  */
 
+import type { ClientData } from './handler-registry.types.js';
+
 export interface RealtimeConfig {
   enabled: boolean;
   port: number;
@@ -55,7 +57,10 @@ export interface ClientConnection {
 export interface RoomState {
   roomId: string;
   roomType: string;
-  participants: ClientConnection[];
+  // Participants are stored as loose ClientData (id + connection metadata) — the
+  // server merges authenticated identity into this at connect time. The handler
+  // registry's RoomState mirrors this shape.
+  participants: ClientData[];
   yjsState?: Uint8Array;
   version: number;
   createdAt: number;

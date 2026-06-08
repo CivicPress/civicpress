@@ -12,7 +12,6 @@ import {
   coreError,
   isCivicPressError,
 } from '@civicpress/core';
-import type { SnapshotMetadata } from '../types/realtime.types.js';
 import { SnapshotStorage } from './storage.js';
 import * as Y from 'yjs';
 

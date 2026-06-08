@@ -28,7 +28,7 @@ export enum ControlEvent {
 export interface BaseMessage {
   type: MessageType;
   timestamp?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface SyncMessage extends BaseMessage {
