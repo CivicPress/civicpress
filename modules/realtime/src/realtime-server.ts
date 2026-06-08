@@ -56,37 +56,6 @@ import {
   setupUpdateFanout,
 } from './yjs-sync.js';
 
-/**
- * Generate a consistent color for a user based on their ID
- * Uses a predefined palette of distinct, accessible colors
- */
-const PARTICIPANT_COLORS = [
-  '#F44336',
-  '#E91E63',
-  '#9C27B0',
-  '#673AB7',
-  '#3F51B5',
-  '#2196F3',
-  '#03A9F4',
-  '#00BCD4',
-  '#009688',
-  '#4CAF50',
-  '#8BC34A',
-  '#CDDC39',
-  '#FFC107',
-  '#FF9800',
-  '#FF5722',
-  '#795548',
-];
-
-function generateParticipantColor(userId: string | number): string {
-  // Convert to number and use modulo to pick from palette
-  const numericId =
-    typeof userId === 'number' ? userId : parseInt(String(userId), 10) || 0;
-  const index = Math.abs(numericId) % PARTICIPANT_COLORS.length;
-  return PARTICIPANT_COLORS[index] || '#3F51B5';
-}
-
 export class RealtimeServer {
   private logger: Logger;
   private hookSystem: HookSystem;
