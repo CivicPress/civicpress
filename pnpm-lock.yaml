@@ -634,6 +634,28 @@ importers:
         specifier: ^3.3.2
         version: 3.3.3(typescript@5.9.3)
 
+  packages/editor-schema:
+    dependencies:
+      yjs:
+        specifier: ^13.6.10
+        version: 13.6.31
+    devDependencies:
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.36.0
+        version: 8.60.0(@typescript-eslint/parser@8.60.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.36.0
+        version: 8.60.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+      eslint:
+        specifier: ^9.30.1
+        version: 9.39.4(jiti@2.7.0)
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@20.19.41)(@vitest/ui@3.2.4)(happy-dom@20.0.11)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+
 packages:
 
   '@alloc/quick-lru@5.2.0':
