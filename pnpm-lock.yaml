@@ -636,6 +636,9 @@ importers:
 
   packages/editor-schema:
     dependencies:
+      markdown-it:
+        specifier: ^14.0.0
+        version: 14.2.0
       prosemirror-markdown:
         specifier: ^1.13.0
         version: 1.13.4
@@ -652,6 +655,9 @@ importers:
         specifier: ^13.6.10
         version: 13.6.31
     devDependencies:
+      '@types/markdown-it':
+        specifier: ^14.0.0
+        version: 14.1.2
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.36.0
         version: 8.60.0(@typescript-eslint/parser@8.60.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)

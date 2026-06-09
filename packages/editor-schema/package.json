@@ -21,6 +21,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "markdown-it": "^14.0.0",
     "prosemirror-markdown": "^1.13.0",
     "prosemirror-model": "^1.22.0",
     "prosemirror-schema-basic": "^1.2.0",
@@ -30,6 +31,7 @@
     "yjs": "^13.6.10"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.0.0",
     "@typescript-eslint/eslint-plugin": "^8.36.0",
     "@typescript-eslint/parser": "^8.36.0",
     "eslint": "^9.30.1",

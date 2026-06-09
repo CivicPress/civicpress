@@ -1,6 +1,7 @@
 import { Schema, type NodeSpec } from 'prosemirror-model'
 import { schema as basicSchema } from 'prosemirror-schema-basic'
 import { addListNodes } from 'prosemirror-schema-list'
+import { civicRefNodeSpec } from './civic-ref-nodes.js'
 
 /**
  * Override the basic schema's `code_block` with a `params` attribute so the
@@ -40,13 +41,13 @@ const codeBlockWithParams: NodeSpec = {
  * strong, code) extended with list nodes (bullet_list, ordered_list,
  * list_item).
  *
- * Civic-reference nodes (record-ref, geography-ref, attachment-ref) are
- * added by extending this schema in W3-T9.
+ * Civic-reference nodes (record/geography/attachment) are added as a single
+ * inline atom `civicRef` (one node type, discriminated by its `refType` attr)
+ * appended to the node set below.
  */
 export const editorSchema: Schema<string, string> = new Schema({
-  nodes: addListNodes(basicSchema.spec.nodes, 'paragraph block*', 'block').update(
-    'code_block',
-    codeBlockWithParams,
-  ),
+  nodes: addListNodes(basicSchema.spec.nodes, 'paragraph block*', 'block')
+    .update('code_block', codeBlockWithParams)
+    .addToEnd('civicRef', civicRefNodeSpec),
   marks: basicSchema.spec.marks,
 })
