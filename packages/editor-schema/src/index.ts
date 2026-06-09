@@ -10,3 +10,4 @@ export {
 } from './markdown-parser.js'
 export { civicRefNodeSpec, isCivicRefType } from './civic-ref-nodes.js'
 export type { CivicRefAttrs, CivicRefType } from './civic-ref-nodes.js'
+export { yXmlFragmentToMarkdown, prosemirrorJSONToYDoc } from './yjs-helpers.js'
