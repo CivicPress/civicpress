@@ -188,6 +188,11 @@ export function parseRoomId(
         roomType = 'device';
       }
 
+      // Normalize singular 'record' → plural 'records' (canonical internal key)
+      if (roomType === 'record') {
+        roomType = 'records';
+      }
+
       return { roomType, roomId };
     }
 

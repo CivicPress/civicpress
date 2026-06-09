@@ -1433,23 +1433,16 @@ export class RealtimeServer {
       return null;
     }
 
-    // Try both room ID formats (record: and records:)
-    const roomIdFormats = [`record:${recordId}`, `records:${recordId}`];
-    let room: YjsRoom | null = null;
-
-    for (const roomId of roomIdFormats) {
-      const foundRoom = this.roomManager.getRoom(roomId);
-      if (foundRoom instanceof YjsRoom) {
-        room = foundRoom;
-        break;
-      }
-    }
+    // Use canonical records: key (parseRoomId normalizes singular record → records)
+    const roomKey = `records:${recordId}`;
+    const foundRoom = this.roomManager.getRoom(roomKey);
+    const room = foundRoom instanceof YjsRoom ? foundRoom : null;
 
     if (!room) {
       coreDebug('No active room found for record snapshot', {
         operation: 'realtime:snapshot:trigger:no-room',
         recordId,
-        triedRoomIds: roomIdFormats,
+        roomKey,
       });
       return null;
     }

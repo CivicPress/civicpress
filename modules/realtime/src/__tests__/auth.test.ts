@@ -94,14 +94,24 @@ describe('WebSocket Authentication', () => {
       });
     });
 
-    it('should parse record room ID (singular)', () => {
-      const url = '/realtime/record/test-record-456';
+    it('normalizes singular "record" room-type prefix to canonical "records"', () => {
+      const url = '/realtime/record/abc-123';
       const result = parseRoomId(url);
 
-      expect(result).toEqual({
-        roomType: 'record',
-        roomId: 'test-record-456',
-      });
+      expect(result).not.toBeNull();
+      expect(result!.roomType).toBe('records');
+      expect(result!.roomId).toBe('abc-123');
+      expect(`${result!.roomType}:${result!.roomId}`).toBe('records:abc-123');
+    });
+
+    it('accepts plural "records" room-type prefix unchanged', () => {
+      const url = '/realtime/records/abc-123';
+      const result = parseRoomId(url);
+
+      expect(result).not.toBeNull();
+      expect(result!.roomType).toBe('records');
+      expect(result!.roomId).toBe('abc-123');
+      expect(`${result!.roomType}:${result!.roomId}`).toBe('records:abc-123');
     });
 
     it('should parse device room ID', () => {

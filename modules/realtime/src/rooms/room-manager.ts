@@ -43,18 +43,16 @@ export class RoomManager {
    * Register default room types
    */
   private registerDefaultRoomTypes(): void {
-    // Factory for record rooms (supports both 'record' and 'records')
+    // Factory for record rooms (canonical plural form only).
+    // parseRoomId normalizes singular 'record' → 'records' at URL-parse time,
+    // so no 'record' factory is needed here.
     const recordRoomFactory: RoomFactory = {
       createRoom: (roomId: string, config: RoomConfig) => {
         return new YjsRoom(roomId, config, this.logger, this.server);
       },
-      supportsRoomType: (roomType: string) =>
-        roomType === 'record' || roomType === 'records',
+      supportsRoomType: (roomType: string) => roomType === 'records',
     };
 
-    // Register both 'record' (singular) and 'records' (plural) room types
-    // This allows URLs like /realtime/records/:recordId to work
-    this.registerRoomType('record', recordRoomFactory);
     this.registerRoomType('records', recordRoomFactory);
   }
 
