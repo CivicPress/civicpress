@@ -20,7 +20,12 @@
     "clean": "rm -rf dist"
   },
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "prosemirror-markdown": "^1.13.0",
+    "prosemirror-model": "^1.22.0",
+    "prosemirror-schema-basic": "^1.2.0",
+    "prosemirror-schema-list": "^1.4.0"
+  },
   "peerDependencies": {
     "yjs": "^13.6.10"
   },
