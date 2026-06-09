@@ -17,6 +17,10 @@ import type { RoomConfig, RoomState } from '../types/realtime.types.js';
 import type { ClientData } from '../types/handler-registry.types.js';
 import type { Room } from './room-manager.js';
 import * as Y from 'yjs';
+import {
+  yXmlFragmentToMarkdown,
+  editorSchema,
+} from '@civicpress/editor-schema';
 import { InvalidYjsUpdateError } from '../errors/realtime-errors.js';
 
 export class YjsRoom implements Room {
@@ -88,8 +92,11 @@ export class YjsRoom implements Room {
         // Load record from API/Manager
         const record = await this.recordManager.getRecord(actualRecordId);
         if (record && record.content) {
-          // Convert Markdown to yjs
-          this.loadFromMarkdown(record.content);
+          // The record has content, but server-side Markdown → Yjs seeding of
+          // the `default` XmlFragment (via prosemirrorJSONToYDoc) lands in W5.
+          // Until then there is no deprecated `initialMarkdown` shadow to write
+          // — the document is hydrated from snapshot (initializeRoom) or by the
+          // first connecting client.
           coreInfo('YjsRoom initialized with record content', {
             operation: 'realtime:yjs-room:initialized',
             roomId: this.roomId,
@@ -131,45 +138,18 @@ export class YjsRoom implements Room {
   }
 
   /**
-   * Load content from Markdown into yjs XmlFragment
-   * Note: For TipTap, content is typically loaded client-side via the editor.
-   * This method stores the markdown as initial content that can be retrieved.
-   * The TipTap editor will handle the actual XML structure.
+   * Serialize the room's Yjs state to canonical Markdown via the shared
+   * @civicpress/editor-schema. Used by the realtime server at snapshot time to
+   * write the Markdown back to the record file (per spec §3b).
+   *
+   * Reads the `default` XmlFragment — the field name TipTap's Collaboration
+   * extension uses by default, which is what the whole-doc CRDT sync replicates
+   * from connected editors. Replaces the broadcast-box-era `toMarkdown()` stub
+   * that returned the raw `XmlFragment.toString()` (XML, not Markdown).
    */
-  private loadFromMarkdown(markdown: string): void {
-    // For XmlFragment used by TipTap, we store the initial markdown
-    // in a separate Text type that can be used for initialization
-    const initialContent = this.yjsDoc.getText('initialMarkdown');
-    initialContent.delete(0, initialContent.length);
-    initialContent.insert(0, markdown);
-
-    this.version++;
-    this.lastActivity = Date.now();
-  }
-
-  /**
-   * Convert yjs document to Markdown
-   * Note: For TipTap XmlFragment, the actual content is in XML format.
-   * This returns the initial markdown if set, or serializes the XML content.
-   */
-  toMarkdown(): string {
-    // Check if we have initial markdown content
-    const initialContent = this.yjsDoc.getText('initialMarkdown');
-    if (initialContent.length > 0) {
-      return initialContent.toString();
-    }
-
-    // For XmlFragment, convert to string representation
-    // The actual markdown conversion should be done by TipTap on the client
-    return this.yjsFragment.toString();
-  }
-
-  /**
-   * Get initial markdown content (if set)
-   */
-  getInitialMarkdown(): string | null {
-    const initialContent = this.yjsDoc.getText('initialMarkdown');
-    return initialContent.length > 0 ? initialContent.toString() : null;
+  public serializeToMarkdown(): string {
+    const fragment = this.yjsDoc.getXmlFragment('default');
+    return yXmlFragmentToMarkdown(fragment, editorSchema);
   }
 
   /**
@@ -298,14 +278,6 @@ export class YjsRoom implements Room {
    */
   getYjsFragment(): Y.XmlFragment {
     return this.yjsFragment;
-  }
-
-  /**
-   * Get yjs text content (deprecated, use getYjsFragment for TipTap)
-   * @deprecated Use getYjsFragment() for TipTap compatibility
-   */
-  getYjsText(): Y.Text {
-    return this.yjsDoc.getText('initialMarkdown');
   }
 
   /**

@@ -35,6 +35,7 @@
   "license": "MIT",
   "dependencies": {
     "@civicpress/core": "workspace:*",
+    "@civicpress/editor-schema": "workspace:*",
     "fs-extra": "^11.2.0",
     "lib0": "0.2.117",
     "ws": "^8.18.0",
