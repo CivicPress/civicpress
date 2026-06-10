@@ -5,8 +5,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { SnapshotManager } from '../persistence/snapshots.js';
+import {
+  SnapshotManager,
+  SnapshotHookBus,
+  SNAPSHOT_FORMAT_V1,
+  MAX_SNAPSHOT_BYTES,
+  SNAPSHOT_TTL_MS,
+} from '../persistence/snapshots.js';
 import { DatabaseSnapshotStorage } from '../persistence/storage.js';
 import { FilesystemSnapshotStorage } from '../persistence/storage.js';
 import { DatabaseService } from '@civicpress/core';
@@ -46,6 +53,7 @@ interface TestPersistenceDb {
 interface TestPersistenceCtx {
   db: TestPersistenceDb;
   snapshotMgr: SnapshotManager;
+  hookBus: SnapshotHookBus;
   close(): Promise<void>;
 }
 
@@ -85,7 +93,8 @@ async function createTestPersistence(): Promise<TestPersistenceCtx> {
 
   const logger = quietLogger();
   const storage = new DatabaseSnapshotStorage(service, logger);
-  const snapshotMgr = new SnapshotManager(logger, storage);
+  const hookBus = new SnapshotHookBus();
+  const snapshotMgr = new SnapshotManager(logger, storage, hookBus);
 
   const db: TestPersistenceDb = {
     all: <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
@@ -98,6 +107,7 @@ async function createTestPersistence(): Promise<TestPersistenceCtx> {
   return {
     db,
     snapshotMgr,
+    hookBus,
     close: async () => {
       await service.getAdapter().close();
     },
@@ -640,6 +650,91 @@ describe('snapshot persistence schema (W4)', () => {
     );
     const names = indexes.map((i) => i.name);
     expect(names).toContain('realtime_snapshots_created_at_idx');
+    await ctx.close();
+  });
+});
+
+describe('snapshot integrity hash (W4)', () => {
+  it('persists integrity_hash = sha256(snapshot_data)', async () => {
+    const ctx = await createTestPersistence();
+    const blob = new Uint8Array([1, 2, 3, 4, 5]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:r1', blob });
+
+    const row = await ctx.snapshotMgr.loadLatest('records:r1');
+    expect(row).toBeDefined();
+    const expectedHash = createHash('sha256').update(blob).digest('hex');
+    expect(row!.integrity_hash).toBe(expectedHash);
+    expect(row!.format_version).toBe(SNAPSHOT_FORMAT_V1);
+    expect(row!.byte_size).toBe(5);
+    expect(row!.created_at).toBeGreaterThan(0);
+    await ctx.close();
+  });
+
+  it('loadLatestVerified returns the row when the hash matches', async () => {
+    const ctx = await createTestPersistence();
+    const blob = new Uint8Array([9, 8, 7, 6]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:r1', blob });
+
+    const row = await ctx.snapshotMgr.loadLatestVerified('records:r1');
+    expect(row).not.toBeNull();
+    expect(Array.from(row!.snapshot_data)).toEqual([9, 8, 7, 6]);
+    await ctx.close();
+  });
+
+  it('loadLatestVerified returns null when hash does not match (corruption)', async () => {
+    const ctx = await createTestPersistence();
+    const blob = new Uint8Array([1, 2, 3]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:r1', blob });
+
+    // Corrupt the stored hash in-place.
+    await ctx.db.run(
+      `UPDATE realtime_snapshots SET integrity_hash = 'invalid' WHERE room_id = ?`,
+      'records:r1'
+    );
+
+    const result = await ctx.snapshotMgr.loadLatestVerified('records:r1');
+    expect(result).toBeNull();
+    await ctx.close();
+  });
+
+  it('fires realtime:snapshot:integrity-failed on corruption', async () => {
+    const ctx = await createTestPersistence();
+    const events: Array<{ roomId: string }> = [];
+    ctx.hookBus.on('realtime:snapshot:integrity-failed', (e) =>
+      events.push(e)
+    );
+
+    const blob = new Uint8Array([1, 2, 3]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:r1', blob });
+    await ctx.db.run(
+      `UPDATE realtime_snapshots SET integrity_hash = 'invalid' WHERE room_id = ?`,
+      'records:r1'
+    );
+
+    await ctx.snapshotMgr.loadLatestVerified('records:r1');
+    expect(events).toHaveLength(1);
+    expect(events[0].roomId).toBe('records:r1');
+    await ctx.close();
+  });
+
+  it('loadLatestVerified returns null when format_version is newer than supported', async () => {
+    const ctx = await createTestPersistence();
+    const blob = new Uint8Array([1, 2, 3]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:r1', blob });
+    await ctx.db.run(
+      `UPDATE realtime_snapshots SET format_version = 99 WHERE room_id = ?`,
+      'records:r1'
+    );
+
+    const result = await ctx.snapshotMgr.loadLatestVerified('records:r1');
+    expect(result).toBeNull();
+    await ctx.close();
+  });
+
+  it('loadLatest returns null for an unknown room', async () => {
+    const ctx = await createTestPersistence();
+    const row = await ctx.snapshotMgr.loadLatest('records:nope');
+    expect(row).toBeNull();
     await ctx.close();
   });
 });
