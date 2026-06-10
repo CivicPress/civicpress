@@ -86,8 +86,23 @@ export function registerRealtimeServices(
     server.setRecordManager(recordManager);
     server.setDatabaseService(databaseService);
 
-    // Register the records room handler
-    const recordHandler = new RecordRoomHandler();
+    // Register the records room handler, wiring the REAL draft pipeline:
+    //  - draftPersistence: DatabaseService.getDraft/createDraft/updateDraft
+    //    (the canonical `record_drafts` pipeline the UI's getDraftOrRecord
+    //    reads via markdown_body),
+    //  - recordSource: RecordManager.getRecord (title/type/metadata seed when
+    //    no draft exists yet),
+    //  - getSnapshotManager: provider over the server's lazily-created W4
+    //    SnapshotManager (persist() integrity-hashes the Yjs binary),
+    //  - hookBus: the server's HookSystem bridge for lifecycle events.
+    const recordHandler = new RecordRoomHandler({
+      draftPersistence: databaseService,
+      recordSource: recordManager,
+      getSnapshotManager: () => server.getSnapshotManager(),
+      hookBus: {
+        emit: (event, payload) => server.emitHook(event, payload),
+      },
+    });
     server.registerRoomTypeHandler(recordHandler);
 
     return server;

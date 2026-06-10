@@ -267,6 +267,17 @@ export class YjsRoom implements Room {
   }
 
   /**
+   * Get the full room id (e.g. "records:rec-1").
+   *
+   * The id is also exposed as the public `roomId` field; this accessor exists
+   * so collaborators (RecordRoomHandler) can read it through a method rather
+   * than reaching into the field, matching the rest of the room API.
+   */
+  getRoomId(): string {
+    return this.roomId;
+  }
+
+  /**
    * Get yjs document
    */
   getYjsDoc(): Y.Doc {
