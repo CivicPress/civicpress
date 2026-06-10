@@ -1134,17 +1134,20 @@ export class RealtimeServer {
               room_id TEXT NOT NULL,
               snapshot_data BLOB NOT NULL,
               version INTEGER NOT NULL,
+              integrity_hash TEXT NOT NULL DEFAULT '',
+              format_version INTEGER NOT NULL DEFAULT 1,
+              byte_size INTEGER NOT NULL DEFAULT 0,
               created_at INTEGER NOT NULL
             )
           `);
 
           await this.databaseService.query(`
-            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_room_id 
+            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_room_id
             ON realtime_snapshots(room_id)
           `);
 
           await this.databaseService.query(`
-            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_created_at 
+            CREATE INDEX IF NOT EXISTS realtime_snapshots_created_at_idx
             ON realtime_snapshots(created_at)
           `);
 

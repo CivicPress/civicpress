@@ -5,14 +5,104 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { fileURLToPath } from 'node:url';
 import { SnapshotManager } from '../persistence/snapshots.js';
 import { DatabaseSnapshotStorage } from '../persistence/storage.js';
 import { FilesystemSnapshotStorage } from '../persistence/storage.js';
-import type { Logger, DatabaseService } from '@civicpress/core';
+import { DatabaseService } from '@civicpress/core';
+import type { Logger } from '@civicpress/core';
 import * as Y from 'yjs';
 import * as fs from 'fs/promises';
+import { readFileSync } from 'node:fs';
 import * as path from 'path';
 import * as os from 'os';
+
+// ---------------------------------------------------------------------------
+// W4 test harness: a REAL in-memory SQLite DB running the actual realtime
+// migration, wired to a real DatabaseSnapshotStorage + SnapshotManager.
+//
+// The W4 tests inspect the schema (PRAGMA table_info / index_list), corrupt
+// rows in-place (UPDATE), and verify integrity/TTL behaviour end-to-end, so a
+// mock storage adapter is insufficient — they need a genuine DB. core's
+// DatabaseService runs over `:memory:` (sqlite3) directly; we connect the
+// adapter (skipping the heavy core-table migration we don't need) and run the
+// realtime migration SQL ourselves so the schema under test is the real one.
+// ---------------------------------------------------------------------------
+
+const MIGRATION_PATH = fileURLToPath(
+  new URL('../persistence/migrations.sql', import.meta.url)
+);
+
+interface TestPersistenceDb {
+  /** Run a SELECT/PRAGMA, returning all rows (plan-style `db.all`). */
+  all<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[]
+  ): Promise<T[]>;
+  /** Run a mutating statement (plan-style `db.run(sql, ...params)`). */
+  run(sql: string, ...params: unknown[]): Promise<void>;
+}
+
+interface TestPersistenceCtx {
+  db: TestPersistenceDb;
+  snapshotMgr: SnapshotManager;
+  close(): Promise<void>;
+}
+
+function quietLogger(): Logger {
+  return {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    isVerbose: () => false,
+  } as unknown as Logger;
+}
+
+async function createTestPersistence(): Promise<TestPersistenceCtx> {
+  const service = new DatabaseService({
+    type: 'sqlite',
+    sqlite: { file: ':memory:' },
+  });
+  // Connect the adapter directly: we only want the realtime_snapshots table,
+  // not the full core schema that DatabaseService.initialize() would build.
+  await service.getAdapter().connect();
+
+  const migrationSql = readFileSync(MIGRATION_PATH, 'utf8');
+  // sqlite3's run() executes a single statement; strip `-- ` line comments
+  // first (so a leading comment block doesn't swallow the statement after it),
+  // then split the migration on `;`.
+  const statements = migrationSql
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    await service.execute(stmt);
+  }
+
+  const logger = quietLogger();
+  const storage = new DatabaseSnapshotStorage(service, logger);
+  const snapshotMgr = new SnapshotManager(logger, storage);
+
+  const db: TestPersistenceDb = {
+    all: <T = Record<string, unknown>>(sql: string, params: unknown[] = []) =>
+      service.query<T>(sql, params as never[]),
+    run: async (sql: string, ...params: unknown[]) => {
+      await service.execute(sql, params as never[]);
+    },
+  };
+
+  return {
+    db,
+    snapshotMgr,
+    close: async () => {
+      await service.getAdapter().close();
+    },
+  };
+}
 
 describe('SnapshotManager', () => {
   let snapshotManager: SnapshotManager;
@@ -522,5 +612,34 @@ describe('FilesystemSnapshotStorage', () => {
       }
       expect(dirExists).toBe(false);
     });
+  });
+});
+
+// ===========================================================================
+// W4 — Persistence rework (spec §3e, realtime-005)
+// ===========================================================================
+
+describe('snapshot persistence schema (W4)', () => {
+  it('has integrity_hash, format_version, byte_size, created_at columns', async () => {
+    const ctx = await createTestPersistence();
+    const cols = await ctx.db.all<{ name: string }>(
+      `PRAGMA table_info('realtime_snapshots')`
+    );
+    const names = cols.map((c) => c.name);
+    expect(names).toContain('integrity_hash');
+    expect(names).toContain('format_version');
+    expect(names).toContain('byte_size');
+    expect(names).toContain('created_at');
+    await ctx.close();
+  });
+
+  it('has an index on created_at for TTL cleanup queries', async () => {
+    const ctx = await createTestPersistence();
+    const indexes = await ctx.db.all<{ name: string }>(
+      `PRAGMA index_list('realtime_snapshots')`
+    );
+    const names = indexes.map((i) => i.name);
+    expect(names).toContain('realtime_snapshots_created_at_idx');
+    await ctx.close();
   });
 });
