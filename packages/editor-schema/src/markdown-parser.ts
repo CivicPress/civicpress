@@ -1,7 +1,8 @@
 import { defaultMarkdownParser, MarkdownParser } from 'prosemirror-markdown'
 import type { Node as ProseMirrorNode } from 'prosemirror-model'
 import MarkdownIt from 'markdown-it'
-import type Token from 'markdown-it/lib/token.mjs'
+import Token from 'markdown-it/lib/token.mjs'
+import type { CellAlign } from './schema.js'
 import { editorSchema } from './schema.js'
 import type { CivicRefAttrs, CivicRefType } from './civic-ref-nodes.js'
 import { isCivicRefType } from './civic-ref-nodes.js'
@@ -49,6 +50,10 @@ function parseCivicRefAttrs(raw: string): CivicRefAttrs | null {
  * civic-ref comment into a dedicated `civic_ref` token. Non-matching HTML
  * tokens are untouched (so they hit the `html_inline`/`html_block` ignore
  * handlers below rather than being mis-converted into an empty civicRef).
+ *
+ * Runs over every `inline` block token (including the per-cell `inline` tokens
+ * markdown-it's table rule emits), so a civic-ref inside a table cell is mapped
+ * to a `civicRef` node just like one in a paragraph.
  */
 function civicRefCoreRule(state: { tokens: Token[] }): void {
   for (const block of state.tokens) {
@@ -62,13 +67,62 @@ function civicRefCoreRule(state: { tokens: Token[] }): void {
   }
 }
 
+/** Read a GFM cell alignment from a `th_open`/`td_open` token's inline style. */
+function alignFromCellToken(tok: Token): CellAlign {
+  const style = tok.attrGet('style')
+  if (!style) return null
+  if (style.includes('text-align:left')) return 'left'
+  if (style.includes('text-align:center')) return 'center'
+  if (style.includes('text-align:right')) return 'right'
+  return null
+}
+
+/**
+ * markdown-it core rule: wrap each table cell's `inline` token in
+ * `paragraph_open` / `paragraph_close`.
+ *
+ * markdown-it emits cell content as a bare `inline` token between `th_open`/
+ * `td_open` and its close, but the ProseMirror table cell's content is `block+`
+ * (a paragraph holding the inline content) — without a paragraph wrapper the
+ * cell would fail to fill. Injecting the wrapper here lets the existing
+ * `paragraph` token handler build the cell's paragraph, so cell inline content
+ * (marks + civic-refs) flows through the normal inline pipeline.
+ */
+function tableCellParagraphRule(state: { tokens: Token[] }): void {
+  const out: Token[] = []
+  for (let i = 0; i < state.tokens.length; i++) {
+    const tok = state.tokens[i]
+    const isCellOpen = tok.type === 'th_open' || tok.type === 'td_open'
+    const next = state.tokens[i + 1]
+    out.push(tok)
+    if (isCellOpen && next && next.type === 'inline') {
+      const open = new Token('paragraph_open', 'p', 1)
+      open.block = true
+      out.push(open)
+      out.push(next)
+      const close = new Token('paragraph_close', 'p', -1)
+      close.block = true
+      out.push(close)
+      i += 1 // the inline token has been consumed
+    }
+  }
+  state.tokens = out
+}
+
 /**
  * Tokenizer with HTML enabled (the default prosemirror-markdown parser uses
  * `{ html: false }`, which collapses HTML comments into plain text). Enabling
  * HTML makes markdown-it emit `html_inline`/`html_block` tokens we can detect.
+ *
+ * The `table` rule is DISABLED under the bare `'commonmark'` preset, so it is
+ * re-enabled explicitly — civic records carry GFM pipe tables that must
+ * round-trip. Enabling it leaves civic-ref `html_inline` handling intact (a
+ * civic-ref still tokenizes as `html_inline`, including inside a table cell).
  */
 const civicTokenizer: MarkdownIt = MarkdownIt('commonmark', { html: true })
+civicTokenizer.enable('table')
 civicTokenizer.core.ruler.push('civic_ref', civicRefCoreRule)
+civicTokenizer.core.ruler.push('civic_table_cell_paragraph', tableCellParagraphRule)
 
 const tokens = {
   ...defaultMarkdownParser.tokens,
@@ -79,6 +133,24 @@ const tokens = {
       if (!attrs) return null
       return { refType: attrs.refType, id: attrs.id, label: attrs.label }
     },
+  },
+  // GFM tables. markdown-it nests rows under thead/tbody wrappers that have no
+  // ProseMirror equivalent — they are `ignore`d (registered as no-op
+  // _open/_close), which makes them transparent: the row tokens they wrap are
+  // still processed and open `table_row` nodes directly inside the `table`.
+  // Header cells (`th`) → `table_header`, body cells (`td`) → `table_cell`;
+  // both read GFM column alignment off the open token's inline style.
+  table: { block: 'table' },
+  thead: { ignore: true },
+  tbody: { ignore: true },
+  tr: { block: 'table_row' },
+  th: {
+    block: 'table_header',
+    getAttrs: (tok: Token) => ({ align: alignFromCellToken(tok) }),
+  },
+  td: {
+    block: 'table_cell',
+    getAttrs: (tok: Token) => ({ align: alignFromCellToken(tok) }),
   },
   // Stray (non-civic-ref) HTML must not crash the parser. It is dropped rather
   // than mis-converted; civic-refs are extracted ahead of this by the core rule.

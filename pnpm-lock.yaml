@@ -657,6 +657,9 @@ importers:
       prosemirror-state:
         specifier: ^1.4.3
         version: 1.4.4
+      prosemirror-tables:
+        specifier: ^1.8.5
+        version: 1.8.5
       prosemirror-view:
         specifier: ^1.34.0
         version: 1.41.8

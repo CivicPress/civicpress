@@ -1,4 +1,5 @@
-export { editorSchema } from './schema.js'
+export { editorSchema, isCellAlign } from './schema.js'
+export type { CellAlign } from './schema.js'
 export {
   serializeDocToMarkdown,
   civicMarkdownSerializer,
