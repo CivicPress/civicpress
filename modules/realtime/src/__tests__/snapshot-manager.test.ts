@@ -738,3 +738,44 @@ describe('snapshot integrity hash (W4)', () => {
     await ctx.close();
   });
 });
+
+describe('snapshot oversize warning (W4)', () => {
+  it('fires realtime:snapshot:oversize when blob > MAX_SNAPSHOT_BYTES', async () => {
+    const ctx = await createTestPersistence();
+    const events: Array<{ roomId: string; byteSize: number; cap: number }> = [];
+    ctx.hookBus.on('realtime:snapshot:oversize', (e) => events.push(e));
+
+    const big = new Uint8Array(MAX_SNAPSHOT_BYTES + 1024);
+    await ctx.snapshotMgr.persist({ roomId: 'records:big', blob: big });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].byteSize).toBe(big.byteLength);
+    expect(events[0].cap).toBe(MAX_SNAPSHOT_BYTES);
+    await ctx.close();
+  });
+
+  it('does NOT fire oversize for a blob at or under the cap', async () => {
+    const ctx = await createTestPersistence();
+    const events: Array<{ roomId: string }> = [];
+    ctx.hookBus.on('realtime:snapshot:oversize', (e) => events.push(e));
+
+    await ctx.snapshotMgr.persist({
+      roomId: 'records:ok',
+      blob: new Uint8Array(MAX_SNAPSHOT_BYTES),
+    });
+
+    expect(events).toHaveLength(0);
+    await ctx.close();
+  });
+
+  it('persists the oversize blob anyway (does not drop)', async () => {
+    const ctx = await createTestPersistence();
+    const big = new Uint8Array(MAX_SNAPSHOT_BYTES + 1024);
+    await ctx.snapshotMgr.persist({ roomId: 'records:big', blob: big });
+
+    const row = await ctx.snapshotMgr.loadLatest('records:big');
+    expect(row).not.toBeNull();
+    expect(row!.byte_size).toBe(big.byteLength);
+    await ctx.close();
+  });
+});
