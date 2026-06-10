@@ -1426,63 +1426,66 @@ export class RealtimeServer {
   }
 
   /**
-   * Trigger a snapshot for a specific record.
-   *
-   * Called by the API when collaborative-editing autosave triggers. The actual
-   * snapshot work — serialize Yjs → Markdown, write the draft, persist the
-   * integrity-hashed binary — is delegated to the `records` room-type handler
-   * (RecordRoomHandler.snapshot), so this method holds no record-specific
-   * snapshot logic; it only resolves the active room and the handler.
-   *
-   * @param recordId The record ID to snapshot
-   * @returns The room id snapshotted, or null if no active room/handler
+   * Trigger a snapshot for a record (the in-process `POST /records/:id/snapshot`
+   * seam). Delegates the snapshot work (Yjs → Markdown + persist) to the
+   * `records` room-type handler, then reads the persisted version back. Returns
+   * `{ snapshotCreated, version, timestamp }`: a no-op `{ false, null, ts }` when
+   * there is no active in-memory room / snapshot-capable handler; otherwise
+   * reflects the latest persisted row for `records:<id>` (false when snapshots
+   * are disabled / produced no row). `ts` is ms epoch; handler errors rethrow.
    */
-  async triggerRecordSnapshot(
-    recordId: string
-  ): Promise<{ roomId: string } | null> {
+  async triggerRecordSnapshot(recordId: string): Promise<{
+    snapshotCreated: boolean;
+    version: number | null;
+    timestamp: number;
+  }> {
+    const timestamp = Date.now();
+    const noop = { snapshotCreated: false, version: null, timestamp };
     if (!this.roomManager) {
       coreWarn('Cannot trigger snapshot: room manager not initialized', {
         operation: 'realtime:snapshot:trigger:error',
         recordId,
       });
-      return null;
+      return noop;
     }
 
     // Use canonical records: key (parseRoomId normalizes singular record → records)
     const roomKey = `records:${recordId}`;
     const foundRoom = this.roomManager.getRoom(roomKey);
     const room = foundRoom instanceof YjsRoom ? foundRoom : null;
-
     if (!room) {
       coreDebug('No active room found for record snapshot', {
         operation: 'realtime:snapshot:trigger:no-room',
         recordId,
         roomKey,
       });
-      return null;
+      return noop;
     }
 
-    const handler = this.handlerRegistry.getHandler(room.roomType);
-    const snapshotFn = (
-      handler as { snapshot?: (room: YjsRoom) => Promise<void> } | undefined
-    )?.snapshot;
+    const handler = this.handlerRegistry.getHandler(room.roomType) as
+      | { snapshot?: (room: YjsRoom) => Promise<void> }
+      | undefined;
+    const snapshotFn = handler?.snapshot;
     if (typeof snapshotFn !== 'function') {
       coreWarn('No snapshot-capable handler for room type', {
         operation: 'realtime:snapshot:trigger:no-handler',
         recordId,
         roomType: room.roomType,
       });
-      return null;
+      return noop;
     }
 
     try {
       await snapshotFn.call(handler, room);
+      // Read the persisted version back; null row → snapshots disabled / no row.
+      const row = await this.snapshotManager?.loadLatest(roomKey);
       coreInfo('Record snapshot triggered via API', {
         operation: 'realtime:snapshot:triggered',
         recordId,
         roomId: room.getRoomId(),
+        version: row?.version ?? null,
       });
-      return { roomId: room.getRoomId() };
+      return { snapshotCreated: row != null, version: row?.version ?? null, timestamp };
     } catch (error) {
       this.logError(
         error,

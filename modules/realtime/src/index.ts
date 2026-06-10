@@ -9,7 +9,11 @@ export { RoomManager } from './rooms/room-manager.js';
 export type { Room, RoomFactory } from './rooms/room-manager.js';
 export { YjsRoom } from './rooms/yjs-room.js';
 export { RealtimeConfigManager } from './realtime-config-manager.js';
-export { registerRealtimeServices } from './realtime-services.js';
+export {
+  registerRealtimeServices,
+  createRealtimeServer,
+} from './realtime-services.js';
+export type { RealtimeServerDeps } from './realtime-services.js';
 export { PresenceManager } from './presence/presence-manager.js';
 export { AwarenessManager } from './presence/awareness.js';
 export {
