@@ -180,4 +180,14 @@ export class RoomManager {
   getAllRooms(): Room[] {
     return Array.from(this.rooms.values());
   }
+
+  /**
+   * Get the set of currently-active room IDs.
+   *
+   * Used by snapshot TTL cleanup to skip rows whose room is still in memory
+   * (an active room's snapshot is load-bearing for grace-period reconnection).
+   */
+  getActiveRoomIds(): ReadonlySet<string> {
+    return new Set(this.rooms.keys());
+  }
 }

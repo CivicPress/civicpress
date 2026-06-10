@@ -12,11 +12,25 @@ export { RealtimeConfigManager } from './realtime-config-manager.js';
 export { registerRealtimeServices } from './realtime-services.js';
 export { PresenceManager } from './presence/presence-manager.js';
 export { AwarenessManager } from './presence/awareness.js';
-export { SnapshotManager } from './persistence/snapshots.js';
+export {
+  SnapshotManager,
+  SnapshotHookBus,
+  SNAPSHOT_FORMAT_V1,
+  MAX_SNAPSHOT_BYTES,
+  SNAPSHOT_TTL_MS,
+} from './persistence/snapshots.js';
+export type {
+  Snapshot,
+  SnapshotRow,
+  PersistRequest,
+  CleanupOptions,
+  SnapshotHookEvents,
+} from './persistence/snapshots.js';
 export {
   DatabaseSnapshotStorage,
   FilesystemSnapshotStorage,
 } from './persistence/storage.js';
+export type { SnapshotStorage } from './persistence/storage.js';
 export {
   DefaultHandlerRegistry,
   createHandlerRegistry,

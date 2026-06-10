@@ -779,3 +779,83 @@ describe('snapshot oversize warning (W4)', () => {
     await ctx.close();
   });
 });
+
+describe('snapshot TTL cleanup (W4)', () => {
+  const expiredAt = (): number => Date.now() - SNAPSHOT_TTL_MS - 60_000;
+
+  it('deletes rows older than SNAPSHOT_TTL_MS with no active room', async () => {
+    const ctx = await createTestPersistence();
+    const blob = new Uint8Array([1, 2, 3]);
+
+    await ctx.snapshotMgr.persist({ roomId: 'records:old', blob });
+    await ctx.db.run(
+      `UPDATE realtime_snapshots SET created_at = ? WHERE room_id = ?`,
+      expiredAt(),
+      'records:old'
+    );
+
+    await ctx.snapshotMgr.persist({ roomId: 'records:fresh', blob });
+
+    const deleted = await ctx.snapshotMgr.cleanupExpired({
+      activeRoomIds: new Set(),
+    });
+    expect(deleted).toBe(1);
+
+    expect(await ctx.snapshotMgr.loadLatest('records:old')).toBeNull();
+    expect(await ctx.snapshotMgr.loadLatest('records:fresh')).not.toBeNull();
+    await ctx.close();
+  });
+
+  it('skips rows whose room is currently active even if past TTL', async () => {
+    const ctx = await createTestPersistence();
+    const blob = new Uint8Array([1, 2, 3]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:active', blob });
+    await ctx.db.run(
+      `UPDATE realtime_snapshots SET created_at = ? WHERE room_id = ?`,
+      expiredAt(),
+      'records:active'
+    );
+
+    const deleted = await ctx.snapshotMgr.cleanupExpired({
+      activeRoomIds: new Set(['records:active']),
+    });
+    expect(deleted).toBe(0);
+    expect(await ctx.snapshotMgr.loadLatest('records:active')).not.toBeNull();
+    await ctx.close();
+  });
+
+  it('does not delete fresh rows (within TTL)', async () => {
+    const ctx = await createTestPersistence();
+    const blob = new Uint8Array([1, 2, 3]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:fresh', blob });
+
+    const deleted = await ctx.snapshotMgr.cleanupExpired({
+      activeRoomIds: new Set(),
+    });
+    expect(deleted).toBe(0);
+    expect(await ctx.snapshotMgr.loadLatest('records:fresh')).not.toBeNull();
+    await ctx.close();
+  });
+
+  it('fires realtime:snapshot:expired hook per deleted row', async () => {
+    const ctx = await createTestPersistence();
+    const events: Array<{ roomId: string }> = [];
+    ctx.hookBus.on('realtime:snapshot:expired', (e) => events.push(e));
+
+    const blob = new Uint8Array([1, 2, 3]);
+    await ctx.snapshotMgr.persist({ roomId: 'records:e1', blob });
+    await ctx.snapshotMgr.persist({ roomId: 'records:e2', blob });
+    await ctx.db.run(
+      `UPDATE realtime_snapshots SET created_at = ? WHERE room_id IN ('records:e1', 'records:e2')`,
+      expiredAt()
+    );
+
+    await ctx.snapshotMgr.cleanupExpired({ activeRoomIds: new Set() });
+    expect(events).toHaveLength(2);
+    expect(events.map((e) => e.roomId).sort()).toEqual([
+      'records:e1',
+      'records:e2',
+    ]);
+    await ctx.close();
+  });
+});

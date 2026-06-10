@@ -69,6 +69,7 @@ export class RealtimeServer {
   private realtimeConfig: RealtimeConfig | null = null;
   private initialized: boolean = false;
   private snapshotInterval: NodeJS.Timeout | null = null;
+  private static readonly SNAPSHOT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h TTL sweep
   // Message rate limiting: clientId -> { count: number, resetTime: number }
   private messageRateLimits: Map<
     string,
@@ -172,6 +173,12 @@ export class RealtimeServer {
           this.createSnapshots();
         }, this.realtimeConfig.snapshots.interval * 1000);
       }
+
+      // SnapshotManager owns its TTL-cleanup interval; server only start/stops.
+      this.snapshotManager.startCleanup(
+        () => this.roomManager?.getActiveRoomIds() ?? new Set<string>(),
+        RealtimeServer.SNAPSHOT_CLEANUP_INTERVAL_MS
+      );
     }
 
     // Start WebSocket server
@@ -1128,28 +1135,22 @@ export class RealtimeServer {
         });
 
         try {
+          // Runtime fallback mirroring persistence/migrations.sql (source of truth).
           await this.databaseService.query(`
             CREATE TABLE IF NOT EXISTS realtime_snapshots (
-              id TEXT PRIMARY KEY,
-              room_id TEXT NOT NULL,
-              snapshot_data BLOB NOT NULL,
-              version INTEGER NOT NULL,
+              id TEXT PRIMARY KEY, room_id TEXT NOT NULL,
+              snapshot_data BLOB NOT NULL, version INTEGER NOT NULL,
               integrity_hash TEXT NOT NULL DEFAULT '',
               format_version INTEGER NOT NULL DEFAULT 1,
-              byte_size INTEGER NOT NULL DEFAULT 0,
-              created_at INTEGER NOT NULL
+              byte_size INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
             )
           `);
-
-          await this.databaseService.query(`
-            CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_room_id
-            ON realtime_snapshots(room_id)
-          `);
-
-          await this.databaseService.query(`
-            CREATE INDEX IF NOT EXISTS realtime_snapshots_created_at_idx
-            ON realtime_snapshots(created_at)
-          `);
+          await this.databaseService.query(
+            `CREATE INDEX IF NOT EXISTS idx_realtime_snapshots_room_id ON realtime_snapshots(room_id)`
+          );
+          await this.databaseService.query(
+            `CREATE INDEX IF NOT EXISTS realtime_snapshots_created_at_idx ON realtime_snapshots(created_at)`
+          );
 
           coreSuccess({}, 'realtime_snapshots table created', {
             operation: 'realtime:server:migration',
@@ -1327,11 +1328,12 @@ export class RealtimeServer {
       operation: 'realtime:server:shutdown',
     });
 
-    // Stop snapshot interval
+    // Stop snapshot intervals (periodic snapshot + manager-owned TTL cleanup).
     if (this.snapshotInterval) {
       clearInterval(this.snapshotInterval);
       this.snapshotInterval = null;
     }
+    this.snapshotManager?.stopCleanup();
 
     // Create final snapshots for all rooms
     if (this.roomManager) {
