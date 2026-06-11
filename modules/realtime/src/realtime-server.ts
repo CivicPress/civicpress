@@ -21,7 +21,10 @@ import {
   coreDebug,
   isCivicPressError,
 } from '@civicpress/core';
-import type { RealtimeConfig } from './types/realtime.types.js';
+import type {
+  RealtimeConfig,
+  RealtimeHealthStatus,
+} from './types/realtime.types.js';
 import { RealtimeConfigManager } from './realtime-config-manager.js';
 import { RoomManager, type Room } from './rooms/room-manager.js';
 import { extractToken, parseRoomId } from './auth.js';
@@ -145,6 +148,10 @@ export class RealtimeServer {
     if (!this.roomManager) {
       this.roomManager = new RoomManager(this.logger, this);
     }
+
+    // Grace window (spec §6.3): keep a clientless room in memory this long
+    // before finalizing, so a reconnect within the window recovers edits.
+    this.roomManager.setGracePeriodMs(this.realtimeConfig.rooms.grace_period_ms);
 
     // Initialize snapshot manager
     if (this.realtimeConfig.snapshots.enabled) {
@@ -846,6 +853,9 @@ export class RealtimeServer {
     // Room bookkeeping — `room` is undefined if the socket closed before join.
     if (room) {
       room.removeClient(clientId);
+      // Spec §6.3: last-client-leave starts the room's grace timer (finalize on
+      // elapse; reconnect cancels). After removeClient so the count is accurate.
+      this.roomManager?.handleRoomClientLeave(fullRoomId);
     }
     this.messageRateLimits.delete(clientId);
 
@@ -1232,54 +1242,18 @@ export class RealtimeServer {
   }
 
   /** Get health status and metrics. */
-  getHealthStatus(): {
-    status: 'healthy' | 'unhealthy';
-    server: {
-      listening: boolean;
-      port: number | null;
-      host: string | null;
-    };
-    connections: {
-      total: number;
-      perUser: number;
-      perIP: number;
-    };
-    rooms: {
-      total: number;
-      maxRooms: number;
-    };
-    memory?: {
-      heapUsed: number;
-      heapTotal: number;
-      external: number;
-    };
-    rateLimiting: {
-      activeClients: number;
-      messagesPerSecond: number;
-    };
-  } {
+  getHealthStatus(): RealtimeHealthStatus {
     const address = this.server?.address();
-    const port =
-      typeof address === 'object' && address
-        ? address.port
-        : this.realtimeConfig?.port || null;
-    const host =
-      typeof address === 'object' && address
-        ? address.address
-        : this.realtimeConfig?.host || null;
+    const addr = typeof address === 'object' && address ? address : null;
+    const port = addr ? addr.port : this.realtimeConfig?.port || null;
+    const host = addr ? addr.address : this.realtimeConfig?.host || null;
 
-    // Calculate unique IPs and users
     const uniqueIPs = this.connectionCounts.size;
     const uniqueUsers = this.userConnections.size;
-
-    // Get room count
     const roomCount = this.roomManager?.getRoomCount() || 0;
     const maxRooms = this.realtimeConfig?.rooms.max_rooms || 100;
 
-    // Get memory usage if available
-    let memory:
-      | { heapUsed: number; heapTotal: number; external: number }
-      | undefined;
+    let memory: RealtimeHealthStatus['memory'];
     if (typeof process.memoryUsage === 'function') {
       const mem = process.memoryUsage();
       memory = {
@@ -1289,7 +1263,6 @@ export class RealtimeServer {
       };
     }
 
-    // Determine overall status
     const isListening = this.server !== null && this.initialized;
     const isHealthy =
       isListening &&
@@ -1334,6 +1307,9 @@ export class RealtimeServer {
       this.snapshotInterval = null;
     }
     this.snapshotManager?.stopCleanup();
+    // Cancel pending grace finalizers — shutdown does its own final snapshot
+    // pass below, so an armed timer would double-snapshot / fire post-teardown.
+    this.roomManager?.clearAllGraceTimers();
 
     // Create final snapshots for all rooms
     if (this.roomManager) {
@@ -1426,13 +1402,38 @@ export class RealtimeServer {
   }
 
   /**
+   * Look up the room-type handler's `snapshot(room)` and run it; true if taken,
+   * false if the handler has none. Shared by grace-finalize + API-trigger.
+   */
+  private async runHandlerSnapshot(room: YjsRoom): Promise<boolean> {
+    const handler = this.handlerRegistry.getHandler(room.roomType) as
+      | { snapshot?: (room: YjsRoom) => Promise<void> }
+      | undefined;
+    if (typeof handler?.snapshot !== 'function') {
+      return false;
+    }
+    await handler.snapshot(room);
+    return true;
+  }
+
+  /**
+   * Finalize a room at the end of its grace window (spec §6.3): persist in-flight
+   * Yjs state via the handler before RoomManager.finalizeRoom evicts it. No-op
+   * for a non-Yjs room. Errors propagate (the caller evicts regardless).
+   */
+  async finalizeRoomSnapshot(room: Room): Promise<void> {
+    if (room instanceof YjsRoom) {
+      await this.runHandlerSnapshot(room);
+    }
+  }
+
+  /**
    * Trigger a snapshot for a record (the in-process `POST /records/:id/snapshot`
-   * seam). Delegates the snapshot work (Yjs → Markdown + persist) to the
-   * `records` room-type handler, then reads the persisted version back. Returns
-   * `{ snapshotCreated, version, timestamp }`: a no-op `{ false, null, ts }` when
-   * there is no active in-memory room / snapshot-capable handler; otherwise
-   * reflects the latest persisted row for `records:<id>` (false when snapshots
-   * are disabled / produced no row). `ts` is ms epoch; handler errors rethrow.
+   * seam). Delegates to the `records` handler, then reads the persisted version
+   * back. Returns a no-op `{ false, null, ts }` when there is no active room /
+   * snapshot-capable handler; otherwise reflects the latest persisted row for
+   * `records:<id>` (false when snapshots are disabled / produced no row). `ts` is
+   * ms epoch; handler errors rethrow.
    */
   async triggerRecordSnapshot(recordId: string): Promise<{
     snapshotCreated: boolean;
@@ -1462,21 +1463,15 @@ export class RealtimeServer {
       return noop;
     }
 
-    const handler = this.handlerRegistry.getHandler(room.roomType) as
-      | { snapshot?: (room: YjsRoom) => Promise<void> }
-      | undefined;
-    const snapshotFn = handler?.snapshot;
-    if (typeof snapshotFn !== 'function') {
-      coreWarn('No snapshot-capable handler for room type', {
-        operation: 'realtime:snapshot:trigger:no-handler',
-        recordId,
-        roomType: room.roomType,
-      });
-      return noop;
-    }
-
     try {
-      await snapshotFn.call(handler, room);
+      if (!(await this.runHandlerSnapshot(room))) {
+        coreWarn('No snapshot-capable handler for room type', {
+          operation: 'realtime:snapshot:trigger:no-handler',
+          recordId,
+          roomType: room.roomType,
+        });
+        return noop;
+      }
       // Read the persisted version back; null row → snapshots disabled / no row.
       const row = await this.snapshotManager?.loadLatest(roomKey);
       coreInfo('Record snapshot triggered via API', {
@@ -1485,7 +1480,11 @@ export class RealtimeServer {
         roomId: room.getRoomId(),
         version: row?.version ?? null,
       });
-      return { snapshotCreated: row != null, version: row?.version ?? null, timestamp };
+      return {
+        snapshotCreated: row != null,
+        version: row?.version ?? null,
+        timestamp,
+      };
     } catch (error) {
       this.logError(
         error,

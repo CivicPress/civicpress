@@ -14,6 +14,10 @@ export interface RealtimeConfig {
   rooms: {
     max_rooms: number;
     cleanup_timeout: number; // seconds
+    // Grace window (ms) the last-client-disconnect keeps a room's Yjs state in
+    // memory before finalizing (snapshot + evict). A reconnect within this window
+    // reuses the in-memory room so edits survive an abrupt drop (spec §6.3).
+    grace_period_ms: number;
   };
   snapshots: {
     enabled: boolean;
@@ -31,6 +35,16 @@ export interface RealtimeConfig {
     check_interval: number; // seconds, default: 60
     stale_threshold: number; // seconds, default: 600 (10 minutes)
   };
+}
+
+/** Health + metrics snapshot returned by RealtimeServer.getHealthStatus(). */
+export interface RealtimeHealthStatus {
+  status: 'healthy' | 'unhealthy';
+  server: { listening: boolean; port: number | null; host: string | null };
+  connections: { total: number; perUser: number; perIP: number };
+  rooms: { total: number; maxRooms: number };
+  memory?: { heapUsed: number; heapTotal: number; external: number };
+  rateLimiting: { activeClients: number; messagesPerSecond: number };
 }
 
 export interface RoomConfig {

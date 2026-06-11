@@ -33,6 +33,29 @@ export default defineConfig({
     fileParallelism: 2,
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
+      // Realtime integration tests under tests/realtime/ import the realtime
+      // source directly (which pulls in ws + the Yjs stack) and the shared
+      // editor-schema. These packages are workspace deps of modules/realtime,
+      // not the repo root, so point them at the realtime module's resolved
+      // copies. Aliasing yjs/lib0/y-protocols to a SINGLE copy also guarantees
+      // one Yjs instance across the harness, server, and editor-schema (so
+      // cross-package `instanceof Y.*` checks hold).
+      '@civicpress/editor-schema': join(
+        __dirname,
+        'packages',
+        'editor-schema',
+        'dist/'
+      ),
+      ws: join(__dirname, 'modules', 'realtime', 'node_modules', 'ws'),
+      yjs: join(__dirname, 'modules', 'realtime', 'node_modules', 'yjs'),
+      'y-protocols': join(
+        __dirname,
+        'modules',
+        'realtime',
+        'node_modules',
+        'y-protocols'
+      ),
+      lib0: join(__dirname, 'modules', 'realtime', 'node_modules', 'lib0'),
       '~': join(__dirname, 'modules', 'ui', 'app'),
       '@': join(__dirname, 'modules', 'ui', 'app'),
     },

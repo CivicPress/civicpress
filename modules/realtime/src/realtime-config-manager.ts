@@ -34,6 +34,7 @@ export class RealtimeConfigManager {
       rooms: {
         max_rooms: 100,
         cleanup_timeout: 3600, // 1 hour
+        grace_period_ms: 5 * 60 * 1000, // 5 minutes (spec §6.3 default)
       },
       snapshots: {
         enabled: true,
@@ -134,6 +135,9 @@ export class RealtimeConfigManager {
         cleanup_timeout:
           loadedConfig.rooms?.cleanup_timeout ??
           this.defaultConfig.rooms.cleanup_timeout,
+        grace_period_ms:
+          loadedConfig.rooms?.grace_period_ms ??
+          this.defaultConfig.rooms.grace_period_ms,
       },
       snapshots: {
         enabled:

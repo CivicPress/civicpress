@@ -278,9 +278,15 @@ export async function setupYjsConnection(
   clientId: string,
   hydrate: () => Promise<void>
 ): Promise<() => void> {
-  // TODO(W3/W4): hydration guard dead — empty Y.Doc state is length 2, not 0.
+  // Hydrate when the room's doc is still empty. An empty Y.Doc's encoded state
+  // is the 2-byte header `[0, 0]` (NOT length 0), so the guard must treat
+  // length <= 2 as empty — otherwise a freshly-(re)created room never loads its
+  // snapshot baseline and a grace-elapsed cold-start (spec §6.3 t=24h) would
+  // open on an empty document. A room that already holds content (length > 2,
+  // e.g. a second client joining a live room) skips hydration.
+  const EMPTY_YDOC_STATE_BYTES = 2;
   const yjsState = room.getState().yjsState;
-  if (!yjsState || yjsState.length === 0) {
+  if (!yjsState || yjsState.length <= EMPTY_YDOC_STATE_BYTES) {
     await hydrate();
   }
   const yjsDoc = room.getYjsDoc();
