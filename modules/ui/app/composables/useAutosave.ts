@@ -7,10 +7,28 @@ interface AutosaveOptions {
   onSave: (data: any) => Promise<void>;
   onError?: (error: Error) => void;
   enabled?: boolean;
+  /**
+   * When true, the deep watcher does NOT fire the debounced save on data
+   * changes. Saving is still callable via the returned `save()` (explicit)
+   * and `saveOnBlur()` (editor blur).
+   *
+   * Rationale (spec §5.4): in collaborative editing the realtime server owns
+   * periodic Markdown writeback (RecordRoomHandler.snapshot), so per-keystroke
+   * client autosave would race PUTs across collaborators. In collab mode the
+   * client autosave shifts from the primary path to a defense-in-depth backstop
+   * triggered on blur and on explicit save.
+   */
+  collaborativeMode?: boolean;
 }
 
 export function useAutosave<T>(data: T, options: AutosaveOptions) {
-  const { debounceMs = 2000, onSave, onError, enabled = true } = options;
+  const {
+    debounceMs = 2000,
+    onSave,
+    onError,
+    enabled = true,
+    collaborativeMode = false,
+  } = options;
 
   const isSaving = ref(false);
   const lastSaved = ref<Date | null>(null);
@@ -56,6 +74,10 @@ export function useAutosave<T>(data: T, options: AutosaveOptions) {
 
   const start = () => {
     if (!enabled) return;
+    // In collaborative mode the realtime server owns periodic writeback, so
+    // the change-driven debounced save is intentionally disabled. Explicit
+    // save() and saveOnBlur() remain available as a backstop.
+    if (collaborativeMode) return;
     stopWatcher = watch(
       () => data,
       (newValue) => {
@@ -77,6 +99,13 @@ export function useAutosave<T>(data: T, options: AutosaveOptions) {
     await save(data);
   };
 
+  // Fires on editor blur. In collaborative mode this is the defense-in-depth
+  // backstop alongside explicit save(); in default mode it is an additional
+  // immediate flush on blur.
+  const saveOnBlur = async () => {
+    await save(data);
+  };
+
   // Cleanup on unmount (only if in component context)
   const instance = getCurrentInstance();
   if (instance) {
@@ -90,6 +119,7 @@ export function useAutosave<T>(data: T, options: AutosaveOptions) {
     lastSaved,
     error,
     save: saveNow,
+    saveOnBlur,
     start,
     stop,
   };
