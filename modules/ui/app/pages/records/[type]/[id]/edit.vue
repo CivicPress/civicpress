@@ -23,6 +23,13 @@ const saving = ref(false);
 const error = ref('');
 const hasSavedChanges = ref(false); // Track if changes have been saved (indicates draft editing)
 
+// Collaborative editing (Phase 3) — opt-in via the realtimeEnabled runtime
+// config flag. RecordForm + MarkdownEditor still apply the content-loss guard,
+// so a record that can't round-trip stays single-user even when enabled.
+const collaborativeMode = computed(
+  () => useRuntimeConfig().public.realtimeEnabled === true
+);
+
 // Toast notifications
 const toast = useToast();
 
@@ -268,6 +275,7 @@ const breadcrumbItems = computed(() => {
             :saving="saving"
             :error="error"
             :can-delete="canDeleteRecords"
+            :collaborative-mode="collaborativeMode"
             @delete="handleDelete"
             @saved="handleRecordSaved"
           />

@@ -193,6 +193,8 @@
     "enterTitle": "Enter record title",
     "enterDescription": "Enter description (optional)",
     "enterContent": "Enter content...",
+    "collaborativeUnavailableTitle": "Collaborative editing unavailable",
+    "collaborativeUnavailable": "This record contains formatting the collaborative editor can't preserve; editing in single-user mode.",
     "enterTags": "Enter tags (comma-separated)",
     "unpublishedChanges": "Unpublished changes",
     "sort": {

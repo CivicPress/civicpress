@@ -32,6 +32,21 @@ export default defineConfig({
     setupFiles: ['./tests/ui/setup.ts'],
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
+      // editor-schema is a dependency of modules/ui only (consumed by the
+      // collaborative editor path) and is not hoisted to the root
+      // node_modules, so the bare specifier is unresolvable from the root test
+      // context. Point it at the modules/ui resolution (a symlink to
+      // packages/editor-schema, whose package.json `main` is dist/index.js) so
+      // the test context and the SFC source context agree — same rationale as
+      // the y-websocket / yjs aliases below.
+      '@civicpress/editor-schema': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        '@civicpress',
+        'editor-schema'
+      ),
       '~': join(__dirname, 'modules', 'ui', 'app'),
       '@': join(__dirname, 'modules', 'ui', 'app'),
       '#imports': join(__dirname, 'tests', 'ui', 'nuxt-imports-shim.ts'),
@@ -50,6 +65,62 @@ export default defineConfig({
         'y-websocket'
       ),
       yjs: join(__dirname, 'modules', 'ui', 'node_modules', 'yjs'),
+      // TipTap (v3) powers the collaborative editor path and is a modules/ui
+      // dependency only, so the @tiptap/* specifiers are unresolvable from the
+      // root test context — same hoisting issue as y-websocket/yjs above.
+      // Object-form aliases match an exact specifier or one with a `<key>/`
+      // prefix, so `@tiptap/extension-collaboration` does NOT shadow
+      // `@tiptap/extension-collaboration-caret`. `@tiptap/pm` is aliased to its
+      // package dir so its `exports` subpaths (./keymap, ./commands, ./tables…)
+      // still resolve.
+      '@tiptap/core': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        '@tiptap',
+        'core'
+      ),
+      '@tiptap/pm': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        '@tiptap',
+        'pm'
+      ),
+      '@tiptap/vue-3': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        '@tiptap',
+        'vue-3'
+      ),
+      '@tiptap/extension-collaboration-caret': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        '@tiptap',
+        'extension-collaboration-caret'
+      ),
+      '@tiptap/extension-collaboration': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        '@tiptap',
+        'extension-collaboration'
+      ),
+      '@tiptap/y-tiptap': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        '@tiptap',
+        'y-tiptap'
+      ),
       // vue-i18n is a transitive dep of @nuxtjs/i18n (not a direct dep), so it
       // is unresolvable from the root test context. Aliasing it fixes the D3
       // hazard: tests that transitively import app/composables/useTypedI18n.ts

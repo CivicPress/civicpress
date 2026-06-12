@@ -242,4 +242,52 @@ describe('RecordForm', () => {
     expect(wrapper.find('[data-test="markdown-editor"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="record-sidebar"]').exists()).toBe(true);
   });
+
+  it('forwards collaborativeMode + recordId to MarkdownEditor when collab is enabled', async () => {
+    civicApiMock.mockImplementation(async (url: string) => {
+      if (url.includes('/transitions')) {
+        return { success: true, data: { transitions: [] } };
+      }
+      if (url.includes('?edit=true')) {
+        return {
+          success: true,
+          data: {
+            id: 'rec-collab',
+            title: 'Doc',
+            type: 'bylaw',
+            status: 'draft',
+            workflowState: 'draft',
+            markdownBody: '# Doc\n\nBody.',
+            metadata: { tags: [], description: '' },
+            isDraft: true,
+          },
+        };
+      }
+      return { success: true, data: {} };
+    });
+
+    const editorStub = {
+      name: 'MarkdownEditor',
+      props: ['collaborativeMode', 'recordId', 'modelValue', 'disabled'],
+      template: '<div data-test="markdown-editor" />',
+    };
+
+    const wrapper = mount(RecordForm, {
+      props: {
+        record: { id: 'rec-collab', title: 'Doc', type: 'bylaw', status: 'draft' } as any,
+        isEditing: true,
+        collaborativeMode: true,
+      },
+      global: {
+        ...mountOptions.global,
+        stubs: { ...mountOptions.global.stubs, MarkdownEditor: editorStub },
+      },
+    });
+    await flushPromises();
+
+    const editor = wrapper.findComponent(editorStub);
+    expect(editor.exists()).toBe(true);
+    expect(editor.props('collaborativeMode')).toBe(true);
+    expect(editor.props('recordId')).toBe('rec-collab');
+  });
 });
