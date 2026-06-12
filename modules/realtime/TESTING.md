@@ -1,183 +1,211 @@
-# Testing the Realtime Module
+# Realtime — Operator Testing Guide
+
+This guide is for operators verifying that a deployed CivicPress realtime
+server is reachable and protocol-compliant.
+
+The realtime server speaks **binary y-protocols** (Yjs CRDT over WebSocket).
+Any older docs that describe JSON `{ "type": "sync" }` / `ping` / `pong`
+messages are obsolete — that JSON control protocol was removed in Phase 3. The
+only application-level messages on the wire are the Yjs binary `SYNC` and
+`AWARENESS` (presence) frames.
+
+The realtime server runs **in-process with the API** (same Node process) but
+listens on its **own WebSocket port** (default `3001`, separate from the API's
+HTTP port `3000`). See `DEPLOYMENT.md` for the hosting model.
 
 ## Prerequisites
 
-1. **Build the module and dependencies**:
+1. Build the workspace (realtime depends on `@civicpress/core` and
+   `@civicpress/editor-schema`):
 
    ```bash
-   # From project root
+   # from the repo root
    pnpm install
-   pnpm --filter @civicpress/core run build
-   pnpm --filter @civicpress/realtime run build
+   pnpm -r build
    ```
 
-2. **Create realtime configuration**: The realtime module will use default
-   config if `.system-data/realtime.yml` doesn't exist. To customize, create
-   `.system-data/realtime.yml`:
+2. Start the API process — it boots the in-process realtime server when
+   `realtime.enabled` is true (the default):
 
-   ```yaml
-   realtime:
-     enabled: true
-     port: 3001
-     host: '0.0.0.0'
-     path: '/realtime'
-
-     rooms:
-       max_rooms: 100
-       cleanup_timeout: 3600
-
-     snapshots:
-       enabled: true
-       interval: 300
-       max_updates: 100
-       storage: 'database'
-
-     rate_limiting:
-       messages_per_second: 10
-       connections_per_ip: 100
-       connections_per_user: 10
+   ```bash
+   pnpm run dev:api
    ```
 
-3. **Ensure you have a test record**: Create a test record via the API or CLI to
-   test collaborative editing.
+   The API serves HTTP on `3000`; the realtime WebSocket server listens on
+   `3001`.
 
-## Starting the API Server
+3. Have an authentication token and an existing record id. Obtain a session
+   token through your normal auth flow, e.g.:
 
-The realtime module is automatically initialized when the API server starts (if
-the module is available).
+   ```bash
+   curl -X POST http://localhost:3000/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username": "admin", "password": "your-password"}'
+   ```
 
-```bash
-# From project root
-pnpm run dev:api
+   The realtime server validates the token via `AuthService.validateSession`
+   and requires `records:view` (and `records:edit` to edit) on the target
+   record.
 
-# Or from modules/api
-cd modules/api
-pnpm run dev
-```
+## Authentication
 
-The API server runs on port 3000, and the realtime WebSocket server runs on port
-3001 (configurable).
+The server's `extractToken` (`src/auth.ts`) accepts the token three ways, in
+priority order:
 
-## Testing WebSocket Connection
+1. `Authorization: Bearer <token>` header — Node.js clients.
+2. `Sec-WebSocket-Protocol: auth.<token>` subprotocol — browser clients (a
+   browser cannot set arbitrary headers on a WebSocket).
+3. `?token=<token>` query string — **deprecated**, kept for backward
+   compatibility only; avoid in production (tokens leak into logs/URLs).
 
-### 1. Get an Authentication Token
+## Smoke test: is the server up?
 
-First, authenticate via the API to get a session token:
-
-```bash
-# Login (adjust endpoint based on your auth setup)
-curl -X POST http://localhost:3000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "your-password"}'
-```
-
-Save the token from the response.
-
-### 2. Connect to WebSocket
-
-#### Using Node.js Test Script
-
-Use the provided test script (see below).
-
-#### Using Browser Console
-
-```javascript
-// In browser console (after logging in)
-const token = 'your-session-token';
-const recordId = 'your-record-id';
-
-const ws = new WebSocket(`ws://localhost:3001/realtime/records/${recordId}?token=${token}`);
-
-ws.onopen = () => {
-  console.log('Connected to realtime server');
-
-  // Send ping
-  ws.send(JSON.stringify({ type: 'ping' }));
-};
-
-ws.onmessage = (event) => {
-  const message = JSON.parse(event.data);
-  console.log('Received:', message);
-
-  if (message.type === 'control' && message.event === 'room_state') {
-    console.log('Room state:', message.room);
-  }
-};
-
-ws.onerror = (error) => {
-  console.error('WebSocket error:', error);
-};
-
-ws.onclose = () => {
-  console.log('Disconnected');
-};
-```
-
-#### Using wscat (CLI tool)
+`test-websocket.mjs` performs a real binary `SYNC` step-1/step-2 handshake. It
+connects with the `auth.<token>` subprotocol, sends `SYNC step 1`, processes the
+server's reply, then closes.
 
 ```bash
-# Install wscat globally
-npm install -g wscat
-
-# Connect
-wscat -c "ws://localhost:3001/realtime/records/your-record-id?token=your-token"
+WS_URL=ws://localhost:3001 \
+  TOKEN=<session-token> \
+  RECORD_ID=<existing-record-id> \
+  node modules/realtime/test-websocket.mjs
 ```
 
-## Test Script
+Expected output:
 
-A simple Node.js test script is provided in `test-websocket.mjs`.
+```
+[ok] connected to ws://localhost:3001/realtime/records/<id>
+[->] sent SYNC step 1
+[<-] received SYNC message; local doc state size: N bytes
+[ok] smoke test complete
+[ok] closed: code=1000 reason=none
+```
+
+If the connection is rejected, the server closes with a 4xxx code instead of
+opening — see "Close codes" below.
+
+## Multi-client convergence
+
+Open the same record in two terminals with two valid tokens:
 
 ```bash
-# Run the test script
-node modules/realtime/test-websocket.mjs
+# Terminal 1
+WS_URL=ws://localhost:3001 TOKEN=$JWT_A RECORD_ID=R1 \
+  node modules/realtime/test-websocket.mjs
+
+# Terminal 2
+WS_URL=ws://localhost:3001 TOKEN=$JWT_B RECORD_ID=R1 \
+  node modules/realtime/test-websocket.mjs
 ```
 
-## Expected Behavior
+Expected: both connections are accepted and both receive a `SYNC` message. The
+smoke client only does a single sync pass (it is a connectivity probe, not a
+soak test); for true convergence testing use the integration suites below or
+the browser editor.
 
-1. **Connection**: Should connect successfully and receive `room_state` message
-2. **Ping/Pong**: Send `ping`, receive `pong` response
-3. **Presence**: When another client connects, you should receive `presence`
-   messages
-4. **Sync**: Send yjs updates, they should be broadcast to other clients
+## Close codes
+
+These are the codes the server actually sends (verified against
+`modules/realtime/src/realtime-server.ts`). The 4xxx codes carry a JSON reason
+payload of the form `{"code":"<NAME>", ...context}`.
+
+| Code | Name                        | Meaning                                                                   |
+|-----:|-----------------------------|--------------------------------------------------------------------------|
+| 1000 | (normal)                    | Normal closure (the smoke client closes this way).                       |
+| 1008 | (policy violation)          | Per-client message rate limit exceeded (`rate_limiting.messages_per_second`). Reason: `Rate limit exceeded`. |
+| 4001 | `AUTH_FAILED`               | Token missing, expired, or invalid.                                      |
+| 4003 | `PERMISSION_DENIED`         | User lacks `records:view`/`records:edit`, **or** the record/draft does not exist (reason context `record_not_found`). |
+| 4004 | `ROOM_TYPE_NOT_REGISTERED`  | The URL room type has no registered handler (e.g. anything other than `records` on a server that only registered the records handler). |
+| 4029 | `CONNECTION_LIMIT_EXCEEDED` | Per-IP or per-user connection cap reached (`rate_limiting.connections_per_ip` / `connections_per_user`). |
+
+Notes:
+
+- There is **no** dedicated "room not found" code — a missing record surfaces
+  as `4003 PERMISSION_DENIED` with `record_not_found` in the reason context.
+- Malformed handshakes (no token, unparseable room URL) and unexpected server
+  exceptions during connection are closed **without** an explicit application
+  code (a bare `ws.close()` → standard `1006`/`1005`), after an error frame is
+  sent. They are not assigned a 4xxx code.
+- The codes `4013`, `4500`, and `4503` do **not** exist in the as-shipped
+  server, despite appearing in earlier draft docs. Do not rely on them.
+
+## Integration tests
+
+The realtime module ships vitest suites that exercise the binary protocol,
+connection limits, snapshot persistence, and the Markdown writeback against an
+in-memory/throwaway server and database. Run them from the repo root:
+
+```bash
+# realtime module unit + integration suites
+pnpm -C modules/realtime test:run
+```
+
+This covers, among others:
+
+- `connection-limits.test.ts` — per-IP / per-user limit enforcement (closes
+  realtime-001 + realtime-002); asserts the `4029` / `4001` close codes.
+- `snapshot-manager.test.ts` — snapshot round-trip, integrity-hash verification,
+  format-version gate, oversize-warning, and TTL cleanup.
+- `record-room-handler.test.ts` — the Markdown-writeback handler (serialize →
+  draft) and its per-room coalescing mutex.
+
+The repo-level realtime exit-criterion tests live in `tests/realtime/` and are
+run as part of the root test run (Vitest):
+
+```bash
+pnpm run test   # or: npx vitest run tests/realtime
+```
+
+- `tests/realtime/exit-criterion-offline-edit-reconnect.test.ts` — edit while
+  disconnected, reconnect, converge (no lost edits).
+- `tests/realtime/exit-criterion-collab-writes-markdown.test.ts` — a
+  collaborative edit is serialized and written back as a record **draft**
+  (validated against a real database).
+
+## Snapshot inspection
+
+> There is currently **no** CLI command for inspecting realtime snapshot rows
+> (no `civic realtime …` subcommand exists). Snapshots are an ephemeral
+> merge-aid, not an operator-managed artifact. To inspect them ad hoc, query the
+> database directly:
+>
+> ```sql
+> SELECT room_id, version, byte_size, format_version, integrity_hash, created_at
+> FROM realtime_snapshots
+> ORDER BY created_at DESC
+> LIMIT 20;
+> ```
+>
+> (Filesystem-storage mode writes the blob plus a `<...>.meta.json` sidecar
+> under the snapshot directory instead.) A dedicated inspect command may be
+> added in a future phase; it is not implemented today.
 
 ## Troubleshooting
 
-### Module Not Found Errors
+### Connection refused
 
-If you see "Cannot find module '@civicpress/realtime'", ensure:
+- Confirm the API process is running and that `realtime.enabled` is true.
+- The realtime server listens on its own port (default `3001`), not the API's
+  `3000`. Check `lsof -i :3001`.
+- A realtime startup failure (e.g. the port is already in use) is logged and
+  swallowed so it never crashes the API — check the API logs for
+  "Failed to start in-process realtime server".
 
-1. Module is built: `pnpm --filter @civicpress/realtime run build`
-2. Core is built: `pnpm --filter @civicpress/core run build`
-3. Dependencies installed: `pnpm install`
+### Closes immediately with 4001 / 4003
 
-### WebSocket Server Not Starting
+- `4001`: the token is missing/expired/invalid, or was not delivered the way the
+  server expects (use `auth.<token>` subprotocol or `Bearer` header).
+- `4003`: the authenticated user lacks permission on the record, **or** the
+  record id does not exist (no published record and no draft row).
 
-Check logs for:
+### Module not found
 
-- Configuration errors
-- Port conflicts (default: 3001)
-- Missing dependencies
+- Build the workspace: `pnpm -r build` (realtime needs `@civicpress/core` and
+  `@civicpress/editor-schema` built).
 
-### Authentication Failures
+## Reference
 
-- Ensure token is valid and not expired
-- Check that record exists and user has permissions
-- Verify token format (should be JWT or session token)
-
-### Connection Refused
-
-- Check that realtime server is enabled in config
-- Verify port is not in use: `lsof -i :3001`
-- Check firewall settings
-
-## Manual Testing Checklist
-
-- [ ] API server starts successfully
-- [ ] Realtime server initializes (check logs)
-- [ ] WebSocket connection succeeds
-- [ ] Room state received on connect
-- [ ] Ping/pong works
-- [ ] Presence messages work (join/leave)
-- [ ] yjs updates sync between clients
-- [ ] Snapshots are created (check database/filesystem)
-- [ ] Disconnect cleanup works
+- [Deployment Guide](./DEPLOYMENT.md)
+- [Architecture Spec](../../docs/specs/realtime-architecture.md)
+- Close codes in source: `modules/realtime/src/realtime-server.ts`
+- Auth/token extraction: `modules/realtime/src/auth.ts`

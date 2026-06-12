@@ -1,128 +1,120 @@
 #!/usr/bin/env node
 /**
- * Simple WebSocket Test Script for Realtime Module
+ * Operator smoke test for the CivicPress realtime server.
+ *
+ * The realtime server speaks BINARY y-protocols (Yjs CRDT over WebSocket), NOT
+ * JSON. This script performs a real SYNC step-1 / step-2 handshake against a
+ * record room so an operator can answer:
+ *   - "Is the realtime server actually up and listening on its port?"
+ *   - "Are we routing through the right reverse-proxy vhost / WS upgrade path?"
+ *   - "Does auth + the binary protocol round-trip end to end?"
+ *
+ * It is a connectivity probe, not a load test. It connects, exchanges one sync
+ * pass, and disconnects.
  *
  * Usage:
- *   node test-websocket.mjs [recordId] [token]
+ *   WS_URL=wss://your.host \
+ *     TOKEN=<session-token> \
+ *     RECORD_ID=<existing-record-id> \
+ *     node modules/realtime/test-websocket.mjs
  *
- * Or set environment variables:
- *   RECORD_ID=your-record-id TOKEN=your-token node test-websocket.mjs
+ * Defaults: WS_URL=ws://localhost:3001, RECORD_ID=smoke-test.
+ * TOKEN is required (the server rejects unauthenticated connections).
+ *
+ * Auth: the token is sent as the `auth.<token>` WebSocket subprotocol, which is
+ * what the server's extractToken() reads (modules/realtime/src/auth.ts). A
+ * Node.js client could instead use an `Authorization: Bearer <token>` header;
+ * the subprotocol form is used here so the script also documents the
+ * browser-compatible path.
+ *
+ * Imports (yjs / y-protocols / lib0 / ws) are all @civicpress/realtime runtime
+ * dependencies, so this script resolves when run from the module workspace.
  */
+import { WebSocket } from 'ws';
+import * as Y from 'yjs';
+import * as syncProtocol from 'y-protocols/sync.js';
+import * as encoding from 'lib0/encoding.js';
+import * as decoding from 'lib0/decoding.js';
 
-import WebSocket from 'ws';
+// Yjs message-type tags on the wire — these MUST match the server's
+// YJS_MSG_SYNC / YJS_MSG_AWARENESS (modules/realtime/src/yjs-sync.ts).
+const MESSAGE_SYNC = 0;
+const MESSAGE_AWARENESS = 1;
 
-const RECORD_ID = process.env.RECORD_ID || process.argv[2] || 'test-record-123';
-const TOKEN = process.env.TOKEN || process.argv[3] || 'test-token';
-const USE_HEADER = process.env.USE_HEADER === 'true';
+const WS_URL = process.env.WS_URL ?? 'ws://localhost:3001';
+const TOKEN = process.env.TOKEN;
+const RECORD_ID = process.env.RECORD_ID ?? 'smoke-test';
 
-// Use secure header authentication (recommended for Node.js clients)
-// For browser clients, use subprotocol: new WebSocket(url, ['auth.' + token])
-const WS_URL = `ws://localhost:3001/realtime/records/${RECORD_ID}`;
+if (!TOKEN) {
+  console.error(
+    'TOKEN env var required (the realtime server rejects unauthenticated connections)'
+  );
+  process.exit(1);
+}
 
-console.log('🔌 Connecting to realtime server...');
-console.log(`   URL: ${WS_URL}`);
-console.log(`   Record ID: ${RECORD_ID}`);
-console.log(`   Auth method: ${USE_HEADER ? 'Authorization header (secure)' : 'Subprotocol (secure)'}`);
-console.log('');
+const yDoc = new Y.Doc();
+const url = `${WS_URL}/realtime/records/${RECORD_ID}`;
+// Token is carried in the `auth.<token>` subprotocol — see extractToken().
+const ws = new WebSocket(url, [`auth.${TOKEN}`]);
 
-// Use Authorization header for Node.js clients (most secure)
-const ws = USE_HEADER
-  ? new WebSocket(WS_URL, {
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-      },
-    })
-  : new WebSocket(WS_URL, [`auth.${TOKEN}`]); // Subprotocol method (browser-compatible)
+ws.binaryType = 'arraybuffer';
 
 ws.on('open', () => {
-  console.log('✅ Connected to realtime server');
-  console.log('');
-
-  // Send ping after 1 second
-  setTimeout(() => {
-    console.log('📤 Sending ping...');
-    ws.send(JSON.stringify({ type: 'ping' }));
-  }, 1000);
-
-  // Send a test sync message after 2 seconds
-  setTimeout(() => {
-    console.log('📤 Sending test sync message...');
-    // Note: This is a placeholder - actual yjs updates need proper encoding
-    ws.send(
-      JSON.stringify({
-        type: 'sync',
-        update: Buffer.from('test').toString('base64'),
-      })
-    );
-  }, 2000);
+  console.log(`[ok] connected to ${url}`);
+  // Send SYNC step 1 — advertise our (empty) state vector so the server replies
+  // with everything it has for this room.
+  const enc = encoding.createEncoder();
+  encoding.writeVarUint(enc, MESSAGE_SYNC);
+  syncProtocol.writeSyncStep1(enc, yDoc);
+  ws.send(encoding.toUint8Array(enc));
+  console.log('[->] sent SYNC step 1');
 });
 
 ws.on('message', (data) => {
-  try {
-    const message = JSON.parse(data.toString());
-    console.log('📥 Received message:', JSON.stringify(message, null, 2));
-    console.log('');
-
-    if (message.type === 'control' && message.event === 'room_state') {
-      console.log('🏠 Room State:');
-      console.log(`   Room ID: ${message.room?.id}`);
-      console.log(`   Version: ${message.room?.version}`);
-      console.log(`   Participants: ${message.room?.participants?.length || 0}`);
-      if (message.room?.participants?.length > 0) {
-        message.room.participants.forEach((p, i) => {
-          console.log(`     ${i + 1}. ${p.name} (${p.id})`);
-        });
-      }
-      console.log('');
+  const buf = new Uint8Array(data);
+  const dec = decoding.createDecoder(buf);
+  const messageType = decoding.readVarUint(dec);
+  if (messageType === MESSAGE_SYNC) {
+    // Let y-protocols process the sync reply; it may produce a follow-up
+    // message (e.g. our SYNC step 2) which we send back.
+    const enc = encoding.createEncoder();
+    encoding.writeVarUint(enc, MESSAGE_SYNC);
+    syncProtocol.readSyncMessage(dec, enc, yDoc, ws);
+    if (encoding.length(enc) > 1) {
+      ws.send(encoding.toUint8Array(enc));
     }
-
-    if (message.type === 'pong') {
-      console.log('🏓 Received pong response');
-      console.log('');
-    }
-
-    if (message.type === 'presence') {
-      console.log(`👤 Presence: ${message.event} - ${message.user?.name}`);
-      console.log('');
-    }
-  } catch (error) {
-    console.error('❌ Failed to parse message:', error);
-    console.log('Raw data:', data.toString());
+    console.log(
+      '[<-] received SYNC message; local doc state size:',
+      Y.encodeStateAsUpdate(yDoc).byteLength,
+      'bytes'
+    );
+  } else if (messageType === MESSAGE_AWARENESS) {
+    console.log('[<-] received AWARENESS (presence) message (skipped)');
+  } else {
+    console.log('[<-] received unknown message type:', messageType);
   }
 });
 
-ws.on('error', (error) => {
-  console.error('❌ WebSocket error:', error.message);
-  if (error.message.includes('ECONNREFUSED')) {
-    console.error('');
-    console.error('💡 Make sure:');
-    console.error('   1. API server is running (pnpm run dev:api)');
-    console.error('   2. Realtime module is enabled in config');
-    console.error('   3. Realtime server is running on port 3001');
+ws.on('close', (code, reason) => {
+  const reasonText = reason && reason.length ? reason.toString() : 'none';
+  console.log(`[ok] closed: code=${code} reason=${reasonText}`);
+  // 1000 = normal closure. Any 4xxx code is a server rejection — see the
+  // "Close codes" table in modules/realtime/TESTING.md.
+  process.exit(code === 1000 ? 0 : 1);
+});
+
+ws.on('error', (err) => {
+  console.error('[fail] WebSocket error:', err.message);
+  if (err.message.includes('ECONNREFUSED')) {
+    console.error(
+      '       Is the realtime server running and listening on its port?'
+    );
   }
   process.exit(1);
 });
 
-ws.on('close', (code, reason) => {
-  console.log('');
-  console.log(`🔌 Connection closed (code: ${code}, reason: ${reason || 'none'})`);
-  process.exit(0);
-});
-
-// Keep process alive
-process.on('SIGINT', () => {
-  console.log('');
-  console.log('👋 Closing connection...');
-  ws.close();
-  process.exit(0);
-});
-
-// Timeout after 10 seconds if no connection
+// Give the handshake a few seconds, then close cleanly.
 setTimeout(() => {
-  if (ws.readyState !== WebSocket.OPEN) {
-    console.error('❌ Connection timeout');
-    console.error('💡 Check that the realtime server is running');
-    process.exit(1);
-  }
-}, 10000);
-
+  console.log('[ok] smoke test complete');
+  ws.close(1000);
+}, 3000);
