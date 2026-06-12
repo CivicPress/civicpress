@@ -31,6 +31,15 @@ export default defineNuxtConfig({
       // App configuration
       appName: 'CivicPress',
       appVersion: '0.1.3',
+      // Realtime collaborative editing (Phase 3). The WebSocket origin of the
+      // in-process realtime server (it listens on its own port, default 3001).
+      // useRealtimeEditor appends `/realtime/records/<recordId>`.
+      realtimeWsUrl:
+        process.env.NUXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3001',
+      // Feature flag — gates the collaborative editor path on the record edit
+      // page. Off by default so editing does not require a running realtime
+      // server; set NUXT_PUBLIC_REALTIME_ENABLED=true to opt in.
+      realtimeEnabled: process.env.NUXT_PUBLIC_REALTIME_ENABLED === 'true',
     },
   },
 

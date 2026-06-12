@@ -62,12 +62,29 @@ import {
 } from './middleware/logging.js';
 import { authMiddleware, optionalAuth } from './middleware/auth.js';
 import { csrfMiddleware } from './middleware/csrf.js';
+import {
+  startInProcessRealtime,
+  type RealtimeServerLike,
+} from './realtime-bootstrap.js';
+import type { RealtimeServer } from '@civicpress/realtime';
 
 export class CivicPressAPI {
   private app: express.Application;
   private civicPress: CivicPress | null = null;
   private port: number;
   private dataDir: string = '';
+  // In-process realtime server (hosted in the SAME process as the API, but
+  // listening on its own WS port). Null until start() wires it; null forever if
+  // realtime is disabled or fails to start. The records router reaches it via
+  // the narrow RealtimeServerLike contract for the snapshot endpoint.
+  private realtimeServer: RealtimeServer | null = null;
+  // True once the realtime WS server actually started listening. Used by the
+  // snapshot provider so a constructed-but-not-listening server (e.g. port in
+  // use) is treated as "not available" → graceful no-op snapshot.
+  private realtimeStarted: boolean = false;
+  // Test seam: lets tests inject a RealtimeServerLike stub WITHOUT starting the
+  // real WS server (start() is not called in the API test harness).
+  private realtimeServerOverride: RealtimeServerLike | null = null;
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -270,11 +287,14 @@ export class CivicPressAPI {
     );
 
     // Public routes that should be accessible to guests
-    // Records router handles auth internally, but CSRF applies to browser requests
+    // Records router handles auth internally, but CSRF applies to browser requests.
+    // The realtime server is passed as a LAZY provider: routes are wired here (in
+    // initialize()) but realtime starts later (in start()), so the snapshot route
+    // resolves it per-request via resolveRealtimeServer().
     this.app.use(
       apiPath('records'),
       csrfMiddleware(this.civicPress),
-      createRecordsRouter(recordsService)
+      createRecordsRouter(recordsService, () => this.resolveRealtimeServer())
     );
     this.app.use(
       apiPath('geography'),
@@ -444,7 +464,9 @@ export class CivicPressAPI {
   }
 
   async start(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    // 1. Start the API HTTP listener (the only thing whose failure should reject
+    //    start() — a missing API port is fatal).
+    await new Promise<void>((resolve, reject) => {
       const server = this.app.listen(this.port, () => {
         logger.info(`CivicPress API server running on port ${this.port}`);
         resolve();
@@ -455,9 +477,84 @@ export class CivicPressAPI {
         reject(error);
       });
     });
+
+    // 2. Start the in-process realtime server (own WS port) AFTER core init +
+    //    HTTP listener. It is config-gated (RealtimeConfig.enabled, plus the
+    //    REALTIME_ENABLED env opt-out) and crash-safe: a realtime startup
+    //    failure (e.g. port in use) is logged and swallowed so it never takes
+    //    down the API. If it doesn't start, the snapshot endpoint degrades
+    //    gracefully (no in-memory room → snapshotCreated false).
+    await this.startRealtime();
+  }
+
+  /**
+   * Construct + start the in-process realtime server from the core services.
+   * Idempotent-ish: only starts when core is initialized and no server is set.
+   * Never throws — failures are logged and leave realtime unavailable.
+   */
+  private async startRealtime(): Promise<void> {
+    if (!this.civicPress) {
+      logger.warn('Cannot start realtime: CivicPress core not initialized');
+      return;
+    }
+    if (this.realtimeServer) {
+      return;
+    }
+
+    // Env opt-out: REALTIME_ENABLED=false hard-disables (skips construction).
+    // Anything else leaves the decision to RealtimeConfig.enabled (default ON).
+    const enabled = process.env.REALTIME_ENABLED !== 'false';
+
+    const { server, started } = await startInProcessRealtime(
+      this.civicPress,
+      logger,
+      enabled
+    );
+    this.realtimeServer = server;
+    this.realtimeStarted = started;
+  }
+
+  /**
+   * Resolve the realtime server for the records router's snapshot route.
+   *
+   * Returns (in priority order): the test override, else the real in-process
+   * server IF it actually started listening, else null. A constructed-but-not-
+   * listening server (e.g. failed on a port clash) resolves to null so the
+   * endpoint reports a graceful no-op instead of touching a dead server.
+   */
+  private resolveRealtimeServer(): RealtimeServerLike | null {
+    if (this.realtimeServerOverride) {
+      return this.realtimeServerOverride;
+    }
+    if (this.realtimeServer && this.realtimeStarted) {
+      return this.realtimeServer;
+    }
+    return null;
+  }
+
+  /**
+   * Inject a RealtimeServerLike stub for tests (the API test harness calls
+   * initialize() but not start(), so the real WS server never runs). Passing
+   * null clears the override.
+   */
+  setRealtimeServerForTesting(server: RealtimeServerLike | null): void {
+    this.realtimeServerOverride = server;
   }
 
   async shutdown(): Promise<void> {
+    // Stop realtime first (close WS connections, flush final snapshots) so it
+    // can persist using core services before core's database closes. A realtime
+    // shutdown error must not block core shutdown.
+    if (this.realtimeServer) {
+      try {
+        await this.realtimeServer.shutdown();
+      } catch (error) {
+        logger.warn('Error shutting down realtime server:', error);
+      }
+      this.realtimeServer = null;
+      this.realtimeStarted = false;
+    }
+
     if (this.civicPress) {
       await this.civicPress.shutdown();
     }

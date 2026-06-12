@@ -193,6 +193,8 @@
     "enterTitle": "Entrez le titre du document",
     "enterDescription": "Entrez la description (optionnel)",
     "enterContent": "Entrez le contenu...",
+    "collaborativeUnavailableTitle": "Édition collaborative indisponible",
+    "collaborativeUnavailable": "Cet enregistrement contient une mise en forme que l'éditeur collaboratif ne peut pas préserver ; édition en mode mono-utilisateur.",
     "enterTags": "Entrez les mots-clés (séparés par des virgules)",
     "unpublishedChanges": "Modifications non publiées",
     "sortBy": {

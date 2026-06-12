@@ -24,6 +24,13 @@ interface Props {
   canDelete?: boolean;
   recordType?: string | null;
   hideBasicFields?: boolean;
+  /**
+   * Opt-in to the TipTap+Yjs collaborative editor for the record body. The
+   * editor only switches to collaborative mode when this is true, a recordId
+   * is present, AND the content round-trips losslessly through the editor
+   * schema (the content-loss guard lives in MarkdownEditor). Default off.
+   */
+  collaborativeMode?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,6 +41,7 @@ const props = withDefaults(defineProps<Props>(), {
   canDelete: false,
   recordType: null,
   hideBasicFields: false,
+  collaborativeMode: false,
 });
 
 // Emits
@@ -345,6 +353,11 @@ onMounted(async () => {
 const autosave = useAutosave(form, {
   debounceMs: 2000,
   enabled: props.isEditing,
+  // In collaborative mode the realtime server owns periodic Markdown writeback,
+  // so per-change client autosave is disabled (it would race PUTs across
+  // collaborators). The client save shifts to a defense-in-depth backstop
+  // fired on editor blur (handleEditorBlur) and on explicit save. (spec §5.4)
+  collaborativeMode: props.collaborativeMode,
   onSave: async (data) => {
     if (!props.isEditing || !form.id) return;
 
@@ -393,6 +406,16 @@ const autosave = useAutosave(form, {
 
 const startAutosave = () => {
   autosave.start();
+};
+
+// Editor blur → immediate save flush. In collaborative mode this is the
+// primary client-side backstop (the change-driven autosave watcher is off);
+// in single-user mode it is an extra flush alongside the debounced watcher.
+// Only meaningful for an existing editable draft (matches autosave gating).
+const handleEditorBlur = () => {
+  if (props.isEditing && form.id && isDraft.value) {
+    autosave.saveOnBlur();
+  }
 };
 
 // Watch isDraft and automatically start/stop autosave when draft status changes
@@ -650,8 +673,11 @@ defineExpose({
               ref="editorRef"
               v-model="form.markdownBody"
               :disabled="saving || isLocked"
+              :collaborative-mode="collaborativeMode"
+              :record-id="form.id"
               placeholder="Start writing your record content..."
               class="h-full"
+              @blur="handleEditorBlur"
             />
           </div>
         </div>

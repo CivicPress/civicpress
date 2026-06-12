@@ -11,6 +11,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@civicpress/editor-schema": "workspace:*",
     "@codemirror/autocomplete": "6.20.0",
     "@codemirror/commands": "6.10.0",
     "@codemirror/lang-markdown": "6.5.0",
@@ -24,7 +25,15 @@
     "@nuxt/ui": "^4.8.0",
     "@nuxtjs/i18n": "10.2.1",
     "@pinia/nuxt": "^0.11.3",
+    "@tiptap/core": "3.24.0",
+    "@tiptap/extension-collaboration": "3.24.0",
+    "@tiptap/extension-collaboration-caret": "3.24.0",
+    "@tiptap/pm": "3.24.0",
+    "@tiptap/vue-3": "3.24.0",
+    "@tiptap/y-tiptap": "^3.0.4",
     "@types/leaflet": "1.9.20",
+    "@types/markdown-it": "^14.0.0",
+    "markdown-it": "^14.0.0",
     "@unhead/vue": "^2.1.15",
     "@vueuse/core": "13.5.0",
     "codemirror": "6.0.2",
@@ -37,7 +46,9 @@
     "pinia-plugin-persistedstate": "^4.7.1",
     "typescript": "^5.9.3",
     "vue": "^3.5.34",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.10"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.108",

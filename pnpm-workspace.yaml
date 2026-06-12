@@ -7,7 +7,9 @@ packages:
   - cli
   - core
   - modules/api
+  - modules/realtime
   - modules/ui
   - modules/schema-extensions/legal
   - modules/storage
+  - packages/*
   # - modules/serve (Astro frontend removed)

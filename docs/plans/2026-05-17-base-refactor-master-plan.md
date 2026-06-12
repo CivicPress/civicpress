@@ -85,7 +85,7 @@ This makes it trivially `grep`-able. A small shell script can verify "every clos
 | 2b | **Truth restoration:** Stop the structural dishonesty | api-004, notifications-001, cli-001, ui-005, broadcast-box-004, legal-register-001, notifications-007, site-001, site-002, BB-HW-008, plus roadmap/manifesto/project-status/site sync | 1-2 weeks | pending |
 | 2c | **Foundation cleanup:** Delete-or-wire all orphaned subsystems | core-005/006, storage-001/003 (fix-side), broadcast-box-003/013, notifications-008/009/013/015, api-008, realtime-007/008, storage-009, plus the docs that claim these work | 1-2 weeks | pending |
 | 2d | **Structural hardening:** God-files, type-safety, module contracts | core-008, api-009/013, ui-008/011, realtime-004 (partial — without broadcast-box code), legal-register-002/005, deps-009/010, ingest-005, site-006, plus the plugin contract layer | 2-3 weeks | pending |
-| 3 | **Reintroduce realtime** with its findings fixed | realtime-001/002/003/005, plus boundary work to make `@civicpress/realtime` Yjs-only | 1-2 weeks | pending |
+| 3 | **Reintroduce realtime** with its findings fixed | realtime-001/002/003/005, plus boundary work to make `@civicpress/realtime` Yjs-only | 1-2 weeks | DONE (pending --no-ff merge to dev) — all 14 realtime-* findings closed; realtime-server.ts 3,581→1,495 LoC; report at `docs/audits/phase-3-closure-report.md` |
 | 4 | **Audit + fix broadcast-box hardware** | All BB-HW-* findings; canonical protocol artifact; license; civic-artifact pipeline via the AI port | 2-3 weeks | pending |
 | 5 | **Reintroduce broadcast-box to CivicPress** through the clean module contract | broadcast-box-* findings; ingest pattern as model for civic-artifact derivation | 2-4 weeks | pending |
 
