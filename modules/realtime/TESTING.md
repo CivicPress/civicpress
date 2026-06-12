@@ -3,11 +3,12 @@
 This guide is for operators verifying that a deployed CivicPress realtime
 server is reachable and protocol-compliant.
 
-The realtime server speaks **binary y-protocols** (Yjs CRDT over WebSocket).
-Any older docs that describe JSON `{ "type": "sync" }` / `ping` / `pong`
-messages are obsolete — that JSON control protocol was removed in Phase 3. The
-only application-level messages on the wire are the Yjs binary `SYNC` and
-`AWARENESS` (presence) frames.
+Document edits and presence travel as **binary y-protocols** (Yjs CRDT over
+WebSocket): the binary `SYNC` and `AWARENESS` frames. The old JSON **document**
+protocol (a JSON `{ "type": "sync" }` update / `room_state`) was removed in
+Phase 3 — do not expect it. A few JSON **control/lifecycle** frames remain:
+`control`/`connection.ack` on connect, `control`/`error` on a rejected message,
+and an optional client-initiated `ping` → `pong` keep-alive.
 
 The realtime server runs **in-process with the API** (same Node process) but
 listens on its **own WebSocket port** (default `3001`, separate from the API's

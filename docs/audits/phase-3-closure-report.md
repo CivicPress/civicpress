@@ -172,9 +172,11 @@ to the record draft on periodic / on-trigger / on-grace snapshots), **realtime-0
   direct DB query and marks an inspect command "not implemented today".
 - The design spec's **`recordManager.saveDraft` → Git commit** writeback was
   fictional; corrected to the as-shipped DB-draft model (see Summary).
-- The architecture spec's **JSON message protocol** and **HTTP collab-snapshot
-  endpoints** were never shipped; replaced with the binary-protocol +
-  in-process reality.
+- The architecture spec's **JSON *document* protocol** (JSON `sync` updates /
+  `room_state`) and its **HTTP collab-snapshot endpoints** were never shipped;
+  replaced with the binary SYNC/AWARENESS reality + the in-process model.
+  (Control/lifecycle frames — `connection.ack`, `error`, and an optional
+  `ping`/`pong` — are still JSON; the spec documents them accurately.)
 
 ---
 

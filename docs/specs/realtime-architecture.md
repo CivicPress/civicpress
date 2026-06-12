@@ -29,11 +29,14 @@ deprecated: false sunset_date: null breaking_changes: [] additions:
 >
 > **As shipped:**
 >
-> - **Protocol is binary y-protocols** (Yjs CRDT over WebSocket). Application
->   data on the wire is the binary `SYNC` and `AWARENESS` (presence) frames. The
->   only JSON frame the server sends is a `control`/`error` notification on a
->   rejected/failed message. There is no JSON `sync`, `room_state`, `pong`, or
->   heartbeat message.
+> - **Document data is binary y-protocols** (Yjs CRDT over WebSocket): the binary
+>   `SYNC` (edits) and `AWARENESS` (presence) frames. Binary frames are routed
+>   first; anything that is not a recognized binary frame is parsed as JSON.
+>   **Control/lifecycle frames are still JSON**: the server sends
+>   `control`/`connection.ack` on connect, `control`/`error` on a rejected/failed
+>   message, and a `pong` in reply to a JSON `ping`. What was **removed** is the
+>   old JSON *document* protocol — there is no JSON `sync` update or JSON
+>   `room_state` message; edits and presence are binary only.
 > - **Hosting is in-process with the API.** The same Node process that serves the
 >   REST API hosts the realtime WebSocket server on its **own port** (default
 >   `3001`), gated by `realtime.enabled`. There is no standalone realtime service
@@ -307,12 +310,14 @@ interface BaseMessage {
 
 ### WebSocket Message Types (as shipped)
 
-> The JSON message examples that previously appeared in this section
-> (`{"type":"sync"}`, `room_state`, `ping`/`pong`, JSON presence) described an
-> earlier design and were **removed in Phase 3**. The shipped protocol is binary
-> y-protocols. This section now documents what is actually on the wire.
+> The JSON **document** protocol that previously appeared here (a JSON
+> `{"type":"sync"}` update and a JSON `room_state`) was **removed in Phase 3** —
+> edits and presence are now binary y-protocols. A small set of JSON
+> **control/lifecycle** frames remains. This section documents what is actually
+> on the wire.
 
-Two binary message families, tagged by a leading var-uint:
+**Document + presence (binary).** Two y-protocols families, tagged by a leading
+var-uint; binary frames are routed first on receipt:
 
 1. **`SYNC` (tag `0`)** — the standard y-protocols sync. Client and server
    exchange state vectors and updates (SYNC step 1 / step 2 / update) to
@@ -321,29 +326,38 @@ Two binary message families, tagged by a leading var-uint:
    encoding (cursors, selections, join/leave). Carried as a binary
    `lib0`-encoded payload, not JSON.
 
-The **only** JSON frame is a server-sent control/error notification when a
-message is rejected or a connection-level error occurs:
+**Control/lifecycle (JSON).** Anything that is not a recognized binary frame is
+parsed as JSON. The shipped JSON frames are:
 
-```json
-{
-  "type": "control",
-  "event": "error",
-  "error": {
-    "code": "PERMISSION_DENIED",
-    "message": "You don't have permission to edit this record"
-  }
-}
-```
+- **`connection.ack`** — server → client on a successful connect:
 
-(`code` is the structured code of the underlying error — e.g. `AUTH_FAILED`,
-`PERMISSION_DENIED`, `CONNECTION_LIMIT_EXCEEDED` — or `UNKNOWN_ERROR`.) See
-`modules/realtime/src/yjs-sync.ts` for the binary framing and
-`modules/realtime/src/realtime-server.ts` (`sendError`) for the JSON error frame.
+  ```json
+  { "type": "control", "event": "connection.ack", "roomId": "records:abc123", "clientId": "client_..." }
+  ```
+
+- **`error`** — server → client when a message is rejected or a connection-level
+  error occurs:
+
+  ```json
+  { "type": "control", "event": "error", "error": { "code": "PERMISSION_DENIED", "message": "..." } }
+  ```
+
+  (`code` is the structured code of the underlying error — e.g. `AUTH_FAILED`,
+  `PERMISSION_DENIED`, `CONNECTION_LIMIT_EXCEEDED` — or `UNKNOWN_ERROR`.)
+
+- **`ping` / `pong`** — a client may send `{ "type": "ping" }`; the server
+  replies `{ "type": "pong", "timestamp": <ms> }` (exempt from rate limiting).
+  This is an optional keep-alive, not a required heartbeat.
+
+See `modules/realtime/src/yjs-sync.ts` for the binary framing and
+`modules/realtime/src/realtime-server.ts` (the `ws.on('message')` router,
+`sendError`, `sendPong`) for the JSON frames.
 
 ### Connection Lifecycle (as shipped)
 
 1. **Client connects** with a token (subprotocol `auth.<token>` or `Bearer`
-   header). The server authenticates and authorizes against the record.
+   header). The server authenticates and authorizes against the record, then
+   sends a JSON `control`/`connection.ack` frame.
 2. **Yjs sync** — client and server exchange binary `SYNC` messages; the server
    seeds the room from a snapshot (if a valid one exists) or from the record's
    Markdown, then both sides converge.
@@ -354,9 +368,9 @@ message is rejected or a connection-level error occurs:
    in-memory state. When the grace elapses with no clients, the room is
    finalized (snapshot persisted + Markdown draft written) and evicted.
 
-> There is no application-level `ping`/`pong` heartbeat message; liveness relies
-> on the WebSocket transport plus the idle-connection cleanup sweep
-> (`connection_cleanup`).
+> An optional JSON `ping` → `pong` keep-alive exists (client-initiated), but
+> there is no *required* heartbeat; liveness also relies on the WebSocket
+> transport plus the idle-connection cleanup sweep (`connection_cleanup`).
 
 ### WebSocket Error Handling (as shipped)
 
