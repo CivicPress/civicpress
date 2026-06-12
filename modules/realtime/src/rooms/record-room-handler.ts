@@ -172,6 +172,13 @@ export class RecordRoomHandler implements RoomTypeHandler {
     return run;
   }
 
+  // TODO(phase-3-followup): the master plan's exit criterion #2 envisioned collab
+  // edits landing as auditable Git civic events (a `realtime-snapshot`-authored
+  // commit). Per the W5-T11 user decision ("draft now, revisit Git later") the
+  // writeback currently stops at the DB draft; a human publish is what turns the
+  // draft into a Git commit. Promoting the snapshot writeback itself into an
+  // auditable Git event is a deferred follow-up (documented in W6).
+
   /** The actual snapshot body (one invocation per coalesced batch). */
   private async runSnapshot(room: YjsRoom): Promise<void> {
     const roomId = room.getRoomId();

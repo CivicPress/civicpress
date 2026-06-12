@@ -19,6 +19,8 @@ import type { Room } from './room-manager.js';
 import * as Y from 'yjs';
 import {
   yXmlFragmentToMarkdown,
+  parseMarkdownToDoc,
+  prosemirrorJSONToYDoc,
   editorSchema,
 } from '@civicpress/editor-schema';
 import { InvalidYjsUpdateError } from '../errors/realtime-errors.js';
@@ -92,15 +94,19 @@ export class YjsRoom implements Room {
         // Load record from API/Manager
         const record = await this.recordManager.getRecord(actualRecordId);
         if (record && record.content) {
-          // The record has content, but server-side Markdown → Yjs seeding of
-          // the `default` XmlFragment (via prosemirrorJSONToYDoc) lands in W5.
-          // Until then there is no deprecated `initialMarkdown` shadow to write
-          // — the document is hydrated from snapshot (initializeRoom) or by the
-          // first connecting client.
-          coreInfo('YjsRoom initialized with record content', {
+          // Markdown-FALLBACK seeding (spec §6.3 t=0). No snapshot existed, so
+          // hydrate the `default` XmlFragment from the record's current Markdown
+          // via @civicpress/editor-schema. This lets the first client start from
+          // the record's content (so a later snapshot/writeback preserves the
+          // heading + body, not just the appended text). Snapshot-FIRST hydration
+          // happens earlier in RealtimeServer.initializeRoom; this branch only
+          // runs when there is no snapshot to apply.
+          this.seedFromMarkdown(record.content);
+          coreInfo('YjsRoom seeded from record Markdown', {
             operation: 'realtime:yjs-room:initialized',
             roomId: this.roomId,
             recordId: actualRecordId,
+            source: 'markdown',
           });
         } else {
           // Empty document
@@ -150,6 +156,42 @@ export class YjsRoom implements Room {
   public serializeToMarkdown(): string {
     const fragment = this.yjsDoc.getXmlFragment('default');
     return yXmlFragmentToMarkdown(fragment, editorSchema);
+  }
+
+  /**
+   * Seed the room's `default` XmlFragment from the record's current Markdown
+   * (spec §6.3 t=0 Markdown-fallback). The inverse of serializeToMarkdown:
+   * parse Markdown → ProseMirror doc (via @civicpress/editor-schema) → prime the
+   * Yjs state (via prosemirrorJSONToYDoc) so the first connecting client starts
+   * from the record's content and the writeback preserves headings/body.
+   *
+   * Only seeds when the `default` fragment is still empty — a guard against
+   * clobbering a live document (y-prosemirror's import is an initial-import-only
+   * operation; re-running it after collaboration began would discard history).
+   * Empty input is a no-op (an empty document, not a stray empty paragraph).
+   * Never throws: a parse failure leaves the document empty rather than blocking
+   * the room from opening (the client-side content-loss guard, W5-T9, is the
+   * primary defence for non-round-trippable records).
+   */
+  public seedFromMarkdown(markdown: string): void {
+    const fragment = this.yjsDoc.getXmlFragment('default');
+    if (fragment.length > 0) {
+      return; // Already populated (snapshot hydration or a live edit) — do not clobber.
+    }
+    if (!markdown || markdown.trim().length === 0) {
+      return; // Nothing to seed.
+    }
+    try {
+      const doc = parseMarkdownToDoc(markdown);
+      prosemirrorJSONToYDoc(doc, this.yjsDoc, 'default');
+      this.initialized = true;
+    } catch (error) {
+      coreWarn('YjsRoom Markdown seed failed; opening with empty document', {
+        operation: 'realtime:yjs-room:seed:error',
+        roomId: this.roomId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**

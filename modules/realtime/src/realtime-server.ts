@@ -52,6 +52,7 @@ import {
   dispatchYjsBinaryFrame,
   setupYjsConnection,
 } from './yjs-sync.js';
+import * as Y from 'yjs';
 
 export class RealtimeServer {
   private logger: Logger;
@@ -174,11 +175,22 @@ export class RealtimeServer {
 
       this.snapshotManager = new SnapshotManager(this.logger, snapshotStorage);
 
-      // Start snapshot interval
+      // Periodic snapshot trigger (spec §6.2): every `interval` seconds (default
+      // 60s) drive the HANDLER snapshot path — binary + collaborative Markdown
+      // draft (W5-T11) — the same path grace-finalize, the API trigger, and the
+      // shutdown final pass use. The legacy binary-only createRoomSnapshot path is
+      // now fully retired (the SnapshotManager.createSnapshot/saveSnapshot pair it
+      // used is dead production code, kept only as the manager's public API).
       if (this.realtimeConfig.snapshots.interval > 0) {
-        this.snapshotInterval = setInterval(() => {
-          this.createSnapshots();
-        }, this.realtimeConfig.snapshots.interval * 1000);
+        this.snapshotInterval = setInterval(
+          () => {
+            void this.runPeriodicSnapshots();
+          },
+          this.realtimeConfig.snapshots.interval * 1000
+        );
+        if (typeof this.snapshotInterval.unref === 'function') {
+          this.snapshotInterval.unref();
+        }
       }
 
       // SnapshotManager owns its TTL-cleanup interval; server only start/stops.
@@ -1057,22 +1069,29 @@ export class RealtimeServer {
   /** Initialize room with content (from record or snapshot). */
   private async initializeRoom(room: YjsRoom, recordId: string): Promise<void> {
     try {
-      // Try to load from snapshot first
+      // Snapshot-FIRST (W4, spec §6.3): hydrate from the latest integrity-VERIFIED
+      // snapshot. loadLatestVerified returns null on hash mismatch / too-new
+      // format, so corruption transparently falls through to the Markdown seed.
       if (this.snapshotManager) {
-        const snapshot = await this.snapshotManager.loadSnapshot(room.roomId);
-        if (snapshot) {
-          this.snapshotManager.applySnapshot(room.getYjsDoc(), snapshot);
+        const row = await this.snapshotManager.loadLatestVerified(room.roomId);
+        if (row) {
+          Y.applyUpdate(room.getYjsDoc(), row.snapshot_data);
           coreInfo('Room initialized from snapshot', {
             operation: 'realtime:server:room:initialized',
             roomId: room.roomId,
             source: 'snapshot',
+            version: row.version,
           });
           return;
         }
       }
 
-      // Fallback to loading from record
+      // Markdown-FALLBACK (spec §6.3 t=0): no snapshot — seed the Y.Doc from the
+      // record's current Markdown (room.initialize → seedFromMarkdown) so the first
+      // client starts from the record content and the writeback preserves it. The
+      // room loads via its own RecordManager, so hand it the server's resolved one.
       if (this.recordManager) {
+        room.setRecordManager(this.recordManager);
         await room.initialize(recordId);
         coreInfo('Room initialized from record', {
           operation: 'realtime:server:room:initialized',
@@ -1191,52 +1210,29 @@ export class RealtimeServer {
     }
   }
 
-  /** Create snapshot for a room. */
-  private async createRoomSnapshot(room: YjsRoom): Promise<void> {
-    if (!this.snapshotManager || !this.realtimeConfig) {
+  /**
+   * Periodic snapshot pass (spec §6.2): run the room-type HANDLER snapshot
+   * (binary + collaborative Markdown draft) for each live Yjs room with new Yjs
+   * updates since its last snapshot. Rooms with no new updates are skipped
+   * (no-diff = no write); per-room failures never stall the rest of the pass.
+   */
+  private async runPeriodicSnapshots(): Promise<void> {
+    if (!this.roomManager) {
       return;
     }
-
-    try {
-      const state = room.getState();
-      const snapshot = this.snapshotManager.createSnapshot(
-        room.roomId,
-        room.getYjsDoc(),
-        state.version
-      );
-
-      await this.snapshotManager.saveSnapshot(snapshot);
-      room.resetUpdateCount();
-
-      // Emit hook event
-      this.emitHook('realtime:snapshot:saved', {
-        roomId: room.roomId,
-        snapshotId: `${room.roomId}-${snapshot.version}`,
-        timestamp: snapshot.timestamp,
-      });
-    } catch (error) {
-      this.logError(error, 'REALTIME_SNAPSHOT_ERROR', {
-        operation: 'realtime:server:snapshot:error',
-        roomId: room.roomId,
-      });
-    }
-  }
-
-  /** Create snapshots for all rooms that need them. */
-  private async createSnapshots(): Promise<void> {
-    if (!this.snapshotManager || !this.roomManager || !this.realtimeConfig) {
-      return;
-    }
-
-    const rooms = this.roomManager.getAllRooms();
-    const maxUpdates = this.realtimeConfig.snapshots.max_updates;
-    const intervalSeconds = this.realtimeConfig.snapshots.interval;
-
-    for (const room of rooms) {
-      if (room instanceof YjsRoom) {
-        if (room.needsSnapshot(maxUpdates, intervalSeconds)) {
-          await this.createRoomSnapshot(room);
-        }
+    for (const room of this.roomManager.getAllRooms()) {
+      // No-diff skip: nothing changed since the last snapshot reset the count.
+      if (!(room instanceof YjsRoom) || room.getUpdateCount() === 0) {
+        continue;
+      }
+      try {
+        await this.runHandlerSnapshot(room);
+      } catch (error) {
+        coreWarn('Periodic snapshot failed for room; continuing', {
+          operation: 'realtime:server:periodic-snapshot:error',
+          roomId: room.roomId,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   }
@@ -1311,12 +1307,13 @@ export class RealtimeServer {
     // pass below, so an armed timer would double-snapshot / fire post-teardown.
     this.roomManager?.clearAllGraceTimers();
 
-    // Create final snapshots for all rooms
+    // Final snapshot pass for all live rooms — via the HANDLER path (binary +
+    // collaborative Markdown draft), the same path periodic/grace-finalize use, so
+    // a shutdown mid-session also flushes the draft (not just the Yjs binary).
     if (this.roomManager) {
-      const rooms = this.roomManager.getAllRooms();
-      for (const room of rooms) {
+      for (const room of this.roomManager.getAllRooms()) {
         if (room instanceof YjsRoom) {
-          await this.createRoomSnapshot(room);
+          await this.runHandlerSnapshot(room);
         }
       }
     }

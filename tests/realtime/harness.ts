@@ -38,13 +38,13 @@ import type {
   AuthService,
   AuthUser,
   CivicPressConfig,
-  DatabaseService,
   DraftRow,
   HookSystem,
   Logger as CoreLogger,
+  RecordData,
   RecordManager,
 } from '@civicpress/core';
-import { Logger } from '@civicpress/core';
+import { DatabaseService, Logger } from '@civicpress/core';
 import { RealtimeConfigManager } from '../../modules/realtime/src/realtime-config-manager.js';
 import { RealtimeServer } from '../../modules/realtime/src/realtime-server.js';
 import { RoomManager } from '../../modules/realtime/src/rooms/room-manager.js';
@@ -88,8 +88,15 @@ export interface TestRealtimeCtx {
   makeToken(userId: string): string;
   /** Sleep `ms` (grace-window timing helper). */
   tick(ms: number): Promise<void>;
-  /** Poll `pred` until true (convergence/eventual-consistency assertions). */
-  waitUntil(pred: () => boolean, message: string, timeoutMs?: number): Promise<void>;
+  /**
+   * Poll `pred` until it (resolves to) true. Accepts a sync or async predicate
+   * so callers can poll on a DB read (e.g. the draft writeback landing).
+   */
+  waitUntil(
+    pred: () => boolean | Promise<boolean>,
+    message: string,
+    timeoutMs?: number
+  ): Promise<void>;
   /** Is a room currently in memory? */
   hasRoom(roomId: string): boolean;
   /** The live room instance (identity assertions), or null. */
@@ -98,13 +105,53 @@ export interface TestRealtimeCtx {
   waitForRoomEviction(roomId: string, timeoutMs?: number): Promise<void>;
   /** Read back a draft written by the snapshot writeback. */
   getDraft(recordId: string): Promise<DraftRow | null>;
+  /**
+   * Trigger a record snapshot through the server's in-process seam (the same
+   * handler path the periodic timer + grace-finalize use). Returns the server's
+   * snapshot result; the draft writeback has completed when it resolves.
+   */
+  triggerRecordSnapshot(recordId: string): Promise<{
+    snapshotCreated: boolean;
+    version: number | null;
+    timestamp: number;
+  }>;
   /** Shut down the server and clean up the temp dir + sockets. */
   close(): Promise<void>;
+}
+
+/** A seed record the harness's record source returns (incl. its Markdown). */
+export interface TestSeedRecord {
+  id: string;
+  title: string;
+  type: string;
+  status?: string;
+  /** The record's current Markdown body — what Markdown-fallback seeding reads. */
+  content?: string;
 }
 
 export interface CreateTestRealtimeServerOptions {
   /** Grace window (ms) before a clientless room is finalized. Default 500. */
   graceMs?: number;
+  /**
+   * Use a REAL `DatabaseService` (sqlite file) as the draft store instead of the
+   * in-memory stub, so the writeback genuinely persists a `record_drafts` row a
+   * `getDraft` reads back. Default false (keeps the lighter stub for tests that
+   * only care about the snapshot binary). W5-T11's exit test sets this true.
+   */
+  withRealDraftDb?: boolean;
+  /**
+   * Seed records the record source returns. Markdown-fallback seeding reads each
+   * record's `content`; the draft create-path reads title/type/status. Any id not
+   * listed falls back to a minimal published placeholder (as before).
+   */
+  records?: Record<string, TestSeedRecord>;
+  /**
+   * Periodic snapshot interval in MILLISECONDS (spec default 60s). When set, the
+   * server's periodic snapshot timer drives the handler writeback this often;
+   * tests pass a small value (e.g. 100) to observe it fire. Omit to disable the
+   * periodic timer (the default — grace-finalize / explicit trigger only).
+   */
+  periodicSnapshotMs?: number;
 }
 
 /**
@@ -115,6 +162,12 @@ export async function createTestRealtimeServer(
   options: CreateTestRealtimeServerOptions = {}
 ): Promise<TestRealtimeCtx> {
   const graceMs = options.graceMs ?? 500;
+  const seedRecords = options.records ?? {};
+  // Config `interval` is in SECONDS; convert the test's ms knob. 0 disables the
+  // periodic timer (the default).
+  const snapshotIntervalSeconds = options.periodicSnapshotMs
+    ? options.periodicSnapshotMs / 1000
+    : 0;
 
   const testDir = await fs.mkdtemp(
     path.join(os.tmpdir(), 'civicpress-realtime-harness-')
@@ -139,7 +192,9 @@ export async function createTestRealtimeServer(
       },
       snapshots: {
         enabled: true,
-        interval: 0, // No periodic snapshots — grace finalize is the trigger.
+        // 0 = no periodic timer (grace finalize / explicit trigger only); a
+        // positive value enables the periodic handler-snapshot pass (spec §6.2).
+        interval: snapshotIntervalSeconds,
         max_updates: 100,
         storage: 'filesystem',
       },
@@ -193,16 +248,30 @@ export async function createTestRealtimeServer(
     userCan: async () => true,
   } as unknown as AuthService;
 
-  // Any record id resolves to a minimal published record so the record-room
-  // path + permission check succeed and the draft create-path can seed title/type.
+  // A record id listed in `records` resolves to that seed record (incl. its
+  // Markdown `content`, which Markdown-fallback seeding reads); any other id
+  // resolves to a minimal published placeholder so the record-room path +
+  // permission check + draft create-path still succeed.
   const recordManager = {
-    getRecord: async (recordId: string) => ({
-      id: recordId,
-      title: `Record ${recordId}`,
-      type: 'bylaw',
-      content: '',
-      status: 'published',
-    }),
+    getRecord: async (recordId: string): Promise<RecordData> => {
+      const seed = seedRecords[recordId];
+      if (seed) {
+        return {
+          id: seed.id,
+          title: seed.title,
+          type: seed.type,
+          status: seed.status ?? 'published',
+          content: seed.content ?? '',
+        } as RecordData;
+      }
+      return {
+        id: recordId,
+        title: `Record ${recordId}`,
+        type: 'bylaw',
+        content: '',
+        status: 'published',
+      } as RecordData;
+    },
   } as unknown as RecordManager;
 
   // Snapshot storage uses the filesystem branch, so the DatabaseService is only
@@ -212,31 +281,47 @@ export async function createTestRealtimeServer(
     execute: async () => undefined,
   } as unknown as DatabaseService;
 
-  // In-memory draft store — the snapshot writeback target the test inspects.
-  const draftRows = new Map<string, DraftRow>();
-  const draftStore: InMemoryDraftStore = {
-    getDraft: async (id) => draftRows.get(id) ?? null,
-    createDraft: async (data) => {
-      draftRows.set(data.id, {
-        id: data.id,
-        title: data.title,
-        type: data.type,
-        status: data.status,
-        workflow_state: data.workflow_state,
-        markdown_body: data.markdown_body ?? undefined,
-        metadata: data.metadata ?? undefined,
-        author: data.author,
-        created_by: data.created_by,
-      });
-    },
-    updateDraft: async (id, updates) => {
-      const existing = draftRows.get(id);
-      if (!existing) {
-        return;
-      }
-      draftRows.set(id, { ...existing, ...updates });
-    },
-  };
+  // Draft store — the snapshot writeback target the test inspects. With
+  // `withRealDraftDb` this is a REAL DatabaseService (sqlite file) whose
+  // createDraft/getDraft/updateDraft IS the canonical pipeline, so the writeback
+  // genuinely persists a `record_drafts` row a getDraft reads back (W5-T11).
+  // Otherwise it is a light in-memory stub (sufficient for tests that only assert
+  // the snapshot binary). Both structurally satisfy RecordDraftPersistence.
+  let realDraftDb: DatabaseService | null = null;
+  let draftStore: InMemoryDraftStore;
+  if (options.withRealDraftDb) {
+    realDraftDb = new DatabaseService({
+      type: 'sqlite',
+      sqlite: { file: path.join(testDir, '.system-data', 'drafts.db') },
+    });
+    await realDraftDb.initialize(); // runs migrations → creates record_drafts
+    draftStore = realDraftDb as unknown as InMemoryDraftStore;
+  } else {
+    const draftRows = new Map<string, DraftRow>();
+    draftStore = {
+      getDraft: async (id) => draftRows.get(id) ?? null,
+      createDraft: async (data) => {
+        draftRows.set(data.id, {
+          id: data.id,
+          title: data.title,
+          type: data.type,
+          status: data.status,
+          workflow_state: data.workflow_state,
+          markdown_body: data.markdown_body ?? undefined,
+          metadata: data.metadata ?? undefined,
+          author: data.author,
+          created_by: data.created_by,
+        });
+      },
+      updateDraft: async (id, updates) => {
+        const existing = draftRows.get(id);
+        if (!existing) {
+          return;
+        }
+        draftRows.set(id, { ...existing, ...updates });
+      },
+    };
+  }
 
   const configManager = new RealtimeConfigManager(
     path.join(testDir, '.system-data')
@@ -283,7 +368,7 @@ export async function createTestRealtimeServer(
     makeToken: (userId: string) => `${TOKEN_PREFIX}${userId}`,
     tick: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
     waitUntil: (pred, message, timeoutMs = 5000) =>
-      waitFor(pred, timeoutMs, message),
+      asyncWaitFor(pred, timeoutMs, message),
     hasRoom: (roomId: string) => roomManager.getRoom(roomId) !== null,
     getRoom: (roomId: string) => roomManager.getRoom(roomId),
     waitForRoomEviction: (roomId: string, timeoutMs = graceMs + 2000) =>
@@ -293,6 +378,8 @@ export async function createTestRealtimeServer(
         `room ${roomId} was not evicted within ${timeoutMs}ms`
       ),
     getDraft: (recordId: string) => draftStore.getDraft(recordId),
+    triggerRecordSnapshot: (recordId: string) =>
+      server.triggerRecordSnapshot(recordId),
     close: async () => {
       for (const c of openClients) {
         c.disconnect();
@@ -300,6 +387,11 @@ export async function createTestRealtimeServer(
       openClients.clear();
       try {
         await server.shutdown();
+      } catch {
+        // ignore
+      }
+      try {
+        await realDraftDb?.close();
       } catch {
         // ignore
       }
@@ -331,10 +423,23 @@ export interface CreateSimulatedYClientOptions {
 export interface SimulatedYClient {
   /** Replace the document text with `text` (clears any existing text first). */
   insertText(text: string): void;
-  /** Append `text` to the end of the document text. */
+  /** Append `text` to the end of the FIRST paragraph's text. */
   appendText(text: string): void;
-  /** Current document text. */
+  /**
+   * Append a NEW paragraph node containing `text` to the end of the document.
+   * Unlike appendText this does not mutate an existing node, so it is safe on a
+   * multi-node doc (e.g. a Markdown-seeded `heading` + `paragraph`) — the shape a
+   * real editor produces when a collaborator adds a paragraph.
+   */
+  appendParagraph(text: string): void;
+  /** Current document text (FIRST paragraph only — single-paragraph helper). */
   getText(): string;
+  /**
+   * Full-document text: the concatenation of every top-level node's text,
+   * newline-joined. Used to assert seeded + appended content across a multi-node
+   * document where getText() (node 0 only) would miss later nodes.
+   */
+  getDocText(): string;
   /** Resolve after pending local edits have been flushed to + applied by the server. */
   flushUpdates(): Promise<void>;
   /** Resolve once the initial server→client sync handshake has completed. */
@@ -483,7 +588,19 @@ export async function createSimulatedYClient(
         t.insert(t.length, text);
       });
     },
+    appendParagraph: (text: string) => {
+      // Append a fresh `paragraph > text` at the end of the fragment in this
+      // client's transaction, so the doc 'update' handler forwards it.
+      doc.transact(() => {
+        const para = new Y.XmlElement('paragraph');
+        const t = new Y.XmlText();
+        t.insert(0, text);
+        para.insert(0, [t]);
+        fragment.insert(fragment.length, [para]);
+      }, client);
+    },
     getText: () => getText().toString(),
+    getDocText: () => readFragmentText(fragment),
     flushUpdates: async () => {
       // Local update is sent synchronously in the 'update' handler above; give
       // the server a tick to apply + fan out to peers.
@@ -529,6 +646,31 @@ export async function createSimulatedYClient(
   return client_;
 }
 
+/**
+ * Read the concatenated text of every top-level node in a Yjs XmlFragment,
+ * newline-joined. Each node's own text is its direct XmlText children joined
+ * (sufficient for the flat `heading`/`paragraph` docs these tests produce).
+ */
+function readFragmentText(fragment: Y.XmlFragment): string {
+  const parts: string[] = [];
+  for (let i = 0; i < fragment.length; i++) {
+    const node = fragment.get(i);
+    if (node instanceof Y.XmlElement) {
+      let text = '';
+      for (let j = 0; j < node.length; j++) {
+        const child = node.get(j);
+        if (child instanceof Y.XmlText) {
+          text += child.toString();
+        }
+      }
+      parts.push(text);
+    } else if (node instanceof Y.XmlText) {
+      parts.push(node.toString());
+    }
+  }
+  return parts.join('\n');
+}
+
 /** Poll `pred` until true or `timeoutMs` elapses (then throw `message`). */
 async function waitFor(
   pred: () => boolean,
@@ -539,6 +681,28 @@ async function waitFor(
   // eslint-disable-next-line no-constant-condition
   while (true) {
     if (pred()) {
+      return;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(message);
+    }
+    await new Promise<void>((r) => setTimeout(r, 10));
+  }
+}
+
+/**
+ * Like `waitFor` but awaits each predicate evaluation, so callers can poll on an
+ * async condition (e.g. a DB read for the draft writeback landing).
+ */
+async function asyncWaitFor(
+  pred: () => boolean | Promise<boolean>,
+  timeoutMs: number,
+  message: string
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (await pred()) {
       return;
     }
     if (Date.now() > deadline) {
