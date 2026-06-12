@@ -26,6 +26,7 @@
  */
 
 import * as fs from 'fs/promises';
+import * as fse from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import { WebSocket } from 'ws';
@@ -44,6 +45,7 @@ import type {
   RecordData,
   RecordManager,
 } from '@civicpress/core';
+import type { SnapshotManager } from '../../modules/realtime/src/persistence/snapshots.js';
 import { DatabaseService, Logger } from '@civicpress/core';
 import { RealtimeConfigManager } from '../../modules/realtime/src/realtime-config-manager.js';
 import { RealtimeServer } from '../../modules/realtime/src/realtime-server.js';
@@ -115,6 +117,20 @@ export interface TestRealtimeCtx {
     version: number | null;
     timestamp: number;
   }>;
+  /**
+   * The server's SnapshotManager (created lazily in server.initialize()).
+   * Call after initialize() has completed (i.e. after createTestRealtimeServer
+   * resolves). Returns null when snapshots are disabled.
+   */
+  get snapshotManager(): SnapshotManager | null;
+  /**
+   * Corrupt the persisted snapshot for `roomId` by overwriting its integrity
+   * hash in the filesystem `.meta.json` sidecar. The next
+   * `loadLatestVerified(roomId)` will return null (hash mismatch) and fall
+   * back to reloading from Markdown. Throws if no snapshot file exists for
+   * the room.
+   */
+  corruptSnapshot(roomId: string): Promise<void>;
   /** Shut down the server and clean up the temp dir + sockets. */
   close(): Promise<void>;
 }
@@ -380,6 +396,34 @@ export async function createTestRealtimeServer(
     getDraft: (recordId: string) => draftStore.getDraft(recordId),
     triggerRecordSnapshot: (recordId: string) =>
       server.triggerRecordSnapshot(recordId),
+    get snapshotManager(): SnapshotManager | null {
+      return server.getSnapshotManager();
+    },
+    corruptSnapshot: async (roomId: string): Promise<void> => {
+      // The harness uses FilesystemSnapshotStorage; blobs live at
+      // {testDir}/realtime/snapshots/{roomId}/ (FilesystemSnapshotStorage
+      // prepends 'realtime/snapshots' to config.dataDir, which is testDir).
+      // Each snapshot has a .meta.json sidecar with the integrity_hash field;
+      // writing 'invalid' there makes loadLatestVerified() return null.
+      const snapshotDir = path.join(
+        testDir,
+        'realtime',
+        'snapshots',
+        roomId
+      );
+      const files = await fs.readdir(snapshotDir);
+      const metaFiles = files.filter((f) => f.endsWith('.meta.json'));
+      if (metaFiles.length === 0) {
+        throw new Error(
+          `corruptSnapshot: no .meta.json found for room ${roomId} in ${snapshotDir}`
+        );
+      }
+      // Corrupt the latest (or only) meta file.
+      const metaPath = path.join(snapshotDir, metaFiles[metaFiles.length - 1]);
+      const meta = await fse.readJson(metaPath);
+      meta.integrity_hash = 'invalid';
+      await fse.writeJson(metaPath, meta);
+    },
     close: async () => {
       for (const c of openClients) {
         c.disconnect();
