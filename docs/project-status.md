@@ -2,7 +2,7 @@
 
 **Last Updated**: 2026-06-03 (lint-rule rollout + 4 of 6 sub-followups closed)
 **Current Version**: v0.2.0 (Alpha)
-**Overall Status**: Alpha — refactor in progress. Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 + 2d merged to local `dev`. **Phase 2d-followup `ui-002` (Nuxt UI Pro v3 → v4 migration) closed 2026-05-28**, **`lint-rule-rollout` (Phase 2d W3-T6 carry-forward) closed 2026-06-02 (merge `656adb5`)**, and **4 of 6 lint-rollout sub-followups closed on local `dev`**: **#3 modules/ui cruft deps** (merge `3103a74`, + pnpm 8→9 toolchain prereq), **#2 Vue-template `no-explicit-any` blind spot** (merge `d7447b4`, 13 sites + new `useTypedI18n` composable + `nuxt-ui-bridge.ts`), **#1.1 core unused-vars cleanup** (merge `60d91e8`, 170 sites + rule promoted to `error`), **#1.2 cli unused-vars cleanup** (merge `961547d`, 110 sites + rule promoted). Per the "finish lint followups before Phase 3" sequencing rule: remaining lint-rollout followups (#1.3 modules/ui 102 sites, #1.4 modules/storage 45 sites, #1.5 modules/api 32 sites, ~30 deferred vue/nuxt style rules) precede Phase 3 (realtime reintroduction, Yjs-only).
+**Overall Status**: Alpha — refactor in progress. Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 + 2d merged to local `dev`. **Phase 2d-followup `ui-002` (Nuxt UI Pro v3 → v4 migration) closed 2026-05-28**, **`lint-rule-rollout` (Phase 2d W3-T6 carry-forward) closed 2026-06-02 (merge `656adb5`)**, and **4 of 6 lint-rollout sub-followups closed on local `dev`**: **#3 modules/ui cruft deps** (merge `3103a74`, + pnpm 8→9 toolchain prereq), **#2 Vue-template `no-explicit-any` blind spot** (merge `d7447b4`, 13 sites + new `useTypedI18n` composable + `nuxt-ui-bridge.ts`), **#1.1 core unused-vars cleanup** (merge `60d91e8`, 170 sites + rule promoted to `error`), **#1.2 cli unused-vars cleanup** (merge `961547d`, 110 sites + rule promoted). Per the "finish lint followups before Phase 3" sequencing rule: the lint-rollout followups (#1.3 modules/ui, #1.4 modules/storage, #1.5 modules/api, plus the deferred vue/nuxt style rules / Tier C) were closed first. **Phase 3 (realtime reintroduction, Yjs-only) is then COMPLETE on the local `refactor/phase-3-realtime` branch — pending its `--no-ff` merge to `dev`** (14 findings closed, realtime-001 … realtime-014; closure report at `docs/audits/phase-3-closure-report.md`). See "Realtime Collaborative Editing" under What's Working.
 **Test Suite**: 1305+ passing / 1 known date-bomb (§9.1 session-mgmt, hardcoded 2025 expiry) / 19 skipped. UI workspace 138/138 passing under `vitest.config.ui.mjs` (under `@nuxt/ui` v4). Storage workspace 216/216 passing under `pnpm -C modules/storage test:run`. API workspace 270/270 passing.
 **Implementation**: v0.2.0 shipped; 2026-05 audit identified 205 findings (20 Critical, 65 High, 79 Medium, 41 Low). Base refactor cumulative state: **66 of 205 original findings closed** (32%); plus **47 refactor-surfaced closures** (6 Phase-2b + 4 Phase-2c.5 + 9 Phase-2d-W0 + 21 Phase-2d-W2-decomp + 6 Phase-2d-W3-latent-bugs + 1 Phase-2d-W4-T2-root-audit-gap surfaced during the v3→v4 migration baseline) for **113 total measurable progress items**.
 
@@ -35,7 +35,7 @@ CivicPress is a **working alpha** civic technology platform. The core record-man
 - **Phase 2d-followup `lint-rule-rollout` closed 2026-06-02** (merge `656adb5` on local `dev`). The deferred Phase 2d W3-T6 `@typescript-eslint/no-explicit-any: error` enforcement landed across all 5 production workspaces (`core`, `cli`, `modules/api`, `modules/ui`, `modules/storage`); baseline went from **1,488 errors → 0**. ~120 production cast sites annotated; 114 test-mock casts covered by the test-file `warn` override; `modules/ui` switched to `@nuxt/eslint`'s Option A integration with a `STYLE_RULES_DEFERRED` map silencing ~30 vue/nuxt style rules out of scope. No CI gate (per the project's no-CI/CD posture); root `pnpm lint` script signals locally. Closure report at `docs/audits/phase-2d-closure-report.md` § "Deferred to dedicated lint-hygiene session" (CLOSED line back-filled at `21da688`).
 - **4 of 6 lint-rollout sub-followups closed 2026-06-02 / 2026-06-03** on local `dev`. `#3 modules/ui cruft deps` (merge `3103a74`) dropped `@eslint/js`, `vue-eslint-parser`, and `@typescript-eslint/parser` from `modules/ui/package.json` (the last is transitively provided by `@nuxt/eslint`); also bumped declared `packageManager` from `pnpm@8.15.0` to `pnpm@9.15.9` after discovering the lockfile was already in v9 format. `#2 Vue-template `no-explicit-any` blind spot` (merge `d7447b4`) refactored 13 `as any` casts inside `<template>` regions of `modules/ui/app/**/*.vue` to `<script setup>` or removed them by typing the source; introduced one new composable (`composables/useTypedI18n.ts` with `tPlural(key, count)`) and one types bridge (`types/nuxt-ui-bridge.ts`). `#1.1 core unused-vars cleanup` (merge `60d91e8`) cleared 170 sites across `core/src/{diagnostics,saga,records,di,database,geography,templates,utils}` + top-level files; rule promoted from `warn` to `error` in both production and test config blocks of `core/eslint.config.cjs`. `#1.2 cli unused-vars cleanup` (merge `961547d`) cleared 110 sites across `cli/src/commands/**` (including a 301-line strip of a superseded validation pipeline in `validate.ts`); rule promoted to `error` in both blocks of `cli/eslint.config.cjs`. 8 surfaced findings recorded for separate triage (sanitizer-not-wired, missing-assertion test patterns, stub-pattern methods, orphan operation logging) — see [[lint-followups-before-phase-3]] / `lint-rollout-2026-06-02-followups` memory.
 
-The platform is suitable for early pilots and development; it is not yet production-grade by the standards a municipal procurement reviewer would apply. Remaining lint-rollout followups (#1.3 modules/ui 102 sites, #1.4 modules/storage 45 sites, #1.5 modules/api 32 sites, plus ~30 deferred vue/nuxt style rules) are next per the sequencing rule — Phase 3 (realtime reintroduction, Yjs-only) follows when those land. Phases 4 (hardware audit) and 5 (broadcast-box reintegration) follow. Other Phase 2d carry-forwards still pending: realtime-012 (handled inside Phase 3), test-suite repair session (date-bomb + lock-endpoints flake + surfaced missing-assertions in cli/saga test files). Branch is local-only per the `refactor-push-policy` — nothing in the refactor pushes to any origin until all 7 phases finish.
+The platform is suitable for early pilots and development; it is not yet production-grade by the standards a municipal procurement reviewer would apply. The lint-rollout followups closed first per the sequencing rule; **Phase 3 (realtime reintroduction, Yjs-only) is then complete on the local `refactor/phase-3-realtime` branch (pending `--no-ff` merge to `dev`)**. Phases 4 (hardware audit) and 5 (broadcast-box reintegration) follow. Other Phase 2d carry-forwards still pending: realtime-012 (handled inside Phase 3), test-suite repair session (date-bomb + lock-endpoints flake + surfaced missing-assertions in cli/saga test files). Branch is local-only per the `refactor-push-policy` — nothing in the refactor pushes to any origin until all 7 phases finish.
 
 ### What's Working
 
@@ -121,6 +121,33 @@ The platform is suitable for early pilots and development; it is not yet product
   - Correlation ID tracking for debugging
   - Enhanced UI error handling with dev mode visibility
   - Test coverage per the Phase 2a verified run: 1213 passing / 1 known flake / 27 skipped (API+core); 67/67 passing (UI). Component coverage is sparse and expanding in Phase 2b/2d.
+
+#### **Realtime Collaborative Editing (shipped in refactor Phase 3, local `dev`)**
+
+- Module: `modules/realtime/` (`@civicpress/realtime`); shared schema:
+  `packages/editor-schema/` (`@civicpress/editor-schema`).
+- Status: complete on the local `refactor/phase-3-realtime` branch (pending the
+  `--no-ff` merge to `dev`; not yet on `main`). Local-only per the
+  `refactor-push-policy`.
+- What it does: **collaborative record editing** over a **binary y-protocols**
+  (Yjs CRDT over WebSocket) server, run **in-process with the API** on its own
+  port (default 3001, gated by `realtime.enabled`). The server serializes the
+  Yjs doc to Markdown and writes it back to a **review-gated DB draft**
+  (`record_drafts.markdown_body`, authored `realtime-snapshot`) through the
+  records-draft pipeline — it does **not** auto-commit to Git. **Markdown-in-Git
+  stays the durable archive**, produced on human *publish*. Ephemeral 48h-TTL
+  snapshot blobs are reconnection merge-aids only.
+- Findings closed: 14 (realtime-001 … realtime-014). Exit criteria met:
+  `realtime-server.ts` 3,581 → 1,495 LoC (target <1,500);
+  offline-edit-then-reconnect and collab-edit-writes-Markdown-draft tests green.
+- Tests: realtime module 148 passing / 1 skipped; `@civicpress/editor-schema`
+  32; repo-level `tests/realtime/` exit-criteria; UI vitest 186/186.
+- Known limits: **single-node** deploy (no multi-node Redis adapter — a
+  documented future option, not shipped); **browser E2E pending** a follow-up
+  (integration tests use simulated y-protocols clients); collaborative writebacks
+  are not yet auditable Git civic events (deferred follow-up); block-level
+  civic-refs round-trip only inline. Details in
+  `docs/audits/phase-3-closure-report.md`.
 
 ### In Progress
 

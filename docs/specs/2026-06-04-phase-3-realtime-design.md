@@ -351,6 +351,33 @@ Cadence: default 60s while clients connected; configurable via `realtime.snapsho
 
 Why the writeback goes through `recordManager.saveDraft` and not a side path: it reuses existing draft-save logic (frontmatter preservation, file locking, Git commit, audit-hook emission, validation). The Git commit author becomes `realtime-snapshot`, so `git log --author=realtime-snapshot` lets a clerk audit exactly which writes came from collab vs. manual saves. One canonical Markdown writer for the system.
 
+> **As-shipped correction (2026-06).** The design above was based on a
+> `recordManager.saveDraft` method that **does not exist** — it is fictional.
+> What actually shipped (a deliberate user decision in W5-T11, "draft now,
+> revisit Git later"):
+>
+> - The writeback target is a **DB draft**, not a Git commit. `RecordRoomHandler`
+>   writes the serialized Markdown to `record_drafts.markdown_body` via the
+>   canonical `DatabaseService.getDraft / createDraft / updateDraft` pipeline
+>   (find-or-create keyed by record id), authored `realtime-snapshot`. The UI's
+>   `getDraftOrRecord` reads this draft body.
+> - It does **not** auto-commit to Git. Git history is produced when a **human
+>   publishes** the draft — the realtime writeback never authors a
+>   `realtime-snapshot` Git commit. So `git log --author=realtime-snapshot` (and
+>   the "frontmatter/locking/Git-commit/audit-hook are identical to a normal
+>   save" claim) do not apply to the as-shipped path.
+> - The periodic cadence is driven by `snapshots.interval` (seconds, default 300)
+>   in the real `RealtimeConfig`, **not** `realtime.snapshot.intervalMs`. There is
+>   no `snapshot.intervalMs` field.
+>
+> **Deferred follow-up (carry-forward).** The master-plan vision of collaborative
+> edits landing as auditable **Git civic events** (a `realtime-snapshot`-authored
+> commit, or an opt-in auto-publish / draft-history branch) is intentionally
+> deferred, to be designed once the governance model for collab-authored history
+> is settled. The original design text above is retained for the audit trail; this
+> note records what shipped. See `modules/realtime/src/rooms/record-room-handler.ts`
+> (and its `TODO(phase-3-followup)`).
+
 ### 6.3 Multi-client edit + crash recovery
 
 ```
@@ -377,6 +404,17 @@ t=48h+ : TTL cleanup job runs → blob deleted; Markdown stays in Git forever
 ```
 
 Crash survival comes for free: A's edits land in Git as one `realtime-snapshot` commit (made before B disconnected), B's later edits land as another. `git log` shows both as discrete civic events.
+
+> **As-shipped correction (2026-06).** Same correction as §6.2: the `t=7:30`
+> grace-finalize step writes the final Markdown to the record's **DB draft**
+> (`record_drafts.markdown_body`, authored `realtime-snapshot`) via
+> `DatabaseService.createDraft/updateDraft` — it does **not** `recordManager.saveDraft`
+> and does **not** produce a Git commit. Crash survival still holds at the draft
+> level (the latest serialized state is in the draft, and the Yjs blob is the
+> 48h-TTL merge-aid), but the edits do **not** appear as `realtime-snapshot` Git
+> commits; they become Git history only when a human publishes the draft. The
+> "collaborative edits as discrete auditable Git civic events" property is the
+> deferred follow-up noted in §6.2.
 
 ### 6.4 Connection-limit lifecycle (realtime-001 + realtime-002 fix)
 

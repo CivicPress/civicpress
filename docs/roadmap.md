@@ -47,6 +47,31 @@ architecture, core concepts, and overall feasibility of the platform.
 These achievements conclude the "Shadow Town Demo" milestone and establish the
 technical baseline for the next phases.
 
+### Collaborative Record Editing (added in refactor Phase 3, local `dev`)
+
+Shipped on the local `refactor/phase-3-realtime` branch (pending the `--no-ff`
+merge to `dev`; not yet on `main`), with deliberately scoped, honest claims:
+
+- **Collaborative record editing** via `@civicpress/realtime` — a **binary
+  y-protocols** (Yjs CRDT over WebSocket) server. It runs **in-process with the
+  API** on its own port (default 3001), gated by `realtime.enabled`.
+- **Server-side Markdown writeback to a review-gated DRAFT.** The server
+  serializes the room's Yjs doc to Markdown (via `@civicpress/editor-schema`) and
+  writes it to the record's draft (`record_drafts.markdown_body`) through the
+  records-draft pipeline. It does **not** auto-commit to Git; **Markdown-in-Git
+  remains the durable archive**, produced when a human *publishes* the draft.
+- **Ephemeral snapshot blobs** (integrity-hashed, 48h TTL) act as reconnection
+  merge-aids; on corruption/format-skew the server re-seeds from the record's
+  Markdown.
+- A content-loss guard falls records the collaborative schema can't round-trip
+  (e.g. raw HTML / footnotes) back to the single-user editor.
+
+**Deferred (carry-forward):** rendering collaborative writebacks as auditable
+Git civic events; a richer collaborative-editor toolbar + interactive civic-ref
+node-views; browser end-to-end tests (integration tests use simulated
+y-protocols clients); a multi-node Redis fan-out adapter. See
+`docs/audits/phase-3-closure-report.md`.
+
 ---
 
 # 1. Vision
@@ -305,7 +330,7 @@ ships its truth meter:
 | 2d Structural Hardening | **13** (W1: legal-register-002/005; W2: core-008/api-013/ui-008; W3: api-009/ui-011/storage-015; W4: storage-006/deps-008/api-007/deps-010/deps-011) + 9 W0-surfaced + 21 W2-decomp + 6 W3-latent-bugs | _closed 2026-05-25; report at `docs/audits/phase-2d-closure-report.md`._ Carry-forwards still pending: realtime-012 → Phase 3. ~~Lint-rule rollout (dedicated session)~~ closed 2026-06-02 (merge `656adb5`). |
 | 2d-followup ui-002 | 2 (ui-002 + deps-009) + 1 Phase-2d-W4-T2-root-audit-gap surfaced (closed by `a92b842`) | _closed 2026-05-28; commit `ec5a9a0` on `refactor/ui-002-nuxt-ui-v4-migration`._ Migrated paid `@nuxt/ui-pro` v3 + free `@nuxt/ui` v3 → MIT `@nuxt/ui` v4.8.0 (single package). Near-drop-in upgrade; only real source change was the `ui.theme.colors` useHead workaround removal (`cd725d5`). |
 | 2d-followup lint-rule-rollout | Phase 2d W3-T6 — `@typescript-eslint/no-explicit-any: error` enforced across 5 workspaces; baseline 1,488 errors → 0 | _closed 2026-06-02; merge `656adb5` on local `dev`._ Sub-followups: ~~#3 modules/ui cruft deps~~ closed (`3103a74`); ~~#2 Vue-template explicit-any blind spot~~ closed (`d7447b4`, 13 sites); ~~#1.1 core unused-vars~~ closed (`60d91e8`, 170 sites + rule→error); ~~#1.2 cli unused-vars~~ closed (`961547d`, 110 sites + rule→error). Remaining: #1.3 modules/ui (102), #1.4 modules/storage (45), #1.5 modules/api (32), ~30 vue/nuxt style rules. See `lint-rollout-2026-06-02-followups` memory for detail + 8 surfaced findings deferred for separate triage. |
-| 3 Reintroduce realtime | _next phase_ | _pending_ |
+| 3 Reintroduce realtime | **14** (realtime-001 … realtime-014) + the `packages/editor-schema` workspace; `realtime-server.ts` 3,581 → 1,495 LoC | _DONE on local `refactor/phase-3-realtime` (pending `--no-ff` merge to `dev`); report at `docs/audits/phase-3-closure-report.md`._ Carry-forwards: collab-edits-as-Git-civic-events writeback (deferred); multi-node Redis adapter; browser E2E. |
 | 4 Audit + fix broadcast-box hardware | _pending_ | _pending_ |
 | 5 Reintroduce broadcast-box to monorepo | _pending_ | _pending_ |
 
