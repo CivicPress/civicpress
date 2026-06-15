@@ -22,14 +22,12 @@ import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import type { Logger } from '@civicpress/core';
 import {
-  coreDebug,
   coreWarn,
   coreInfo,
   coreError,
   isCivicPressError,
 } from '@civicpress/core';
 import { SnapshotStorage } from './storage.js';
-import * as Y from 'yjs';
 
 /** Snapshot binary format version. A row with a higher value is discarded. */
 export const SNAPSHOT_FORMAT_V1 = 1;
@@ -37,13 +35,6 @@ export const SNAPSHOT_FORMAT_V1 = 1;
 export const MAX_SNAPSHOT_BYTES = 1 * 1024 * 1024; // 1 MB
 /** Rows older than this whose room is inactive are eligible for cleanup. */
 export const SNAPSHOT_TTL_MS = 48 * 60 * 60 * 1000; // 48h
-
-export interface Snapshot {
-  roomId: string;
-  yjsState: Uint8Array;
-  version: number;
-  timestamp: number;
-}
 
 /** Caller-facing persist payload (W4 API). */
 export interface PersistRequest {
@@ -125,7 +116,6 @@ export class SnapshotHookBus {
 export class SnapshotManager {
   private logger: Logger;
   private storage: SnapshotStorage;
-  private snapshots: Map<string, Snapshot> = new Map(); // roomId -> snapshot
   private hookBus: SnapshotHookBus;
   private cleanupTimer: NodeJS.Timeout | null = null;
 
@@ -192,14 +182,6 @@ export class SnapshotManager {
 
     try {
       await this.storage.insert(row);
-      // Keep the legacy in-memory cache coherent for callers still on the
-      // Snapshot-shaped API (loadSnapshot / applySnapshot).
-      this.snapshots.set(roomId, {
-        roomId,
-        yjsState: blob,
-        version: nextVersion,
-        timestamp: createdAt,
-      });
       coreInfo('Snapshot persisted', {
         operation: 'realtime:snapshot:persisted',
         roomId,
@@ -296,8 +278,6 @@ export class SnapshotManager {
         continue;
       }
       await this.storage.deleteRow(row.room_id, row.version);
-      // Drop the stale in-memory cache entry too.
-      this.snapshots.delete(row.room_id);
       this.hookBus.emit('realtime:snapshot:expired', {
         roomId: row.room_id,
         version: row.version,
@@ -349,171 +329,6 @@ export class SnapshotManager {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
-    }
-  }
-
-  /**
-   * Create snapshot from yjs document
-   */
-  createSnapshot(roomId: string, yjsDoc: Y.Doc, version: number): Snapshot {
-    const yjsState = Y.encodeStateAsUpdate(yjsDoc);
-    const snapshot: Snapshot = {
-      roomId,
-      yjsState,
-      version,
-      timestamp: Date.now(),
-    };
-
-    this.snapshots.set(roomId, snapshot);
-
-    coreDebug('Snapshot created', {
-      operation: 'realtime:snapshot:created',
-      roomId,
-      version,
-      size: yjsState.length,
-    });
-
-    return snapshot;
-  }
-
-  /**
-   * Load snapshot for room
-   */
-  async loadSnapshot(roomId: string): Promise<Snapshot | null> {
-    // Try memory first
-    const memorySnapshot = this.snapshots.get(roomId);
-    if (memorySnapshot) {
-      coreDebug('Snapshot loaded from memory', {
-        operation: 'realtime:snapshot:loaded',
-        roomId,
-        source: 'memory',
-      });
-      return memorySnapshot;
-    }
-
-    // Try storage
-    try {
-      const storedSnapshot = await this.storage.loadSnapshot(roomId);
-      if (storedSnapshot) {
-        // Cache in memory
-        this.snapshots.set(roomId, storedSnapshot);
-        coreDebug('Snapshot loaded from storage', {
-          operation: 'realtime:snapshot:loaded',
-          roomId,
-          source: 'storage',
-        });
-        return storedSnapshot;
-      }
-    } catch (error) {
-      coreWarn('Failed to load snapshot from storage', {
-        operation: 'realtime:snapshot:load:error',
-        roomId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    return null;
-  }
-
-  /**
-   * Save snapshot to storage
-   */
-  async saveSnapshot(snapshot: Snapshot): Promise<void> {
-    try {
-      // Save to storage
-      await this.storage.saveSnapshot(snapshot);
-
-      // Keep in memory
-      this.snapshots.set(snapshot.roomId, snapshot);
-
-      coreInfo('Snapshot saved', {
-        operation: 'realtime:snapshot:saved',
-        roomId: snapshot.roomId,
-        version: snapshot.version,
-        size: snapshot.yjsState.length,
-      });
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error) ? undefined : 'REALTIME_SNAPSHOT_SAVE_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:save:error',
-          roomId: snapshot.roomId,
-        }
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Apply snapshot to yjs document
-   */
-  applySnapshot(yjsDoc: Y.Doc, snapshot: Snapshot): void {
-    try {
-      Y.applyUpdate(yjsDoc, snapshot.yjsState);
-      coreInfo('Snapshot applied to yjs document', {
-        operation: 'realtime:snapshot:applied',
-        roomId: snapshot.roomId,
-        version: snapshot.version,
-      });
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error) ? undefined : 'REALTIME_SNAPSHOT_APPLY_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:apply:error',
-          roomId: snapshot.roomId,
-        }
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Delete snapshot
-   */
-  async deleteSnapshot(roomId: string): Promise<void> {
-    this.snapshots.delete(roomId);
-    await this.storage.deleteSnapshot(roomId);
-
-    coreInfo('Snapshot deleted', {
-      operation: 'realtime:snapshot:deleted',
-      roomId,
-    });
-  }
-
-  /**
-   * Cleanup old snapshots
-   */
-  async cleanupOldSnapshots(maxAgeSeconds: number): Promise<void> {
-    const now = Date.now();
-    const maxAge = maxAgeSeconds * 1000;
-    const roomsToDelete: string[] = [];
-
-    for (const [roomId, snapshot] of this.snapshots.entries()) {
-      if (now - snapshot.timestamp > maxAge) {
-        roomsToDelete.push(roomId);
-      }
-    }
-
-    for (const roomId of roomsToDelete) {
-      await this.deleteSnapshot(roomId);
-    }
-
-    if (roomsToDelete.length > 0) {
-      coreInfo(`Cleaned up ${roomsToDelete.length} old snapshots`, {
-        operation: 'realtime:snapshot:cleanup',
-      });
     }
   }
 }
