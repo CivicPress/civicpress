@@ -6,18 +6,13 @@
 
 import type { Logger, DatabaseService } from '@civicpress/core';
 import { coreError, isCivicPressError } from '@civicpress/core';
-import type { Snapshot, SnapshotRow } from './snapshots.js';
+import type { SnapshotRow } from './snapshots.js';
 import { SNAPSHOT_FORMAT_V1 } from './snapshots.js';
 import { createHash } from 'node:crypto';
 import fs from 'fs-extra';
 import path from 'path';
 
 export interface SnapshotStorage {
-  // Legacy Snapshot-shaped API (used by the existing realtime-server wiring).
-  loadSnapshot(roomId: string): Promise<Snapshot | null>;
-  saveSnapshot(snapshot: Snapshot): Promise<void>;
-  deleteSnapshot(roomId: string): Promise<void>;
-
   // W4 row-shaped API (integrity / format / size / TTL aware).
   /** Insert a fully-formed snapshot row (integrity hash + metadata included). */
   insert(row: SnapshotRow): Promise<void>;
@@ -39,107 +34,6 @@ export class DatabaseSnapshotStorage implements SnapshotStorage {
   constructor(db: DatabaseService, logger: Logger) {
     this.db = db;
     this.logger = logger;
-  }
-
-  async loadSnapshot(roomId: string): Promise<Snapshot | null> {
-    try {
-      const rows = await this.db.query(
-        'SELECT * FROM realtime_snapshots WHERE room_id = ? ORDER BY version DESC LIMIT 1',
-        [roomId]
-      );
-
-      if (rows.length === 0) {
-        return null;
-      }
-
-      const row = rows[0] as {
-        room_id: string;
-        snapshot_data: Uint8Array;
-        version: number;
-        created_at: number;
-      };
-      return {
-        roomId: row.room_id,
-        yjsState: Buffer.from(row.snapshot_data),
-        version: row.version,
-        timestamp: row.created_at,
-      };
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error)
-          ? undefined
-          : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:storage:load:error',
-          roomId,
-        }
-      );
-      throw error;
-    }
-  }
-
-  async saveSnapshot(snapshot: Snapshot): Promise<void> {
-    try {
-      const snapshotId = `${snapshot.roomId}-${snapshot.version}-${snapshot.timestamp}`;
-      await this.db.query(
-        'INSERT OR REPLACE INTO realtime_snapshots (id, room_id, snapshot_data, version, created_at) VALUES (?, ?, ?, ?, ?)',
-        [
-          snapshotId,
-          snapshot.roomId,
-          Buffer.from(snapshot.yjsState),
-          snapshot.version,
-          snapshot.timestamp,
-        ]
-      );
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error)
-          ? undefined
-          : 'REALTIME_SNAPSHOT_STORAGE_SAVE_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:storage:save:error',
-          roomId: snapshot.roomId,
-        }
-      );
-      throw error;
-    }
-  }
-
-  async deleteSnapshot(roomId: string): Promise<void> {
-    try {
-      await this.db.query('DELETE FROM realtime_snapshots WHERE room_id = ?', [
-        roomId,
-      ]);
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error)
-          ? undefined
-          : 'REALTIME_SNAPSHOT_STORAGE_DELETE_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:storage:delete:error',
-          roomId,
-        }
-      );
-      throw error;
-    }
   }
 
   // ---- W4 row-shaped API ----
@@ -295,114 +189,6 @@ export class FilesystemSnapshotStorage implements SnapshotStorage {
   constructor(basePath: string, logger: Logger) {
     this.basePath = path.join(basePath, 'realtime', 'snapshots');
     this.logger = logger;
-  }
-
-  async loadSnapshot(roomId: string): Promise<Snapshot | null> {
-    try {
-      // Find latest snapshot file for this room
-      const snapshotDir = path.join(this.basePath, roomId);
-      if (!(await fs.pathExists(snapshotDir))) {
-        return null;
-      }
-
-      const files = await fs.readdir(snapshotDir);
-      const snapshotFiles = files
-        .filter((f) => f.endsWith('.snapshot'))
-        .sort()
-        .reverse(); // Latest first
-
-      if (snapshotFiles.length === 0) {
-        return null;
-      }
-
-      const latestFile = snapshotFiles[0];
-      const filePath = path.join(snapshotDir, latestFile);
-      const fileContent = await fs.readFile(filePath);
-
-      // Parse filename: {roomId}-{version}-{timestamp}.snapshot
-      const parts = latestFile.replace('.snapshot', '').split('-');
-      const version = parseInt(parts[parts.length - 2] || '0', 10);
-      const timestamp = parseInt(parts[parts.length - 1] || '0', 10);
-
-      return {
-        roomId,
-        yjsState: new Uint8Array(fileContent),
-        version,
-        timestamp,
-      };
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error)
-          ? undefined
-          : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:storage:load:error',
-          roomId,
-        }
-      );
-      throw error;
-    }
-  }
-
-  async saveSnapshot(snapshot: Snapshot): Promise<void> {
-    try {
-      const snapshotDir = path.join(this.basePath, snapshot.roomId);
-      await fs.ensureDir(snapshotDir);
-
-      const filename = `${snapshot.roomId}-${snapshot.version}-${snapshot.timestamp}.snapshot`;
-      const filePath = path.join(snapshotDir, filename);
-
-      await fs.writeFile(filePath, Buffer.from(snapshot.yjsState));
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error)
-          ? undefined
-          : 'REALTIME_SNAPSHOT_STORAGE_SAVE_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:storage:save:error',
-          roomId: snapshot.roomId,
-        }
-      );
-      throw error;
-    }
-  }
-
-  async deleteSnapshot(roomId: string): Promise<void> {
-    try {
-      const snapshotDir = path.join(this.basePath, roomId);
-      if (await fs.pathExists(snapshotDir)) {
-        await fs.remove(snapshotDir);
-      }
-    } catch (error) {
-      coreError(
-        error instanceof Error && isCivicPressError(error)
-          ? error
-          : error instanceof Error
-            ? error
-            : new Error(String(error)),
-        isCivicPressError(error)
-          ? undefined
-          : 'REALTIME_SNAPSHOT_STORAGE_DELETE_ERROR',
-        { error: error instanceof Error ? error.message : String(error) },
-        {
-          operation: 'realtime:snapshot:storage:delete:error',
-          roomId,
-        }
-      );
-      throw error;
-    }
   }
 
   // ---- W4 row-shaped API ----
@@ -583,7 +369,7 @@ export class FilesystemSnapshotStorage implements SnapshotStorage {
 
   /**
    * Read a SnapshotRow from a blob + sidecar. If the sidecar is missing (e.g.
-   * a snapshot written by the legacy saveSnapshot()), the hash is recomputed
+   * a snapshot written before the W4 sidecar format), the hash is recomputed
    * on load and format/size are defaulted, so the row is still usable.
    */
   private async readRow(

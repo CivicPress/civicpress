@@ -239,10 +239,17 @@ prosemirror-markdown serializer/parser + y-prosemirror Yjs↔Markdown helpers.
 | Richer collaborative-editor **toolbar** + interactive **civic-ref node-views** | Out of Phase 3 scope; the editor path ships functional but minimal. |
 | **Browser E2E** | Integration tests use simulated y-protocols clients; real-browser E2E is a follow-up session. |
 | **Multi-node** (Redis/shared-state adapter) | Not shipped; room Yjs state is per-process. Single-node is the supported topology. A Redis fan-out adapter is a documented future option. |
-| The now-dead **legacy `SnapshotManager` API** (`createSnapshot` / `saveSnapshot` / `loadSnapshot` / `applySnapshot`) | Unused after the W4 schema rework + the handler-path swap; retained only as the manager's public API. Candidate for a cleanup pass. |
+| ~~The now-dead **legacy `SnapshotManager` API**~~ | **REMOVED 2026-06-15** (door-closing triage). Was unused after the W4 schema rework + the handler-path swap; deleted along with the legacy `SnapshotStorage` methods + the `Snapshot` interface. See `docs/post-refactor-backlog.md`. |
 | The CREATE-path **record-not-found placeholder** (draft seeded with `title = recordId`, `type = 'unknown'`) | Pragmatic fallback so collaborative content isn't dropped when the source record can't be found at writeback time. |
 | **Block-level civic-refs** round-trip only **inline** | Documented schema limitation. |
 | **Pre-existing 11 test failures** (EmailChannel / oauth / DNS / date-bomb) | Not Phase 3's to fix — deferred to the test-suite repair session (master plan §9.1 + `known-test-issues.md`). |
+
+**Triaged 2026-06-15** (door-closing pass before Phase 4): the remaining
+carry-forward items now live in `docs/post-refactor-backlog.md` with explicit
+dispositions. The dead `SnapshotManager` API was removed; the rest are
+backlogged (design-spike / editor UX / browser E2E / multi-node) or accepted as
+documented limitations. The 11 test failures stay with the test-suite-repair
+session.
 
 ---
 

@@ -178,9 +178,9 @@ export class RealtimeServer {
       // Periodic snapshot trigger (spec §6.2): every `interval` seconds (default
       // 60s) drive the HANDLER snapshot path — binary + collaborative Markdown
       // draft (W5-T11) — the same path grace-finalize, the API trigger, and the
-      // shutdown final pass use. The legacy binary-only createRoomSnapshot path is
-      // now fully retired (the SnapshotManager.createSnapshot/saveSnapshot pair it
-      // used is dead production code, kept only as the manager's public API).
+      // shutdown final pass use. The legacy binary-only createRoomSnapshot path
+      // and the SnapshotManager.createSnapshot/saveSnapshot/loadSnapshot/
+      // applySnapshot methods it used were removed as dead code (Phase 3 followup).
       if (this.realtimeConfig.snapshots.interval > 0) {
         this.snapshotInterval = setInterval(
           () => {

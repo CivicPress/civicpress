@@ -24,7 +24,6 @@ export {
   SNAPSHOT_TTL_MS,
 } from './persistence/snapshots.js';
 export type {
-  Snapshot,
   SnapshotRow,
   PersistRequest,
   CleanupOptions,
