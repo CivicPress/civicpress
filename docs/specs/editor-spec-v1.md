@@ -1,19 +1,51 @@
 # CivicPress Spec: `editor-spec-v1.md`
 
 ---
+version: 1.0.0
+status: draft
+created: '2025-12-04'
+updated: '2026-06-15'
+deprecated: false
+sunset_date: null
+breaking_changes: []
+additions:
+  - Markdown editor with preview mode
+  - Autosave draft functionality
+  - Metadata sidebar management
+  - Publish/draft workflow
+fixes: []
+migration_guide: null
+compatibility:
+  min_civicpress: '1.0.0'
+  max_civicpress: null
+dependencies:
+  - 'records.md: >=1.0.0'
+  - 'api.md: >=1.0.0'
+  - 'frontend.md: >=1.0.0'
+authors:
+  - 'Core Team <team@civicpress.io>'
+reviewers: []
+---
 
-version: 1.0.0 status: draft created: '2025-12-04' updated: '2025-12-04'
-deprecated: false sunset_date: null breaking_changes: [] additions:
+## ✅ As-Shipped Status (reconciled 2026-06-15)
 
-- Markdown editor with preview mode
-- Autosave draft functionality
-- Metadata sidebar management
-- Publish/draft workflow fixes: [] migration_guide: null compatibility:
-  min_civicpress: '1.0.0' max_civicpress: null dependencies:
-- 'records.md: >=1.0.0'
-- 'api.md: >=1.0.0'
-- 'frontend.md: >=1.0.0' authors:
-- 'Core Team <team@civicpress.io>' reviewers: []
+**Status: SHIPPED — this is the default editor.** The CodeMirror single-user
+Markdown editor described below is real and is the **default, always-safe path**
+of an as-shipped **dual-path editor**; the other path is the collaborative
+TipTap + Yjs editor (see `editor-spec-v3.md`). Corrections to this v1 document:
+
+- **Component layout.** `components/editor/MarkdownEditor.vue` is now the **host
+  that picks the path**, not the CodeMirror editor itself; the actual single-user
+  editor is `components/editor/CodeMirrorEditor.vue`, and the collaborative
+  editor is `components/editor/CollaborativeMarkdownEditor.vue`. `RecordForm.vue`
+  drives the choice via a `collaborativeMode` prop (default `false`). The
+  `PreviewPanel.vue` / `EditorToolbar.vue` pair drawn below is indicative, not
+  literal.
+- **API base path** is `/api/v1/records…`; the create / draft / publish model is
+  as described.
+- The **v1 → v2 → v3 "sequential replacement" framing** across these specs did
+  not play out as written — see the v2 and v3 reconciliation notes. The
+  canonical realtime transport spec is `realtime-architecture.md`.
 
 ---
 
