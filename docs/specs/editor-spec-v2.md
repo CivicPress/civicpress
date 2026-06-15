@@ -1,20 +1,62 @@
 # CivicPress Spec: `editor-spec-v2.md`
 
 ---
+version: 1.0.0
+status: draft
+created: '2025-12-04'
+updated: '2026-06-15'
+deprecated: false
+sunset_date: null
+breaking_changes: []
+additions:
+  - Typora-style WYSIWYM editing experience
+  - Inline civic components (records, geographies, attachments)
+  - ProseMirror/Milkdown editor framework
+  - Reference extraction from Markdown
+fixes: []
+migration_guide: null
+compatibility:
+  min_civicpress: '1.0.0'
+  max_civicpress: null
+dependencies:
+  - 'editor-spec-v1.md: >=1.0.0'
+  - 'records.md: >=1.0.0'
+  - 'api.md: >=1.0.0'
+  - 'frontend.md: >=1.0.0'
+authors:
+  - 'Core Team <team@civicpress.io>'
+reviewers: []
+---
 
-version: 1.0.0 status: draft created: '2025-12-04' updated: '2025-12-04'
-deprecated: false sunset_date: null breaking_changes: [] additions:
+## ⚠️ As-Shipped Status (reconciled 2026-06-15)
 
-- Typora-style WYSIWYM editing experience
-- Inline civic components (records, geographies, attachments)
-- ProseMirror/Milkdown editor framework
-- Reference extraction from Markdown fixes: [] migration_guide: null
-  compatibility: min_civicpress: '1.0.0' max_civicpress: null dependencies:
-- 'editor-spec-v1.md: >=1.0.0'
-- 'records.md: >=1.0.0'
-- 'api.md: >=1.0.0'
-- 'frontend.md: >=1.0.0' authors:
-- 'Core Team <team@civicpress.io>' reviewers: []
+**Status: SUPERSEDED — NOT shipped as specified.** The v2 plan below (a
+**Milkdown** WYSIWYM editor that **replaces** CodeMirror, **HTTP-only**, realtime
+deferred to v3) was **not built as described**. Read the sections below as the
+original v2 design, corrected by these points:
+
+- **No "WYSIWYM replaces CodeMirror" step shipped.** CodeMirror was **retained**
+  as the default single-user editor (`editor-spec-v1.md`). A WYSIWYM editor was
+  added — but as the **collaborative** path only (Phase 3, see
+  `editor-spec-v3.md`), not as a standalone HTTP-only v2 editor.
+- **TipTap, not Milkdown.** The WYSIWYM surface that shipped is **TipTap**
+  (ProseMirror-based), in `components/editor/CollaborativeMarkdownEditor.vue`,
+  built on the shared **`@civicpress/editor-schema`** package
+  (prosemirror-schema-basic subset + list nodes + **GFM tables** + a civic-ref
+  inline node).
+- **Civic-ref syntax is different.** Civic references serialize as **HTML
+  comments**, not `[[record:UUID|Label]]`:
+  `<!--civic-ref type="record" id="rec-abc" label="Budget 2026"-->`. There is a
+  **single** `civicRef` inline node with `refType ∈ {record, geography,
+  attachment}` — not separate record/zone/file component types. Images use
+  standard Markdown `![alt](src)`. Civic-refs round-trip **inline only** (not
+  block-level).
+- **No `/parse-references` endpoint.** `POST /api/v1/records/:id/parse-references`
+  does **not** exist.
+- **Content-loss guard.** Because the editor schema is a Markdown subset, a
+  record whose Markdown can't round-trip losslessly (raw HTML, footnotes) is
+  routed back to the CodeMirror single-user editor rather than risk dropping
+  content (`utils/content-loss-guard.ts`).
 
 ---
 

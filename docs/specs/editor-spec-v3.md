@@ -1,21 +1,70 @@
 # CivicPress Spec: `editor-spec-v3.md`
 
 ---
+version: 1.0.0
+status: draft
+created: '2025-12-04'
+updated: '2026-06-15'
+deprecated: false
+sunset_date: null
+breaking_changes: []
+additions:
+  - Real-time collaborative editing using yjs
+  - WebSocket-based document synchronization
+  - Presence indicators and cursor tracking
+  - Snapshot persistence for reconnection
+fixes: []
+migration_guide: null
+compatibility:
+  min_civicpress: '1.0.0'
+  max_civicpress: null
+dependencies:
+  - 'editor-spec-v2.md: >=1.0.0'
+  - 'realtime-architecture.md: >=1.0.0'
+  - 'records.md: >=1.0.0'
+  - 'api.md: >=1.0.0'
+  - 'frontend.md: >=1.0.0'
+authors:
+  - 'Core Team <team@civicpress.io>'
+reviewers: []
+---
 
-version: 1.0.0 status: draft created: '2025-12-04' updated: '2025-12-04'
-deprecated: false sunset_date: null breaking_changes: [] additions:
+## ✅ As-Shipped Status (reconciled 2026-06-15)
 
-- Real-time collaborative editing using yjs
-- WebSocket-based document synchronization
-- Presence indicators and cursor tracking
-- Snapshot persistence for reconnection fixes: [] migration_guide: null
-  compatibility: min_civicpress: '1.0.0' max_civicpress: null dependencies:
-- 'editor-spec-v2.md: >=1.0.0'
-- 'realtime-architecture.md: >=1.0.0'
-- 'records.md: >=1.0.0'
-- 'api.md: >=1.0.0'
-- 'frontend.md: >=1.0.0' authors:
-- 'Core Team <team@civicpress.io>' reviewers: []
+**Status: SHIPPED in Phase 3 (with the corrections below).** Real-time
+collaborative editing landed via the reintroduced `modules/realtime` (Yjs-only).
+The canonical realtime transport/architecture doc is `realtime-architecture.md`;
+this spec is right in spirit (yjs + WebSocket + presence + snapshots) but
+diverges in specifics:
+
+- **TipTap, not "the v2 Milkdown editor."** The collaborative surface is
+  **TipTap + Yjs** (`components/editor/CollaborativeMarkdownEditor.vue`) over the
+  shared **`@civicpress/editor-schema`**. It is one path of a **dual-path
+  editor**: CodeMirror (single-user, default) + TipTap/Yjs (collaborative,
+  opt-in via the `collaborativeMode` prop, and only when the record's Markdown
+  round-trips losslessly — otherwise it falls back to CodeMirror with a notice,
+  enforced by `utils/content-loss-guard.ts`).
+- **Realtime runs IN-PROCESS with the API.** Not a separately deployed service:
+  the same Node process hosts the WS server on its **own port** (default 3001),
+  gated by `RealtimeConfig.enabled`. The endpoint `/realtime/records/<recordId>`
+  is correct as specced; auth is carried in the `auth.<token>` WS subprotocol.
+- **Snapshot endpoint differs.** There is **one** endpoint —
+  `POST /api/v1/records/:id/snapshot` (force-flush the room's Yjs doc to a
+  persisted snapshot + canonical Markdown draft) — **not** the GET/POST
+  `/collab-snapshot` pair below. Snapshots are **integrity-hashed,
+  format-versioned, size-aware, 48h-TTL DB rows** owned by the server's
+  `SnapshotManager`, not base64 blobs round-tripped through the UI.
+- **Writeback is server-owned → a review-gated DB DRAFT, not auto-Git.** The
+  server's `RecordRoomHandler` periodically serializes the Yjs doc to Markdown
+  and writes a **draft** (`record_drafts.markdown_body`, authored
+  `realtime-snapshot`); a Git commit happens only when a human **publishes**.
+  Client autosave is **gated off** in collab mode (server owns writeback; client
+  save becomes a blur/explicit backstop). The "collab edits as auditable Git
+  civic events" idea is a **deferred follow-up** — see
+  `docs/post-refactor-backlog.md`.
+- **Component names.** The server file is `realtime-server.ts` (not `server.ts`),
+  with `rooms/yjs-room.ts` + `rooms/record-room-handler.ts`, `presence/`, and
+  `persistence/snapshots.ts`.
 
 ---
 
