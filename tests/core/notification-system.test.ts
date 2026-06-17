@@ -9,21 +9,20 @@ import { vi } from 'vitest';
 import { join } from 'path';
 import { existsSync, mkdirSync, rmSync, copyFileSync } from 'fs';
 
-// Mock nodemailer so the canonical EmailChannel does not attempt real SMTP
-// connections against the fixture host (`smtp.test.com`). Hoisted via
-// vi.hoisted so the mock is in place before the canonical channel module
-// loads.
-const mocks = vi.hoisted(() => {
-  const sendMail = vi
-    .fn()
-    .mockResolvedValue({ messageId: 'mock-mid-notification-system-test' });
-  const createTransport = vi.fn(() => ({ sendMail }));
-  return { sendMail, createTransport };
-});
-vi.mock('nodemailer', () => ({
-  default: { createTransport: mocks.createTransport },
-  createTransport: mocks.createTransport,
-}));
+// Inject a fake nodemailer transport factory into the canonical EmailChannel
+// so it does not attempt a real SMTP connection against the fixture host
+// (`smtp.test.com`). EmailChannel takes `createTransport` as a dependency;
+// a module-level `vi.mock('nodemailer')` was fragile here (cross-workspace
+// resolution mismatch). See known-test-issues W5/D1.
+const sendMail = vi
+  .fn()
+  .mockResolvedValue({ messageId: 'mock-mid-notification-system-test' });
+const fakeCreateTransport = vi.fn(
+  () =>
+    ({ sendMail }) as unknown as ReturnType<
+      typeof import('nodemailer').createTransport
+    >
+);
 
 import { NotificationService } from '../../core/src/notifications/notification-service.js';
 import { NotificationConfig } from '../../core/src/notifications/notification-config.js';
@@ -84,23 +83,25 @@ describe('Notification System', () => {
       // notification-service dispatcher can drive it.
       const emailConfig = config.getChannelConfig('email');
       const smtp = (emailConfig as any).nodemailer;
-      const canonical = new EmailChannel({
-        smtp: {
-          host: smtp.host,
-          port: smtp.port,
-          secure: smtp.secure,
-          auth: smtp.auth,
+      const canonical = new EmailChannel(
+        {
+          smtp: {
+            host: smtp.host,
+            port: smtp.port,
+            secure: smtp.secure,
+            auth: smtp.auth,
+          },
+          defaultFrom: smtp.from,
         },
-        defaultFrom: smtp.from,
-      });
+        fakeCreateTransport
+      );
       const emailChannel = {
         getName: () => 'email',
         isEnabled: () => true,
         async send(request: any) {
           const { messageId } = await canonical.send({
             to: request.to,
-            subject:
-              request.content?.subject || 'CivicPress Notification',
+            subject: request.content?.subject || 'CivicPress Notification',
             text: request.content?.text || request.content?.body,
             html: request.content?.html,
           });
@@ -129,8 +130,8 @@ describe('Notification System', () => {
       expect(result.success).toBe(true);
       expect(result.sentChannels).toContain('email');
       expect(result.notificationId).toBeDefined();
-      // nodemailer mock was invoked by the canonical channel
-      expect(mocks.sendMail).toHaveBeenCalled();
+      // the injected fake transport was invoked by the canonical channel
+      expect(sendMail).toHaveBeenCalled();
     });
 
     it('should handle missing template gracefully', async () => {

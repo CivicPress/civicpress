@@ -2,34 +2,41 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   GitHubOAuthProvider,
   OAuthProviderManager,
+  type OctokitLoader,
+  type OctokitUser,
 } from '../../core/src/auth/oauth-provider';
 
-// Mock Octokit
-vi.mock('octokit', () => ({
-  Octokit: vi.fn().mockImplementation(() => ({
-    rest: {
-      users: {
-        getAuthenticated: vi.fn().mockResolvedValue({
-          data: {
-            id: 123456,
-            login: 'testuser',
-            email: 'test@example.com',
-            name: 'Test User',
-            avatar_url: 'https://avatars.githubusercontent.com/u/123456?v=4',
-          },
-        }),
-      },
-    },
-  })),
-}));
+// Canonical authenticated-user payload the fake GitHub API returns.
+const githubUser: OctokitUser = {
+  id: 123456,
+  login: 'testuser',
+  email: 'test@example.com',
+  name: 'Test User',
+  avatar_url: 'https://avatars.githubusercontent.com/u/123456?v=4',
+};
+
+// Build an OctokitLoader whose `rest.users.getAuthenticated` behaves as the
+// supplied spy dictates. This is injected into the provider/manager so no real
+// network call and no module-path-sensitive `vi.mock('octokit')` is needed.
+function loaderFor(
+  getAuthenticated: () => Promise<{ data: OctokitUser }>
+): OctokitLoader {
+  return async () =>
+    class {
+      rest = { users: { getAuthenticated } };
+    } as unknown as Awaited<ReturnType<OctokitLoader>>;
+}
+
+const okLoader = () =>
+  loaderFor(vi.fn().mockResolvedValue({ data: { ...githubUser } }));
 
 describe('OAuth Provider', () => {
   let provider: GitHubOAuthProvider;
   let manager: OAuthProviderManager;
 
   beforeEach(() => {
-    provider = new GitHubOAuthProvider();
-    manager = new OAuthProviderManager();
+    provider = new GitHubOAuthProvider(okLoader());
+    manager = new OAuthProviderManager(okLoader());
   });
 
   describe('GitHubOAuthProvider', () => {
@@ -49,53 +56,32 @@ describe('OAuth Provider', () => {
     });
 
     it('should throw error for invalid token', async () => {
-      const { Octokit } = await import('octokit');
-      const mockOctokit = Octokit as any;
+      const failing = new GitHubOAuthProvider(
+        loaderFor(vi.fn().mockRejectedValue(new Error('Bad credentials')))
+      );
 
-      // Mock error response
-      mockOctokit.mockImplementation(() => ({
-        rest: {
-          users: {
-            getAuthenticated: vi
-              .fn()
-              .mockRejectedValue(new Error('Invalid token')),
-          },
-        },
-      }));
-
-      const token = 'invalid_token';
-
-      await expect(provider.validateToken(token)).rejects.toThrow(
+      await expect(failing.validateToken('invalid_token')).rejects.toThrow(
         'Invalid GitHub token'
       );
     });
 
     it('should handle missing email gracefully', async () => {
-      const { Octokit } = await import('octokit');
-      const mockOctokit = Octokit as any;
+      const noEmail = new GitHubOAuthProvider(
+        loaderFor(
+          vi.fn().mockResolvedValue({ data: { ...githubUser, email: null } })
+        )
+      );
 
-      // Mock response with null email
-      mockOctokit.mockImplementation(() => ({
-        rest: {
-          users: {
-            getAuthenticated: vi.fn().mockResolvedValue({
-              data: {
-                id: 123456,
-                login: 'testuser',
-                email: null,
-                name: 'Test User',
-                avatar_url:
-                  'https://avatars.githubusercontent.com/u/123456?v=4',
-              },
-            }),
-          },
-        },
-      }));
-
-      const token = 'ghp_test123456789';
-      const user = await provider.validateToken(token);
-
+      const user = await noEmail.validateToken('ghp_test123456789');
       expect(user.email).toBeUndefined();
+    });
+
+    it('should throw when Octokit is unavailable', async () => {
+      const unavailable = new GitHubOAuthProvider(async () => null);
+
+      await expect(
+        unavailable.validateToken('ghp_test123456789')
+      ).rejects.toThrow('GitHub OAuth is not available');
     });
   });
 
