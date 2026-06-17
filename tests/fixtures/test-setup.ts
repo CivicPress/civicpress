@@ -178,60 +178,6 @@ export function setupCoreMocks() {
 }
 
 // Mock implementations
-function createMockRecordManager() {
-  let recordStore: any = {
-    'test-record-1': {
-      id: 'test-record-1',
-      title: 'Test Record',
-      type: 'bylaw',
-      status: 'draft',
-      content: '# Test Record\n\nContent here...',
-      metadata: {},
-      path: '/test-record-1.md',
-      created_at: new Date().toISOString(),
-      author: 'test-user',
-    },
-  };
-
-  return {
-    createRecord: vi.fn().mockImplementation((request: any) => {
-      const id = `test-record-${Object.keys(recordStore).length + 1}`;
-      const record = {
-        id,
-        title: request.title || 'Test Record',
-        type: request.type || 'bylaw',
-        status: 'draft',
-        content: request.content || '# Test Record\n\nContent here...',
-        metadata: request.metadata || {},
-        path: `/${id}.md`,
-        created_at: new Date().toISOString(),
-        author: 'test-user',
-      };
-      recordStore[id] = record;
-      return record;
-    }),
-    getRecord: vi.fn().mockImplementation((id: string) => {
-      return recordStore[id] || null;
-    }),
-    updateRecord: vi.fn().mockImplementation((id: string, updates: any) => {
-      if (!recordStore[id]) return null;
-      recordStore[id] = { ...recordStore[id], ...updates };
-      return recordStore[id];
-    }),
-    archiveRecord: vi.fn().mockImplementation((id: string) => {
-      if (!recordStore[id]) return false;
-      delete recordStore[id];
-      return true;
-    }),
-    listRecords: vi.fn().mockResolvedValue({
-      records: Object.values(recordStore),
-      total: Object.keys(recordStore).length,
-      page: 1,
-      limit: 10,
-    }),
-  };
-}
-
 function createMockTemplateManager() {
   return {
     createTemplate: vi.fn().mockImplementation((data: any) => ({
