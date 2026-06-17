@@ -9,5 +9,6 @@
   "files.associations": {
     "*.md": "markdown"
   },
-  "files.trimTrailingWhitespaceInRegexAndStrings": false
+  "files.trimTrailingWhitespaceInRegexAndStrings": false,
+  "makefile.configureOnOpen": false
 }
