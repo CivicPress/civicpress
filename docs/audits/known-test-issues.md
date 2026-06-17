@@ -17,7 +17,17 @@ dedicated one named in the "Deferred to" column.
 
 ### W1 — `pnpm -C core test` (jest) is broken
 
-**Status:** pre-existing; no jest config has ever shipped in `core/`.
+**Status:** RESOLVED 2026-06-17 (workspace-test-runner-setup session, branch
+`test/workspace-runners`). Added `core/vitest.config.mjs` (scoped to core's
+colocated `src/**/__tests__/**`, node env, forks) and switched
+`core/package.json` `"test": "jest"` → `"vitest run"` (+ `test:run`,
+`test:watch`). Removed the dead `jest` + `@types/jest` devDeps (no jest
+config/key/imports ever existed). `pnpm -C core test` → 35 files / 358 tests
+pass. Scope note: the per-workspace runner covers core's colocated unit tests;
+the root runner (`pnpm test`) remains canonical and additionally owns
+`tests/core/**` integration tests. Mirrors the existing `modules/storage`
+pattern; verified the root collection is unchanged (124 files / 1324 cases) and
+the sub-config does not leak into root runs.
 
 **Reproduction:**
 
@@ -49,7 +59,13 @@ audit). One-day chore.
 
 ### W2 — `pnpm -C cli test` (jest) is broken
 
-**Status:** pre-existing; same root cause as W1.
+**Status:** RESOLVED 2026-06-17 (workspace-test-runner-setup session). Added
+`cli/vitest.config.mjs` (colocated `src/**/__tests__/**` + `@civicpress/core` →
+`../core/dist/` alias, since some CLI unit tests import core), switched
+`cli/package.json` `"test": "jest"` → `"vitest run"` (+ `test:run`,
+`test:watch`), and removed the dead `jest` + `@types/jest` devDeps.
+`pnpm -C cli test` → 11 files / 84 tests pass. Same scope note as W1
+(`tests/cli/**` integration tests stay with the root runner).
 
 **Reproduction:**
 
@@ -66,7 +82,13 @@ vitest.
 
 ### W3 — `pnpm -C modules/api test:run` finds no test files
 
-**Status:** pre-existing; no per-workspace vitest config in `modules/api`.
+**Status:** RESOLVED 2026-06-17 (workspace-test-runner-setup session). Added
+`modules/api/vitest.config.mjs` (colocated `src/**/__tests__/**` +
+`@civicpress/core` → `../../core/dist/` alias). The `test`/`test:run` scripts
+were already `vitest`/`vitest run`; they just lacked a config to resolve include
+globs from the workspace cwd. `pnpm -C modules/api test:run` → 3 files / 35
+tests pass. Same scope note as W1 (`tests/api/**`, `tests/e2e/**`,
+`tests/integration/**` stay with the root runner).
 
 **Reproduction:**
 
