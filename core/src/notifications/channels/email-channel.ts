@@ -49,11 +49,21 @@ export type EmailSendResult = {
   messageId: string;
 };
 
+// Factory that builds a nodemailer Transporter. Injectable so tests supply a
+// fake without `vi.mock('nodemailer')` — module mocking is fragile here because
+// this source resolves `nodemailer` from `core/`'s node_modules while a root
+// `tests/` file resolves it from the root, so the mock can miss. Defaults to
+// the real nodemailer in production.
+export type CreateTransport = typeof nodemailer.createTransport;
+
 export class EmailChannel {
   private readonly transporter: Transporter;
   private readonly defaultFrom?: string;
 
-  constructor(options: EmailChannelOptions) {
+  constructor(
+    options: EmailChannelOptions,
+    createTransport: CreateTransport = nodemailer.createTransport
+  ) {
     this.defaultFrom = options.defaultFrom;
     if (options.smtp && options.sendgrid) {
       throw new Error(
@@ -61,7 +71,7 @@ export class EmailChannel {
       );
     }
     if (options.smtp) {
-      this.transporter = nodemailer.createTransport({
+      this.transporter = createTransport({
         host: options.smtp.host,
         port: options.smtp.port,
         secure: options.smtp.secure ?? false,
@@ -74,7 +84,7 @@ export class EmailChannel {
       // do not duplicate here — if/when richer SendGrid features (templates,
       // sandbox mode, etc.) are needed, add a second class rather than
       // expanding this one.
-      this.transporter = nodemailer.createTransport({
+      this.transporter = createTransport({
         service: 'SendGrid',
         auth: { user: 'apikey', pass: options.sendgrid.apiKey },
       });

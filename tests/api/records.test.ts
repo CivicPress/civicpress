@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import {
   createAPITestContext,
   cleanupAPITestContext,
   setupGlobalTestEnvironment,
 } from '../fixtures/test-setup';
+
+// This is the heaviest API suite: many cases seed records, and each record
+// write is a real Git commit. On slower machines/CI that pushes individual
+// cases past Vitest's 5s default. Raise the ceiling for this file only — still
+// bounded, so a genuine hang surfaces rather than running forever.
+vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
 
 // Setup global test environment
 await setupGlobalTestEnvironment();
