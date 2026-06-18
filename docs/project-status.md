@@ -186,6 +186,23 @@ The platform is suitable for early pilots and development; it is not yet product
 - Password reset functionality - In Progress
 - Admin dashboard - In Progress
 
+#### **BroadcastBox Hardware Appliance (Alpha — Phase 4)**
+
+The meeting-capture hardware appliance lives in a **separate repository**
+(`civicpress-broadcast-box`, Python, AGPL-3.0-or-later). It is **alpha, not
+pilot-ready**:
+
+- **Working:** video capture, encoding (incl. Raspberry Pi `h264_v4l2m2m`
+  hardware encoder), WebRTC preview, AP-mode enrollment, and CivicPress API
+  integration.
+- **Not yet there (the mission gap):** recordings produce `.mp4` only — **no
+  Markdown civic record** (transcript, motions, attendees, speaker turns) is
+  generated yet. There is also no clerk-installable appliance image.
+- **Status:** refactor **Phase 4** is auditing and fixing the hardware repo
+  (canonical cross-repo protocol artifact, the video→Markdown civic-artifact
+  pipeline, and a real install path). See
+  `docs/plans/2026-06-18-base-refactor-phase-4-broadcast-box-hw.md`.
+
 ### Recently Completed Features
 
 #### **Google Cloud Storage (GCS) Provider Support (January 2025)**

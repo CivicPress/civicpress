@@ -430,6 +430,12 @@ Two High-severity sensitive-content findings (workspace-001, workspace-002) both
 | BB-HW-011 | `closed-with-commit-SHA` | 2026-06-18 | Phase 4 quick-win. civicpress-broadcast-box repo commit `afda81d` (local only — no remote). `services/ap_mode/service.py` hardcoded `self.timeout_minutes = 0  # Disabled for testing`, leaving the enrollment Wi-Fi AP open indefinitely. Made `timeout_minutes` a constructor param with a safe default of 15 (the existing `if timeout_minutes > 0` guard + `_timeout_timer` auto-deactivate the AP); 0 still disables it for tests. py_compile clean; no test references the timer. Full pytest not run (hardware-repo deps not installed in the dev VM). |
 | BB-HW-012 | `closed-by-recon-no-commit` | 2026-06-18 | Phase 4 recon. Audit (2026-05) flagged `security-considerations.md` "Credentials stored encrypted in SQLite" as doc-vs-code drift. Re-verified against current code: `services/device/credentials.py` now implements real encryption (`Fernet` + PBKDF2HMAC); `store_credentials` encrypts before `state_manager.set_config(...)` and `get_credentials` decrypts. The doc claim is now TRUE — encryption was added since the audit snapshot. No change needed; registry-only closure. |
 | BB-HW-015 | `closed-with-commit-SHA` | 2026-06-18 | Phase 4 quick-win. civicpress-broadcast-box repo commit `6b45fc9` (local only — no remote). Version/status claims disagreed across three sources: `pyproject.toml` (`version = "0.1.0"`, no maturity signal), CHANGELOG (`[0.1.0]` = "Initial design and documentation phase" — false; the real implementation sat under `[Unreleased]`), and `agent/goals.md` ("✅ CORE IMPLEMENTATION COMPLETE"). Maintainer chose the "alpha, not pilot-ready" framing (2026-06-18); aligned all four sources (those three + README `## Status`) on: **0.1.0, alpha, unreleased — core capture/encoding/preview/CivicPress integration operational; not yet pilot-ready (no civic-artifact output, no installer)**. Added a `Development Status :: 3 - Alpha` classifier to pyproject. Doc-only; pyproject still parses. |
+| BB-HW-007 | `closed-with-commit-SHA` | 2026-06-18 | Phase 4 W0. The hardware appliance is now documented in the published base docs (this Phase 4 W0 base commit on `refactor/phase-4-w0`): `docs/roadmap.md` Phase 4 truth-meter row expanded from "_pending_" to the in-progress state, and `docs/project-status.md` "In Progress" gains a **"BroadcastBox Hardware Appliance (Alpha — Phase 4)"** subsection — separate repo, AGPL-3.0, working capture/encode/preview, honest about the gaps (no Markdown civic record yet, no installer). Closes the "flagship's hardware side invisible to published roadmap" gap. |
+| bb-hw-pyproject-dep-drift | `closed-with-commit-SHA` | 2026-06-18 | (Phase 4 W0 scoping finding N1, not in original 205) civicpress-broadcast-box `23b87c9` (local only — no remote, workspace-003). `pyproject.toml [project.dependencies]` omitted `fastapi`, `uvicorn`, `av`, `aiortc` — all imported at module load by `src/` (`web/api/routes.py`, `services/preview/*`, `services/ap_mode/web_server.py`) — so a clean `pip install -e .` produced a non-importable app (the Mac flow worked only because the Makefile installed from `requirements.txt`, which did list them). Added the four to pyproject (now a complete single source of truth); pointed Makefile `install`/`dev-setup` at `pip install -e ".[dev]"`; kept `requirements.txt` as a documented mirror. |
+| bb-hw-opencv-headless | `closed-with-commit-SHA` | 2026-06-18 | (Phase 4 W0 scoping finding N2, not in original 205) `23b87c9`. Switched `opencv-python` → `opencv-python-headless` in pyproject + requirements. The appliance is a headless SBC (no display / no `libGL.so.1`); the GUI build can't import there and is the wrong dependency for a Raspberry Pi. Verified zero `cv2` GUI calls (`imshow`/`namedWindow`/`waitKey`/…) in the tree, so headless is behaviour-preserving. Ties into BB-HW-009 (Pi install path). |
+| bb-hw-v4l2-encoder-test | `closed-with-commit-SHA` | 2026-06-18 | (Phase 4 W0 scoping finding N3, not in original 205) `23b87c9`. `tests/unit/test_unified_encoder.py::test_encoder_detection` allow-list omitted `EncoderType.V4L2_M2M` (`h264_v4l2m2m`) — the Raspberry Pi's hardware encoder that production **defines and selects** (`services/encoder/detection.py:17,210`). The test therefore passed on a Mac (VideoToolbox) but would **fail on the actual Pi target** — inverse of what a hardware appliance's suite should do. Production code is correct; added `V4L2_M2M` to the test. With N1+N2+N3 and the system `ffmpeg` binary, a clean `pip install -e ".[dev]"` yields **283 passed / 7 skipped / 0 failed** on the ARM dev VM (was un-runnable from a clean checkout before W0). |
+| bb-hw-gitignore-venvs | `closed-with-commit-SHA` | 2026-06-18 | (Phase 4 W0 scoping finding N4, not in original 205) `23b87c9`. `.gitignore` hardened to ignore side venvs (`.venv*/`) created by the documented dev-env recipe; removed on-disk macOS/build cruft (`.DS_Store`, `.coverage`, `coverage.xml`, `htmlcov/`, dead macOS `.venv/`) — all were already gitignored/untracked, so disk-only cleanup, no tracked-file change. |
+| truth-check-makefile-allowlist | `closed-with-commit-SHA` | 2026-06-18 | (Phase 4 W0 surfaced finding N5, base repo, not in original 205) The `audit-truth-check` gate itself was failing whole-repo: `make help`'s text (`Makefile:12`) lists the overclaim patterns as examples of what it scans for, so the gate flagged its own documentation. Latent since `443a577` (2026-05-18, the commit that added both the gate and the help text); never observed because the refactor runs on local-only branches, so GitHub CI hasn't executed. Fix: added `Makefile` to `scripts/audit-truth-check-allowlist.txt`, extending the existing "this script + its allow-list + the CI workflow naturally mention the patterns" stanza (the Makefile target is the same gate machinery, simply omitted). Gate now PASSES whole-repo under both GNU grep (CI-equivalent) and the dev VM's ugrep shim. |
 | ui-005 | `closed-with-commit-SHA` | 2026-05-18 | Phase 2b Tasks 8 (`b58cd27` — RecordForm/GeographyForm/UserForm, 24 cases) + 9 (`10997e3` — RecordList/RecordSearch/RecordPreview/StatusTransitionControls, 23 cases). 47 component test cases pinning the 7 civic-critical UI surfaces. `data-test` hooks added to the 4 viewing components. Full ≥25-component coverage rolls to Phase 2d structural hardening. |
 | cli-001 | `closed-with-commit-SHA` | 2026-05-18 | Phase 2b Tasks 10 (`5d9587d` — init/create/list/publish/validate, 34 cases incl. 3 .skip-with-TODO) + 11 (`08ed68a` — history/search/status/users/login, 37 cases). 71 CLI test cases pinning command registration, options, positional args. Surfaced real bugs: `publish.ts` doesn't exist (folded into status command); `status.ts` hardcodes valid statuses without 'published' while `init.ts` seeds it. Bugs tracked for Phase 2c, not fixed in scope. Full 28-command coverage rolls to Phase 2d. **Phase 2c follow-ups (post-closure):** Task 10 (`b2914ea`) deleted 16 placeholder `tests/cli/*.test.ts` theatre files (2232 LoC) that asserted only the "CLI testing disabled" stub — plus removed `runCivicCommand` from `tests/utils/cli-test-utils.ts`. Kept the 10 real `tests/cli/*` integration files that exec the built binary. Task 11 (`230976e`) wired `civic publish` as a top-level CLI command (wraps `publishDraft` saga path), exported `VALID_STATUSES` from `status.ts` with `'published'` added (matches what `init.ts` seeds), and replaced the 3 `.skip-with-TODO` cases in `cli/src/commands/__tests__/publish.test.ts` with real assertions. Test count drop on suite (1309 → 1191) is the theatre removal. CLI's real test surface is now `cli/src/commands/__tests__/` (Phase 2b+2c, 12 files / 84 cases) + `tests/cli/` (10 integration files exercising the built binary). |
 | realtime-007 | `wontfix-pending-phase-3` | 2026-05-18 | Phase 2c Task 2 recon: `modules/realtime/src/realtime-server.ts` does not exist on `dev` (only compiled `.d.ts` artefacts remain). The file lives on the paused `broadcast-box` branch; per master plan §5/§9 Phase 3 reintroduces realtime "Yjs-only, no broadcast-box code." `generateParticipantColor()` and `PARTICIPANT_COLORS` get cleaned up as part of Phase 3 realtime reintroduction. No commit on Phase 2c branch (registry-only). |
@@ -657,3 +663,45 @@ snapshot — several had drifted.** Outcome:
 2026-05 audit (enrollment flow, credential encryption, …), so `BB-HW-*` findings
 must be re-verified against current code before action — BB-HW-012 was already
 fixed; others may be too.
+
+### Phase 4 W0 — unblock + green (2026-06-18)
+
+The first real Phase 4 workstream. Goal: make the hardware repo build/run/test
+from a clean, non-macOS checkout, and make the appliance visible in the
+published base docs — the foundation the heavier workstreams (protocol artifact,
+civic-artifact pipeline, installer) sit on. Plan:
+`docs/plans/2026-06-18-base-refactor-phase-4-broadcast-box-hw.md`.
+
+Scoping proved the repo **is runnable on the dev VM** (ARM/aarch64, Python 3.12)
+— the committed `.venv` was a dead macOS venv that hid this. Four issues blocked
+a clean build; all fixed in hardware-repo commit `23b87c9`:
+
+- **N1 `bb-hw-pyproject-dep-drift`** → `pyproject` was missing 4 deps the code
+  imports (fastapi/uvicorn/av/aiortc); a clean `pip install -e .` built a broken
+  app. (See closed-row above.)
+- **N2 `bb-hw-opencv-headless`** → `opencv-python` → `-headless` for the headless
+  appliance. (See closed-row above.)
+- **N3 `bb-hw-v4l2-encoder-test`** → encoder-detection test rejected the Pi's own
+  `V4L2_M2M` encoder; green on a Mac, red on the actual Pi. (See closed-row above.)
+- **N4 `bb-hw-gitignore-venvs`** → gitignore hardening + on-disk cruft removal.
+  (See closed-row above.)
+
+**Result:** a clean `pip install -e ".[dev]"` (+ the system `ffmpeg` binary —
+a documented non-pip dependency) yields **283 passed / 7 skipped / 0 failed**
+(~2.5 min). Also closed **BB-HW-007** (appliance now in `roadmap.md` +
+`project-status.md`).
+
+**Unblocks BB-HW-010:** its deferral above cited "no runnable test suite
+(hardware-repo deps not installed in the dev VM)" as the risk. W0 removes that
+blocker — the suite now runs, so the query-param-token auth-flow refactor is
+testable. Re-open it in the W4 security pass.
+
+**Reproducible dev-env recipe** captured in the `broadcast-box-hw-dev-env`
+memory (and now wired into `make dev-setup`).
+
+**Also surfaced (base repo, N5 `truth-check-makefile-allowlist`):** committing
+these W0 docs exposed that the `audit-truth-check` gate was failing whole-repo on
+its own `Makefile` help text — latent since the gate was added, unseen because
+the refactor never pushed to GitHub CI. Fixed by allow-listing `Makefile`
+(same rationale as the already-listed script/allow-list/workflow). The gate now
+passes whole-repo. (See closed-row above.)
