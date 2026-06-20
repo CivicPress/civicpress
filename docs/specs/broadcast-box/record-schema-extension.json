@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://civicpress.org/schemas/modules/broadcast-box/session-extension.json",
+  "title": "BroadcastBox session record extension",
+  "description": "Fields the broadcast-box module contributes to `session` records via its manifest `capabilities.schemaExtensions: [\"session\"]`. STAGING LOCATION: this is the canonical draft; in Phase 5 it relocates verbatim to `modules/broadcast-box/schemas/record-schema-extension.json` (where ModuleResolver loads it). Capture/schedule provenance for meetings captured by a BroadcastBox appliance. NOTE: `visibility` and `minutes_status` are CORE session fields (record-type-schemas/session-schema.json), not here; the A/V blob itself is an `attached_files[]` entry on the record (UUID storage), referenced by `capture.av_file`.",
+  "type": "object",
+  "properties": {
+    "capture": {
+      "type": "object",
+      "description": "Provenance of an appliance-captured recording.",
+      "required": ["device"],
+      "properties": {
+        "device": {
+          "type": "string",
+          "description": "Enrolled BroadcastBox device id that produced the recording."
+        },
+        "av_file": {
+          "type": "string",
+          "description": "Storage UUID of the recorded A/V, stored as an attached_files[] entry."
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Actual recording start (ISO 8601)."
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Actual recording end (ISO 8601)."
+        },
+        "duration_s": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Actual recording duration in seconds."
+        },
+        "segments": {
+          "type": "array",
+          "description": "Time segments enabling per-segment visibility (e.g. an in-camera portion within an otherwise public meeting).",
+          "items": {
+            "type": "object",
+            "required": ["start", "end", "visibility"],
+            "properties": {
+              "start": { "type": "number", "minimum": 0, "description": "Segment start offset in seconds." },
+              "end": { "type": "number", "minimum": 0, "description": "Segment end offset in seconds." },
+              "visibility": {
+                "type": "string",
+                "enum": ["public", "in_camera"],
+                "description": "Whether this segment is published. in_camera segments are excluded from publication and livestream."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "schedule": {
+      "type": "object",
+      "description": "Pre-meeting scheduling pushed to the assigned device so it can capture autonomously even without connectivity.",
+      "properties": {
+        "scheduled_start": { "type": "string", "format": "date-time" },
+        "scheduled_end": { "type": "string", "format": "date-time" },
+        "assigned_device": {
+          "type": "string",
+          "description": "Enrolled device id assigned to capture this session."
+        }
+      },
+      "additionalProperties": true
+    },
+    "transcript_status": {
+      "type": "string",
+      "enum": ["automated", "reviewed"],
+      "description": "Verification state of the AI transcript. 'automated' = unverified (display labeled, A/V is authoritative); 'reviewed' = a clerk has checked it."
+    }
+  },
+  "additionalProperties": true
+}

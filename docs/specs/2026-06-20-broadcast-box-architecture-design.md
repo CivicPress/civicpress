@@ -101,14 +101,26 @@ transcript, minutes, agenda}. Plus base: `status` (config enum:
 draft → pending_review → under_review → approved → published → …),
 `attached_files[]` on UUID storage.
 
-**BroadcastBox extensions** — added via the broadcast-box module's manifest
-`capabilities.schemaExtensions` (the legal-register pattern), NOT in core's
-session schema, NOT as a new type:
+**Field placement (split between core and the module):**
+
+*Core `session` schema* — general civic fields that any session can have
+(`core/src/schemas/record-type-schemas/session-schema.json`, landed `fa27c37`):
+
+```yaml
+visibility: public          # public | in_camera  (gates publication AND livestream)
+minutes_status: draft       # draft | under_review | adopted  (minutes adoption)
+```
+
+*Broadcast-box module fragment* — capture-specific fields, contributed via the
+module's manifest `capabilities.schemaExtensions: ["session"]` (the legal-register
+pattern; NOT in core, NOT a new type). Staged at
+`docs/specs/broadcast-box/record-schema-extension.json` (relocates to
+`modules/broadcast-box/schemas/record-schema-extension.json` in Phase 5),
+validated by `tests/core/broadcast-box-session-extension.test.ts`:
 
 ```yaml
 # existing session fields (date, location, attendees[], topics[], media{…}) … plus:
-visibility: public            # public | in_camera   (gates publication AND livestream)
-schedule:                     # the pre-meeting "event" state the device caches
+schedule:                     # pre-meeting state the device caches for offline autonomy
   scheduled_start: 2026-06-09T19:00:00Z
   scheduled_end:   2026-06-09T21:00:00Z
   assigned_device: bb-001
@@ -122,7 +134,6 @@ capture:                      # recording provenance (A/V blob itself → attach
     - { start: 0, end: 8400, visibility: public }
     - { start: 8400, end: 9000, visibility: in_camera }
 transcript_status: automated  # automated | reviewed     (trust label)
-minutes_status: draft         # draft | under_review | adopted
 ```
 
 **Status lifecycle (one record):**
