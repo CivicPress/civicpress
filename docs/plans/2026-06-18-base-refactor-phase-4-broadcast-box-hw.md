@@ -1,5 +1,21 @@
 # Phase 4 — BroadcastBox Hardware: Audit + Fix Implementation Plan
 
+> **Design update (2026-06-20):** the architecture is now specified in
+> `docs/specs/2026-06-20-broadcast-box-architecture-design.md` (the source of
+> truth). Key reframes since this plan was first written:
+> - **Capture at the edge; derive in a service; core stays source-of-truth.** The
+>   AI/transcription pipeline is a **separate optional service** (`civic start`-
+>   managed, pluggable local/cloud), NOT on the appliance and NOT in core. This
+>   reshapes **W2** (BB-HW-003) from "AI on the device" to that service.
+> - **No new record type — extend the existing `session` type** (single evolving
+>   record per meeting; `visibility`/`minutes_status` added to core; capture
+>   fields via the broadcast-box module's `schemaExtensions`). Done as prep:
+>   core `session` schema + a seam contract test.
+> - **Greenfield protocol** (nothing public → no legacy migration) and a
+>   **headless device** (kill the control UI, BB-HW-017). Detail in
+>   `docs/plans/2026-06-18-base-refactor-phase-4-w1-protocol-artifact.md`.
+> - **Live streaming** = external RTMP restream only (reuse `rtmp_service.py`).
+
 **Goal:** Take the `civicpress-broadcast-box` hardware repo from "alpha, not
 pilot-ready" to pilot-ready, and build the manifesto's core path — *public
 meeting → Markdown civic record* — instead of the current `.mp4`-blobs-only
