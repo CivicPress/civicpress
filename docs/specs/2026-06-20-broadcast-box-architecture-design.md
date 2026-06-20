@@ -77,6 +77,9 @@ without human review; **wire-format back-compat** (greenfield protocol).
 - Consumes A/V + the session's agenda → produces a transcript and populates the
   session's `topics[]` as a **draft**. Built fresh — do NOT use
   `civicpress-ingest` (private PDF→.md demo-data helper).
+- **Detailed design:** `docs/specs/2026-06-20-transcription-service-design.md`
+  (W2) — trigger model, pluggable engine interface, `civic start` integration,
+  packaging, write-back.
 
 ## 4. Data model — extend the existing `session` record (decision: single evolving record)
 
