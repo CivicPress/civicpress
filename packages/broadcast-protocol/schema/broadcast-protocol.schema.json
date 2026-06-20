@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://civicpress.org/schemas/broadcast-protocol.schema.json",
+  "title": "CivicPress ↔ BroadcastBox wire protocol",
+  "description": "Canonical message catalog for the appliance↔CivicPress WebSocket contract. Greenfield (no legacy shapes). Every message is {type, id, timestamp, …}; envelopes are strict (additionalProperties:false). Consumed by both repos: the hardware client generates pydantic from this file; the server (Phase 5) generates TS types.",
+  "x-protocol-version": "1.0.0-draft",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Message id (UUID recommended)."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp."
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["public", "in_camera"]
+    },
+    "segment": {
+      "type": "object",
+      "required": ["start", "end", "visibility"],
+      "properties": {
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "minimum": 0 },
+        "visibility": { "$ref": "#/$defs/visibility" }
+      },
+      "additionalProperties": false
+    },
+    "captureBlock": {
+      "type": "object",
+      "required": ["device"],
+      "properties": {
+        "device": { "type": "string", "minLength": 1 },
+        "av_file": { "type": "string" },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "ended_at": { "$ref": "#/$defs/timestamp" },
+        "duration_s": { "type": "number", "minimum": 0 },
+        "segments": { "type": "array", "items": { "$ref": "#/$defs/segment" } }
+      },
+      "additionalProperties": true
+    },
+    "scheduleItem": {
+      "type": "object",
+      "required": ["id", "scheduled_start"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "description": "Session record id." },
+        "scheduled_start": { "$ref": "#/$defs/timestamp" },
+        "scheduled_end": { "$ref": "#/$defs/timestamp" },
+        "visibility": { "$ref": "#/$defs/visibility" },
+        "assigned_device": { "type": "string" },
+        "agenda": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+
+    "command": {
+      "type": "object",
+      "description": "CP → device. Imperative action the device must execute.",
+      "required": ["type", "id", "timestamp", "action"],
+      "properties": {
+        "type": { "const": "command" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "action": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "ack": {
+      "type": "object",
+      "description": "device → CP. Acknowledges a command by id.",
+      "required": ["type", "id", "timestamp", "commandId", "success"],
+      "properties": {
+        "type": { "const": "ack" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "commandId": { "type": "string", "minLength": 1 },
+        "success": { "type": "boolean" },
+        "payload": { "type": "object" },
+        "error": { "type": "string" },
+        "errorCode": { "type": "string" },
+        "errorType": { "type": "string" },
+        "errorDetails": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "description": "device → CP. A named event (e.g. device.connected).",
+      "required": ["type", "id", "timestamp", "event"],
+      "properties": {
+        "type": { "const": "event" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "event": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "description": "device → CP. Periodic status snapshot (also serves as keepalive).",
+      "required": ["type", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "const": "status" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "heartbeat": {
+      "type": "object",
+      "description": "Either direction. Liveness ping.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "heartbeat" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" }
+      },
+      "additionalProperties": false
+    },
+    "schedulePush": {
+      "type": "object",
+      "description": "CP → device. Upcoming sessions the device caches for offline-autonomous capture.",
+      "required": ["type", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "const": "schedule.push" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": {
+          "type": "object",
+          "required": ["sessions"],
+          "properties": {
+            "sessions": { "type": "array", "items": { "$ref": "#/$defs/scheduleItem" } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "sessionManifest": {
+      "type": "object",
+      "description": "device → CP. Binds an A/V upload to the session it belongs to.",
+      "required": ["type", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "const": "session.manifest" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": {
+          "type": "object",
+          "required": ["session_id", "capture"],
+          "properties": {
+            "session_id": { "type": "string", "minLength": 1 },
+            "capture": { "$ref": "#/$defs/captureBlock" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "streamConfigure": {
+      "type": "object",
+      "description": "CP → device. Configure the external RTMP restream target.",
+      "required": ["type", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "const": "stream.configure" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": {
+          "type": "object",
+          "required": ["platform", "rtmp_url"],
+          "properties": {
+            "platform": { "type": "string", "enum": ["youtube", "facebook", "twitch", "generic"] },
+            "rtmp_url": { "type": "string", "minLength": 1 },
+            "stream_key": { "type": "string", "description": "Secret — never logged; transported only over the control plane." }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "streamStart": {
+      "type": "object",
+      "description": "CP → device. Begin the external restream.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "stream.start" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "streamStop": {
+      "type": "object",
+      "description": "CP → device. Stop the external restream.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "stream.stop" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "previewOffer": {
+      "type": "object",
+      "description": "device → CP. WebRTC offer for the clerk monitoring preview.",
+      "required": ["type", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "const": "preview.offer" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "previewAnswer": {
+      "type": "object",
+      "description": "CP → device. WebRTC answer.",
+      "required": ["type", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "const": "preview.answer" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "previewIceCandidate": {
+      "type": "object",
+      "description": "Either direction. WebRTC ICE candidate.",
+      "required": ["type", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "const": "preview.ice_candidate" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "previewStopped": {
+      "type": "object",
+      "description": "device → CP. Preview stream ended.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "preview.stopped" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "connectionAck": {
+      "type": "object",
+      "description": "CP → device. Connection accepted.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "connection.ack" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "reEnrolled": {
+      "type": "object",
+      "description": "CP → device. Device was re-enrolled; new credentials/endpoint apply.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "re_enrolled" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "authFailed": {
+      "type": "object",
+      "description": "CP → device. Authentication failed.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "auth_failed" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "description": "Either direction. Protocol-level error.",
+      "required": ["type", "id", "timestamp"],
+      "properties": {
+        "type": { "const": "error" },
+        "id": { "$ref": "#/$defs/id" },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "error": { "type": "string" },
+        "errorCode": { "type": "string" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/command" },
+    { "$ref": "#/$defs/ack" },
+    { "$ref": "#/$defs/event" },
+    { "$ref": "#/$defs/status" },
+    { "$ref": "#/$defs/heartbeat" },
+    { "$ref": "#/$defs/schedulePush" },
+    { "$ref": "#/$defs/sessionManifest" },
+    { "$ref": "#/$defs/streamConfigure" },
+    { "$ref": "#/$defs/streamStart" },
+    { "$ref": "#/$defs/streamStop" },
+    { "$ref": "#/$defs/previewOffer" },
+    { "$ref": "#/$defs/previewAnswer" },
+    { "$ref": "#/$defs/previewIceCandidate" },
+    { "$ref": "#/$defs/previewStopped" },
+    { "$ref": "#/$defs/connectionAck" },
+    { "$ref": "#/$defs/reEnrolled" },
+    { "$ref": "#/$defs/authFailed" },
+    { "$ref": "#/$defs/error" }
+  ]
+}
