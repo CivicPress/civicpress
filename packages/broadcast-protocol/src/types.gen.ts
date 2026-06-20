@@ -16,9 +16,6 @@ export type CivicPressBroadcastBoxWireProtocol =
   | Heartbeat
   | SchedulePush
   | SessionManifest
-  | StreamConfigure
-  | StreamStart
-  | StreamStop
   | PreviewOffer
   | PreviewAnswer
   | PreviewIceCandidate
@@ -38,7 +35,7 @@ export type Timestamp = string;
 export type Visibility = "public" | "in_camera";
 
 /**
- * CP → device. Imperative action the device must execute.
+ * CP → device. Imperative action the device executes; `action` names it (e.g. start_session, stop_session, get_sources, preview.start, preview.stop, sources.set, record.start, stream.configure, stream.start, stream.stop, quality.set, watermark.set) and `payload` carries its args. The action set is open — the device's dispatch table is the source of truth — and per-action payloads are validated by the device's handlers, not this envelope.
  */
 export interface Command {
   type: "command";
@@ -147,44 +144,6 @@ export interface Segment {
   start: number;
   end: number;
   visibility: Visibility;
-}
-/**
- * CP → device. Configure the external RTMP restream target.
- */
-export interface StreamConfigure {
-  type: "stream.configure";
-  id: Id;
-  timestamp: Timestamp;
-  payload: {
-    platform: "youtube" | "facebook" | "twitch" | "generic";
-    rtmp_url: string;
-    /**
-     * Secret — never logged; transported only over the control plane.
-     */
-    stream_key?: string;
-  };
-}
-/**
- * CP → device. Begin the external restream.
- */
-export interface StreamStart {
-  type: "stream.start";
-  id: Id;
-  timestamp: Timestamp;
-  payload?: {
-    [k: string]: unknown;
-  };
-}
-/**
- * CP → device. Stop the external restream.
- */
-export interface StreamStop {
-  type: "stream.stop";
-  id: Id;
-  timestamp: Timestamp;
-  payload?: {
-    [k: string]: unknown;
-  };
 }
 /**
  * device → CP. WebRTC offer for the clerk monitoring preview.

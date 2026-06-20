@@ -58,7 +58,7 @@
 
     "command": {
       "type": "object",
-      "description": "CP → device. Imperative action the device must execute.",
+      "description": "CP → device. Imperative action the device executes; `action` names it (e.g. start_session, stop_session, get_sources, preview.start, preview.stop, sources.set, record.start, stream.configure, stream.start, stream.stop, quality.set, watermark.set) and `payload` carries its args. The action set is open — the device's dispatch table is the source of truth — and per-action payloads are validated by the device's handlers, not this envelope.",
       "required": ["type", "id", "timestamp", "action"],
       "properties": {
         "type": { "const": "command" },
@@ -159,51 +159,6 @@
           },
           "additionalProperties": false
         }
-      },
-      "additionalProperties": false
-    },
-    "streamConfigure": {
-      "type": "object",
-      "description": "CP → device. Configure the external RTMP restream target.",
-      "required": ["type", "id", "timestamp", "payload"],
-      "properties": {
-        "type": { "const": "stream.configure" },
-        "id": { "$ref": "#/$defs/id" },
-        "timestamp": { "$ref": "#/$defs/timestamp" },
-        "payload": {
-          "type": "object",
-          "required": ["platform", "rtmp_url"],
-          "properties": {
-            "platform": { "type": "string", "enum": ["youtube", "facebook", "twitch", "generic"] },
-            "rtmp_url": { "type": "string", "minLength": 1 },
-            "stream_key": { "type": "string", "description": "Secret — never logged; transported only over the control plane." }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    "streamStart": {
-      "type": "object",
-      "description": "CP → device. Begin the external restream.",
-      "required": ["type", "id", "timestamp"],
-      "properties": {
-        "type": { "const": "stream.start" },
-        "id": { "$ref": "#/$defs/id" },
-        "timestamp": { "$ref": "#/$defs/timestamp" },
-        "payload": { "type": "object" }
-      },
-      "additionalProperties": false
-    },
-    "streamStop": {
-      "type": "object",
-      "description": "CP → device. Stop the external restream.",
-      "required": ["type", "id", "timestamp"],
-      "properties": {
-        "type": { "const": "stream.stop" },
-        "id": { "$ref": "#/$defs/id" },
-        "timestamp": { "$ref": "#/$defs/timestamp" },
-        "payload": { "type": "object" }
       },
       "additionalProperties": false
     },
@@ -314,9 +269,6 @@
     { "$ref": "#/$defs/heartbeat" },
     { "$ref": "#/$defs/schedulePush" },
     { "$ref": "#/$defs/sessionManifest" },
-    { "$ref": "#/$defs/streamConfigure" },
-    { "$ref": "#/$defs/streamStart" },
-    { "$ref": "#/$defs/streamStop" },
     { "$ref": "#/$defs/previewOffer" },
     { "$ref": "#/$defs/previewAnswer" },
     { "$ref": "#/$defs/previewIceCandidate" },

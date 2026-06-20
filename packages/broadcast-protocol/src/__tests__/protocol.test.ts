@@ -23,9 +23,8 @@ const VALID: Record<string, unknown> = {
     timestamp: TS,
     payload: { session_id: 'pv-2026-06-09', capture: { device: 'bb-001', av_file: 'uuid-1', duration_s: 7440, segments: [{ start: 0, end: 7000, visibility: 'public' }, { start: 7000, end: 7440, visibility: 'in_camera' }] } },
   },
-  'stream.configure': { type: 'stream.configure', id: '1', timestamp: TS, payload: { platform: 'youtube', rtmp_url: 'rtmp://a/live2', stream_key: 'secret' } },
-  'stream.start': { type: 'stream.start', id: '1', timestamp: TS },
-  'stream.stop': { type: 'stream.stop', id: '1', timestamp: TS },
+  'command(stream.configure)': { type: 'command', id: '1', timestamp: TS, action: 'stream.configure', payload: { platform: 'youtube', rtmp_url: 'rtmp://a/live2', stream_key: 'secret' } },
+  'command(record.start)': { type: 'command', id: '1', timestamp: TS, action: 'record.start', payload: {} },
   'preview.offer': { type: 'preview.offer', id: '1', timestamp: TS, payload: { sdp: '...' } },
   'preview.answer': { type: 'preview.answer', id: '1', timestamp: TS, payload: { sdp: '...' } },
   'preview.ice_candidate': { type: 'preview.ice_candidate', id: '1', timestamp: TS, payload: { candidate: '...' } },
@@ -59,9 +58,6 @@ describe('broadcast-protocol', () => {
   });
   it('rejects unknown top-level fields (strict envelope)', () => {
     expect(validateMessage({ type: 'heartbeat', id: '1', timestamp: TS, rogue: 1 }).valid).toBe(false);
-  });
-  it('rejects an out-of-enum stream platform', () => {
-    expect(validateMessage({ type: 'stream.configure', id: '1', timestamp: TS, payload: { platform: 'vimeo', rtmp_url: 'x' } }).valid).toBe(false);
   });
   it('rejects a schedule item without an id', () => {
     expect(validateMessage({ type: 'schedule.push', id: '1', timestamp: TS, payload: { sessions: [{ scheduled_start: TS }] } }).valid).toBe(false);
