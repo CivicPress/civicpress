@@ -218,13 +218,14 @@ export class RecordSchemaBuilder {
   }
 
   /**
-   * Merge module schema extensions (e.g., legal-register)
+   * Merge module schema extensions.
    *
-   * As of Phase 2d W1-T2, discovery is routed through `ModuleResolver` so
-   * the `process.cwd()`-based traversal is gone. The W1-T3 follow-up
-   * removes the remaining hardcoded `moduleName === 'legal-register'`
-   * check by reading `manifest.capabilities.schemaExtensions` from the
-   * loaded module.
+   * Discovery is routed through `ModuleResolver` (Phase 2d W1-T2). A module
+   * opts a record type into its schema fragment by declaring the type in
+   * `capabilities.schemaExtensions` in its `module.json` manifest;
+   * `shouldApplyModuleSchema` reads it, so extending a new type (e.g.
+   * `session` for broadcast-box) needs no core change. Phase 2d W1-T3
+   * removed the former hardcoded `moduleName === 'legal-register'` check.
    */
   private static mergeModuleExtensions(schema: JsonSchemaObject, recordType?: string): void {
     try {
