@@ -49,9 +49,14 @@ without human review; **wire-format back-compat** (greenfield protocol).
 
 ### 3.1 Appliance (`civicpress-broadcast-box`, separate repo)
 - **Dumb and reliable.** Capture A/V; encode (incl. Pi `h264_v4l2m2m`); upload.
-- **Headless — no standalone control UI** (kill the `frontend/` control app →
-  closes **BB-HW-017**). Minimal local surface only for **enrollment / network
-  setup** (existing AP mode) + optional status LED / emergency-stop.
+- **Headless for operational control** — start/stop/configure happen via CP over
+  the WebSocket; there is *no separate device "control UI"*. The `frontend/` app
+  (`@broadcast-box/ap-mode-ui`) is the **AP-mode enrollment/setup UI** (enrollment,
+  network, preview-to-verify) and is **kept** — a headless appliance still needs a
+  first-run setup surface. **BB-HW-017** (a second heavy Nuxt + `@nuxt/ui-pro`
+  app) is therefore *not* "delete the control UI" but "slim the enrollment UI"
+  (drop `@nuxt/ui-pro`, reduce to enrollment+network) — a separate UI task,
+  deferred (not W1). [Corrected 2026-06-21: W1f scoping verified against the code.]
 - **Dials out** to CivicPress over a WebSocket → no inbound ports.
 - **Offline autonomy (control plane ≠ data plane).** The schedule is **pushed in
   advance**; the device starts AND stops the scheduled meeting on its cached
@@ -205,8 +210,10 @@ parsing outright (nothing public depends on it). Message catalog:
 ## 10. What gets cut or changed
 
 - **Extend `session`** — do NOT add `meeting`/`minutes` record types.
-- **Kill the device control UI** (`frontend/`) → closes **BB-HW-017**; keep only
-  enrollment/setup.
+- **Device is already headless for operational control** (control = CP WebSocket
+  commands). `frontend/` is the AP-mode enrollment/setup UI — **kept**.
+  **BB-HW-017** = slim that enrollment UI later (drop `@nuxt/ui-pro`), NOT delete
+  it — deferred, not W1.
 - **Greenfield protocol** — delete the three defensive wire shapes; no sunset
   dance (**BB-HW-004** trivially); dispatch table (**BB-HW-005**); reconnect
   consolidation (**BB-HW-006**); regenerate the 1,626-line protocol doc from

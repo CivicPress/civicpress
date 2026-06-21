@@ -13,9 +13,10 @@
 single source of truth for the appliance↔CivicPress contract; implement the
 clean format on the hardware client (deleting the old defensive multi-shape
 parsing outright); collapse command dispatch to a table; consolidate the
-reconnect paths; and make the device headless (kill its control UI). Closes
-**BB-HW-001, BB-HW-004, BB-HW-005, BB-HW-006, BB-HW-017** and advances
-**BB-HW-014**.
+reconnect paths. Closes **BB-HW-001, BB-HW-004, BB-HW-005, BB-HW-006** and
+advances **BB-HW-014**. (W1f found the device is *already* headless for control —
+`frontend/` is the enrollment UI, kept; **BB-HW-017** = slim it later, deferred,
+see W1f.)
 
 **Design doc:** `docs/specs/2026-06-20-broadcast-box-architecture-design.md`.
 **Parent plan:** `docs/plans/2026-06-18-base-refactor-phase-4-broadcast-box-hw.md` §3 W1.
@@ -132,12 +133,17 @@ Closeout        →  registry closures; memories; merges
       `DEVICE-CAPABILITIES-MESSAGES.md`.
 - [ ] **T2.** `make protocol-doc` (schema → markdown catalog). Commit.
 
-### W1f — Headless device: remove the control UI (BB-HW-017)
-- [ ] **T1.** Remove the `frontend/` control app; keep only the enrollment/setup
-      surface (AP mode). Confirm nothing in the capture/connector path imports it.
-- [ ] **T2.** Update docs/Makefile (drop `frontend-*` control targets; keep
-      enrollment). Update README to "headless; controlled via CivicPress."
-- [ ] **T3.** Suite green; commit. *(Can sequence independently of W1a–W1e.)*
+### W1f — Headless device *(re-scoped 2026-06-21 — see below)*
+**Finding:** the device is *already* headless for operational control — there is
+no separate "control UI" to delete. `frontend/` (`@broadcast-box/ap-mode-ui`) is
+the **AP-mode enrollment/setup UI** (pages: enrollment, network, settings,
+preview, index), served by `services/ap_mode/web_server.py`; deleting it would
+break first-run setup. So W1f's original premise (delete `frontend/`) was wrong.
+- [x] **Done (no code):** confirmed via code that operational control is via CP
+      WebSocket commands; `frontend/` is the setup surface and stays.
+- [ ] **Deferred (NOT W1) — BB-HW-017:** the real residue is that the enrollment
+      UI is a heavy Nuxt + `@nuxt/ui-pro` app. Slim it (drop `@nuxt/ui-pro`,
+      reduce to enrollment+network) as a focused UI task; tracked, not done here.
 
 ---
 
@@ -148,7 +154,8 @@ Closeout        →  registry closures; memories; merges
 - [ ] Command dispatch is a table; unknown actions → error ack.
 - [ ] Reconnect logic is one path (or a documented, tracked spill).
 - [ ] Protocol doc generated from schema.
-- [ ] Device control UI removed; device is headless.
+- [x] Device confirmed headless for operational control (control via CP);
+      enrollment UI (`frontend/`) kept; BB-HW-017 slimming deferred (not W1).
 - [ ] HW suite green (≥ 283 passed) + new tests.
 - [ ] Closes BB-HW-001/004/005/006/017; advances BB-HW-014. (Server binding of
       the artifact → Phase 5.)
