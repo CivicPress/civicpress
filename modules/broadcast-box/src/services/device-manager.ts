@@ -122,12 +122,10 @@ export class DeviceManager {
       data.enrollmentCode
     );
 
-    // Fall back to finding by device UUID (legacy path for re-registration)
-    if (!enrollmentCode) {
-      enrollmentCode = await this.enrollmentCodeModel.findByDeviceUuid(
-        data.deviceUuid
-      );
-    }
+    // One-time codes (BB-HW-013): only an UNUSED, recent code (findByCode)
+    // enrolls a device. The former findByDeviceUuid fallback re-used codes by
+    // UUID (incl. already-used ones) and is removed — re-registration requires
+    // a freshly issued code (re-pairing), never silent reuse.
 
     if (!enrollmentCode) {
       this.logger.warn(
@@ -199,66 +197,42 @@ export class DeviceManager {
         throw new Error('Invalid enrollment code');
       }
 
-      // For existing devices, we allow expired codes (recovery mechanism)
-      // This allows devices to re-register and get a new token even if their enrollment code expired
-      const isExpired = this.enrollmentCodeModel.isExpired(enrollmentCode);
-      if (isExpired) {
-        coreInfo(
-          'Re-registration with expired enrollment code (recovery path)',
+      // One-time, revocable codes (BB-HW-013): re-registration requires a
+      // FRESH (unused, non-expired) code — no silent recovery or reuse. A
+      // device that lost its token is re-paired with a newly issued code.
+      if (this.enrollmentCodeModel.isExpired(enrollmentCode)) {
+        coreWarn('Device re-registration failed: enrollment code expired', {
+          operation: 'broadcast-box:device:registration:expired-existing',
+          deviceId: existing.id,
+          deviceUuid: existing.deviceUuid,
+          registrationIp: data.registrationIp || 'unknown',
+        });
+        throw new Error('Enrollment code expired');
+      }
+      if (this.enrollmentCodeModel.isUsed(enrollmentCode)) {
+        coreWarn(
+          'Device re-registration failed: enrollment code already used',
           {
-            operation:
-              'broadcast-box:device:registration:expired-code-recovery',
+            operation: 'broadcast-box:device:registration:already-used-existing',
             deviceId: existing.id,
             deviceUuid: existing.deviceUuid,
-            expiresAt: enrollmentCode.expiresAt.toISOString(),
             registrationIp: data.registrationIp || 'unknown',
-            note: 'Allowing re-registration for existing device with expired code. This is a recovery mechanism for devices that lost their token.',
           }
         );
+        throw new Error('Enrollment code already used');
       }
 
-      // Code is valid (hash matches) - allow re-registration
-      // This handles:
-      // 1. Re-registration with a valid (non-expired) code
-      // 2. Re-registration with an expired code (recovery path for existing devices)
-      // 3. Re-registration with a previously used code (idempotent)
-      // 4. Re-registration with a newly generated code (regeneration scenario)
+      // Consume the fresh code (one-time) and re-issue a token for the device.
+      await this.enrollmentCodeModel.markAsUsed(
+        enrollmentCode.id,
+        data.registrationIp || null
+      );
 
-      // Mark the code as used if it hasn't been used yet
-      if (!this.enrollmentCodeModel.isUsed(enrollmentCode)) {
-        try {
-          await this.enrollmentCodeModel.markAsUsed(
-            enrollmentCode.id,
-            data.registrationIp || null
-          );
-        } catch (markError: any) {
-          // If marking as used fails, log but don't fail registration (non-critical)
-          this.logger.warn(
-            'Failed to mark enrollment code as used during re-registration (non-critical)',
-            {
-              operation:
-                'broadcast-box:device:registration:mark-used-failed-re-registration',
-              enrollmentCodeId: enrollmentCode.id,
-              deviceId: existing.id,
-              error:
-                markError instanceof Error
-                  ? markError.message
-                  : String(markError),
-            }
-          );
-        }
-      }
-
-      coreInfo('Device re-registration with valid enrollment code', {
+      coreInfo('Device re-registration with a fresh enrollment code', {
         operation: 'broadcast-box:device:registration:re-registration',
         deviceId: existing.id,
         deviceUuid: existing.deviceUuid,
         status: existing.status,
-        codeWasUsed: this.enrollmentCodeModel.isUsed(enrollmentCode),
-        codeExpired: isExpired,
-        note: isExpired
-          ? 'Generating new token for existing device (recovery with expired code)'
-          : 'Generating new token for existing device',
       });
       return existing;
     }
