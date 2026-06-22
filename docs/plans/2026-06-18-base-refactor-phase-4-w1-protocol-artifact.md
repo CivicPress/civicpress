@@ -119,13 +119,22 @@ Closeout        →  registry closures; memories; merges
       special-cases (`connection.ack`, `error`→re-enroll).
 - [ ] **T3.** Tests: all actions covered; aliases resolve; unknown → error ack. Commit.
 
-### W1d — Reconnect consolidation (BB-HW-006) *(largest; may spill to followup)*
-- [ ] **T1.** Extract the 4 paths (`connect`/`_handle_disconnect`/`_reconnect_loop`/
-      `_health_monitor_loop`) into one `ReconnectionManager` over the existing
-      `ConnectionState` machine; one backoff, one reconnect task.
-- [ ] **T2. (TDD)** State-transition + backoff + no-double-reconnect tests.
-- [ ] **T3.** `websocket_client.py` shrinks toward transport + message-pump;
-      record before/after LoC. Commit. *(T1–T2 can land; LoC-trim may spill.)*
+### W1d — Reconnect consolidation (BB-HW-006) *(safety net laid; consolidation GATED on E3)*
+- [x] **T0 — characterization tests** (`df2a006`, `tests/unit/test_reconnect_characterization.py`):
+      6 tests pin current behaviour the consolidation must preserve — backoff
+      `5/10/20/40/60/60`, last-successful-endpoint priority, attempts-reset +
+      last-successful-recorded on success, command dedup (pending+processed),
+      reconnection stale-command timeout, ack pending→processed. (Decided:
+      "characterization tests now, consolidate after E3".)
+- [ ] **T1. (deferred → after BB-HW-013 one-time-code work)** Extract the 4 paths
+      (`connect`/`_handle_disconnect`/`_reconnect_loop`/`_health_monitor_loop`)
+      into one `ReconnectionManager` over `ConnectionState`; one backoff, one
+      reconnect task. **Gated:** the reconnect paths include the
+      `AUTH_FAILED`→re-enroll handler, which the BB-HW-013 enrollment strategy
+      (one-time, revocable codes) will rewrite — consolidate *after* that so it
+      isn't redone. The characterization tests above are the safety net.
+- [ ] **T2.** `websocket_client.py` shrinks toward transport + message-pump;
+      record before/after LoC. Commit. *(LoC-trim may spill.)*
 
 ### W1e — Regenerate the protocol doc (BB-HW-001 + BB-HW-014)
 - [ ] **T1.** Replace the 1,626-line `docs/civicpress-integration-protocol.md`
