@@ -14,9 +14,13 @@ import type {
 } from '../types/index.js';
 import type { StructuredErrorDict } from '../types/errors.js';
 import { v4 as uuidv4 } from 'uuid';
+import { validateMessage as validateAgainstSchema } from '@civicpress/broadcast-protocol';
 
 export interface ParsedMessage {
-  type: 'command' | 'event' | 'ack' | 'heartbeat' | 'status';
+  // The canonical message `type` (command | event | ack | status | heartbeat |
+  // preview.* | schedule.push | session.manifest | control). String-typed so
+  // every catalog member flows through; consumers narrow as needed.
+  type: string;
   message: CommandMessage | EventMessage | AckMessage | BaseMessage; // BaseMessage covers status messages
   isValid: boolean;
   error?: string;
@@ -35,65 +39,28 @@ export class ProtocolHandler {
           ? JSON.parse(data)
           : JSON.parse(data.toString());
 
-      // Validate base message structure
-      if (!message.type || !message.id || !message.timestamp) {
+      // Authoritative validation against the canonical wire schema
+      // (@civicpress/broadcast-protocol) — the same schema the device validates
+      // against. Replaces the former hand-rolled per-type field checks.
+      const { valid, errors } = validateAgainstSchema(message);
+      if (!valid) {
         return {
-          type: 'command', // Default
+          type: typeof message?.type === 'string' ? message.type : 'command',
           message: message as BaseMessage,
           isValid: false,
-          error: 'Missing required fields: type, id, or timestamp',
+          error: errors.join('; ') || 'Schema validation failed',
         };
       }
 
-      // Validate timestamp format (ISO 8601)
-      const timestamp = new Date(message.timestamp);
-      if (isNaN(timestamp.getTime())) {
-        return {
-          type: message.type,
-          message: message as BaseMessage,
-          isValid: false,
-          error: 'Invalid timestamp format',
-        };
-      }
-
-      // Route by message type
-      switch (message.type) {
-        case 'command':
-          return this.parseCommand(message);
-        case 'event':
-          return this.parseEvent(message);
-        case 'ack':
-          return this.parseAck(message);
-        case 'heartbeat':
-          return {
-            type: 'heartbeat',
-            message: message as BaseMessage,
-            isValid: true,
-          };
-        case 'status':
-          // Status messages are valid as-is (device sends type: "status" with payload)
-          return {
-            type: 'status',
-            message: message as BaseMessage,
-            isValid: true,
-          };
-        case 'preview.offer':
-        case 'preview.answer':
-        case 'preview.ice_candidate':
-          // Preview WebRTC messages are valid as-is (for routing between device and clients)
-          return {
-            type: message.type,
-            message: message as BaseMessage,
-            isValid: true,
-          };
-        default:
-          return {
-            type: message.type,
-            message: message as BaseMessage,
-            isValid: false,
-            error: `Unknown message type: ${message.type}`,
-          };
-      }
+      return {
+        type: message.type as string,
+        message: message as
+          | CommandMessage
+          | EventMessage
+          | AckMessage
+          | BaseMessage,
+        isValid: true,
+      };
     } catch (error) {
       coreError(
         'Failed to parse WebSocket message',
@@ -106,66 +73,6 @@ export class ProtocolHandler {
       );
       return null;
     }
-  }
-
-  /**
-   * Parse command message
-   */
-  private parseCommand(message: any): ParsedMessage {
-    if (!message.action) {
-      return {
-        type: 'command',
-        message: message as CommandMessage,
-        isValid: false,
-        error: 'Command message missing action field',
-      };
-    }
-
-    return {
-      type: 'command',
-      message: message as CommandMessage,
-      isValid: true,
-    };
-  }
-
-  /**
-   * Parse event message
-   */
-  private parseEvent(message: any): ParsedMessage {
-    if (!message.event) {
-      return {
-        type: 'event',
-        message: message as EventMessage,
-        isValid: false,
-        error: 'Event message missing event field',
-      };
-    }
-
-    return {
-      type: 'event',
-      message: message as EventMessage,
-      isValid: true,
-    };
-  }
-
-  /**
-   * Parse acknowledgment message
-   */
-  private parseAck(message: any): ParsedMessage {
-    if (!message.commandId) {
-      return {
-        type: 'ack',
-        message: message as AckMessage,
-        isValid: false,
-        error: 'Ack message missing commandId field',
-      };
-    }
-
-    return {
-      type: 'ack',
-      message: message as AckMessage,
-      isValid: true,
-    };
   }
 
   /**
@@ -260,24 +167,7 @@ export class ProtocolHandler {
    * Validate message structure
    */
   validateMessage(message: BaseMessage): { valid: boolean; error?: string } {
-    if (!message.type) {
-      return { valid: false, error: 'Message type is required' };
-    }
-
-    if (!message.id) {
-      return { valid: false, error: 'Message ID is required' };
-    }
-
-    if (!message.timestamp) {
-      return { valid: false, error: 'Message timestamp is required' };
-    }
-
-    // Validate timestamp
-    const timestamp = new Date(message.timestamp);
-    if (isNaN(timestamp.getTime())) {
-      return { valid: false, error: 'Invalid timestamp format' };
-    }
-
-    return { valid: true };
+    const { valid, errors } = validateAgainstSchema(message);
+    return valid ? { valid: true } : { valid: false, error: errors.join('; ') };
   }
 }

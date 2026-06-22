@@ -149,10 +149,13 @@ describe('ProtocolHandler', () => {
 
   describe('validateMessage', () => {
     it('should validate a valid message', () => {
+      // A `command` must carry a top-level `action` to be canonically valid.
       const message = {
         type: 'command',
         id: 'cmd-123',
         timestamp: new Date().toISOString(),
+        action: 'get_status',
+        payload: {},
       };
 
       const result = protocol.validateMessage(message);
