@@ -83,6 +83,58 @@ describe('Broadcast Box Integration', () => {
     };
 
     deviceManager = new DeviceManager(mockDb, mockLogger);
+
+    // Stateful in-memory enrollment-code store so enroll -> register is a real
+    // one-time round-trip (the mock DB above doesn't persist). Mirrors the
+    // EnrollmentCodeModel contract: a code is hashed on create, matched on
+    // findByCode, and — crucially — a used code stops resolving (one-time,
+    // BB-HW-013). Only the storage is faked; DeviceManager's real enroll/register
+    // logic and real bcrypt hashing/compare run end to end.
+    const enrollmentCodes: any[] = [];
+    (deviceManager as any).enrollmentCodeModel = {
+      create: vi.fn(async (data: any) => {
+        const row = {
+          id: data.id,
+          deviceUuid: data.deviceUuid,
+          enrollmentCodeHash: data.enrollmentCodeHash,
+          createdAt: new Date(),
+          expiresAt: data.expiresAt,
+          usedAt: null as Date | null,
+          createdByUserId: data.createdByUserId ?? null,
+          ipAddress: data.ipAddress ?? null,
+          registrationIp: null as string | null,
+        };
+        enrollmentCodes.push(row);
+        return row;
+      }),
+      findByCode: vi.fn(async (code: string) => {
+        const bcrypt = await import('bcrypt');
+        const normalized = code.trim().toUpperCase();
+        for (const row of enrollmentCodes) {
+          if (row.usedAt) continue; // one-time: consumed codes don't resolve
+          if (await bcrypt.compare(normalized, row.enrollmentCodeHash)) {
+            return row;
+          }
+        }
+        return null;
+      }),
+      findByDeviceUuid: vi.fn(
+        async (deviceUuid: string) =>
+          enrollmentCodes
+            .filter((r) => r.deviceUuid === deviceUuid)
+            .at(-1) ?? null
+      ),
+      isExpired: (row: any) => new Date() > row.expiresAt,
+      isUsed: (row: any) => row.usedAt !== null,
+      markAsUsed: vi.fn(async (id: string, registrationIp: string | null) => {
+        const row = enrollmentCodes.find((r) => r.id === id);
+        if (row) {
+          row.usedAt = new Date();
+          row.registrationIp = registrationIp ?? null;
+        }
+      }),
+    };
+
     deviceAuth = new DeviceAuthService(mockLogger, mockSecretsManager);
     connectionTracker = new DeviceConnectionTracker(
       deviceManager,

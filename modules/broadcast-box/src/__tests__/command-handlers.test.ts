@@ -316,7 +316,10 @@ describe('createDefaultCommandHandlers', () => {
     const result = await registry.handleCommand(command, mockContext);
 
     expect(result?.success).toBe(false);
-    expect(result?.error).toContain('Invalid video source');
+    // Bound to the canonical protocol error (P5b/P5c): an unknown source maps to
+    // ERR_SOURCE_NOT_FOUND, whose canonical message ("Requested source not
+    // found") replaces the old free-text "Invalid video source".
+    expect(result?.error).toMatch(/source not found/i);
   });
 
   it('should register list_sources handler', async () => {

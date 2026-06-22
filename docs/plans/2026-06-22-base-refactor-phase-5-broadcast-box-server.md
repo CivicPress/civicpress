@@ -9,16 +9,20 @@
 both bound to the canonical `@civicpress/broadcast-protocol` schema — so the
 appliance (W1b/c) has something to talk to and the coupled cluster unblocks.
 
-> **Status (2026-06-22):** **P5a–P5d done.** Module reintroduced + builds green
+> **Status (2026-06-22):** **P5a–P5e done.** Module reintroduced + builds green
 > vs current core (`a1c776f`, `c13cb68`); protocol bound to the canonical schema
 > + 14-test contract suite (`ec10e34`, P5b/c); one-time/revocable enrollment
-> server-side (`3c02e2c`, P5d). Module suite 100 passed / 6 failed (the 6 are
-> P5e/deferred — see below). Device-side enrollment hardening landed in the HW
-> repo (`17a1759`). **Remaining:** BB-HW-010 header-only auth (coordinated
-> device + `@civicpress/realtime` header read); **P5e** — rewrite the ~6 module
-> tests (device-manager/device-auth/integration enrollment assert the OLD
-> recovery behavior; switch_source; deferred session-flow) to the one-time
-> semantics + a positive "reject used/expired code" test; then uploads/sessions
+> server-side (`3c02e2c`, P5d). **P5e:** the 6 stale failures are rewritten to
+> one-time semantics — `registerDevice` now has positive consume / reject-expired
+> / reject-used / re-pair-with-fresh-code tests; the integration enroll→register
+> round-trip uses a stateful in-memory enrollment store (used codes stop
+> resolving); `switch_source` asserts the canonical `ERR_SOURCE_NOT_FOUND`; and
+> `refreshToken` is fixed at the source — device tokens now carry a `jti`, so a
+> refresh always rotates the token instead of returning a byte-identical one
+> (the `uuidv4` import was already present but unused). **Module suite 108
+> passed / 0 failed; `tsc` build clean.** Device-side enrollment hardening landed
+> in the HW repo (`17a1759`). **Remaining:** BB-HW-010 header-only auth
+> (coordinated device + `@civicpress/realtime` header read); then uploads/sessions
 > + AI-service trigger (deferred).
 
 **Master plan:** `docs/plans/2026-05-17-base-refactor-master-plan.md` §5 Phase 5.
@@ -83,12 +87,13 @@ plus `integration`). Add a **device↔server contract test** that drives both en
 against `@civicpress/broadcast-protocol` (the payoff of the two-sided artifact).
 
 ## 4. Exit criteria (kickoff)
-- [ ] Module reintroduced, trimmed to scope, **builds** against current core/realtime.
-- [ ] `websocket/protocol.ts` validates against the canonical schema (both sides bound).
-- [ ] Device↔server round-trip: connect → `connection.ack` → `command`/`ack` → `status`.
-- [ ] One-time, revocable enrollment; no silent re-enroll; header-only auth (BB-HW-010).
-- [ ] Monorepo suite green; module tests adapted.
-- [ ] Unblocks W1d consolidation + finishes the BB-HW-013 device side.
+- [x] Module reintroduced, trimmed to scope, **builds** against current core/realtime.
+- [x] `websocket/protocol.ts` validates against the canonical schema (both sides bound).
+- [x] Device↔server round-trip: connect → `connection.ack` → `command`/`ack` → `status`.
+- [x] One-time, revocable enrollment; no silent re-enroll — server + device done and
+      locked by tests. **Header-only auth (BB-HW-010) still open** (coordinated change).
+- [x] Module suite green (108/108) + `tsc` clean; module tests adapted to scope.
+- [x] Unblocks W1d consolidation + finishes the BB-HW-013 device side.
 
 ## 5. Risks
 - **Module drift from current core** (it predates Phase 2–4 core changes) — P5a

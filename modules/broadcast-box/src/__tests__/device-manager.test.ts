@@ -62,13 +62,42 @@ describe('DeviceManager', () => {
     });
   });
 
+  // One-time, revocable enrollment (BB-HW-013): a code is consumed on first use
+  // and a used/expired code can never register again. `findByCode` only returns
+  // UNUSED codes (its SQL filters `used_at IS NULL`), so a consumed code stops
+  // resolving — modelled below by returning null for the used case.
   describe('registerDevice', () => {
-    it('should register an enrolled device', async () => {
+    const enrollmentCode = 'ABCD-EFGH-JKLM';
+
+    /** A persisted code fixture whose hash matches `enrollmentCode`. */
+    async function freshCode(deviceUuid: string) {
+      const bcrypt = await import('bcrypt');
+      return {
+        id: 'enrollment-code-id',
+        deviceUuid,
+        enrollmentCodeHash: await bcrypt.hash(
+          enrollmentCode.trim().toUpperCase(),
+          4 // low cost: test-only fixture, real codes use 12
+        ),
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        usedAt: null as Date | null,
+      };
+    }
+
+    it('consumes a fresh code and registers a new device', async () => {
       const deviceUuid = 'test-device-uuid';
       const name = 'Test Device';
+      const code = await freshCode(deviceUuid);
 
+      const mockEnrollmentCodeModel = {
+        findByCode: vi.fn().mockResolvedValue(code),
+        isExpired: vi.fn().mockReturnValue(false),
+        isUsed: vi.fn().mockReturnValue(false),
+        markAsUsed: vi.fn().mockResolvedValue(undefined),
+      };
       const mockDeviceModel = {
-        getByDeviceUuid: vi.fn().mockResolvedValue(null), // Device doesn't exist yet
+        getByDeviceUuid: vi.fn().mockResolvedValue(null), // new device
         create: vi.fn().mockResolvedValue({
           id: 'device-id',
           deviceUuid,
@@ -80,45 +109,117 @@ describe('DeviceManager', () => {
           updatedAt: new Date(),
         }),
       };
-
       const mockDeviceEventModel = {
         create: vi.fn().mockResolvedValue(undefined),
       };
 
+      (deviceManager as any).enrollmentCodeModel = mockEnrollmentCodeModel;
       (deviceManager as any).deviceModel = mockDeviceModel;
       (deviceManager as any).deviceEventModel = mockDeviceEventModel;
 
       const result = await deviceManager.registerDevice({
         deviceUuid,
-        enrollmentCode: 'ABC123',
+        enrollmentCode,
         name,
       });
 
-      expect(result).toBeDefined();
       expect(result.status).toBe('enrolled');
       expect(mockDeviceModel.create).toHaveBeenCalled();
+      // The one-time guarantee: the code is consumed on success.
+      expect(mockEnrollmentCodeModel.markAsUsed).toHaveBeenCalledWith(
+        code.id,
+        null
+      );
     });
 
-    it('should throw error if device already registered', async () => {
+    it('rejects an expired enrollment code and does not register', async () => {
       const deviceUuid = 'test-device-uuid';
+      const code = await freshCode(deviceUuid);
+      code.expiresAt = new Date(Date.now() - 60 * 1000); // expired
+
+      const mockEnrollmentCodeModel = {
+        findByCode: vi.fn().mockResolvedValue(code),
+        isExpired: vi.fn().mockReturnValue(true),
+        isUsed: vi.fn().mockReturnValue(false),
+        markAsUsed: vi.fn().mockResolvedValue(undefined),
+      };
       const mockDeviceModel = {
-        getByDeviceUuid: vi.fn().mockResolvedValue({
-          id: 'device-id',
-          deviceUuid,
-          name: 'Existing Device',
-          status: 'active',
-        }),
+        getByDeviceUuid: vi.fn().mockResolvedValue(null),
+        create: vi.fn(),
       };
 
+      (deviceManager as any).enrollmentCodeModel = mockEnrollmentCodeModel;
       (deviceManager as any).deviceModel = mockDeviceModel;
 
       await expect(
-        deviceManager.registerDevice({
-          deviceUuid,
-          enrollmentCode: 'ABC123',
-          name: 'Test Device',
-        })
-      ).rejects.toThrow('already registered');
+        deviceManager.registerDevice({ deviceUuid, enrollmentCode, name: 'X' })
+      ).rejects.toThrow('expired');
+      expect(mockDeviceModel.create).not.toHaveBeenCalled();
+      expect(mockEnrollmentCodeModel.markAsUsed).not.toHaveBeenCalled();
+    });
+
+    it('rejects an already-used code (a consumed code no longer resolves)', async () => {
+      const deviceUuid = 'test-device-uuid';
+      // A used code is filtered out by findByCode's `used_at IS NULL` query.
+      const mockEnrollmentCodeModel = {
+        findByCode: vi.fn().mockResolvedValue(null),
+      };
+      const mockDeviceModel = {
+        getByDeviceUuid: vi.fn().mockResolvedValue(null),
+        create: vi.fn(),
+      };
+
+      (deviceManager as any).enrollmentCodeModel = mockEnrollmentCodeModel;
+      (deviceManager as any).deviceModel = mockDeviceModel;
+
+      await expect(
+        deviceManager.registerDevice({ deviceUuid, enrollmentCode, name: 'X' })
+      ).rejects.toThrow('Invalid enrollment code');
+      expect(mockDeviceModel.create).not.toHaveBeenCalled();
+    });
+
+    it('re-registers an existing device only with a fresh code, consuming it', async () => {
+      const deviceUuid = 'test-device-uuid';
+      const code = await freshCode(deviceUuid);
+      const existing = {
+        id: 'device-id',
+        deviceUuid,
+        name: 'Existing Device',
+        status: 'active',
+        capabilities: {},
+        config: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockEnrollmentCodeModel = {
+        findByCode: vi.fn().mockResolvedValue(code),
+        isExpired: vi.fn().mockReturnValue(false),
+        isUsed: vi.fn().mockReturnValue(false),
+        markAsUsed: vi.fn().mockResolvedValue(undefined),
+      };
+      const mockDeviceModel = {
+        getByDeviceUuid: vi.fn().mockResolvedValue(existing),
+        create: vi.fn(),
+      };
+
+      (deviceManager as any).enrollmentCodeModel = mockEnrollmentCodeModel;
+      (deviceManager as any).deviceModel = mockDeviceModel;
+
+      const result = await deviceManager.registerDevice({
+        deviceUuid,
+        enrollmentCode,
+        name: 'Test Device',
+      });
+
+      expect(result.id).toBe(existing.id);
+      expect(result.deviceUuid).toBe(deviceUuid);
+      // Re-pairing consumes the fresh code; no duplicate device is created.
+      expect(mockEnrollmentCodeModel.markAsUsed).toHaveBeenCalledWith(
+        code.id,
+        null
+      );
+      expect(mockDeviceModel.create).not.toHaveBeenCalled();
     });
   });
 
