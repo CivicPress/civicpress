@@ -62,7 +62,7 @@ export class UploadJobModel {
   async getById(id: string): Promise<UploadJob | null> {
     const rows = await this.db
       .getAdapter()
-      .query(`SELECT * FROM broadcast_uploads WHERE id = ?`, [id]);
+      .query<Record<string, any>>(`SELECT * FROM broadcast_uploads WHERE id = ?`, [id]);
 
     if (rows.length === 0) {
       return null;
@@ -77,7 +77,7 @@ export class UploadJobModel {
   async getBySessionId(sessionId: string): Promise<UploadJob | null> {
     const rows = await this.db
       .getAdapter()
-      .query(
+      .query<Record<string, any>>(
         `SELECT * FROM broadcast_uploads WHERE session_id = ? ORDER BY created_at DESC LIMIT 1`,
         [sessionId]
       );
@@ -129,7 +129,7 @@ export class UploadJobModel {
       params.push(filters.offset);
     }
 
-    const rows = await this.db.getAdapter().query(query, params);
+    const rows = await this.db.getAdapter().query<Record<string, any>>(query, params);
     return rows.map((row) => this.mapRowToUpload(row));
   }
 

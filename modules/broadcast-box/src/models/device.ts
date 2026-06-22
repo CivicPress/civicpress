@@ -66,7 +66,7 @@ export class DeviceModel {
   async getById(id: string): Promise<BroadcastDevice | null> {
     const rows = await this.db
       .getAdapter()
-      .query(`SELECT * FROM broadcast_devices WHERE id = ?`, [id]);
+      .query<Record<string, any>>(`SELECT * FROM broadcast_devices WHERE id = ?`, [id]);
 
     if (rows.length === 0) {
       return null;
@@ -81,7 +81,7 @@ export class DeviceModel {
   async getByDeviceUuid(deviceUuid: string): Promise<BroadcastDevice | null> {
     const rows = await this.db
       .getAdapter()
-      .query(`SELECT * FROM broadcast_devices WHERE device_uuid = ?`, [
+      .query<Record<string, any>>(`SELECT * FROM broadcast_devices WHERE device_uuid = ?`, [
         deviceUuid,
       ]);
 
@@ -126,7 +126,7 @@ export class DeviceModel {
       params.push(filters.offset);
     }
 
-    const rows = await this.db.getAdapter().query(query, params);
+    const rows = await this.db.getAdapter().query<Record<string, any>>(query, params);
     return rows.map((row) => this.mapRowToDevice(row));
   }
 

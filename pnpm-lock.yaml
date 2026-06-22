@@ -405,6 +405,9 @@ importers:
       express-validator:
         specifier: ^7.3.2
         version: 7.3.2
+      multer:
+        specifier: ^1.4.5-lts.1
+        version: 1.4.5-lts.2
       uuid:
         specifier: 11.1.0
         version: 11.1.0
@@ -415,6 +418,9 @@ importers:
       '@types/express':
         specifier: ^4.17.25
         version: 4.17.25
+      '@types/multer':
+        specifier: ^1.4.11
+        version: 1.4.13
       '@types/node':
         specifier: ^20.19.0
         version: 20.19.41

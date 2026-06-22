@@ -76,7 +76,7 @@ export class EnrollmentCodeModel {
   async findByCodeHash(codeHash: string): Promise<EnrollmentCode | null> {
     const rows = await this.db
       .getAdapter()
-      .query(
+      .query<Record<string, any>>(
         `SELECT * FROM broadcast_enrollment_codes WHERE enrollment_code_hash = ?`,
         [codeHash]
       );
@@ -100,7 +100,7 @@ export class EnrollmentCodeModel {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const rows = await this.db
       .getAdapter()
-      .query(
+      .query<Record<string, any>>(
         `SELECT * FROM broadcast_enrollment_codes WHERE used_at IS NULL AND created_at > ? ORDER BY created_at DESC`,
         [cutoff]
       );
@@ -125,7 +125,7 @@ export class EnrollmentCodeModel {
   async findByDeviceUuid(deviceUuid: string): Promise<EnrollmentCode | null> {
     const rows = await this.db
       .getAdapter()
-      .query(
+      .query<Record<string, any>>(
         `SELECT * FROM broadcast_enrollment_codes WHERE device_uuid = ? ORDER BY created_at DESC LIMIT 1`,
         [deviceUuid]
       );
@@ -157,7 +157,7 @@ export class EnrollmentCodeModel {
     const now = new Date().toISOString();
 
     // First, count how many will be deleted
-    const countRows = await this.db.getAdapter().query(
+    const countRows = await this.db.getAdapter().query<Record<string, any>>(
       `SELECT COUNT(*) as count FROM broadcast_enrollment_codes 
        WHERE expires_at < ? AND used_at IS NULL`,
       [now]
@@ -186,7 +186,7 @@ export class EnrollmentCodeModel {
    */
   async deleteUnusedByDeviceUuid(deviceUuid: string): Promise<number> {
     // First, count how many will be deleted
-    const countRows = await this.db.getAdapter().query(
+    const countRows = await this.db.getAdapter().query<Record<string, any>>(
       `SELECT COUNT(*) as count FROM broadcast_enrollment_codes 
        WHERE device_uuid = ? AND used_at IS NULL`,
       [deviceUuid]
@@ -216,7 +216,7 @@ export class EnrollmentCodeModel {
    */
   async deleteAllByDeviceUuid(deviceUuid: string): Promise<number> {
     // First, count how many will be deleted
-    const countRows = await this.db.getAdapter().query(
+    const countRows = await this.db.getAdapter().query<Record<string, any>>(
       `SELECT COUNT(*) as count FROM broadcast_enrollment_codes 
        WHERE device_uuid = ?`,
       [deviceUuid]

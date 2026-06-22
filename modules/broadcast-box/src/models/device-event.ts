@@ -52,7 +52,7 @@ export class DeviceEventModel {
   async getById(id: string): Promise<DeviceEvent | null> {
     const rows = await this.db
       .getAdapter()
-      .query(`SELECT * FROM broadcast_device_events WHERE id = ?`, [id]);
+      .query<Record<string, any>>(`SELECT * FROM broadcast_device_events WHERE id = ?`, [id]);
 
     if (rows.length === 0) {
       return null;
@@ -107,7 +107,7 @@ export class DeviceEventModel {
       params.push(filters.offset);
     }
 
-    const rows = await this.db.getAdapter().query(query, params);
+    const rows = await this.db.getAdapter().query<Record<string, any>>(query, params);
     return rows.map((row) => this.mapRowToEvent(row));
   }
 

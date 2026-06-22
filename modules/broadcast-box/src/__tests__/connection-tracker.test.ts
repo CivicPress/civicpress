@@ -19,6 +19,10 @@ describe('DeviceConnectionTracker', () => {
   beforeEach(() => {
     mockDeviceManager = {
       updateLastSeen: vi.fn().mockResolvedValue(undefined),
+      // registerConnection() now consults getDevice() to detect a device's
+      // first connection; default to "not found" so the basic-tracking tests
+      // exercise the common path.
+      getDevice: vi.fn().mockResolvedValue(null),
     };
 
     mockDeviceEventModel = {

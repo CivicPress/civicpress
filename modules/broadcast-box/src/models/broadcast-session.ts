@@ -61,7 +61,7 @@ export class BroadcastSessionModel {
   async getById(id: string): Promise<BroadcastSession | null> {
     const rows = await this.db
       .getAdapter()
-      .query(`SELECT * FROM broadcast_sessions WHERE id = ?`, [id]);
+      .query<Record<string, any>>(`SELECT * FROM broadcast_sessions WHERE id = ?`, [id]);
 
     if (rows.length === 0) {
       return null;
@@ -78,7 +78,7 @@ export class BroadcastSessionModel {
   ): Promise<BroadcastSession | null> {
     const rows = await this.db
       .getAdapter()
-      .query(
+      .query<Record<string, any>>(
         `SELECT * FROM broadcast_sessions WHERE civicpress_session_id = ? ORDER BY created_at DESC LIMIT 1`,
         [civicpressSessionId]
       );
@@ -130,7 +130,7 @@ export class BroadcastSessionModel {
       params.push(filters.offset);
     }
 
-    const rows = await this.db.getAdapter().query(query, params);
+    const rows = await this.db.getAdapter().query<Record<string, any>>(query, params);
     return rows.map((row) => this.mapRowToSession(row));
   }
 

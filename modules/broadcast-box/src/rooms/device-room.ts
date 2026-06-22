@@ -10,7 +10,7 @@ import type {
   RealtimeServer,
   RoomConfig,
   RoomState,
-  ClientConnection,
+  ClientData,
   Room,
   RoomFactory,
 } from '@civicpress/realtime';
@@ -24,7 +24,7 @@ type WebSocketConnection = {
 export class DeviceRoom implements Room {
   public readonly roomId: string;
   public readonly roomType: string = 'device';
-  private clients: Map<string, ClientConnection> = new Map();
+  private clients: Map<string, ClientData> = new Map();
   private logger: Logger;
   private server: RealtimeServer;
   private deviceId: string;
@@ -61,7 +61,7 @@ export class DeviceRoom implements Room {
   /**
    * Add client to room
    */
-  addClient(clientId: string, connection: ClientConnection): void {
+  addClient(clientId: string, connection: ClientData): void {
     this.clients.set(clientId, connection);
     this.lastActivity = Date.now();
     this.version++;
