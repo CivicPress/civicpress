@@ -11,5 +11,6 @@ packages:
   - modules/ui
   - modules/schema-extensions/legal
   - modules/storage
+  - modules/broadcast-box
   - packages/*
   # - modules/serve (Astro frontend removed)
