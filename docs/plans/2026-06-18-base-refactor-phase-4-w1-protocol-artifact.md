@@ -1,5 +1,13 @@
 # Phase 4 W1 — Canonical Broadcast Protocol Artifact (Implementation Sub-Plan)
 
+> **Status (2026-06-22):** **W1a/b/c/e done; W1f re-scoped (no-op + deferred);
+> W1d safety-net in, consolidation gated.** Protocol package `25744ea`(+`189c0b3`
+> schema fix); device bound + dispatch table `c6c71e7`; protocol doc generated
+> `f127ce8`; W1f corrected `608785f`; W1d characterization tests `df2a006`
+> (consolidation waits on the BB-HW-013 enrollment work — shared re-enroll path).
+> Closes BB-HW-001/004/005; advances 014. Remaining: W1d reconnect consolidation;
+> (the server side of the protocol bound in Phase 5, `ec10e34`).
+
 > **For agentic workers:** steps use checkbox (`- [ ]`) syntax. Implement
 > task-by-task; each ends green (HW suite ≥ 283 passed + new tests) before the
 > next. TDD where a task says "(TDD)".

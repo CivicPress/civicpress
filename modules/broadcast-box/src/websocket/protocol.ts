@@ -5,7 +5,7 @@
  */
 
 import type { Logger } from '@civicpress/core';
-import { coreWarn, coreError } from '@civicpress/core';
+import { coreError } from '@civicpress/core';
 import type {
   BaseMessage,
   CommandMessage,
