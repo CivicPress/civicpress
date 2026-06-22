@@ -6,7 +6,6 @@
 
 import type { Logger, SecretsManager } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
-import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface DeviceTokenPayload {
@@ -14,6 +13,12 @@ export interface DeviceTokenPayload {
   deviceUuid: string;
   organizationId: string;
   type: 'device';
+  /**
+   * Unique token id (JWT `jti` claim). Makes every minted token distinct even
+   * when `iat`/`exp` collide at one-second granularity, so a refresh always
+   * rotates the token rather than returning a byte-identical one.
+   */
+  jti: string;
   iat: number;
   exp: number;
 }
@@ -54,6 +59,7 @@ export class DeviceAuthService {
       deviceUuid: data.deviceUuid,
       organizationId: data.organizationId,
       type: 'device',
+      jti: uuidv4(),
       iat: now,
       exp: now + this.TOKEN_EXPIRY_HOURS * 60 * 60,
     };
