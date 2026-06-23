@@ -250,13 +250,15 @@ can be end-to-end tested rather than against mocks of ambiguous behaviour:
   filter only → the adapter applies the derived scan `capture.av_file && !transcript_status`);
   `getRecord(id)` returns the parsed frontmatter. The `CoreRecordsGateway` read path is
   buildable + unit-testable now.
-- **Records WRITE = needs verification.** `updateRecord(id, req: UpdateRecordRequest,
-  user: AuthUser)` — `UpdateRecordRequest` has NO `media`/`transcript_status` field;
-  custom top-level frontmatter goes through the `metadata` catch-all, whose mapping to
-  written YAML (top-level vs nested; merge-vs-replace of an existing `media` block) is
-  runtime-ambiguous. The worker also needs a service `AuthUser` for audit attribution.
-  Both must be pinned against a real RecordManager (temp data dir) before trusting the
-  atomic-write latch (§10.4) — otherwise it could write the wrong shape.
+- **Records WRITE = the top-level-field gap is FIXED in core (`41adfb1`).** Custom
+  module-extension fields used to nest under `metadata:`; `RecordParser.buildFrontmatter`
+  now writes a record type's registered schema-extension fields (incl.
+  `transcript_status`) to TOP-LEVEL — verified by a serialize→parse→serialize round-trip
+  test. So the write-back is `updateRecord(id, { metadata: { transcript_status: 'automated',
+  media: { ...transcript } } }, systemUser)` with the `{id:1,username:'system',role:'admin'}`
+  AuthUser pattern (from `SessionController.linkFileToSession`); `media` is a known
+  top-level field. **Remaining e2e:** confirm the published-record saga path writes the
+  expected YAML against a real RecordManager (temp data dir).
 - **A/V fetch.** Storage exposes `getFileContent(uuid) → Buffer` (cloud-uuid-storage
   download-ops); the public service entry to wire is still to confirm.
 - **whisper.cpp is ABSENT in dev** (ffmpeg present). Its CLI args + output-JSON schema
