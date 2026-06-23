@@ -197,17 +197,20 @@ wiring smoke test. The two fields:
    `session` extension (`capture` / `schedule` / `transcript_status`) into the module;
    merge semantics + wiring pinned by tests. (Applies only when broadcast-box is in
    config `modules:`.)
-2. **Worker skeleton** (`services/transcription/`) — poll → claim
-   (`transcript_status: processing`) → engine → write `media.transcript` +
-   `transcript_status: automated`, all via the **records API** (Git + audit).
-   In-camera segments excluded. Graceful skip when the engine is unavailable.
-3. **Engine** — `whisper-cpp` (spawn the binary, `fr-CA`) behind the
-   `TranscriptionEngine` interface; `http` + `noop` stubs.
+2. **Worker core** (`services/transcription/`) — ✅ **done (2026-06-23):** the
+   `TranscriptionWorker` poll cycle (engine-available gate → derived scan → in-camera
+   exclusion → engine → atomic write of `media.transcript` + `transcript_status:
+   automated` with the §10.4 re-read guard — **no claim marker**, per §10.3), behind
+   narrow `RecordsGateway`/`TranscriptionEngine` contracts + `NoopEngine`. 12 tests
+   (fake gateway + mock engine). New `@civicpress/transcription` workspace package.
+3. **Adapters + wiring** *(next)* — the real `RecordsGateway` over `@civicpress/core`
+   `RecordManager` + storage; the `whisper-cpp` `TranscriptionEngine` (spawn binary,
+   model `small`, `fr-CA`); `http` + the `noop` (done) backends.
 4. **`civic start`** — launch when `transcription.enabled` + `available()`,
    else log-and-skip (no hard failure).
-5. **Tests** — fixture sessions + mock engine: the poll→claim→write-back loop,
-   in-camera exclusion, and graceful degradation (engine down → A/V still
-   public, no write).
+5. **Tests** — worker-core tests ✅ done (loop, in-camera exclusion, idempotency,
+   re-read guard, graceful degradation). Real-adapter + end-to-end tests land with
+   step 3/4.
 
 ### 10.3 Sub-decisions (resolved 2026-06-23)
 - **`transcript_status` enum = `automated | reviewed`, unchanged.** MVP is a
