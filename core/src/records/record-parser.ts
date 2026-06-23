@@ -16,6 +16,7 @@ import { stringify } from 'yaml';
 import { RecordData } from './record-manager.js';
 import { Logger } from '../utils/logger.js';
 import { RecordSchemaValidator } from './record-schema-validator.js';
+import { getSchemaExtensionFieldNames } from './record-schema-builder.js';
 import { RecordValidationError } from '../errors/domain-errors.js';
 import { ValidationError } from '../errors/index.js';
 
@@ -468,10 +469,25 @@ ${record.content || ''}`;
         ...rest
       } = record.metadata;
 
-      if (Object.keys(rest).length > 0) {
+      // Fields a module schema-extension contributes to this record type are
+      // written to TOP-LEVEL frontmatter (so they round-trip + validate against
+      // the extension), not nested under `metadata:`. Everything else stays a
+      // metadata passthrough. (No-op unless an extension module is enabled.)
+      const extensionFields = getSchemaExtensionFieldNames(record.type);
+      const fm = frontmatter as Record<string, unknown>;
+      const nested: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(rest)) {
+        if (extensionFields.has(key)) {
+          fm[key] = value;
+        } else {
+          nested[key] = value;
+        }
+      }
+
+      if (Object.keys(nested).length > 0) {
         frontmatter.metadata = {
           ...(frontmatter.metadata || {}),
-          ...rest,
+          ...nested,
         };
       }
     }

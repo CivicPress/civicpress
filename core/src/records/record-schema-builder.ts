@@ -84,6 +84,35 @@ function getModuleResolver(): ModuleResolver {
 }
 
 /**
+ * Top-level frontmatter field names a record type gains from ENABLED module
+ * schema extensions — the same modules (`CentralConfigManager.getModules()`) and
+ * fragments that `mergeModuleExtensions` validates against. The record serializer
+ * (`RecordParser.buildFrontmatter`) uses this so extension fields round-trip as
+ * top-level YAML instead of nesting under `metadata:`. Graceful: returns an empty
+ * set if no resolver/config/fragment is available (then serialization is unchanged).
+ */
+export function getSchemaExtensionFieldNames(recordType: string): Set<string> {
+  const names = new Set<string>();
+  try {
+    const modules = CentralConfigManager.getModules();
+    const resolver = getModuleResolver();
+    for (const moduleName of modules) {
+      const loaded = resolver.loadByName(moduleName);
+      if (!loaded?.schemaPath) continue;
+      const types = loaded.manifest.capabilities.schemaExtensions ?? [];
+      if (!types.includes(recordType)) continue;
+      const fragment = JSON.parse(readFileSync(loaded.schemaPath, 'utf-8'));
+      for (const key of Object.keys(fragment?.properties ?? {})) {
+        names.add(key);
+      }
+    }
+  } catch {
+    // No resolver/config/fragment → no extension fields; serialize as before.
+  }
+  return names;
+}
+
+/**
  * RecordSchemaBuilder - Builds dynamic JSON schemas for record validation
  */
 export class RecordSchemaBuilder {
