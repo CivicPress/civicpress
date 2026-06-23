@@ -209,9 +209,31 @@ wiring smoke test. The two fields:
    in-camera exclusion, and graceful degradation (engine down → A/V still
    public, no write).
 
-### 10.3 Sub-decisions still open (non-blocking)
-- `transcript_status` exact enum (the §10.1 set is the proposal to confirm).
-- whisper.cpp model default for `fr-CA` (`base` is fast/weak; `small`/`medium`
-  more accurate/slower) — config-overridable; pick a default during build.
-- "needs transcription" = a **derived scan** (GET sessions, filter) for MVP; a
-  real API filter is a later optimisation.
+### 10.3 Sub-decisions (resolved 2026-06-23)
+- **`transcript_status` enum = `automated | reviewed`, unchanged.** MVP is a
+  SINGLE worker, so no claim marker: the *write* of `transcript_status` is the
+  idempotency latch (§10.4). Worker `processing`/`failed` states are deferred to a
+  multi-worker / retry-capping increment (a separate operational field, not this
+  public trust label).
+- **whisper.cpp model default = `small`** (multilingual, good `fr-CA` accuracy on
+  proper nouns, CPU-runnable on a modest server); config-overridable (`medium` as a
+  quality opt-in for capable hardware, `base` only for constrained boxes).
+- **"needs transcription" = a derived scan** (GET sessions, filter for
+  `capture.av_file` present && `transcript_status` absent) for MVP; a real API
+  filter is a later optimisation.
+
+### 10.4 Worker idempotency (single-worker MVP)
+Re-running the worker is safe — idempotent in OUTCOME:
+1. **The query is the gate.** "needs transcription" requires `transcript_status`
+   ABSENT, so once written the session is never re-picked.
+2. **One atomic write = the latch.** Write `media.transcript` + `transcript_status:
+   automated` in a SINGLE records-API update. A crash *before* it leaves the session
+   cleanly re-pollable (redoes the transcription); a crash *after* it leaves it done.
+   No half-states.
+3. **Deterministic engine.** whisper.cpp is deterministic for the same
+   input/model/params, so even a redundant reprocess yields an identical transcript —
+   no divergence.
+4. **Re-read-before-write guard.** Just before writing, re-fetch the session; if
+   `transcript_status` is now set (another worker finished), skip. A cheap optimistic
+   check covering most concurrent double-pickup without a full claim protocol; the
+   real claim marker arrives with multi-worker support.
