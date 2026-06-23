@@ -1,0 +1,12 @@
+{
+  "$schema": "../../core/src/modules/module.schema.json",
+  "name": "broadcast-box",
+  "version": "1.0.0",
+  "kind": "module",
+  "description": "Remote control + capture for BroadcastBox appliances; contributes capture/schedule/transcript provenance to session records.",
+  "license": "MIT",
+  "entry": "dist/index.js",
+  "capabilities": {
+    "schemaExtensions": ["session"]
+  }
+}

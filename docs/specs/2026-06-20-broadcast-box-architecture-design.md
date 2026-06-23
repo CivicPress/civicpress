@@ -121,10 +121,11 @@ minutes_status: draft       # draft | under_review | adopted  (minutes adoption)
 
 *Broadcast-box module fragment* — capture-specific fields, contributed via the
 module's manifest `capabilities.schemaExtensions: ["session"]` (the legal-register
-pattern; NOT in core, NOT a new type). Staged at
-`docs/specs/broadcast-box/record-schema-extension.json` (relocates to
-`modules/broadcast-box/schemas/record-schema-extension.json` in Phase 5),
-validated by `tests/core/broadcast-box-session-extension.test.ts`:
+pattern; NOT in core, NOT a new type). Lives at
+`modules/broadcast-box/schemas/record-schema-extension.json` (relocated from the
+`docs/specs/broadcast-box/` staging draft in Phase 5, W2 Step 1), wired by
+`module.json` and validated by
+`modules/broadcast-box/src/__tests__/session-extension.test.ts`:
 
 ```yaml
 # existing session fields (date, location, attendees[], topics[], media{…}) … plus:

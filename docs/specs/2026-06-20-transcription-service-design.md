@@ -170,24 +170,33 @@ Converged with the maintainer; this graduates the draft toward implementation.
   in-camera exclusion**. Agenda-aligned `topics[]`, diarization, and audio-render
   are the next increment.
 
-### 10.1 Prerequisite — session-record schema (core)
-The write-back target is ~80 % already present (`topics[]`, `media.transcript`,
-`visibility`, `minutes_status`), but two fields are missing and *are* W2's
-contract, so they land first (`core/src/schemas/record-type-schemas/session-schema.json`):
-- **`transcript_status`** (trust label + worker claim marker): proposed enum
-  `processing | automated | verified | failed`. Its **absence** means "needs
-  transcription". `automated` = transcript present, auto-published, unverified;
-  `verified` = clerk-adopted.
+### 10.1 Prerequisite — session-record schema *(corrected: it's a module extension, not core)*
+The write-back target is ~80 % already present in CORE `session-schema.json`
+(`topics[]`, `media.transcript`, `visibility`, `minutes_status`). The two W2
+fields are NOT added to core — they are contributed by the **broadcast-box module
+as a `session` schema extension** (`modules/broadcast-box/schemas/record-schema-extension.json`,
+wired by `module.json` `capabilities.schemaExtensions: ["session"]`, merged onto
+core's `session` via the module seam). They apply at runtime **only when
+broadcast-box is enabled in CivicPress config `modules:`**.
+
+**✅ Done (W2 Step 1, 2026-06-23):** the fragment (drafted in W0/W1) was relocated
+from its `docs/specs/broadcast-box/` staging home into the module and wired; pinned
+by `tests/core/broadcast-box-session-extension.test.ts` (merge semantics) + a module
+wiring smoke test. The two fields:
+- **`transcript_status`** (trust label): the shipped fragment currently has enum
+  `automated | reviewed` (`automated` = auto-published unverified; `reviewed` =
+  clerk-checked; **absence** = needs transcription). Reconciling this with the
+  worker claim/fail states (`processing`/`failed`) is the first §10.3 sub-decision.
 - **`capture` block** mirroring the protocol `session.manifest`:
-  `{ device, av_file, duration_s, segments: [{ start, end, visibility }] }`.
+  `{ device, av_file, started_at, ended_at, duration_s, segments: [{ start, end, visibility }] }`.
   **Segment-level `visibility` is civic-critical** — it is how the worker excludes
-  in-camera portions from transcription/publication. Today only *session*-level
-  `visibility` is persisted; the manifest already carries segment visibility,
-  it just isn't written onto the record yet.
+  in-camera portions from transcription/publication.
 
 ### 10.2 First slice (contract-first)
-1. **Schema** — add `transcript_status` + `capture` to the session schema
-   (+ any validator rules); fixtures.
+1. **Schema contract** — ✅ **done (2026-06-23):** relocated + wired the broadcast-box
+   `session` extension (`capture` / `schedule` / `transcript_status`) into the module;
+   merge semantics + wiring pinned by tests. (Applies only when broadcast-box is in
+   config `modules:`.)
 2. **Worker skeleton** (`services/transcription/`) — poll → claim
    (`transcript_status: processing`) → engine → write `media.transcript` +
    `transcript_status: automated`, all via the **records API** (Git + audit).

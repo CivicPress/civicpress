@@ -1,11 +1,12 @@
 /**
  * Phase 4 #3 — BroadcastBox `session` schema-extension fragment
  *
- * Validates the REAL fragment that the broadcast-box module will contribute to
- * `session` records (staged at docs/specs/broadcast-box/record-schema-extension.json;
- * relocates to modules/broadcast-box/schemas/ in Phase 5). Loads the actual
- * file, merges it onto core's `session` via the module-extension seam, and
- * checks representative records validate / fail as intended.
+ * Validates the REAL fragment the broadcast-box module contributes to `session`
+ * records (modules/broadcast-box/schemas/record-schema-extension.json, wired by
+ * modules/broadcast-box/module.json — relocated from the docs/specs staging
+ * draft in Phase 5, W2 Step 1). Loads the actual file, merges it onto core's
+ * `session` via the module-extension seam, and checks representative records
+ * validate / fail as intended.
  *
  * Complements record-schema-extension.contract.test.ts (which pins the seam
  * with a toy fragment); this pins the real capture/schedule/transcript fields.
@@ -32,7 +33,7 @@ import { CentralConfigManager } from '../../core/src/config/central-config.js';
 
 const FRAGMENT_PATH = join(
   process.cwd(),
-  'docs/specs/broadcast-box/record-schema-extension.json'
+  'modules/broadcast-box/schemas/record-schema-extension.json'
 );
 
 const BASE_RECORD = {
@@ -58,7 +59,7 @@ function errorsMentioning(
 describe('BroadcastBox session schema-extension fragment', () => {
   let root: string;
 
-  it('the staged fragment is valid JSON with the expected top-level fields', () => {
+  it('the module fragment is valid JSON with the expected top-level fields', () => {
     const fragment = JSON.parse(readFileSync(FRAGMENT_PATH, 'utf-8'));
     expect(Object.keys(fragment.properties)).toEqual(
       expect.arrayContaining(['capture', 'schedule', 'transcript_status'])
