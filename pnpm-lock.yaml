@@ -802,6 +802,18 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.41)(@vitest/ui@3.2.4)(happy-dom@20.0.11)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
+  services/transcription:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.0
+        version: 20.19.41
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@20.19.41)(@vitest/ui@3.2.4)(happy-dom@20.0.11)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+
 packages:
 
   '@alloc/quick-lru@5.2.0':
