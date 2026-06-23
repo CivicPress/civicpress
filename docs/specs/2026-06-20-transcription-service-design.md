@@ -1,6 +1,6 @@
 ---
 title: CivicPress Transcription Service (BroadcastBox W2) — Design
-status: design (draft)
+status: design (decided 2026-06-23 — see §10)
 date: 2026-06-20
 related:
   - docs/specs/2026-06-20-broadcast-box-architecture-design.md (parent)
@@ -147,8 +147,62 @@ separate repo (keep it in the monorepo with the rest of `civic start`).
 - **Next:** agenda-aligned draft `topics[]`; diarization (speaker turns);
   audio-version render; event-driven trigger; clerk-review UI for adoption.
 
-## 9. Open questions
+## 9. Open questions *(resolved 2026-06-23 — see §10)*
 - `services/transcription/` vs `modules/transcription/` (module-contract fit).
 - whisper.cpp model size vs the server resource floor (accuracy/latency tradeoff).
 - The "needs transcription" query: a real API filter vs a derived scan.
 - French-first (the Richmond data is `fr-CA`) — model/language defaults.
+
+## 10. Decisions (2026-06-23 brainstorm)
+
+Converged with the maintainer; this graduates the draft toward implementation.
+
+- **Sequencing = contract-first.** Lock the session-record transcript contract,
+  then build the worker against **fixture** session records — W2 stays decoupled
+  (it polls the records API) and does **not** block on the deferred Phase-5
+  device→session input pipeline. Real input wires in later.
+- **Packaging = `services/transcription/`** (a plain worker managed by
+  `civic start`), not a `modules/` module: it is a media→records *worker*
+  (infrastructure), not a civic-records module, so it does not need the module
+  contract's registration hooks. (Resolves §6 / §9.)
+- **MVP scope = transcript-only.** poll → whisper.cpp (`fr-CA`) →
+  `media.transcript` + `transcript_status: automated`, honouring **segment-level
+  in-camera exclusion**. Agenda-aligned `topics[]`, diarization, and audio-render
+  are the next increment.
+
+### 10.1 Prerequisite — session-record schema (core)
+The write-back target is ~80 % already present (`topics[]`, `media.transcript`,
+`visibility`, `minutes_status`), but two fields are missing and *are* W2's
+contract, so they land first (`core/src/schemas/record-type-schemas/session-schema.json`):
+- **`transcript_status`** (trust label + worker claim marker): proposed enum
+  `processing | automated | verified | failed`. Its **absence** means "needs
+  transcription". `automated` = transcript present, auto-published, unverified;
+  `verified` = clerk-adopted.
+- **`capture` block** mirroring the protocol `session.manifest`:
+  `{ device, av_file, duration_s, segments: [{ start, end, visibility }] }`.
+  **Segment-level `visibility` is civic-critical** — it is how the worker excludes
+  in-camera portions from transcription/publication. Today only *session*-level
+  `visibility` is persisted; the manifest already carries segment visibility,
+  it just isn't written onto the record yet.
+
+### 10.2 First slice (contract-first)
+1. **Schema** — add `transcript_status` + `capture` to the session schema
+   (+ any validator rules); fixtures.
+2. **Worker skeleton** (`services/transcription/`) — poll → claim
+   (`transcript_status: processing`) → engine → write `media.transcript` +
+   `transcript_status: automated`, all via the **records API** (Git + audit).
+   In-camera segments excluded. Graceful skip when the engine is unavailable.
+3. **Engine** — `whisper-cpp` (spawn the binary, `fr-CA`) behind the
+   `TranscriptionEngine` interface; `http` + `noop` stubs.
+4. **`civic start`** — launch when `transcription.enabled` + `available()`,
+   else log-and-skip (no hard failure).
+5. **Tests** — fixture sessions + mock engine: the poll→claim→write-back loop,
+   in-camera exclusion, and graceful degradation (engine down → A/V still
+   public, no write).
+
+### 10.3 Sub-decisions still open (non-blocking)
+- `transcript_status` exact enum (the §10.1 set is the proposal to confirm).
+- whisper.cpp model default for `fr-CA` (`base` is fast/weak; `small`/`medium`
+  more accurate/slower) — config-overridable; pick a default during build.
+- "needs transcription" = a **derived scan** (GET sessions, filter) for MVP; a
+  real API filter is a later optimisation.
