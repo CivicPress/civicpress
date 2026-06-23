@@ -4,7 +4,7 @@
  * Handles chunked file uploads from Broadcast Box devices
  */
 
-import type { Logger } from '@civicpress/core';
+import type { Logger, HookSystem } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -27,7 +27,10 @@ export class UploadProcessor {
     private db: any, // DatabaseService
     private storageService: CloudUuidStorageService,
     private systemDataDir: string,
-    private logger: Logger
+    private logger: Logger,
+    // Optional: emits `broadcast-box:recording:complete` on finalize so the
+    // recording is linked to its CivicPress session record (capture block).
+    private hookSystem?: HookSystem
   ) {
     this.uploadModel = new UploadJobModel(db, logger);
     this.uploadsDir = path.join(systemDataDir, 'tmp', 'uploads');
@@ -245,6 +248,31 @@ export class UploadProcessor {
         uploadId,
         storageLocation: storageResult.uuid,
       });
+
+      // Announce completion so the workflow trigger links the A/V to its
+      // CivicPress session record and writes the `capture` block (W2). The hook
+      // is best-effort: the recording is already stored, so a link failure must
+      // not fail the upload. `upload.sessionId`/`deviceId` are the broadcast
+      // session id + device (set in createUpload), which is what the trigger
+      // (onRecordingComplete → linkFileToSession) expects.
+      if (this.hookSystem && upload.sessionId) {
+        try {
+          await this.hookSystem.emit('broadcast-box:recording:complete', {
+            sessionId: upload.sessionId,
+            storageFileId: storageResult.uuid,
+            deviceId: upload.deviceId,
+          });
+        } catch (hookError) {
+          this.logger.error('Failed to emit recording:complete hook', {
+            operation: 'broadcast-box:upload:recording-complete-hook-error',
+            uploadId,
+            error:
+              hookError instanceof Error
+                ? hookError.message
+                : String(hookError),
+          });
+        }
+      }
 
       return storageResult.uuid;
     } catch (error) {

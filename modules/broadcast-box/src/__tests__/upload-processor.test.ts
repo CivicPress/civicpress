@@ -16,6 +16,7 @@ describe('UploadProcessor', () => {
   let mockStorageService: any;
   let testDir: string;
   let mockLogger: Logger;
+  let mockHookSystem: any;
 
   beforeEach(async () => {
     testDir = await fs.mkdtemp(
@@ -47,11 +48,14 @@ describe('UploadProcessor', () => {
       debug: vi.fn(),
     } as any;
 
+    mockHookSystem = { emit: vi.fn(), registerHook: vi.fn() };
+
     processor = new UploadProcessor(
       mockDb,
       mockStorageService,
       testDir,
-      mockLogger
+      mockLogger,
+      mockHookSystem
     );
 
     await processor.initialize();
@@ -242,6 +246,16 @@ describe('UploadProcessor', () => {
       expect(storageUuid).toBe('storage-file-uuid');
       expect(mockStorageService.uploadFile).toHaveBeenCalled();
       expect(mockUploadModel.update).toHaveBeenCalled();
+      // Announces completion (broadcast-session id + storage uuid + device) so
+      // the workflow trigger links the A/V to its session record + writes capture.
+      expect(mockHookSystem.emit).toHaveBeenCalledWith(
+        'broadcast-box:recording:complete',
+        {
+          sessionId: 'session-id',
+          storageFileId: 'storage-file-uuid',
+          deviceId: 'device-id',
+        }
+      );
     });
 
     it('should throw error if hash mismatch', async () => {

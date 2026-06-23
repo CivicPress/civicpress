@@ -371,11 +371,20 @@ export async function registerBroadcastBoxServices(
       : path.resolve(process.cwd(), path.dirname(config.dataDir));
     const systemDataDir = path.join(projectRoot, '.system-data');
 
+    // Hooks drive upload→record linking; may not be registered yet — optional.
+    let hookSystem: HookSystem | undefined;
+    try {
+      hookSystem = c.resolve<HookSystem>('hooks');
+    } catch {
+      // Hooks unavailable; finalizeUpload skips the recording-complete emit.
+    }
+
     const processor = new UploadProcessor(
       db,
       storageService,
       systemDataDir,
-      logger
+      logger,
+      hookSystem
     );
 
     // Initialize uploads directory
