@@ -1,12 +1,15 @@
 # Phase 4 W1 — Canonical Broadcast Protocol Artifact (Implementation Sub-Plan)
 
-> **Status (2026-06-22):** **W1a/b/c/e done; W1f re-scoped (no-op + deferred);
-> W1d safety-net in, consolidation gated.** Protocol package `25744ea`(+`189c0b3`
-> schema fix); device bound + dispatch table `c6c71e7`; protocol doc generated
-> `f127ce8`; W1f corrected `608785f`; W1d characterization tests `df2a006`
-> (consolidation waits on the BB-HW-013 enrollment work — shared re-enroll path).
-> Closes BB-HW-001/004/005; advances 014. Remaining: W1d reconnect consolidation;
-> (the server side of the protocol bound in Phase 5, `ec10e34`).
+> **Status (2026-06-23):** **W1 complete (a–f).** Protocol package `25744ea`
+> (+`189c0b3` schema fix); device bound + dispatch table `c6c71e7`; protocol doc
+> generated `f127ce8`; W1f re-scoped (no-op + deferred, `608785f`). **W1d reconnect
+> consolidation done:** characterization safety net `df2a006`, then the 4 overlapping
+> reconnect paths (`connect`/`_handle_disconnect`/`_reconnect_loop`/`_health_monitor`)
+> extracted into one `ReconnectionManager` — one state machine, one backoff, one
+> reconnect task, one trigger (`request_reconnect`); the client's status flags are
+> now a projection of that single state. `websocket_client.py` 1380→1124 LoC (1,432
+> at audit time); HW suite 313/7. Closes BB-HW-001/004/005/006; advances 014. (The
+> server side of the protocol bound in Phase 5, `ec10e34`.)
 
 > **For agentic workers:** steps use checkbox (`- [ ]`) syntax. Implement
 > task-by-task; each ends green (HW suite ≥ 283 passed + new tests) before the
@@ -127,22 +130,25 @@ Closeout        →  registry closures; memories; merges
       special-cases (`connection.ack`, `error`→re-enroll).
 - [ ] **T3.** Tests: all actions covered; aliases resolve; unknown → error ack. Commit.
 
-### W1d — Reconnect consolidation (BB-HW-006) *(safety net laid; consolidation GATED on E3)*
+### W1d — Reconnect consolidation (BB-HW-006) *(DONE 2026-06-23)*
 - [x] **T0 — characterization tests** (`df2a006`, `tests/unit/test_reconnect_characterization.py`):
       6 tests pin current behaviour the consolidation must preserve — backoff
       `5/10/20/40/60/60`, last-successful-endpoint priority, attempts-reset +
       last-successful-recorded on success, command dedup (pending+processed),
-      reconnection stale-command timeout, ack pending→processed. (Decided:
-      "characterization tests now, consolidate after E3".)
-- [ ] **T1. (deferred → after BB-HW-013 one-time-code work)** Extract the 4 paths
+      reconnection stale-command timeout, ack pending→processed.
+- [x] **T1.** Extracted the 4 paths
       (`connect`/`_handle_disconnect`/`_reconnect_loop`/`_health_monitor_loop`)
-      into one `ReconnectionManager` over `ConnectionState`; one backoff, one
-      reconnect task. **Gated:** the reconnect paths include the
-      `AUTH_FAILED`→re-enroll handler, which the BB-HW-013 enrollment strategy
-      (one-time, revocable codes) will rewrite — consolidate *after* that so it
-      isn't redone. The characterization tests above are the safety net.
-- [ ] **T2.** `websocket_client.py` shrinks toward transport + message-pump;
-      record before/after LoC. Commit. *(LoC-trim may spill.)*
+      into one `ReconnectionManager` over `ConnectionState` (`connector/reconnection.py`):
+      one backoff, one reconnect task, one trigger (`request_reconnect`). The
+      client's `connected`/`_connecting`/`state` flags are now a *projection* of
+      the manager's single authoritative state (one writer), so the ~112 readers +
+      `is_connected()`/`get_state()` can't drift. The gate (the `AUTH_FAILED`→
+      re-enroll handler) cleared once BB-HW-013 landed; the characterization tests
+      were migrated to drive the manager with **identical assertions** (the safety
+      net survives the extraction). HW suite 313/7 + 11 new manager contract tests.
+- [x] **T2.** `websocket_client.py` shrank **1380→1124 LoC** (−256; reconnect logic
+      now lives in the 212-LoC `reconnection.py`). Behavioural consolidation
+      complete; no further LoC-trim spill needed.
 
 ### W1e — Regenerate the protocol doc (BB-HW-001 + BB-HW-014)
 - [ ] **T1.** Replace the 1,626-line `docs/civicpress-integration-protocol.md`
@@ -169,7 +175,8 @@ break first-run setup. So W1f's original premise (delete `frontend/`) was wrong.
 - [ ] HW client speaks only the clean protocol; old multi-shape parsing deleted;
       outbound validates; vendored copy verified identical to canonical.
 - [ ] Command dispatch is a table; unknown actions → error ack.
-- [ ] Reconnect logic is one path (or a documented, tracked spill).
+- [x] Reconnect logic is one path (`ReconnectionManager`: one state machine, one
+      backoff, one task, one trigger).
 - [ ] Protocol doc generated from schema.
 - [x] Device confirmed headless for operational control (control via CP);
       enrollment UI (`frontend/`) kept; BB-HW-017 slimming deferred (not W1).
