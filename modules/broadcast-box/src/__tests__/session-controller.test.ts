@@ -499,4 +499,60 @@ describe('SessionController', () => {
       expect(mockSessionModel.delete).not.toHaveBeenCalled();
     });
   });
+
+  describe('linkFileToSession', () => {
+    it('writes the capture block (device + av_file) so the transcription service finds the session', async () => {
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue({
+        id: 'bs-1',
+        deviceId: 'bb-001',
+        civicpressSessionId: 'pv-2026-06-09',
+        metadata: {},
+      });
+      mockSessionModel.update.mockResolvedValue({});
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-2026-06-09',
+        type: 'session',
+        attachedFiles: [],
+      });
+      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
+
+      await sessionController.linkFileToSession('bs-1', 'storage-uuid-1');
+
+      expect(mockRecordManager.updateRecord).toHaveBeenCalledWith(
+        'pv-2026-06-09',
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            capture: { device: 'bb-001', av_file: 'storage-uuid-1' },
+          }),
+        }),
+        expect.objectContaining({ username: 'system' })
+      );
+      // ...and still attaches the A/V file
+      const request = mockRecordManager.updateRecord.mock.calls[0][1];
+      expect(
+        request.attachedFiles.some((f: any) => f.id === 'storage-uuid-1')
+      ).toBe(true);
+    });
+
+    it('is idempotent — skips the write if the file is already attached', async () => {
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue({
+        id: 'bs-1',
+        deviceId: 'bb-001',
+        civicpressSessionId: 'pv-x',
+        metadata: {},
+      });
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-x',
+        type: 'session',
+        attachedFiles: [{ id: 'storage-uuid-1' }],
+      });
+      mockRecordManager.updateRecord = vi.fn();
+
+      await sessionController.linkFileToSession('bs-1', 'storage-uuid-1');
+
+      expect(mockRecordManager.updateRecord).not.toHaveBeenCalled();
+    });
+  });
 });

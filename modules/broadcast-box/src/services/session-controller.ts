@@ -362,11 +362,24 @@ export class SessionController {
     if (!attachedFiles.some((f: any) => f.id === storageFileId)) {
       attachedFiles.push(fileEntry);
 
-      // Update record
+      // Update record: attach the A/V file AND write the `capture` block
+      // (broadcast-box session extension). The capture block is what the
+      // transcription service (W2) scans for — `capture.av_file` present and no
+      // `transcript_status`. Segment-level visibility (in-camera exclusion)
+      // requires the device's `session.manifest`, which is not yet wired here;
+      // until it is, capture carries the device + the A/V file (a recording with
+      // no segments is treated as wholly public, and a fully in-camera session is
+      // still gated by the record's session-level `visibility`).
       await this.recordManager.updateRecord(
         session.civicpressSessionId,
         {
           attachedFiles,
+          metadata: {
+            capture: {
+              device: session.deviceId,
+              av_file: storageFileId,
+            },
+          },
         },
         {
           id: 1, // System user
