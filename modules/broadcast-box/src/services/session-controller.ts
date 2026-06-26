@@ -38,17 +38,30 @@ export class SessionController {
   }
 
   /**
-   * Deliver a command to a device's room. Prefer the device-specific
-   * sendToDevice (resolves the device's own live socket) over broadcast, which
-   * fans out to observers and depends on the room's client map being populated.
+   * Deliver a command to a device's room. Two things matter here, both of which
+   * were silently broken before (the room only ever exists with a live device,
+   * so unit tests with a mocked room never noticed):
+   *  - the device room is keyed by the device UUID (the device connects to
+   *    /realtime/devices/<uuid>), NOT the database id — keying by db id targets
+   *    an empty room, so the command never arrives;
+   *  - prefer the device-specific sendToDevice (resolves the device's own live
+   *    socket via the server's clientToDevice map) over broadcast, which fans
+   *    out to observers and depends on the room's client map.
+   *
+   * @param deviceId the device's DATABASE id (resolved to its UUID here).
    */
-  private deliverToDevice(deviceId: string, command: unknown): void {
+  private async deliverToDevice(
+    deviceId: string,
+    command: unknown
+  ): Promise<void> {
     if (!this.roomManager) {
       throw new Error(
         'RoomManager not available - realtime module required for session control'
       );
     }
-    const roomId = `device:${deviceId}`;
+    const device = await this.deviceManager.getDevice(deviceId);
+    const deviceUuid = device?.deviceUuid ?? deviceId;
+    const roomId = `device:${deviceUuid}`;
     const room =
       this.roomManager.getRoom(roomId) ??
       this.roomManager.getOrCreateRoom(roomId, 'device', {});
@@ -139,7 +152,7 @@ export class SessionController {
     });
 
     // Send start_session to the device (creates the room on demand if missing).
-    this.deliverToDevice(request.deviceId, command);
+    await this.deliverToDevice(request.deviceId, command);
 
     // Update session status to recording
     const updated = await this.sessionModel.update(created.id, {
@@ -213,7 +226,7 @@ export class SessionController {
     });
 
     // Send stop_session to the device.
-    this.deliverToDevice(session.deviceId, command);
+    await this.deliverToDevice(session.deviceId, command);
 
     // Update session to complete so UI shows terminal state immediately (device may still encode/upload in background)
     const now = new Date();

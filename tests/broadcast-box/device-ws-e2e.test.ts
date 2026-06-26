@@ -262,4 +262,93 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
     expect(capture.segments).toHaveLength(3);
     expect(capture.segments[1]).toMatchObject({ visibility: 'in_camera' });
   }, 20000);
+
+  // The OUTBOUND seam: an operator start_session must actually reach the device
+  // over the wire. This is the path the unit tests never exercised — the realtime
+  // server had no clientToDevice map, so DeviceRoom.sendToDevice silently failed
+  // ("Failed to send command") and only a live run caught it.
+  it('delivers an operator start_session to the connected device + creates the broadcast_sessions row', async () => {
+    realtime = await startInProcessRealtime(civic, silentLogger, true);
+    const express = (await import('express')).default;
+    const app = express();
+    app.use(express.json());
+    bbMount = await startInProcessBroadcastBox(civic, app, silentLogger, {
+      enabled: true,
+      realtimeServer: realtime.server,
+    });
+
+    const container = civic.getContainer();
+    const deviceManager = container.resolve('broadcastBoxDeviceManager');
+    const deviceAuth = container.resolve('broadcastBoxDeviceAuth');
+    const sessionController: any = container.resolve(
+      'broadcastBoxSessionController'
+    );
+
+    const enrollment = await deviceManager.enrollDevice({ name: 'Cam' });
+    const device = await deviceManager.registerDevice({
+      deviceUuid: enrollment.deviceUuid,
+      enrollmentCode: enrollment.enrollmentCode,
+      name: 'Cam',
+    });
+    const { token } = await deviceAuth.generateToken({
+      deviceId: device.id,
+      deviceUuid: device.deviceUuid,
+      organizationId: device.organizationId,
+    });
+    const recordId = await seedSessionRecord();
+
+    // Connect as the device; collect every inbound frame.
+    const inbound: any[] = [];
+    ws = new WebSocket(
+      `ws://127.0.0.1:${port}/realtime/devices/${device.deviceUuid}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    ws.on('message', (d) => inbound.push(JSON.parse(d.toString())));
+    ws.on('error', () => {});
+
+    const waitFor = async (
+      pred: (m: any) => boolean,
+      ms: number,
+      what: string
+    ): Promise<any> => {
+      const deadline = Date.now() + ms;
+      while (Date.now() < deadline) {
+        const m = inbound.find(pred);
+        if (m) return m;
+        await new Promise((r) => setTimeout(r, 40));
+      }
+      throw new Error(`timed out waiting for ${what}`);
+    };
+
+    // onConnect registers the connection (→ device activated + isConnected), which
+    // startSession requires; the ack confirms it ran.
+    await waitFor(
+      (m) => m.type === 'control' && m.event === 'connection.ack',
+      5000,
+      'connection.ack'
+    );
+
+    // Operator starts the session via the real SessionController path.
+    const session = await sessionController.startSession({
+      deviceId: device.id,
+      civicpressSessionId: recordId,
+    });
+
+    // The device must RECEIVE the start_session command over the wire.
+    const cmd = await waitFor(
+      (m) => m.action === 'start_session',
+      4000,
+      'start_session command at the device'
+    );
+    expect(cmd.type).toBe('command');
+    expect(cmd.payload.sessionId).toBe(session.id);
+    expect(cmd.payload.civicpressSessionId).toBe(recordId);
+
+    // And the broadcast_sessions row links recording → device → record (so an
+    // upload can resolve ownership; nothing had to seed it by hand).
+    const row = await sessionController.sessionModel.getById(session.id);
+    expect(row).toBeTruthy();
+    expect(row.deviceId).toBe(device.id);
+    expect(row.civicpressSessionId).toBe(recordId);
+  }, 20000);
 });
