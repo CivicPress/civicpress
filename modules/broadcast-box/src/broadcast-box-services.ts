@@ -425,6 +425,11 @@ export async function registerBroadcastBoxServices(
     // Start cleanup service
     cleanupService.start();
 
+    // Expose the running instance so the host (e.g. the API bootstrap) can stop
+    // its interval on shutdown — the timer is not unref'd, so without this it
+    // would keep the event loop alive.
+    container.registerInstance('broadcastBoxEnrollmentCleanup', cleanupService);
+
     logger.info('Enrollment cleanup service registered and started', {
       operation: 'broadcast-box:cleanup:registered',
     });

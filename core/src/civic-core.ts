@@ -223,9 +223,8 @@ export class CivicPress {
       this.logger.info('Database initialized');
 
       // Complete service initialization (cache registration, etc.)
-      const { completeServiceInitialization } = await import(
-        './civic-core-services.js'
-      );
+      const { completeServiceInitialization } =
+        await import('./civic-core-services.js');
       await completeServiceInitialization(this.container, this);
 
       // Initialize other services
@@ -268,6 +267,16 @@ export class CivicPress {
       this.logger.error('Error during shutdown:', error);
       throw error;
     }
+  }
+
+  /**
+   * The DI container. Exposed so the API layer can mount optional modules whose
+   * registration hooks are container-based (e.g. broadcast-box's
+   * `registerBroadcastBoxServices`), mirroring how core itself wires the storage
+   * module. Prefer the typed `get*Service()` accessors for core services.
+   */
+  getContainer(): ServiceContainer {
+    return this.container;
   }
 
   // Database and Auth services

@@ -23,6 +23,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.12.4",
   "dependencies": {
+    "@civicpress/broadcast-box": "workspace:*",
     "@civicpress/core": "workspace:*",
     "@civicpress/realtime": "workspace:*",
     "@civicpress/storage": "workspace:*",

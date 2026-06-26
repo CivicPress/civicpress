@@ -69,6 +69,10 @@ import {
 import type { RealtimeServer } from '@civicpress/realtime';
 import { startInProcessTranscription } from './transcription-bootstrap.js';
 import type { TranscriptionWorker } from '@civicpress/transcription';
+import {
+  startInProcessBroadcastBox,
+  type BroadcastBoxStartResult,
+} from './broadcast-box-bootstrap.js';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -91,6 +95,11 @@ export class CivicPressAPI {
   // process as the API. Null until start() wires it; null forever if disabled /
   // engine unavailable / failed. Stopped on shutdown.
   private transcriptionWorker: TranscriptionWorker | null = null;
+  // In-process broadcast-box mount (BroadcastBox Phase 5): device/session/upload
+  // routes + services. Null until start() wires it; null forever if the module
+  // is not in config `modules:` / disabled / failed. Its stop() halts the
+  // enrollment-cleanup timer on shutdown.
+  private broadcastBox: BroadcastBoxStartResult | null = null;
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -498,6 +507,13 @@ export class CivicPressAPI {
     //    crash-safe: a failure here is logged and swallowed so it never takes
     //    down the API (the A/V stays public regardless).
     await this.startTranscription();
+
+    // 4. Mount the broadcast-box module (device/session/upload endpoints) AFTER
+    //    core init + HTTP listener. Config-gated (config `modules:` includes
+    //    `broadcast-box`, plus the BROADCAST_BOX_ENABLED env opt-out) and
+    //    crash-safe: a mount failure is logged and swallowed. Routers added
+    //    after listen() still serve subsequent requests.
+    await this.startBroadcastBox();
   }
 
   /**
@@ -534,7 +550,9 @@ export class CivicPressAPI {
    */
   private async startTranscription(): Promise<void> {
     if (!this.civicPress) {
-      logger.warn('Cannot start transcription: CivicPress core not initialized');
+      logger.warn(
+        'Cannot start transcription: CivicPress core not initialized'
+      );
       return;
     }
     if (this.transcriptionWorker) {
@@ -549,6 +567,31 @@ export class CivicPressAPI {
       { enabled }
     );
     this.transcriptionWorker = worker;
+  }
+
+  /**
+   * Mount the broadcast-box module onto the API's Express app from the core
+   * services. Gated on the config `modules:` list (+ the BROADCAST_BOX_ENABLED
+   * env opt-out). Never throws — a mount failure leaves the device endpoints
+   * absent and the rest of the API unaffected.
+   */
+  private async startBroadcastBox(): Promise<void> {
+    if (!this.civicPress) {
+      logger.warn(
+        'Cannot mount broadcast-box: CivicPress core not initialized'
+      );
+      return;
+    }
+    if (this.broadcastBox) {
+      return;
+    }
+    const enabled = process.env.BROADCAST_BOX_ENABLED !== 'false';
+    this.broadcastBox = await startInProcessBroadcastBox(
+      this.civicPress,
+      this.app,
+      logger,
+      { enabled }
+    );
   }
 
   /**
@@ -600,6 +643,17 @@ export class CivicPressAPI {
         logger.warn('Error stopping transcription worker:', error);
       }
       this.transcriptionWorker = null;
+    }
+
+    // Stop broadcast-box background work (the enrollment-cleanup timer) before
+    // core's database closes.
+    if (this.broadcastBox) {
+      try {
+        this.broadcastBox.stop();
+      } catch (error) {
+        logger.warn('Error stopping broadcast-box:', error);
+      }
+      this.broadcastBox = null;
     }
 
     if (this.civicPress) {
