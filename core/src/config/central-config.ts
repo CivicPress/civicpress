@@ -436,6 +436,26 @@ export class CentralConfigManager {
   }
 
   /**
+   * Get the optional `transcription:` block (BroadcastBox W2). Raw + untyped —
+   * the transcription service normalizes it (normalizeTranscriptionConfig).
+   * Prefers data/.civic/config.yml, then deprecated .civicrc; undefined if unset
+   * (the worker then stays off). Mirrors getModules()'s source precedence.
+   */
+  static getTranscriptionConfig(): Record<string, unknown> | undefined {
+    const dataDir = this.getDataDir();
+    const userConfig = this.loadYamlIfExists(
+      path.join(dataDir, '.civic', 'config.yml')
+    );
+    if (userConfig && userConfig.transcription) {
+      return userConfig.transcription as Record<string, unknown>;
+    }
+    const config = this.getConfig() as CentralConfig & {
+      transcription?: Record<string, unknown>;
+    };
+    return config.transcription;
+  }
+
+  /**
    * Get record types configuration (prefers data/.civic/config.yml, then defaults, then deprecated .civicrc)
    */
   static getRecordTypesConfig(): RecordTypesConfig {

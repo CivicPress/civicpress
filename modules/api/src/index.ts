@@ -67,6 +67,8 @@ import {
   type RealtimeServerLike,
 } from './realtime-bootstrap.js';
 import type { RealtimeServer } from '@civicpress/realtime';
+import { startInProcessTranscription } from './transcription-bootstrap.js';
+import type { TranscriptionWorker } from '@civicpress/transcription';
 
 export class CivicPressAPI {
   private app: express.Application;
@@ -85,6 +87,10 @@ export class CivicPressAPI {
   // Test seam: lets tests inject a RealtimeServerLike stub WITHOUT starting the
   // real WS server (start() is not called in the API test harness).
   private realtimeServerOverride: RealtimeServerLike | null = null;
+  // In-process transcription worker (BroadcastBox W2), hosted in the SAME
+  // process as the API. Null until start() wires it; null forever if disabled /
+  // engine unavailable / failed. Stopped on shutdown.
+  private transcriptionWorker: TranscriptionWorker | null = null;
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -485,6 +491,13 @@ export class CivicPressAPI {
     //    down the API. If it doesn't start, the snapshot endpoint degrades
     //    gracefully (no in-memory room → snapshotCreated false).
     await this.startRealtime();
+
+    // 3. Start the in-process transcription worker (BroadcastBox W2) AFTER core
+    //    init + HTTP listener. Config-gated (transcription.enabled + the
+    //    TRANSCRIPTION_ENABLED env opt-out) + engine-availability-gated, and
+    //    crash-safe: a failure here is logged and swallowed so it never takes
+    //    down the API (the A/V stays public regardless).
+    await this.startTranscription();
   }
 
   /**
@@ -512,6 +525,30 @@ export class CivicPressAPI {
     );
     this.realtimeServer = server;
     this.realtimeStarted = started;
+  }
+
+  /**
+   * Start the in-process transcription worker from the core services. Reads the
+   * `transcription:` config block; honors a TRANSCRIPTION_ENABLED=false env
+   * opt-out. Never throws — failures leave the worker unstarted (A/V still public).
+   */
+  private async startTranscription(): Promise<void> {
+    if (!this.civicPress) {
+      logger.warn('Cannot start transcription: CivicPress core not initialized');
+      return;
+    }
+    if (this.transcriptionWorker) {
+      return;
+    }
+    const enabled = process.env.TRANSCRIPTION_ENABLED !== 'false';
+    const rawConfig = CentralConfigManager.getTranscriptionConfig();
+    const { worker } = await startInProcessTranscription(
+      this.civicPress,
+      rawConfig,
+      logger,
+      { enabled }
+    );
+    this.transcriptionWorker = worker;
   }
 
   /**
@@ -553,6 +590,16 @@ export class CivicPressAPI {
       }
       this.realtimeServer = null;
       this.realtimeStarted = false;
+    }
+
+    // Stop the transcription worker's poll loop before core's database closes.
+    if (this.transcriptionWorker) {
+      try {
+        this.transcriptionWorker.stop();
+      } catch (error) {
+        logger.warn('Error stopping transcription worker:', error);
+      }
+      this.transcriptionWorker = null;
     }
 
     if (this.civicPress) {

@@ -290,6 +290,9 @@ importers:
       '@civicpress/storage':
         specifier: workspace:*
         version: link:../storage
+      '@civicpress/transcription':
+        specifier: workspace:*
+        version: link:../../services/transcription
       '@types/bcrypt':
         specifier: 5.0.2
         version: 5.0.2

@@ -26,6 +26,7 @@
     "@civicpress/core": "workspace:*",
     "@civicpress/realtime": "workspace:*",
     "@civicpress/storage": "workspace:*",
+    "@civicpress/transcription": "workspace:*",
     "@types/bcrypt": "5.0.2",
     "@types/swagger-ui-express": "4.1.8",
     "bcrypt": "6.0.0",
