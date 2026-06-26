@@ -23,6 +23,7 @@ import { execSync } from 'node:child_process';
 import yaml from 'js-yaml';
 
 import { CivicPress } from '@civicpress/core';
+import { initializeStorageService } from '../../modules/storage/dist/index.js';
 import { CentralConfigManager } from '../../core/dist/config/central-config.js';
 import {
   RecordSchemaBuilder,
@@ -127,7 +128,8 @@ describe('transcription write-back e2e (real CivicPress)', () => {
   });
 
   async function seedRecordedSession(
-    segments?: Array<{ start: number; end: number; visibility: string }>
+    segments?: Array<{ start: number; end: number; visibility: string }>,
+    avFile = 'av-uuid-1'
   ): Promise<string> {
     await recordManager.createRecord(
       {
@@ -139,7 +141,7 @@ describe('transcription write-back e2e (real CivicPress)', () => {
           media: { recording: 'rec-uuid' },
           capture: {
             device: 'bb-001',
-            av_file: 'av-uuid-1',
+            av_file: avFile,
             ...(segments ? { segments } : {}),
           },
         },
@@ -215,14 +217,22 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     };
     // Storage that ALSO supports uploadFile (the real CloudUuidStorageService
     // does); capture what the gateway stores.
-    const uploaded: { buffer: Buffer; folder: string } | null = {} as any;
+    const uploaded: {
+      buffer: Buffer;
+      folder: string;
+      originalname: string;
+      mimetype: string;
+    } = {} as any;
     const storage = {
       async getFileContent() {
         return Buffer.from('x');
       },
       async uploadFile(req: any) {
-        uploaded.buffer = req.file;
+        // The gateway now passes a multer-style file (not a raw Buffer).
+        uploaded.buffer = req.file.buffer;
         uploaded.folder = req.folder;
+        uploaded.originalname = req.file.originalname;
+        uploaded.mimetype = req.file.mimetype;
         return { success: true, file: { id: 'vtt-uuid-1' } };
       },
     };
@@ -246,7 +256,72 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     expect(vtt).toContain('00:00:00.000 --> 00:00:01.800');
     expect(vtt).toContain('Bonjour le conseil.');
     expect(uploaded.folder).toBe('transcripts');
+    // a .vtt multer file the `transcripts` folder accepts (text/vtt)
+    expect(uploaded.originalname).toMatch(/\.vtt$/);
+    expect(uploaded.mimetype).toBe('text/vtt');
   });
+
+  it('REAL STORAGE: stores the WebVTT artifact via CloudUuidStorageService and it is retrievable', async () => {
+    // Exercise the REAL storage service (not a fake uploadFile) so the
+    // raw-Buffer → multer-file → validate(.vtt) → store path is proven end to
+    // end (CloudUuidStorageService rejects raw Buffers + validates by extension).
+    const storage: any = civic.getService('storage');
+    await initializeStorageService(storage);
+
+    // Put a fake A/V in real storage so prepareAudio (getFileContent) succeeds.
+    const av = Buffer.from('fake-av-bytes-for-transcript-artifact-e2e');
+    const avRes = await storage.uploadFile({
+      file: {
+        fieldname: 'file',
+        originalname: 'recording.mp4',
+        encoding: '7bit',
+        mimetype: 'video/mp4',
+        size: av.length,
+        destination: '',
+        filename: '',
+        path: '',
+        buffer: av,
+      },
+      folder: 'recordings',
+      uploaded_by: 'system',
+    });
+    expect(avRes.success).toBe(true);
+    const avUuid = avRes.file.id;
+
+    const id = await seedRecordedSession(undefined, avUuid);
+    const transcript = {
+      language: 'fr',
+      text: 'Bonjour le conseil municipal.',
+      segments: [{ start: 0, end: 1.8, text: 'Bonjour le conseil municipal.' }],
+    };
+    const gateway = new CoreRecordsGateway({
+      records: recordManager,
+      storage,
+      logger: silentLogger,
+    });
+    const worker = new TranscriptionWorker({
+      records: gateway,
+      engine: new StubEngine(transcript) as any,
+      logger: silentLogger,
+      language: 'fr-CA',
+    });
+
+    expect((await worker.runOnce()).processed).toBe(1);
+
+    const fm = await readFrontmatter(id);
+    expect(fm.media.transcript).toMatch(/^\/api\/v1\/storage\/files\//);
+    expect(fm.media.transcript_data).toMatchObject(transcript);
+
+    // Fetch the stored artifact back from REAL storage and validate it.
+    const vttUuid = String(fm.media.transcript).split('/').pop()!;
+    const stored = await storage.getFileContent(vttUuid);
+    const vtt = (Buffer.isBuffer(stored) ? stored : Buffer.from(stored)).toString(
+      'utf-8'
+    );
+    expect(vtt.startsWith('WEBVTT')).toBe(true);
+    expect(vtt).toContain('00:00:00.000 --> 00:00:01.800');
+    expect(vtt).toContain('Bonjour le conseil municipal.');
+  }, 20000);
 
   it('still writes transcript_data when storage cannot store the artifact (no media.transcript)', async () => {
     const id = await seedRecordedSession();

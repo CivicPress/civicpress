@@ -53,6 +53,24 @@ export interface RecordStore {
   ): Promise<unknown>;
 }
 
+/**
+ * A multer-style file — the shape `CloudUuidStorageService.uploadFile` requires
+ * (it validates by the `originalname` extension and explicitly rejects raw
+ * Buffers). We mirror the full shape here so the real service stays structurally
+ * assignable to `BlobStore` without this package depending on `@civicpress/storage`.
+ */
+export interface UploadArtifactFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  destination: string;
+  filename: string;
+  path: string;
+  buffer: Buffer;
+}
+
 /** The slice of @civicpress/storage's CloudUuidStorageService this gateway needs. */
 export interface BlobStore {
   getFileContent(id: string): Promise<Buffer | null>;
@@ -62,7 +80,7 @@ export interface BlobStore {
    * `media.transcript` path. Matches CloudUuidStorageService.uploadFile.
    */
   uploadFile?(request: {
-    file: Buffer;
+    file: UploadArtifactFile;
     folder: string;
     description?: string;
     uploaded_by?: string;
@@ -204,8 +222,22 @@ export class CoreRecordsGateway implements RecordsGateway {
     if (!this.opts.storage.uploadFile) return null;
     try {
       const vtt = renderVtt(transcript);
+      const buffer = Buffer.from(vtt, 'utf-8');
+      // CloudUuidStorageService validates by the originalname extension and
+      // rejects raw Buffers, so pass a multer-style `.vtt` file (an extension the
+      // `transcripts` folder allows).
       const res = await this.opts.storage.uploadFile({
-        file: Buffer.from(vtt, 'utf-8'),
+        file: {
+          fieldname: 'file',
+          originalname: 'transcript.vtt',
+          encoding: '7bit',
+          mimetype: 'text/vtt',
+          size: buffer.length,
+          destination: '',
+          filename: '',
+          path: '',
+          buffer,
+        },
         folder: 'transcripts',
         description: `Transcript for session ${id}`,
         uploaded_by: this.user.username,

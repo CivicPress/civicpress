@@ -472,6 +472,34 @@ ownership, so a real (or compromised) appliance can only push its own recording.
   four `tests/broadcast-box` e2es green; broadcast-box + api `tsc` clean.
 
 **Still open (needs the HW device / coordinated):** the HW device's real upload +
-`session.manifest` emit (device upload is still a stub); and the transcript
-artifact's real-storage path (§10.9 — raw-Buffer upload type validation not yet
-e2e-verified).
+`session.manifest` emit (device upload is still a stub). _(The transcript
+artifact's real-storage path is now verified — see §10.12.)_
+
+### 10.12 Transcript artifact verified against real storage (2026-06-26) — raw Buffer → multer file
+
+§10.9 stored the WebVTT artifact through a **faked** `uploadFile`; against the
+real `CloudUuidStorageService` it would have silently degraded.
+`CoreRecordsGateway.storeTranscriptArtifact` passed `file: Buffer.from(vtt)`, but
+the real `uploadFile` **explicitly rejects raw Buffers**
+(`cloud-uuid-storage/upload-ops.ts`: "Buffer uploads not yet supported — use
+MulterFile") and validates by the `originalname` extension — so every artifact
+upload threw and the gateway degraded to `transcript_data` only (the A/V stays
+public, nothing user-visible broke, but `media.transcript` never stored).
+
+- **Fix.** The gateway now builds a multer-style file (`originalname:
+  transcript.vtt`, `mimetype: text/vtt`, buffer, size) — the same shape the A/V
+  upload path uses. `BlobStore.uploadFile`'s `file` is the full MulterFile shape,
+  so `CloudUuidStorageService` stays structurally assignable at the launcher's
+  `storage = service` (api `tsc` green). The `transcripts` folder already allows
+  `vtt` (`allowed_types`), so validation passes. Graceful degradation unchanged
+  (no `uploadFile` / failure / render error → `transcript_data` only).
+- **Verified end-to-end against real storage.** New e2e (`tests/transcription/
+  transcription-e2e.test.ts` — "REAL STORAGE") initializes
+  `CloudUuidStorageService`, puts a fake A/V in the `recordings` folder, runs the
+  worker, and asserts `media.transcript` = `/api/v1/storage/files/<uuid>` with the
+  stored bytes fetched back as valid WebVTT. The prior faked-storage test now
+  asserts the multer-file shape (`.vtt` / `text/vtt`). transcription package suite
+  34 green + 9 e2e green; transcription + api `tsc` clean.
+
+This was the last server-side integration gap; the remaining work is in the HW
+repo (the device's stubbed upload + `session.manifest` emit).
