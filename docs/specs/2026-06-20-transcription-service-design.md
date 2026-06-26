@@ -325,8 +325,7 @@ test green).
 - A **first-class `civic start` CLI command** — wanted for the deployment / easy-install
   phase (maintainer, 2026-06-26). Today "civic start" = the API server boot, so the
   in-process launcher above IS the civic-start launcher for now.
-- **Transcript artifact** increment (render `media.transcript_data` → VTT/etc. + set the
-  `media.transcript` string path) — until the artifact storage location is decided.
+- ~~**Transcript artifact** increment~~ **✅ DONE (2026-06-26 — see §10.9).**
 - **`civic init` enablement DX** (preset / `civic module enable`).
 
 ### 10.8 The device→CP capture path (2026-06-26) — mount + manifest + e2e
@@ -376,3 +375,31 @@ binds av_file via the manifest, not via a POSTed upload + storage module) and a
 **live WS device** (4d/4c routing is unit-tested, not driven over a socket);
 both need the storage module mounted and/or the HW device's real upload +
 manifest emit (device upload is still a stub — see the integration-status note).
+
+### 10.9 Transcript artifact render (2026-06-26) — `media.transcript` = WebVTT
+
+The MVP wrote the structured transcript to `media.transcript_data` but never the
+human/UI-facing `media.transcript` artifact (§10.5 left it pending the storage
+location). Decided (maintainer, 2026-06-26): **store the rendered VTT via the
+storage module as a UUID blob**, consistent with the A/V recording.
+
+- New `services/transcription/src/vtt.ts` — `renderVtt(TranscriptResult)` → a
+  WebVTT document (one cue per segment, `HH:MM:SS.mmm`, optional `<v speaker>`);
+  in-camera segments are already excluded upstream so every cue is public.
+- `CoreRecordsGateway.writeTranscript` now (best-effort) renders the VTT, stores
+  it via `storage.uploadFile({ folder: 'transcripts', … })`, and sets
+  `media.transcript` to `/api/v1/storage/files/<uuid>` alongside
+  `media.transcript_data`. `media.transcript` is string-typed, so the path
+  validates (the object still lives in `transcript_data`). The narrow `BlobStore`
+  contract gained an optional `uploadFile`; the real CloudUuidStorageService
+  satisfies it. **Graceful degradation:** no `uploadFile` / an upload failure /
+  a render error logs and writes `transcript_data` only — never blocks the
+  write-back.
+- Tests: `vtt.test.ts` (timestamp formatting incl. the rounding-carry edge,
+  cue rendering, speaker span, empty transcript); transcription e2e gains an
+  artifact case (asserts `media.transcript` path + the stored bytes are valid
+  WebVTT) and a storage-failure degradation case. transcription package suite 37
+  green; `tsc` clean.
+
+**Deferred:** speaker diarization (renderer already supports `<v …>` when
+segments carry `speaker`), and alternate artifact formats (SRT/plain text).

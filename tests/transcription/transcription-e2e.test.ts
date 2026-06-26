@@ -206,6 +206,75 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     expect(fm.capture.av_file).toBe('av-uuid-1');
   });
 
+  it('renders + stores a WebVTT artifact and sets media.transcript to its path', async () => {
+    const id = await seedRecordedSession();
+    const transcript = {
+      language: 'fr',
+      text: 'Bonjour le conseil.',
+      segments: [{ start: 0, end: 1.8, text: 'Bonjour le conseil.' }],
+    };
+    // Storage that ALSO supports uploadFile (the real CloudUuidStorageService
+    // does); capture what the gateway stores.
+    const uploaded: { buffer: Buffer; folder: string } | null = {} as any;
+    const storage = {
+      async getFileContent() {
+        return Buffer.from('x');
+      },
+      async uploadFile(req: any) {
+        uploaded.buffer = req.file;
+        uploaded.folder = req.folder;
+        return { success: true, file: { id: 'vtt-uuid-1' } };
+      },
+    };
+    const gateway = new CoreRecordsGateway({ records: recordManager, storage });
+    const worker = new TranscriptionWorker({
+      records: gateway,
+      engine: new StubEngine(transcript) as any,
+      logger: silentLogger,
+      language: 'fr-CA',
+    });
+
+    expect((await worker.runOnce()).processed).toBe(1);
+
+    const fm = await readFrontmatter(id);
+    // The string artifact path is set alongside the structured data.
+    expect(fm.media.transcript).toBe('/api/v1/storage/files/vtt-uuid-1');
+    expect(fm.media.transcript_data).toMatchObject(transcript);
+    // The stored bytes are valid WebVTT for this transcript.
+    const vtt = uploaded.buffer.toString('utf-8');
+    expect(vtt.startsWith('WEBVTT')).toBe(true);
+    expect(vtt).toContain('00:00:00.000 --> 00:00:01.800');
+    expect(vtt).toContain('Bonjour le conseil.');
+    expect(uploaded.folder).toBe('transcripts');
+  });
+
+  it('still writes transcript_data when storage cannot store the artifact (no media.transcript)', async () => {
+    const id = await seedRecordedSession();
+    const transcript = { language: 'fr', text: 'x', segments: [] };
+    // uploadFile reports failure → graceful degradation.
+    const storage = {
+      async getFileContent() {
+        return Buffer.from('x');
+      },
+      async uploadFile() {
+        return { success: false, error: 'storage down' };
+      },
+    };
+    const gateway = new CoreRecordsGateway({ records: recordManager, storage });
+    const worker = new TranscriptionWorker({
+      records: gateway,
+      engine: new StubEngine(transcript) as any,
+      logger: silentLogger,
+    });
+
+    expect((await worker.runOnce()).processed).toBe(1);
+
+    const fm = await readFrontmatter(id);
+    expect(fm.transcript_status).toBe('automated');
+    expect(fm.media.transcript_data).toMatchObject(transcript);
+    expect(fm.media.transcript).toBeUndefined();
+  });
+
   it('excludes in-camera segments — the engine transcribes only the public ranges', async () => {
     // Mixed-visibility capture: the middle segment is in-camera (closed) and must
     // be excluded; the worker passes only the public windows to the engine.

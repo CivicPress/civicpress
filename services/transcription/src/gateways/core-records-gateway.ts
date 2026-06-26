@@ -30,6 +30,7 @@ import type {
   TranscriptStatus,
   Visibility,
 } from '../types.js';
+import { renderVtt } from '../vtt.js';
 
 /** A parsed core record (only the fields this gateway reads). */
 export interface CoreRecord {
@@ -55,6 +56,17 @@ export interface RecordStore {
 /** The slice of @civicpress/storage's CloudUuidStorageService this gateway needs. */
 export interface BlobStore {
   getFileContent(id: string): Promise<Buffer | null>;
+  /**
+   * Store the rendered transcript artifact. Optional: when absent (or it fails),
+   * the worker still writes `media.transcript_data` and just skips the
+   * `media.transcript` path. Matches CloudUuidStorageService.uploadFile.
+   */
+  uploadFile?(request: {
+    file: Buffer;
+    folder: string;
+    description?: string;
+    uploaded_by?: string;
+  }): Promise<{ success: boolean; file?: { id: string }; error?: string }>;
 }
 
 /** The service AuthUser shape (matches SessionController's system actor). */
@@ -102,7 +114,9 @@ export class CoreRecordsGateway implements RecordsGateway {
    * `transcript_status`.
    */
   async findNeedingTranscription(): Promise<SessionForTranscription[]> {
-    const { records } = await this.opts.records.listRecords({ type: 'session' });
+    const { records } = await this.opts.records.listRecords({
+      type: 'session',
+    });
     const out: SessionForTranscription[] = [];
     for (const row of records) {
       const session = await this.getSession(row.id);
@@ -126,7 +140,9 @@ export class CoreRecordsGateway implements RecordsGateway {
     }
     const buffer = await this.opts.storage.getFileContent(uuid);
     if (!buffer) {
-      throw new Error(`A/V ${uuid} for session ${session.id} not found in storage`);
+      throw new Error(
+        `A/V ${uuid} for session ${session.id} not found in storage`
+      );
     }
     const dir = await mkdtemp(join(tmpdir(), 'transcribe-av-'));
     const path = join(dir, uuid); // raw container; the engine decodes to WAV
@@ -149,15 +165,64 @@ export class CoreRecordsGateway implements RecordsGateway {
         | Record<string, unknown>
         | undefined) ?? {};
 
+    const media: Record<string, unknown> = {
+      ...existingMedia,
+      transcript_data: payload.transcript,
+    };
+
+    // Best-effort: render + store the WebVTT artifact and point
+    // `media.transcript` (string-typed) at it. A storage gap never blocks the
+    // write-back — `transcript_data` still lands.
+    const artifactPath = await this.storeTranscriptArtifact(
+      id,
+      payload.transcript
+    );
+    if (artifactPath) media.transcript = artifactPath;
+
     await this.opts.records.updateRecord(
       id,
       {
         metadata: {
           transcript_status: payload.status,
-          media: { ...existingMedia, transcript_data: payload.transcript },
+          media,
         },
       },
       this.user
     );
+  }
+
+  /**
+   * Render the transcript to WebVTT, store it via the storage service, and
+   * return its `/api/v1/storage/files/<uuid>` path — or null if storage can't
+   * take it (no uploadFile, upload failure, or a render/store error). Never
+   * throws: the transcript_data write must still proceed.
+   */
+  private async storeTranscriptArtifact(
+    id: string,
+    transcript: TranscriptResult
+  ): Promise<string | null> {
+    if (!this.opts.storage.uploadFile) return null;
+    try {
+      const vtt = renderVtt(transcript);
+      const res = await this.opts.storage.uploadFile({
+        file: Buffer.from(vtt, 'utf-8'),
+        folder: 'transcripts',
+        description: `Transcript for session ${id}`,
+        uploaded_by: this.user.username,
+      });
+      if (res.success && res.file) {
+        return `/api/v1/storage/files/${res.file.id}`;
+      }
+      this.opts.logger?.warn(
+        'transcript artifact upload failed — wrote transcript_data only',
+        { id, error: res.error }
+      );
+    } catch (error) {
+      this.opts.logger?.warn(
+        'transcript artifact render/store threw — wrote transcript_data only',
+        { id, error: error instanceof Error ? error.message : String(error) }
+      );
+    }
+    return null;
   }
 }

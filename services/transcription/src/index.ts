@@ -19,6 +19,7 @@ export type {
   WhisperJson,
 } from './engines/whisper-cpp.js';
 export { createEngine } from './engines/factory.js';
+export { renderVtt, formatTimestamp } from './vtt.js';
 export { CoreRecordsGateway } from './gateways/core-records-gateway.js';
 export type {
   BlobStore,
