@@ -370,11 +370,42 @@ e2e; the 4a/4d transcription e2es. core/api/broadcast-box `tsc` clean. (The full
 monorepo pre-commit suite is flaky on the dev VM — parallel DB-init/auth races,
 unrelated to these changes — so commits used `--no-verify` after targeted runs.)
 
-**Still open after this:** the real **HTTP chunked-upload path** end-to-end (4d
-binds av_file via the manifest, not via a POSTed upload + storage module) and a
-**live WS device** (4d/4c routing is unit-tested, not driven over a socket);
-both need the storage module mounted and/or the HW device's real upload +
-manifest emit (device upload is still a stub — see the integration-status note).
+### 10.10 The two remaining halves landed (2026-06-26) — live WS + real HTTP upload
+
+§10.8 left two server-side gaps; both are now closed (no hardware), so a real
+device has a working server to talk to end-to-end:
+
+- **R1 — realtime device-room bridge.** The mount left the `DeviceRoomHandler`
+  unregistered (realtime wasn't in the container). The bootstrap now bridges the
+  in-process realtime server into the DI container — `realtimeServer` (registers
+  the handler), `realtimeRoomManager` (registers the device room FACTORY, else a
+  device hits ROOM_NOT_FOUND), and `authService` (the module's block resolves
+  this key; core registers auth as `auth`).
+- **R2 — live device WebSocket auth + session.manifest.** The realtime server
+  HARD-CODED user-session auth before any room handler, so a device token was
+  rejected (AUTH_FAILED) — i.e. no device could connect. Added an opt-in
+  `RoomTypeHandler.authenticatesConnection`: when set, the server skips its
+  `validateSession` and treats the handler's `onConnect` result (deviceAuth) as
+  authoritative, deriving the connection identity (`resolveConnectionIdentity`,
+  device ids namespaced `device:<id>`). Record rooms unchanged. Proven by an e2e
+  that onboards a device (enroll→register→token), opens a real WS to
+  `/realtime/devices/:uuid`, waits for `connection.ack`, sends `session.manifest`
+  → `capture.segments` persisted.
+- **R3 — real HTTP chunked-upload.** Drives `POST /uploads → /chunks → /finalize`
+  against the mounted module with REAL storage → `recording:complete` →
+  `linkFileToSession` writes `capture.av_file`. Fixed three bugs the mocked tests
+  hid: the chunk route validated `chunkNumber` BEFORE multer parsed it (every
+  chunk 400'd); `upload-processor` read a non-existent `storageResult.uuid`
+  instead of `.file.id` (finalize returned undefined); and storage's default
+  config had no `recordings`/`transcripts` folders (uploads 404'd) — both added.
+
+**Still open (needs the HW device / coordinated):** device-token auth for the
+HTTP **upload** routes (still behind user `authMiddleware` via a `// TODO`; R3
+uses the `x-mock-user` test seam); the HW device's real **upload + manifest
+emit** (device upload is still a stub — see the integration-status note); and the
+**transcript artifact's** real-storage path (§10.9 stored via a faked
+`uploadFile`; the `transcripts` folder now exists, but a raw-Buffer upload's type
+validation isn't yet e2e-verified).
 
 ### 10.9 Transcript artifact render (2026-06-26) — `media.transcript` = WebVTT
 
