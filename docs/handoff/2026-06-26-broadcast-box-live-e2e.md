@@ -114,21 +114,29 @@ as fatal — kill any lingering device before re-running, or it shuts down.
 
 ## Remaining work
 
+The post-live-e2e follow-ups are now **done** (see the `broadcast-box-integration-status`
+memory UPDATE-9): the dead bandwidth-throttle gate, segment `t0` (now anchored to
+`encode.unified.started`), the `control`/`connection.ack` handling,
+`configure_device.py`, AP-mode `:8443` (non-fatal + env-gated), FSM→IDLE for
+back-to-back meetings, the `POST /sessions` row creation (which also surfaced + fixed
+a **9th** bug — the device room was keyed by the db id, not the uuid, so commands
+never reached the device), seam regression tests, the committed live-e2e harness
+(`e2e/broadcast-box-live/`), and a hardware bring-up runbook + capture smoke
+(`scripts/check_capture.py`, `docs/hardware-bring-up.md`). All suites green.
+
+Only two things remain:
+
 - **Real-hardware bring-up** — x86_64 mini-PC + a **UVC** HDMI capture dongle
-  (MS2109/MS2130 ~$15–25 or Elgato Cam Link 4K; NOT the Elgato HD60, NOT a Pi).
-  Plug a webcam/UVC source → the existing V4L2/ALSA capture path (untouched by the
-  synthetic work) takes over; no synthetic flag.
-- **Optional cleanup (still pending):** the vestigial bandwidth-throttle subsystem
-  in `upload_queue.py` (`_monitor_bandwidth` + state, never fed) — delete or wire.
-- Segment `t0` still uses `session.started` wall-clock (~sub-second skew vs true
-  recording start; fine for coarse in-camera, generous margins recommended).
-- The device drops the realtime `control`/`connection.ack` frame on a strict
-  protocol schema (cosmetic — it proceeds), and `--language en` was used for the
-  English test clip vs the `fr-CA` production default.
+  (MS2109/MS2130 or Elgato Cam Link 4K; NOT the Elgato HD60, NOT a Pi). Needs the
+  physical kit; follow `docs/hardware-bring-up.md` (run the capture smoke, then run
+  the device with no synthetic flag → the V4L2/ALSA path takes over).
+- **Create-on-demand session record / Meeting model** — a maintainer data-model
+  decision, spec'd in `docs/specs/2026-06-26-broadcast-box-meeting-model-design.md`.
+
+(`--language en` was used for the English JFK test clip; production default is `fr-CA`.)
 
 ## Repos / branches (local only — DO NOT push to origin/main; audit freeze)
 
-- Monorepo `civicpress` @ `refactor/phase-5-broadcast-box-server` (commit the 5
-  realtime/transcription files; `--no-verify`).
-- HW repo `../civicpress-broadcast-box` @ `refactor/phase-4-enrollment-hardening`
-  (commit the 6 src + 2 test files; `--no-verify`).
+- Monorepo `civicpress` @ `refactor/phase-5-broadcast-box-server`.
+- HW repo `../civicpress-broadcast-box` @ `refactor/phase-4-enrollment-hardening`.
+- All work committed with `--no-verify`; origin/main stays frozen.
