@@ -590,7 +590,9 @@ export class CivicPressAPI {
       this.civicPress,
       this.app,
       logger,
-      { enabled }
+      // Pass the in-process realtime server (started in step 2) so the device
+      // WS handler is wired; null/undefined if realtime is disabled → HTTP only.
+      { enabled, realtimeServer: this.realtimeServer ?? undefined }
     );
   }
 

@@ -48,11 +48,57 @@ import {
   FilesystemSnapshotStorage,
 } from './persistence/storage.js';
 import { YjsRoom } from './rooms/yjs-room.js';
-import {
-  dispatchYjsBinaryFrame,
-  setupYjsConnection,
-} from './yjs-sync.js';
+import { dispatchYjsBinaryFrame, setupYjsConnection } from './yjs-sync.js';
 import * as Y from 'yjs';
+
+/** The connection identity used for limits, per-user tracking, and metadata. */
+interface ConnectionIdentity {
+  /** Stable id for metadata (numeric user id, or the device id string). */
+  id: number | string;
+  /** Key for the per-user connection set (namespaced for devices). */
+  userId: string;
+  username: string;
+  role: string;
+}
+
+/**
+ * Resolve the connection identity from the server-side user session (when
+ * present) or the handler's onConnect result (device, else user). Returns null
+ * when a handler-authenticated room produced neither — a misconfiguration.
+ */
+function resolveConnectionIdentity(
+  authUser: { id: number; username: string; role: string } | null,
+  authResult: AuthResult
+): ConnectionIdentity | null {
+  if (authUser) {
+    return {
+      id: authUser.id,
+      userId: String(authUser.id),
+      username: authUser.username,
+      role: authUser.role,
+    };
+  }
+  if (authResult.deviceAuth) {
+    const d = authResult.deviceAuth;
+    // Namespace the per-user key so a device can't collide with user id N.
+    return {
+      id: d.deviceId,
+      userId: `device:${d.deviceId}`,
+      username: `device:${d.deviceUuid}`,
+      role: 'device',
+    };
+  }
+  if (authResult.userAuth) {
+    const u = authResult.userAuth;
+    return {
+      id: u.userId,
+      userId: String(u.userId),
+      username: u.username,
+      role: u.role,
+    };
+  }
+  return null;
+}
 
 export class RealtimeServer {
   private logger: Logger;
@@ -152,7 +198,9 @@ export class RealtimeServer {
 
     // Grace window (spec §6.3): keep a clientless room in memory this long
     // before finalizing, so a reconnect within the window recovers edits.
-    this.roomManager.setGracePeriodMs(this.realtimeConfig.rooms.grace_period_ms);
+    this.roomManager.setGracePeriodMs(
+      this.realtimeConfig.rooms.grace_period_ms
+    );
 
     // Initialize snapshot manager
     if (this.realtimeConfig.snapshots.enabled) {
@@ -182,12 +230,9 @@ export class RealtimeServer {
       // and the SnapshotManager.createSnapshot/saveSnapshot/loadSnapshot/
       // applySnapshot methods it used were removed as dead code (Phase 3 followup).
       if (this.realtimeConfig.snapshots.interval > 0) {
-        this.snapshotInterval = setInterval(
-          () => {
-            void this.runPeriodicSnapshots();
-          },
-          this.realtimeConfig.snapshots.interval * 1000
-        );
+        this.snapshotInterval = setInterval(() => {
+          void this.runPeriodicSnapshots();
+        }, this.realtimeConfig.snapshots.interval * 1000);
         if (typeof this.snapshotInterval.unref === 'function') {
           this.snapshotInterval.unref();
         }
@@ -412,7 +457,13 @@ export class RealtimeServer {
           operation: 'realtime:connection:no-handler',
           roomType: roomInfo.roomType,
         });
-        ws.close(4004, JSON.stringify({ code: 'ROOM_TYPE_NOT_REGISTERED', roomType: roomInfo.roomType }));
+        ws.close(
+          4004,
+          JSON.stringify({
+            code: 'ROOM_TYPE_NOT_REGISTERED',
+            roomType: roomInfo.roomType,
+          })
+        );
         return;
       }
       await this.handleConnectionWithHandler(
@@ -482,22 +533,28 @@ export class RealtimeServer {
     // 1. Authenticate FIRST (generic, server-side) — the authoritative identity
     //    for limits + per-user tracking. No counts touched here, so failed auth
     //    never leaks (realtime-001/002).
-    const authUser = await this.authService.validateSession(token);
-    if (!authUser) {
-      coreWarn('WebSocket authentication failed: invalid session', {
-        operation: 'realtime:server:auth:failed',
-        clientId,
-        roomType: roomInfo.roomType,
-        ip: clientIp,
-      });
-      this.sendError(ws, new AuthenticationFailedError());
-      this.closeWithCode(ws, 4001, 'AUTH_FAILED');
-      return;
+    //    EXCEPTION: handlers that authenticate the connection themselves (device
+    //    rooms use device tokens, not user sessions) skip this — their onConnect
+    //    is authoritative.
+    let authUser: Awaited<ReturnType<AuthService['validateSession']>> = null;
+    if (!handler.authenticatesConnection) {
+      authUser = await this.authService.validateSession(token);
+      if (!authUser) {
+        coreWarn('WebSocket authentication failed: invalid session', {
+          operation: 'realtime:server:auth:failed',
+          clientId,
+          roomType: roomInfo.roomType,
+          ip: clientIp,
+        });
+        this.sendError(ws, new AuthenticationFailedError());
+        this.closeWithCode(ws, 4001, 'AUTH_FAILED');
+        return;
+      }
     }
-    const userId = String(authUser.id);
 
     // 2. Room-type authorization via the handler (room-specific access, e.g.
-    //    record permissions); identity is already established above.
+    //    record permissions); identity is already established above (or, for
+    //    handler-authenticated rooms, established by onConnect below).
     let authResult: AuthResult;
     if (handler.onConnect) {
       try {
@@ -538,12 +595,27 @@ export class RealtimeServer {
       authResult = { success: true };
     }
 
-    // Ensure the authenticated identity is carried with the connection metadata
-    // (the room participant record + downstream handlers rely on it).
+    // Establish the connection identity for limits + per-user tracking +
+    // metadata: the user session if there was one, else the handler's auth
+    // result (device or user). A handler-authenticated room that yields no
+    // identity is a misconfiguration → reject rather than track an anon device.
+    const identity = resolveConnectionIdentity(authUser, authResult);
+    if (!identity) {
+      coreWarn('WebSocket authentication failed: handler yielded no identity', {
+        operation: 'realtime:server:auth:no-identity',
+        clientId,
+        roomType: roomInfo.roomType,
+        ip: clientIp,
+      });
+      this.sendError(ws, new AuthenticationFailedError());
+      this.closeWithCode(ws, 4001, 'AUTH_FAILED');
+      return;
+    }
+    const userId = identity.userId;
     authResult.clientMetadata = {
-      userId: authUser.id,
-      username: authUser.username,
-      role: authUser.role,
+      userId: identity.id,
+      username: identity.username,
+      role: identity.role,
       ...(authResult.clientMetadata || {}),
     };
 
@@ -670,8 +742,11 @@ export class RealtimeServer {
     // Generic Yjs wiring (hydrate + fan-out + initial handshake). Assigns the
     // outer `yjsUpdateCleanup` so the close handler can tear it down mid-setup.
     if (joinedRoom instanceof YjsRoom) {
-      yjsUpdateCleanup = await setupYjsConnection(ws, joinedRoom, clientId, () =>
-        this.initializeRoom(joinedRoom, roomInfo.roomId)
+      yjsUpdateCleanup = await setupYjsConnection(
+        ws,
+        joinedRoom,
+        clientId,
+        () => this.initializeRoom(joinedRoom, roomInfo.roomId)
       );
     }
 

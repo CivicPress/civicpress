@@ -89,6 +89,9 @@ export interface DeviceRoomHandlerConfig {
  */
 export class DeviceRoomHandler implements RoomTypeHandler {
   public readonly roomType = 'device';
+  // Devices authenticate with device tokens (not user sessions), so onConnect
+  // is the authoritative auth — the realtime server skips its user-session gate.
+  public readonly authenticatesConnection = true;
 
   private eventHandlerRegistry: EventHandlerRegistry;
 

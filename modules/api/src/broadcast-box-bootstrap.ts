@@ -11,9 +11,11 @@
  *    for the DI services + SQL migrations, `registerBroadcastBoxRoutes` for the
  *    Express routers) against core's DI container.
  *
- * The device-room WebSocket handler (the `session.manifest` transport) is NOT
- * wired here — `registerBroadcastBoxServices` skips it gracefully when the
- * realtime server isn't in the container. It lands with the manifest handler.
+ * The device-room WebSocket handler (device connect / command / status /
+ * `session.manifest`) is wired when an in-process realtime server is supplied:
+ * we bridge it into the DI container so the module's handler-registration block
+ * registers the `DeviceRoomHandler`. Without a realtime server, only the HTTP
+ * routes mount (a device can't connect over WS).
  */
 
 import type { Application } from 'express';
@@ -36,6 +38,13 @@ export interface BroadcastBoxStartResult {
 export interface BroadcastBoxStartOptions {
   /** Hard on/off switch (default: BROADCAST_BOX_ENABLED !== 'false'). */
   enabled?: boolean;
+  /**
+   * The API's in-process realtime server. When supplied, the device-room WS
+   * handler is registered so devices can connect to `/realtime/devices/:id`
+   * and send commands / `session.manifest`. Omit → HTTP routes only. Typed
+   * loosely to keep this module off a hard `@civicpress/realtime` dependency.
+   */
+  realtimeServer?: unknown;
 }
 
 const NOOP_STOP = () => {};
@@ -85,10 +94,35 @@ export async function startInProcessBroadcastBox(
   try {
     const config = container.resolve<any>('config');
 
-    // 1. DI services + SQL migrations + the enrollment-cleanup timer. This is
-    //    the module's tested container-based registration hook; the realtime
-    //    device-room wiring inside it no-ops when realtime isn't in the
-    //    container (the WS transport is wired with the manifest handler).
+    // Bridge the in-process realtime server into the DI container so
+    // registerBroadcastBoxServices wires the device room:
+    //   - 'realtimeServer'      → its handler-registration block registers the
+    //     DeviceRoomHandler (connect / message / session.manifest);
+    //   - 'realtimeRoomManager' → its room-type block registers the device room
+    //     FACTORY, so the server can create `device:<uuid>` rooms (else a
+    //     connecting device gets ROOM_NOT_FOUND);
+    //   - 'authService'         → the handler block resolves this key; core
+    //     registers auth as 'auth', so alias it.
+    // All guarded so we never clobber an existing registration.
+    if (options.realtimeServer) {
+      const realtimeServer = options.realtimeServer as {
+        getRoomManager?: () => unknown;
+      };
+      if (!container.isRegistered('realtimeServer')) {
+        container.registerInstance('realtimeServer', realtimeServer);
+      }
+      const roomManager = realtimeServer.getRoomManager?.();
+      if (roomManager && !container.isRegistered('realtimeRoomManager')) {
+        container.registerInstance('realtimeRoomManager', roomManager);
+      }
+      if (!container.isRegistered('authService')) {
+        container.registerInstance('authService', civicPress.getAuthService());
+      }
+    }
+
+    // 1. DI services + SQL migrations + the enrollment-cleanup timer + (when the
+    //    realtime server was bridged above) the device-room WS handler. The
+    //    module's tested container-based registration hook.
     await registerBroadcastBoxServices(container, config);
 
     // 2. Resolve the services the routers need. deviceManager + deviceAuth are
@@ -132,7 +166,11 @@ export async function startInProcessBroadcastBox(
       uploadProcessor
     );
 
-    logger.info('Broadcast-box mounted in-process (devices/sessions/uploads)');
+    logger.info(
+      `Broadcast-box mounted in-process (devices/sessions/uploads${
+        options.realtimeServer ? ' + device-room WS handler' : ''
+      })`
+    );
     return { started: true, stop: () => stopBroadcastBox(container, logger) };
   } catch (error) {
     logger.error(

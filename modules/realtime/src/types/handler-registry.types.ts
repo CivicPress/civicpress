@@ -213,6 +213,15 @@ export interface RoomTypeHandler {
   roomType: string;
 
   /**
+   * When true, this handler authenticates the connection ITSELF in `onConnect`
+   * (e.g. device rooms authenticate with device tokens, not user sessions), so
+   * the server SKIPS its generic user-session auth and treats the handler's
+   * `AuthResult` (deviceAuth/userAuth) as the authoritative identity. Default
+   * (false/undefined) keeps the user-session-first behaviour for record rooms.
+   */
+  authenticatesConnection?: boolean;
+
+  /**
    * Called when a client attempts to connect to this room type.
    * Should authenticate and authorize the connection.
    *
