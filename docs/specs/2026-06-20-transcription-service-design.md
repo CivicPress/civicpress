@@ -269,3 +269,45 @@ can be end-to-end tested rather than against mocks of ambiguous behaviour:
 is validated against reality (the write-path YAML, real transcription). The contract
 (§10.2.1) + worker core (§10.2.2) are done + verified, and the adapters slot in behind
 the existing `RecordsGateway` / `TranscriptionEngine` interfaces.
+
+### 10.6 Step 3 DONE (2026-06-25) — adapters built + verified end-to-end
+
+Built whisper.cpp on the dev VM (ggml 0.15.2, commit 43d78af) and the real adapters,
+all verified against a running CivicPress + the real binary.
+
+- **`WhisperCppEngine`** (`engines/whisper-cpp.ts`) — decodes the A/V via **ffmpeg →
+  16 kHz mono WAV** (whisper-cli reads WAV only), then `whisper-cli -m … -f … -l … -oj
+  -of <prefix>` → maps `<prefix>.json` `transcription[].offsets{from,to}` (**ms → s**)
+  to `TranscriptResult`. Findings pinned by tests: whisper rejects region subtags
+  (**`fr-CA` → `fr`**); with `-ot` the returned offsets are **absolute** (so per-public-
+  range passes merge directly, in-camera excluded). `available()` probes binary+model
+  (graceful degradation). Region/whole-file + range paths covered by a real-binary
+  integration test (env-gated `WHISPER_CPP_BIN/MODEL/SAMPLE`).
+- **`CoreRecordsGateway`** (`gateways/core-records-gateway.ts`) — `RecordsGateway` over
+  RecordManager + a UUID blob store, built on NARROW structural interfaces (the package
+  stays `@civicpress/core`-free; real instances satisfy the shapes at wiring time). Read
+  = `listRecords({type:'session'})` enumerate → `getRecord` authoritatively → derived
+  scan. `prepareAudio` = `storage.getFileContent(uuid)` → temp file.
+- **Write-path resolved (the §10.5 open item).** Core `session.media.transcript` is
+  **string-typed**, and the update saga's validator **rejects an object** there
+  (confirmed: `media/transcript must be of type string`). So `writeTranscript` writes
+  the structured `TranscriptResult` to **`media.transcript_data`** (allowed by media's
+  additionalProperties; serializes top-level under `media`) + `transcript_status:
+  automated` (the latch). Existing `media` fields are merged, not clobbered. The
+  published-saga path writes the **expected top-level YAML** — verified by a real e2e
+  (`tests/transcription/transcription-e2e.test.ts`): seed session → `worker.runOnce()` →
+  `transcript_status` top-level + `media.transcript_data` on disk; idempotent re-run;
+  and a full **A/V → real whisper → transcript on the record** pass. Invariant guarded
+  by `tests/core/bb-session-transcript-shape.test.ts`.
+- **`transcription:` config contract** (`config.ts`) — `enabled/engine/language/
+  poll_interval_ms/whisper_cpp{binary,model,threads}` + `normalizeTranscriptionConfig`
+  (tolerant snake_case parse, safe default = disabled/noop) + `createEngine` factory.
+
+**Still open (deferred):** **step 4 — `civic start` launcher does NOT exist** as a
+command (no `cli/src/commands/start.ts`); the worker + config + factory are ready to be
+launched, but the host command is a separate decision (new `civic start` vs. a standalone
+worker entrypoint). And the **transcript artifact** increment (render `media.transcript_data`
+to a VTT/etc. and set the `media.transcript` string path) — left until the artifact
+storage location is decided. Plus `civic init` enablement DX (preset / `civic module
+enable`). Segment-level in-camera exclusion stays unexercised e2e until the device
+`session.manifest → capture.segments` flow lands (the engine's range path is unit-tested).
