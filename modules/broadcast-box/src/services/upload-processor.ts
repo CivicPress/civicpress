@@ -59,8 +59,32 @@ export class UploadProcessor {
   /**
    * Create a new upload job
    */
-  async createUpload(request: CreateUploadRequest): Promise<UploadJob> {
+  async createUpload(
+    request: CreateUploadRequest,
+    expectedDeviceId?: string
+  ): Promise<UploadJob> {
     const uploadId = uuidv4();
+
+    // Resolve the owning device from the broadcast session up front, so an
+    // ownership violation is rejected before any directory or row is created.
+    const sessionModel = (this.uploadModel as any).db;
+    const sessionRows = await sessionModel
+      .getAdapter()
+      .query('SELECT device_id FROM broadcast_sessions WHERE id = ?', [
+        request.sessionId,
+      ]);
+    const sessionDeviceId: string =
+      sessionRows.length > 0 ? sessionRows[0].device_id : '';
+
+    // Authorization: when an authenticated device is supplied, it may only
+    // create uploads for a session it owns. A missing session resolves to no
+    // device and so also fails closed. We don't distinguish "not found" from
+    // "not yours", to avoid leaking which sessions exist.
+    if (expectedDeviceId !== undefined && sessionDeviceId !== expectedDeviceId) {
+      throw new Error(
+        `Forbidden: device does not own session ${request.sessionId}`
+      );
+    }
 
     // Create upload directory for chunks
     const uploadDir = path.join(this.uploadsDir, uploadId);
@@ -69,7 +93,7 @@ export class UploadProcessor {
     const upload: Omit<UploadJob, 'createdAt' | 'updatedAt'> = {
       id: uploadId,
       sessionId: request.sessionId,
-      deviceId: '', // Will be set from session
+      deviceId: sessionDeviceId,
       filePath: path.join(uploadDir, request.fileName),
       fileName: request.fileName,
       fileSize: request.fileSize,
@@ -78,18 +102,6 @@ export class UploadProcessor {
       status: 'pending',
       progressPercent: 0,
     };
-
-    // Get device ID from session
-    const sessionModel = (this.uploadModel as any).db;
-    const sessionRows = await sessionModel
-      .getAdapter()
-      .query('SELECT device_id FROM broadcast_sessions WHERE id = ?', [
-        request.sessionId,
-      ]);
-
-    if (sessionRows.length > 0) {
-      upload.deviceId = sessionRows[0].device_id;
-    }
 
     const created = await this.uploadModel.create(upload);
 
@@ -109,11 +121,17 @@ export class UploadProcessor {
   async processChunk(
     uploadId: string,
     chunk: Buffer,
-    chunkNumber: number
+    chunkNumber: number,
+    expectedDeviceId?: string
   ): Promise<void> {
     const upload = await this.uploadModel.getById(uploadId);
     if (!upload) {
       throw new Error(`Upload job not found: ${uploadId}`);
+    }
+
+    // Authorization: a device may only upload chunks to its own upload job.
+    if (expectedDeviceId !== undefined && upload.deviceId !== expectedDeviceId) {
+      throw new Error(`Forbidden: device does not own upload ${uploadId}`);
     }
 
     if (upload.status === 'complete') {
@@ -159,10 +177,18 @@ export class UploadProcessor {
   /**
    * Finalize upload (combine chunks and store in Storage Manager)
    */
-  async finalizeUpload(uploadId: string): Promise<string> {
+  async finalizeUpload(
+    uploadId: string,
+    expectedDeviceId?: string
+  ): Promise<string> {
     const upload = await this.uploadModel.getById(uploadId);
     if (!upload) {
       throw new Error(`Upload job not found: ${uploadId}`);
+    }
+
+    // Authorization: a device may only finalize its own upload job.
+    if (expectedDeviceId !== undefined && upload.deviceId !== expectedDeviceId) {
+      throw new Error(`Forbidden: device does not own upload ${uploadId}`);
     }
 
     if (upload.status !== 'uploading') {

@@ -332,4 +332,103 @@ describe('UploadProcessor', () => {
       expect(mockUploadModel.list).toHaveBeenCalledWith(filters);
     });
   });
+
+  describe('ownership enforcement (expectedDeviceId)', () => {
+    const req = {
+      sessionId: 'session-id',
+      fileName: 'r.mp4',
+      fileSize: 10,
+      fileHash: 'h',
+      mimeType: 'video/mp4',
+    };
+
+    it('createUpload rejects when the session is owned by another device', async () => {
+      const mockUploadModel = {
+        db: {
+          getAdapter: vi.fn().mockReturnValue({
+            query: vi.fn().mockResolvedValue([{ device_id: 'device-A' }]),
+          }),
+        },
+        create: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(processor.createUpload(req, 'device-B')).rejects.toThrow(
+        'Forbidden'
+      );
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('createUpload rejects when the session does not exist', async () => {
+      const mockUploadModel = {
+        db: {
+          getAdapter: vi.fn().mockReturnValue({
+            query: vi.fn().mockResolvedValue([]),
+          }),
+        },
+        create: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(processor.createUpload(req, 'device-A')).rejects.toThrow(
+        'Forbidden'
+      );
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('createUpload succeeds when the session is owned by the device', async () => {
+      const mockUploadModel = {
+        db: {
+          getAdapter: vi.fn().mockReturnValue({
+            query: vi.fn().mockResolvedValue([{ device_id: 'device-A' }]),
+          }),
+        },
+        create: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          sessionId: 'session-id',
+          deviceId: 'device-A',
+          status: 'pending',
+        }),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const result = await processor.createUpload(req, 'device-A');
+      expect(result.deviceId).toBe('device-A');
+      expect(mockUploadModel.create).toHaveBeenCalled();
+    });
+
+    it('processChunk rejects a chunk from another device', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          deviceId: 'device-A',
+          status: 'uploading',
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(
+        processor.processChunk('upload-id', Buffer.from('x'), 0, 'device-B')
+      ).rejects.toThrow('Forbidden');
+      expect(mockUploadModel.update).not.toHaveBeenCalled();
+    });
+
+    it('finalizeUpload rejects a finalize from another device', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          deviceId: 'device-A',
+          status: 'uploading',
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(
+        processor.finalizeUpload('upload-id', 'device-B')
+      ).rejects.toThrow('Forbidden');
+      expect(mockUploadModel.update).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -11,6 +11,7 @@ export * from './services/device-manager.js';
 export * from './services/device-auth.js';
 export * from './services/device-connection-tracker.js';
 export * from './services/device-websocket-auth.js';
+export * from './middleware/device-auth.js';
 export * from './api/index.js';
 export * from './websocket/index.js';
 export * from './realtime/index.js';

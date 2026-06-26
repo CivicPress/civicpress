@@ -66,10 +66,77 @@ export class DevicePermissionError extends Error {
 }
 
 /**
+ * Validate a device bearer token and resolve the authenticated device.
+ *
+ * The shared core of device authentication, with no transport-specific checks:
+ * validate the token (signature / expiry / `type === 'device'`), load the
+ * device, and verify it is in a status that may connect or upload
+ * (`active` / `enrolled`). Both the WebSocket path
+ * (`authenticateDeviceConnection`, which additionally matches the URL device
+ * UUID) and the HTTP upload path (`deviceAuthMiddleware`) build on this, so the
+ * "what counts as an authenticated device" rule has a single source of truth.
+ *
+ * @param token - Device authentication token (the bearer credential)
+ * @param deviceAuthService - Device authentication service
+ * @param deviceManager - Device manager service
+ * @param logger - Logger instance
+ * @returns Authenticated device connection info
+ * @throws DeviceAuthenticationError if authentication fails
+ */
+export async function authenticateDeviceToken(
+  token: string,
+  deviceAuthService: DeviceAuthService,
+  deviceManager: DeviceManager,
+  logger: Logger
+): Promise<AuthenticatedDeviceConnection> {
+  // Validate the device token (signature, expiry, type === 'device').
+  const tokenPayload = await deviceAuthService.validateToken(token);
+  if (!tokenPayload) {
+    coreWarn('Device authentication failed: invalid token', {
+      operation: 'broadcast-box:device-auth:invalid-token',
+      tokenLength: token.length,
+    });
+    throw new DeviceAuthenticationError('Invalid device token');
+  }
+
+  // Verify the device still exists.
+  const device = await deviceManager.getDeviceByUuid(tokenPayload.deviceUuid);
+  if (!device) {
+    coreWarn('Device authentication failed: device not found', {
+      operation: 'broadcast-box:device-auth:device-not-found',
+      deviceUuid: tokenPayload.deviceUuid,
+    });
+    throw new DeviceAuthenticationError('Device not found', 'DEVICE_NOT_FOUND');
+  }
+
+  // Only 'active' and 'enrolled' devices may connect or upload.
+  if (device.status !== 'active' && device.status !== 'enrolled') {
+    coreWarn('Device authentication denied: invalid device status', {
+      operation: 'broadcast-box:device-auth:invalid-status',
+      deviceUuid: device.deviceUuid,
+      deviceId: device.id,
+      status: device.status,
+    });
+    throw new DeviceAuthenticationError(
+      `Device status '${device.status}' does not allow connections`,
+      'INVALID_STATUS'
+    );
+  }
+
+  return {
+    deviceId: device.id,
+    deviceUuid: device.deviceUuid,
+    organizationId: device.organizationId,
+  };
+}
+
+/**
  * Authenticate device WebSocket connection
  *
- * Validates device tokens and verifies device exists and is in valid status.
- * This is used for Broadcast Box device connections.
+ * Validates the device token + device status (via `authenticateDeviceToken`),
+ * then enforces that the device UUID in the connection URL matches the token's
+ * device. This prevents using one device's token on another device's WS
+ * endpoint.
  *
  * @param token - Device authentication token
  * @param deviceUuid - Device UUID from the connection URL
@@ -93,83 +160,34 @@ export async function authenticateDeviceConnection(
     tokenPreview: token.substring(0, 30) + '...',
   });
 
-  // Validate device token
-  const tokenPayload = await deviceAuthService.validateToken(token);
-  if (!tokenPayload) {
-    coreWarn('Device WebSocket authentication failed: invalid token', {
-      operation: 'broadcast-box:ws-auth:device:invalid-token',
-      deviceUuid,
-      tokenLength: token.length,
-    });
-    throw new DeviceAuthenticationError('Invalid device token');
-  }
+  // Validate token + load device + status check (shared with the HTTP upload
+  // path). Returns the token's device identity.
+  const connection = await authenticateDeviceToken(
+    token,
+    deviceAuthService,
+    deviceManager,
+    logger
+  );
 
-  coreDebug('Device token validated', {
-    operation: 'broadcast-box:ws-auth:device:token-validated',
-    deviceUuid,
-    tokenDeviceUuid: tokenPayload.deviceUuid,
-    tokenDeviceId: tokenPayload.deviceId,
-  });
-
-  // Critical security check: Verify device UUID in URL matches token payload
-  // This prevents token reuse for different devices
-  if (tokenPayload.deviceUuid !== deviceUuid) {
+  // Critical security check: the device UUID in the URL must match the token's
+  // device. This prevents token reuse for different devices.
+  if (connection.deviceUuid !== deviceUuid) {
     coreWarn('Device WebSocket authentication failed: UUID mismatch', {
       operation: 'broadcast-box:ws-auth:device:uuid-mismatch',
-      tokenDeviceUuid: tokenPayload.deviceUuid,
+      tokenDeviceUuid: connection.deviceUuid,
       urlDeviceUuid: deviceUuid,
     });
-    throw new DeviceAuthenticationError(
-      'Device UUID mismatch',
-      'UUID_MISMATCH'
-    );
-  }
-
-  // Verify device exists in database
-  const device = await deviceManager.getDeviceByUuid(deviceUuid);
-  if (!device) {
-    coreWarn('Device WebSocket connection failed: device not found', {
-      operation: 'broadcast-box:ws-auth:device:not-found',
-      deviceUuid,
-    });
-    throw new DeviceAuthenticationError('Device not found', 'DEVICE_NOT_FOUND');
-  }
-
-  coreDebug('Device found in database', {
-    operation: 'broadcast-box:ws-auth:device:device-found',
-    deviceUuid,
-    deviceId: device.id,
-    deviceStatus: device.status,
-  });
-
-  // Verify device is in a valid status for connections
-  // Only 'active' and 'enrolled' devices can connect
-  if (device.status !== 'active' && device.status !== 'enrolled') {
-    coreWarn('Device WebSocket connection denied: invalid device status', {
-      operation: 'broadcast-box:ws-auth:device:invalid-status',
-      deviceUuid,
-      deviceId: device.id,
-      status: device.status,
-    });
-    throw new DeviceAuthenticationError(
-      `Device status '${device.status}' does not allow connections`,
-      'INVALID_STATUS'
-    );
+    throw new DeviceAuthenticationError('Device UUID mismatch', 'UUID_MISMATCH');
   }
 
   coreInfo('Device WebSocket connection authenticated', {
     operation: 'broadcast-box:ws-auth:device:success',
-    deviceId: device.id,
-    deviceUuid: device.deviceUuid,
-    organizationId: device.organizationId,
-    status: device.status,
+    deviceId: connection.deviceId,
+    deviceUuid: connection.deviceUuid,
+    organizationId: connection.organizationId,
   });
 
-  return {
-    deviceId: device.id,
-    deviceUuid: device.deviceUuid,
-    organizationId: device.organizationId,
-  };
+  return connection;
 }
 
 /**

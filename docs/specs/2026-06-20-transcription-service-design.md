@@ -399,13 +399,12 @@ device has a working server to talk to end-to-end:
   instead of `.file.id` (finalize returned undefined); and storage's default
   config had no `recordings`/`transcripts` folders (uploads 404'd) — both added.
 
-**Still open (needs the HW device / coordinated):** device-token auth for the
-HTTP **upload** routes (still behind user `authMiddleware` via a `// TODO`; R3
-uses the `x-mock-user` test seam); the HW device's real **upload + manifest
-emit** (device upload is still a stub — see the integration-status note); and the
-**transcript artifact's** real-storage path (§10.9 stored via a faked
-`uploadFile`; the `transcripts` folder now exists, but a raw-Buffer upload's type
-validation isn't yet e2e-verified).
+**Still open (needs the HW device / coordinated):** ~~device-token auth for the
+HTTP **upload** routes~~ **✅ DONE (2026-06-26 — see §10.11);** the HW device's
+real **upload + manifest emit** (device upload is still a stub — see the
+integration-status note); and the **transcript artifact's** real-storage path
+(§10.9 stored via a faked `uploadFile`; the `transcripts` folder now exists, but
+a raw-Buffer upload's type validation isn't yet e2e-verified).
 
 ### 10.9 Transcript artifact render (2026-06-26) — `media.transcript` = WebVTT
 
@@ -434,3 +433,45 @@ storage module as a UUID blob**, consistent with the A/V recording.
 
 **Deferred:** speaker diarization (renderer already supports `<v …>` when
 segments carry `speaker`), and alternate artifact formats (SRT/plain text).
+
+### 10.11 Upload device-token auth (2026-06-26) — the upload routes are a device surface
+
+The R3 upload routes (§10.10) sat behind the user `authMiddleware` with a
+`// TODO`, and the e2e faked an operator via `BYPASS_AUTH` / `x-mock-user`.
+Closed: the HTTP upload routes now authenticate the **device** by its own bearer
+token — the same credential as the device WebSocket — and enforce per-resource
+ownership, so a real (or compromised) appliance can only push its own recording.
+
+- **Shared auth core.** Extracted `authenticateDeviceToken` (validate token →
+  load device → status `active`/`enrolled`) in `device-websocket-auth.ts`. Both
+  the WS path (`authenticateDeviceConnection`, which additionally matches the
+  URL device UUID) and the new HTTP middleware build on it, so "an authenticated
+  device" has a single definition. No behaviour change to the WS path (the
+  manifest e2e + handler tests stay green).
+- **`deviceAuthMiddleware`** (`middleware/device-auth.ts`) reads
+  `Authorization: Bearer <deviceToken>` (header-only, BB-HW-010), attaches
+  `req.device`, and 401s on any failure (surfacing the helper's code:
+  `UNAUTHENTICATED` / `INVALID_AUTH_SCHEME` / `DEVICE_NOT_FOUND` /
+  `INVALID_STATUS`). `registerBroadcastBoxRoutes` mounts the uploads router
+  behind it — built from the `deviceAuth` + `deviceManager` it already receives,
+  **always** (an unauthenticated upload is never allowed) — NOT the user
+  `authMiddleware`, which still guards the operator-facing device/session routes.
+- **Ownership (defense in depth).** A device may act only on its own resources:
+  `createUpload` / `processChunk` / `finalizeUpload` take an optional
+  `expectedDeviceId` and reject (`Forbidden` → 403) a session/upload owned by
+  another device; `createUpload` resolves the session's device up front and fails
+  closed before any row/dir is created (a missing session also fails closed,
+  without leaking existence); `GET /:id` 403s a non-owned upload; `GET /` is
+  scoped to the authenticated device (any client `deviceId` filter is ignored).
+  The param is optional, so the processor's existing no-arg unit tests are
+  unaffected.
+- **Verified.** broadcast-box module suite 133 green (new `device-auth-middleware`
+  unit tests + ownership cases; WS manifest path still green through the
+  refactor). The R3 e2e now mints a real device token (enroll → register →
+  `generateToken`) and adds a no-token **401** + a cross-device **403** case. All
+  four `tests/broadcast-box` e2es green; broadcast-box + api `tsc` clean.
+
+**Still open (needs the HW device / coordinated):** the HW device's real upload +
+`session.manifest` emit (device upload is still a stub); and the transcript
+artifact's real-storage path (§10.9 — raw-Buffer upload type validation not yet
+e2e-verified).

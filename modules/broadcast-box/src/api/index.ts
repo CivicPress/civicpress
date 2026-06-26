@@ -15,6 +15,7 @@ import { createDevicesRouter } from './devices.js';
 import { createSessionsRouter } from './sessions.js';
 import { createUploadsRouter } from './uploads.js';
 import { DeviceRegistrationRateLimiter } from '../middleware/rate-limiter.js';
+import { deviceAuthMiddleware } from '../middleware/device-auth.js';
 
 /**
  * Register broadcast-box API routes
@@ -251,14 +252,18 @@ export async function registerBroadcastBoxRoutes(
     }
   }
 
-  // Register uploads router if uploadProcessor is provided
+  // Register uploads router if uploadProcessor is provided. Uploads are a
+  // device surface (the appliance pushes its own recording), so they
+  // authenticate with the device's bearer token via deviceAuthMiddleware — NOT
+  // the user authMiddleware used by the operator-facing device/session routes.
+  // The middleware is always applied: an unauthenticated upload is never
+  // allowed (the device + session ownership is then enforced per-route).
   if (uploadProcessor) {
     const uploadsRouter = createUploadsRouter(uploadProcessor, logger);
-
-    if (authMiddleware) {
-      app.use('/api/v1/broadcast-box/uploads', authMiddleware, uploadsRouter);
-    } else {
-      app.use('/api/v1/broadcast-box/uploads', uploadsRouter);
-    }
+    app.use(
+      '/api/v1/broadcast-box/uploads',
+      deviceAuthMiddleware(deviceAuth, deviceManager, logger),
+      uploadsRouter
+    );
   }
 }
