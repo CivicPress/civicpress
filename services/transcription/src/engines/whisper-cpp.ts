@@ -129,11 +129,19 @@ export class WhisperCppEngine implements TranscriptionEngine {
         const json = await this.runWhisper(wav, lang, range, workDir, i);
         const partial = mapWhisperJson(json, lang);
         if (partial.language) detectedLanguage = partial.language;
-        const shift = range ? range.start : 0;
         for (const s of partial.segments) {
-          all.push(
-            shift ? { ...s, start: s.start + shift, end: s.end + shift } : s
-          );
+          if (range) {
+            // Slice-relative → absolute, clamped to the public range: whisper's
+            // blank/silence spans can overrun the slice and otherwise push
+            // segment ends past the recording duration.
+            all.push({
+              ...s,
+              start: Math.min(range.end, range.start + s.start),
+              end: Math.min(range.end, range.start + s.end),
+            });
+          } else {
+            all.push(s);
+          }
         }
       }
 
