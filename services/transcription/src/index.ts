@@ -9,6 +9,33 @@
 export { TranscriptionWorker, computePublicRanges } from './worker.js';
 export type { WorkerOptions } from './worker.js';
 export { NoopEngine } from './engines/noop.js';
+export {
+  WhisperCppEngine,
+  toWhisperLanguage,
+  mapWhisperJson,
+} from './engines/whisper-cpp.js';
+export type {
+  WhisperCppEngineOptions,
+  WhisperJson,
+} from './engines/whisper-cpp.js';
+export { createEngine } from './engines/factory.js';
+export { CoreRecordsGateway } from './gateways/core-records-gateway.js';
+export type {
+  BlobStore,
+  CoreRecord,
+  CoreRecordsGatewayOptions,
+  CoreUser,
+  RecordStore,
+} from './gateways/core-records-gateway.js';
+export {
+  DEFAULT_TRANSCRIPTION_CONFIG,
+  normalizeTranscriptionConfig,
+} from './config.js';
+export type {
+  EngineKind,
+  TranscriptionConfig,
+  WhisperCppConfig,
+} from './config.js';
 export type {
   AudioRef,
   CaptureSegment,

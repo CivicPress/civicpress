@@ -88,7 +88,12 @@ export interface RecordsGateway {
   getSession(id: string): Promise<SessionForTranscription | null>;
   /** Fetch the session's A/V into a local handle the engine can read. */
   prepareAudio(session: SessionForTranscription): Promise<AudioRef>;
-  /** Atomic write-back: `media.transcript` + `transcript_status` in one records-API update. */
+  /**
+   * Atomic write-back: `transcript_status` (the idempotency latch) + the
+   * structured transcript in one records-API update. NB core `media.transcript`
+   * is string-typed (a path/URL), so the adapter writes the structured result to
+   * `media.transcript_data` — see the CoreRecordsGateway + design §10.5.
+   */
   writeTranscript(
     id: string,
     payload: { transcript: TranscriptResult; status: 'automated' }
