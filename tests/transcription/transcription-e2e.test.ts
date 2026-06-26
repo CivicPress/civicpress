@@ -56,6 +56,21 @@ class StubEngine {
   }
 }
 
+// Like StubEngine, but records the transcribe() input so a test can assert which
+// public ranges the worker passed (in-camera exclusion is computed there).
+class CapturingStubEngine {
+  readonly name = 'capturing-stub';
+  lastInput: any = null;
+  constructor(private readonly result: any) {}
+  async available() {
+    return true;
+  }
+  async transcribe(input: any) {
+    this.lastInput = input;
+    return this.result;
+  }
+}
+
 function frontmatter(md: string): Record<string, any> {
   const m = md.match(/^---\n([\s\S]*?)\n---/);
   if (!m) throw new Error('no frontmatter found');
@@ -74,7 +89,10 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     await fs.mkdir(path.join(testDir, 'records'), { recursive: true });
     execSync('git init', { cwd: testDir, stdio: 'ignore' });
     execSync('git config user.name "Test"', { cwd: testDir, stdio: 'ignore' });
-    execSync('git config user.email "t@e.com"', { cwd: testDir, stdio: 'ignore' });
+    execSync('git config user.email "t@e.com"', {
+      cwd: testDir,
+      stdio: 'ignore',
+    });
 
     civic = new CivicPress({
       dataDir: testDir,
@@ -108,7 +126,9 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  async function seedRecordedSession(): Promise<string> {
+  async function seedRecordedSession(
+    segments?: Array<{ start: number; end: number; visibility: string }>
+  ): Promise<string> {
     await recordManager.createRecord(
       {
         title: 'Regular Council Meeting',
@@ -117,7 +137,11 @@ describe('transcription write-back e2e (real CivicPress)', () => {
         status: 'published',
         metadata: {
           media: { recording: 'rec-uuid' },
-          capture: { device: 'bb-001', av_file: 'av-uuid-1' },
+          capture: {
+            device: 'bb-001',
+            av_file: 'av-uuid-1',
+            ...(segments ? { segments } : {}),
+          },
         },
       },
       SYSTEM_USER
@@ -136,7 +160,11 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     const id = await seedRecordedSession();
     const gateway = new CoreRecordsGateway({
       records: recordManager,
-      storage: { async getFileContent() { return Buffer.from('x'); } },
+      storage: {
+        async getFileContent() {
+          return Buffer.from('x');
+        },
+      },
     });
     const needing = await gateway.findNeedingTranscription();
     expect(needing.map((s: any) => s.id)).toContain(id);
@@ -151,7 +179,11 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     };
     const gateway = new CoreRecordsGateway({
       records: recordManager,
-      storage: { async getFileContent() { return Buffer.from('x'); } },
+      storage: {
+        async getFileContent() {
+          return Buffer.from('x');
+        },
+      },
     });
     const worker = new TranscriptionWorker({
       records: gateway,
@@ -174,15 +206,100 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     expect(fm.capture.av_file).toBe('av-uuid-1');
   });
 
+  it('excludes in-camera segments — the engine transcribes only the public ranges', async () => {
+    // Mixed-visibility capture: the middle segment is in-camera (closed) and must
+    // be excluded; the worker passes only the public windows to the engine.
+    const id = await seedRecordedSession([
+      { start: 0, end: 5, visibility: 'public' },
+      { start: 5, end: 10, visibility: 'in_camera' },
+      { start: 10, end: 15, visibility: 'public' },
+    ]);
+    const transcript = {
+      language: 'fr',
+      text: 'public only',
+      segments: [{ start: 0, end: 5, text: 'public only' }],
+    };
+    const engine = new CapturingStubEngine(transcript);
+    const gateway = new CoreRecordsGateway({
+      records: recordManager,
+      storage: {
+        async getFileContent() {
+          return Buffer.from('x');
+        },
+      },
+    });
+    const worker = new TranscriptionWorker({
+      records: gateway,
+      engine: engine as any,
+      logger: silentLogger,
+      language: 'fr-CA',
+    });
+
+    const summary = await worker.runOnce();
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: 0 });
+
+    // The civic-critical assertion: the in-camera window (5–10s) never reaches
+    // the engine — only the two public ranges do.
+    expect(engine.lastInput.publicRanges).toEqual([
+      { start: 0, end: 5 },
+      { start: 10, end: 15 },
+    ]);
+
+    const fm = await readFrontmatter(id);
+    expect(fm.transcript_status).toBe('automated');
+    expect(fm.media.transcript_data).toMatchObject(transcript);
+  });
+
+  it('a fully in-camera session is skipped — no transcript is written', async () => {
+    const id = await seedRecordedSession([
+      { start: 0, end: 8, visibility: 'in_camera' },
+      { start: 8, end: 16, visibility: 'in_camera' },
+    ]);
+    const engine = new CapturingStubEngine({
+      language: 'fr',
+      text: 'should never run',
+      segments: [],
+    });
+    const gateway = new CoreRecordsGateway({
+      records: recordManager,
+      storage: {
+        async getFileContent() {
+          return Buffer.from('x');
+        },
+      },
+    });
+    const worker = new TranscriptionWorker({
+      records: gateway,
+      engine: engine as any,
+      logger: silentLogger,
+    });
+
+    const summary = await worker.runOnce();
+    expect(summary).toEqual({ processed: 0, skipped: 1, failed: 0 });
+    // The engine was never invoked, and the record stays untranscribed (so a
+    // later segment correction could re-open it).
+    expect(engine.lastInput).toBeNull();
+    const fm = await readFrontmatter(id);
+    expect(fm.transcript_status).toBeUndefined();
+  });
+
   it('is idempotent — a second cycle re-picks nothing', async () => {
     await seedRecordedSession();
     const gateway = new CoreRecordsGateway({
       records: recordManager,
-      storage: { async getFileContent() { return Buffer.from('x'); } },
+      storage: {
+        async getFileContent() {
+          return Buffer.from('x');
+        },
+      },
     });
     const worker = new TranscriptionWorker({
       records: gateway,
-      engine: new StubEngine({ language: 'fr', text: 'x', segments: [] }) as any,
+      engine: new StubEngine({
+        language: 'fr',
+        text: 'x',
+        segments: [],
+      }) as any,
       logger: silentLogger,
     });
     expect((await worker.runOnce()).processed).toBe(1);
@@ -201,7 +318,11 @@ describe('transcription write-back e2e (real CivicPress)', () => {
       const avBytes = readFileSync(SAMPLE!); // English JFK sample
       const gateway = new CoreRecordsGateway({
         records: recordManager,
-        storage: { async getFileContent() { return avBytes; } },
+        storage: {
+          async getFileContent() {
+            return avBytes;
+          },
+        },
       });
       const engine = new WhisperCppEngine({ binary: BIN!, model: MODEL! });
       const worker = new TranscriptionWorker({
@@ -230,9 +351,8 @@ describe('transcription write-back e2e (real CivicPress)', () => {
       text: 'Bonjour.',
       segments: [{ start: 0, end: 1, text: 'Bonjour.' }],
     };
-    const { startInProcessTranscription } = await import(
-      '../../modules/api/src/transcription-bootstrap.js'
-    );
+    const { startInProcessTranscription } =
+      await import('../../modules/api/src/transcription-bootstrap.js');
     // Large poll interval: start() runs runOnce() ONCE immediately, then sleeps —
     // so the test observes a single write with no overlapping-cycle DB churn.
     const { worker, started } = await startInProcessTranscription(
@@ -241,7 +361,11 @@ describe('transcription write-back e2e (real CivicPress)', () => {
       silentLogger,
       {
         engine: new StubEngine(transcript) as any,
-        storage: { async getFileContent() { return Buffer.from('x'); } },
+        storage: {
+          async getFileContent() {
+            return Buffer.from('x');
+          },
+        },
       }
     );
     expect(started).toBe(true);
