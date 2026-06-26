@@ -71,3 +71,6 @@ Icon?
 
 # backup exports
 *.zip
+
+# BroadcastBox live-e2e harness throwaway data
+/.e2e-live/
