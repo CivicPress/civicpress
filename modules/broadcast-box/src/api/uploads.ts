@@ -115,13 +115,15 @@ export function createUploadsRouter(
    */
   router.post(
     '/:id/chunks',
+    // multer MUST run before the body validators — it parses the multipart form,
+    // so `chunkNumber` (a text field) isn't on req.body until after this.
+    upload.single('chunk'),
     [
       param('id').isUUID().withMessage('Upload ID must be a valid UUID'),
       body('chunkNumber')
         .isInt({ min: 0 })
         .withMessage('Chunk number must be a non-negative integer'),
     ],
-    upload.single('chunk'),
     // TODO: Add authMiddleware
     async (req: AuthenticatedRequest, res: Response) => {
       try {

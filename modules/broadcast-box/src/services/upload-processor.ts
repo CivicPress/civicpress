@@ -246,7 +246,7 @@ export class UploadProcessor {
       coreInfo('Upload finalized', {
         operation: 'broadcast-box:upload:finalized',
         uploadId,
-        storageLocation: storageResult.uuid,
+        storageLocation: storageResult.file.id,
       });
 
       // Announce completion so the workflow trigger links the A/V to its
@@ -259,7 +259,7 @@ export class UploadProcessor {
         try {
           await this.hookSystem.emit('broadcast-box:recording:complete', {
             sessionId: upload.sessionId,
-            storageFileId: storageResult.uuid,
+            storageFileId: storageResult.file.id,
             deviceId: upload.deviceId,
           });
         } catch (hookError) {
@@ -274,7 +274,7 @@ export class UploadProcessor {
         }
       }
 
-      return storageResult.uuid;
+      return storageResult.file.id;
     } catch (error) {
       // Mark upload as failed
       await this.uploadModel.update(uploadId, {

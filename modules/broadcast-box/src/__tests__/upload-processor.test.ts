@@ -230,20 +230,20 @@ describe('UploadProcessor', () => {
 
       (processor as any).uploadModel = mockUploadModel;
 
-      // Mock storage service to return file with uuid
+      // Storage uploadFile returns { success, file: { id } } — the id IS the
+      // stored file's UUID (there is no separate `uuid` field on the response).
       mockStorageService.uploadFile.mockResolvedValue({
         success: true,
         file: {
           id: 'storage-file-id',
           original_name: fileName,
         },
-        uuid: 'storage-file-uuid', // finalizeUpload returns uuid
       });
 
-      // finalizeUpload returns the storage UUID string
+      // finalizeUpload returns the stored file id.
       const storageUuid = await processor.finalizeUpload(uploadId);
 
-      expect(storageUuid).toBe('storage-file-uuid');
+      expect(storageUuid).toBe('storage-file-id');
       expect(mockStorageService.uploadFile).toHaveBeenCalled();
       expect(mockUploadModel.update).toHaveBeenCalled();
       // Announces completion (broadcast-session id + storage uuid + device) so
@@ -252,7 +252,7 @@ describe('UploadProcessor', () => {
         'broadcast-box:recording:complete',
         {
           sessionId: 'session-id',
-          storageFileId: 'storage-file-uuid',
+          storageFileId: 'storage-file-id',
           deviceId: 'device-id',
         }
       );

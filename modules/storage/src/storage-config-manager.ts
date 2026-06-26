@@ -42,6 +42,20 @@ export class StorageConfigManager {
           max_size: '100MB',
           description: 'Meeting recordings and session materials',
         },
+        recordings: {
+          path: 'recordings',
+          access: 'public',
+          allowed_types: ['mp4', 'webm', 'mov', 'mkv', 'mp3', 'wav', 'm4a'],
+          max_size: '4096MB',
+          description: 'BroadcastBox A/V recordings uploaded by devices',
+        },
+        transcripts: {
+          path: 'transcripts',
+          access: 'public',
+          allowed_types: ['vtt', 'srt', 'txt', 'json', 'md'],
+          max_size: '25MB',
+          description: 'Rendered meeting transcripts (WebVTT, etc.)',
+        },
         permits: {
           path: 'permits',
           access: 'authenticated',
