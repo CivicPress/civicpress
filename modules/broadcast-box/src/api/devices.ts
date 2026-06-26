@@ -895,6 +895,7 @@ export function createDevicesRouter(
           'list_sources',
           'start_session',
           'stop_session',
+          'set_visibility',
           'preview.start',
           'preview.stop',
           'record.start',
