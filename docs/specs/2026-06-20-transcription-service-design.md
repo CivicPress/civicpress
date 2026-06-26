@@ -303,11 +303,30 @@ all verified against a running CivicPress + the real binary.
   poll_interval_ms/whisper_cpp{binary,model,threads}` + `normalizeTranscriptionConfig`
   (tolerant snake_case parse, safe default = disabled/noop) + `createEngine` factory.
 
-**Still open (deferred):** **step 4 — `civic start` launcher does NOT exist** as a
-command (no `cli/src/commands/start.ts`); the worker + config + factory are ready to be
-launched, but the host command is a separate decision (new `civic start` vs. a standalone
-worker entrypoint). And the **transcript artifact** increment (render `media.transcript_data`
-to a VTT/etc. and set the `media.transcript` string path) — left until the artifact
-storage location is decided. Plus `civic init` enablement DX (preset / `civic module
-enable`). Segment-level in-camera exclusion stays unexercised e2e until the device
-`session.manifest → capture.segments` flow lands (the engine's range path is unit-tested).
+### 10.7 Step 4 DONE (2026-06-26) — in-process launcher (realtime-style)
+
+The worker now boots with the API server, mirroring the realtime precedent
+(`modules/api/src/realtime-bootstrap.ts`). New `modules/api/src/transcription-bootstrap.ts`
+exports `startInProcessTranscription(civicPress, rawConfig, logger, opts?)`:
+config-gated (`transcription.enabled` + a `TRANSCRIPTION_ENABLED=false` env opt-out),
+engine-availability-gated, and crash-safe (every failure path logs + returns
+`{ worker: null, started: false }` — the A/V stays public). It resolves storage via
+`civicPress.getService('storage')` + `initializeStorageService`, builds the
+`CoreRecordsGateway` + engine (`createEngine`), and runs `worker.start(pollIntervalMs)`.
+`CivicPressAPI.start()` calls it after the HTTP listener + realtime; `shutdown()` stops
+it. New core getter `CentralConfigManager.getTranscriptionConfig()` sources the
+`transcription:` block (data/.civic/config.yml → .civicrc), mirroring `getModules()`.
+Verified: gating unit tests (`modules/api/src/__tests__/transcription-bootstrap.test.ts`,
+4) + a real-CivicPress launcher test (`tests/transcription/…e2e`: start → worker loop →
+write-back). API tsc clean; no regression (diagnose + a createAPITestContext integration
+test green).
+
+**Still open (deferred):**
+- A **first-class `civic start` CLI command** — wanted for the deployment / easy-install
+  phase (maintainer, 2026-06-26). Today "civic start" = the API server boot, so the
+  in-process launcher above IS the civic-start launcher for now.
+- **Transcript artifact** increment (render `media.transcript_data` → VTT/etc. + set the
+  `media.transcript` string path) — until the artifact storage location is decided.
+- **`civic init` enablement DX** (preset / `civic module enable`).
+- **Segment-level in-camera exclusion** stays unexercised e2e until the device
+  `session.manifest → capture.segments` flow lands (the engine's range path is unit-tested).
