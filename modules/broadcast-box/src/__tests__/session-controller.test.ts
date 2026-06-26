@@ -554,5 +554,101 @@ describe('SessionController', () => {
 
       expect(mockRecordManager.updateRecord).not.toHaveBeenCalled();
     });
+
+    it('preserves manifest segments already on the record when the A/V file is linked', async () => {
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.getById.mockResolvedValue({
+        id: 'bs-1',
+        deviceId: 'bb-001',
+        civicpressSessionId: 'pv-x',
+        metadata: {},
+      });
+      mockSessionModel.update.mockResolvedValue({});
+      // The manifest arrived first and wrote segments + timing.
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-x',
+        type: 'session',
+        attachedFiles: [],
+        metadata: {
+          capture: {
+            device: 'bb-001',
+            duration_s: 120,
+            segments: [{ start: 0, end: 60, visibility: 'public' }],
+          },
+        },
+      });
+      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
+
+      await sessionController.linkFileToSession('bs-1', 'storage-uuid-1');
+
+      const written =
+        mockRecordManager.updateRecord.mock.calls[0][1].metadata.capture;
+      expect(written.av_file).toBe('storage-uuid-1');
+      // segments + timing from the manifest survive the finalize write.
+      expect(written.segments).toEqual([
+        { start: 0, end: 60, visibility: 'public' },
+      ]);
+      expect(written.duration_s).toBe(120);
+    });
+  });
+
+  describe('applySessionManifest', () => {
+    it('writes capture.segments + timing onto the session record', async () => {
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-1',
+        type: 'session',
+        metadata: {},
+      });
+      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
+
+      const segments = [
+        { start: 0, end: 60, visibility: 'public' },
+        { start: 60, end: 90, visibility: 'in_camera' },
+      ];
+      await sessionController.applySessionManifest('pv-1', {
+        device: 'bb-001',
+        duration_s: 90,
+        segments,
+      });
+
+      expect(mockRecordManager.updateRecord).toHaveBeenCalledWith(
+        'pv-1',
+        {
+          metadata: {
+            capture: { device: 'bb-001', duration_s: 90, segments },
+          },
+        },
+        expect.objectContaining({ username: 'system' })
+      );
+    });
+
+    it('merges onto an existing capture block (keeps the av_file from finalize)', async () => {
+      // The A/V upload finalized first and wrote device + av_file.
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-2',
+        type: 'session',
+        metadata: { capture: { device: 'bb-001', av_file: 'av-uuid-9' } },
+      });
+      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
+
+      await sessionController.applySessionManifest('pv-2', {
+        segments: [{ start: 0, end: 30, visibility: 'public' }],
+      });
+
+      const written =
+        mockRecordManager.updateRecord.mock.calls[0][1].metadata.capture;
+      expect(written.av_file).toBe('av-uuid-9'); // not clobbered
+      expect(written.device).toBe('bb-001');
+      expect(written.segments).toEqual([
+        { start: 0, end: 30, visibility: 'public' },
+      ]);
+    });
+
+    it('throws when the session record does not exist', async () => {
+      mockRecordManager.getRecord.mockResolvedValue(null);
+      await expect(
+        sessionController.applySessionManifest('missing', { segments: [] })
+      ).rejects.toThrow(/Session record not found/);
+    });
   });
 });

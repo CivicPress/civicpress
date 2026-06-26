@@ -22,6 +22,7 @@ import type { DeviceAuthService } from '../services/device-auth.js';
 import type { DeviceManager } from '../services/device-manager.js';
 import type { DeviceConnectionTracker } from '../services/device-connection-tracker.js';
 import type { DeviceCommandService } from '../services/device-command-service.js';
+import type { SessionController } from '../services/session-controller.js';
 import { DeviceEventModel } from '../models/device-event.js';
 import {
   authenticateDeviceConnection,
@@ -67,6 +68,13 @@ export interface DeviceRoomHandlerConfig {
    * Auth service for user authentication
    */
   authService: AuthService;
+
+  /**
+   * Session controller — applies device `session.manifest` frames (capture
+   * block + segment-level visibility) to the CivicPress session record.
+   * Optional: when absent, manifests are accepted but not persisted.
+   */
+  sessionController?: SessionController;
 
   /**
    * Logger instance
@@ -375,6 +383,12 @@ export class DeviceRoomHandler implements RoomTypeHandler {
       await this.handleEventMessage(message, clientId, deviceAuth);
     }
 
+    // Handle session.manifest — binds the recording to its CivicPress session
+    // record and carries segment-level visibility (in-camera exclusion).
+    if (message.type === 'session.manifest' && message.payload) {
+      await this.handleManifestMessage(message, deviceAuth);
+    }
+
     // Handle preview WebRTC messages
     if (
       message.type === 'preview.offer' ||
@@ -540,6 +554,59 @@ export class DeviceRoomHandler implements RoomTypeHandler {
     };
 
     await this.eventHandlerRegistry.handleEvent(message, eventContext);
+  }
+
+  /**
+   * Handle a device `session.manifest`: persist the capture block (incl.
+   * segment-level visibility) onto the CivicPress session record. The
+   * `session_id` is the session record id pushed to the device via the schedule.
+   */
+  private async handleManifestMessage(
+    message: any,
+    deviceAuth: NonNullable<AuthResult['deviceAuth']>
+  ): Promise<void> {
+    const sessionId = message.payload?.session_id;
+    const capture = message.payload?.capture;
+    if (!sessionId || !capture) {
+      coreWarn('session.manifest missing session_id/capture — ignored', {
+        operation: 'broadcast-box:device-handler:manifest:invalid',
+        deviceId: deviceAuth.deviceId,
+      });
+      return;
+    }
+
+    if (!this.config.sessionController) {
+      coreWarn('session.manifest received but no SessionController — dropped', {
+        operation: 'broadcast-box:device-handler:manifest:no-controller',
+        deviceId: deviceAuth.deviceId,
+        sessionId,
+      });
+      return;
+    }
+
+    try {
+      await this.config.sessionController.applySessionManifest(
+        sessionId,
+        capture
+      );
+      coreInfo('session.manifest applied to session record', {
+        operation: 'broadcast-box:device-handler:manifest:applied',
+        deviceId: deviceAuth.deviceId,
+        sessionId,
+        segments: Array.isArray(capture.segments) ? capture.segments.length : 0,
+      });
+    } catch (error) {
+      coreError(
+        error instanceof Error ? error : new Error(String(error)),
+        'SESSION_MANIFEST_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'broadcast-box:device-handler:manifest:error',
+          deviceId: deviceAuth.deviceId,
+          sessionId,
+        }
+      );
+    }
   }
 }
 

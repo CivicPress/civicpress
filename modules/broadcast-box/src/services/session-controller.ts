@@ -365,17 +365,20 @@ export class SessionController {
       // Update record: attach the A/V file AND write the `capture` block
       // (broadcast-box session extension). The capture block is what the
       // transcription service (W2) scans for — `capture.av_file` present and no
-      // `transcript_status`. Segment-level visibility (in-camera exclusion)
-      // requires the device's `session.manifest`, which is not yet wired here;
-      // until it is, capture carries the device + the A/V file (a recording with
-      // no segments is treated as wholly public, and a fully in-camera session is
-      // still gated by the record's session-level `visibility`).
+      // `transcript_status`. We MERGE onto any existing capture (the device's
+      // `session.manifest` may have already written segments/timing — see
+      // applySessionManifest) because the records write path shallow-merges
+      // `metadata` per key, so a bare `{ capture: {...} }` would clobber it.
+      const existingCapture =
+        ((sessionRecord.metadata as Record<string, any> | undefined)
+          ?.capture as Record<string, unknown> | undefined) ?? {};
       await this.recordManager.updateRecord(
         session.civicpressSessionId,
         {
           attachedFiles,
           metadata: {
             capture: {
+              ...existingCapture,
               device: session.deviceId,
               av_file: storageFileId,
             },
@@ -408,6 +411,64 @@ export class SessionController {
         storageFileId,
       });
     }
+  }
+
+  /**
+   * Apply a device `session.manifest` to its CivicPress session record.
+   *
+   * The manifest binds the recording to the session and — crucially —
+   * carries the segment-level visibility (`capture.segments`) the transcription
+   * worker uses to exclude in-camera portions. `session_id` is the CivicPress
+   * session record id (the same id pushed to the device via the schedule).
+   *
+   * We MERGE onto any existing capture block (the A/V upload finalize writes
+   * `device` + `av_file` independently — see linkFileToSession) since the
+   * records write path shallow-merges `metadata` per key.
+   */
+  async applySessionManifest(
+    civicpressSessionId: string,
+    capture: {
+      device?: string;
+      av_file?: string;
+      started_at?: string;
+      ended_at?: string;
+      duration_s?: number;
+      segments?: Array<{ start: number; end: number; visibility: string }>;
+    }
+  ): Promise<void> {
+    const record = await this.recordManager.getRecord(civicpressSessionId);
+    if (!record) {
+      throw new Error(`Session record not found: ${civicpressSessionId}`);
+    }
+
+    const existing =
+      ((record.metadata as Record<string, any> | undefined)?.capture as
+        | Record<string, unknown>
+        | undefined) ?? {};
+
+    // Merge: keep prior capture fields (e.g. av_file from finalize), overlay the
+    // manifest's. Only overlay keys the manifest actually provided.
+    const merged: Record<string, unknown> = { ...existing };
+    if (capture.device !== undefined) merged.device = capture.device;
+    if (capture.av_file !== undefined) merged.av_file = capture.av_file;
+    if (capture.started_at !== undefined)
+      merged.started_at = capture.started_at;
+    if (capture.ended_at !== undefined) merged.ended_at = capture.ended_at;
+    if (capture.duration_s !== undefined)
+      merged.duration_s = capture.duration_s;
+    if (capture.segments !== undefined) merged.segments = capture.segments;
+
+    await this.recordManager.updateRecord(
+      civicpressSessionId,
+      { metadata: { capture: merged } },
+      { id: 1, username: 'system', role: 'admin' } as any
+    );
+
+    coreInfo('Session manifest applied to record', {
+      operation: 'broadcast-box:session:manifest-applied',
+      civicpressSessionId,
+      segments: capture.segments?.length ?? 0,
+    });
   }
 
   /**

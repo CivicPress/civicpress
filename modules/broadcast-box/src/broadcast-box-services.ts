@@ -733,6 +733,10 @@ export async function registerBroadcastBoxServices(
       const db = container.resolve<DatabaseService>('database');
       const deviceEventModel = new DeviceEventModel(db, logger);
 
+      const sessionController = container.resolve<SessionController>(
+        'broadcastBoxSessionController'
+      );
+
       const deviceRoomHandler = createDeviceRoomHandler({
         deviceAuthService: deviceAuth,
         deviceManager,
@@ -740,6 +744,7 @@ export async function registerBroadcastBoxServices(
         deviceCommandService,
         deviceEventModel,
         authService,
+        sessionController,
         logger,
       });
 
