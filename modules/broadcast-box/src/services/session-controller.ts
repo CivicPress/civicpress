@@ -38,6 +38,31 @@ export class SessionController {
   }
 
   /**
+   * Deliver a command to a device's room. Prefer the device-specific
+   * sendToDevice (resolves the device's own live socket) over broadcast, which
+   * fans out to observers and depends on the room's client map being populated.
+   */
+  private deliverToDevice(deviceId: string, command: unknown): void {
+    if (!this.roomManager) {
+      throw new Error(
+        'RoomManager not available - realtime module required for session control'
+      );
+    }
+    const roomId = `device:${deviceId}`;
+    const room =
+      this.roomManager.getRoom(roomId) ??
+      this.roomManager.getOrCreateRoom(roomId, 'device', {});
+    const deviceRoom = room as unknown as {
+      sendToDevice?: (m: unknown) => boolean;
+    };
+    if (typeof deviceRoom.sendToDevice === 'function') {
+      deviceRoom.sendToDevice(command);
+    } else {
+      room.broadcast(command);
+    }
+  }
+
+  /**
    * Start a recording session
    */
   async startSession(request: StartSessionRequest): Promise<BroadcastSession> {
@@ -113,17 +138,8 @@ export class SessionController {
       },
     });
 
-    // Get or create device room and send command (room is created when device connects; create on demand if missing)
-    if (!this.roomManager) {
-      throw new Error(
-        'RoomManager not available - realtime module required for session control'
-      );
-    }
-    const roomId = `device:${request.deviceId}`;
-    const room =
-      this.roomManager.getRoom(roomId) ??
-      this.roomManager.getOrCreateRoom(roomId, 'device', {});
-    room.broadcast(command);
+    // Send start_session to the device (creates the room on demand if missing).
+    this.deliverToDevice(request.deviceId, command);
 
     // Update session status to recording
     const updated = await this.sessionModel.update(created.id, {
@@ -196,17 +212,8 @@ export class SessionController {
       sessionId: session.id,
     });
 
-    // Get or create device room and send command
-    if (!this.roomManager) {
-      throw new Error(
-        'RoomManager not available - realtime module required for session control'
-      );
-    }
-    const roomId = `device:${session.deviceId}`;
-    const room =
-      this.roomManager.getRoom(roomId) ??
-      this.roomManager.getOrCreateRoom(roomId, 'device', {});
-    room.broadcast(command);
+    // Send stop_session to the device.
+    this.deliverToDevice(session.deviceId, command);
 
     // Update session to complete so UI shows terminal state immediately (device may still encode/upload in background)
     const now = new Date();
