@@ -1,5 +1,7 @@
 # BroadcastBox Phase 4/5 — session handoff
 
+> ⚠️ **SUPERSEDED by `docs/handoff/2026-06-26-broadcast-box-integration-wired.md`** (kept for history).
+>
 > Written 2026-06-25, covering work committed through 2026-06-23. Feed this doc
 > (or the short pointer prompt) to a new session to continue the work. Detail +
 > file:line citations live in the auto-loaded project memory — read it first:
