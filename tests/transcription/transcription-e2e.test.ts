@@ -222,4 +222,47 @@ describe('transcription write-back e2e (real CivicPress)', () => {
     },
     120_000
   );
+
+  it('LAUNCHER: startInProcessTranscription runs the worker against real CivicPress', async () => {
+    const id = await seedRecordedSession();
+    const transcript = {
+      language: 'fr',
+      text: 'Bonjour.',
+      segments: [{ start: 0, end: 1, text: 'Bonjour.' }],
+    };
+    const { startInProcessTranscription } = await import(
+      '../../modules/api/src/transcription-bootstrap.js'
+    );
+    // Large poll interval: start() runs runOnce() ONCE immediately, then sleeps —
+    // so the test observes a single write with no overlapping-cycle DB churn.
+    const { worker, started } = await startInProcessTranscription(
+      civic,
+      { enabled: true, poll_interval_ms: 60_000 },
+      silentLogger,
+      {
+        engine: new StubEngine(transcript) as any,
+        storage: { async getFileContent() { return Buffer.from('x'); } },
+      }
+    );
+    expect(started).toBe(true);
+    try {
+      const deadline = Date.now() + 4000;
+      let done = false;
+      while (Date.now() < deadline) {
+        const fm = await readFrontmatter(id);
+        if (fm.transcript_status === 'automated') {
+          expect(fm.media.transcript_data).toMatchObject(transcript);
+          done = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(done).toBe(true);
+    } finally {
+      worker?.stop();
+      // Let the write-back saga finish its bookkeeping before afterEach closes
+      // the DB (avoids benign teardown-race log noise).
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  });
 });
