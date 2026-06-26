@@ -114,19 +114,27 @@ export class WhisperCppEngine implements TranscriptionEngine {
       await this.toWav(input.audio.path, wav);
 
       // null → the whole recording is public: one pass over the file.
-      // [...] → in-camera excluded: one pass per public range (offsets stay
-      //         absolute, so the segments merge directly). An empty list never
-      //         reaches here — the worker skips a fully-in-camera session.
+      // [...] → in-camera excluded: one pass per public range, each over a WAV
+      //         physically sliced to [start,end] (see runWhisper). The slice
+      //         starts at 0, so we shift its timestamps back to absolute here.
+      //         An empty list never reaches here — the worker skips a
+      //         fully-in-camera session.
       const ranges: Array<TimeRange | null> =
         input.publicRanges === null ? [null] : input.publicRanges;
 
       const all: TranscriptSegment[] = [];
       let detectedLanguage = lang;
       for (let i = 0; i < ranges.length; i++) {
-        const json = await this.runWhisper(wav, lang, ranges[i], workDir, i);
+        const range = ranges[i];
+        const json = await this.runWhisper(wav, lang, range, workDir, i);
         const partial = mapWhisperJson(json, lang);
         if (partial.language) detectedLanguage = partial.language;
-        all.push(...partial.segments);
+        const shift = range ? range.start : 0;
+        for (const s of partial.segments) {
+          all.push(
+            shift ? { ...s, start: s.start + shift, end: s.end + shift } : s
+          );
+        }
       }
 
       all.sort((a, b) => a.start - b.start);
@@ -162,21 +170,40 @@ export class WhisperCppEngine implements TranscriptionEngine {
     workDir: string,
     index: number
   ): Promise<WhisperJson> {
+    // When a public range is given, CUT it out with ffmpeg BEFORE whisper rather
+    // than relying on whisper-cli's -ot/-d flags: -d (duration) is unreliable
+    // across whisper.cpp builds (observed: ignored, so a range pass runs to EOF
+    // and leaks the in-camera audio it was meant to exclude — civic-critical).
+    // Slicing the WAV is build-independent; transcribe() shifts the slice's
+    // timestamps back to absolute.
+    let inputWav = wavPath;
+    if (range) {
+      const slice = join(workDir, `slice-${index}.wav`);
+      await this.exec(this.opts.ffmpeg ?? 'ffmpeg', [
+        '-nostdin',
+        '-y',
+        '-ss', String(range.start),
+        '-t', String(Math.max(0, range.end - range.start)),
+        '-i', wavPath,
+        '-ar', '16000',
+        '-ac', '1',
+        '-c:a', 'pcm_s16le',
+        '-f', 'wav',
+        slice,
+      ]);
+      inputWav = slice;
+    }
+
     const prefix = join(workDir, `out-${index}`);
     const args = [
       '-m', this.opts.model,
-      '-f', wavPath,
+      '-f', inputWav,
       '-l', lang,
       '-oj',
       '-of', prefix,
       '-np', // no progress prints; the JSON file is the contract
     ];
     if (this.opts.threads) args.push('-t', String(this.opts.threads));
-    if (range) {
-      const startMs = Math.max(0, Math.round(range.start * 1000));
-      const durMs = Math.max(0, Math.round((range.end - range.start) * 1000));
-      args.push('-ot', String(startMs), '-d', String(durMs));
-    }
 
     await this.exec(this.opts.binary, args);
     const raw = await readFile(`${prefix}.json`, 'utf-8');

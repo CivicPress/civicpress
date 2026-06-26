@@ -41,17 +41,22 @@ const TRANSCRIPT: TranscriptResult = {
 };
 
 describe('CoreRecordsGateway.findNeedingTranscription', () => {
-  it('keeps only sessions with capture.av_file and no transcript_status', async () => {
+  it('keeps only sessions with capture.av_file + segments (manifest applied) and no transcript_status', async () => {
     const { store } = fakeStore([
-      { id: 'needs', metadata: { capture: { device: 'bb', av_file: 'uuid-1' } } },
+      // av_file + segments present (manifest applied) + no status → READY.
+      { id: 'needs', metadata: { capture: { device: 'bb', av_file: 'uuid-1', segments: [] } } },
       {
         id: 'done',
         metadata: {
-          capture: { device: 'bb', av_file: 'uuid-2' },
+          capture: { device: 'bb', av_file: 'uuid-2', segments: [] },
           transcript_status: 'automated',
         },
       },
-      { id: 'no-av', metadata: { capture: { device: 'bb' } } },
+      { id: 'no-av', metadata: { capture: { device: 'bb', segments: [] } } },
+      // av_file present but NO segments = upload finalized, session.manifest not yet
+      // applied → visibility unknown → NOT ready (transcribing now would leak
+      // in-camera audio). This is the manifest race the gate closes.
+      { id: 'no-manifest', metadata: { capture: { device: 'bb', av_file: 'uuid-9' } } },
       { id: 'no-capture', metadata: {} },
     ]);
     const gw = new CoreRecordsGateway({

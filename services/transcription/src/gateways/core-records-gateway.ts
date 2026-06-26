@@ -128,8 +128,16 @@ export class CoreRecordsGateway implements RecordsGateway {
 
   /**
    * Derived scan: enumerate `session` records, then read each authoritatively
-   * (parsed frontmatter) and keep those with `capture.av_file` present and no
-   * `transcript_status`.
+   * (parsed frontmatter) and keep those READY for transcription — `capture.av_file`
+   * present, `capture.segments` present, and no `transcript_status`.
+   *
+   * The `segments` requirement is the manifest-applied gate (civic-critical):
+   * `capture.av_file` is written by the upload finalize, but the visibility
+   * `capture.segments` arrive separately via the device `session.manifest`. The
+   * two RACE, so triggering on `av_file` alone lets the worker transcribe a
+   * recording before its in-camera windows are known — leaking closed-session
+   * audio. `segments` is only ever written by the manifest (an empty `[]` =
+   * all-public still counts as ready); waiting for it is the safe contract.
    */
   async findNeedingTranscription(): Promise<SessionForTranscription[]> {
     const { records } = await this.opts.records.listRecords({
@@ -138,7 +146,11 @@ export class CoreRecordsGateway implements RecordsGateway {
     const out: SessionForTranscription[] = [];
     for (const row of records) {
       const session = await this.getSession(row.id);
-      if (session?.capture?.av_file && !session.transcript_status) {
+      if (
+        session?.capture?.av_file &&
+        session.capture.segments !== undefined &&
+        !session.transcript_status
+      ) {
         out.push(session);
       }
     }

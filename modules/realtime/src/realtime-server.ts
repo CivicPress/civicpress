@@ -112,6 +112,14 @@ export class RealtimeServer {
   private roomManager: RoomManager | null = null;
   private snapshotManager: SnapshotManager | null = null;
   private connections: Map<string, WebSocket> = new Map();
+  // clientId → device identity, populated when a connection authenticates as a
+  // device (authResult.deviceAuth). Device rooms read this (DeviceRoom.sendToDevice)
+  // to resolve a device's live socket for OUTBOUND commands — without it the
+  // server receives device frames but can never deliver commands back.
+  private clientToDevice: Map<
+    string,
+    { deviceId: string; deviceUuid: string; organizationId: string }
+  > = new Map();
   // Connection-limit bookkeeping (realtime-001/002): written only by
   // handleConnectionWithHandler (register) + handleDisconnect (release).
   private connectionCounts: Map<string, number> = new Map(); // IP -> open count
@@ -647,6 +655,17 @@ export class RealtimeServer {
     userSet.add(clientId);
     this.userConnections.set(userId, userSet);
 
+    // Device connections: index clientId → device identity so device rooms can
+    // resolve THIS socket for outbound commands (DeviceRoom.sendToDevice).
+    if (authResult.deviceAuth) {
+      const d = authResult.deviceAuth as any;
+      this.clientToDevice.set(clientId, {
+        deviceId: String(d.deviceId),
+        deviceUuid: d.deviceUuid,
+        organizationId: d.organizationId ?? '',
+      });
+    }
+
     this.messageRateLimits.set(clientId, {
       count: 0,
       resetTime: Date.now() + 1000,
@@ -920,6 +939,7 @@ export class RealtimeServer {
       return;
     }
     this.connections.delete(clientId);
+    this.clientToDevice.delete(clientId);
 
     // Yjs fan-out teardown — null if the socket closed before fan-out was wired.
     if (yjsUpdateCleanup) {

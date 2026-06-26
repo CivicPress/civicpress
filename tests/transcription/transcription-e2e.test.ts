@@ -142,7 +142,11 @@ describe('transcription write-back e2e (real CivicPress)', () => {
           capture: {
             device: 'bb-001',
             av_file: avFile,
-            ...(segments ? { segments } : {}),
+            // segments PRESENT (even empty) = the device session.manifest has been
+            // applied → the worker's readiness gate is satisfied. Empty = all-public
+            // (transcribe the whole recording). Omitting it now means "manifest not
+            // yet applied" and the record is intentionally skipped.
+            segments: segments ?? [],
           },
         },
       },
