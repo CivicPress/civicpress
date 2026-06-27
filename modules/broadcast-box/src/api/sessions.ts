@@ -105,6 +105,85 @@ export function createSessionsRouter(
   );
 
   /**
+   * POST /api/v1/broadcast-box/sessions/quick-start
+   * Create-on-demand: draft a `session` record then start recording against it.
+   * Optionally attach to a `meeting` (meetingId) so the meeting owns the recording.
+   */
+  router.post(
+    '/quick-start',
+    [
+      body('deviceId').isUUID().withMessage('Device ID must be a valid UUID'),
+      body('title').optional().isString(),
+      body('meetingId').optional().isString(),
+    ],
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({
+            success: false,
+            error: { message: 'Validation failed', details: errors.array() },
+          });
+        }
+        const result = await sessionController.quickStartSession({
+          deviceId: req.body.deviceId,
+          title: req.body.title,
+          meetingId: req.body.meetingId,
+          user: req.user,
+        });
+        res.status(201).json({ success: true, ...result });
+      } catch (error) {
+        logger.error('Error quick-starting session', {
+          operation: 'broadcast-box:api:sessions:quick-start',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        const msg = error instanceof Error ? error.message : '';
+        const statusCode =
+          msg.includes('not connected') || msg.includes('already recording')
+            ? 409
+            : msg.includes('not found')
+              ? 404
+              : 500;
+        res.status(statusCode).json({
+          success: false,
+          error: { message: msg || 'Failed to quick-start session' },
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/broadcast-box/sessions/by-meeting/:meetingId
+   * The session recordings that belong to a meeting (the meeting↔session model).
+   */
+  router.get(
+    '/by-meeting/:meetingId',
+    [param('meetingId').isString().notEmpty()],
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const sessions = await sessionController.getSessionsForMeeting(
+          req.params.meetingId
+        );
+        res.json({ success: true, meetingId: req.params.meetingId, sessions });
+      } catch (error) {
+        logger.error('Error listing meeting sessions', {
+          operation: 'broadcast-box:api:sessions:by-meeting',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        res.status(500).json({
+          success: false,
+          error: {
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Failed to list meeting sessions',
+          },
+        });
+      }
+    }
+  );
+
+  /**
    * POST /api/v1/broadcast-box/sessions/:id/stop
    * Stop a recording session
    */

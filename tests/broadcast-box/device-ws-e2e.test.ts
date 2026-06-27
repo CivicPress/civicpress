@@ -351,4 +351,96 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
     expect(row.deviceId).toBe(device.id);
     expect(row.civicpressSessionId).toBe(recordId);
   }, 20000);
+
+  // Create-on-demand + the Meeting model: quick-start drafts a session record
+  // (linked to a `meeting`), starts it, and the meeting can list its recordings.
+  it('quick-start drafts a session under a meeting, starts it, and lists it by meeting', async () => {
+    realtime = await startInProcessRealtime(civic, silentLogger, true);
+    const express = (await import('express')).default;
+    const app = express();
+    app.use(express.json());
+    bbMount = await startInProcessBroadcastBox(civic, app, silentLogger, {
+      enabled: true,
+      realtimeServer: realtime.server,
+    });
+
+    const container = civic.getContainer();
+    const deviceManager = container.resolve('broadcastBoxDeviceManager');
+    const deviceAuth = container.resolve('broadcastBoxDeviceAuth');
+    const sessionController: any = container.resolve(
+      'broadcastBoxSessionController'
+    );
+
+    // A `meeting` record (the new core type) that will own the recording.
+    const meeting = await recordManager.createRecord(
+      { title: 'June Council Meeting', type: 'meeting', content: '# Agenda', status: 'published', metadata: {} },
+      SYSTEM_USER
+    );
+    expect(meeting.id).toBeTruthy();
+
+    const enrollment = await deviceManager.enrollDevice({ name: 'Cam' });
+    const device = await deviceManager.registerDevice({
+      deviceUuid: enrollment.deviceUuid,
+      enrollmentCode: enrollment.enrollmentCode,
+      name: 'Cam',
+    });
+    const { token } = await deviceAuth.generateToken({
+      deviceId: device.id,
+      deviceUuid: device.deviceUuid,
+      organizationId: device.organizationId,
+    });
+
+    const inbound: any[] = [];
+    ws = new WebSocket(
+      `ws://127.0.0.1:${port}/realtime/devices/${device.deviceUuid}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    ws.on('message', (d) => inbound.push(JSON.parse(d.toString())));
+    ws.on('error', () => {});
+    const waitFor = async (pred: (m: any) => boolean, ms: number, what: string) => {
+      const deadline = Date.now() + ms;
+      while (Date.now() < deadline) {
+        const m = inbound.find(pred);
+        if (m) return m;
+        await new Promise((r) => setTimeout(r, 40));
+      }
+      throw new Error(`timed out waiting for ${what}`);
+    };
+    await waitFor(
+      (m) => m.type === 'control' && m.event === 'connection.ack',
+      5000,
+      'connection.ack'
+    );
+
+    // Create-on-demand: no pre-existing session record; draft one + start.
+    const { session, civicpressSessionId } =
+      await sessionController.quickStartSession({
+        deviceId: device.id,
+        title: 'Live recording',
+        meetingId: meeting.id,
+      });
+
+    // The device received start_session for the auto-created record.
+    const cmd = await waitFor(
+      (m) => m.action === 'start_session',
+      4000,
+      'start_session command'
+    );
+    expect(cmd.payload.civicpressSessionId).toBe(civicpressSessionId);
+    expect(cmd.payload.sessionId).toBe(session.id);
+
+    // The auto-created session record is a DRAFT (status), linked to the meeting.
+    const rec: any = await recordManager.getRecord(civicpressSessionId);
+    expect(rec).toBeTruthy();
+    expect(rec.status).toBe('draft');
+    expect(
+      (rec.linkedRecords || []).some(
+        (l: any) => l.id === meeting.id && l.type === 'meeting'
+      )
+    ).toBe(true);
+
+    // And the meeting lists its recording.
+    const recordings = await sessionController.getSessionsForMeeting(meeting.id);
+    expect(recordings.map((s: any) => s.id)).toContain(session.id);
+  }, 20000);
 });

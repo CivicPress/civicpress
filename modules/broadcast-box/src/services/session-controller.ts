@@ -76,6 +76,114 @@ export class SessionController {
   }
 
   /**
+   * Create-on-demand: draft a CivicPress `session` record, then start recording
+   * against it — so an operator can "start recording this meeting" without
+   * pre-creating the record. The record is created as a DRAFT (a clerk curates +
+   * publishes later); the A/V is public regardless. Optionally links the session
+   * to a `meeting` record (via `linked_records`) so a meeting owns its recordings.
+   */
+  async quickStartSession(request: {
+    deviceId: string;
+    title?: string;
+    meetingId?: string;
+    user?: { id: number; username: string; role: string };
+  }): Promise<{ session: BroadcastSession; civicpressSessionId: string }> {
+    // Pre-flight the device BEFORE creating the record so an offline/busy device
+    // doesn't leave an orphan draft (startSession re-checks authoritatively).
+    const device = await this.deviceManager.getDevice(request.deviceId);
+    if (!device) {
+      throw new Error(`Device not found: ${request.deviceId}`);
+    }
+    if (!this.connectionTracker.isConnected(request.deviceId)) {
+      throw new Error(`Device ${request.deviceId} is not connected`);
+    }
+    const cs = this.connectionTracker.getConnectionState(request.deviceId);
+    if (cs?.state?.status === 'recording') {
+      throw new Error(`Device ${request.deviceId} is already recording`);
+    }
+
+    const user = request.user ?? {
+      id: 1,
+      username: 'broadcast-box',
+      role: 'clerk',
+    };
+    const title =
+      request.title?.trim() ||
+      `Recording ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+
+    const record = await this.recordManager.createRecord(
+      {
+        title,
+        type: 'session',
+        status: 'draft', // a clerk reviews + publishes later; A/V is public regardless
+        content: `# ${title}\n`,
+        metadata: {},
+        ...(request.meetingId
+          ? {
+              linkedRecords: [
+                {
+                  id: request.meetingId,
+                  type: 'meeting',
+                  description: 'Session recording for this meeting',
+                },
+              ],
+            }
+          : {}),
+      } as any,
+      user as any
+    );
+
+    coreInfo('Quick-start created a draft session record', {
+      operation: 'broadcast-box:session:quick-start',
+      civicpressSessionId: record.id,
+      deviceId: request.deviceId,
+      meetingId: request.meetingId,
+    });
+
+    const session = await this.startSession({
+      deviceId: request.deviceId,
+      civicpressSessionId: record.id,
+      metadata: {},
+    });
+    return { session, civicpressSessionId: record.id };
+  }
+
+  /**
+   * The session recordings that belong to a meeting — found by scanning the
+   * broadcast_sessions rows and keeping those whose CivicPress `session` record
+   * links to this meeting via `linked_records` (covers draft + published records).
+   * Scaffold-grade (a small scan, no index); a dedicated meeting↔session index is
+   * a follow-on.
+   */
+  async getSessionsForMeeting(meetingId: string): Promise<BroadcastSession[]> {
+    const rows = await this.sessionModel.list({});
+    const out: BroadcastSession[] = [];
+    for (const row of rows) {
+      const rec =
+        (await this.recordManager
+          .getRecord(row.civicpressSessionId)
+          .catch(() => null)) ??
+        (await this.db.getDraft(row.civicpressSessionId).catch(() => null));
+      // Published records expose parsed `linkedRecords`; draft rows store
+      // `linked_records` as a JSON string — handle both.
+      let raw: unknown =
+        (rec as any)?.linkedRecords ?? (rec as any)?.linked_records ?? [];
+      if (typeof raw === 'string') {
+        try {
+          raw = JSON.parse(raw);
+        } catch {
+          raw = [];
+        }
+      }
+      const links = Array.isArray(raw) ? (raw as Array<{ id?: string }>) : [];
+      if (links.some((l) => l?.id === meetingId)) {
+        out.push(row);
+      }
+    }
+    return out;
+  }
+
+  /**
    * Start a recording session
    */
   async startSession(request: StartSessionRequest): Promise<BroadcastSession> {

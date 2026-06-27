@@ -1,9 +1,41 @@
-# BroadcastBox — create-on-demand session record + the Meeting model (DECISION NEEDED)
+# BroadcastBox — create-on-demand session record + the Meeting model
 
-Status: **proposal / awaiting maintainer decision.** This is a civic-data-model
-choice, not a bug — flagging it rather than building unilaterally. Builds on
-`2026-06-20-broadcast-box-architecture-design.md` (core = source of truth; A/V
+Status: **DECIDED + scaffolded (2026-06-27).** Maintainer chose **Both**
+(create-on-demand now + scaffold the Meeting model) with auto-created records as
+**Draft**. See **Implemented** below for what landed and what's deferred. Builds
+on `2026-06-20-broadcast-box-architecture-design.md` (core = source of truth; A/V
 always public; AI = optional service).
+
+## Implemented (2026-06-27)
+
+- **Create-on-demand (D1=yes, D4=draft).** `POST /api/v1/broadcast-box/sessions/quick-start`
+  `{ deviceId, title?, meetingId? }` → `SessionController.quickStartSession`:
+  pre-flights the device, creates a **draft** `session` record (`status: draft` —
+  a clerk reviews + publishes; A/V is public regardless), optionally links it to a
+  meeting, then `startSession`s against it. Returns `{ session, civicpressSessionId }`.
+- **Meeting model (D2 — as a core type).** A new core record type `meeting`
+  (`core/src/config/record-types.ts` priority 8 +
+  `core/src/schemas/record-type-schemas/meeting-schema.json`: meeting_type,
+  scheduled_start/end, location, chair, agenda[]). Modules can only *extend*
+  types, so a new type is necessarily core — but a meeting is first-class civic
+  data, so that's correct.
+- **meeting ↔ session relationship** via the built-in `linked_records` (no schema
+  change): a session links to its meeting (`type:'meeting'`).
+  `GET /api/v1/broadcast-box/sessions/by-meeting/:meetingId` lists a meeting's
+  recordings (`SessionController.getSessionsForMeeting` — scans broadcast_sessions,
+  resolving each session record's links; handles draft + published).
+- Meeting CRUD reuses the **core records API** (it's a core type) — no bb-specific
+  create endpoint.
+- Covered by an in-process e2e (`tests/broadcast-box/device-ws-e2e.test.ts`):
+  meeting → quick-start (draft, linked) → device receives start_session → listed
+  by meeting.
+
+**Deferred (D3 + the heavier Meeting bits):** `schedule.push` to the device +
+scheduled/autonomous recording; recurring meetings; agenda ↔ transcript `topics[]`
+alignment; a dedicated meetings router/UI + a meeting→session back-link index
+(today's listing is a small scan); a bb schema *extension* on `meeting` for
+appliance fields (assigned_device). Permissions still TODO (any authenticated
+user; a clerk/recorder role check).
 
 ## Current state (what works today)
 
