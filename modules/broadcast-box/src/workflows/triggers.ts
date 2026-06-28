@@ -229,5 +229,17 @@ export class BroadcastBoxWorkflowTriggers {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+
+    // The upload finalized → the recording session is now truthfully complete
+    // (stopSession left it `stopping`; broadcast-box-009).
+    try {
+      await this.sessionController.handleSessionComplete(data.sessionId);
+    } catch (error) {
+      this.logger.error('Failed to mark session complete', {
+        operation: 'broadcast-box:workflows:session-complete-error',
+        sessionId: data.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 }

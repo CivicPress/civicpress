@@ -286,9 +286,8 @@ describe('SessionController', () => {
       mockSessionModel.update.mockResolvedValue({
         id: sessionId,
         deviceId,
-        status: 'complete',
+        status: 'stopping',
         stoppedAt: now,
-        completedAt: now,
       });
 
       const mockRoom = {
@@ -298,7 +297,9 @@ describe('SessionController', () => {
 
       const result = await sessionController.stopSession(sessionId);
 
-      expect(result.status).toBe('complete');
+      // Truthful FSM: stop leaves the session `stopping` (device still encoding +
+      // uploading); the upload-finalize hook moves it to `complete` (bb-009).
+      expect(result.status).toBe('stopping');
       expect(mockProtocol.createCommand).toHaveBeenCalledWith(
         'stop_session',
         expect.objectContaining({ sessionId })

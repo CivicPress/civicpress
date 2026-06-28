@@ -762,8 +762,17 @@ meeting recording can exceed Node's ~2GB Buffer limit). Real-storage upload e2e 
 | broadcast-box-018 | `wontfix-with-rationale` | `findByCode` is an O(n) bcrypt scan, but n is bounded to the *unused* codes from the last 24h — a handful in practice (consumed within minutes), and the route is rate-limited. A constant-time lookup needs a non-secret code-id/prefix beside the hash — not worth the schema/format change at this scale. Rationale documented in-code (`enrollment-code.ts`) + here. |
 | broadcast-box-022 | `triaged-deferred` | Legacy/New type duality (`videoSources`/`audioSources` `string[]` vs `*Objects: SourceInfo[]` — 31 refs; `PiPConfig` vs `PiPConfiguration` — 9 refs). NOT a safe no-hardware fix: the **device** populates these and they ride the canonical `@civicpress/broadcast-protocol`, so collapsing them is a two-sided contract migration. Deferred to a coordinated device+server change: keep the `*Objects`/`PiPConfiguration` forms, deprecate the legacy `string[]`/`PiPConfig`, migrate consumers, bump the protocol. |
 
-**Still open after this pass (no-hardware work):** broadcast-box-009 (premature
-`complete` in `stopSession` — being wired so the upload-finalize drives `complete`). **Bigger / decisions:**
+**broadcast-box-009** (`closed-with-commit-SHA`): `stopSession` wrote `complete`
+immediately while the device was still encoding + uploading — the FSM lied. Now it
+writes `stopping` (truthful); the upload-finalize hook (`broadcast-box:recording:complete`
+→ `handleSessionComplete`, previously dead/orphaned, now wired through the workflow
+triggers) moves it to `complete`. A recording whose upload never lands stays `stopping`
+— honest, since it never completed. The pending/failed stop paths still resolve to
+`complete` (nothing to upload). Unit + integration tests assert the new FSM; the
+real-upload e2e drives stopping→complete.
+
+**No-hardware bucket C is COMPLETE** (bb-006/019/017/007/016/009 fixed; bb-018 wontfix,
+bb-022 deferred). Remaining are hardware + decision items only. **Bigger / decisions:**
 broadcast-box-001 + broadcast-box-015 (public-narrative sync + device-page UI), broadcast-box-002
 + BB-HW-003 (civic-artifact: transcript done, audio-version deferred), BB-HW-009 (installer),
 BB-HW-014/016 + BB-HW-017 (HW doc/UI slimming). BB-HW-001/013 are effectively done and can be

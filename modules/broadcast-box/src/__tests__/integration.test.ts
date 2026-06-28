@@ -237,9 +237,8 @@ describe('Broadcast Box Integration', () => {
             id: 'broadcast-session-id',
             deviceId: device.id,
             civicpressSessionId: 'civicpress-session-id',
-            status: 'complete',
+            status: 'stopping',
             stoppedAt: new Date(),
-            completedAt: new Date(),
           }),
       };
 
@@ -264,7 +263,9 @@ describe('Broadcast Box Integration', () => {
       // Stop session (getById mock already set up to return recording session)
       const stoppedSession = await sessionController.stopSession(session.id);
 
-      expect(stoppedSession.status).toBe('complete');
+      // Truthful FSM: stop leaves the session `stopping`; the upload-finalize hook
+      // (handleSessionComplete) moves it to `complete` (bb-009).
+      expect(stoppedSession.status).toBe('stopping');
       expect(mockProtocol.createCommand).toHaveBeenCalledWith(
         'stop_session',
         expect.any(Object)

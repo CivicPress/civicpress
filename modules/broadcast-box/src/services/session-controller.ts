@@ -336,12 +336,15 @@ export class SessionController {
     // Send stop_session to the device.
     await this.deliverToDevice(session.deviceId, command);
 
-    // Update session to complete so UI shows terminal state immediately (device may still encode/upload in background)
+    // Truthful FSM (audit broadcast-box-009): the device is still encoding +
+    // uploading, so the session is `stopping`, NOT `complete`. It moves to
+    // `complete` only when the upload finalizes (the
+    // `broadcast-box:recording:complete` hook → handleSessionComplete). A recording
+    // whose upload never lands stays `stopping`, which is honest — it never completed.
     const now = new Date();
     const updated = await this.sessionModel.update(sessionId, {
-      status: 'complete',
+      status: 'stopping',
       stoppedAt: now,
-      completedAt: now,
     });
 
     // Update device state
@@ -419,27 +422,22 @@ export class SessionController {
   }
 
   /**
-   * Handle session completion (called by event handler)
+   * Mark a recording session `complete` once its A/V upload has finalized. Wired to
+   * the `broadcast-box:recording:complete` hook (via the workflow triggers), this is
+   * what truthfully moves a session out of `stopping` (see stopSession + the
+   * broadcast-box-009 FSM fix). Idempotent + tolerant of an unknown/cleaned-up session.
    */
-  async handleSessionComplete(
-    sessionId: string,
-    filePath: string,
-    fileSize: number,
-    hash: string,
-    durationSeconds: number
-  ): Promise<void> {
+  async handleSessionComplete(sessionId: string): Promise<void> {
     const session = await this.sessionModel.getById(sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${sessionId}`);
+    if (!session || session.status === 'complete') {
+      return;
     }
 
-    // Update session status
     await this.sessionModel.update(sessionId, {
       status: 'complete',
       completedAt: new Date(),
     });
 
-    // Update device state
     this.connectionTracker.updateDeviceState(session.deviceId, {
       status: 'idle',
       activeSessionId: undefined,
@@ -450,8 +448,6 @@ export class SessionController {
       sessionId: session.id,
       deviceId: session.deviceId,
     });
-
-    // TODO: Link file to session record when upload is complete (Phase 5)
   }
 
   /**
