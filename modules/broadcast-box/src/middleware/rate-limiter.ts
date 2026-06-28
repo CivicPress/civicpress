@@ -167,8 +167,14 @@ export class DeviceRegistrationRateLimiter {
    */
   middleware() {
     return (req: Request, res: Response, next: NextFunction): void => {
-      // Skip rate limiting in development
-      if (process.env.NODE_ENV !== 'production') {
+      // Rate limiting is ON by default in every environment. It is bypassed ONLY
+      // for the test runner or via an explicit positive opt-in — never implicitly
+      // by NODE_ENV (the old `!== 'production'` gate silently disabled it in dev +
+      // staging, exactly where an exposed appliance might run).
+      if (
+        process.env.NODE_ENV === 'test' ||
+        process.env.CIVIC_DEV_DISABLE_RATELIMIT === 'true'
+      ) {
         next();
         return;
       }

@@ -753,10 +753,17 @@ whole combined recording into memory **twice** (hash + upload). Now streams both
 over a `createReadStream`, then `storageService.uploadFileStream` (no full-file Buffer; a long
 meeting recording can exceed Node's ~2GB Buffer limit). Real-storage upload e2e stays green.
 
-**Still open after this pass (no-hardware work, next session):** broadcast-box-007
-(positive rate-limit opt-in), broadcast-box-009 (premature `complete` in `stopSession`), broadcast-box-022
-(Legacy/New type duality), broadcast-box-018 (`findByCode` O(n) bcrypt — bounded; fix or
-wontfix-rationale), broadcast-box-016 (`decommissioned` transition). **Bigger / decisions:**
+### Phase 5 — bucket C (cont.): device lifecycle, rate-limit gate, triage (2026-06-28)
+
+| ID | Status | Action |
+|---|---|---|
+| broadcast-box-007 | `closed-with-commit-SHA` | Rate limiter short-circuited on `NODE_ENV !== 'production'` (silently OFF in dev + staging — where an exposed appliance might run). Now ON by default; bypassed only by the test runner (`NODE_ENV === 'test'`) or an explicit positive opt-in (`CIVIC_DEV_DISABLE_RATELIMIT=true`). |
+| broadcast-box-016 | `closed-with-commit-SHA` | `DeviceStatus` defined `decommissioned` but no method ever transitioned to it. Added `DeviceManager.decommissionDevice()` (terminal; parity with `suspendDevice`/`revokeDevice`; logs a `device.decommissioned` event). |
+| broadcast-box-018 | `wontfix-with-rationale` | `findByCode` is an O(n) bcrypt scan, but n is bounded to the *unused* codes from the last 24h — a handful in practice (consumed within minutes), and the route is rate-limited. A constant-time lookup needs a non-secret code-id/prefix beside the hash — not worth the schema/format change at this scale. Rationale documented in-code (`enrollment-code.ts`) + here. |
+| broadcast-box-022 | `triaged-deferred` | Legacy/New type duality (`videoSources`/`audioSources` `string[]` vs `*Objects: SourceInfo[]` — 31 refs; `PiPConfig` vs `PiPConfiguration` — 9 refs). NOT a safe no-hardware fix: the **device** populates these and they ride the canonical `@civicpress/broadcast-protocol`, so collapsing them is a two-sided contract migration. Deferred to a coordinated device+server change: keep the `*Objects`/`PiPConfiguration` forms, deprecate the legacy `string[]`/`PiPConfig`, migrate consumers, bump the protocol. |
+
+**Still open after this pass (no-hardware work):** broadcast-box-009 (premature
+`complete` in `stopSession` — being wired so the upload-finalize drives `complete`). **Bigger / decisions:**
 broadcast-box-001 + broadcast-box-015 (public-narrative sync + device-page UI), broadcast-box-002
 + BB-HW-003 (civic-artifact: transcript done, audio-version deferred), BB-HW-009 (installer),
 BB-HW-014/016 + BB-HW-017 (HW doc/UI slimming). BB-HW-001/013 are effectively done and can be

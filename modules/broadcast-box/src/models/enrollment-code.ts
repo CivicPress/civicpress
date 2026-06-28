@@ -91,6 +91,13 @@ export class EnrollmentCodeModel {
   /**
    * Find an active (unused, non-expired) enrollment code by matching the plaintext code
    * against stored bcrypt hashes. Returns the first match.
+   *
+   * Performance (audit broadcast-box-018): this is an O(n) bcrypt scan, but n is
+   * bounded to the *unused* codes issued in the last 24h — in practice a handful
+   * (a clerk enrolls a device and the code is consumed within minutes), and the
+   * registration route is rate-limited. A constant-time lookup would need a
+   * non-secret code id/prefix stored beside the hash; deferred as not worth the
+   * schema + code-format change at this scale (wontfix-with-rationale).
    */
   async findByCode(code: string): Promise<EnrollmentCode | null> {
     const bcrypt = await import('bcrypt');

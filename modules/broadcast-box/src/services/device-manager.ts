@@ -569,6 +569,37 @@ export class DeviceManager {
   }
 
   /**
+   * Permanently decommission a device — a terminal state. Unlike `suspendDevice`
+   * (reversible via `activateDevice`), a decommissioned device is retired for good.
+   * Closes the `DeviceStatus` gap where `decommissioned` was a defined state with
+   * no service method ever transitioning to it.
+   */
+  async decommissionDevice(deviceId: string): Promise<BroadcastDevice> {
+    const device = await this.deviceModel.getById(deviceId);
+    if (!device) {
+      throw new Error(`Device not found: ${deviceId}`);
+    }
+
+    const updated = await this.deviceModel.update(deviceId, {
+      status: 'decommissioned',
+    });
+
+    await this.deviceEventModel.create({
+      id: uuidv4(),
+      deviceId: updated.id,
+      eventType: 'device.decommissioned',
+      eventData: {},
+    });
+
+    coreInfo('Device decommissioned', {
+      operation: 'broadcast-box:device:decommissioned',
+      deviceId: updated.id,
+    });
+
+    return updated;
+  }
+
+  /**
    * Update device last seen timestamp
    */
   async updateLastSeen(deviceId: string): Promise<void> {
