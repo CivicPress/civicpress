@@ -39,6 +39,13 @@ describe('UploadProcessor', () => {
           original_name: 'test.mp4',
         },
       }),
+      uploadFileStream: vi.fn().mockResolvedValue({
+        success: true,
+        file: {
+          id: 'storage-file-id',
+          original_name: 'test.mp4',
+        },
+      }),
     };
 
     mockLogger = {
@@ -230,9 +237,9 @@ describe('UploadProcessor', () => {
 
       (processor as any).uploadModel = mockUploadModel;
 
-      // Storage uploadFile returns { success, file: { id } } — the id IS the
+      // Storage uploadFileStream returns { success, file: { id } } — the id IS the
       // stored file's UUID (there is no separate `uuid` field on the response).
-      mockStorageService.uploadFile.mockResolvedValue({
+      mockStorageService.uploadFileStream.mockResolvedValue({
         success: true,
         file: {
           id: 'storage-file-id',
@@ -244,7 +251,7 @@ describe('UploadProcessor', () => {
       const storageUuid = await processor.finalizeUpload(uploadId);
 
       expect(storageUuid).toBe('storage-file-id');
-      expect(mockStorageService.uploadFile).toHaveBeenCalled();
+      expect(mockStorageService.uploadFileStream).toHaveBeenCalled();
       expect(mockUploadModel.update).toHaveBeenCalled();
       // Announces completion (broadcast-session id + storage uuid + device) so
       // the workflow trigger links the A/V to its session record + writes capture.

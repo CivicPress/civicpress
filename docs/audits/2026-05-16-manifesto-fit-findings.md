@@ -748,9 +748,13 @@ authorization at all. Now **fail-closed + permissioned**.
 | broadcast-box-019 | `closed-with-commit-SHA` | Fail-open route registration (`api/index.ts`) mounted the admin/devices/sessions routers **unauthenticated** when `authMiddleware` was undefined (logged a warning + served them publicly). Restructured fail-closed: a deny-all (503) guard replaces a missing middleware; device registration (enrollment-code) is the only public route; uploads keep device-token auth. |
 | broadcast-box-006 | `closed-with-commit-SHA` | 38 `// TODO: Add authMiddleware`/permission-check placeholders — operator routes had no authorization. Added a `requirePermission` middleware (built on core `userCan`, no `@civicpress/api` dep) on all 9 device + 7 session routes; defined 7 `broadcast-box:*` permissions in the core role config (`default-config.ts`) + granted them (admin → all; clerk → devices:view + all sessions; public → none); removed every TODO. New `require-permission.test.ts` exercises the real grants (401 unauth / 403 public+clerk-enroll / 200 admin+clerk-create). |
 
+**broadcast-box-017** (`closed-with-commit-SHA`): `UploadProcessor.finalizeUpload` read the
+whole combined recording into memory **twice** (hash + upload). Now streams both — SHA-256
+over a `createReadStream`, then `storageService.uploadFileStream` (no full-file Buffer; a long
+meeting recording can exceed Node's ~2GB Buffer limit). Real-storage upload e2e stays green.
+
 **Still open after this pass (no-hardware work, next session):** broadcast-box-007
-(positive rate-limit opt-in), broadcast-box-017 (stream the upload finalize — 2× full-file
-read), broadcast-box-009 (premature `complete` in `stopSession`), broadcast-box-022
+(positive rate-limit opt-in), broadcast-box-009 (premature `complete` in `stopSession`), broadcast-box-022
 (Legacy/New type duality), broadcast-box-018 (`findByCode` O(n) bcrypt — bounded; fix or
 wontfix-rationale), broadcast-box-016 (`decommissioned` transition). **Bigger / decisions:**
 broadcast-box-001 + broadcast-box-015 (public-narrative sync + device-page UI), broadcast-box-002

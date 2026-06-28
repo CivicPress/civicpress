@@ -7,6 +7,7 @@
 import type { Logger, HookSystem } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
 import * as fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -223,9 +224,16 @@ export class UploadProcessor {
         await fs.appendFile(combinedPath, chunkData);
       }
 
-      // Verify hash
-      const fileData = await fs.readFile(combinedPath);
-      const hash = crypto.createHash('sha256').update(fileData).digest('hex');
+      // Verify hash by STREAMING the combined file — never load the whole
+      // recording into memory (a long meeting can exceed Node's ~2GB Buffer
+      // limit, and even when it fits, two full reads doubled the footprint).
+      const hash = await new Promise<string>((resolve, reject) => {
+        const h = crypto.createHash('sha256');
+        const rs = createReadStream(combinedPath);
+        rs.on('error', reject);
+        rs.on('data', (chunk) => h.update(chunk));
+        rs.on('end', () => resolve(h.digest('hex')));
+      });
 
       if (hash !== upload.fileHash) {
         throw new Error(
@@ -233,21 +241,14 @@ export class UploadProcessor {
         );
       }
 
-      // Store in Storage Manager
-      // Read file and create MulterFile-like object
-      const fileBuffer = await fs.readFile(combinedPath);
-      const multerFile = {
-        fieldname: 'file',
-        originalname: upload.fileName,
-        encoding: '7bit',
-        mimetype: upload.mimeType,
-        buffer: fileBuffer,
-        size: fileBuffer.length,
-      };
-
-      const storageResult = await this.storageService.uploadFile({
-        file: multerFile as any,
+      // Store in the storage service by streaming the file (no full-file buffer).
+      const { size } = await fs.stat(combinedPath);
+      const storageResult = await this.storageService.uploadFileStream({
+        stream: createReadStream(combinedPath),
+        filename: upload.fileName,
         folder: 'recordings', // Use recordings folder for broadcast box files
+        size,
+        contentType: upload.mimeType,
         description: `Recording from session ${upload.sessionId}`,
         uploaded_by: 'system', // System upload
       });
