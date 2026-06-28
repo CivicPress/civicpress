@@ -737,8 +737,18 @@ command-routing e2e), core 354 — all green after the cleanup.
 | broadcast-box-021 | `closed-with-commit-SHA` | Module README stamped "Phase 8 Complete / UI ready / v1.0.0" (2025-01-30) corrected to honest alpha status pointing at the refactor master plan + this registry. |
 | broadcast-box-020 | `closed-with-commit-SHA` | `DeviceCommandService.getRoomManager()` lazy-resolve logged an alarming "CRITICAL:" note for the normal "realtime not loaded yet" path. Note de-escalated; the lazy-resolve pattern itself is intentional + documented. |
 
-**Still open after this pass (no-hardware work, next session):** broadcast-box-006/019
-(auth/permission TODOs + fail-open `authMiddleware` fallback), broadcast-box-007
+### Phase 5 — bucket C: auth/permissions hardening (2026-06-28)
+
+Closes the security half of bucket C. Broadcast-box operator routes were
+authenticated only when an auth middleware happened to be wired, and had no
+authorization at all. Now **fail-closed + permissioned**.
+
+| ID | Status | Action |
+|---|---|---|
+| broadcast-box-019 | `closed-with-commit-SHA` | Fail-open route registration (`api/index.ts`) mounted the admin/devices/sessions routers **unauthenticated** when `authMiddleware` was undefined (logged a warning + served them publicly). Restructured fail-closed: a deny-all (503) guard replaces a missing middleware; device registration (enrollment-code) is the only public route; uploads keep device-token auth. |
+| broadcast-box-006 | `closed-with-commit-SHA` | 38 `// TODO: Add authMiddleware`/permission-check placeholders — operator routes had no authorization. Added a `requirePermission` middleware (built on core `userCan`, no `@civicpress/api` dep) on all 9 device + 7 session routes; defined 7 `broadcast-box:*` permissions in the core role config (`default-config.ts`) + granted them (admin → all; clerk → devices:view + all sessions; public → none); removed every TODO. New `require-permission.test.ts` exercises the real grants (401 unauth / 403 public+clerk-enroll / 200 admin+clerk-create). |
+
+**Still open after this pass (no-hardware work, next session):** broadcast-box-007
 (positive rate-limit opt-in), broadcast-box-017 (stream the upload finalize — 2× full-file
 read), broadcast-box-009 (premature `complete` in `stopSession`), broadcast-box-022
 (Legacy/New type duality), broadcast-box-018 (`findByCode` O(n) bcrypt — bounded; fix or

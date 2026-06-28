@@ -8,6 +8,7 @@ import { Router, Response, Request } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import type { Logger } from '@civicpress/core';
 import { coreWarn } from '@civicpress/core';
+import { requirePermission } from '../middleware/require-permission.js';
 
 // Type for authenticated requests
 interface AuthenticatedRequest extends Request {
@@ -67,7 +68,7 @@ export function createDevicesRouter(
       query('limit').optional().isInt({ min: 1, max: 100 }),
       query('offset').optional().isInt({ min: 0 }),
     ],
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:view', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -81,8 +82,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:list
 
         // Validate and cast status to DeviceStatus type
         const status = req.query.status as string | undefined;
@@ -136,7 +135,7 @@ export function createDevicesRouter(
   router.get(
     '/:id',
     [param('id').isUUID().withMessage('Device ID must be a valid UUID')],
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:view', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -150,8 +149,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:view
 
         // Try to find device by UUID first (most common case)
         // If that fails, try by database ID (for backward compatibility)
@@ -274,7 +271,7 @@ export function createDevicesRouter(
   router.post(
     '/enroll',
     enrollValidation,
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:enroll', logger),
     async (req: AuthenticatedRequest, res: Response, next: any) => {
       try {
         // Check validation errors
@@ -293,8 +290,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:enroll
 
         // Validate request body exists
         if (!req.body) {
@@ -396,7 +391,9 @@ export function createDevicesRouter(
       body('capabilities').optional().isObject(),
       body('config').optional().isObject(),
     ],
-    // TODO: Add authMiddleware from @civicpress/api
+    // Device self-registration via enrollment code (no user token). Superseded by
+    // the public registration router in api/index.ts, which intercepts POST / before
+    // this auth-mounted router — kept for parity but effectively unreachable.
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -410,8 +407,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:create
 
         // Get client IP for audit logging
         const registrationIp = getClientIp(req);
@@ -508,7 +503,7 @@ export function createDevicesRouter(
         .optional()
         .isIn(['enrolled', 'active', 'suspended', 'revoked', 'decommissioned']),
     ],
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:manage', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -522,8 +517,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:update
 
         // Try to find device by UUID first, then by database ID
         let device = await deviceManager.getDeviceByUuid(req.params.id);
@@ -588,7 +581,7 @@ export function createDevicesRouter(
   router.delete(
     '/:id',
     [param('id').isUUID().withMessage('Device ID must be a valid UUID')],
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:manage', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -602,8 +595,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:delete
 
         // Try to find device by UUID first, then by database ID
         let device = await deviceManager.getDeviceByUuid(req.params.id);
@@ -658,7 +649,7 @@ export function createDevicesRouter(
   router.post(
     '/:id/enroll',
     [param('id').isUUID().withMessage('Device ID must be a valid UUID')],
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:enroll', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -672,8 +663,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:enroll
 
         // Try to find device by UUID first, then by database ID
         let device = await deviceManager.getDeviceByUuid(req.params.id);
@@ -795,7 +784,7 @@ export function createDevicesRouter(
         .isObject()
         .withMessage('Payload must be an object'),
     ],
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:manage', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -809,8 +798,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:control
 
         // Check if DeviceCommandService is available
         if (!deviceCommandService) {
@@ -1027,7 +1014,7 @@ export function createDevicesRouter(
   router.get(
     '/:id/health',
     [param('id').isUUID().withMessage('Device ID must be a valid UUID')],
-    // TODO: Add authMiddleware from @civicpress/api
+    requirePermission('broadcast-box:devices:view', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -1041,8 +1028,6 @@ export function createDevicesRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:devices:view
 
         // Try to find device by UUID first (most common case)
         // If that fails, try by database ID (for backward compatibility)

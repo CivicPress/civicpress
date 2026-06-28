@@ -26,6 +26,13 @@ export function getDefaultRolesConfig(): RolesConfig {
           'hooks:manage',
           'users:manage',
           'system:configure',
+          'broadcast-box:devices:view',
+          'broadcast-box:devices:enroll',
+          'broadcast-box:devices:manage',
+          'broadcast-box:sessions:view',
+          'broadcast-box:sessions:create',
+          'broadcast-box:sessions:manage',
+          'broadcast-box:admin',
         ],
         record_types: {
           can_create: [
@@ -130,6 +137,10 @@ export function getDefaultRolesConfig(): RolesConfig {
           'records:edit',
           'records:view',
           'templates:view',
+          'broadcast-box:devices:view',
+          'broadcast-box:sessions:view',
+          'broadcast-box:sessions:create',
+          'broadcast-box:sessions:manage',
         ],
         record_types: {
           can_create: ['bylaw', 'policy', 'resolution'],
@@ -245,6 +256,34 @@ export function getDefaultRolesConfig(): RolesConfig {
       'users:manage': {
         description: 'Manage users and roles',
         level: 'user',
+      },
+      'broadcast-box:devices:view': {
+        description: 'View broadcast-box devices',
+        level: 'system',
+      },
+      'broadcast-box:devices:enroll': {
+        description: 'Enroll / re-pair broadcast-box devices',
+        level: 'system',
+      },
+      'broadcast-box:devices:manage': {
+        description: 'Update, delete, and command broadcast-box devices',
+        level: 'system',
+      },
+      'broadcast-box:sessions:view': {
+        description: 'View broadcast-box recording sessions',
+        level: 'system',
+      },
+      'broadcast-box:sessions:create': {
+        description: 'Start broadcast-box recording sessions',
+        level: 'system',
+      },
+      'broadcast-box:sessions:manage': {
+        description: 'Stop and delete broadcast-box recording sessions',
+        level: 'system',
+      },
+      'broadcast-box:admin': {
+        description: 'Broadcast-box administration (e.g. reset rate limits)',
+        level: 'system',
       },
     },
     role_hierarchy: {

@@ -16,6 +16,7 @@ import { createSessionsRouter } from './sessions.js';
 import { createUploadsRouter } from './uploads.js';
 import { DeviceRegistrationRateLimiter } from '../middleware/rate-limiter.js';
 import { deviceAuthMiddleware } from '../middleware/device-auth.js';
+import { requirePermission } from '../middleware/require-permission.js';
 
 /**
  * Register broadcast-box API routes
@@ -82,32 +83,37 @@ export async function registerBroadcastBoxRoutes(
     }
   };
 
-  // Register admin endpoint with or without auth (for development)
-  if (authMiddleware) {
-    app.post(
-      '/api/v1/broadcast-box/admin/reset-rate-limits',
-      authMiddleware,
-      resetRateLimitsHandler
-    );
-  } else {
-    // In development, allow without auth (WARNING: Not secure for production)
-    app.post(
-      '/api/v1/broadcast-box/admin/reset-rate-limits',
-      resetRateLimitsHandler
-    );
+  // Fail-closed user auth for operator-facing routes: if no auth middleware was
+  // provided, mount a deny-all guard rather than leaving routes public.
+  const auth: any =
+    authMiddleware ??
+    ((_req: any, res: any) =>
+      res.status(503).json({
+        success: false,
+        error: {
+          message: 'Broadcast Box authentication is not configured',
+          code: 'AUTH_NOT_CONFIGURED',
+        },
+      }));
+  if (!authMiddleware) {
     logger.warn(
-      'Rate limit reset endpoint is accessible without authentication',
-      {
-        operation: 'broadcast-box:admin:reset-rate-limits-warning',
-      }
+      'Broadcast Box auth middleware not provided - operator routes deny all (fail-closed)',
+      { operation: 'broadcast-box:auth:not-configured' }
     );
   }
 
-  // Device registration endpoint (POST /) should be public - device uses enrollment code for auth
-  // We need to register it separately before applying auth middleware
-  if (authMiddleware) {
-    // Create a separate public router for device registration
-    // This allows devices to register themselves without a token
+  // Admin endpoint (reset rate limits) - authenticated + permissioned.
+  app.post(
+    '/api/v1/broadcast-box/admin/reset-rate-limits',
+    auth,
+    requirePermission('broadcast-box:admin', logger),
+    resetRateLimitsHandler
+  );
+
+  // Device registration (POST /) is a DEVICE surface: the device presents its
+  // one-time enrollment code (not a user token), like uploads. Mounted publicly
+  // + rate-limited, before the authenticated operator device routes below.
+  {
     const express = await import('express');
     const publicRouter = express.default.Router();
 
@@ -231,25 +237,18 @@ export async function registerBroadcastBoxRoutes(
       }
     );
 
-    // Register public registration endpoint (no auth required)
+    // Register the public registration endpoint (enrollment-code auth).
     app.use('/api/v1/broadcast-box/devices', publicRouter);
-
-    // Apply auth middleware to all other device routes (GET, PATCH, DELETE, etc.)
-    app.use('/api/v1/broadcast-box/devices', authMiddleware, devicesRouter);
-  } else {
-    // No auth middleware - register all routes as public
-    app.use('/api/v1/broadcast-box/devices', devicesRouter);
   }
 
-  // Register sessions router if sessionController is provided
+  // All other device routes (list/view/enroll/update/delete/command/health) are
+  // operator routes: authenticated + per-route permissions (enforced in the router).
+  app.use('/api/v1/broadcast-box/devices', auth, devicesRouter);
+
+  // Sessions router - operator routes: authenticated + per-route permissions.
   if (sessionController) {
     const sessionsRouter = createSessionsRouter(sessionController, logger);
-
-    if (authMiddleware) {
-      app.use('/api/v1/broadcast-box/sessions', authMiddleware, sessionsRouter);
-    } else {
-      app.use('/api/v1/broadcast-box/sessions', sessionsRouter);
-    }
+    app.use('/api/v1/broadcast-box/sessions', auth, sessionsRouter);
   }
 
   // Register uploads router if uploadProcessor is provided. Uploads are a

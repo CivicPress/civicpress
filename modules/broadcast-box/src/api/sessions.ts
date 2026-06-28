@@ -19,6 +19,7 @@ interface AuthenticatedRequest extends Request {
 
 import type { SessionController } from '../services/session-controller.js';
 import type { StartSessionRequest, SessionStatus } from '../types/index.js';
+import { requirePermission } from '../middleware/require-permission.js';
 
 export function createSessionsRouter(
   sessionController: SessionController,
@@ -44,7 +45,7 @@ export function createSessionsRouter(
       body('metadata.quality').optional().isString(),
       body('metadata.pip').optional().isObject(),
     ],
-    // TODO: Add authMiddleware
+    requirePermission('broadcast-box:sessions:create', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -58,8 +59,6 @@ export function createSessionsRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:sessions:create
 
         const request: StartSessionRequest = {
           deviceId: req.body.deviceId,
@@ -116,6 +115,7 @@ export function createSessionsRouter(
       body('title').optional().isString(),
       body('meetingId').optional().isString(),
     ],
+    requirePermission('broadcast-box:sessions:create', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -159,6 +159,7 @@ export function createSessionsRouter(
   router.get(
     '/by-meeting/:meetingId',
     [param('meetingId').isString().notEmpty()],
+    requirePermission('broadcast-box:sessions:view', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const sessions = await sessionController.getSessionsForMeeting(
@@ -190,7 +191,7 @@ export function createSessionsRouter(
   router.post(
     '/:id/stop',
     [param('id').isUUID().withMessage('Session ID must be a valid UUID')],
-    // TODO: Add authMiddleware
+    requirePermission('broadcast-box:sessions:manage', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -204,8 +205,6 @@ export function createSessionsRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:sessions:stop
 
         const session = await sessionController.stopSession(req.params.id);
 
@@ -245,6 +244,7 @@ export function createSessionsRouter(
   router.delete(
     '/:id',
     [param('id').isUUID().withMessage('Session ID must be a valid UUID')],
+    requirePermission('broadcast-box:sessions:manage', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -295,7 +295,7 @@ export function createSessionsRouter(
   router.get(
     '/:id',
     [param('id').isUUID().withMessage('Session ID must be a valid UUID')],
-    // TODO: Add authMiddleware
+    requirePermission('broadcast-box:sessions:view', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -309,8 +309,6 @@ export function createSessionsRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:sessions:view
 
         const session = await sessionController.getSession(req.params.id);
 
@@ -357,7 +355,7 @@ export function createSessionsRouter(
       query('limit').optional().isInt({ min: 1, max: 100 }),
       query('offset').optional().isInt({ min: 0 }),
     ],
-    // TODO: Add authMiddleware
+    requirePermission('broadcast-box:sessions:view', logger),
     async (req: AuthenticatedRequest, res: Response) => {
       try {
         const errors = validationResult(req);
@@ -371,8 +369,6 @@ export function createSessionsRouter(
           });
         }
 
-        // Check permissions
-        // TODO: Add permission check for broadcast-box:sessions:list
 
         const filters = {
           deviceId: req.query.deviceId as string | undefined,
