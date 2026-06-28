@@ -257,13 +257,8 @@ export function createDevicesRouter(
     body('roomLocation').optional().isString(),
     // Add a handler to check validation results
     (req: any, res: any, next: any) => {
-      console.log('=== VALIDATION MIDDLEWARE RUNNING ===');
-      console.log('Request body:', JSON.stringify(req.body, null, 2));
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        console.error('=== VALIDATION ERRORS FOUND ===');
-        console.error('Errors:', JSON.stringify(errors.array(), null, 2));
-        console.error('===============================');
         return res.status(400).json({
           success: false,
           error: {
@@ -272,7 +267,6 @@ export function createDevicesRouter(
           },
         });
       }
-      console.log('Validation passed, calling next()');
       next();
     },
   ];
@@ -283,21 +277,6 @@ export function createDevicesRouter(
     // TODO: Add authMiddleware from @civicpress/api
     async (req: AuthenticatedRequest, res: Response, next: any) => {
       try {
-        console.log('=== ENROLL ENDPOINT CALLED ===');
-        console.log('Request body:', JSON.stringify(req.body, null, 2));
-        console.log('Body type:', typeof req.body);
-        console.log('Has body:', !!req.body);
-        console.log('Request method:', req.method);
-        console.log('Request path:', req.path);
-        console.log('==============================');
-
-        logger.info('Enroll endpoint called', {
-          operation: 'broadcast-box:api:devices:enroll',
-          body: req.body,
-          bodyType: typeof req.body,
-          hasBody: !!req.body,
-        });
-
         // Check validation errors
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -376,24 +355,10 @@ export function createDevicesRouter(
           },
         });
       } catch (error) {
-        // Log the error with full details BEFORE passing to error handler
         const errorObj =
           error instanceof Error ? error : new Error(String(error));
 
-        // Log to console directly for immediate visibility
-        console.error('=== BROADCAST BOX ENROLL ERROR ===');
-        console.error('Error type:', typeof error);
-        console.error('Error constructor:', error?.constructor?.name);
-        console.error('Error name:', errorObj.name);
-        console.error('Error message:', errorObj.message);
-        console.error('Error stack:', errorObj.stack);
-        console.error('Request body:', JSON.stringify(req.body, null, 2));
-        if ((error as any).code) {
-          console.error('Error code:', (error as any).code);
-        }
-        console.error('===================================');
-
-        logger.error('Error enrolling device - full details', {
+        logger.error('Error enrolling device', {
           operation: 'broadcast-box:api:devices:enroll',
           error: {
             message: errorObj.message,
@@ -401,10 +366,6 @@ export function createDevicesRouter(
             stack: errorObj.stack,
             ...((error as any).code && { code: (error as any).code }),
           },
-          body: req.body,
-          bodyStringified: JSON.stringify(req.body),
-          errorType: typeof error,
-          errorConstructor: error?.constructor?.name,
         });
 
         // Set status code on error object

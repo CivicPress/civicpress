@@ -138,7 +138,7 @@ export class DeviceCommandService {
             'broadcast-box:services:device-command-service:room-manager-unavailable',
           error: e?.message || 'unknown',
           errorCode: e?.code,
-          note: 'CRITICAL: DeviceCommandService requires RoomManager to send commands. Ensure realtime module is built and realtime server is initialized.',
+          note: 'DeviceCommandService requires RoomManager to send commands; ensure the realtime module is loaded and initialized.',
         }
       );
       return null;

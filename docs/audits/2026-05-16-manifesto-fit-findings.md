@@ -713,3 +713,37 @@ its own `Makefile` help text — latent since the gate was added, unseen because
 the refactor never pushed to GitHub CI. Fixed by allow-listing `Makefile`
 (same rationale as the already-listed script/allow-list/workflow). The gate now
 passes whole-repo. (See closed-row above.)
+
+### Phase 5 findings reconciliation (2026-06-28)
+
+Phase 5 reintroduced `modules/broadcast-box/` wholesale, so its findings were
+reviewed in bulk against the *current* code (3 read-only verification agents +
+spot-checks) rather than closed one-by-one as the work landed. The batch below is
+closed in a single Phase 5 reconciliation commit on
+`refactor/phase-5-broadcast-box-server` — see that commit's `closes:` footer for
+the SHA. No regression: bb module 117, bb e2e 9 (incl. the real device↔server
+command-routing e2e), core 354 — all green after the cleanup.
+
+| ID | Status | Action |
+|---|---|---|
+| broadcast-box-010 | `closed-with-commit-SHA` | Command/ACK had no canonical wire format. `websocket/protocol.ts:45` now validates every frame against the canonical `@civicpress/broadcast-protocol` schema (bound in P5b) — one format, both sides. |
+| broadcast-box-008 | `closed-with-commit-SHA` | Re-registration with a leaked enrollment code. The `findByDeviceUuid` reuse/recovery fallback is gone (`device-manager.ts:125`); registration requires a fresh, unused, non-expired code and consumes it (one-time semantics, P5d; locked by tests). Partner to BB-HW-013. |
+| broadcast-box-014 | `closed-with-commit-SHA` | Capabilities had 3 drifting sources of truth. Now single-source: `BroadcastDevice.capabilities`, written only via `deviceManager.updateDevice` from the `device.connected` event; the connection tracker holds connection state only. |
+| broadcast-box-012 | `closed-with-commit-SHA` | Realtime↔broadcast-box boundary collapse (setter injection into `@civicpress/realtime`). Boundary restored via `registerRoomTypeHandler` (device-room-handler) in Phase 3/5; **this commit deletes the 3 vestigial setter-injection blocks** (`set{DeviceAuthDependencies,DeviceCommandService,DeviceConnectionTracker}` no longer exist on the realtime server). The device-ws-e2e (real command routing) stays green → removal verified safe. |
+| broadcast-box-003 | `closed-with-commit-SHA` | Dead `websocket/protocol-adapter.ts` (172 LoC, imported nowhere) **deleted**. |
+| broadcast-box-013 | `closed-with-commit-SHA` | `websocket/command-handlers.ts` (1124 LoC) + its `CommandHandlerRegistry` were exported but **never invoked** (real device messages route through `EventHandlerRegistry`/device-room-handler). File + its `websocket/index.ts` exports + its 12-test file **deleted**. |
+| broadcast-box-004 | `closed-with-commit-SHA` | Fake `__tests__/api.devices.test.ts` (tautological `toBeDefined()`/`toBeInstanceOf` asserts) **deleted**; real coverage is in the module + e2e suites. |
+| broadcast-box-011 | `closed-with-commit-SHA` | Debug logging in production: `console.log` banners (`=== ENROLL ENDPOINT CALLED ===`, validation/error banners) + `req.body`/`bodyStringified` dumps in `api/devices.ts`, plus `🔧`/`✅✅✅` console.logs in `broadcast-box-services.ts` — **removed**. Structured `logger.*` kept without body dumps; all 22 `console.*` gone from devices.ts. |
+| broadcast-box-021 | `closed-with-commit-SHA` | Module README stamped "Phase 8 Complete / UI ready / v1.0.0" (2025-01-30) corrected to honest alpha status pointing at the refactor master plan + this registry. |
+| broadcast-box-020 | `closed-with-commit-SHA` | `DeviceCommandService.getRoomManager()` lazy-resolve logged an alarming "CRITICAL:" note for the normal "realtime not loaded yet" path. Note de-escalated; the lazy-resolve pattern itself is intentional + documented. |
+
+**Still open after this pass (no-hardware work, next session):** broadcast-box-006/019
+(auth/permission TODOs + fail-open `authMiddleware` fallback), broadcast-box-007
+(positive rate-limit opt-in), broadcast-box-017 (stream the upload finalize — 2× full-file
+read), broadcast-box-009 (premature `complete` in `stopSession`), broadcast-box-022
+(Legacy/New type duality), broadcast-box-018 (`findByCode` O(n) bcrypt — bounded; fix or
+wontfix-rationale), broadcast-box-016 (`decommissioned` transition). **Bigger / decisions:**
+broadcast-box-001 + broadcast-box-015 (public-narrative sync + device-page UI), broadcast-box-002
++ BB-HW-003 (civic-artifact: transcript done, audio-version deferred), BB-HW-009 (installer),
+BB-HW-014/016 + BB-HW-017 (HW doc/UI slimming). BB-HW-001/013 are effectively done and can be
+moved to `closed-with-commit-SHA` next pass.

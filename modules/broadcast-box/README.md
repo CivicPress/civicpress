@@ -1,10 +1,14 @@
 # CivicPress Broadcast Box Module
 
-**Status**: Phase 8 Complete - UI Components Ready ✅  
-**Version**: 1.0.0  
-**Last Updated**: 2025-01-30  
-**Test Status**: 78 tests passing (10 test files)  
-**UI Status**: Complete (12 components/pages)
+**Status**: Alpha — reintroduced + hardened during the CivicPress base-refactor (Phase 5); not yet pilot-ready.  
+**Last Updated**: 2026-06-28
+
+> The earlier "Phase 8 Complete / UI ready / v1.0.0" stamp was aspirational. This module was
+> pulled from the active path, audited, and is being reintroduced through the clean module
+> contract: the protocol is bound to the canonical `@civicpress/broadcast-protocol`, and the
+> device↔server + capture→upload→transcript chain is proven hardware-free. Remaining work is
+> tracked in the audit findings registry and
+> `docs/plans/2026-05-17-base-refactor-master-plan.md` (Phase 5).
 
 ---
 
