@@ -228,6 +228,15 @@
       "showing": "Showing {start} to {end} of {total} results",
       "perPage": "Per page"
     },
+    "transcript": {
+      "title": "Transcript",
+      "automated": "Automated",
+      "reviewed": "Reviewed",
+      "automatedNote": "AI-generated transcript — the recording remains authoritative.",
+      "loading": "Loading transcript…",
+      "empty": "The transcript is empty.",
+      "loadError": "Failed to load the transcript."
+    },
     "attachments": {
       "title": "File Attachments",
       "titleSingular": "File Attachment",

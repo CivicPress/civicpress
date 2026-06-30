@@ -273,9 +273,12 @@ const loadImage = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 
@@ -331,9 +334,12 @@ const loadPDF = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 
@@ -371,9 +377,12 @@ const loadVideo = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 
@@ -411,9 +420,12 @@ const loadAudio = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 

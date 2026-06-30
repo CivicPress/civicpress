@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import MediaPlayer from '@/components/storage/MediaPlayer.vue';
+import { isPlayableMedia, inferMediaMime } from '@/utils/media-preview';
+
 interface AttachedFile {
   id: string;
   path: string;
@@ -18,6 +21,21 @@ defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+// MediaPlayer wants a full storage-file shape; attached_files carry no mime_type,
+// so infer it from the filename to drive inline audio/video playback.
+function toMediaFile(file: AttachedFile) {
+  return {
+    id: file.id,
+    name: file.original_name,
+    mime_type: inferMediaMime(file.original_name),
+    path: file.path,
+    url: '',
+    size: 0,
+    created: '',
+    modified: '',
+  };
+}
 </script>
 
 <template>
@@ -82,6 +100,11 @@ const { t } = useI18n();
               {{ t('records.download') }}
             </UButton>
           </div>
+        </div>
+
+        <!-- Inline player for audio/video recordings (e.g. a BroadcastBox capture) -->
+        <div v-if="isPlayableMedia(file.original_name)" class="mt-3">
+          <MediaPlayer :file="toMediaFile(file)" />
         </div>
       </div>
     </div>

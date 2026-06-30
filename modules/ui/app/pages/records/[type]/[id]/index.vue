@@ -4,6 +4,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 import RecordHeaderInfo from './_components/RecordHeaderInfo.vue';
 import RecordContentBody from './_components/RecordContentBody.vue';
 import RecordDetailAccordion from './_components/RecordDetailAccordion.vue';
+import TranscriptViewer from './_components/TranscriptViewer.vue';
 import { useRecordDetail } from '~/composables/useRecordDetail';
 
 // Route parameters
@@ -48,6 +49,16 @@ const {
   markdownContainer,
   t,
 });
+
+// BroadcastBox session media: the transcript artifact URL + its verification label
+// (top-level frontmatter on a `session` record: `media.transcript`, `transcript_status`).
+const transcriptSrc = computed(
+  () => (record.value?.metadata as any)?.media?.transcript as string | undefined
+);
+const transcriptStatus = computed(
+  () =>
+    (record.value?.metadata as any)?.transcript_status as string | undefined
+);
 </script>
 
 <template>
@@ -134,6 +145,12 @@ const {
           :content="record.content"
           :rendered-content="renderedContent"
           @content-click="handleContentClick"
+        />
+
+        <TranscriptViewer
+          v-if="transcriptSrc"
+          :src="transcriptSrc"
+          :status="transcriptStatus"
         />
 
         <RecordDetailAccordion

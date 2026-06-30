@@ -171,3 +171,30 @@ confirming fresh audit.
 **Next:** the no-hardware items above (records-UI loop; closure bookkeeping),
 the real-hardware bring-up when the kit is wired, then the coordinated narrative
 push + merge-to-main.
+
+---
+
+## Addendum — records-UI media + transcript viewing (2026-06-30)
+
+The exit criterion "media + transcript, viewable in the public records UI" was
+carried forward as unverified. A first cut now lands in `modules/ui`:
+
+- **Inline A/V player** — `AttachmentsPanel` renders the existing `MediaPlayer` for
+  audio/video attachments (mime inferred from the filename via
+  `app/utils/media-preview.ts`), so a recording plays in-page instead of download-only.
+- **Transcript viewer** — a new `TranscriptViewer` (`_components/`) fetches the
+  session's `media.transcript` (WebVTT), renders timed cues, and shows the
+  `transcript_status` trust label ("Automated" vs "Reviewed").
+- **Public access** — `MediaPlayer` + the transcript fetch now attach the bearer
+  token only when present. Confirmed end-to-end: the `recordings` and `transcripts`
+  storage folders are `access: 'public'` (`storage-config-manager.ts`), and
+  `GET /storage/files/:id` serves public-folder files without auth — so an anonymous
+  resident can play the recording + read the transcript.
+- Tested: `media-preview.test.ts` (mime inference + WebVTT parse, 8); full UI suite
+  green (42); `nuxt typecheck` clean.
+
+**The records-UI half of the exit criterion is DONE.** What remains for the full
+criterion is a **real record to view** (the real-hardware capstone). A polished
+session-specific *layout* (vs. the generic record view) and the operator-facing
+**device-control UI** (bb-015 — `useDevicePreview`/`useDeviceConnectionStatus`/
+`useDeviceCommands`) remain separate carry-forward items.
