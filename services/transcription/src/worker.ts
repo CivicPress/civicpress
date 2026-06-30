@@ -8,6 +8,7 @@
  */
 
 import type {
+  DraftTopic,
   Logger,
   RecordsGateway,
   RunSummary,
@@ -16,6 +17,7 @@ import type {
   TimeRange,
   TranscriptionEngine,
 } from './types.js';
+import { deriveTopics } from './structuring.js';
 
 export interface WorkerOptions {
   records: RecordsGateway;
@@ -119,13 +121,29 @@ export class TranscriptionWorker {
       return 'skipped';
     }
 
+    // Draft structured minutes (bb-002): align the transcript to the meeting's
+    // agenda → draft topics[]. Best-effort — no agenda (or no getAgenda support)
+    // means no topics, just the transcript. The A/V + transcript never block on it.
+    let topics: DraftTopic[] = [];
+    try {
+      const agenda = (await records.getAgenda?.(session)) ?? [];
+      topics = deriveTopics(transcript.segments, agenda);
+    } catch (error) {
+      logger.warn('agenda alignment failed — writing transcript without topics', {
+        id: session.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     await records.writeTranscript(session.id, {
       transcript,
       status: 'automated',
+      topics,
     });
     logger.info('transcript written', {
       id: session.id,
       language: transcript.language,
+      topics: topics.length,
     });
     return 'written';
   }

@@ -21,7 +21,9 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
+  AgendaItem,
   AudioRef,
+  DraftTopic,
   Logger,
   RecordsGateway,
   SessionCapture,
@@ -119,6 +121,66 @@ function toSession(record: CoreRecord): SessionForTranscription {
   };
 }
 
+/**
+ * The linked `meeting` record id on a session — `linkedRecords` may be a parsed
+ * array (published) or a JSON string (draft).
+ */
+function linkedMeetingId(record: CoreRecord): string | null {
+  let raw: unknown =
+    field<unknown>(record, 'linkedRecords') ??
+    field<unknown>(record, 'linked_records');
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(raw)) return null;
+  const meeting = raw.find(
+    (l) =>
+      l &&
+      typeof l === 'object' &&
+      (l as { type?: unknown }).type === 'meeting' &&
+      (l as { id?: unknown }).id
+  );
+  return meeting ? String((meeting as { id: unknown }).id) : null;
+}
+
+/** Normalize a meeting's `agenda` field into AgendaItem[] (tolerates strings + a JSON-string). */
+function normalizeAgenda(raw: unknown): AgendaItem[] {
+  let val = raw;
+  if (typeof val === 'string') {
+    try {
+      val = JSON.parse(val);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(val)) return [];
+  const items: AgendaItem[] = [];
+  for (const it of val) {
+    if (typeof it === 'string' && it.trim()) {
+      items.push({ title: it.trim() });
+    } else if (
+      it &&
+      typeof it === 'object' &&
+      typeof (it as { title?: unknown }).title === 'string'
+    ) {
+      const title = ((it as { title: string }).title || '').trim();
+      const description = (it as { description?: unknown }).description;
+      if (title) {
+        items.push({
+          title,
+          description:
+            typeof description === 'string' ? description : undefined,
+        });
+      }
+    }
+  }
+  return items;
+}
+
 export class CoreRecordsGateway implements RecordsGateway {
   private readonly user: CoreUser;
 
@@ -162,6 +224,21 @@ export class CoreRecordsGateway implements RecordsGateway {
     return record ? toSession(record) : null;
   }
 
+  /**
+   * Resolve the structured agenda for a session — from its linked `meeting` record
+   * (the core session schema only carries `media.agenda` as a path). Best-effort:
+   * no link / no meeting / no agenda → [], and the worker derives no topics.
+   */
+  async getAgenda(session: SessionForTranscription): Promise<AgendaItem[]> {
+    const record = await this.opts.records.getRecord(session.id);
+    if (!record) return [];
+    const meetingId = linkedMeetingId(record);
+    if (!meetingId) return [];
+    const meeting = await this.opts.records.getRecord(meetingId);
+    if (!meeting) return [];
+    return normalizeAgenda(field<unknown>(meeting, 'agenda'));
+  }
+
   /** Fetch the A/V blob to a temp file the engine can decode. */
   async prepareAudio(session: SessionForTranscription): Promise<AudioRef> {
     const uuid = session.capture?.av_file;
@@ -187,7 +264,11 @@ export class CoreRecordsGateway implements RecordsGateway {
    */
   async writeTranscript(
     id: string,
-    payload: { transcript: TranscriptResult; status: 'automated' }
+    payload: {
+      transcript: TranscriptResult;
+      status: 'automated';
+      topics?: DraftTopic[];
+    }
   ): Promise<void> {
     const record = await this.opts.records.getRecord(id);
     const existingMedia =
@@ -209,16 +290,18 @@ export class CoreRecordsGateway implements RecordsGateway {
     );
     if (artifactPath) media.transcript = artifactPath;
 
-    await this.opts.records.updateRecord(
-      id,
-      {
-        metadata: {
-          transcript_status: payload.status,
-          media,
-        },
-      },
-      this.user
-    );
+    const metadata: Record<string, unknown> = {
+      transcript_status: payload.status,
+      media,
+    };
+    // Draft structured minutes (bb-002): write the derived topics + flag the
+    // minutes as a draft for clerk review. Empty/absent topics leave them untouched.
+    if (payload.topics && payload.topics.length > 0) {
+      metadata.topics = payload.topics;
+      metadata.minutes_status = 'draft';
+    }
+
+    await this.opts.records.updateRecord(id, { metadata }, this.user);
   }
 
   /**

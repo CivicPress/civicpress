@@ -788,8 +788,9 @@ installer, cross-repo narrative sync). Reconciling the last effectively-done ite
 |---|---|---|
 | BB-HW-001 | `closed-with-commit-SHA` | Protocol-doc-lies finding. Closed by the canonical artifact: `@civicpress/broadcast-protocol` is now the single source the device validates against (HW `c6c71e7`, BB-HW-004) + the server binds (Phase 5 P5b) — the doc IS the schema, both sides. |
 | BB-HW-013 | `closed-with-commit-SHA` | One-time revocable enrollment done both sides (device `17a1759`, server `3c02e2c`); no silent re-enroll; no plaintext at rest. Residual E2 (Fernet key co-located with ciphertext) = documented threat-model note; real key separation carried forward. |
-| broadcast-box-002 / BB-HW-003 | `wontfix-pending-decision` | Civic-artifact gap, partially closed: the **transcript + capture block** ship (Phase 5 W2). The remaining **audio version** of the artifact is a maintainer decision (Phase 5 scope vs. post-refactor backlog) — not yet built. |
+| broadcast-box-002 / BB-HW-003 | `closed-with-commit-SHA` | Civic-artifact gap CLOSED (this commit). A recording now yields the **transcript** (W2) **+ draft structured minutes**: `topics[]` derived by heuristically aligning the transcript to the linked `meeting`'s agenda (no AI vendor — pure string matching, `services/transcription/src/structuring.ts`), written `minutes_status: draft` for clerk review. By design (transcription spec §4) `votes[]`/`decisions[]`/`attendees` are left for clerk entry, with an LLM structuring engine as the optional pluggable upgrade (maintainer chose heuristic-first, 2026-06-30). A separate optional **audio version** (an accessibility TTS render) remains a deferred master-plan AI-port stage — NOT part of bb-002's Markdown-artifact core. |
 
-**Master-plan finding tally (BroadcastBox):** BB-HW-* = 12 closed / 1 partial (003) /
-1 deferred (017) / 3 open (009, 014, 016); broadcast-box-* = 15 closed / 1 wontfix (018) /
-1 deferred (022) / 4 open (001, 002-audio, 005, 015).
+**Master-plan finding tally (BroadcastBox):** BB-HW-* = 13 closed / 1 deferred (017) /
+3 open (009, 014, 016); broadcast-box-* = 16 closed / 1 wontfix (018) / 1 deferred (022) /
+3 open (001 narrative, 005 RTMP-scope, 015 device-control-UI). Separate optional deferred
+goal: the **audio version** (accessibility TTS render of the minutes).

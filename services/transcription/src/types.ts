@@ -52,6 +52,26 @@ export interface TranscriptResult {
   segments: TranscriptSegment[];
 }
 
+/**
+ * A meeting agenda item — the scaffold for draft minutes. The STRUCTURED agenda
+ * lives on the linked `meeting` record (the core `session` schema only carries
+ * `media.agenda` as a path).
+ */
+export interface AgendaItem {
+  title: string;
+  description?: string;
+}
+
+/**
+ * A draft topic derived by aligning the transcript to the agenda (design §4).
+ * Carries the discussion text; `votes[]`/`decisions[]` are intentionally left for
+ * clerk entry, so this is a `title` + `description` only.
+ */
+export interface DraftTopic {
+  title: string;
+  description: string;
+}
+
 /** A handle to fetched A/V the engine can read (e.g. a local file path). */
 export interface AudioRef {
   path: string;
@@ -89,14 +109,25 @@ export interface RecordsGateway {
   /** Fetch the session's A/V into a local handle the engine can read. */
   prepareAudio(session: SessionForTranscription): Promise<AudioRef>;
   /**
+   * The structured agenda items for a session — resolved from its linked `meeting`
+   * record. Optional (older gateways/fakes omit it); absent or unresolvable → the
+   * worker derives no topics and just writes the transcript.
+   */
+  getAgenda?(session: SessionForTranscription): Promise<AgendaItem[]>;
+  /**
    * Atomic write-back: `transcript_status` (the idempotency latch) + the
-   * structured transcript in one records-API update. NB core `media.transcript`
-   * is string-typed (a path/URL), so the adapter writes the structured result to
-   * `media.transcript_data` — see the CoreRecordsGateway + design §10.5.
+   * structured transcript + optional draft `topics[]` in one records-API update.
+   * NB core `media.transcript` is string-typed (a path/URL), so the adapter writes
+   * the structured result to `media.transcript_data` — see the CoreRecordsGateway
+   * + design §10.5. When `topics` are present, `minutes_status: draft` is set too.
    */
   writeTranscript(
     id: string,
-    payload: { transcript: TranscriptResult; status: 'automated' }
+    payload: {
+      transcript: TranscriptResult;
+      status: 'automated';
+      topics?: DraftTopic[];
+    }
   ): Promise<void>;
 }
 

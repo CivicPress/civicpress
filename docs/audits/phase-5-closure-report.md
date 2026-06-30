@@ -198,3 +198,27 @@ criterion is a **real record to view** (the real-hardware capstone). A polished
 session-specific *layout* (vs. the generic record view) and the operator-facing
 **device-control UI** (bb-015 — `useDevicePreview`/`useDeviceConnectionStatus`/
 `useDeviceCommands`) remain separate carry-forward items.
+
+---
+
+## Addendum — draft structured minutes (bb-002) (2026-06-30)
+
+bb-002 (the civic-artifact gap) was carried forward as "transcript ships; structured
+minutes pending a decision." Maintainer chose **heuristic agenda-alignment** (no AI
+vendor) over an LLM. Built in `services/transcription`:
+
+- `structuring.ts` `deriveTopics(segments, agenda)` — aligns transcript segments to
+  the meeting's agenda items (monotonic, keyword match + a proportional fallback) →
+  one draft topic per item carrying the discussion text. Pure + unit-tested.
+- The worker resolves the agenda from the session's linked `meeting` record
+  (`CoreRecordsGateway.getAgenda`), derives topics, and writes them with
+  `minutes_status: draft` for clerk review. Best-effort: no agenda → no topics (the
+  transcript still stands; the A/V never blocks on it).
+- By design (spec §4), `votes[]`/`decisions[]`/`attendees` are left for clerk entry;
+  an LLM structuring engine is the optional pluggable upgrade.
+- Tests: `structuring.test.ts` (4) + gateway getAgenda/topics tests (5); transcription
+  suite **43** green; real-chain e2e green; package `tsc` clean.
+
+So a recording now produces a **Markdown civic record** (transcript + draft minutes),
+not just a media blob — closing bb-002 + its HW partner BB-HW-003. The optional
+**audio version** (accessibility TTS render) remains a separate deferred goal.

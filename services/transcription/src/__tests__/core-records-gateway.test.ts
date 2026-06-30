@@ -121,4 +121,97 @@ describe('CoreRecordsGateway.writeTranscript', () => {
     expect(request.metadata.media.recording).toBe('rec-uuid');
     expect(user).toEqual({ id: 1, username: 'system', role: 'admin' });
   });
+
+  it('writes draft topics[] + minutes_status:draft when topics are provided', async () => {
+    const { store, updates } = fakeStore([{ id: 's1', metadata: {} }]);
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+
+    await gw.writeTranscript('s1', {
+      transcript: TRANSCRIPT,
+      status: 'automated',
+      topics: [{ title: 'Parks budget', description: 'discussion' }],
+    });
+
+    const [{ request }] = updates;
+    expect(request.metadata.topics).toEqual([
+      { title: 'Parks budget', description: 'discussion' },
+    ]);
+    expect(request.metadata.minutes_status).toBe('draft');
+  });
+
+  it('omits topics/minutes_status when no topics are derived', async () => {
+    const { store, updates } = fakeStore([{ id: 's1', metadata: {} }]);
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+
+    await gw.writeTranscript('s1', {
+      transcript: TRANSCRIPT,
+      status: 'automated',
+      topics: [],
+    });
+
+    const [{ request }] = updates;
+    expect(request.metadata.topics).toBeUndefined();
+    expect(request.metadata.minutes_status).toBeUndefined();
+  });
+});
+
+describe('CoreRecordsGateway.getAgenda', () => {
+  it('resolves the agenda from the linked meeting record', async () => {
+    const { store } = fakeStore([
+      {
+        id: 's1',
+        metadata: {},
+        linkedRecords: [{ id: 'm1', type: 'meeting', description: 'recording' }],
+      },
+      {
+        id: 'm1',
+        metadata: {
+          agenda: [
+            { title: 'Parks budget', description: 'annual' },
+            { title: 'Zoning bylaw' },
+          ],
+        },
+      },
+    ]);
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+    expect(await gw.getAgenda({ id: 's1' })).toEqual([
+      { title: 'Parks budget', description: 'annual' },
+      { title: 'Zoning bylaw' },
+    ]);
+  });
+
+  it('returns [] when the session has no linked meeting / no agenda', async () => {
+    const { store } = fakeStore([{ id: 's1', metadata: {} }]);
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+    expect(await gw.getAgenda({ id: 's1' })).toEqual([]);
+  });
+
+  it('tolerates linked_records / agenda stored as JSON strings (draft shape)', async () => {
+    const { store } = fakeStore([
+      {
+        id: 's1',
+        metadata: {
+          linked_records: JSON.stringify([{ id: 'm1', type: 'meeting' }]),
+        },
+      },
+      { id: 'm1', metadata: { agenda: JSON.stringify([{ title: 'Item A' }]) } },
+    ]);
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+    expect(await gw.getAgenda({ id: 's1' })).toEqual([{ title: 'Item A' }]);
+  });
 });
