@@ -775,5 +775,21 @@ real-upload e2e drives stopping→complete.
 bb-022 deferred). Remaining are hardware + decision items only. **Bigger / decisions:**
 broadcast-box-001 + broadcast-box-015 (public-narrative sync + device-page UI), broadcast-box-002
 + BB-HW-003 (civic-artifact: transcript done, audio-version deferred), BB-HW-009 (installer),
-BB-HW-014/016 + BB-HW-017 (HW doc/UI slimming). BB-HW-001/013 are effectively done and can be
-moved to `closed-with-commit-SHA` next pass.
+BB-HW-014/016 + BB-HW-017 (HW doc/UI slimming).
+
+### Phase 4 + 5 closure (2026-06-30)
+
+Closure reports written: `docs/audits/phase-4-closure-report.md`,
+`docs/audits/phase-5-closure-report.md` — both **conditional** (substantially
+complete; carried-forward exit criteria: real-hardware capstone, audio-version,
+installer, cross-repo narrative sync). Reconciling the last effectively-done items:
+
+| ID | Status | Action |
+|---|---|---|
+| BB-HW-001 | `closed-with-commit-SHA` | Protocol-doc-lies finding. Closed by the canonical artifact: `@civicpress/broadcast-protocol` is now the single source the device validates against (HW `c6c71e7`, BB-HW-004) + the server binds (Phase 5 P5b) — the doc IS the schema, both sides. |
+| BB-HW-013 | `closed-with-commit-SHA` | One-time revocable enrollment done both sides (device `17a1759`, server `3c02e2c`); no silent re-enroll; no plaintext at rest. Residual E2 (Fernet key co-located with ciphertext) = documented threat-model note; real key separation carried forward. |
+| broadcast-box-002 / BB-HW-003 | `wontfix-pending-decision` | Civic-artifact gap, partially closed: the **transcript + capture block** ship (Phase 5 W2). The remaining **audio version** of the artifact is a maintainer decision (Phase 5 scope vs. post-refactor backlog) — not yet built. |
+
+**Master-plan finding tally (BroadcastBox):** BB-HW-* = 12 closed / 1 partial (003) /
+1 deferred (017) / 3 open (009, 014, 016); broadcast-box-* = 15 closed / 1 wontfix (018) /
+1 deferred (022) / 4 open (001, 002-audio, 005, 015).
