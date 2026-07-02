@@ -82,7 +82,6 @@ export function createDevicesRouter(
           });
         }
 
-
         // Validate and cast status to DeviceStatus type
         const status = req.query.status as string | undefined;
         const validStatuses = [
@@ -148,7 +147,6 @@ export function createDevicesRouter(
             },
           });
         }
-
 
         // Try to find device by UUID first (most common case)
         // If that fails, try by database ID (for backward compatibility)
@@ -290,7 +288,6 @@ export function createDevicesRouter(
           });
         }
 
-
         // Validate request body exists
         if (!req.body) {
           logger.warn('Request body missing', {
@@ -407,7 +404,6 @@ export function createDevicesRouter(
           });
         }
 
-
         // Get client IP for audit logging
         const registrationIp = getClientIp(req);
 
@@ -517,7 +513,6 @@ export function createDevicesRouter(
           });
         }
 
-
         // Try to find device by UUID first, then by database ID
         let device = await deviceManager.getDeviceByUuid(req.params.id);
         if (!device) {
@@ -595,7 +590,6 @@ export function createDevicesRouter(
           });
         }
 
-
         // Try to find device by UUID first, then by database ID
         let device = await deviceManager.getDeviceByUuid(req.params.id);
         if (!device) {
@@ -662,7 +656,6 @@ export function createDevicesRouter(
             },
           });
         }
-
 
         // Try to find device by UUID first, then by database ID
         let device = await deviceManager.getDeviceByUuid(req.params.id);
@@ -797,7 +790,6 @@ export function createDevicesRouter(
             },
           });
         }
-
 
         // Check if DeviceCommandService is available
         if (!deviceCommandService) {
@@ -1027,7 +1019,6 @@ export function createDevicesRouter(
             },
           });
         }
-
 
         // Try to find device by UUID first (most common case)
         // If that fails, try by database ID (for backward compatibility)

@@ -59,7 +59,6 @@ export function createSessionsRouter(
           });
         }
 
-
         const request: StartSessionRequest = {
           deviceId: req.body.deviceId,
           civicpressSessionId: req.body.civicpressSessionId,
@@ -205,7 +204,6 @@ export function createSessionsRouter(
           });
         }
 
-
         const session = await sessionController.stopSession(req.params.id);
 
         res.json({
@@ -309,7 +307,6 @@ export function createSessionsRouter(
           });
         }
 
-
         const session = await sessionController.getSession(req.params.id);
 
         if (!session) {
@@ -368,7 +365,6 @@ export function createSessionsRouter(
             },
           });
         }
-
 
         const filters = {
           deviceId: req.query.deviceId as string | undefined,

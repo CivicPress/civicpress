@@ -169,12 +169,6 @@ export class DeviceRoom implements Room {
       })
     );
 
-    console.log('[DeviceRoom] 🔍 Searching for device in clientToDevice map:', {
-      targetDeviceUuid: this.deviceId,
-      totalConnections: clientToDevice.size,
-      allConnections: allDeviceConnections,
-    });
-
     // Find ALL matching device connections (there may be multiple if device reconnected)
     const matchingConnections: Array<{
       clientId: string;
@@ -193,15 +187,6 @@ export class DeviceRoom implements Room {
             2: 'CLOSING',
             3: 'CLOSED',
           };
-
-          console.log('[DeviceRoom] Found matching device connection:', {
-            clientId,
-            deviceUuid: deviceInfo.deviceUuid,
-            deviceId: deviceInfo.deviceId,
-            wsReadyState: ws.readyState,
-            wsReadyStateName: readyStateNames[ws.readyState] || 'UNKNOWN',
-            isOpen: ws.readyState === 1,
-          });
 
           matchingConnections.push({
             clientId,
@@ -222,22 +207,6 @@ export class DeviceRoom implements Room {
         clientToDeviceEntries: allDeviceConnections,
       });
 
-      console.error(
-        '[DeviceRoom] ❌ Device not found - troubleshooting info:',
-        {
-          targetDeviceUuid: this.deviceId,
-          roomId: this.roomId,
-          roomClients: Array.from(this.clients.keys()),
-          availableDeviceConnections: allDeviceConnections,
-          possibleCauses: [
-            'Device not connected to WebSocket',
-            'Device connected but not authenticated',
-            'Device UUID mismatch',
-            'Device connected to different room',
-          ],
-        }
-      );
-
       return false;
     }
 
@@ -257,18 +226,6 @@ export class DeviceRoom implements Room {
           clientId: conn.clientId,
           readyState: conn.readyState,
         })),
-      });
-
-      console.error('[DeviceRoom] ❌ All device connections are not OPEN:', {
-        totalConnections: matchingConnections.length,
-        connections: matchingConnections.map((conn) => ({
-          clientId: conn.clientId,
-          readyState: conn.readyState,
-        })),
-        possibleCauses: [
-          'All WebSocket connections are closed or closing',
-          'Device reconnected but old connections not cleaned up',
-        ],
       });
 
       return false;
@@ -341,17 +298,6 @@ export class DeviceRoom implements Room {
         }
       );
 
-      console.warn(
-        '[DeviceRoom] ⚠️ Multiple OPEN connections for device - using highest-scored connection:',
-        {
-          deviceUuid: this.deviceId,
-          totalOpenConnections: scoredConnections.length,
-          selectedClientId: deviceClientId,
-          selectedScore: primaryConnection.score.toFixed(3),
-          connections: connectionDetails,
-          note: 'Connection selected based on recency, activity, and message volume',
-        }
-      );
     }
 
     // Try sending to connections in order of quality (fallback on failure)
@@ -393,25 +339,6 @@ export class DeviceRoom implements Room {
           commandId: message.id,
         });
 
-        console.log(
-          '[DeviceRoom] 📤 Sending command to device WebSocket (attempt ' +
-            attemptCount +
-            '/' +
-            allAttempts.length +
-            '):',
-          {
-            deviceClientId: attemptClientId,
-            wsReadyState: attemptWs.readyState,
-            connectionScore: score.toFixed(3),
-            messageType: message.type,
-            action: message.action,
-            commandId: message.id,
-            messageSize: messageJson.length,
-            messagePreview: messageJson.substring(0, 200),
-            totalOpenConnections: scoredConnections.length,
-          }
-        );
-
         attemptWs.send(messageJson);
 
         // Success - log and return
@@ -437,21 +364,6 @@ export class DeviceRoom implements Room {
           commandDetails
         );
 
-        console.log('[DeviceRoom] ✅ Command successfully sent to device:', {
-          action: message.action,
-          commandId: message.id,
-          deviceId: this.deviceId,
-          deviceClientId: attemptClientId,
-          attempt: attemptCount,
-          connectionScore: score.toFixed(3),
-          usedFallback: attemptCount > 1,
-          payload: message.payload,
-          messageSize: messageJson.length,
-          timestamp: message.timestamp,
-          fullMessage: messageJson,
-          totalOpenConnections: scoredConnections.length,
-        });
-
         return true;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -468,31 +380,6 @@ export class DeviceRoom implements Room {
           remainingAttempts: allAttempts.length - attemptCount,
         });
 
-        console.error(
-          '[DeviceRoom] ❌ Command send attempt ' + attemptCount + ' failed:',
-          {
-            deviceClientId: attemptClientId,
-            connectionScore: score.toFixed(3),
-            error: lastError.message,
-            remainingAttempts: allAttempts.length - attemptCount,
-            possibleCauses: [
-              'WebSocket connection closed during send',
-              'Message too large',
-              'Network error',
-            ],
-          }
-        );
-
-        // Continue to next connection if available
-        if (attemptCount < allAttempts.length) {
-          console.warn(
-            '[DeviceRoom] ⚠️ Retrying with next available connection (attempt ' +
-              (attemptCount + 1) +
-              '/' +
-              allAttempts.length +
-              ')...'
-          );
-        }
       }
     }
 
@@ -506,17 +393,6 @@ export class DeviceRoom implements Room {
       allConnectionScores: scoredConnections.map((c) => ({
         clientId: c.clientId,
         score: c.score.toFixed(3),
-      })),
-    });
-
-    console.error('[DeviceRoom] ❌ All connection attempts failed:', {
-      deviceUuid: this.deviceId,
-      totalAttempts: attemptCount,
-      lastError: lastError?.message,
-      connectionDetails: scoredConnections.map((c) => ({
-        clientId: c.clientId,
-        score: c.score.toFixed(3),
-        readyState: c.ws.readyState,
       })),
     });
 
