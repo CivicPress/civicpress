@@ -794,3 +794,10 @@ installer, cross-repo narrative sync). Reconciling the last effectively-done ite
 3 open (009, 014, 016); broadcast-box-* = 16 closed / 1 wontfix (018) / 1 deferred (022) /
 3 open (001 narrative, 005 RTMP-scope, 015 device-control-UI). Separate optional deferred
 goal: the **audio version** (accessibility TTS render of the minutes).
+
+**BB-HW-009 (installer) — in progress (2026-07-02):** a **tested install path** now exists in
+the HW repo — `docs/SETUP.md` (blank mini-PC → running appliance: BIOS, Ubuntu Server, host
+prep, enrol, systemd) + `scripts/setup-appliance.sh` (idempotent host prep that installs the
+non-free VAAPI stack + verifies hardware H.264 encode via `vainfo` + a real `h264_vaapi -low_power 1`
+test), HW commit `88bc7c1`. Syntax-verified; **closes fully once run + validated on the real N150**
+during hardware bring-up. Counted "open" above until then.
