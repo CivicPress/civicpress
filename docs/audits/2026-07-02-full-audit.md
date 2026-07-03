@@ -261,3 +261,27 @@ All `FA-*` findings default to `open`. None are closed yet. Next actions per the
 This audit is **advisory input to the origin/main unfreeze**, not a closure. The base refactor's verified closures hold and the BroadcastBox engineering is substantially complete — but **4 Critical findings (one of them, `FA-BB-002`, a direct violation of the platform's central privacy promise) and 22 High findings are open**, several of them in the newly-added surface. Per the standing freeze, nothing pushes to `origin/main` until these land and a confirming re-audit is clean. The honest read: the refactor made the base true; the new work now needs the same treatment before it goes public.
 
 🏛️ — *Make truth true again.*
+
+---
+
+## Addendum — live real-hardware capstone (2026-07-03)
+
+A real BroadcastBox appliance (BOSGAME E3 / Intel N150, Razer Kiyo Pro + MS2131 HDMI dongle) was brought up and driven **end-to-end against a live CivicPress dev server**. This validated most of the integration and surfaced four new findings (one server-side, since fixed; three device-side).
+
+**Proven working live on real hardware:** appliance install + hardware H.264 (VAAPI) encode; device enrollment against CivicPress (real token); device↔CivicPress WebSocket connection; full command round-trip with ACKs (`sources.set`, `preview.start`, `start_session`, `set_visibility` in-camera/public, `stop_session`); CivicPress session-record lifecycle (draft → recording → stopping); device capability reporting. Encoder **detection is correct** (selects Intel QuickSync/`h264_vaapi`, not the Pi `h264_v4l2m2m`).
+
+### FA-API-023 · High · S · `security`/`correctness` · **closed-with-commit-`8f6a791`** · In-process broadcast-box HTTP API was 404-shadowed on the real server
+`modules/api/src/index.ts` registered `notFoundHandler` + `errorHandler` in `initialize()` (before `app.listen()`), but broadcast-box mounts its device/session/upload routers in `start()` (after `listen()`, so the realtime WS server can be bridged in). Express matches middleware in registration order, so the catch-all 404 shadowed **every** broadcast-box HTTP route — enrollment, sessions, and uploads all returned 404 on a normally-deployed server. It only ever worked in the `e2e/broadcast-box-live` / `broadcast-box-mount-e2e` harnesses, which build the Express app without a 404 handler — a "green tests, dead in prod" gap. **Fix (shipped):** register the 404/error handlers at the END of `start()`, after `startBroadcastBox()`; added two regression tests pinning the ordering. This is why the closure report's "proven end-to-end hardware-free" did not catch it — the harness constructs the app differently from the real entrypoint.
+
+### FA-HW-014 · High · M · `correctness` · `start_session` ignores `sources.set`; capture only starts from a PiP layout or a running preview
+`main.py:497` `handle_session_start` builds `video_sources` **only** from `get_pip_layout()` (`:519-523`) or an already-running preview (`:567-597`) — it never reads the single-camera source that `sources.set` persisted to `session_defaults`. So an API-driven `start_session` without a prior `preview.start` logs "No video sources available or FFmpeg capture service not available" and records nothing (the CivicPress session then hangs in `stopping`, no upload, no capture block, no transcript). The documented single-camera flow (`sources.set` → `start_session`) does not work unattended. **Fix direction:** populate `video_sources`/`audio_sources` in `handle_session_start` from the persisted `session_defaults` when no PiP/preview is active.
+
+### FA-HW-015 · High · M · `correctness` · Preview→record transition leaves the audio device busy → recording ffmpeg fails
+Using a preview to work around FA-HW-014, `start_session` then fails: the combined recording ffmpeg dies with **`cannot open audio device plughw:1 (Device or resource busy)`**. The preview's separate audio ffmpeg holds the Kiyo's ALSA capture device, and the preview→record transition calls `stop_capture()` on the **video** capture (`main.py:607`) but does not release the **audio** device. **Fix direction:** stop/hand-off the preview's audio capture before opening the recording's audio input (or share one capture graph).
+
+### FA-HW-016 · High · M · `correctness` · Video-only recording still produces no MP4
+With audio removed to dodge FA-HW-015, the encoder is selected correctly (`-c:v h264_vaapi`) and VAAPI processes run, but the combined recording+`rawvideo`-preview command still writes no file to `storage_root/<session>/` (the dir is created but stays empty), so nothing uploads. The multi-output capture command needs debugging on this hardware. (A **manual** `ffmpeg -f v4l2 -input_format mjpeg … -c:v h264_vaapi -low_power 1` records 1080p fine, so the hardware, encoder, and camera are all good — the defect is in the app's capture-pipeline command construction / process orchestration.)
+
+**Net:** the CivicPress↔device *integration* is validated on real hardware and the one server-side bug is fixed; the device-app **A/V recording pipeline** (FA-HW-014/015/016) needs a focused firmware pass before a meeting can be captured → uploaded → turned into a civic record + transcript. Tracked for the broadcast-box hardware repo.
+
+🏛️ — *Make truth true again.*
