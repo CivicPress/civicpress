@@ -22,6 +22,7 @@ import request from 'supertest';
 import { CivicPress } from '@civicpress/core';
 import { CentralConfigManager } from '../../core/dist/config/central-config.js';
 import { startInProcessBroadcastBox } from '../../modules/api/src/broadcast-box-bootstrap.js';
+import { notFoundHandler } from '../../modules/api/src/middleware/not-found.js';
 
 const silentLogger = {
   info() {},
@@ -109,6 +110,51 @@ describe('broadcast-box in-process mount (real CivicPress)', () => {
     expect(mount.started).toBe(false);
 
     // No router mounted → the path 404s.
+    const res = await request(app)
+      .post('/api/v1/broadcast-box/devices')
+      .send({});
+    expect(res.status).toBe(404);
+  });
+
+  // Regression guard for the middleware-ordering bug in modules/api/src/index.ts:
+  // the catch-all `notFoundHandler` was registered in initialize() (before
+  // listen()), but broadcast-box mounts its routers in start() (after listen()).
+  // Express matches middleware in registration order, so the 404 handler shadowed
+  // EVERY device/session/upload route on the real server — the routes returned 404
+  // instead of running. The fix registers notFoundHandler LAST (after the
+  // post-listen mounts). These two tests pin the ordering contract with the REAL
+  // notFoundHandler + the real mount hook.
+  it('does NOT shadow broadcast-box routes when the 404 handler is registered AFTER the mount (the fix)', async () => {
+    const app = express();
+    app.use(express.json());
+
+    // Correct order: mount the module's routers FIRST …
+    mount = await startInProcessBroadcastBox(civic, app, silentLogger, {
+      enabled: true,
+    });
+    expect(mount.started).toBe(true);
+    // … THEN the catch-all 404 (as start() now does after startBroadcastBox()).
+    app.use(notFoundHandler);
+
+    // The device route is reachable → its validation runs (400), not the 404.
+    const res = await request(app)
+      .post('/api/v1/broadcast-box/devices')
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('reproduces the bug: a 404 handler registered BEFORE the mount shadows the routes', async () => {
+    const app = express();
+    app.use(express.json());
+
+    // Wrong order (the original bug): catch-all 404 before the module mounts.
+    app.use(notFoundHandler);
+    mount = await startInProcessBroadcastBox(civic, app, silentLogger, {
+      enabled: true,
+    });
+    expect(mount.started).toBe(true);
+
+    // The device route is shadowed by the earlier catch-all → 404, never 400.
     const res = await request(app)
       .post('/api/v1/broadcast-box/devices')
       .send({});

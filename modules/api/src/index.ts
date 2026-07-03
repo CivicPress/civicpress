@@ -218,9 +218,10 @@ export class CivicPressAPI {
       await AuthConfigManager.getInstance().loadConfig();
       logger.info('Auth configuration loaded');
 
-      // Error handling middleware (must be last)
-      this.app.use(notFoundHandler);
-      this.app.use(errorHandler);
+      // NOTE: the 404 (notFoundHandler) + errorHandler are registered at the END
+      // of start(), AFTER the post-listen module mounts (realtime / transcription /
+      // broadcast-box). Registering them here (before those mounts) made the
+      // catch-all 404 shadow every late-added broadcast-box router.
 
       logger.info('CivicPress API initialized');
     } catch (error) {
@@ -514,6 +515,13 @@ export class CivicPressAPI {
     //    crash-safe: a mount failure is logged and swallowed. Routers added
     //    after listen() still serve subsequent requests.
     await this.startBroadcastBox();
+
+    // 5. Error-handling middleware — registered LAST, after EVERY router
+    //    (including the post-listen broadcast-box mount) so the catch-all 404
+    //    never shadows a late-added route. Express matches middleware in
+    //    registration order, so these must come after startBroadcastBox().
+    this.app.use(notFoundHandler);
+    this.app.use(errorHandler);
   }
 
   /**
