@@ -150,7 +150,7 @@ unknown-role fallback is **fail-_safe_** to least-privilege, not fail-open; the
 
 Effort: **S** ≤ ½ day · **M** ~1–3 days · **L** > 3 days / cross-cutting.
 
-### FA-API-001 · Critical · S · Unauthenticated admin-session minting via `POST /api/v1/auth/simulated`
+### FA-API-001 · Critical · S · **closed** (`da2ff38`, branch `refactor/phase-6-audit-remediation-criticals`) · Unauthenticated admin-session minting via `POST /api/v1/auth/simulated`
 
 `modules/api/src/routes/auth.ts:239-307` mounts `/simulated` on the public auth
 router (`index.ts:277-285`, no `authMiddleware`). The only guard is
@@ -165,7 +165,13 @@ escalation to admin (read/write all records incl. closed-session material, user
 management), plus a persistent backdoor user. **Fix:** fail-closed — enable only
 when `NODE_ENV==='development'|'test'` **and** an explicit opt-in flag
 (`CIVIC_ALLOW_SIMULATED_AUTH`); never treat unset as non-production. Prefer not
-mounting the route at all absent the dev flag.
+mounting the route at all absent the dev flag. **Fixed (shipped `da2ff38`):**
+new core helper `isSimulatedAuthEnabled()` — allowed only under `NODE_ENV==='test'`
+or `NODE_ENV==='development'` **with** `CIVIC_ALLOW_SIMULATED_AUTH=true`; unset /
+`production` / anything else denied. Enforced in the API route, the CLI twin
+(`FA-CLI-001`), and core `authenticateWithSimulatedAccount` (throws) as a
+defense-in-depth backstop. Tests: 6 policy unit cases + API 403 cases for both
+unset `NODE_ENV` and `production`.
 
 ### FA-BB-002 · Critical · L · Closed-session (in-camera) video recorded, uploaded, and served publicly unauthenticated
 
@@ -264,7 +270,7 @@ token (shown on local console/QR) enforced on every `/api` route;
 | FA-HW-008   | S      | HW hijack      | `update_config` (`command_handler.py:1198-1213`) writes **any** server-supplied config key with no allowlist — a compromised/MITM server persistently overwrites `civicpress_url` (permanent redirect) or `encryption_key`.                                                                                                                                       | —                            |
 | FA-HW-009   | M      | HW transport   | No TLS floor: `main.py:363` picks `ws` for any non-`https://` URL (the documented example is `http://`), and the token/enrollment code are then sent; there is **no refusal or warning** on cleartext. Bearer token + one-time code + uploads travel unencrypted across the (untrusted) network.                                                                  | —                            |
 | FA-UI-001   | M      | UI XSS         | `app/app.vue:62-135` fetches `/api/v1/info` and **re-materializes `<script>` elements** from `analytics.inject_head/body_*` into `<head>`/`<body>` with no sanitization/allow-list/CSP; combined with JWT+CSRF in `localStorage` (`stores/auth.ts:115`, `useCsrf.ts`) any injected script exfiltrates tokens. Still-present.                                      | ui-004                       |
-| FA-CLI-001  | S      | CLI auth       | `civic auth:simulated` is gated only by `NODE_ENV==='production'` (`cli/src/commands/auth.ts:328`), and core `authenticateWithSimulatedAccount` has no env check — on a host with `NODE_ENV` unset, `--role admin` mints a real admin token with no credential (the CLI twin of `FA-API-001`).                                                                    | cli-010                      |
+| FA-CLI-001 · **closed** (`da2ff38`) | S | CLI auth | `civic auth:simulated` is gated only by `NODE_ENV==='production'` (`cli/src/commands/auth.ts:328`), and core `authenticateWithSimulatedAccount` has no env check — on a host with `NODE_ENV` unset, `--role admin` mints a real admin token with no credential (the CLI twin of `FA-API-001`). **Fixed** with the shared `isSimulatedAuthEnabled()` gate + core backstop. | cli-010 |
 
 ---
 
