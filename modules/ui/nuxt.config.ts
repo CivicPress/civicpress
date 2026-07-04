@@ -26,8 +26,14 @@ export default defineNuxtConfig({
   // Runtime configuration
   runtimeConfig: {
     public: {
-      // API base URL
-      civicApiUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+      // API base URL. CIVIC_API_CLIENT_BASE lets the browser client use a
+      // relative base ('') so requests ride the same origin and hit the
+      // Nitro devProxy below (no CORS, works from any host/tunnel); unset,
+      // it falls back to API_BASE_URL then the local default as before.
+      civicApiUrl:
+        process.env.CIVIC_API_CLIENT_BASE ??
+        process.env.API_BASE_URL ??
+        'http://localhost:3000',
       // App configuration
       appName: 'CivicPress',
       appVersion: '0.1.3',
