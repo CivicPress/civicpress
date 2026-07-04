@@ -1,5 +1,5 @@
 import { CAC } from 'cac';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, isSimulatedAuthEnabled } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
 import {
   getGlobalOptionsFromArgs,
@@ -324,11 +324,13 @@ export default function setupAuthCommand(cli: CAC) {
 
       const endOperation = cliStartOperation('auth:simulated');
 
-      // Check production environment first, before any initialization
-      if (process.env.NODE_ENV === 'production') {
+      // FA-CLI-001: fail closed before any initialization. Only enabled in an
+      // explicit dev/test environment; an unset NODE_ENV is treated as production.
+      if (!isSimulatedAuthEnabled()) {
         cliError(
-          'Simulated accounts are disabled in production',
-          'PRODUCTION_DISABLED',
+          'Simulated accounts are disabled in this environment ' +
+            '(enable only in development with CIVIC_ALLOW_SIMULATED_AUTH=true)',
+          'SIMULATED_AUTH_DISABLED',
           undefined,
           'auth:simulated'
         );

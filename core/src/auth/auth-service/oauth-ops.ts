@@ -3,6 +3,10 @@ import { Logger } from '../../utils/logger.js';
 import { OAuthProviderManager, type OAuthUser } from '../oauth-provider.js';
 import type { AuthUser, Session } from '../auth-service.js';
 import type { AuthAuditEvent } from './user-ops.js';
+import {
+  isSimulatedAuthEnabled,
+  SIMULATED_AUTH_DISABLED_MESSAGE,
+} from '../simulated-auth-policy.js';
 
 export interface OAuthOpsDeps {
   db: DatabaseService;
@@ -268,6 +272,12 @@ export class OAuthOps {
     username: string,
     role: string = 'public'
   ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
+    // FA-API-001 backstop: refuse passwordless auth outside dev/test even if a
+    // caller forgets to gate its own entry point. Thrown before the try so it is
+    // not swallowed into the generic "Simulated authentication failed" message.
+    if (!isSimulatedAuthEnabled()) {
+      throw new Error(SIMULATED_AUTH_DISABLED_MESSAGE);
+    }
     try {
       // Create or get simulated user
       const user = await this.createSimulatedUser({

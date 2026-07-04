@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { HttpError } from '../utils/http-error.js';
-import { CivicPress, CsrfProtection } from '@civicpress/core';
+import {
+  CivicPress,
+  CsrfProtection,
+  isSimulatedAuthEnabled,
+} from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -237,11 +241,13 @@ router.post('/logout', async (req, res) => {
  * Authenticate with simulated account (for development/testing)
  */
 router.post('/simulated', async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
+  // FA-API-001: fail closed. Only enabled in an explicit dev/test environment
+  // (see isSimulatedAuthEnabled); an unset NODE_ENV is treated as production.
+  if (!isSimulatedAuthEnabled()) {
     return res.status(403).json({
       success: false,
       error: {
-        message: 'Simulated accounts are disabled in production',
+        message: 'Simulated accounts are disabled in this environment',
         code: 'SIMULATED_AUTH_DISABLED',
       },
     });

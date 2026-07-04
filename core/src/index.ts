@@ -147,6 +147,10 @@ export {
   userIsAdmin,
   initializeRoleManager,
 } from './auth/role-utils.js';
+export {
+  isSimulatedAuthEnabled,
+  SIMULATED_AUTH_DISABLED_MESSAGE,
+} from './auth/simulated-auth-policy.js';
 
 // Export existing services
 export { GitEngine } from './git/git-engine.js';
