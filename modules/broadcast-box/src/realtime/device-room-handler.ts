@@ -587,6 +587,29 @@ export class DeviceRoomHandler implements RoomTypeHandler {
       return;
     }
 
+    // FA-BB-001: a device may only rewrite the capture block of a session it
+    // owns. The manifest carries `capture.segments`, which the server trusts to
+    // exclude in-camera content from the transcript AND (once redaction lands)
+    // from the published video — so an unchecked manifest lets any enrolled
+    // device relabel another session's closed segments as public, or repoint its
+    // `av_file` (FA-BB-013). Resolve the broadcast session behind this CivicPress
+    // record id and require the caller to be its owning device. Both ids are the
+    // device DB id (`device.id`), so a direct comparison is authoritative.
+    const ownedSession =
+      await this.config.sessionController.getSessionByCivicPressId(sessionId);
+    if (!ownedSession || ownedSession.deviceId !== deviceAuth.deviceId) {
+      coreWarn(
+        'session.manifest rejected — device does not own the session — dropped',
+        {
+          operation: 'broadcast-box:device-handler:manifest:forbidden',
+          deviceId: deviceAuth.deviceId,
+          sessionId,
+          ownerDeviceId: ownedSession?.deviceId,
+        }
+      );
+      return;
+    }
+
     try {
       await this.config.sessionController.applySessionManifest(
         sessionId,
