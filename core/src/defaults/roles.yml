@@ -35,6 +35,7 @@ roles:
         - 'storage:delete'
         - 'storage:manage'
         - 'storage:admin'
+        - 'storage:read_private'
       type: 'array'
       description: 'List of permissions granted to this role'
       required: true

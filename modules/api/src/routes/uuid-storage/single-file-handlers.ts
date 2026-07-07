@@ -1,6 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
 import { body, param, validationResult } from 'express-validator';
-import { userCan } from '@civicpress/core';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { requireStoragePermission } from '../../middleware/auth.js';
 import {
@@ -13,6 +12,7 @@ import {
   upload,
   getStorageService,
   getStorageConfigManager,
+  checkFileAccess,
 } from './handlers-common.js';
 
 export function registerSingleFileRoutes(router: Router): void {
@@ -175,39 +175,19 @@ export function registerSingleFileRoutes(router: Router): void {
           }
         }
         const folderConfig = config.folders?.[fileInfo.folder];
-        const folderAccess = folderConfig?.access ?? 'private';
-        const isPublicFolder = folderAccess === 'public';
-
-        if (!req.user) {
-          if (!isPublicFolder) {
-            res.status(401).json({
-              success: false,
-              error: {
-                message: 'Authentication required',
-                code: 'UNAUTHENTICATED',
-              },
-            });
-            return;
-          }
-        } else if (!isPublicFolder) {
-          const hasPermission = await userCan(req.user, 'storage:download', { action: 'view' });
-
-          if (!hasPermission) {
-            res.status(403).json({
-              success: false,
-              error: {
-                message: 'Permission denied: Cannot download storage resources',
-                code: 'INSUFFICIENT_PERMISSIONS',
-                required: 'storage:download',
-                user: {
-                  id: req.user.id,
-                  username: req.user.username,
-                  role: req.user.role,
-                },
-              },
-            });
-            return;
-          }
+        // FA-STOR-002: same three-tier gate as download — /info leaks file
+        // metadata (name, size, path) so it must honor the private tier too.
+        const access = await checkFileAccess(folderConfig?.access, req.user);
+        if (!access.ok) {
+          res.status(access.status ?? 403).json({
+            success: false,
+            error: {
+              message: access.message,
+              code: access.code,
+              ...(access.required ? { required: access.required } : {}),
+            },
+          });
+          return;
         }
 
         return handleStorageSuccess(
@@ -288,39 +268,18 @@ export function registerSingleFileRoutes(router: Router): void {
           }
         }
         const folderConfig = config.folders?.[fileInfo.folder];
-        const folderAccess = folderConfig?.access ?? 'private';
-        const isPublicFolder = folderAccess === 'public';
-
-        if (!req.user) {
-          if (!isPublicFolder) {
-            res.status(401).json({
-              success: false,
-              error: {
-                message: 'Authentication required',
-                code: 'UNAUTHENTICATED',
-              },
-            });
-            return;
-          }
-        } else if (!isPublicFolder) {
-          const hasPermission = await userCan(req.user, 'storage:download', { action: 'view' });
-
-          if (!hasPermission) {
-            res.status(403).json({
-              success: false,
-              error: {
-                message: 'Permission denied: Cannot download storage resources',
-                code: 'INSUFFICIENT_PERMISSIONS',
-                required: 'storage:download',
-                user: {
-                  id: req.user.id,
-                  username: req.user.username,
-                  role: req.user.role,
-                },
-              },
-            });
-            return;
-          }
+        // FA-STOR-002: three-tier gate (public / authenticated / private).
+        const access = await checkFileAccess(folderConfig?.access, req.user);
+        if (!access.ok) {
+          res.status(access.status ?? 403).json({
+            success: false,
+            error: {
+              message: access.message,
+              code: access.code,
+              ...(access.required ? { required: access.required } : {}),
+            },
+          });
+          return;
         }
 
         const fileContent = await storageService.getFileContent(fileId);

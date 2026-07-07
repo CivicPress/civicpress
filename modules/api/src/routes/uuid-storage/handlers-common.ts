@@ -4,8 +4,74 @@ import {
   StorageConfigManager,
   initializeStorageService,
 } from '@civicpress/storage';
+import { userCan } from '@civicpress/core';
 import path from 'path';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
+
+/**
+ * Decision returned by {@link checkFileAccess}. `ok:true` means serve; otherwise
+ * `status`/`code`/`message` describe the deny response to send.
+ */
+export interface StorageAccessDecision {
+  ok: boolean;
+  status?: number;
+  code?: string;
+  message?: string;
+  required?: string;
+}
+
+/**
+ * The single three-tier storage access gate (FA-STOR-002). Consulted by every
+ * read surface — file download, file `/info`, and folder listing — so the access
+ * model can't drift between handlers (the check used to be hand-copied in three
+ * places and only the download path was ever tightened).
+ *
+ *   public        → open to everyone, including anonymous callers
+ *   authenticated → any logged-in user holding `storage:download`
+ *   private / *   → `storage:read_private`, a permission NOT granted to the
+ *                   default `public` role or to `clerk` (admin-only by default).
+ *
+ * Unknown/missing access levels fall through to the private tier — fail closed.
+ */
+export async function checkFileAccess(
+  folderAccess: string | undefined,
+  user: AuthenticatedRequest['user']
+): Promise<StorageAccessDecision> {
+  const access = folderAccess ?? 'private';
+
+  if (access === 'public') {
+    return { ok: true };
+  }
+
+  if (!user) {
+    return {
+      ok: false,
+      status: 401,
+      code: 'UNAUTHENTICATED',
+      message: 'Authentication required',
+    };
+  }
+
+  // 'authenticated' keeps the historical storage:download requirement (so
+  // clerks/citizens keep permit access); anything else — private or an
+  // unrecognized level — demands the stronger confidential permission.
+  const required =
+    access === 'authenticated' ? 'storage:download' : 'storage:read_private';
+  const allowed = await userCan(user, required, { action: 'view' });
+  if (!allowed) {
+    return {
+      ok: false,
+      status: 403,
+      code: 'INSUFFICIENT_PERMISSIONS',
+      message:
+        required === 'storage:read_private'
+          ? 'Permission denied: confidential storage requires storage:read_private'
+          : 'Permission denied: Cannot access storage resource',
+      required,
+    };
+  }
+  return { ok: true };
+}
 
 // Configure multer for file uploads
 export const upload = multer({

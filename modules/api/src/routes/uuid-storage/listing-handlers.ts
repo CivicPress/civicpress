@@ -118,38 +118,43 @@ export function registerListingRoutes(router: Router): void {
           return;
         }
         const folderAccess = folderConfig.access ?? 'private';
-        const isPublicFolder = folderAccess === 'public';
 
+        // FA-STOR-001: folder ENUMERATION is never anonymous. The prior
+        // public-folder bypass (added for storage-002) let anyone list every
+        // recording/transcript UUID + a ready-made download URL without any
+        // record being published — the enumeration amplifier for FA-BB-002.
+        // Listing now always requires auth; private folders additionally require
+        // storage:read_private so a raw-recordings folder can't be enumerated by
+        // the default public/clerk roles. Per-file GET stays public for public
+        // folders, so citizen playback (which resolves ids from a published
+        // record's attached_files, never from listing) is unaffected.
         if (!req.user) {
-          if (!isPublicFolder) {
-            res.status(401).json({
-              success: false,
-              error: {
-                message: 'Authentication required',
-                code: 'UNAUTHENTICATED',
-              },
-            });
-            return;
-          }
-        } else if (!isPublicFolder) {
-          // Note: folder isn't part of userCan's context schema — the prior
-          // `folder: folderName` field was a no-op masked by `as any`.
-          const hasPermission = await userCan(req.user, 'storage:download', {
-            action: 'view',
+          res.status(401).json({
+            success: false,
+            error: {
+              message: 'Authentication required',
+              code: 'UNAUTHENTICATED',
+            },
           });
-
-          if (!hasPermission) {
-            res.status(403).json({
-              success: false,
-              error: {
-                message:
-                  'Permission denied: Cannot list files in non-public folder',
-                code: 'INSUFFICIENT_PERMISSIONS',
-                required: 'storage:download',
-              },
-            });
-            return;
-          }
+          return;
+        }
+        const required =
+          folderAccess === 'private'
+            ? 'storage:read_private'
+            : 'storage:download';
+        const hasPermission = await userCan(req.user, required, {
+          action: 'view',
+        });
+        if (!hasPermission) {
+          res.status(403).json({
+            success: false,
+            error: {
+              message: 'Permission denied: Cannot list files in this folder',
+              code: 'INSUFFICIENT_PERMISSIONS',
+              required,
+            },
+          });
+          return;
         }
 
         const files = await storageService.listFiles(folderName);

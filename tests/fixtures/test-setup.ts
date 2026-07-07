@@ -898,6 +898,7 @@ export function createRolesConfig(config: TestConfig) {
             'storage:upload',
             'storage:download',
             'storage:delete',
+            'storage:read_private',
           ],
           type: 'array',
           description: 'List of permissions granted to this role',

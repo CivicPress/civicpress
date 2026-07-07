@@ -191,6 +191,39 @@ describe('UUID Storage API', () => {
       expect(authenticatedResponse.status).toBe(200);
     });
 
+    it('FA-STOR-002: a download-only role cannot read a private folder', async () => {
+      // Upload a private-folder file as admin.
+      const privateFilePath = path.join(context.testDir, 'private-clerk.pdf');
+      await fs.writeFile(privateFilePath, 'confidential document body');
+      const up = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', privateFilePath)
+        .field('folder', 'private');
+      expect(up.status).toBe(200);
+      const fileId = up.body.data.id;
+
+      // Clerk holds storage:download (and storage:manage) but NOT
+      // storage:read_private — the old gate let this through (private ≈
+      // authenticated). It must now be denied.
+      const clerkResp = await request(context.api.getApp())
+        .post('/api/v1/auth/simulated')
+        .send({ username: 'clerk', role: 'clerk' });
+      const clerkToken = clerkResp.body.data.session.token;
+
+      const denied = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${fileId}`)
+        .set('Authorization', `Bearer ${clerkToken}`);
+      expect(denied.status).toBe(403);
+      expect(denied.body.error.required).toBe('storage:read_private');
+
+      // Admin (holds storage:read_private) is still allowed.
+      const allowed = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${fileId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(allowed.status).toBe(200);
+    });
+
     it('should return 404 for non-existent file', async () => {
       const fakeUuid = '123e4567-e89b-12d3-a456-426614174000';
       const response = await request(context.api.getApp())
@@ -291,6 +324,34 @@ describe('UUID Storage API', () => {
       expect(file).toHaveProperty('relative_path');
       expect(file).toHaveProperty('size');
       expect(file).toHaveProperty('mime_type');
+    });
+
+    it('FA-STOR-001: anonymous folder listing is rejected (no enumeration)', async () => {
+      // The old public-folder bypass let anyone enumerate every UUID in a
+      // public folder (recordings/transcripts) — the FA-BB-002 amplifier.
+      const anon = await request(context.api.getApp()).get(
+        '/api/v1/storage/folders/public/files'
+      );
+      expect(anon.status).toBe(401);
+    });
+
+    it('FA-STOR-001/002: a download-only role cannot enumerate a private folder', async () => {
+      const clerkResp = await request(context.api.getApp())
+        .post('/api/v1/auth/simulated')
+        .send({ username: 'clerk', role: 'clerk' });
+      const clerkToken = clerkResp.body.data.session.token;
+
+      // Private folder listing requires storage:read_private → clerk denied.
+      const denied = await request(context.api.getApp())
+        .get('/api/v1/storage/folders/private/files')
+        .set('Authorization', `Bearer ${clerkToken}`);
+      expect(denied.status).toBe(403);
+
+      // A public folder listing still works for a storage:download holder.
+      const ok = await request(context.api.getApp())
+        .get('/api/v1/storage/folders/public/files')
+        .set('Authorization', `Bearer ${clerkToken}`);
+      expect(ok.status).toBe(200);
     });
   });
 

@@ -47,7 +47,16 @@ export class StorageConfigManager {
           access: 'public',
           allowed_types: ['mp4', 'webm', 'mov', 'mkv', 'mp3', 'wav', 'm4a'],
           max_size: '4096MB',
-          description: 'BroadcastBox A/V recordings uploaded by devices',
+          description:
+            'Publicly served BroadcastBox recordings — REDACTED variants only (in-camera windows blanked). Raw originals never land here (FA-BB-002).',
+        },
+        recordings_raw: {
+          path: 'recordings_raw',
+          access: 'private',
+          allowed_types: ['mp4', 'webm', 'mov', 'mkv', 'mp3', 'wav', 'm4a'],
+          max_size: '4096MB',
+          description:
+            'Raw unredacted BroadcastBox originals (may contain in-camera/closed-session A/V). Private: requires storage:read_private (FA-BB-002 / FA-STOR-002). Device uploads land here; the redaction worker publishes a blanked variant to `recordings`.',
         },
         transcripts: {
           path: 'transcripts',
@@ -118,6 +127,14 @@ export class StorageConfigManager {
    */
   async saveConfig(config: StorageConfig): Promise<void> {
     try {
+      // FA-BB-002/FA-STOR-002: confidential folders must never be persisted with
+      // a weaker access level. `mergeWithDefaults` lets a stored storage.yml value
+      // beat the code default at load time, so without this guard a CLI
+      // `storage:config`/updateFolder could silently re-open recordings_raw to
+      // `public` and re-expose raw closed-session A/V. All mutation paths
+      // (addFolder/updateFolder/updateConfig/direct save) funnel through here.
+      this.assertConfidentialFolderInvariant(config);
+
       // Ensure directory exists
       await fs.ensureDir(path.dirname(this.configPath));
 
@@ -151,6 +168,27 @@ export class StorageConfigManager {
   }
 
   /**
+   * Folders that MUST stay `access: 'private'` — they hold confidential
+   * material (raw closed-session A/V) and are a load-bearing part of the
+   * FA-BB-002 fail-closed model.
+   */
+  private static readonly CONFIDENTIAL_FOLDERS = ['recordings_raw'];
+
+  /**
+   * Reject any config that would weaken a confidential folder's access level.
+   */
+  private assertConfidentialFolderInvariant(config: StorageConfig): void {
+    for (const name of StorageConfigManager.CONFIDENTIAL_FOLDERS) {
+      const folder = config.folders?.[name];
+      if (folder && folder.access !== 'private') {
+        throw new Error(
+          `Storage folder '${name}' must be access: 'private' (holds confidential closed-session A/V); refusing to set access: '${folder.access}'.`
+        );
+      }
+    }
+  }
+
+  /**
    * Add a new storage folder
    */
   async addFolder(
@@ -181,7 +219,11 @@ export class StorageConfigManager {
     }
 
     // Don't allow removal of system folders
-    if (['public', 'sessions', 'permits', 'private'].includes(folderName)) {
+    if (
+      ['public', 'sessions', 'permits', 'private', 'recordings_raw'].includes(
+        folderName
+      )
+    ) {
       throw new Error(`Cannot remove system folder '${folderName}'`);
     }
 
