@@ -44,7 +44,13 @@ export function createUploadsRouter(
       body('fileName')
         .isString()
         .notEmpty()
-        .withMessage('File name is required'),
+        .isLength({ max: 255 })
+        // FA-BB-003: a plain basename only — it becomes a disk path server-side.
+        .custom(
+          (value: string) =>
+            !/[/\\\0]/.test(value) && value !== '.' && value !== '..'
+        )
+        .withMessage('File name must be a plain file name'),
       body('fileSize')
         .isInt({ min: 1 })
         .withMessage('File size must be a positive integer'),

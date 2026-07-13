@@ -258,6 +258,26 @@ describe('HTTP chunked upload → capture block (real storage, mounted module)',
     expect(rawInfo?.folder).toBe('recordings_raw');
   }, 20000);
 
+  it('FA-BB-003: rejects a traversal fileName over the wire (400)', async () => {
+    const recordId = await createSessionRecord();
+    const { device, token } = await onboardDevice('Cam Traversal');
+    const bsId = await seedSession(device.id, recordId);
+
+    for (const fileName of ['../../../.civic/hooks.yml', 'a/b.mp4', '..']) {
+      const res = await request(app)
+        .post('/api/v1/broadcast-box/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sessionId: bsId,
+          fileName,
+          fileSize: 10,
+          fileHash: 'abc',
+          mimeType: 'video/mp4',
+        });
+      expect(res.status).toBe(400);
+    }
+  });
+
   it('rejects an upload with no device token (401)', async () => {
     const res = await request(app)
       .post('/api/v1/broadcast-box/uploads')

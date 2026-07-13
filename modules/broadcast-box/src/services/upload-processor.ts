@@ -58,12 +58,35 @@ export class UploadProcessor {
   }
 
   /**
+   * FA-BB-003: `fileName` is device-controlled and becomes a DISK path
+   * (`path.join(uploadDir, fileName)`) — chunk bytes are written there
+   * BEFORE the hash check, so `../` meant an authenticated/compromised
+   * device could write attacker-controlled bytes to an arbitrary path
+   * (config/hook overwrite → plausible RCE). Only a plain basename is
+   * accepted; anything else fails the upload up front.
+   */
+  private assertSafeFileName(fileName: string): void {
+    if (
+      typeof fileName !== 'string' ||
+      fileName.length === 0 ||
+      fileName.length > 255 ||
+      fileName === '.' ||
+      fileName === '..' ||
+      /[/\\\0]/.test(fileName) ||
+      fileName !== path.basename(fileName)
+    ) {
+      throw new Error('Invalid fileName: must be a plain file name');
+    }
+  }
+
+  /**
    * Create a new upload job
    */
   async createUpload(
     request: CreateUploadRequest,
     expectedDeviceId?: string
   ): Promise<UploadJob> {
+    this.assertSafeFileName(request.fileName);
     const uploadId = uuidv4();
 
     // Resolve the owning device from the broadcast session up front, so an

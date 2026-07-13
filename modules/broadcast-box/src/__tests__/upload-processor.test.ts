@@ -119,6 +119,62 @@ describe('UploadProcessor', () => {
       expect(result.status).toBe('pending');
       expect(mockUploadModel.create).toHaveBeenCalled();
     });
+
+    it('FA-BB-003: rejects fileName path traversal before any row/dir is created', async () => {
+      const mockUploadModel = { db: mockDb, create: vi.fn() };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const base = {
+        sessionId: 'session-id',
+        fileSize: 1000,
+        fileHash: 'h',
+        mimeType: 'video/mp4',
+      };
+      for (const fileName of [
+        '../../../.civic/hooks.yml',
+        '..\\..\\evil.mp4',
+        'a/b.mp4',
+        '..',
+        '.',
+        '',
+        'x'.repeat(256),
+        'nul\0byte.mp4',
+      ]) {
+        await expect(
+          processor.createUpload({ ...base, fileName })
+        ).rejects.toThrow(/Invalid fileName/);
+      }
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+      // No upload directory was created for any rejected attempt.
+      const dirs = await fs.readdir(path.join(testDir, 'tmp', 'uploads'));
+      expect(dirs).toHaveLength(0);
+    });
+
+    it('FA-BB-003: plain basenames (incl. dots inside) stay accepted', async () => {
+      const mockSessionDb = {
+        getAdapter: vi.fn().mockReturnValue({
+          query: vi.fn().mockResolvedValue([{ device_id: 'device-id' }]),
+        }),
+      };
+      const mockUploadModel = {
+        db: mockSessionDb,
+        create: vi.fn().mockImplementation(async (u: any) => ({
+          ...u,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const result = await processor.createUpload({
+        sessionId: 'session-id',
+        fileName: 'meeting..2026-07-13.recording.mp4',
+        fileSize: 1000,
+        fileHash: 'h',
+        mimeType: 'video/mp4',
+      });
+      expect(result.fileName).toBe('meeting..2026-07-13.recording.mp4');
+    });
   });
 
   describe('processChunk', () => {
