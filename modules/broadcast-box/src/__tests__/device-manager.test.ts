@@ -158,6 +158,38 @@ describe('DeviceManager', () => {
       expect(mockEnrollmentCodeModel.markAsUsed).not.toHaveBeenCalled();
     });
 
+    it('FA-BB-004: rejects a valid code presented with a DIFFERENT device UUID', async () => {
+      // The intercepted-code attack: a rogue device races the real appliance
+      // with the stolen one-time code and its OWN UUID. The code is bound to
+      // the UUID it was issued for; the mismatch must fail with the same
+      // generic error as an unknown code (no binding-existence oracle) and
+      // must neither register nor consume anything.
+      const code = await freshCode('real-appliance-uuid');
+      const mockEnrollmentCodeModel = {
+        findByCode: vi.fn().mockResolvedValue(code),
+        isExpired: vi.fn().mockReturnValue(false),
+        isUsed: vi.fn().mockReturnValue(false),
+        markAsUsed: vi.fn().mockResolvedValue(undefined),
+      };
+      const mockDeviceModel = {
+        getByDeviceUuid: vi.fn().mockResolvedValue(null),
+        create: vi.fn(),
+      };
+
+      (deviceManager as any).enrollmentCodeModel = mockEnrollmentCodeModel;
+      (deviceManager as any).deviceModel = mockDeviceModel;
+
+      await expect(
+        deviceManager.registerDevice({
+          deviceUuid: 'attacker-rogue-uuid',
+          enrollmentCode,
+          name: 'Rogue Device',
+        })
+      ).rejects.toThrow('Invalid enrollment code');
+      expect(mockDeviceModel.create).not.toHaveBeenCalled();
+      expect(mockEnrollmentCodeModel.markAsUsed).not.toHaveBeenCalled();
+    });
+
     it('rejects an already-used code (a consumed code no longer resolves)', async () => {
       const deviceUuid = 'test-device-uuid';
       // A used code is filtered out by findByCode's `used_at IS NULL` query.

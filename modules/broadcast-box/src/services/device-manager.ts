@@ -108,8 +108,10 @@ export class DeviceManager {
     }
   ): Promise<BroadcastDevice> {
     // Validate enrollment code
-    // Find the enrollment code by matching the provided code against stored hashes
-    // This allows any device UUID to register with a valid enrollment code
+    // Find the enrollment code by matching the provided code against stored
+    // hashes, then require the caller's deviceUuid to MATCH the UUID the code
+    // was issued for (FA-BB-004 — an intercepted code must not let a rogue
+    // device register first under its own UUID).
     this.logger.debug('Looking up enrollment code for device', {
       operation: 'broadcast-box:device:registration:lookup',
       deviceUuid: data.deviceUuid,
@@ -148,6 +150,24 @@ export class DeviceManager {
       expiresAt: enrollmentCode.expiresAt.toISOString(),
       usedAt: enrollmentCode.usedAt?.toISOString() || null,
     });
+
+    // FA-BB-004: the one-time code is BOUND to the device UUID it was issued
+    // for. Without this check, an intercepted code let an attacker register a
+    // rogue device (their own UUID) FIRST, receive the device token, and lock
+    // out the real appliance. Same generic error as an unknown code so the
+    // response does not reveal that a valid code exists for another UUID.
+    if (enrollmentCode.deviceUuid !== data.deviceUuid) {
+      coreWarn(
+        'Device registration failed: enrollment code is bound to a different device UUID',
+        {
+          operation: 'broadcast-box:device:registration:uuid-mismatch',
+          enrollmentDeviceUuid: enrollmentCode.deviceUuid,
+          registrationDeviceUuid: data.deviceUuid,
+          registrationIp: data.registrationIp || 'unknown',
+        }
+      );
+      throw new Error('Invalid enrollment code');
+    }
 
     // Check if device UUID already exists FIRST (before expiration check)
     // This allows recovery for existing devices even with expired codes
