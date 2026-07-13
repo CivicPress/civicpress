@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { CivicPress, CsrfProtection } from '@civicpress/core';
+import {
+  CivicPress,
+  CsrfProtection,
+  isSimulatedAuthEnabled,
+} from '@civicpress/core';
 
 /**
  * CSRF Protection Middleware
@@ -37,9 +41,11 @@ export function csrfMiddleware(civicPress: CivicPress) {
       return next();
     }
 
-    // Skip CSRF for X-Mock-User requests (test-only authentication bypass)
-    // This is safe because X-Mock-User is only used in tests
-    if (req.headers['x-mock-user']) {
+    // Skip CSRF for X-Mock-User requests (test-only authentication bypass).
+    // FA-API-002: honoured ONLY where the mock-user bypass itself is enabled
+    // (isSimulatedAuthEnabled — test / opt-in dev), so it cannot skip CSRF in
+    // production even if the header is present.
+    if (req.headers['x-mock-user'] && isSimulatedAuthEnabled()) {
       return next();
     }
 

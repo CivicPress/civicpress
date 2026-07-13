@@ -1,5 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { CivicPress, AuthUser, Logger, userCan } from '@civicpress/core';
+import {
+  CivicPress,
+  AuthUser,
+  Logger,
+  userCan,
+  isSimulatedAuthEnabled,
+} from '@civicpress/core';
 
 const logger = new Logger();
 
@@ -22,8 +28,17 @@ export function authMiddleware(civicPress: CivicPress) {
     next: NextFunction
   ) => {
     try {
-      // BYPASS_AUTH: Inject mock user for testing
-      if (process.env.BYPASS_AUTH === 'true' && req.headers['x-mock-user']) {
+      // BYPASS_AUTH: inject a mock user for testing. FA-API-002: this trusts
+      // the X-Mock-User header verbatim (role included), so it is a full
+      // auth+authz bypass. It is now gated by the SAME fail-closed policy as
+      // simulated auth (isSimulatedAuthEnabled) — allowed only under
+      // NODE_ENV=test, or development with CIVIC_ALLOW_SIMULATED_AUTH=true;
+      // inert everywhere else even if BYPASS_AUTH leaks into the environment.
+      if (
+        process.env.BYPASS_AUTH === 'true' &&
+        req.headers['x-mock-user'] &&
+        isSimulatedAuthEnabled()
+      ) {
         try {
           req.user = JSON.parse(req.headers['x-mock-user'] as string);
           req.civicPress = civicPress;
