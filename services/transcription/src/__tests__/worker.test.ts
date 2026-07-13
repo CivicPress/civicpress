@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { TranscriptionWorker, computePublicRanges } from '../worker.js';
+import { TranscriptionWorker } from '../worker.js';
 import { NoopEngine } from '../engines/noop.js';
 import type {
   RecordsGateway,
@@ -61,37 +61,17 @@ function mockEngine(
   };
 }
 
+// An attested all-public session (FA-BB-002: absent segments alone now HOLD,
+// so the baseline "transcribe everything" case needs the positive attestation).
 const needs = (extra: Partial<SessionForTranscription> = {}): SessionForTranscription => ({
   id: 'pv-2026-06-09',
-  capture: { device: 'bb-001', av_file: 'uuid-av-1' },
+  capture: { device: 'bb-001', av_file: 'uuid-av-1', all_public: true },
   ...extra,
 });
 
 function worker(records: RecordsGateway, engine: TranscriptionEngine) {
   return new TranscriptionWorker({ records, engine, logger: silentLogger });
 }
-
-describe('computePublicRanges', () => {
-  it('returns null when there are no segments (whole recording public)', () => {
-    expect(computePublicRanges({ av_file: 'x' })).toBeNull();
-    expect(computePublicRanges(undefined)).toBeNull();
-  });
-  it('returns only the public segments, excluding in-camera', () => {
-    expect(
-      computePublicRanges({
-        segments: [
-          { start: 0, end: 7000, visibility: 'public' },
-          { start: 7000, end: 7440, visibility: 'in_camera' },
-        ],
-      })
-    ).toEqual([{ start: 0, end: 7000 }]);
-  });
-  it('returns [] when every segment is in-camera', () => {
-    expect(
-      computePublicRanges({ segments: [{ start: 0, end: 10, visibility: 'in_camera' }] })
-    ).toEqual([]);
-  });
-});
 
 describe('TranscriptionWorker.runOnce', () => {
   it('transcribes a needing session and writes media.transcript + automated', async () => {
@@ -106,7 +86,7 @@ describe('TranscriptionWorker.runOnce', () => {
     ]);
   });
 
-  it('passes only the public ranges to the engine (in-camera excluded)', async () => {
+  it('passes only the public ranges to the engine, shrunk by the skew padding', async () => {
     const gw = new FakeGateway([
       needs({
         capture: {
@@ -122,9 +102,39 @@ describe('TranscriptionWorker.runOnce', () => {
     const engine = mockEngine();
     await worker(gw, engine).runOnce();
 
+    // The hidden window [7000,7440] is padded (default lead 3s) so the public
+    // range shrinks to [0,6997] — content near the closed boundary never leaks.
     expect(engine.transcribe).toHaveBeenCalledWith(
-      expect.objectContaining({ publicRanges: [{ start: 0, end: 7000 }] })
+      expect.objectContaining({ publicRanges: [{ start: 0, end: 6997 }] })
     );
+  });
+
+  it('HOLDS a session with no segments and no attestation (FA-BB-002 fail-closed)', async () => {
+    const gw = new FakeGateway([
+      needs({ capture: { device: 'bb-001', av_file: 'uuid-av-1' } }),
+    ]);
+    const engine = mockEngine();
+    const summary = await worker(gw, engine).runOnce();
+
+    expect(summary).toEqual({ processed: 0, skipped: 1, failed: 0 });
+    expect(engine.transcribe).not.toHaveBeenCalled();
+    expect(gw.writes).toEqual([]);
+    // No latch was written — the session stays pollable for when the manifest lands.
+    expect(await gw.findNeedingTranscription()).toHaveLength(1);
+  });
+
+  it('HOLDS a session with empty segments ([] is UNKNOWN, not all-public)', async () => {
+    const gw = new FakeGateway([
+      needs({
+        capture: { device: 'bb-001', av_file: 'uuid-av-1', segments: [] },
+      }),
+    ]);
+    const engine = mockEngine();
+    const summary = await worker(gw, engine).runOnce();
+
+    expect(summary).toEqual({ processed: 0, skipped: 1, failed: 0 });
+    expect(engine.transcribe).not.toHaveBeenCalled();
+    expect(gw.writes).toEqual([]);
   });
 
   it('skips an in-camera session entirely (no engine call, no write)', async () => {

@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -193,6 +194,19 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
 
     const id = await seedSessionRecord();
 
+    // FA-BB-001: a manifest is only accepted from the device that OWNS the
+    // broadcast session behind the record — seed that ownership row.
+    const sessionController: any = container.resolve(
+      'broadcastBoxSessionController'
+    );
+    await sessionController.sessionModel.create({
+      id: crypto.randomUUID(),
+      deviceId: device.id,
+      civicpressSessionId: id,
+      status: 'recording',
+      metadata: {},
+    });
+
     // R2: connect a real WebSocket as the device and send session.manifest.
     ws = new WebSocket(
       `ws://127.0.0.1:${port}/realtime/devices/${device.deviceUuid}`,
@@ -258,7 +272,8 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
     }
 
     expect(capture).not.toBeNull();
-    expect(capture.av_file).toBe('av-uuid-1');
+    // FA-BB-013: a manifest may NOT bind av_file — only upload-finalize does.
+    expect(capture.av_file).toBeUndefined();
     expect(capture.segments).toHaveLength(3);
     expect(capture.segments[1]).toMatchObject({ visibility: 'in_camera' });
   }, 20000);

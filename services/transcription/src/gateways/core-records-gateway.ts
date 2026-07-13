@@ -198,8 +198,9 @@ export class CoreRecordsGateway implements RecordsGateway {
    * `capture.segments` arrive separately via the device `session.manifest`. The
    * two RACE, so triggering on `av_file` alone lets the worker transcribe a
    * recording before its in-camera windows are known — leaking closed-session
-   * audio. `segments` is only ever written by the manifest (an empty `[]` =
-   * all-public still counts as ready); waiting for it is the safe contract.
+   * audio. `segments` is only ever written by the manifest; waiting for it (or
+   * an explicit `all_public` attestation) is the safe contract. NB an empty
+   * `[]` is UNKNOWN, not all-public — the worker HOLDS on it (FA-BB-002).
    */
   async findNeedingTranscription(): Promise<SessionForTranscription[]> {
     const { records } = await this.opts.records.listRecords({
@@ -210,7 +211,8 @@ export class CoreRecordsGateway implements RecordsGateway {
       const session = await this.getSession(row.id);
       if (
         session?.capture?.av_file &&
-        session.capture.segments !== undefined &&
+        (session.capture.segments !== undefined ||
+          session.capture.all_public === true) &&
         !session.transcript_status
       ) {
         out.push(session);

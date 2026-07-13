@@ -42,6 +42,12 @@ export interface TranscriptionConfig {
   language: string;
   /** Poll cadence when the worker runs as a loop. */
   pollIntervalMs: number;
+  /**
+   * Clock-skew padding (seconds) applied to hidden windows before excluding
+   * them — see visibility.ts (FA-BB-002). Defaults 3 lead / 5 trail.
+   */
+  leadPadS: number;
+  trailPadS: number;
   /** whisper.cpp settings (required when `engine === 'whisper-cpp'`). */
   whisperCpp?: WhisperCppConfig;
 }
@@ -51,6 +57,8 @@ export const DEFAULT_TRANSCRIPTION_CONFIG: TranscriptionConfig = {
   engine: 'noop',
   language: 'fr-CA',
   pollIntervalMs: 30_000,
+  leadPadS: 3,
+  trailPadS: 5,
 };
 
 /**
@@ -80,6 +88,15 @@ export function normalizeTranscriptionConfig(
       typeof pollRaw === 'number'
         ? pollRaw
         : DEFAULT_TRANSCRIPTION_CONFIG.pollIntervalMs,
+    leadPadS:
+      typeof r.visibility_pad_lead_s === 'number' && r.visibility_pad_lead_s >= 0
+        ? r.visibility_pad_lead_s
+        : DEFAULT_TRANSCRIPTION_CONFIG.leadPadS,
+    trailPadS:
+      typeof r.visibility_pad_trail_s === 'number' &&
+      r.visibility_pad_trail_s >= 0
+        ? r.visibility_pad_trail_s
+        : DEFAULT_TRANSCRIPTION_CONFIG.trailPadS,
   };
 
   if (

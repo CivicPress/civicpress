@@ -35,12 +35,23 @@ describe('normalizeTranscriptionConfig', () => {
       engine: 'whisper-cpp',
       language: 'fr-CA',
       pollIntervalMs: 15000,
+      leadPadS: 3,
+      trailPadS: 5,
       whisperCpp: {
         binary: '/opt/whisper/whisper-cli',
         model: '/opt/whisper/ggml-small.bin',
         threads: 4,
       },
     });
+  });
+
+  it('parses the visibility skew pads (snake_case from YAML)', () => {
+    const config = normalizeTranscriptionConfig({
+      visibility_pad_lead_s: 1,
+      visibility_pad_trail_s: 2,
+    });
+    expect(config.leadPadS).toBe(1);
+    expect(config.trailPadS).toBe(2);
   });
 
   it('drops an incomplete whisper_cpp block (missing model) → no engine config', () => {

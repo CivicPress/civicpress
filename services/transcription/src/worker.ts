@@ -12,12 +12,12 @@ import type {
   Logger,
   RecordsGateway,
   RunSummary,
-  SessionCapture,
   SessionForTranscription,
   TimeRange,
   TranscriptionEngine,
 } from './types.js';
 import { deriveTopics } from './structuring.js';
+import { resolveVisibility } from './visibility.js';
 
 export interface WorkerOptions {
   records: RecordsGateway;
@@ -25,25 +25,12 @@ export interface WorkerOptions {
   logger: Logger;
   /** Transcription language hint. Defaults to fr-CA (the pilot data). */
   language?: string;
+  /** Clock-skew padding on hidden windows (seconds; defaults 3 lead / 5 trail). */
+  leadPadS?: number;
+  trailPadS?: number;
 }
 
 type Outcome = 'written' | 'skipped' | 'failed';
-
-/**
- * Public time ranges to transcribe.
- * - `null`  → no segments declared, the whole recording is public.
- * - `[]`    → segments declared but none public (fully in-camera) → nothing to do.
- * - `[...]` → the public segments only (in-camera excluded).
- */
-export function computePublicRanges(
-  capture: SessionCapture | undefined
-): TimeRange[] | null {
-  const segments = capture?.segments;
-  if (!segments || segments.length === 0) return null;
-  return segments
-    .filter((s) => s.visibility === 'public')
-    .map((s) => ({ start: s.start, end: s.end }));
-}
 
 export class TranscriptionWorker {
   private running = false;
@@ -87,13 +74,29 @@ export class TranscriptionWorker {
       logger.warn('session is in-camera — not transcribing', { id: session.id });
       return 'skipped';
     }
-    const publicRanges = computePublicRanges(session.capture);
-    if (publicRanges !== null && publicRanges.length === 0) {
+    // Fail-closed visibility (FA-BB-002): UNKNOWN segments HOLD — a session
+    // with no/empty/malformed segments and no all-public attestation is never
+    // transcribed whole-file. Hidden windows are skew-padded, so the public
+    // ranges handed to the engine shrink at every boundary touching them.
+    const decision = resolveVisibility(session.capture, {
+      leadPadS: this.opts.leadPadS,
+      trailPadS: this.opts.trailPadS,
+    });
+    if (decision.kind === 'hold') {
+      logger.warn('session visibility unknown — holding, not transcribing', {
+        id: session.id,
+        reason: decision.reason,
+      });
+      return 'skipped';
+    }
+    if (decision.kind === 'none_public') {
       logger.warn('session has no public segments — not transcribing', {
         id: session.id,
       });
       return 'skipped';
     }
+    const publicRanges: TimeRange[] | null =
+      decision.kind === 'all_public' ? null : decision.publicRanges;
 
     let transcript;
     try {

@@ -27,6 +27,8 @@ import { DeviceConnectionTracker } from './services/device-connection-tracker.js
 import { DeviceCommandService } from './services/device-command-service.js';
 import { SessionController } from './services/session-controller.js';
 import { UploadProcessor } from './services/upload-processor.js';
+import { RedactionWorker } from './services/redaction-worker.js';
+import { FfmpegMediaProcessor } from './services/redaction-ffmpeg.js';
 import { DeviceEventModel } from './models/device-event.js';
 import { ProtocolHandler } from './websocket/protocol.js';
 import { BroadcastBoxWorkflowTriggers } from './workflows/triggers.js';
@@ -397,6 +399,49 @@ export async function registerBroadcastBoxServices(
 
     return processor;
   });
+
+  // Register + start the FA-BB-002 redaction worker: the only path that makes
+  // a recording publicly visible (verified blanked variant → public_file).
+  // Gated by env (default on wherever broadcast-box mounts); ffmpeg-missing
+  // just idles the worker, so registration is safe on any host.
+  if (process.env.BROADCAST_BOX_REDACTION_ENABLED !== 'false') {
+    try {
+      const recordManager = container.resolve<RecordManager>('recordManager');
+      const storageService =
+        container.resolve<CloudUuidStorageService>('storage');
+      const pollMsRaw = Number(process.env.BROADCAST_BOX_REDACTION_POLL_MS);
+      const pollIntervalMs =
+        Number.isFinite(pollMsRaw) && pollMsRaw > 0 ? pollMsRaw : 15_000;
+
+      const redactionWorker = new RedactionWorker({
+        records: recordManager as any,
+        storage: storageService as any,
+        media: new FfmpegMediaProcessor({ logger }),
+        logger,
+      });
+      void redactionWorker.start(pollIntervalMs).catch((error) => {
+        logger.error('Redaction worker loop terminated unexpectedly', {
+          operation: 'broadcast-box:redaction:loop-terminated',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+      // Expose the running instance so the host can stop it on shutdown.
+      container.registerInstance('broadcastBoxRedactionWorker', redactionWorker);
+      logger.info('Redaction worker registered and started', {
+        operation: 'broadcast-box:redaction:registered',
+        pollIntervalMs,
+      });
+    } catch (e: any) {
+      // Storage/records unavailable → no uploads can land either; log + skip.
+      logger.warn(
+        'Failed to start redaction worker (recordings will not be published)',
+        {
+          operation: 'broadcast-box:redaction:registration-failed',
+          error: e?.message || 'unknown',
+        }
+      );
+    }
+  }
 
   // Register EnrollmentCleanupService and start it
   try {

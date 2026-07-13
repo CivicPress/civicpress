@@ -198,18 +198,23 @@ function resolveOptional(
   }
 }
 
-/** Stop background work — currently the enrollment-cleanup interval. */
+/** Stop background work — the enrollment-cleanup interval + redaction worker. */
 function stopBroadcastBox(
   container: ReturnType<CivicPress['getContainer']>,
   logger: Logger
 ): void {
-  try {
-    if (container.isRegistered('broadcastBoxEnrollmentCleanup')) {
-      container.resolve<any>('broadcastBoxEnrollmentCleanup').stop();
+  for (const key of [
+    'broadcastBoxEnrollmentCleanup',
+    'broadcastBoxRedactionWorker',
+  ]) {
+    try {
+      if (container.isRegistered(key)) {
+        container.resolve<any>(key).stop();
+      }
+    } catch (error) {
+      logger.warn(`Broadcast-box: failed to stop background service '${key}'`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-  } catch (error) {
-    logger.warn('Broadcast-box: failed to stop enrollment-cleanup service', {
-      error: error instanceof Error ? error.message : String(error),
-    });
   }
 }

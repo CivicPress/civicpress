@@ -118,6 +118,8 @@ export async function startInProcessTranscription(
     engine,
     logger,
     language: config.language,
+    leadPadS: config.leadPadS,
+    trailPadS: config.trailPadS,
   });
 
   // Fire-and-forget the poll loop; a loop error must not reject start().

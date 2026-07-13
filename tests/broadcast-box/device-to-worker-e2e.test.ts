@@ -214,7 +214,13 @@ describe('device → server → worker (synthetic, real CivicPress)', () => {
     const engine = new CapturingStubEngine(transcript);
     const started = await startInProcessTranscription(
       civic,
-      { enabled: true, poll_interval_ms: 60_000 },
+      {
+        enabled: true,
+        poll_interval_ms: 60_000,
+        // Test-scale skew pads (production defaults are 3/5s).
+        visibility_pad_lead_s: 1,
+        visibility_pad_trail_s: 1,
+      },
       silentLogger,
       {
         engine: engine as any,
@@ -244,10 +250,10 @@ describe('device → server → worker (synthetic, real CivicPress)', () => {
     expect(fm!.media.transcript_data).toMatchObject(transcript);
     // The civic-critical assertion: the in-camera window (5–10s) was never sent
     // to the engine — only the two public ranges, derived from the manifest the
-    // mounted module persisted.
+    // mounted module persisted, SHRUNK by the 1s skew pads ([5,10] → [4,11]).
     expect(engine.lastInput.publicRanges).toEqual([
-      { start: 0, end: 5 },
-      { start: 10, end: 15 },
+      { start: 0, end: 4 },
+      { start: 11, end: 15 },
     ]);
   });
 });

@@ -33,14 +33,15 @@
   "author": "CivicPress Team",
   "license": "MIT",
   "dependencies": {
+    "@civicpress/broadcast-protocol": "workspace:*",
     "@civicpress/core": "workspace:*",
     "@civicpress/realtime": "workspace:*",
-    "@civicpress/broadcast-protocol": "workspace:*",
+    "@civicpress/transcription": "workspace:*",
+    "bcrypt": "^5.1.1",
     "express": "^4.22.2",
     "express-validator": "^7.3.2",
     "multer": "^1.4.5-lts.1",
-    "uuid": "11.1.0",
-    "bcrypt": "^5.1.1"
+    "uuid": "11.1.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

@@ -142,11 +142,11 @@ describe('transcription write-back e2e (real CivicPress)', () => {
           capture: {
             device: 'bb-001',
             av_file: avFile,
-            // segments PRESENT (even empty) = the device session.manifest has been
-            // applied → the worker's readiness gate is satisfied. Empty = all-public
-            // (transcribe the whole recording). Omitting it now means "manifest not
-            // yet applied" and the record is intentionally skipped.
-            segments: segments ?? [],
+            // FA-BB-002 fail-closed: an empty/absent `segments` is UNKNOWN and
+            // HOLDS. The whole-file baseline therefore needs the positive
+            // attestation (`all_public: true`); mixed-visibility tests pass
+            // explicit segments.
+            ...(segments ? { segments } : { all_public: true }),
           },
         },
       },
@@ -381,16 +381,20 @@ describe('transcription write-back e2e (real CivicPress)', () => {
       engine: engine as any,
       logger: silentLogger,
       language: 'fr-CA',
+      // Test-scale skew pads (1s; production defaults are 3/5).
+      leadPadS: 1,
+      trailPadS: 1,
     });
 
     const summary = await worker.runOnce();
     expect(summary).toEqual({ processed: 1, skipped: 0, failed: 0 });
 
     // The civic-critical assertion: the in-camera window (5–10s) never reaches
-    // the engine — only the two public ranges do.
+    // the engine — only the two public ranges do, SHRUNK by the skew padding
+    // (hidden [5,10] → padded [4,11]).
     expect(engine.lastInput.publicRanges).toEqual([
-      { start: 0, end: 5 },
-      { start: 10, end: 15 },
+      { start: 0, end: 4 },
+      { start: 11, end: 15 },
     ]);
 
     const fm = await readFrontmatter(id);

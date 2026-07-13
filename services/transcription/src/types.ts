@@ -26,8 +26,17 @@ export interface CaptureSegment extends TimeRange {
 /** The capture provenance block contributed by the broadcast-box module. */
 export interface SessionCapture {
   device?: string;
-  /** Storage UUID of the recorded A/V (an attached_files[] entry). */
+  /** Storage UUID of the RAW recorded A/V (private `recordings_raw`; FA-BB-002). */
   av_file?: string;
+  /** Storage UUID of the worker-published redacted variant (public `recordings`). */
+  public_file?: string;
+  /** Redaction pipeline latch (FA-BB-002). */
+  redaction_status?: 'pending' | 'complete' | 'failed' | 'awaiting_visibility';
+  /**
+   * Positive all-public attestation: the device/operator asserts the whole
+   * recording is public. Absent/false + no segments = UNKNOWN → HOLD.
+   */
+  all_public?: boolean;
   duration_s?: number;
   segments?: CaptureSegment[];
 }

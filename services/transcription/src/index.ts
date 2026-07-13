@@ -6,8 +6,17 @@
  * the `civic start` launcher are added in the wiring step.
  */
 
-export { TranscriptionWorker, computePublicRanges } from './worker.js';
+export { TranscriptionWorker } from './worker.js';
 export type { WorkerOptions } from './worker.js';
+export {
+  DEFAULT_LEAD_PAD_S,
+  DEFAULT_TRAIL_PAD_S,
+  mergeRanges,
+  padRanges,
+  resolveVisibility,
+  subtractRanges,
+} from './visibility.js';
+export type { VisibilityDecision, VisibilityOptions } from './visibility.js';
 export { NoopEngine } from './engines/noop.js';
 export {
   WhisperCppEngine,
