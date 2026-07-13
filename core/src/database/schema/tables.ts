@@ -175,4 +175,15 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     expires_at DATETIME NOT NULL,
     FOREIGN KEY (saga_id) REFERENCES saga_states(id) ON DELETE CASCADE
   )`,
+
+  // Login-attempt throttling / account lockout (FA-API-007). One row per
+  // username (case-normalized): running failed-attempt count + a lockout
+  // window. Cleared on a successful login.
+  `CREATE TABLE IF NOT EXISTS login_attempts (
+    username TEXT PRIMARY KEY,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    first_failed_at DATETIME,
+    last_failed_at DATETIME,
+    locked_until DATETIME
+  )`,
 ];

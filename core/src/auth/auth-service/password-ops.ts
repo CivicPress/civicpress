@@ -3,6 +3,12 @@ import { Logger } from '../../utils/logger.js';
 import { EmailValidationService } from '../email-validation-service.js';
 import type { AuthUser, Session } from '../auth-service.js';
 import type { AuthAuditEvent } from './user-ops.js';
+import {
+  LoginThrottle,
+  AccountLockedError,
+  parseDurationMs,
+} from '../login-throttle.js';
+import { AuthConfigManager } from '../auth-config.js';
 
 export interface PasswordOpsDeps {
   db: DatabaseService;
@@ -38,14 +44,40 @@ export interface PasswordOpsDeps {
 export class PasswordOps {
   constructor(private readonly deps: PasswordOpsDeps) {}
 
+  /** Build the throttle from the loaded auth config (defaults if unloaded). */
+  private getThrottle(): LoginThrottle {
+    let maxAttempts = 5;
+    let lockoutMs = 15 * 60 * 1000;
+    try {
+      const pw = AuthConfigManager.getInstance().getConfig().password;
+      if (pw?.maxLoginAttempts && pw.maxLoginAttempts > 0) {
+        maxAttempts = pw.maxLoginAttempts;
+      }
+      if (pw?.lockoutDuration) {
+        lockoutMs = parseDurationMs(pw.lockoutDuration, lockoutMs);
+      }
+    } catch {
+      // config not loaded → keep the safe defaults
+    }
+    return new LoginThrottle(this.deps.db, { maxAttempts, lockoutMs });
+  }
+
   async authenticateWithPassword(
     username: string,
     password: string
   ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
+    // FA-API-007: account lockout. The lockout check + AccountLockedError run
+    // OUTSIDE the generic catch below so the 429 (and its retry hint) reach
+    // the caller instead of being flattened into 'Invalid username or
+    // password'. A wrong-password attempt records a failure toward the lock.
+    const throttle = this.getThrottle();
+    await throttle.assertNotLocked(username);
+
     try {
       // Get user with password hash
       const user = await this.deps.db.getUserWithPassword(username);
       if (!user || !user.password_hash) {
+        await throttle.recordFailure(username);
         throw new Error('Invalid username or password');
       }
 
@@ -53,8 +85,12 @@ export class PasswordOps {
       const bcrypt = await import('bcrypt');
       const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
+        await throttle.recordFailure(username);
         throw new Error('Invalid username or password');
       }
+
+      // Success clears the failure counter.
+      await throttle.recordSuccess(username);
 
       // Create session
       const { token: sessionToken, session } = await this.deps.createSession(
@@ -82,6 +118,7 @@ export class PasswordOps {
         expiresAt: session.expiresAt,
       };
     } catch (error) {
+      if (error instanceof AccountLockedError) throw error;
       this.deps.logger?.error('Password authentication failed:', error);
       throw new Error('Invalid username or password');
     }

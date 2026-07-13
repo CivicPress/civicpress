@@ -128,6 +128,11 @@ export {
   OAuthProviderManager,
 } from './auth/oauth-provider.js';
 export { AuthConfigManager } from './auth/auth-config.js';
+export {
+  LoginThrottle,
+  AccountLockedError,
+  parseDurationMs,
+} from './auth/login-throttle.js';
 export { RoleManager } from './auth/role-manager.js';
 export {
   EmailValidationService,
