@@ -318,10 +318,14 @@ export class SagaStateStore {
    */
   async getFailedSagas(): Promise<SagaState[]> {
     try {
+      // FA-CORE-006: the `AND … OR …` was unparenthesized, so precedence made
+      // this `(status='failed' AND comp IS NULL) OR (comp != 'completed')` —
+      // selecting sagas that are NOT failed. Parenthesize the OR so we only
+      // ever return failed sagas whose compensation has not completed.
       const rows = await this.db.getAdapter().query<SagaStateRow>(
-        `SELECT * FROM saga_states 
-         WHERE status = 'failed' 
-         AND compensation_status IS NULL OR compensation_status != 'completed'`
+        `SELECT * FROM saga_states
+         WHERE status = 'failed'
+         AND (compensation_status IS NULL OR compensation_status != 'completed')`
       );
 
       return rows.map((row) => this.rowToState(row));

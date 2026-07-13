@@ -222,6 +222,26 @@ export class CivicPress {
       await db.initialize();
       this.logger.info('Database initialized');
 
+      // FA-CORE-001: recover sagas orphaned by a prior crash BEFORE any new
+      // work starts — release their held resource locks and surface any
+      // SQLite/git divergence. Non-fatal: a recovery failure must not block
+      // boot.
+      try {
+        const { SagaStateStore } = await import('./saga/saga-state-store.js');
+        const { ResourceLockManager } = await import('./saga/resource-lock.js');
+        const { SagaRecoveryService } = await import('./saga/saga-recovery.js');
+        const recovery = new SagaRecoveryService(
+          new SagaStateStore(db),
+          new ResourceLockManager(db)
+        );
+        const summary = await recovery.recover();
+        if (summary.scanned > 0) {
+          this.logger.warn('Saga crash-recovery ran at startup', summary);
+        }
+      } catch (error) {
+        this.logger.warn('Saga crash-recovery skipped (non-fatal):', error);
+      }
+
       // Complete service initialization (cache registration, etc.)
       const { completeServiceInitialization } =
         await import('./civic-core-services.js');

@@ -148,6 +148,29 @@ export class ResourceLockManager {
   }
 
   /**
+   * Release EVERY lock held by a saga (FA-CORE-001 recovery). A crashed
+   * process leaves its in-flight saga's resource locks orphaned; recovery
+   * frees them so the record is not permanently locked. Returns the count
+   * released.
+   */
+  async releaseAllForSaga(sagaId: string): Promise<number> {
+    try {
+      const result = await this.db
+        .getAdapter()
+        .execute('DELETE FROM saga_resource_locks WHERE saga_id = ?', [sagaId]);
+      return (result as { changes?: number } | undefined)?.changes ?? 0;
+    } catch (error) {
+      coreError(
+        `Failed to release locks for saga: ${sagaId}`,
+        'SAGA_LOCK_RELEASE_ALL_ERROR',
+        { sagaId, error: error instanceof Error ? error.message : String(error) },
+        { operation: 'saga:lock:release-all' }
+      );
+      return 0;
+    }
+  }
+
+  /**
    * Get current lock on a resource
    */
   async getLock(resourceKey: string): Promise<ResourceLock | null> {

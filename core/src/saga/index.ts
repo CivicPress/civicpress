@@ -22,6 +22,9 @@ export * from './idempotency.js';
 // Resource locking
 export * from './resource-lock.js';
 
+// Crash recovery (FA-CORE-001)
+export * from './saga-recovery.js';
+
 // Saga executor
 export * from './saga-executor.js';
 
