@@ -67,6 +67,7 @@ export class RecordsService {
     this.crud = new RecordsCrud({
       civicPress: this.civicPress,
       recordManager: this.recordManager,
+      workflowManager: this.workflowManager,
       logger: this.logger,
       dataDir: this.dataDir,
     });
@@ -86,6 +87,7 @@ export class RecordsService {
     this.frontmatterAndPublish = new RecordsFrontmatterAndPublish({
       civicPress: this.civicPress,
       recordManager: this.recordManager,
+      workflowManager: this.workflowManager,
       db: this.db,
       logger: this.logger,
       // getDraftOrRecord falls back to the published-record path; wire it

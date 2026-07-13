@@ -252,6 +252,35 @@ export class WorkflowConfigManager {
     return { valid: true };
   }
 
+  /**
+   * The set of statuses that are DESTINATIONS in the transition graph — i.e.
+   * moving a record INTO one of them is a workflow-controlled transition
+   * (proposed/reviewed/approved/archived in the default config).
+   *
+   * FA-API-008: the generic write paths (create/update/publish) must validate
+   * a status change against the transition rules ONLY for these — a legal
+   * status that is not a transition target (e.g. `published`, set by the
+   * publish flow) is governed by that flow's own permission gate, not by the
+   * editorial transition graph.
+   */
+  async getControlledStatuses(): Promise<Set<string>> {
+    const config = await this.loadConfig();
+    const controlled = new Set<string>();
+    const collect = (raw: unknown) => {
+      let targets: string[] = [];
+      if (Array.isArray(raw)) {
+        targets = raw as string[];
+      } else if (raw && typeof raw === 'object' && 'value' in raw) {
+        targets = ((raw as { value?: string[] }).value || []) as string[];
+      }
+      targets.forEach((s) => controlled.add(s));
+    };
+    for (const raw of Object.values(config.transitions || {})) {
+      collect(raw);
+    }
+    return controlled;
+  }
+
   async getAvailableStatuses(recordType?: string): Promise<string[]> {
     const config = await this.loadConfig();
 

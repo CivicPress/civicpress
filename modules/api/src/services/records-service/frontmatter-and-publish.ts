@@ -12,6 +12,7 @@ import {
   RecordManager,
   RecordParser,
   RecordData,
+  WorkflowConfigManager,
   userCan,
   DatabaseService,
   Logger,
@@ -22,6 +23,7 @@ import type {
   TableInfoRow,
 } from '@civicpress/core';
 import { normalizeDateString } from './helpers.js';
+import { HttpError } from '../../utils/http-error.js';
 
 /** Hybrid envelope returned by getDraftOrRecord — covers both draft + record paths. */
 interface DraftOrRecord {
@@ -88,6 +90,8 @@ function parseGeography(
 export interface RecordsFrontmatterAndPublishDeps {
   civicPress: CivicPress;
   recordManager: RecordManager;
+  /** Workflow config — enforces the target status at publish (FA-API-008). */
+  workflowManager: WorkflowConfigManager;
   db: DatabaseService;
   logger: Logger;
   /**
@@ -312,6 +316,43 @@ export class RecordsFrontmatterAndPublish {
       throw new Error(
         `Permission denied: Cannot publish records of type '${draft.type}'`
       );
+    }
+
+    // FA-API-008: publishing sets the record's LEGAL status. `records:edit` is
+    // authority to publish (draft → published), not to place the record at an
+    // arbitrary WORKFLOW-controlled status — otherwise a clerk could
+    // draft-then-publish straight to 'approved'/'archived', skipping the
+    // review chain. Publishing to a controlled status must be a valid
+    // transition from the record's current status (or the initial status for a
+    // first publish) for this role; 'published' itself is not a controlled
+    // target and stays governed by the publish permission above.
+    if (typeof targetStatus === 'string') {
+      const controlled = await this.deps.workflowManager.getControlledStatuses();
+      if (controlled.has(targetStatus)) {
+        const statuses = await this.deps.workflowManager.getAvailableStatuses(
+          draft.type
+        );
+        const initialStatus = statuses[0];
+        const published = (await this.deps
+          .getRecord(id)
+          .catch(() => null)) as { status?: string } | null;
+        const fromStatus = published?.status || initialStatus;
+        if (fromStatus && targetStatus !== fromStatus) {
+          const check = await this.deps.workflowManager.validateTransition(
+            fromStatus,
+            targetStatus,
+            user.role
+          );
+          if (!check.valid) {
+            throw new HttpError(
+              403,
+              check.reason ||
+                `Cannot publish to status '${targetStatus}' from '${fromStatus}' (role '${user.role}')`,
+              'INVALID_STATUS_TRANSITION'
+            );
+          }
+        }
+      }
     }
 
     const record = await this.deps.recordManager.publishDraft(

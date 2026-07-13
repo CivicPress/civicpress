@@ -3,11 +3,13 @@ import {
   CreateRecordRequest,
   UpdateRecordRequest,
   RecordManager,
+  WorkflowConfigManager,
   userCan,
   coreError,
   Logger,
 } from '@civicpress/core';
 import type { AuthUser, Geography } from '@civicpress/core';
+import { HttpError } from '../../utils/http-error.js';
 import fs from 'fs';
 import path from 'path';
 import { normalizeDateString } from './helpers.js';
@@ -90,6 +92,11 @@ interface RawApiRecord {
 export interface RecordsCrudDeps {
   civicPress: CivicPress;
   recordManager: RecordManager;
+  /**
+   * Workflow config — used to enforce status-transition rules on the generic
+   * write paths (create/update), not just POST /:id/status (FA-API-008).
+   */
+  workflowManager: WorkflowConfigManager;
   logger: Logger;
   /**
    * Resolved data directory used to read raw record files from disk. The
@@ -173,6 +180,35 @@ export class RecordsCrud {
       throw new Error(
         `Permission denied: Cannot create records of type '${data.type}'`
       );
+    }
+
+    // FA-API-008: a record is BORN at the workflow's initial status. Creating
+    // one directly at a workflow-controlled status (e.g. 'approved'/'archived')
+    // would skip the review chain, so such a status must be a valid transition
+    // FROM the initial status for this role.
+    if (typeof data.status === 'string') {
+      const controlled = await this.deps.workflowManager.getControlledStatuses();
+      if (controlled.has(data.status)) {
+        const statuses = await this.deps.workflowManager.getAvailableStatuses(
+          data.type
+        );
+        const initialStatus = statuses[0];
+        if (initialStatus && data.status !== initialStatus) {
+          const check = await this.deps.workflowManager.validateTransition(
+            initialStatus,
+            data.status,
+            user.role
+          );
+          if (!check.valid) {
+            throw new HttpError(
+              403,
+              check.reason ||
+                `Cannot create a record directly at status '${data.status}' (role '${user.role}')`,
+              'INVALID_STATUS_TRANSITION'
+            );
+          }
+        }
+      }
     }
 
     // Create record request
@@ -379,6 +415,34 @@ export class RecordsCrud {
       throw new Error(
         `Permission denied: Cannot edit records of type '${currentRecord.type}'`
       );
+    }
+
+    // FA-API-008: a generic update that moves a record INTO a
+    // workflow-controlled status (approved/archived/…) must satisfy the same
+    // transition rules as POST /:id/status — else a coarse records:edit role
+    // could fabricate an approved/archived record here, bypassing
+    // separation-of-duties. Legal statuses outside the transition graph
+    // (draft/published) are left to their own flows.
+    if (
+      typeof data.status === 'string' &&
+      data.status !== currentRecord.status
+    ) {
+      const controlled = await this.deps.workflowManager.getControlledStatuses();
+      if (controlled.has(data.status)) {
+        const check = await this.deps.workflowManager.validateTransition(
+          currentRecord.status,
+          data.status,
+          user.role
+        );
+        if (!check.valid) {
+          throw new HttpError(
+            403,
+            check.reason ||
+              `Invalid status transition from '${currentRecord.status}' to '${data.status}' for role '${user.role}'`,
+            'INVALID_STATUS_TRANSITION'
+          );
+        }
+      }
     }
 
     // Update record request
