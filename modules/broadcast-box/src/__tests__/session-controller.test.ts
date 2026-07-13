@@ -40,6 +40,19 @@ describe('SessionController', () => {
 
     mockRecordManager = {
       getRecord: vi.fn(),
+      // Emulates RecordManager.mergeCapture (FA-BB-002 E): field merge onto the
+      // record's current capture + precondition gate, minus the DB lock.
+      mergeCapture: vi.fn(
+        async (id: string, patch: any, _user: any, options: any = {}) => {
+          const rec = await mockRecordManager.getRecord(id);
+          if (!rec) throw new Error(`Record not found: ${id}`);
+          const existing = rec.metadata?.capture ?? {};
+          if (options.precondition && !options.precondition(existing)) {
+            return null;
+          }
+          return { ...existing, ...patch };
+        }
+      ),
     };
 
     mockLogger = {
@@ -502,7 +515,7 @@ describe('SessionController', () => {
   });
 
   describe('linkFileToSession', () => {
-    it('writes the capture block (device + av_file + redaction pending) without attaching the raw publicly', async () => {
+    it('merges the capture block (device + av_file + redaction pending) without attaching the raw publicly', async () => {
       const mockSessionModel = (sessionController as any).sessionModel;
       mockSessionModel.getById.mockResolvedValue({
         id: 'bs-1',
@@ -516,30 +529,29 @@ describe('SessionController', () => {
         type: 'session',
         attachedFiles: [],
       });
-      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
 
       await sessionController.linkFileToSession('bs-1', 'storage-uuid-1');
 
-      expect(mockRecordManager.updateRecord).toHaveBeenCalledWith(
+      // Routed through the concurrency-safe mergeCapture (FA-BB-002 E)…
+      expect(mockRecordManager.mergeCapture).toHaveBeenCalledWith(
         'pv-2026-06-09',
-        expect.objectContaining({
-          metadata: expect.objectContaining({
-            capture: {
-              device: 'bb-001',
-              av_file: 'storage-uuid-1',
-              redaction_status: 'pending',
-            },
-          }),
-        }),
-        expect.objectContaining({ username: 'system' })
+        {
+          device: 'bb-001',
+          av_file: 'storage-uuid-1',
+          redaction_status: 'pending',
+        },
+        expect.objectContaining({ username: 'system' }),
+        expect.objectContaining({ precondition: expect.any(Function) })
       );
-      // FA-BB-002 fail-closed: the raw is NOT attached to the public record —
-      // only the redaction worker attaches the verified public_file.
-      const request = mockRecordManager.updateRecord.mock.calls[0][1];
-      expect(request.attachedFiles).toBeUndefined();
+      // …and FA-BB-002 fail-closed: no appendAttachedFile — the raw is never
+      // attached to the public record; only the redaction worker attaches the
+      // verified public_file.
+      const options = mockRecordManager.mergeCapture.mock.calls[0][3];
+      expect(options.appendAttachedFile).toBeUndefined();
+      expect(mockSessionModel.update).toHaveBeenCalled();
     });
 
-    it('is idempotent — skips the write if capture.av_file is already this file', async () => {
+    it('is idempotent — the precondition declines when capture.av_file is already this file', async () => {
       const mockSessionModel = (sessionController as any).sessionModel;
       mockSessionModel.getById.mockResolvedValue({
         id: 'bs-1',
@@ -555,11 +567,14 @@ describe('SessionController', () => {
           capture: { device: 'bb-001', av_file: 'storage-uuid-1' },
         },
       });
-      mockRecordManager.updateRecord = vi.fn();
 
       await sessionController.linkFileToSession('bs-1', 'storage-uuid-1');
 
-      expect(mockRecordManager.updateRecord).not.toHaveBeenCalled();
+      // mergeCapture returned null (precondition) → no session-side effects.
+      await expect(
+        mockRecordManager.mergeCapture.mock.results[0].value
+      ).resolves.toBeNull();
+      expect(mockSessionModel.update).not.toHaveBeenCalled();
     });
 
     it('preserves manifest segments already on the record when the A/V file is linked', async () => {
@@ -584,12 +599,11 @@ describe('SessionController', () => {
           },
         },
       });
-      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
 
       await sessionController.linkFileToSession('bs-1', 'storage-uuid-1');
 
-      const written =
-        mockRecordManager.updateRecord.mock.calls[0][1].metadata.capture;
+      const written = await mockRecordManager.mergeCapture.mock.results[0]
+        .value;
       expect(written.av_file).toBe('storage-uuid-1');
       expect(written.redaction_status).toBe('pending');
       // segments + timing from the manifest survive the finalize write.
@@ -601,13 +615,12 @@ describe('SessionController', () => {
   });
 
   describe('applySessionManifest', () => {
-    it('writes capture.segments + timing onto the session record', async () => {
+    it('merges capture.segments + timing onto the session record via mergeCapture', async () => {
       mockRecordManager.getRecord.mockResolvedValue({
         id: 'pv-1',
         type: 'session',
         metadata: {},
       });
-      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
 
       const segments = [
         { start: 0, end: 60, visibility: 'public' },
@@ -619,13 +632,9 @@ describe('SessionController', () => {
         segments,
       });
 
-      expect(mockRecordManager.updateRecord).toHaveBeenCalledWith(
+      expect(mockRecordManager.mergeCapture).toHaveBeenCalledWith(
         'pv-1',
-        {
-          metadata: {
-            capture: { device: 'bb-001', duration_s: 90, segments },
-          },
-        },
+        { device: 'bb-001', duration_s: 90, segments },
         expect.objectContaining({ username: 'system' })
       );
     });
@@ -637,14 +646,13 @@ describe('SessionController', () => {
         type: 'session',
         metadata: { capture: { device: 'bb-001', av_file: 'av-uuid-9' } },
       });
-      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
 
       await sessionController.applySessionManifest('pv-2', {
         segments: [{ start: 0, end: 30, visibility: 'public' }],
       });
 
-      const written =
-        mockRecordManager.updateRecord.mock.calls[0][1].metadata.capture;
+      const written = await mockRecordManager.mergeCapture.mock.results[0]
+        .value;
       expect(written.av_file).toBe('av-uuid-9'); // not clobbered
       expect(written.device).toBe('bb-001');
       expect(written.segments).toEqual([
@@ -658,15 +666,18 @@ describe('SessionController', () => {
         type: 'session',
         metadata: { capture: { device: 'bb-001', av_file: 'av-uuid-9' } },
       });
-      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
 
       await sessionController.applySessionManifest('pv-3', {
         av_file: 'attacker-chosen-uuid',
         segments: [{ start: 0, end: 30, visibility: 'public' }],
       });
 
-      const written =
-        mockRecordManager.updateRecord.mock.calls[0][1].metadata.capture;
+      // The overlay handed to mergeCapture never contains av_file…
+      const overlay = mockRecordManager.mergeCapture.mock.calls[0][1];
+      expect(overlay.av_file).toBeUndefined();
+      // …so the merged capture keeps the finalize-bound file.
+      const written = await mockRecordManager.mergeCapture.mock.results[0]
+        .value;
       expect(written.av_file).toBe('av-uuid-9'); // manifest could not repoint it
     });
 

@@ -47,11 +47,20 @@ export interface RedactionRecordStore {
     limit?: number;
   }): Promise<{ records: Array<{ id: string }> }>;
   getRecord(id: string): Promise<Record<string, any> | null>;
-  updateRecord(
+  /**
+   * Concurrency-safe field-level capture merge (RecordManager.mergeCapture,
+   * FA-BB-002 E): serialized on a capture lock so racing writers (finalize,
+   * manifest, this worker) never clobber each other's fields.
+   */
+  mergeCapture(
     id: string,
-    request: Record<string, unknown>,
-    user: Record<string, unknown>
-  ): Promise<unknown>;
+    partialCapture: Record<string, unknown>,
+    user: Record<string, unknown>,
+    options?: {
+      precondition?: (existingCapture: Record<string, unknown>) => boolean;
+      appendAttachedFile?: { id: string } & Record<string, unknown>;
+    }
+  ): Promise<Record<string, unknown> | null>;
 }
 
 /** The narrow storage slice the worker needs. */
@@ -325,46 +334,37 @@ export class RedactionWorker {
   }
 
   /**
-   * Read-merge write-back (the records write path shallow-merges `metadata`
-   * per key). When `publicFileId` is set, the public 'Recording'
-   * attached_files entry is appended too — the ONLY place a recording is
-   * attached to the public record.
+   * Concurrency-safe write-back via mergeCapture (FA-BB-002 E): the read and
+   * write are atomic under the capture lock, so a racing manifest/finalize
+   * write can't clobber the latch and vice-versa. When `publicFileId` is set,
+   * the public 'Recording' attached_files entry is appended in the SAME
+   * update — the ONLY place a recording is attached to the public record.
+   * Precondition: never overwrite a redaction another worker completed.
    */
   private async writeBack(
     recordId: string,
     capturePatch: Partial<SessionCapture>,
     publicFileId: string | null
   ): Promise<void> {
-    const { records } = this.opts;
-    const record = await records.getRecord(recordId);
-    if (!record) throw new Error(`session record vanished: ${recordId}`);
-    const existing = (field<SessionCapture>(record, 'capture') ?? {}) as Record<
-      string,
-      unknown
-    >;
-    // Idempotency latch: if another worker already completed this session,
-    // never overwrite its verified public_file.
-    if (existing.redaction_status === 'complete') return;
-
-    const request: Record<string, unknown> = {
-      metadata: { capture: { ...existing, ...capturePatch } },
-    };
-    if (publicFileId) {
-      const attachedFiles: any[] = (record.attachedFiles as any[]) ?? [];
-      if (!attachedFiles.some((f) => f?.id === publicFileId)) {
-        request.attachedFiles = [
-          ...attachedFiles,
-          {
-            id: publicFileId,
-            path: `/api/v1/storage/files/${publicFileId}`,
-            original_name: `recording-${recordId}-public.mp4`,
-            description: 'Session recording (redacted public variant)',
-            category: 'Recording',
-          },
-        ];
+    await this.opts.records.mergeCapture(
+      recordId,
+      capturePatch as Record<string, unknown>,
+      SYSTEM_USER,
+      {
+        precondition: (existing) => existing.redaction_status !== 'complete',
+        ...(publicFileId
+          ? {
+              appendAttachedFile: {
+                id: publicFileId,
+                path: `/api/v1/storage/files/${publicFileId}`,
+                original_name: `recording-${recordId}-public.mp4`,
+                description: 'Session recording (redacted public variant)',
+                category: 'Recording',
+              },
+            }
+          : {}),
       }
-    }
-    await records.updateRecord(recordId, request, SYSTEM_USER);
+    );
   }
 
   /** Poll forever until stop(). */

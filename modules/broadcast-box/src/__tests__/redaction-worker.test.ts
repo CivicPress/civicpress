@@ -61,15 +61,27 @@ function fakeRecords(records: Record<string, any>[]) {
       records: records.map((r) => ({ id: r.id })),
     })),
     getRecord: vi.fn(async (id: string) => byId.get(id) ?? null),
-    updateRecord: vi.fn(async (id: string, request: any) => {
-      const rec = byId.get(id);
-      if (!rec) throw new Error('missing');
-      if (request.metadata?.capture) {
-        rec.metadata = { ...rec.metadata, capture: request.metadata.capture };
+    // Mirrors RecordManager.mergeCapture semantics (field merge + precondition
+    // + attached_files append), minus the DB lock.
+    mergeCapture: vi.fn(
+      async (id: string, patch: any, _user: any, options: any = {}) => {
+        const rec = byId.get(id);
+        if (!rec) throw new Error(`Record not found: ${id}`);
+        const existing = rec.metadata?.capture ?? {};
+        if (options.precondition && !options.precondition(existing)) {
+          return null;
+        }
+        const merged = { ...existing, ...patch };
+        rec.metadata = { ...rec.metadata, capture: merged };
+        if (options.appendAttachedFile) {
+          const attached: any[] = rec.attachedFiles ?? [];
+          if (!attached.some((f) => f?.id === options.appendAttachedFile.id)) {
+            rec.attachedFiles = [...attached, options.appendAttachedFile];
+          }
+        }
+        return merged;
       }
-      if (request.attachedFiles) rec.attachedFiles = request.attachedFiles;
-      return rec;
-    }),
+    ),
   };
 }
 
@@ -257,7 +269,7 @@ describe('RedactionWorker', () => {
 
     expect(summary).toEqual({ published: 0, held: 0, failed: 0 });
     expect(records.listRecords).not.toHaveBeenCalled();
-    expect(records.updateRecord).not.toHaveBeenCalled();
+    expect(records.mergeCapture).not.toHaveBeenCalled();
   });
 
   it('skips sessions that are not pending (complete / no capture / no av_file)', async () => {
@@ -283,25 +295,23 @@ describe('RedactionWorker', () => {
       segments: PARTIAL_SEGMENTS,
     });
     const records = fakeRecords([rec]);
-    // Another worker completes the session between our scan and our write-back.
-    const realGet = records.getRecord.getMockImplementation()!;
-    let calls = 0;
-    records.getRecord.mockImplementation(async (id: string) => {
-      calls++;
-      const rec2 = await realGet(id);
-      if (calls > 1 && rec2) {
-        rec2.metadata.capture.redaction_status = 'complete';
-        rec2.metadata.capture.public_file = 'other-worker-file';
-      }
-      return rec2;
+    // Another worker completes the session while ours is mid-encode: flip the
+    // latch during blank(). writeBack's precondition (inside the capture lock)
+    // must then decline the write.
+    const media = fakeMedia({
+      blank: vi.fn(async (_in: string, out: string) => {
+        rec.metadata.capture.redaction_status = 'complete';
+        rec.metadata.capture.public_file = 'other-worker-file';
+        await fs.writeFile(out, 'blanked');
+      }),
     });
-    const media = fakeMedia();
     const { worker } = makeWorker(records, media);
 
     await worker.runOnce();
 
     expect(rec.metadata.capture.public_file).toBe('other-worker-file');
-    expect(records.updateRecord).not.toHaveBeenCalled();
+    // mergeCapture ran but its precondition declined the overwrite.
+    await expect(records.mergeCapture.mock.results[0].value).resolves.toBeNull();
   });
 
   it('leaves the session pending when the public upload fails', async () => {

@@ -479,38 +479,29 @@ export class SessionController {
     // after post-encode verification. This write latches
     // `redaction_status: 'pending'` so the worker picks the session up.
     //
-    // We MERGE onto any existing capture (the device's `session.manifest` may
-    // have already written segments/timing — see applySessionManifest) because
-    // the records write path shallow-merges `metadata` per key, so a bare
-    // `{ capture: {...} }` would clobber it. The capture block is also what the
+    // mergeCapture (FA-BB-002 E) field-merges onto any existing capture (the
+    // device's `session.manifest` may have already written segments/timing —
+    // see applySessionManifest) under the capture lock, so a racing writer's
+    // fields are never clobbered. The capture block is also what the
     // transcription service (W2) scans for — `capture.av_file` present and no
-    // `transcript_status`.
-    const existingCapture =
-      ((sessionRecord.metadata as Record<string, any> | undefined)?.capture as
-        | Record<string, unknown>
-        | undefined) ?? {};
+    // `transcript_status`. Precondition = idempotency: the raw is linked
+    // exactly once per file.
+    const merged = await this.recordManager.mergeCapture(
+      session.civicpressSessionId,
+      {
+        device: session.deviceId,
+        av_file: storageFileId,
+        redaction_status: 'pending',
+      },
+      {
+        id: 1, // System user
+        username: 'system',
+        role: 'admin',
+      } as any,
+      { precondition: (c) => c.av_file !== storageFileId }
+    );
 
-    // Idempotency: the raw is linked exactly once per file.
-    if (existingCapture.av_file !== storageFileId) {
-      await this.recordManager.updateRecord(
-        session.civicpressSessionId,
-        {
-          metadata: {
-            capture: {
-              ...existingCapture,
-              device: session.deviceId,
-              av_file: storageFileId,
-              redaction_status: 'pending',
-            },
-          },
-        },
-        {
-          id: 1, // System user
-          username: 'system',
-          role: 'admin',
-        } as any
-      );
-
+    if (merged) {
       // Update session metadata with media reference (the raw — private;
       // serving it requires storage:read_private)
       const metadata = {
@@ -562,32 +553,28 @@ export class SessionController {
       throw new Error(`Session record not found: ${civicpressSessionId}`);
     }
 
-    const existing =
-      ((record.metadata as Record<string, any> | undefined)?.capture as
-        | Record<string, unknown>
-        | undefined) ?? {};
-
-    // Merge: keep prior capture fields (e.g. av_file from finalize), overlay the
-    // manifest's. Only overlay keys the manifest actually provided.
+    // Overlay: only keys the manifest actually provided, field-merged onto the
+    // existing capture under the capture lock (mergeCapture, FA-BB-002 E) so a
+    // racing finalize/redaction write is never clobbered.
     // FA-BB-013: `capture.av_file` is deliberately NOT overlaid — it is written
     // only by upload-finalize (linkFileToSession), which binds it to the bytes
     // that were actually uploaded. A manifest that could repoint av_file would
     // let a device swap which file the transcription/redaction pipeline treats
     // as the session recording.
-    const merged: Record<string, unknown> = { ...existing };
-    if (capture.device !== undefined) merged.device = capture.device;
+    const overlay: Record<string, unknown> = {};
+    if (capture.device !== undefined) overlay.device = capture.device;
     if (capture.started_at !== undefined)
-      merged.started_at = capture.started_at;
-    if (capture.ended_at !== undefined) merged.ended_at = capture.ended_at;
+      overlay.started_at = capture.started_at;
+    if (capture.ended_at !== undefined) overlay.ended_at = capture.ended_at;
     if (capture.duration_s !== undefined)
-      merged.duration_s = capture.duration_s;
-    if (capture.segments !== undefined) merged.segments = capture.segments;
+      overlay.duration_s = capture.duration_s;
+    if (capture.segments !== undefined) overlay.segments = capture.segments;
 
-    await this.recordManager.updateRecord(
-      civicpressSessionId,
-      { metadata: { capture: merged } },
-      { id: 1, username: 'system', role: 'admin' } as any
-    );
+    await this.recordManager.mergeCapture(civicpressSessionId, overlay, {
+      id: 1,
+      username: 'system',
+      role: 'admin',
+    } as any);
 
     coreInfo('Session manifest applied to record', {
       operation: 'broadcast-box:session:manifest-applied',

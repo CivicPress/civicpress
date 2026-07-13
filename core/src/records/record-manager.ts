@@ -651,6 +651,97 @@ export class RecordManager {
   }
 
   /**
+   * Field-level, concurrency-safe merge into `metadata.capture` (FA-BB-002 E).
+   *
+   * The capture block has several independent writers (upload finalize, the
+   * device manifest, the redaction worker, a manual publish) that each
+   * read-merge-write. Two stale snapshots racing shallow-merge would silently
+   * drop the other writer's fields — including the security-critical
+   * `public_file`/`redaction_status` latch. This method serializes capture
+   * writers on a DB-backed `capture:<id>` resource lock so the read and the
+   * write are atomic with respect to each other.
+   *
+   * @param partialCapture  Only these keys are overlaid onto the existing capture.
+   * @param options.precondition  Evaluated INSIDE the lock against the current
+   *        capture; returning false skips the write (returns null). Use for
+   *        idempotency latches ("don't overwrite a completed redaction").
+   * @param options.appendAttachedFile  Appended to `attached_files` (if not
+   *        already present by id) in the SAME atomic update.
+   * @returns the merged capture that was written, or null when the
+   *          precondition declined the write.
+   * @throws when the record does not exist or the lock cannot be acquired.
+   */
+  async mergeCapture(
+    id: string,
+    partialCapture: Record<string, unknown>,
+    user: AuthUser,
+    options: {
+      precondition?: (existingCapture: Record<string, unknown>) => boolean;
+      appendAttachedFile?: { id: string } & Record<string, unknown>;
+    } = {}
+  ): Promise<Record<string, unknown> | null> {
+    const { ResourceLockManager } = await import('../saga/resource-lock.js');
+    const { SagaLockError } = await import('../saga/errors.js');
+    const lockManager = new ResourceLockManager(this.db);
+    const lockKey = `capture:${id}`;
+    const holderId = `merge-capture-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}`;
+
+    // Bounded acquire: capture merges are short (one record update), so a
+    // held lock clears quickly; give up loudly rather than write unlocked.
+    const maxAttempts = 20;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await lockManager.acquireLock(lockKey, holderId, 30_000);
+        break;
+      } catch (error) {
+        if (error instanceof SagaLockError && attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 250));
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    try {
+      const record = await this.getRecord(id);
+      if (!record) {
+        throw new Error(`Record not found: ${id}`);
+      }
+      // Extension fields may surface top-level after parse.
+      const existing: Record<string, unknown> =
+        (record.metadata?.capture as Record<string, unknown> | undefined) ??
+        ((record as Record<string, any>).capture as
+          | Record<string, unknown>
+          | undefined) ??
+        {};
+
+      if (options.precondition && !options.precondition(existing)) {
+        return null;
+      }
+
+      const merged = { ...existing, ...partialCapture };
+      const request: UpdateRecordRequest = {
+        metadata: { capture: merged },
+      };
+      if (options.appendAttachedFile) {
+        const attached = record.attachedFiles ?? [];
+        if (!attached.some((f) => f?.id === options.appendAttachedFile!.id)) {
+          request.attachedFiles = [
+            ...attached,
+            options.appendAttachedFile,
+          ] as RecordData['attachedFiles'];
+        }
+      }
+      await this.updateRecord(id, request, user);
+      return merged;
+    } finally {
+      await lockManager.releaseLock(lockKey, holderId).catch(() => {});
+    }
+  }
+
+  /**
    * Update a record
    *
    * Note: For published records, this method uses the saga pattern for better
