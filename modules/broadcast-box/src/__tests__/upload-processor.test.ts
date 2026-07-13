@@ -252,6 +252,11 @@ describe('UploadProcessor', () => {
 
       expect(storageUuid).toBe('storage-file-id');
       expect(mockStorageService.uploadFileStream).toHaveBeenCalled();
+      // FA-BB-002 fail-closed: the raw original lands in the PRIVATE
+      // recordings_raw folder, never directly in the public 'recordings'.
+      expect(
+        mockStorageService.uploadFileStream.mock.calls[0][0].folder
+      ).toBe('recordings_raw');
       expect(mockUploadModel.update).toHaveBeenCalled();
       // Announces completion (broadcast-session id + storage uuid + device) so
       // the workflow trigger links the A/V to its session record + writes capture.

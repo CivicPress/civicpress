@@ -472,39 +472,35 @@ export class SessionController {
       );
     }
 
-    // Add file to attached_files
-    const attachedFiles = sessionRecord.attachedFiles || [];
-    const fileEntry = {
-      id: storageFileId,
-      path: `/api/v1/storage/files/${storageFileId}`,
-      original_name: `recording-${sessionId}.mp4`, // TODO: Get actual filename
-      description: 'Session recording',
-      category: 'Recording',
-    };
+    // FA-BB-002 fail-closed: the uploaded file is the RAW original (private
+    // recordings_raw folder) and may contain in-camera content, so it is NOT
+    // attached to the public record here. The redaction worker appends the
+    // public 'Recording' attached_files entry at `capture.public_file` only
+    // after post-encode verification. This write latches
+    // `redaction_status: 'pending'` so the worker picks the session up.
+    //
+    // We MERGE onto any existing capture (the device's `session.manifest` may
+    // have already written segments/timing — see applySessionManifest) because
+    // the records write path shallow-merges `metadata` per key, so a bare
+    // `{ capture: {...} }` would clobber it. The capture block is also what the
+    // transcription service (W2) scans for — `capture.av_file` present and no
+    // `transcript_status`.
+    const existingCapture =
+      ((sessionRecord.metadata as Record<string, any> | undefined)?.capture as
+        | Record<string, unknown>
+        | undefined) ?? {};
 
-    // Check if file already attached
-    if (!attachedFiles.some((f: any) => f.id === storageFileId)) {
-      attachedFiles.push(fileEntry);
-
-      // Update record: attach the A/V file AND write the `capture` block
-      // (broadcast-box session extension). The capture block is what the
-      // transcription service (W2) scans for — `capture.av_file` present and no
-      // `transcript_status`. We MERGE onto any existing capture (the device's
-      // `session.manifest` may have already written segments/timing — see
-      // applySessionManifest) because the records write path shallow-merges
-      // `metadata` per key, so a bare `{ capture: {...} }` would clobber it.
-      const existingCapture =
-        ((sessionRecord.metadata as Record<string, any> | undefined)
-          ?.capture as Record<string, unknown> | undefined) ?? {};
+    // Idempotency: the raw is linked exactly once per file.
+    if (existingCapture.av_file !== storageFileId) {
       await this.recordManager.updateRecord(
         session.civicpressSessionId,
         {
-          attachedFiles,
           metadata: {
             capture: {
               ...existingCapture,
               device: session.deviceId,
               av_file: storageFileId,
+              redaction_status: 'pending',
             },
           },
         },
@@ -515,12 +511,13 @@ export class SessionController {
         } as any
       );
 
-      // Update session metadata with media reference
+      // Update session metadata with media reference (the raw — private;
+      // serving it requires storage:read_private)
       const metadata = {
         ...session.metadata,
         recording: {
           fileId: storageFileId,
-          filePath: fileEntry.path,
+          filePath: `/api/v1/storage/files/${storageFileId}`,
         },
       };
 
@@ -572,9 +569,13 @@ export class SessionController {
 
     // Merge: keep prior capture fields (e.g. av_file from finalize), overlay the
     // manifest's. Only overlay keys the manifest actually provided.
+    // FA-BB-013: `capture.av_file` is deliberately NOT overlaid — it is written
+    // only by upload-finalize (linkFileToSession), which binds it to the bytes
+    // that were actually uploaded. A manifest that could repoint av_file would
+    // let a device swap which file the transcription/redaction pipeline treats
+    // as the session recording.
     const merged: Record<string, unknown> = { ...existing };
     if (capture.device !== undefined) merged.device = capture.device;
-    if (capture.av_file !== undefined) merged.av_file = capture.av_file;
     if (capture.started_at !== undefined)
       merged.started_at = capture.started_at;
     if (capture.ended_at !== undefined) merged.ended_at = capture.ended_at;

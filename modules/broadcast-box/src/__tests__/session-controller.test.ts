@@ -502,7 +502,7 @@ describe('SessionController', () => {
   });
 
   describe('linkFileToSession', () => {
-    it('writes the capture block (device + av_file) so the transcription service finds the session', async () => {
+    it('writes the capture block (device + av_file + redaction pending) without attaching the raw publicly', async () => {
       const mockSessionModel = (sessionController as any).sessionModel;
       mockSessionModel.getById.mockResolvedValue({
         id: 'bs-1',
@@ -524,19 +524,22 @@ describe('SessionController', () => {
         'pv-2026-06-09',
         expect.objectContaining({
           metadata: expect.objectContaining({
-            capture: { device: 'bb-001', av_file: 'storage-uuid-1' },
+            capture: {
+              device: 'bb-001',
+              av_file: 'storage-uuid-1',
+              redaction_status: 'pending',
+            },
           }),
         }),
         expect.objectContaining({ username: 'system' })
       );
-      // ...and still attaches the A/V file
+      // FA-BB-002 fail-closed: the raw is NOT attached to the public record —
+      // only the redaction worker attaches the verified public_file.
       const request = mockRecordManager.updateRecord.mock.calls[0][1];
-      expect(
-        request.attachedFiles.some((f: any) => f.id === 'storage-uuid-1')
-      ).toBe(true);
+      expect(request.attachedFiles).toBeUndefined();
     });
 
-    it('is idempotent — skips the write if the file is already attached', async () => {
+    it('is idempotent — skips the write if capture.av_file is already this file', async () => {
       const mockSessionModel = (sessionController as any).sessionModel;
       mockSessionModel.getById.mockResolvedValue({
         id: 'bs-1',
@@ -547,7 +550,10 @@ describe('SessionController', () => {
       mockRecordManager.getRecord.mockResolvedValue({
         id: 'pv-x',
         type: 'session',
-        attachedFiles: [{ id: 'storage-uuid-1' }],
+        attachedFiles: [],
+        metadata: {
+          capture: { device: 'bb-001', av_file: 'storage-uuid-1' },
+        },
       });
       mockRecordManager.updateRecord = vi.fn();
 
@@ -585,6 +591,7 @@ describe('SessionController', () => {
       const written =
         mockRecordManager.updateRecord.mock.calls[0][1].metadata.capture;
       expect(written.av_file).toBe('storage-uuid-1');
+      expect(written.redaction_status).toBe('pending');
       // segments + timing from the manifest survive the finalize write.
       expect(written.segments).toEqual([
         { start: 0, end: 60, visibility: 'public' },
@@ -643,6 +650,24 @@ describe('SessionController', () => {
       expect(written.segments).toEqual([
         { start: 0, end: 30, visibility: 'public' },
       ]);
+    });
+
+    it('ignores a manifest av_file — only upload-finalize may bind it (FA-BB-013)', async () => {
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-3',
+        type: 'session',
+        metadata: { capture: { device: 'bb-001', av_file: 'av-uuid-9' } },
+      });
+      mockRecordManager.updateRecord = vi.fn().mockResolvedValue({});
+
+      await sessionController.applySessionManifest('pv-3', {
+        av_file: 'attacker-chosen-uuid',
+        segments: [{ start: 0, end: 30, visibility: 'public' }],
+      });
+
+      const written =
+        mockRecordManager.updateRecord.mock.calls[0][1].metadata.capture;
+      expect(written.av_file).toBe('av-uuid-9'); // manifest could not repoint it
     });
 
     it('throws when the session record does not exist', async () => {

@@ -165,11 +165,14 @@ describe('device → server → worker (synthetic, real CivicPress)', () => {
     // 2. A session record exists (no capture yet — needs the device manifest).
     const id = await seedSessionRecord();
 
-    // 3. The device sends its session.manifest: binds the A/V file AND declares
-    //    segment-level visibility. The middle window is in-camera (closed).
+    // 3. The device sends its session.manifest: declares segment-level
+    //    visibility. The middle window is in-camera (closed). A manifest can no
+    //    longer bind av_file (FA-BB-013) — that is upload-finalize's job, which
+    //    we simulate below with the same read-merge write linkFileToSession
+    //    performs (the records write path shallow-merges `metadata` per key).
     await sessionController.applySessionManifest(id, {
       device: 'bb-001',
-      av_file: 'av-uuid-1',
+      av_file: 'ignored-by-manifest',
       duration_s: 15,
       segments: [
         { start: 0, end: 5, visibility: 'public' },
@@ -178,10 +181,28 @@ describe('device → server → worker (synthetic, real CivicPress)', () => {
       ],
     });
 
-    // Sanity: the capture block (segments + av_file) landed on the real record.
+    // Sanity: segments landed, and the manifest could NOT bind av_file.
     const afterManifest = await readFrontmatter(id);
-    expect(afterManifest.capture.av_file).toBe('av-uuid-1');
+    expect(afterManifest.capture.av_file).toBeUndefined();
     expect(afterManifest.capture.segments).toHaveLength(3);
+
+    // Upload-finalize binds the raw A/V file (linkFileToSession's write shape).
+    const recAfterManifest = await recordManager.getRecord(id);
+    await recordManager.updateRecord(
+      id,
+      {
+        metadata: {
+          capture: {
+            ...(recAfterManifest.metadata?.capture ?? {}),
+            av_file: 'av-uuid-1',
+            redaction_status: 'pending',
+          },
+        },
+      },
+      SYSTEM_USER
+    );
+    const afterFinalize = await readFrontmatter(id);
+    expect(afterFinalize.capture.av_file).toBe('av-uuid-1');
 
     // 4. Start the in-process transcription worker (the W2 launcher) with a
     //    capturing stub engine + faked storage bytes.

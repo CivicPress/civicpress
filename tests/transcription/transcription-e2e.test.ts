@@ -286,7 +286,7 @@ describe('transcription write-back e2e (real CivicPress)', () => {
         path: '',
         buffer: av,
       },
-      folder: 'recordings',
+      folder: 'recordings_raw',
       uploaded_by: 'system',
     });
     expect(avRes.success).toBe(true);

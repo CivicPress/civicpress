@@ -244,12 +244,18 @@ describe('HTTP chunked upload → capture block (real storage, mounted module)',
     expect(capture).not.toBeNull();
     expect(capture.av_file).toBe(storageFileId);
     expect(capture.device).toBe(device.id);
+    // FA-BB-002 fail-closed: the raw is queued for redaction, not published.
+    expect(capture.redaction_status).toBe('pending');
+    expect(capture.public_file).toBeUndefined();
 
     // The stored A/V is retrievable from storage (what the transcription worker
-    // would fetch via capture.av_file).
+    // would fetch via capture.av_file)…
     const storage: any = civic.getService('storage');
     const stored = await storage.getFileContent(storageFileId);
     expect(Buffer.isBuffer(stored) ? stored : Buffer.from(stored)).toEqual(av);
+    // …and it lives in the PRIVATE recordings_raw folder (FA-BB-002).
+    const rawInfo = await storage.getFileById(storageFileId);
+    expect(rawInfo?.folder).toBe('recordings_raw');
   }, 20000);
 
   it('rejects an upload with no device token (401)', async () => {

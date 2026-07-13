@@ -246,7 +246,11 @@ export class UploadProcessor {
       const storageResult = await this.storageService.uploadFileStream({
         stream: createReadStream(combinedPath),
         filename: upload.fileName,
-        folder: 'recordings', // Use recordings folder for broadcast box files
+        // FA-BB-002: raw originals may contain in-camera (closed-session) A/V,
+        // so they land in the PRIVATE recordings_raw folder. Only the redaction
+        // worker publishes a verified redacted variant into the public
+        // 'recordings' folder.
+        folder: 'recordings_raw',
         size,
         contentType: upload.mimeType,
         description: `Recording from session ${upload.sessionId}`,
