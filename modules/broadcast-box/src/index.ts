@@ -10,6 +10,7 @@ export * from './models/index.js';
 export * from './services/device-manager.js';
 export * from './services/redaction-worker.js';
 export * from './services/redaction-ffmpeg.js';
+export * from './services/recordings-backfill.js';
 export * from './services/device-auth.js';
 export * from './services/device-connection-tracker.js';
 export * from './services/device-websocket-auth.js';
