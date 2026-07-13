@@ -58,7 +58,11 @@ useHead({
   ],
 });
 
-// Analytics injection - fetch and inject after mount
+// Analytics injection - fetch and inject after mount.
+// FA-UI-001: config-supplied HTML is never materialized verbatim — inline
+// <script> bodies are refused, external scripts must be https/same-origin
+// with an attribute allowlist, and everything else passes DOMPurify. See
+// composables/useAnalyticsInjection.ts.
 onMounted(() => {
   setTimeout(() => {
     const api = useNuxtApp().$civicApi;
@@ -72,62 +76,17 @@ onMounted(() => {
         const { inject_head, inject_body_start, inject_body_end } =
           res.analytics;
 
-        // Inject head
-        if (inject_head?.trim()) {
-          const div = document.createElement('div');
-          div.innerHTML = inject_head;
-          const scripts = div.querySelectorAll('script');
-          scripts.forEach((s) => {
-            const ns = document.createElement('script');
-            Array.from(s.attributes).forEach((a) =>
-              ns.setAttribute(a.name, a.value)
-            );
-            ns.textContent = s.textContent || '';
-            document.head.appendChild(ns);
-          });
-          Array.from(div.children)
-            .filter((c) => c.tagName !== 'SCRIPT')
-            .forEach((el) => {
-              document.head.appendChild(el.cloneNode(true));
-            });
-        }
-
-        // Inject body start
-        if (inject_body_start?.trim() && document.body) {
-          const div = document.createElement('div');
-          div.innerHTML = inject_body_start;
-          while (div.firstChild) {
-            const n = div.firstChild;
-            if (n.nodeName === 'SCRIPT') {
-              const s = document.createElement('script');
-              Array.from((n as HTMLScriptElement).attributes).forEach((a) =>
-                s.setAttribute(a.name, a.value)
-              );
-              s.textContent = (n as HTMLScriptElement).textContent || '';
-              document.body.insertBefore(s, document.body.firstChild);
-            } else {
-              document.body.insertBefore(n, document.body.firstChild);
-            }
-          }
-        }
-
-        // Inject body end
-        if (inject_body_end?.trim() && document.body) {
-          const div = document.createElement('div');
-          div.innerHTML = inject_body_end;
-          while (div.firstChild) {
-            const n = div.firstChild;
-            if (n.nodeName === 'SCRIPT') {
-              const s = document.createElement('script');
-              Array.from((n as HTMLScriptElement).attributes).forEach((a) =>
-                s.setAttribute(a.name, a.value)
-              );
-              s.textContent = (n as HTMLScriptElement).textContent || '';
-              document.body.appendChild(s);
-            } else {
-              document.body.appendChild(n);
-            }
-          }
+        injectAnalyticsFragment(inject_head, (node) =>
+          document.head.appendChild(node)
+        );
+        if (document.body) {
+          const anchor = document.body.firstChild;
+          injectAnalyticsFragment(inject_body_start, (node) =>
+            document.body.insertBefore(node, anchor)
+          );
+          injectAnalyticsFragment(inject_body_end, (node) =>
+            document.body.appendChild(node)
+          );
         }
       })
       .catch(() => {});
