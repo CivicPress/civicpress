@@ -33,6 +33,7 @@ export function getDefaultRolesConfig(): RolesConfig {
           'broadcast-box:sessions:create',
           'broadcast-box:sessions:manage',
           'broadcast-box:admin',
+          'geography:manage',
         ],
         record_types: {
           can_create: [
@@ -141,6 +142,7 @@ export function getDefaultRolesConfig(): RolesConfig {
           'broadcast-box:sessions:view',
           'broadcast-box:sessions:create',
           'broadcast-box:sessions:manage',
+          'geography:manage',
         ],
         record_types: {
           can_create: ['bylaw', 'policy', 'resolution'],

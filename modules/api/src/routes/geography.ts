@@ -15,7 +15,7 @@ import {
   applyGeographyPreset,
 } from '@civicpress/core';
 import type { GeographyCategory, GeographyFileType } from '@civicpress/core';
-import { AuthenticatedRequest } from '../middleware/auth.js';
+import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
 import {
   handleApiError,
   logApiSuccess,
@@ -98,8 +98,11 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   );
 
   // POST /api/v1/geography - Create geography file
+  // FA-API-003: geography (municipal boundaries/zones) is reference data —
+  // every write route requires `geography:manage`, not mere authentication.
   router.post(
     '/',
+    requirePermission('geography:manage'),
     body('name').isString().notEmpty().withMessage('Name is required'),
     body('type')
       .isIn(['geojson', 'kml', 'gpx', 'shapefile'])
@@ -334,6 +337,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   // PUT /api/v1/geography/:id - Update geography file
   router.put(
     '/:id',
+    requirePermission('geography:manage'), // FA-API-003
     param('id').isString().notEmpty().withMessage('Invalid geography ID'),
     body('name').optional().isString().notEmpty(),
     body('category')
@@ -387,6 +391,7 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   // DELETE /api/v1/geography/:id - Delete geography file
   router.delete(
     '/:id',
+    requirePermission('geography:manage'), // FA-API-003
     param('id').isString().notEmpty().withMessage('Invalid geography ID'),
     async (req: AuthenticatedRequest, res: Response) => {
       // Check authentication

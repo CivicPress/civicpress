@@ -70,6 +70,76 @@ describe('Geography API Endpoints', () => {
     await cleanupAPITestContext(context);
   });
 
+  describe('FA-API-003: geography writes require geography:manage', () => {
+    let publicToken: string;
+
+    beforeEach(async () => {
+      const publicResponse = await request(context.api.getApp())
+        .post('/api/v1/auth/simulated')
+        .send({ username: 'resident', role: 'public' });
+      publicToken = publicResponse.body.data.session.token;
+    });
+
+    it('a public user cannot create geography (403)', async () => {
+      const response = await request(context.api.getApp())
+        .post('/api/v1/geography')
+        .set('Authorization', `Bearer ${publicToken}`)
+        .send({
+          name: 'Rogue Boundary',
+          type: 'geojson',
+          category: 'boundary',
+          description: 'attacker-supplied boundary',
+          content: testGeoJson,
+        });
+      expect(response.status).toBe(403);
+    });
+
+    it('a public user cannot update or delete geography (403)', async () => {
+      // Seed a real file as admin.
+      const created = await request(context.api.getApp())
+        .post('/api/v1/geography')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'City Boundary',
+          type: 'geojson',
+          category: 'boundary',
+          description: 'the real boundary',
+          content: testGeoJson,
+        });
+      const id = created.body.data.id;
+
+      const updated = await request(context.api.getApp())
+        .put(`/api/v1/geography/${id}`)
+        .set('Authorization', `Bearer ${publicToken}`)
+        .send({ description: 'defaced' });
+      expect(updated.status).toBe(403);
+
+      const deleted = await request(context.api.getApp())
+        .delete(`/api/v1/geography/${id}`)
+        .set('Authorization', `Bearer ${publicToken}`);
+      expect(deleted.status).toBe(403);
+
+      // The file survives and is still readable.
+      const still = await request(context.api.getApp())
+        .get(`/api/v1/geography/${id}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(still.status).toBe(200);
+    });
+
+    it('unauthenticated writes are rejected (401)', async () => {
+      const response = await request(context.api.getApp())
+        .post('/api/v1/geography')
+        .send({
+          name: 'X',
+          type: 'geojson',
+          category: 'boundary',
+          description: 'x',
+          content: testGeoJson,
+        });
+      expect(response.status).toBe(401);
+    });
+  });
+
   describe('POST /api/v1/geography/validate', () => {
     it('should validate valid GeoJSON content', async () => {
       const response = await request(context.api.getApp())

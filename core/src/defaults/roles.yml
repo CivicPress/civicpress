@@ -74,6 +74,9 @@ roles:
         - 'templates:view'
         - 'storage:upload'
         - 'storage:download'
+        # FA-API-003: municipal geography (boundaries/zones) is reference
+        # data managed by staff — write access is permission-gated.
+        - 'geography:manage'
       type: 'array'
       description: 'List of permissions granted to this role'
       required: true
