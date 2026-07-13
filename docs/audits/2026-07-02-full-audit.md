@@ -308,6 +308,32 @@ token (shown on local console/QR) enforced on every `/api` route;
 - **FA-UI-001** — `0086dfa`: analytics injection no longer executes inline
   scripts; external scripts need an https/same-origin `src` + attribute
   allowlist, other markup passes DOMPurify.
+- **FA-API-002** — `5421ea1`: `BYPASS_AUTH`/`X-Mock-User` (auth + the CSRF
+  skip) gated behind the fail-closed `isSimulatedAuthEnabled()` policy — inert
+  in production even if the env var leaks.
+- **FA-API-004** — `eb482ca`: `/api/status*` diagnostics moved behind
+  auth + `system:admin` (were unauthenticated); liveness stays on `/health`.
+- **FA-API-008** — `99158f5`: create/update/publish now enforce the
+  workflow-transition rules (via `getControlledStatuses`), not just
+  `POST /:id/status` — no more fabricating an approved/archived record.
+- **FA-API-007** — `9cbe171`: real account lockout (`LoginThrottle` +
+  `login_attempts` table) after N failed logins; complements the FA-API-006
+  per-IP limit.
+- **FA-CORE-001 / FA-CORE-006** — `22aa44c`: `SagaRecoveryService` runs at
+  startup — releases orphaned locks + flags crashed-mid-flight sagas out of
+  the permanent `executing` limbo; also fixed the `getFailedSagas` precedence
+  bug it relies on.
+
+**Closed in the BroadcastBox HW repo (`refactor/phase-4-enrollment-hardening`, 2026-07-13):**
+
+- **FA-HW-004/005** — `bba2113`: Fernet key moved to a 0600 `device_key` file
+  outside the DB (legacy key migrated + cleared); state DB dir/file chmod'd
+  0700/0600.
+- **FA-HW-006/007/008** — `bba2113`: `sessionId` validated before it becomes a
+  path; RTMP url must be `rtmp(s)://`; `update_config` allowlists operational
+  keys only (no `civicpress_url`/`encryption_key` hijack).
+- **FA-HW-009** — `bba2113`: TLS floor — the device refuses to send credentials
+  over cleartext `ws://` to a non-loopback host without an explicit opt-in.
 
 ---
 
