@@ -1,7 +1,13 @@
 # FA-BB-002 — closed-session video redaction (hardened design)
 
-**Status:** design complete + storage foundation landed; the redaction subsystem
-(Commits B–G) is not yet built. **Gates:** origin/main unfreeze (Phase-5 sign-off).
+**Status:** IMPLEMENTED — Commits A–G all landed (2026-07-13: B `99da16b`,
+C `ba9f711`, D `32b53cb`, E `8275a3c`, F `30e68da`, G `782f406`). The live dev
+instance is backfilled AND redacted: all 3 pre-redaction public raws re-homed
+to `recordings_raw`; the worker published verified blanked variants for the 2
+segment-bearing sessions (capstone closed window independently re-verified on
+the published bytes: max luma 16 / −91 dB at t=180, public content intact);
+the third (no segments) holds pending → `awaiting_visibility`, resolvable via
+the manual override. **The FA-BB-002 unfreeze gate is met.**
 **Branch:** `refactor/phase-6-audit-remediation-criticals`.
 
 This design was produced by a 6-area code map and a 6-lens adversarial red-team of
