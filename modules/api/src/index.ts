@@ -1,6 +1,9 @@
 import express from 'express';
 import { HttpError } from './utils/http-error.js';
 import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import { rateLimit } from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 import {
@@ -134,6 +137,66 @@ export class CivicPressAPI {
   }
 
   private setupMiddleware(): void {
+    // FA-API-006: helmet/rate-limit/compression were declared in package.json
+    // but never wired — no security headers and no throttle on the
+    // internet-exposed API.
+
+    // Behind a reverse proxy, per-IP limits need the real client IP.
+    if (process.env.TRUST_PROXY) {
+      this.app.set(
+        'trust proxy',
+        process.env.TRUST_PROXY === 'true' ? 1 : process.env.TRUST_PROXY
+      );
+    }
+
+    // Security headers. CORP must allow cross-origin: the UI runs on a
+    // different origin (dev :3030, prod its own host) and embeds API-served
+    // media (<video src="/api/v1/storage/files/…">) — helmet's same-origin
+    // default would break playback of the public recordings.
+    this.app.use(
+      helmet({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+      })
+    );
+
+    // Rate limiting: a generous global ceiling plus a strict window on the
+    // credential surface (login/register/password — FA-API-007's cheap
+    // bcrypt-amplification + stuffing vector). Env-tunable; disabled under
+    // NODE_ENV=test so in-process suites (hundreds of requests) don't trip it.
+    const testEnv =
+      process.env.NODE_ENV === 'test' &&
+      process.env.RATE_LIMIT_ENFORCE !== 'true';
+    if (!testEnv && process.env.RATE_LIMIT_DISABLED !== 'true') {
+      this.app.use(
+        rateLimit({
+          windowMs: 15 * 60 * 1000,
+          limit: Number(process.env.RATE_LIMIT_MAX) || 1000,
+          standardHeaders: 'draft-7',
+          legacyHeaders: false,
+        })
+      );
+      this.app.use(
+        ['/api/v1/auth', '/api/v1/users/register'],
+        rateLimit({
+          windowMs: 15 * 60 * 1000,
+          limit: Number(process.env.RATE_LIMIT_AUTH_MAX) || 30,
+          standardHeaders: 'draft-7',
+          legacyHeaders: false,
+          message: {
+            success: false,
+            error: {
+              message: 'Too many authentication attempts — try again later',
+              code: 'RATE_LIMITED',
+            },
+          },
+        })
+      );
+    }
+
+    // Response compression (media/video types are non-compressible and pass
+    // through untouched, so Range/206 streaming is unaffected).
+    this.app.use(compression());
+
     // CORS
     this.app.use(
       cors({
