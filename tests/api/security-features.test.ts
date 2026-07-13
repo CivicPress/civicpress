@@ -562,4 +562,64 @@ describe('API Security Features', () => {
       });
     });
   });
+
+  describe('FA-API-005: record path traversal is contained', () => {
+    let viewerToken: string;
+
+    beforeAll(async () => {
+      const viewer = await request(context.api.getApp())
+        .post('/api/v1/auth/simulated')
+        .send({ username: 'viewer', role: 'public' });
+      viewerToken = viewer.body.data.session.token;
+    });
+
+    it('POST /api/v1/validation/record refuses ../ escapes (no file content leaks)', async () => {
+      // Try to read a file OUTSIDE data/records via the traversal shape from
+      // the audit. Regardless of which not-found branch answers, no content
+      // may come back and no 500 (fs error oracle) may fire.
+      for (const recordId of [
+        '../../.civic/roles.yml',
+        '../../../etc/hostname',
+        'bylaw/../../.civic/org-config.yml',
+      ]) {
+        const response = await request(context.api.getApp())
+          .post('/api/v1/validation/record')
+          .set('Authorization', `Bearer ${viewerToken}`)
+          .send({ recordId });
+
+        expect(response.status).toBe(200); // validation report, not a read
+        const report = response.body.data ?? response.body;
+        expect(JSON.stringify(report)).not.toContain('permissions:');
+        expect(JSON.stringify(report)).not.toContain('roles:');
+        const issues = report.results?.[0]?.issues ?? report.issues ?? [];
+        expect(
+          issues.some((i: any) => i.code === 'RECORD_NOT_FOUND')
+        ).toBe(true);
+      }
+    });
+
+    it('a legitimate record reference still validates', async () => {
+      // A published record lands in the data/records tree (drafts do not).
+      const created = await context.civic.getRecordManager().createRecord(
+        {
+          title: 'Traversal Guard Bylaw',
+          type: 'bylaw',
+          content: '# Guard',
+          status: 'published',
+        },
+        { id: 1, username: 'admin', role: 'admin' }
+      );
+
+      const response = await request(context.api.getApp())
+        .post('/api/v1/validation/record')
+        .set('Authorization', `Bearer ${viewerToken}`)
+        .send({ recordId: created.id });
+      expect(response.status).toBe(200);
+      const report = response.body.data ?? response.body;
+      const issues = report.results?.[0]?.issues ?? report.issues ?? [];
+      expect(
+        issues.some((i: any) => i.code === 'RECORD_NOT_FOUND')
+      ).toBe(false);
+    });
+  });
 });

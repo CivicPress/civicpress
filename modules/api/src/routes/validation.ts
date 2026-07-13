@@ -18,6 +18,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
+import { resolveInsideRecordsRoot } from '../utils/record-path-guard.js';
 
 type Severity = 'error' | 'warning' | 'info';
 function isSeverity(val: unknown): val is Severity {
@@ -347,12 +348,12 @@ async function validateSingleRecord(
     const fullCandidateSegments = relativeCandidate
       .replace(/^records\//, '')
       .split('/');
-    const fullCandidate = path.join(
+    // FA-API-005: the caller-supplied path must stay inside data/records.
+    const fullCandidate = resolveInsideRecordsRoot(
       dataDir,
-      'records',
-      ...fullCandidateSegments
+      fullCandidateSegments
     );
-    if (fs.existsSync(fullCandidate)) {
+    if (fullCandidate && fs.existsSync(fullCandidate)) {
       recordRelativePath = relativeCandidate;
     }
   }
@@ -400,10 +401,12 @@ async function validateSingleRecord(
 
   const normalizedPath = recordRelativePath.replace(/^records\//, '');
   const fullPathSegments = normalizedPath.split('/');
-  const fullPath = path.join(dataDir, 'records', ...fullPathSegments);
+  // FA-API-005: containment-checked resolve (recordRelativePath may derive
+  // from caller input above).
+  const fullPath = resolveInsideRecordsRoot(dataDir, fullPathSegments);
 
   try {
-    if (!fs.existsSync(fullPath)) {
+    if (!fullPath || !fs.existsSync(fullPath)) {
       issues.push({
         severity: 'error' as Severity,
         code: 'RECORD_NOT_FOUND',

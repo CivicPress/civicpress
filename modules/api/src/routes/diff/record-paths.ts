@@ -4,8 +4,8 @@ import {
   parseRecordRelativePath,
 } from '@civicpress/core';
 import { HttpError } from '../../utils/http-error.js';
+import { resolveInsideRecordsRoot } from '../../utils/record-path-guard.js';
 import * as fs from 'fs';
-import * as path from 'path';
 
 export function resolveRecordPath(
   dataDir: string,
@@ -23,8 +23,9 @@ export function resolveRecordPath(
     const candidateSegments = relativeCandidate
       .replace(/^records\//, '')
       .split('/');
-    const fullCandidate = path.join(dataDir, 'records', ...candidateSegments);
-    if (fs.existsSync(fullCandidate)) {
+    // FA-API-005: the caller-supplied path must stay inside data/records.
+    const fullCandidate = resolveInsideRecordsRoot(dataDir, candidateSegments);
+    if (fullCandidate && fs.existsSync(fullCandidate)) {
       recordRelativePath = relativeCandidate;
     }
   }
