@@ -63,7 +63,11 @@ import {
   requestContextMiddleware,
   createDatabaseContextMiddleware,
 } from './middleware/logging.js';
-import { authMiddleware, optionalAuth } from './middleware/auth.js';
+import {
+  authMiddleware,
+  optionalAuth,
+  requirePermission,
+} from './middleware/auth.js';
 import { csrfMiddleware } from './middleware/csrf.js';
 import {
   startInProcessRealtime,
@@ -396,12 +400,19 @@ export class CivicPressAPI {
     // Status routes (api-003 fix: inject civicPress; previously the
     // mount had no injection, so every status endpoint threw 500
     // outside of test fixtures.)
+    // FA-API-004: /status, /status/git, /status/records leak git file paths +
+    // commit messages/authors, draft/pending/rejected record ids & filenames,
+    // the .civic config listing, and process.memoryUsage()/NODE_ENV. These are
+    // admin DIAGNOSTICS, not a public surface — gate behind auth + system:admin
+    // (liveness lives at the unauthenticated /health).
     this.app.use(
       apiPath('status'),
       (req, _res, next) => {
         req.civicPress = this.civicPress;
         next();
       },
+      authMiddleware(this.civicPress),
+      requirePermission('system:admin'),
       createStatusRouter()
     );
 
