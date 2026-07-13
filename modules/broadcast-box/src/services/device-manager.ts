@@ -228,11 +228,20 @@ export class DeviceManager {
         data.registrationIp || null
       );
 
+      // FA-BB-001: a re-pairing with a fresh code may (re)bind the device's
+      // manifest-signing key — this is the key-rotation path (a fresh code is
+      // operator-issued, so key replacement is operator-sanctioned).
+      if (data.publicKey) {
+        await this.updateDevicePublicKey(existing.id, data.publicKey);
+        existing.publicKey = data.publicKey;
+      }
+
       coreInfo('Device re-registration with a fresh enrollment code', {
         operation: 'broadcast-box:device:registration:re-registration',
         deviceId: existing.id,
         deviceUuid: existing.deviceUuid,
         status: existing.status,
+        signingKey: Boolean(data.publicKey),
       });
       return existing;
     }
@@ -314,6 +323,7 @@ export class DeviceManager {
         maxResolution: '1080p',
       },
       config: data.config || {},
+      publicKey: data.publicKey,
     };
 
     let created: BroadcastDevice;
@@ -623,6 +633,14 @@ export class DeviceManager {
   /**
    * Get device by ID
    */
+  /** FA-BB-001: (re)bind the device's manifest-signing public key. */
+  private async updateDevicePublicKey(
+    deviceId: string,
+    publicKey: string
+  ): Promise<void> {
+    await this.deviceModel.update(deviceId, { publicKey });
+  }
+
   async getDevice(deviceId: string): Promise<BroadcastDevice | null> {
     return this.deviceModel.getById(deviceId);
   }

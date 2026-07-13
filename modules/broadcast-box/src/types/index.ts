@@ -18,6 +18,12 @@ export interface BroadcastDevice {
   status: DeviceStatus;
   capabilities: DeviceCapabilities;
   config: DeviceConfig;
+  /**
+   * Ed25519 public key (PEM/SPKI) registered at enrollment (FA-BB-001).
+   * When present, the device's `session.manifest` MUST be signed by the
+   * matching private key or it is dropped.
+   */
+  publicKey?: string;
   activeSources?: ActiveSources; // Currently active sources from status messages
   pipConfig?: PiPConfiguration; // Current PiP configuration from status messages
   lastSeenAt?: Date;
@@ -506,6 +512,8 @@ export interface CreateDeviceRequest {
   roomLocation?: string;
   capabilities: DeviceCapabilities;
   config?: DeviceConfig;
+  /** Ed25519 public key (PEM/SPKI) for manifest signing (FA-BB-001). */
+  publicKey?: string;
 }
 
 export interface UpdateDeviceRequest {

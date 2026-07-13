@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import * as crypto from 'node:crypto';
 import { createDeviceRoomHandler } from '../realtime/device-room-handler.js';
 
 const logger = {
@@ -40,10 +41,17 @@ function makeController(opts: {
   return { applySessionManifest, getSessionByCivicPressId };
 }
 
-function makeHandler(sessionController?: any) {
-  // Only logger + sessionController matter for manifest handling; the rest of
-  // the config is unused on this path.
-  return createDeviceRoomHandler({ logger, sessionController } as any);
+function makeHandler(sessionController?: any, device: any = {}) {
+  // logger + sessionController + deviceManager (for the FA-BB-001 signing-key
+  // lookup) matter for manifest handling; the rest of the config is unused.
+  const deviceManager = {
+    getDevice: vi.fn().mockResolvedValue(device),
+  };
+  return createDeviceRoomHandler({
+    logger,
+    sessionController,
+    deviceManager,
+  } as any);
 }
 
 const capture = {
@@ -135,5 +143,106 @@ describe('DeviceRoomHandler session.manifest routing', () => {
       )
     ).resolves.toBeUndefined();
     expect(controller.applySessionManifest).toHaveBeenCalled();
+  });
+});
+
+describe('DeviceRoomHandler session.manifest signing (FA-BB-001 residual)', () => {
+  const { generateKeyPairSync, sign } = crypto;
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const publicKeyPem = publicKey
+    .export({ type: 'spki', format: 'pem' })
+    .toString();
+
+  function signedPayload(sessionId: string, captureBlock: any) {
+    const manifest = JSON.stringify({
+      session_id: sessionId,
+      capture: captureBlock,
+      signed_at: new Date().toISOString(),
+    });
+    return {
+      session_id: sessionId,
+      manifest,
+      signature: sign(null, Buffer.from(manifest, 'utf8'), privateKey).toString(
+        'base64'
+      ),
+      alg: 'ed25519',
+    };
+  }
+
+  it('accepts a correctly signed manifest from a keyed device', async () => {
+    const controller = makeController({ owner: 'bb-001' });
+    const handler = makeHandler(controller, { publicKey: publicKeyPem });
+
+    await (handler as any).handleManifestMessage(
+      { type: 'session.manifest', payload: signedPayload('pv-1', capture) },
+      deviceAuth
+    );
+
+    expect(controller.applySessionManifest).toHaveBeenCalledWith(
+      'pv-1',
+      capture
+    );
+  });
+
+  it('drops an UNSIGNED manifest once the device has a registered key', async () => {
+    const controller = makeController({ owner: 'bb-001' });
+    const handler = makeHandler(controller, { publicKey: publicKeyPem });
+
+    await (handler as any).handleManifestMessage(
+      { type: 'session.manifest', payload: { session_id: 'pv-1', capture } },
+      deviceAuth
+    );
+
+    expect(controller.applySessionManifest).not.toHaveBeenCalled();
+  });
+
+  it('drops a manifest signed by a DIFFERENT key', async () => {
+    const other = generateKeyPairSync('ed25519');
+    const payload = signedPayload('pv-1', capture);
+    payload.signature = sign(
+      null,
+      Buffer.from(payload.manifest, 'utf8'),
+      other.privateKey
+    ).toString('base64');
+
+    const controller = makeController({ owner: 'bb-001' });
+    const handler = makeHandler(controller, { publicKey: publicKeyPem });
+
+    await (handler as any).handleManifestMessage(
+      { type: 'session.manifest', payload },
+      deviceAuth
+    );
+
+    expect(controller.applySessionManifest).not.toHaveBeenCalled();
+  });
+
+  it('drops a validly signed manifest replayed against another session', async () => {
+    // Signature is valid, but the SIGNED content names pv-1 while the
+    // envelope targets pv-2 — a cross-session replay.
+    const payload = { ...signedPayload('pv-1', capture), session_id: 'pv-2' };
+    const controller = makeController({ owner: 'bb-001' });
+    const handler = makeHandler(controller, { publicKey: publicKeyPem });
+
+    await (handler as any).handleManifestMessage(
+      { type: 'session.manifest', payload },
+      deviceAuth
+    );
+
+    expect(controller.applySessionManifest).not.toHaveBeenCalled();
+  });
+
+  it('still accepts unsigned manifests from a LEGACY device (no key on record)', async () => {
+    const controller = makeController({ owner: 'bb-001' });
+    const handler = makeHandler(controller, { publicKey: undefined });
+
+    await (handler as any).handleManifestMessage(
+      { type: 'session.manifest', payload: { session_id: 'pv-1', capture } },
+      deviceAuth
+    );
+
+    expect(controller.applySessionManifest).toHaveBeenCalledWith(
+      'pv-1',
+      capture
+    );
   });
 });

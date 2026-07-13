@@ -178,6 +178,10 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
     const deviceManager = container.resolve('broadcastBoxDeviceManager');
     const deviceAuth = container.resolve('broadcastBoxDeviceAuth');
 
+    // FA-BB-001 residual: the device registers its Ed25519 signing key, so
+    // its manifests must be SIGNED — this e2e exercises the strongest path.
+    const { publicKey: devicePub, privateKey: devicePriv } =
+      crypto.generateKeyPairSync('ed25519');
     const enrollment = await deviceManager.enrollDevice({
       name: 'Council Chamber Camera',
     });
@@ -185,7 +189,9 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
       deviceUuid: enrollment.deviceUuid,
       enrollmentCode: enrollment.enrollmentCode,
       name: 'Council Chamber Camera',
+      publicKey: devicePub.export({ type: 'spki', format: 'pem' }).toString(),
     });
+    expect(device.publicKey).toContain('BEGIN PUBLIC KEY');
     const { token } = await deviceAuth.generateToken({
       deviceId: device.id,
       deviceUuid: device.deviceUuid,
@@ -238,6 +244,39 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
       });
     });
 
+    // An UNSIGNED manifest from a keyed device must be dropped…
+    ws.send(
+      JSON.stringify({
+        type: 'session.manifest',
+        id: 'm-0',
+        timestamp: '2026-06-26T19:00:00.000Z',
+        payload: {
+          session_id: id,
+          capture: {
+            device: device.id,
+            segments: [{ start: 0, end: 15, visibility: 'public' }],
+          },
+        },
+      })
+    );
+    await new Promise((r) => setTimeout(r, 400));
+    expect((await readCapture(id))?.segments).toBeUndefined();
+
+    // …while the SIGNED manifest (signed over the exact bytes sent) applies.
+    const manifestJson = JSON.stringify({
+      session_id: id,
+      capture: {
+        device: device.id,
+        av_file: 'av-uuid-1',
+        duration_s: 15,
+        segments: [
+          { start: 0, end: 5, visibility: 'public' },
+          { start: 5, end: 10, visibility: 'in_camera' },
+          { start: 10, end: 15, visibility: 'public' },
+        ],
+      },
+      signed_at: new Date().toISOString(),
+    });
     ws.send(
       JSON.stringify({
         type: 'session.manifest',
@@ -245,16 +284,11 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
         timestamp: '2026-06-26T19:00:00.000Z',
         payload: {
           session_id: id,
-          capture: {
-            device: device.id,
-            av_file: 'av-uuid-1',
-            duration_s: 15,
-            segments: [
-              { start: 0, end: 5, visibility: 'public' },
-              { start: 5, end: 10, visibility: 'in_camera' },
-              { start: 10, end: 15, visibility: 'public' },
-            ],
-          },
+          manifest: manifestJson,
+          signature: crypto
+            .sign(null, Buffer.from(manifestJson, 'utf8'), devicePriv)
+            .toString('base64'),
+          alg: 'ed25519',
         },
       })
     );

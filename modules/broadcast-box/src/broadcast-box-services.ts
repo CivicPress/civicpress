@@ -243,6 +243,13 @@ export async function registerBroadcastBoxServices(
       );
       await executeMigration(migration003, '003_add_active_sources_pip');
 
+      // Migration 004: Device manifest-signing public key (FA-BB-001)
+      const migration004 = path.join(
+        migrationsDir,
+        '004_add_device_public_key.sql'
+      );
+      await executeMigration(migration004, '004_add_device_public_key');
+
       logger.info('Broadcast Box database migrations completed');
     }
   } catch (migrationError: any) {

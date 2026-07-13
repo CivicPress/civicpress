@@ -23,6 +23,7 @@ import type { DeviceManager } from '../services/device-manager.js';
 import type { DeviceConnectionTracker } from '../services/device-connection-tracker.js';
 import type { DeviceCommandService } from '../services/device-command-service.js';
 import type { SessionController } from '../services/session-controller.js';
+import { resolveManifestCapture } from '../services/manifest-signature.js';
 import { DeviceEventModel } from '../models/device-event.js';
 import {
   authenticateDeviceConnection,
@@ -569,9 +570,8 @@ export class DeviceRoomHandler implements RoomTypeHandler {
     deviceAuth: NonNullable<AuthResult['deviceAuth']>
   ): Promise<void> {
     const sessionId = message.payload?.session_id;
-    const capture = message.payload?.capture;
-    if (!sessionId || !capture) {
-      coreWarn('session.manifest missing session_id/capture — ignored', {
+    if (!sessionId) {
+      coreWarn('session.manifest missing session_id — ignored', {
         operation: 'broadcast-box:device-handler:manifest:invalid',
         deviceId: deviceAuth.deviceId,
       });
@@ -610,6 +610,39 @@ export class DeviceRoomHandler implements RoomTypeHandler {
       return;
     }
 
+    // FA-BB-001 residual: cryptographic manifest verification. A device that
+    // registered an Ed25519 key at enrollment must SIGN its manifests — a
+    // stolen bearer token alone can then no longer forge the capture
+    // segments. Keyless (legacy) devices are accepted unverified, with a warn.
+    const device = await this.config.deviceManager.getDevice(
+      deviceAuth.deviceId
+    );
+    const resolved = resolveManifestCapture(
+      message.payload,
+      sessionId,
+      device?.publicKey
+    );
+    if (!resolved.ok || !resolved.capture) {
+      coreWarn('session.manifest rejected — signature check failed — dropped', {
+        operation: 'broadcast-box:device-handler:manifest:bad-signature',
+        deviceId: deviceAuth.deviceId,
+        sessionId,
+        reason: resolved.reason,
+      });
+      return;
+    }
+    if (!resolved.verified) {
+      coreWarn(
+        'session.manifest accepted UNVERIFIED — device has no registered signing key (re-enroll to enable manifest signing)',
+        {
+          operation: 'broadcast-box:device-handler:manifest:unverified',
+          deviceId: deviceAuth.deviceId,
+          sessionId,
+        }
+      );
+    }
+    const capture = resolved.capture as any;
+
     try {
       await this.config.sessionController.applySessionManifest(
         sessionId,
@@ -619,6 +652,7 @@ export class DeviceRoomHandler implements RoomTypeHandler {
         operation: 'broadcast-box:device-handler:manifest:applied',
         deviceId: deviceAuth.deviceId,
         sessionId,
+        verified: resolved.verified,
         segments: Array.isArray(capture.segments) ? capture.segments.length : 0,
       });
     } catch (error) {

@@ -16,6 +16,7 @@ import { createSessionsRouter } from './sessions.js';
 import { createUploadsRouter } from './uploads.js';
 import { DeviceRegistrationRateLimiter } from '../middleware/rate-limiter.js';
 import { deviceAuthMiddleware } from '../middleware/device-auth.js';
+import { isValidEd25519PublicKeyPem } from '../services/manifest-signature.js';
 import { requirePermission } from '../middleware/require-permission.js';
 
 /**
@@ -156,6 +157,8 @@ export async function registerBroadcastBoxRoutes(
         body('roomLocation').optional().isString(),
         body('capabilities').optional().isObject(),
         body('config').optional().isObject(),
+        // FA-BB-001: optional Ed25519 manifest-signing key (PEM/SPKI).
+        body('publicKey').optional().isString().isLength({ max: 4096 }),
       ],
       async (req: any, res: any) => {
         try {
@@ -170,6 +173,20 @@ export async function registerBroadcastBoxRoutes(
             });
           }
 
+          // A malformed key must fail HERE, not silently disable signing.
+          if (
+            req.body.publicKey &&
+            !isValidEd25519PublicKeyPem(req.body.publicKey)
+          ) {
+            return res.status(400).json({
+              success: false,
+              error: {
+                message:
+                  'publicKey must be a PEM (SPKI) Ed25519 public key',
+              },
+            });
+          }
+
           const registrationIp = getClientIp(req);
           const createRequest = {
             deviceUuid: req.body.deviceUuid,
@@ -178,6 +195,7 @@ export async function registerBroadcastBoxRoutes(
             roomLocation: req.body.roomLocation,
             capabilities: req.body.capabilities,
             config: req.body.config,
+            publicKey: req.body.publicKey,
             registrationIp,
           };
 

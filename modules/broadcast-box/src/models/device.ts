@@ -33,9 +33,9 @@ export class DeviceModel {
     await this.db.getAdapter().execute(
       `INSERT INTO broadcast_devices (
         id, organization_id, device_uuid, name, room_location,
-        status, capabilities, config, active_sources, pip_config,
+        status, capabilities, config, public_key, active_sources, pip_config,
         last_seen_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         device.id,
         device.organizationId,
@@ -45,6 +45,7 @@ export class DeviceModel {
         device.status,
         JSON.stringify(device.capabilities),
         device.config ? JSON.stringify(device.config) : null,
+        device.publicKey || null,
         device.activeSources ? JSON.stringify(device.activeSources) : null,
         device.pipConfig ? JSON.stringify(device.pipConfig) : null,
         device.lastSeenAt ? device.lastSeenAt.toISOString() : null,
@@ -141,6 +142,7 @@ export class DeviceModel {
       status: DeviceStatus;
       capabilities: DeviceCapabilities;
       config: DeviceConfig;
+      publicKey: string;
       activeSources: ActiveSources;
       pipConfig: PiPConfiguration;
       lastSeenAt: Date;
@@ -152,6 +154,11 @@ export class DeviceModel {
     if (updates.name !== undefined) {
       setClauses.push('name = ?');
       params.push(updates.name);
+    }
+
+    if (updates.publicKey !== undefined) {
+      setClauses.push('public_key = ?');
+      params.push(updates.publicKey || null);
     }
 
     if (updates.roomLocation !== undefined) {
@@ -241,6 +248,7 @@ export class DeviceModel {
       status: row.status as DeviceStatus,
       capabilities: JSON.parse(row.capabilities),
       config: row.config ? JSON.parse(row.config) : {},
+      publicKey: row.public_key || undefined,
       activeSources: row.active_sources
         ? JSON.parse(row.active_sources)
         : undefined,
