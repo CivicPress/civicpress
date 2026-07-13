@@ -291,6 +291,24 @@ token (shown on local console/QR) enforced on every `/api` route;
 | FA-UI-001   | M      | UI XSS         | `app/app.vue:62-135` fetches `/api/v1/info` and **re-materializes `<script>` elements** from `analytics.inject_head/body_*` into `<head>`/`<body>` with no sanitization/allow-list/CSP; combined with JWT+CSRF in `localStorage` (`stores/auth.ts:115`, `useCsrf.ts`) any injected script exfiltrates tokens. Still-present.                                      | ui-004                       |
 | FA-CLI-001 · **closed** (`da2ff38`) | S | CLI auth | `civic auth:simulated` is gated only by `NODE_ENV==='production'` (`cli/src/commands/auth.ts:328`), and core `authenticateWithSimulatedAccount` has no env check — on a host with `NODE_ENV` unset, `--role admin` mints a real admin token with no credential (the CLI twin of `FA-API-001`). **Fixed** with the shared `isSimulatedAuthEnabled()` gate + core backstop. | cli-010 |
 
+**Closed on `refactor/phase-6b-audit-highs` (2026-07-13):**
+
+- **FA-API-003** — `4d4c6f0`: `geography:manage` permission required on
+  geography POST/PUT/DELETE (granted to admin + clerk); `generateFilename`
+  sanitization confirmed.
+- **FA-API-005** — `0e9f858`: `resolveInsideRecordsRoot` containment guard on
+  every caller-influenced record-path join (`validation.ts` + `diff/record-paths.ts`).
+- **FA-API-006** — `a6439dd`: `helmet` (CORP cross-origin for media),
+  `express-rate-limit` (global + a strict auth window — also partial
+  `FA-API-007`), and `compression` wired.
+- **FA-BB-003** — `dcf3259`: upload `fileName` must be a plain basename
+  (processor guard + route validator) before any disk write.
+- **FA-BB-004** — `64d9392`: the enrollment code is bound to its issued
+  `deviceUuid`; a mismatched UUID is rejected as an invalid code.
+- **FA-UI-001** — `0086dfa`: analytics injection no longer executes inline
+  scripts; external scripts need an https/same-origin `src` + attribute
+  allowlist, other markup passes DOMPurify.
+
 ---
 
 ## Findings — Medium
