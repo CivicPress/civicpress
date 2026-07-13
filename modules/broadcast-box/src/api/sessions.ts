@@ -340,6 +340,68 @@ export function createSessionsRouter(
   );
 
   /**
+   * POST /api/v1/broadcast-box/sessions/records/:recordId/redaction
+   * Manual redaction override (FA-BB-002 G) for a CivicPress `session` RECORD
+   * stuck `awaiting_visibility` (manifest lost / attempts exhausted).
+   * Gated on `storage:manage` — the same authority that governs storage
+   * configuration. Actions:
+   *   - retry           → re-queue the redaction (attempts reset)
+   *   - publish_public  → operator ATTESTS the recording is all-public
+   *                       (in-camera segments, if declared, still win)
+   * Publishing always flows through the worker's verified path.
+   */
+  router.post(
+    '/records/:recordId/redaction',
+    [
+      param('recordId').isString().notEmpty(),
+      body('action')
+        .isIn(['retry', 'publish_public'])
+        .withMessage("action must be 'retry' or 'publish_public'"),
+    ],
+    requirePermission('storage:manage', logger),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({
+            success: false,
+            error: { message: 'Validation failed', details: errors.array() },
+          });
+        }
+
+        const capture = await sessionController.overrideRedaction(
+          req.params.recordId,
+          req.body.action,
+          req.user?.username ?? 'unknown'
+        );
+
+        res.json({ success: true, capture });
+      } catch (error) {
+        logger.error('Error applying redaction override', {
+          operation: 'broadcast-box:api:sessions:redaction-override',
+          recordId: req.params.recordId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        const statusCode =
+          error instanceof Error && error.message.includes('not found')
+            ? 404
+            : error instanceof Error && error.message.includes('no captured')
+              ? 409
+              : 500;
+        res.status(statusCode).json({
+          success: false,
+          error: {
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Failed to apply redaction override',
+          },
+        });
+      }
+    }
+  );
+
+  /**
    * GET /api/v1/broadcast-box/sessions
    * List sessions with filters
    */

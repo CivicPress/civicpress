@@ -233,6 +233,8 @@
       "noAttachments": "Aucune pièce jointe",
       "noFilesAttachedTitle": "Aucun fichier attaché",
       "noFilesAttachedDesc": "Ce document n'a pas encore de fichiers attachés.",
+      "recordingProcessingTitle": "Enregistrement en cours de traitement",
+      "recordingProcessingDesc": "L'enregistrement de la séance est en préparation pour publication (les portions à huis clos sont d'abord retirées). Il apparaîtra ici une fois prêt.",
       "linkFiles": "Lier des fichiers",
       "selectCategory": "Sélectionner la catégorie",
       "optionalDescription": "Description optionnelle",

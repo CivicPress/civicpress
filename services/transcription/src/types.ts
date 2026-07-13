@@ -32,6 +32,10 @@ export interface SessionCapture {
   public_file?: string;
   /** Redaction pipeline latch (FA-BB-002). */
   redaction_status?: 'pending' | 'complete' | 'failed' | 'awaiting_visibility';
+  /** Failed redaction attempts (bounded retry, Commit G). */
+  redaction_attempts?: number;
+  /** When the pipeline first held on unknown visibility (Commit G timeout). */
+  redaction_pending_since?: string;
   /**
    * Positive all-public attestation: the device/operator asserts the whole
    * recording is public. Absent/false + no segments = UNKNOWN → HOLD.

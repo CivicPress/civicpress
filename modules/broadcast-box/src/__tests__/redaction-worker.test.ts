@@ -314,6 +314,63 @@ describe('RedactionWorker', () => {
     await expect(records.mergeCapture.mock.results[0].value).resolves.toBeNull();
   });
 
+  it('G: stamps redaction_pending_since on first hold, escalates to awaiting_visibility past the timeout', async () => {
+    const rec = sessionRecord({ redaction_status: 'pending' }); // no segments → hold
+    const records = fakeRecords([rec]);
+    const media = fakeMedia();
+    const worker = new RedactionWorker({
+      records,
+      storage: fakeStorage(rawPath),
+      media,
+      logger: silentLogger,
+      visibilityTimeoutMs: 60_000,
+    });
+
+    // First cycle: the hold is stamped, status stays pending.
+    await worker.runOnce();
+    expect(rec.metadata.capture.redaction_pending_since).toBeTruthy();
+    expect(rec.metadata.capture.redaction_status).toBe('pending');
+
+    // Simulate the stamp being older than the timeout → escalation.
+    rec.metadata.capture.redaction_pending_since = new Date(
+      Date.now() - 120_000
+    ).toISOString();
+    await worker.runOnce();
+    expect(rec.metadata.capture.redaction_status).toBe('awaiting_visibility');
+    expect(rec.metadata.capture.public_file).toBeUndefined(); // still unpublished
+
+    // awaiting_visibility sessions are no longer scanned.
+    const third = await worker.runOnce();
+    expect(third).toEqual({ published: 0, held: 0, failed: 0 });
+  });
+
+  it('G: bounded retry — failures count attempts, the cap escalates to awaiting_visibility', async () => {
+    const rec = sessionRecord({
+      redaction_status: 'pending',
+      duration_s: 60,
+      segments: PARTIAL_SEGMENTS,
+    });
+    const records = fakeRecords([rec]);
+    // Every encode fails verification.
+    const media = fakeMedia({ frameMaxLuma: vi.fn(async () => 200) });
+    const worker = new RedactionWorker({
+      records,
+      storage: fakeStorage(rawPath),
+      media,
+      logger: silentLogger,
+      maxAttempts: 2,
+    });
+
+    await worker.runOnce();
+    expect(rec.metadata.capture.redaction_attempts).toBe(1);
+    expect(rec.metadata.capture.redaction_status).toBe('pending');
+
+    await worker.runOnce();
+    expect(rec.metadata.capture.redaction_attempts).toBe(2);
+    expect(rec.metadata.capture.redaction_status).toBe('awaiting_visibility');
+    expect(rec.metadata.capture.public_file).toBeUndefined(); // never published
+  });
+
   it('leaves the session pending when the public upload fails', async () => {
     const rec = sessionRecord({
       redaction_status: 'pending',

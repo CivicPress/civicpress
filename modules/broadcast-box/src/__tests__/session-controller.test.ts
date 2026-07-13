@@ -688,4 +688,75 @@ describe('SessionController', () => {
       ).rejects.toThrow(/Session record not found/);
     });
   });
+
+  describe('overrideRedaction (FA-BB-002 G)', () => {
+    it('retry re-queues the redaction with attempts reset', async () => {
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-1',
+        type: 'session',
+        metadata: {
+          capture: {
+            device: 'bb-001',
+            av_file: 'raw-1',
+            redaction_status: 'awaiting_visibility',
+            redaction_attempts: 5,
+          },
+        },
+      });
+
+      const capture = await sessionController.overrideRedaction(
+        'pv-1',
+        'retry',
+        'clerk-admin'
+      );
+
+      const patch = mockRecordManager.mergeCapture.mock.calls[0][1];
+      expect(patch.redaction_status).toBe('pending');
+      expect(patch.redaction_attempts).toBe(0);
+      expect(patch.all_public).toBeUndefined(); // retry attests NOTHING
+      expect(capture.av_file).toBe('raw-1');
+    });
+
+    it('publish_public sets the operator attestation and re-queues', async () => {
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-1',
+        type: 'session',
+        metadata: {
+          capture: {
+            device: 'bb-001',
+            av_file: 'raw-1',
+            redaction_status: 'awaiting_visibility',
+          },
+        },
+      });
+
+      await sessionController.overrideRedaction(
+        'pv-1',
+        'publish_public',
+        'clerk-admin'
+      );
+
+      const patch = mockRecordManager.mergeCapture.mock.calls[0][1];
+      expect(patch.all_public).toBe(true);
+      expect(patch.redaction_status).toBe('pending'); // worker still publishes
+    });
+
+    it('rejects a record with no captured recording', async () => {
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'pv-1',
+        type: 'session',
+        metadata: { capture: { device: 'bb-001' } },
+      });
+      await expect(
+        sessionController.overrideRedaction('pv-1', 'retry', 'x')
+      ).rejects.toThrow(/no captured recording/);
+    });
+
+    it('throws when the record does not exist', async () => {
+      mockRecordManager.getRecord.mockResolvedValue(null);
+      await expect(
+        sessionController.overrideRedaction('missing', 'retry', 'x')
+      ).rejects.toThrow(/Session record not found/);
+    });
+  });
 });

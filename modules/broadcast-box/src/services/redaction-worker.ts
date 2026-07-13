@@ -92,6 +92,17 @@ export interface RedactionWorkerOptions {
   trailPadS?: number;
   /** Scratch directory for encode outputs (default: a per-job os.tmpdir()). */
   workDir?: string;
+  /**
+   * How long a session may HOLD on unknown visibility before it escalates to
+   * `awaiting_visibility` for manual review (Commit G). Default 30 min.
+   */
+  visibilityTimeoutMs?: number;
+  /**
+   * Bounded retry (Commit G): after this many failed redaction attempts the
+   * session escalates to `awaiting_visibility` instead of retrying forever
+   * (no permanent 'failed' latch — a human decides). Default 5.
+   */
+  maxAttempts?: number;
 }
 
 export interface RedactionRunSummary {
@@ -161,7 +172,10 @@ export class RedactionWorker {
         const outcome = await this.processSession(id, capture);
         if (outcome === 'published') summary.published++;
         else if (outcome === 'held') summary.held++;
-        else summary.failed++;
+        else {
+          summary.failed++;
+          await this.recordFailure(id, capture).catch(() => {});
+        }
       } catch (error) {
         summary.failed++;
         logger.error('redaction failed — will retry next cycle', {
@@ -169,6 +183,7 @@ export class RedactionWorker {
           recordId: id,
           error: error instanceof Error ? error.message : String(error),
         });
+        await this.recordFailure(id, capture).catch(() => {});
       }
     }
 
@@ -224,6 +239,7 @@ export class RedactionWorker {
         recordId,
         reason: decision.reason,
       });
+      await this.trackHold(recordId, capture);
       return 'held';
     }
 
@@ -268,6 +284,90 @@ export class RedactionWorker {
       return 'published';
     } finally {
       await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  /**
+   * Commit G: a HOLD that outlives the visibility timeout escalates to
+   * `awaiting_visibility` — still unpublished (the invariant holds), but
+   * surfaced for a manual, permission-gated decision instead of waiting
+   * silently forever (manifest-lost case). The first hold stamps
+   * `redaction_pending_since`; the escalation compares against it.
+   */
+  private async trackHold(
+    recordId: string,
+    capture: SessionCapture
+  ): Promise<void> {
+    const { records, logger } = this.opts;
+    const timeoutMs = this.opts.visibilityTimeoutMs ?? 30 * 60 * 1000;
+    const sinceIso = (capture as Record<string, unknown>)
+      .redaction_pending_since as string | undefined;
+    const stillPending = (c: Record<string, unknown>) =>
+      c.redaction_status === 'pending';
+
+    if (!sinceIso) {
+      await records.mergeCapture(
+        recordId,
+        { redaction_pending_since: new Date().toISOString() },
+        SYSTEM_USER,
+        { precondition: stillPending }
+      );
+      return;
+    }
+    const sinceMs = Date.parse(sinceIso);
+    if (Number.isFinite(sinceMs) && Date.now() - sinceMs > timeoutMs) {
+      await records.mergeCapture(
+        recordId,
+        { redaction_status: 'awaiting_visibility' },
+        SYSTEM_USER,
+        { precondition: stillPending }
+      );
+      logger.warn(
+        'redaction: visibility unknown past timeout — awaiting manual review',
+        {
+          operation: 'broadcast-box:redaction:awaiting-visibility',
+          recordId,
+          pendingSince: sinceIso,
+        }
+      );
+    }
+  }
+
+  /**
+   * Commit G bounded retry: count failed attempts on the capture block; at
+   * the cap, escalate to `awaiting_visibility` (manual review) instead of
+   * retrying forever — and never latch a permanent 'failed'.
+   */
+  private async recordFailure(
+    recordId: string,
+    capture: SessionCapture
+  ): Promise<void> {
+    const { records, logger } = this.opts;
+    const maxAttempts = this.opts.maxAttempts ?? 5;
+    const attempts =
+      (Number((capture as Record<string, unknown>).redaction_attempts) || 0) +
+      1;
+    const escalate = attempts >= maxAttempts;
+    await records.mergeCapture(
+      recordId,
+      escalate
+        ? {
+            redaction_attempts: attempts,
+            redaction_status: 'awaiting_visibility',
+          }
+        : { redaction_attempts: attempts },
+      SYSTEM_USER,
+      { precondition: (c) => c.redaction_status === 'pending' }
+    );
+    if (escalate) {
+      logger.warn(
+        'redaction: attempt cap reached — awaiting manual review (still unpublished)',
+        {
+          operation: 'broadcast-box:redaction:attempts-exhausted',
+          recordId,
+          attempts,
+        }
+      );
     }
   }
 

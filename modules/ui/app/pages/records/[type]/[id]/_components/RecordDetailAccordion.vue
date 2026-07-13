@@ -72,6 +72,7 @@ defineEmits<{
       <AttachmentsPanel
         v-else-if="item.value === 'attachments'"
         :attached-files="record.attachedFiles"
+        :capture="(record.metadata as any)?.capture ?? (record as any).capture"
         @download="(id, name) => $emit('download', id, name)"
       />
 

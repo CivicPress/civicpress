@@ -244,6 +244,8 @@
       "noAttachments": "No attachments",
       "noFilesAttachedTitle": "No files attached",
       "noFilesAttachedDesc": "This record doesn't have any files attached to it yet.",
+      "recordingProcessingTitle": "Recording is being processed",
+      "recordingProcessingDesc": "The session recording is being prepared for publication (closed-session portions are removed first). It will appear here once ready.",
       "linkFiles": "Link Files",
       "selectCategory": "Select category",
       "optionalDescription": "Optional description",

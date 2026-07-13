@@ -584,6 +584,65 @@ export class SessionController {
   }
 
   /**
+   * Manual redaction override (FA-BB-002 G) — the `storage:manage`-gated
+   * escape hatch for sessions stuck `awaiting_visibility` (manifest lost,
+   * attempts exhausted).
+   *
+   * - `retry`: re-queue the session (`pending`, attempts reset); the worker
+   *   re-redacts from the declared segments.
+   * - `publish_public`: a HUMAN with authority attests the recording is fully
+   *   public (`all_public: true`) and re-queues it. Publishing still flows
+   *   ONLY through the worker's verified path — and if the capture carries
+   *   in-camera segments, they still win over the attestation (the worker
+   *   blanks them regardless). There is no bypass that ships raw bytes.
+   */
+  async overrideRedaction(
+    recordId: string,
+    action: 'retry' | 'publish_public',
+    actor: string
+  ): Promise<Record<string, unknown>> {
+    const record = await this.recordManager.getRecord(recordId);
+    if (!record) {
+      throw new Error(`Session record not found: ${recordId}`);
+    }
+    const capture =
+      ((record.metadata as Record<string, any> | undefined)?.capture as
+        | Record<string, unknown>
+        | undefined) ??
+      ((record as Record<string, any>).capture as
+        | Record<string, unknown>
+        | undefined) ??
+      {};
+    if (!capture.av_file) {
+      throw new Error(
+        `Session ${recordId} has no captured recording (capture.av_file)`
+      );
+    }
+
+    const patch: Record<string, unknown> = {
+      redaction_status: 'pending',
+      redaction_attempts: 0,
+      redaction_pending_since: new Date().toISOString(),
+    };
+    if (action === 'publish_public') {
+      patch.all_public = true;
+    }
+    const merged = await this.recordManager.mergeCapture(
+      recordId,
+      patch,
+      { id: 1, username: 'system', role: 'admin' } as any
+    );
+
+    coreInfo('Redaction override applied', {
+      operation: 'broadcast-box:redaction:override',
+      recordId,
+      action,
+      actor,
+    });
+    return merged ?? {};
+  }
+
+  /**
    * Handle session failure (called by event handler)
    */
   async handleSessionFailed(sessionId: string, error: string): Promise<void> {

@@ -12,9 +12,27 @@ interface AttachedFile {
 
 interface Props {
   attachedFiles?: AttachedFile[];
+  /** The session record's capture block (broadcast-box), when present. */
+  capture?: {
+    av_file?: string;
+    public_file?: string;
+    redaction_status?: string;
+  };
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+// FA-BB-002 G: a captured recording exists but its verified public variant has
+// not been published yet (redaction pending / awaiting review) — tell the
+// visitor it's coming instead of showing nothing.
+const recordingProcessing = computed(
+  () =>
+    Boolean(props.capture?.av_file) &&
+    !props.capture?.public_file &&
+    ['pending', 'awaiting_visibility'].includes(
+      props.capture?.redaction_status ?? ''
+    )
+);
 
 defineEmits<{
   download: [fileId: string, fileName: string];
@@ -40,6 +58,24 @@ function toMediaFile(file: AttachedFile) {
 
 <template>
   <div class="space-y-4">
+    <div
+      v-if="recordingProcessing"
+      class="flex items-start gap-3 border rounded-lg p-4 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800"
+    >
+      <UIcon
+        name="i-lucide-clock"
+        class="w-5 h-5 mt-0.5 text-amber-600 dark:text-amber-400"
+      />
+      <div>
+        <h4 class="text-sm font-medium text-amber-900 dark:text-amber-100">
+          {{ t('records.attachments.recordingProcessingTitle') }}
+        </h4>
+        <p class="text-sm text-amber-800 dark:text-amber-200">
+          {{ t('records.attachments.recordingProcessingDesc') }}
+        </p>
+      </div>
+    </div>
+
     <div
       v-if="attachedFiles && attachedFiles.length > 0"
       class="space-y-4"
@@ -108,7 +144,7 @@ function toMediaFile(file: AttachedFile) {
         </div>
       </div>
     </div>
-    <div v-else class="text-center py-8">
+    <div v-else-if="!recordingProcessing" class="text-center py-8">
       <UIcon
         name="i-lucide-paperclip"
         class="w-12 h-12 text-gray-400 mx-auto mb-4"
