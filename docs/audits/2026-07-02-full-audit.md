@@ -175,6 +175,12 @@ unset `NODE_ENV` and `production`.
 
 ### FA-BB-002 · Critical · L · Closed-session (in-camera) video recorded, uploaded, and served publicly unauthenticated
 
+> **CLOSED 2026-07-13.** Full fail-closed redaction pipeline, Commits A–G
+> (`a046f73`, `99da16b`, `ba9f711`, `32b53cb`, `8275a3c`, `30e68da`,
+> `782f406`); live dev backfilled + redacted; closed window verified black +
+> silent on the PUBLISHED bytes. Design + closure detail:
+> `docs/specs/2026-07-07-fa-bb-002-redaction-design.md`.
+
 End-to-end trace (both repos, all links verified):
 
 - **Device** — `command_handler.py:1155-1187` (`set_visibility('in_camera')`)
@@ -210,6 +216,12 @@ End-to-end trace (both repos, all links verified):
 
 ### FA-BB-001 · Critical · M · `session.manifest` has no device-ownership check (cross-session capture tampering)
 
+> **CLOSED 2026-07-13.** Ownership check `4da2f51`; manifest can no longer
+> bind `av_file` (FA-BB-013, `99da16b`); Ed25519-signed manifests (CP
+> `e90dbc4` + HW `c38a0c6`): device key registered at enrollment (migration
+> 004), signature over the exact wire bytes verified with replay/freshness
+> checks, unsigned manifests dropped once a key is on record.
+
 `device-room-handler.ts` (~567-613) reads `payload.session_id` +
 `payload.capture` from an authenticated device and calls
 `sessionController.applySessionManifest(sessionId, capture)`; the authenticated
@@ -227,6 +239,13 @@ and reject unless its `deviceId` matches the authenticated device; validate
 `segment.visibility` against the enum and reject unknown session ids.
 
 ### FA-HW-001 · Critical · M · Device config API binds `0.0.0.0` unauthenticated (LAN takeover of enrollment credentials)
+
+> **CLOSED 2026-07-13** (HW repo `e249fc9`). Loopback-only default bind
+> (`AP_MODE_BIND_HOST` opt-in for LAN setup); mandatory per-boot setup token
+> on every `/api` route except `/api/health` (console/journal +
+> `data/setup_token` 0600); CORS credentials off; enrollment code never
+> returned once enrolled; frontend carries the token via `?token=` →
+> `X-Setup-Token`.
 
 `web_server.py:103-109` binds uvicorn `0.0.0.0:8443` plain HTTP; `:59-65` sets
 CORS `allow_origins=['*'] allow_credentials=True`; **no auth dependency on any
