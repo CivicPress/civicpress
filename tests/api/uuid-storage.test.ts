@@ -232,6 +232,93 @@ describe('UUID Storage API', () => {
 
       expect(response.status).toBe(404);
     });
+
+    it('streams the full file with Accept-Ranges and the exact bytes', async () => {
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['accept-ranges']).toBe('bytes');
+      const original = await fs.readFile(testFilePath);
+      expect(Buffer.compare(response.body as Buffer, original)).toBe(0);
+    });
+
+    it('serves a byte range as 206 with Content-Range (video seek support)', async () => {
+      const original = await fs.readFile(testFilePath);
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Range', 'bytes=2-5')
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(response.status).toBe(206);
+      expect(response.headers['content-range']).toBe(
+        `bytes 2-5/${original.length}`
+      );
+      expect(response.headers['content-length']).toBe('4');
+      expect(Buffer.compare(response.body as Buffer, original.subarray(2, 6))).toBe(
+        0
+      );
+    });
+
+    it('serves an open-ended range (bytes=N-) to the end of the file', async () => {
+      const original = await fs.readFile(testFilePath);
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Range', 'bytes=3-')
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(response.status).toBe(206);
+      expect(response.headers['content-range']).toBe(
+        `bytes 3-${original.length - 1}/${original.length}`
+      );
+      expect(Buffer.compare(response.body as Buffer, original.subarray(3))).toBe(0);
+    });
+
+    it('rejects an unsatisfiable range with 416 + Content-Range */size', async () => {
+      const original = await fs.readFile(testFilePath);
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Range', `bytes=${original.length + 100}-`);
+
+      expect(response.status).toBe(416);
+      expect(response.headers['content-range']).toBe(
+        `bytes */${original.length}`
+      );
+    });
+
+    it('Range does NOT bypass the private-folder gate', async () => {
+      const privateFilePath = path.join(context.testDir, 'private-range.pdf');
+      await fs.writeFile(privateFilePath, 'confidential range test body');
+      const up = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', privateFilePath)
+        .field('folder', 'private');
+      expect(up.status).toBe(200);
+
+      const denied = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${up.body.data.id}`)
+        .set('Range', 'bytes=0-10');
+      expect(denied.status).toBe(401);
+    });
   });
 
   describe('GET /api/v1/storage/files/:id/info - Get File Info', () => {

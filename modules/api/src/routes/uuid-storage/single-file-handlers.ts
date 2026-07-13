@@ -282,8 +282,52 @@ export function registerSingleFileRoutes(router: Router): void {
           return;
         }
 
-        const fileContent = await storageService.getFileContent(fileId);
-        if (!fileContent) {
+        // FA-BB-002 (Commit D): STREAM the file with HTTP Range support. The
+        // prior whole-file Buffer path could not serve a multi-hour redacted
+        // recording (>2GB Buffer ceiling, no seek); video players need 206s.
+        const totalSize = fileInfo.size;
+        const rangeHeader = req.headers.range;
+        let start = 0;
+        let end = totalSize - 1;
+        let isPartial = false;
+
+        if (rangeHeader) {
+          // Single-range form only: "bytes=start-end" / "bytes=start-" /
+          // "bytes=-suffix". Anything unsatisfiable → 416 per RFC 9110.
+          const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+          const rawStart = match?.[1] ?? '';
+          const rawEnd = match?.[2] ?? '';
+          if (!match || (rawStart === '' && rawEnd === '')) {
+            res
+              .status(416)
+              .setHeader('Content-Range', `bytes */${totalSize}`)
+              .end();
+            return;
+          }
+          if (rawStart === '') {
+            // Suffix range: the last N bytes.
+            const suffix = Math.min(Number(rawEnd), totalSize);
+            start = totalSize - suffix;
+            end = totalSize - 1;
+          } else {
+            start = Number(rawStart);
+            end = rawEnd === '' ? totalSize - 1 : Math.min(Number(rawEnd), totalSize - 1);
+          }
+          if (start > end || start >= totalSize) {
+            res
+              .status(416)
+              .setHeader('Content-Range', `bytes */${totalSize}`)
+              .end();
+            return;
+          }
+          isPartial = true;
+        }
+
+        const stream = await storageService.downloadFileStream(
+          fileId,
+          isPartial ? { start, end } : undefined
+        );
+        if (!stream) {
           return handleStorageError(
             'download_file',
             new Error(`File content not found for ID '${fileId}'`),
@@ -293,16 +337,38 @@ export function registerSingleFileRoutes(router: Router): void {
           );
         }
 
-        // Set appropriate headers
+        // Media plays inline (the UI's <video>/<audio> src points here);
+        // everything else stays a download.
+        const disposition = /^(video|audio)\//.test(fileInfo.mime_type)
+          ? 'inline'
+          : 'attachment';
         res.setHeader('Content-Type', fileInfo.mime_type);
         res.setHeader(
           'Content-Disposition',
-          `attachment; filename="${fileInfo.original_name}"`
+          `${disposition}; filename="${fileInfo.original_name}"`
         );
-        res.setHeader('Content-Length', fileInfo.size.toString());
+        res.setHeader('Accept-Ranges', 'bytes');
+        if (isPartial) {
+          res.status(206);
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+          res.setHeader('Content-Length', String(end - start + 1));
+        } else {
+          res.setHeader('Content-Length', String(totalSize));
+        }
 
-        // Send the file content
-        res.send(fileContent);
+        stream.on('error', (error: Error) => {
+          if (!res.headersSent) {
+            handleStorageError('download_file', error, req, res);
+          } else {
+            res.destroy(error);
+          }
+        });
+        // A client abort must tear the source stream down (else a seek-happy
+        // player leaks one open file descriptor per abandoned request).
+        res.on('close', () => {
+          stream.destroy();
+        });
+        stream.pipe(res);
       } catch (error: unknown) {
         return handleStorageError('download_file', error, req, res);
       }
