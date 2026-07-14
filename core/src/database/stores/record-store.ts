@@ -295,10 +295,12 @@ export class RecordStore {
       workflow_state?: string;
       content?: string;
       metadata?: string;
-      geography?: string;
-      attached_files?: string;
-      linked_records?: string;
-      linked_geography_files?: string;
+      // `null` writes SQL NULL — saga compensation uses it to reset fields
+      // that did not exist before a failed update (FA-CORE-009).
+      geography?: string | null;
+      attached_files?: string | null;
+      linked_records?: string | null;
+      linked_geography_files?: string | null;
       path?: string;
     }
   ): Promise<void> {

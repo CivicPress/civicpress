@@ -135,6 +135,29 @@ export class SagaTimeoutError extends CivicPressError {
 }
 
 /**
+ * Saga duplicate error
+ * Thrown when an operation with the same idempotency key is already in flight
+ * (FA-CORE-008 double-submit protection).
+ */
+export class SagaDuplicateError extends CivicPressError {
+  code = 'SAGA_DUPLICATE_OPERATION';
+  statusCode = 409;
+
+  constructor(
+    public idempotencyKey: string,
+    public inFlightSagaId: string
+  ) {
+    super(
+      `An identical operation is already in progress (saga ${inFlightSagaId})`,
+      {
+        idempotencyKey,
+        inFlightSagaId,
+      }
+    );
+  }
+}
+
+/**
  * Saga lock error
  * Thrown when resource lock cannot be acquired
  */

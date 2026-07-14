@@ -70,8 +70,13 @@ class CreateInRecordsStep extends BaseSagaStep<
       const request = context.request;
       const user = context.user;
 
-      // Generate record ID if not provided
-      const recordId = context.recordId || `record-${Date.now()}`;
+      // Use the pre-generated ID (metadata.recordId doubles as the resource
+      // lock key — FA-CORE-015); fall back to generating one for callers
+      // that build contexts by hand.
+      const recordId =
+        context.recordId ||
+        (context.metadata?.recordId as string | undefined) ||
+        `record-${Date.now()}`;
 
       // Calculate dates
       const creationDate = request.createdAt

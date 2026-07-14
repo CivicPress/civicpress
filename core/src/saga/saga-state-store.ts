@@ -159,6 +159,34 @@ export class SagaStateStore {
   }
 
   /**
+   * Release an idempotency key held by a previous saga run (FA-CORE-008).
+   * The column is UNIQUE, so an expired/failed/abandoned run must give up
+   * the key before a new run can register it. The old state row itself is
+   * kept for history/recovery.
+   */
+  async clearIdempotencyKey(idempotencyKey: string): Promise<void> {
+    try {
+      await this.db
+        .getAdapter()
+        .execute(
+          'UPDATE saga_states SET idempotency_key = NULL WHERE idempotency_key = ?',
+          [idempotencyKey]
+        );
+    } catch (error) {
+      coreError(
+        `Failed to clear idempotency key: ${idempotencyKey}`,
+        'SAGA_STATE_CLEAR_KEY_ERROR',
+        {
+          idempotencyKey,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'saga:state:clear-key' }
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Update saga state status
    */
   async updateStatus(

@@ -187,6 +187,46 @@ describe('ArchiveRecordSaga Integration', () => {
       expect(history.length).toBeGreaterThan(0);
       expect(history[0].message).toContain('Archive record');
     });
+
+    it('stages the deletion of the original path, not just the archive copy (FA-CORE-010)', async () => {
+      const saga = new ArchiveRecordSaga(
+        db,
+        recordManager,
+        civic.getGitEngine(),
+        civic.getHookSystem(),
+        testDir
+      );
+
+      const context = {
+        correlationId: `test-tree-${Date.now()}`,
+        startedAt: new Date(),
+        recordId: existingRecordId,
+        user: testUser,
+        metadata: { recordId: existingRecordId },
+      } as any;
+
+      const result = await sagaExecutor.execute(saga, context);
+      expect(result.result).toBe(true);
+
+      // The committed tree must contain the archive path and NOT the
+      // original path — previously only the addition was staged, so every
+      // archive commit kept the old file alive in HEAD.
+      const tree = execSync('git ls-tree -r HEAD --name-only', {
+        cwd: testDir,
+      })
+        .toString()
+        .split('\n');
+      expect(tree).toContain(context.archiveFilePath);
+      expect(tree).not.toContain(context.originalFilePath);
+
+      // And no tracked change (e.g. the unstaged deletion) is left behind.
+      const status = execSync('git status --porcelain --untracked-files=no', {
+        cwd: testDir,
+      })
+        .toString()
+        .trim();
+      expect(status).toBe('');
+    });
   });
 
   describe('Error Handling', () => {

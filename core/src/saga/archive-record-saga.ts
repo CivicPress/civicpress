@@ -243,7 +243,11 @@ class CommitToGitStep extends BaseSagaStep<ArchiveRecordContext, string> {
   async execute(context: ArchiveRecordContext): Promise<string> {
     this.logStep('start', context);
 
-    if (!context.originalRecord || !context.archiveFilePath) {
+    if (
+      !context.originalRecord ||
+      !context.archiveFilePath ||
+      !context.originalFilePath
+    ) {
       throw new Error('Record and archive file path not available in context');
     }
 
@@ -252,8 +256,14 @@ class CommitToGitStep extends BaseSagaStep<ArchiveRecordContext, string> {
       const archivePath = context.archiveFilePath;
       const message = `Archive record: ${record.title}`;
 
-      // Commit to Git (both deletion of original and addition of archive)
-      const commitHash = await this.git.commit(message, [archivePath]);
+      // Commit to Git — stage BOTH the new archive path and the removed
+      // original path; `git add <deleted-path>` stages the deletion.
+      // Staging only the addition left every archive commit with the old
+      // file still present in the tree (FA-CORE-010).
+      const commitHash = await this.git.commit(message, [
+        archivePath,
+        context.originalFilePath,
+      ]);
 
       context.commitHash = commitHash;
       this.logStep('complete', context, commitHash);

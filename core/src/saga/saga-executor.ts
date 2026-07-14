@@ -72,10 +72,14 @@ export class SagaExecutor {
     this.stateStore = stateStore;
     this.idempotencyManager = idempotencyManager;
     this.lockManager = lockManager;
+    const defaultTimeout = config.defaultTimeout || 300000; // 5 minutes
     this.config = {
-      defaultTimeout: config.defaultTimeout || 300000, // 5 minutes
+      defaultTimeout,
       defaultStepTimeout: config.defaultStepTimeout || 60000, // 1 minute
-      lockTimeout: config.lockTimeout || 30000, // 30 seconds
+      // FA-CORE-007: the lock must outlive the longest possible saga run,
+      // otherwise a second saga can grab the "lock" mid-execution and
+      // interleave DB + file + git writes on the same record.
+      lockTimeout: config.lockTimeout || defaultTimeout + 30000,
       idempotencyTtl: config.idempotencyTtl || 24 * 60 * 60 * 1000, // 24 hours
       persistState: config.persistState !== false, // Default true
     };
@@ -146,13 +150,13 @@ export class SagaExecutor {
     const startTime = Date.now();
     const sagaId = generateSagaId();
 
-    // Generate idempotency key if not provided
-    if (!context.idempotencyKey) {
-      context.idempotencyKey = IdempotencyManager.generateIdempotencyKey(
-        saga.name,
-        context
-      );
-    }
+    // Normalize the idempotency key (FA-CORE-008): caller-provided keys are
+    // scoped per saga type + user, absent keys are derived from the stable
+    // operation content so real retries map to the same key.
+    context.idempotencyKey = IdempotencyManager.generateIdempotencyKey(
+      saga.name,
+      context
+    );
 
     // Check idempotency
     const cachedResult =
@@ -210,8 +214,13 @@ export class SagaExecutor {
         correlationId: context.correlationId,
       };
 
-      // Persist initial state
+      // Persist initial state. The idempotency key column is UNIQUE, so a
+      // prior run (expired, failed, or abandoned) that still owns this key
+      // must give it up before this run can register it (FA-CORE-008).
       if (this.config.persistState) {
+        if (context.idempotencyKey) {
+          await this.stateStore.clearIdempotencyKey(context.idempotencyKey);
+        }
         await this.stateStore.saveState(initialState);
       }
 

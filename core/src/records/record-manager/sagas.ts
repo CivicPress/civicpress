@@ -219,16 +219,23 @@ export class RecordSagas {
       this.deps.dataDir
     );
 
+    // FA-CORE-015: pre-generate the record ID so the executor can acquire a
+    // resource lock on it (previously the context carried no
+    // metadata.recordId and CreateRecord ran completely unlocked). The
+    // top-level recordId stays caller-supplied-only because it feeds the
+    // idempotency key, which must not vary across retries.
+    const effectiveRecordId = recordId || `record-${Date.now()}`;
+
     // Create context
     const context = {
-      correlationId:
-        correlationId || `create-${recordId || 'record'}-${Date.now()}`,
+      correlationId: correlationId || `create-${effectiveRecordId}`,
       startedAt: new Date(),
       request,
       user,
       recordId,
       metadata: {
         recordType: request.type,
+        recordId: effectiveRecordId,
       },
     };
 

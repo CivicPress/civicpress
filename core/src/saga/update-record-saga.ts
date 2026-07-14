@@ -199,20 +199,21 @@ class UpdateInRecordsStep extends BaseSagaStep<
           }),
         };
 
-        if (original.geography) {
-          dbUpdates.geography = JSON.stringify(original.geography);
-        }
-        if (original.attachedFiles) {
-          dbUpdates.attached_files = JSON.stringify(original.attachedFiles);
-        }
-        if (original.linkedRecords) {
-          dbUpdates.linked_records = JSON.stringify(original.linkedRecords);
-        }
-        if (original.linkedGeographyFiles) {
-          dbUpdates.linked_geography_files = JSON.stringify(
-            original.linkedGeographyFiles
-          );
-        }
+        // FA-CORE-009: always revert these columns. Guarding on the original
+        // value being non-empty left values ADDED by the failed update in
+        // place; an originally-absent field must be reset to NULL.
+        dbUpdates.geography = original.geography
+          ? JSON.stringify(original.geography)
+          : null;
+        dbUpdates.attached_files = original.attachedFiles
+          ? JSON.stringify(original.attachedFiles)
+          : null;
+        dbUpdates.linked_records = original.linkedRecords
+          ? JSON.stringify(original.linkedRecords)
+          : null;
+        dbUpdates.linked_geography_files = original.linkedGeographyFiles
+          ? JSON.stringify(original.linkedGeographyFiles)
+          : null;
         if (original.path) {
           dbUpdates.path = original.path;
         }
