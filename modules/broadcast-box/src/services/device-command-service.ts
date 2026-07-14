@@ -27,6 +27,27 @@ import type { DeviceConnectionTracker } from './device-connection-tracker.js';
 import type { DeviceEventModel } from '../models/device-event.js';
 
 /**
+ * FA-BB-009: strip credential material from anything that gets logged or
+ * persisted to `device_events`. `stream.configure` carries the RTMP
+ * `stream_key`; future commands may carry other secrets — match by key name.
+ */
+const SECRET_PAYLOAD_KEYS = /^(stream_key|streamkey|token|password|secret)$/i;
+
+export function redactSecretFields<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => redactSecretFields(v)) as T;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = SECRET_PAYLOAD_KEYS.test(k) ? '[REDACTED]' : redactSecretFields(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/**
  * Command source tracking for audit trail
  */
 export interface CommandSource {
@@ -369,15 +390,14 @@ export class DeviceCommandService {
         );
       }, timeout);
 
-      // Store promise resolvers using command.id as key
-      // Debug: log what we're storing
+      // Store promise resolvers using command.id as key.
+      // FA-BB-009: never serialize the raw command here — stream.configure
+      // carries the RTMP stream_key and this line logged it at INFO.
       coreInfo('Storing pending command', {
         operation: 'broadcast-box:command:store-pending',
         commandId: command.id,
-        commandIdType: typeof command.id,
         action: command.action,
         commandKeys: Object.keys(command),
-        commandFull: JSON.stringify(command),
       });
 
       this.pendingCommands.set(command.id, {
@@ -538,14 +558,16 @@ export class DeviceCommandService {
         eventData: {
           commandId,
           action: request.action,
-          payload: request.payload,
+          // FA-BB-009: device_events is a persisted audit trail — the RTMP
+          // stream_key (and any other credential field) must not land in it.
+          payload: redactSecretFields(request.payload),
           source: request.source,
           status,
           ack: ack
             ? {
                 success: ack.success,
                 error: ack.error,
-                payload: ack.payload,
+                payload: redactSecretFields(ack.payload),
               }
             : undefined,
           error,

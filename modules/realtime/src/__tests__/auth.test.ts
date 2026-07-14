@@ -40,14 +40,15 @@ describe('WebSocket Authentication', () => {
       expect(result.method).toBe('subprotocol');
     });
 
-    it('should extract token from query string (deprecated)', () => {
+    it('FA-BB-010: rejects a query-string token (leaks into proxy/access logs)', () => {
       const url =
         'ws://localhost:3001/realtime/records/test-123?token=query-token-789';
       const headers = {};
       const result = extractToken(url, headers);
 
-      expect(result.token).toBe('query-token-789');
-      expect(result.method).toBe('query');
+      expect(result.token).toBeNull();
+      expect(result.method).toBeNull();
+      expect(result.rejectedQueryToken).toBe(true);
     });
 
     it('should prioritize Authorization header over query string', () => {

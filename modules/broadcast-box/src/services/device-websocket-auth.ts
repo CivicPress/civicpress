@@ -153,11 +153,11 @@ export async function authenticateDeviceConnection(
   deviceManager: DeviceManager,
   logger: Logger
 ): Promise<AuthenticatedDeviceConnection> {
+  // FA-BB-010: never log token material, not even a prefix.
   coreDebug('Authenticating device connection', {
     operation: 'broadcast-box:ws-auth:device:start',
     deviceUuid,
     tokenLength: token.length,
-    tokenPreview: token.substring(0, 30) + '...',
   });
 
   // Validate token + load device + status check (shared with the HTTP upload

@@ -114,7 +114,11 @@ export async function authenticateConnection(
  * Priority order (most secure first):
  * 1. Authorization header (Bearer token) - for Node.js clients
  * 2. Subprotocol header (Sec-WebSocket-Protocol) - for browser clients
- * 3. Query string - deprecated, kept for backward compatibility
+ *
+ * FA-BB-010: `?token=` in the URL is NOT accepted — query strings land in
+ * proxy/access logs, turning every connection into a credential leak. A
+ * query token is reported via `rejectedQueryToken` so the server can log
+ * an actionable warning, but it never authenticates.
  *
  * @param url - WebSocket URL
  * @param headers - Request headers
@@ -125,7 +129,11 @@ export function extractToken(
   url: string,
   headers?: Record<string, string>,
   protocols?: string[]
-): { token: string | null; method: 'header' | 'subprotocol' | 'query' | null } {
+): {
+  token: string | null;
+  method: 'header' | 'subprotocol' | null;
+  rejectedQueryToken?: boolean;
+} {
   // 1. Try Authorization header first (most secure, for Node.js clients)
   if (headers) {
     const authHeader = headers.authorization || headers.Authorization;
@@ -153,11 +161,10 @@ export function extractToken(
     }
   }
 
-  // 3. Try query string (deprecated, less secure - kept for backward compatibility)
+  // FA-BB-010: flag (but never accept) a query-string token.
   const urlObj = new URL(url, 'http://localhost');
-  const tokenFromQuery = urlObj.searchParams.get('token');
-  if (tokenFromQuery) {
-    return { token: tokenFromQuery, method: 'query' };
+  if (urlObj.searchParams.has('token')) {
+    return { token: null, method: null, rejectedQueryToken: true };
   }
 
   return { token: null, method: null };

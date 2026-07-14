@@ -20,6 +20,19 @@ import type {
 // @ts-ignore - @civicpress/storage may not be available in all environments
 import type { CloudUuidStorageService } from '@civicpress/storage';
 
+/**
+ * FA-BB-007: hard cap on a single upload's declared (and actual) size.
+ * A long council meeting at a few Mbps is single-digit GB; 16 GiB leaves
+ * generous headroom while stopping an authenticated-but-malicious device
+ * from filling the disk. Override via BROADCAST_BOX_MAX_UPLOAD_BYTES.
+ */
+const DEFAULT_MAX_UPLOAD_BYTES = 16 * 1024 * 1024 * 1024;
+
+function maxUploadBytes(): number {
+  const raw = Number(process.env.BROADCAST_BOX_MAX_UPLOAD_BYTES);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MAX_UPLOAD_BYTES;
+}
+
 export class UploadProcessor {
   private uploadModel: UploadJobModel;
   private uploadsDir: string;
@@ -87,6 +100,20 @@ export class UploadProcessor {
     expectedDeviceId?: string
   ): Promise<UploadJob> {
     this.assertSafeFileName(request.fileName);
+
+    // FA-BB-007: the declared size is the budget every later chunk write is
+    // checked against, so it must be a sane bounded integer up front.
+    const declaredSize = Number(request.fileSize);
+    if (
+      !Number.isSafeInteger(declaredSize) ||
+      declaredSize <= 0 ||
+      declaredSize > maxUploadBytes()
+    ) {
+      throw new Error(
+        `Invalid fileSize: must be a positive integer <= ${maxUploadBytes()} bytes`
+      );
+    }
+
     const uploadId = uuidv4();
 
     // Resolve the owning device from the broadcast session up front, so an
@@ -120,7 +147,7 @@ export class UploadProcessor {
       deviceId: sessionDeviceId,
       filePath: path.join(uploadDir, request.fileName),
       fileName: request.fileName,
-      fileSize: request.fileSize,
+      fileSize: declaredSize,
       fileHash: request.fileHash,
       mimeType: request.mimeType,
       status: 'pending',
@@ -166,6 +193,35 @@ export class UploadProcessor {
       throw new Error(`Upload ${uploadId} has failed`);
     }
 
+    // FA-BB-007: chunkNumber becomes part of a filename and drives ordering —
+    // reject anything that isn't a plain non-negative integer.
+    if (!Number.isSafeInteger(chunkNumber) || chunkNumber < 0) {
+      throw new Error('Invalid chunkNumber: must be a non-negative integer');
+    }
+
+    // FA-BB-007: enforce the declared size as a hard budget. Sum what is
+    // already on disk (excluding a chunk being re-sent under the same number,
+    // which overwrites) and reject when this chunk would exceed it — without
+    // this, a device could stream unlimited chunks regardless of fileSize.
+    const uploadDir = path.join(this.uploadsDir, uploadId);
+    const chunkName = `chunk-${chunkNumber}`;
+    let bytesOnDisk = 0;
+    for (const f of await fs.readdir(uploadDir)) {
+      if (f.startsWith('chunk-') && f !== chunkName) {
+        bytesOnDisk += (await fs.stat(path.join(uploadDir, f))).size;
+      }
+    }
+    if (bytesOnDisk + chunk.length > upload.fileSize) {
+      await this.uploadModel.update(uploadId, {
+        status: 'failed',
+        error: 'Upload exceeded declared fileSize',
+      });
+      await this.cleanupUpload(uploadId);
+      throw new Error(
+        `Upload ${uploadId} exceeded its declared fileSize (${upload.fileSize} bytes)`
+      );
+    }
+
     // Update status to uploading if first chunk
     if (upload.status === 'pending') {
       await this.uploadModel.update(uploadId, {
@@ -175,11 +231,7 @@ export class UploadProcessor {
     }
 
     // Write chunk to temporary file
-    const chunkPath = path.join(
-      this.uploadsDir,
-      uploadId,
-      `chunk-${chunkNumber}`
-    );
+    const chunkPath = path.join(uploadDir, chunkName);
     await fs.writeFile(chunkPath, chunk);
 
     // Calculate progress (approximate, based on chunks received)
@@ -266,6 +318,14 @@ export class UploadProcessor {
 
       // Store in the storage service by streaming the file (no full-file buffer).
       const { size } = await fs.stat(combinedPath);
+
+      // FA-BB-007: the declared fileSize was never verified — enforce that
+      // what actually arrived matches what was declared at createUpload.
+      if (size !== upload.fileSize) {
+        throw new Error(
+          `Size mismatch. Declared: ${upload.fileSize}, Got: ${size}`
+        );
+      }
       const storageResult = await this.storageService.uploadFileStream({
         stream: createReadStream(combinedPath),
         filename: upload.fileName,

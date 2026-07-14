@@ -7,6 +7,7 @@
 import type { Logger, SecretsManager } from '@civicpress/core';
 import { coreInfo, coreWarn, coreError } from '@civicpress/core';
 import { v4 as uuidv4 } from 'uuid';
+import type { DeviceTokenDenylist } from './device-token-denylist.js';
 
 export interface DeviceTokenPayload {
   deviceId: string;
@@ -34,7 +35,10 @@ export class DeviceAuthService {
 
   constructor(
     private logger: Logger,
-    private secretsManager?: SecretsManager
+    private secretsManager?: SecretsManager,
+    // Optional token-level revocation (FA-BB-006); when absent, validation
+    // falls back to signature+expiry+device-status checks only.
+    private denylist?: DeviceTokenDenylist
   ) {}
 
   /**
@@ -135,6 +139,18 @@ export class DeviceAuthService {
         return null;
       }
 
+      // FA-BB-006: reject revoked tokens (refresh rotates the old jti onto
+      // the denylist; explicit revocation kills a leaked token immediately).
+      if (this.denylist && payload.jti) {
+        if (await this.denylist.isRevoked(payload.jti)) {
+          coreWarn('Device token revoked', {
+            operation: 'broadcast-box:device-auth:token-revoked',
+            deviceId: payload.deviceId,
+          });
+          return null;
+        }
+      }
+
       return payload;
     } catch (error) {
       coreError(
@@ -151,7 +167,10 @@ export class DeviceAuthService {
   }
 
   /**
-   * Refresh device token
+   * Refresh device token.
+   *
+   * FA-BB-006: refresh is a true rotation — the old token's jti is revoked
+   * once the replacement is minted, instead of both staying valid until exp.
    */
   async refreshToken(oldToken: string): Promise<DeviceTokenResult | null> {
     const payload = await this.validateToken(oldToken);
@@ -160,11 +179,80 @@ export class DeviceAuthService {
     }
 
     // Generate new token with same device info
-    return this.generateToken({
+    const result = await this.generateToken({
       deviceId: payload.deviceId,
       deviceUuid: payload.deviceUuid,
       organizationId: payload.organizationId,
     });
+
+    if (this.denylist && payload.jti) {
+      try {
+        await this.denylist.revoke(
+          payload.jti,
+          payload.deviceId,
+          new Date(payload.exp * 1000),
+          'rotated'
+        );
+      } catch (error) {
+        // The new token is already minted; a failed revocation must not
+        // break the refresh, but it has to be visible.
+        coreWarn('Failed to revoke rotated device token', {
+          operation: 'broadcast-box:device-auth:rotate-revoke-failed',
+          deviceId: payload.deviceId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Revoke a specific token (FA-BB-006). Verifies the signature so only
+   * genuinely-issued tokens land on the denylist, but deliberately ignores
+   * expiry/denylist state — revoking twice or revoking an expired token is
+   * harmless, and an admin must be able to kill a leaked token regardless.
+   */
+  async revokeToken(
+    token: string,
+    reason: string = 'revoked'
+  ): Promise<boolean> {
+    if (!this.denylist) {
+      return false;
+    }
+
+    const parts = token.split('.');
+    if (parts.length !== 2) {
+      return false;
+    }
+    const [tokenPayload, signature] = parts;
+    const secret = await this.getSecret();
+    if (!(await this.verifyToken(tokenPayload, signature, secret))) {
+      return false;
+    }
+
+    try {
+      const payload: DeviceTokenPayload = JSON.parse(
+        Buffer.from(tokenPayload, 'base64url').toString('utf-8')
+      );
+      if (!payload.jti) {
+        return false;
+      }
+      await this.denylist.revoke(
+        payload.jti,
+        payload.deviceId,
+        new Date(payload.exp * 1000),
+        reason
+      );
+      coreInfo('Device token revoked', {
+        operation: 'broadcast-box:device-auth:token-revoked-explicit',
+        deviceId: payload.deviceId,
+        reason,
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -198,14 +286,22 @@ export class DeviceAuthService {
   }
 
   /**
-   * Verify token signature
+   * Verify token signature in constant time (FA-BB-005) — `===` short-
+   * circuits on the first differing byte, a timing side-channel on the
+   * bearer credential.
    */
   private async verifyToken(
     payload: string,
     signature: string,
     secret: string
   ): Promise<boolean> {
+    const crypto = await import('crypto');
     const expectedSignature = await this.signToken(payload, secret);
-    return signature === expectedSignature;
+    const provided = Buffer.from(signature);
+    const expected = Buffer.from(expectedSignature);
+    if (provided.length !== expected.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(provided, expected);
   }
 }

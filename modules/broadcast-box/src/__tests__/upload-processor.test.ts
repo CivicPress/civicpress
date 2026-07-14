@@ -499,4 +499,123 @@ describe('UploadProcessor', () => {
       expect(mockUploadModel.update).not.toHaveBeenCalled();
     });
   });
+
+  describe('FA-BB-007: size caps and declared-size enforcement', () => {
+    it('createUpload rejects an over-cap or nonsense declared fileSize', async () => {
+      const mockUploadModel = { db: mockDb, create: vi.fn() };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const base = {
+        sessionId: 'session-id',
+        fileName: 'big.mp4',
+        fileHash: 'h',
+        mimeType: 'video/mp4',
+      };
+      for (const fileSize of [
+        17 * 1024 * 1024 * 1024, // above the 16 GiB default cap
+        0,
+        -5,
+        1.5,
+        Number.MAX_SAFE_INTEGER + 2,
+        NaN,
+      ]) {
+        await expect(
+          processor.createUpload({ ...base, fileSize })
+        ).rejects.toThrow(/Invalid fileSize/);
+      }
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('processChunk rejects bytes beyond the declared fileSize and fails the upload', async () => {
+      const uploadId = 'upload-overflow';
+      const uploadDir = path.join(testDir, 'tmp', 'uploads', uploadId);
+      await fs.mkdir(uploadDir, { recursive: true });
+
+      const upload = {
+        id: uploadId,
+        deviceId: 'device-id',
+        status: 'uploading',
+        fileName: 'test.mp4',
+        fileSize: 10, // declared budget: 10 bytes
+      };
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue(upload),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      // 8 bytes fit the 10-byte budget.
+      await processor.processChunk(uploadId, Buffer.from('12345678'), 0);
+
+      // 8 more would blow it → rejected, upload failed, chunks cleaned up.
+      await expect(
+        processor.processChunk(uploadId, Buffer.from('12345678'), 1)
+      ).rejects.toThrow(/exceeded its declared fileSize/);
+      expect(mockUploadModel.update).toHaveBeenCalledWith(
+        uploadId,
+        expect.objectContaining({ status: 'failed' })
+      );
+
+      // Re-sending the SAME chunk number is an overwrite, not extra budget.
+      const upload2 = { ...upload, id: 'upload-resend' };
+      const dir2 = path.join(testDir, 'tmp', 'uploads', upload2.id);
+      await fs.mkdir(dir2, { recursive: true });
+      mockUploadModel.getById = vi.fn().mockResolvedValue(upload2);
+      await processor.processChunk(upload2.id, Buffer.from('12345678'), 0);
+      await expect(
+        processor.processChunk(upload2.id, Buffer.from('87654321'), 0)
+      ).resolves.toBeUndefined();
+    });
+
+    it('processChunk rejects a non-integer chunkNumber', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          deviceId: 'device-id',
+          status: 'uploading',
+          fileSize: 1000,
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      for (const bad of [-1, 1.5, NaN, Infinity]) {
+        await expect(
+          processor.processChunk('upload-id', Buffer.from('x'), bad)
+        ).rejects.toThrow(/Invalid chunkNumber/);
+      }
+    });
+
+    it('finalizeUpload rejects when the combined size differs from the declared fileSize', async () => {
+      const uploadId = 'upload-size-mismatch';
+      const uploadDir = path.join(testDir, 'tmp', 'uploads', uploadId);
+      await fs.mkdir(uploadDir, { recursive: true });
+
+      const content = Buffer.from('actual-content'); // 14 bytes
+      await fs.writeFile(path.join(uploadDir, 'chunk-0'), content);
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
+
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: uploadId,
+          deviceId: 'device-id',
+          status: 'uploading',
+          fileName: 'test.mp4',
+          fileSize: 9999, // declared ≠ actual
+          fileHash: hash, // hash matches, so ONLY the size check can catch it
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(processor.finalizeUpload(uploadId)).rejects.toThrow(
+        /Size mismatch/
+      );
+      expect(mockStorageService.uploadFileStream).not.toHaveBeenCalled();
+      expect(mockUploadModel.update).toHaveBeenCalledWith(
+        uploadId,
+        expect.objectContaining({ status: 'failed' })
+      );
+    });
+  });
 });

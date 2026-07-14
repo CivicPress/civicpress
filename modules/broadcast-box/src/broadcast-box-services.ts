@@ -23,6 +23,7 @@ import { createDeviceRoomFactory } from './rooms/device-room.js';
 import { createDeviceRoomHandler } from './realtime/device-room-handler.js';
 import { DeviceManager } from './services/device-manager.js';
 import { DeviceAuthService } from './services/device-auth.js';
+import { DeviceTokenDenylist } from './services/device-token-denylist.js';
 import { DeviceConnectionTracker } from './services/device-connection-tracker.js';
 import { DeviceCommandService } from './services/device-command-service.js';
 import { SessionController } from './services/session-controller.js';
@@ -250,6 +251,20 @@ export async function registerBroadcastBoxServices(
       );
       await executeMigration(migration004, '004_add_device_public_key');
 
+      // Migration 005: Device-token revocation denylist (FA-BB-006)
+      const migration005 = path.join(
+        migrationsDir,
+        '005_revoked_device_tokens.sql'
+      );
+      await executeMigration(migration005, '005_revoked_device_tokens');
+
+      // Migration 006: Scrub historical RTMP stream keys (FA-BB-009)
+      const migration006 = path.join(
+        migrationsDir,
+        '006_redact_persisted_stream_keys.sql'
+      );
+      await executeMigration(migration006, '006_redact_persisted_stream_keys');
+
       logger.info('Broadcast Box database migrations completed');
     }
   } catch (migrationError: any) {
@@ -270,7 +285,10 @@ export async function registerBroadcastBoxServices(
   container.singleton('broadcastBoxDeviceAuth', (c: ServiceContainer) => {
     const logger = c.resolve<Logger>('logger');
     const secretsManager = c.resolve<SecretsManager>('secretsManager');
-    return new DeviceAuthService(logger, secretsManager);
+    const db = c.resolve<DatabaseService>('database');
+    // FA-BB-006: token-level revocation (jti denylist).
+    const denylist = new DeviceTokenDenylist(db, logger);
+    return new DeviceAuthService(logger, secretsManager, denylist);
   });
 
   // Register DeviceConnectionTracker as singleton

@@ -407,12 +407,13 @@ export class RealtimeServer {
       const url = req.url || '';
       const tokenResult = extractToken(url, req.headers, req.protocols);
 
-      // Log warning if using deprecated query string method
-      if (tokenResult.method === 'query') {
+      // FA-BB-010: query-string tokens are no longer accepted (they leak
+      // into proxy/access logs). Tell the operator why the client fails.
+      if (tokenResult.rejectedQueryToken) {
         coreWarn(
-          'WebSocket authentication using deprecated query string method',
+          'WebSocket connection sent a query-string token — rejected',
           {
-            operation: 'realtime:auth:deprecated',
+            operation: 'realtime:auth:query-token-rejected',
             clientId,
             ip: clientIp,
             recommendation:
