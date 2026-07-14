@@ -360,6 +360,30 @@ Tests: `core/src/saga/__tests__/saga-hardening.integration.test.ts`
 (9 cases, real SQLite) + FA-CORE-009/010 cases in the update/archive
 saga integration suites.
 
+### Medium/Low tail — BroadcastBox server mediums CLOSED (2026-07-14, monorepo `08fb4f7`)
+
+- **FA-BB-005** — device-token signature compare is `crypto.timingSafeEqual`
+  (length checked first), no longer `===`.
+- **FA-BB-006** — token-level revocation: `broadcast_revoked_device_tokens`
+  jti denylist (migration 005) checked on every validation, **fail-closed**
+  on DB errors; refresh revokes the rotated-out jti (old token no longer
+  valid until exp); `DeviceAuthService.revokeToken()` for leaked tokens.
+- **FA-BB-007** — declared `fileSize` capped (16 GiB default,
+  `BROADCAST_BOX_MAX_UPLOAD_BYTES` override) and enforced as a hard budget
+  per chunk (overflow fails + cleans the upload); finalize verifies the
+  combined bytes equal the declaration; `chunkNumber` validated.
+- **FA-BB-009** — `redactSecretFields` strips `stream_key`/token/password/
+  secret from `device_events` writes and logs; the INFO full-command
+  serialization removed; migration 006 scrubs historical rows via
+  `json_set`.
+- **FA-BB-010** — `extractToken` no longer accepts `?token=` (header/
+  subprotocol only; explicit rejection warning); device WS auth no longer
+  logs a token prefix. HW device (Authorization header) and UI
+  (`auth.<token>` subprotocol) already complied — no client change needed.
+
+Tests: device-auth, upload-processor, redact-secret-fields, realtime auth
+suites + full module and repo e2e runs green.
+
 ---
 
 ## Findings — Medium
