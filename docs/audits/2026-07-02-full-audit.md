@@ -335,6 +335,31 @@ token (shown on local console/QR) enforced on every `/api` route;
 - **FA-HW-009** — `bba2113`: TLS floor — the device refuses to send credentials
   over cleartext `ws://` to a non-loopback host without an explicit opt-in.
 
+### Medium/Low tail — saga cluster CLOSED (2026-07-14, monorepo `f37f2a7`)
+
+- **FA-CORE-007** — resource-lock TTL defaults to saga timeout + 30 s
+  (was 30 s vs 300 s); a concurrent saga on the same record now reliably
+  gets `SagaLockError` for the whole run.
+- **FA-CORE-008** — idempotency is real: auto keys = SHA-256 of stable
+  operation content (user + target + request payload), not the per-call
+  timestamp; explicit keys scoped per saga type + user; retry of a
+  completed run returns the cached result (5-min auto / 24-h explicit
+  window); identical in-flight op → new `SagaDuplicateError` (409);
+  failed runs stay retryable.
+- **FA-CORE-009** — UpdateRecord compensation always reverts
+  `geography`/`attachedFiles`/`linkedRecords`/`linkedGeographyFiles`;
+  fields *added* by the failed update are reset to SQL NULL.
+- **FA-CORE-010** — archive `CommitToGit` stages the original path's
+  deletion alongside the archive copy; committed tree verified via
+  `git ls-tree` in the integration test.
+- **FA-CORE-015** — CreateRecord contexts carry a pre-generated
+  `metadata.recordId`, so creates acquire a resource lock like
+  update/archive (double-submit creates also covered by FA-CORE-008).
+
+Tests: `core/src/saga/__tests__/saga-hardening.integration.test.ts`
+(9 cases, real SQLite) + FA-CORE-009/010 cases in the update/archive
+saga integration suites.
+
 ---
 
 ## Findings — Medium
@@ -394,7 +419,7 @@ _(node-tar path-traversal advisories are build-time-only via
 | FA-CORE-012 | auth    | `verifyCurrentEmail` deletes by signed token but the DB stores the hash — the token is not consumed (single-use broken).                                                                                          | confirmed        |
 | FA-CORE-013 | boot    | Boot storage-module loader imports from a `process.cwd()`-derived path under a broad silent `catch`.                                                                                                              | mitigated        |
 | FA-CORE-014 | diag    | Diagnostics auto-fix ignores `dryRun` — a "preview" request mutates the DB (VACUUM/DDL).                                                                                                                          | confirmed        |
-| FA-CORE-015 | saga    | CreateRecord saga acquires no resource lock (context omits `metadata.recordId`).                                                                                                                                  | confirmed        |
+| FA-CORE-015 | saga    | CreateRecord saga acquires no resource lock (context omits `metadata.recordId`).                                                                                                                                  | **closed** `f37f2a7` |
 | FA-CORE-016 | audit   | `core-001` (updateRecord audit without `userId`) is now written with `userId`.                                                                                                                                    | mitigated/closed |
 | FA-CORE-017 | storage | Two divergent stored-filename generators; the upload path does not sanitize the base name.                                                                                                                        | confirmed        |
 | FA-API-019  | CSRF    | CSRF tokens non-session-bound (defense-in-depth only; Bearer API has no cookie CSRF surface).                                                                                                                     | mitigated        |
