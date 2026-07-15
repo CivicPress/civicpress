@@ -138,10 +138,16 @@ export function registerListingRoutes(router: Router): void {
           });
           return;
         }
+        // FA-STOR-002 (re-audit): fail closed. Only an explicitly public or
+        // authenticated folder may be listed with the ordinary storage:download
+        // grant; 'private', a missing access level, OR any unrecognized value
+        // demands the admin-only storage:read_private — matching the shared
+        // checkFileAccess gate used by download/info, so a mis-typed access
+        // string can't downgrade a confidential folder to enumerable.
         const required =
-          folderAccess === 'private'
-            ? 'storage:read_private'
-            : 'storage:download';
+          folderAccess === 'public' || folderAccess === 'authenticated'
+            ? 'storage:download'
+            : 'storage:read_private';
         const hasPermission = await userCan(req.user, required, {
           action: 'view',
         });

@@ -352,12 +352,25 @@ export function registerSingleFileRoutes(router: Router): void {
           );
         }
 
+        // Re-audit: attach the teardown BEFORE any setHeader. A malformed stored
+        // mime_type could make res.setHeader throw ERR_INVALID_CHAR; with the
+        // cleanup registered only after the headers, that throw leaked the
+        // already-open source stream (an fd locally, a provider socket on
+        // S3/Azure) per request. Registering here guarantees destruction on any
+        // response close, including the throwing path.
+        res.on('close', () => stream.destroy());
+
         // Media plays inline (the UI's <video>/<audio> src points here);
         // everything else stays a download.
         const disposition = /^(video|audio)\//.test(fileInfo.mime_type)
           ? 'inline'
           : 'attachment';
-        res.setHeader('Content-Type', fileInfo.mime_type);
+        // A stored mime_type is metadata and could carry header-invalid bytes;
+        // fall back to octet-stream if it isn't clean printable ASCII.
+        const safeMime = /^[\x20-\x7E]+$/.test(fileInfo.mime_type)
+          ? fileInfo.mime_type
+          : 'application/octet-stream';
+        res.setHeader('Content-Type', safeMime);
         // FA-API-020: the raw original_name could contain a `"` that breaks out
         // of the quoted filename param (spoofing extra Content-Disposition
         // params). Emit a sanitized ASCII fallback (quotes/backslashes/control
@@ -389,11 +402,8 @@ export function registerSingleFileRoutes(router: Router): void {
             res.destroy(error);
           }
         });
-        // A client abort must tear the source stream down (else a seek-happy
-        // player leaks one open file descriptor per abandoned request).
-        res.on('close', () => {
-          stream.destroy();
-        });
+        // (The res 'close' → stream.destroy() teardown is registered above,
+        // before the headers, so it also covers a setHeader throw.)
         stream.pipe(res);
       } catch (error: unknown) {
         return handleStorageError('download_file', error, req, res);
