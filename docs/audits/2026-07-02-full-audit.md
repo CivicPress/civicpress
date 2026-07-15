@@ -534,6 +534,13 @@ _(node-tar path-traversal advisories are build-time-only via
 
 ## Findings — Low (defense-in-depth / latent / polish)
 
+> **All CLOSED as of 2026-07-15** (the `Status` column below is the original
+> triage state). FA-CORE-012/014/015/016/017 closed with the Medium batch;
+> FA-CORE-013 + FA-API-019/020/021 in `db5acb0`; FA-BB-011/013 in `65b0a82`;
+> FA-BB-012 in `deacb35`; FA-CLI-005 in `65d2a7d`; FA-DEP-006 in the HW repo
+> `d5fd484`. FA-CLI-006 (`--no-emoji`) and FA-API-019 (CSRF non-session-binding)
+> are accepted deferrals — see the Status tracker.
+
 | ID          | Area    | Finding                                                                                                                                                                                                           | Status           |
 | ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
 | FA-CORE-012 | auth    | `verifyCurrentEmail` deletes by signed token but the DB stores the hash — the token is not consumed (single-use broken).                                                                                          | confirmed        |
@@ -734,12 +741,16 @@ essentially complete — the per-finding closure banners above (and their
   cluster (FA-CORE-007/008/009/010/015), BB server mediums
   (FA-BB-005/006/007/009/010), the API/CORE/CLI/storage batch
   (FA-DEP-001/002, FA-API-009–018, FA-CORE-002/003/004/005/011/012/014/017,
-  FA-CLI-002/003/004/005, FA-STOR-003/004, FA-BB-008), and the HW tail
-  (FA-HW-010/011/012/013, FA-DEP-004/005/006).
-- **Remaining OPEN:** `FA-OPS-001` (this doc reconciliation — in progress) and
-  the residual **Low** defense-in-depth / latent tier (FA-API-019/020/021,
-  FA-BB-011/012/013, FA-CORE-013, FA-CLI-006 deferred). See the Findings — Low
-  table for each item's status.
+  FA-CLI-002/003/004/005, FA-STOR-003/004, FA-BB-008), the HW tail
+  (FA-HW-010/011/012/013, FA-DEP-004/005/006), and — finally — the **Low
+  defense-in-depth tier** (`db5acb0` FA-CORE-013 + FA-API-019/020/021,
+  `65b0a82` FA-BB-011/013, `deacb35` FA-BB-012, `59fd24f` FA-OPS-001).
+- **Remaining OPEN: none.** Every `FA-*` finding is closed or an explicit
+  accepted-deferral (**FA-CLI-006** `--no-emoji`, since `--json` already emits
+  emoji-free output; **FA-API-019** CSRF non-session-binding, documented as
+  no-risk because the API has no cookie-auth surface). The carry-forward items
+  under "Recommendations" (appliance signed image, etc.) are roadmap work, not
+  audit findings.
 
 Remediation lives on `refactor/phase-6c-audit-mediums` (monorepo) and
 `refactor/phase-4-enrollment-hardening` (BroadcastBox HW); `origin/main` stays
