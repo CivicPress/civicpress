@@ -38,6 +38,7 @@ import { DraftStore } from './stores/draft-store.js';
 import { RecordStore } from './stores/record-store.js';
 import { UserStore } from './stores/user-store.js';
 import { StorageFileStore } from './stores/storage-file-store.js';
+import { GeographyStore } from './stores/geography-store.js';
 import type {
   RecordLockRow,
   AuditLogWithUserRow,
@@ -53,6 +54,7 @@ export class DatabaseService {
   private records: RecordStore;
   private users: UserStore;
   private storageFiles: StorageFileStore;
+  private geographyFiles: GeographyStore;
 
   constructor(
     config: DatabaseConfig,
@@ -79,6 +81,7 @@ export class DatabaseService {
     );
     this.users = new UserStore(this.adapter);
     this.storageFiles = new StorageFileStore(this.adapter, this.logger);
+    this.geographyFiles = new GeographyStore(this.adapter, this.logger);
   }
 
   /**
@@ -462,6 +465,32 @@ export class DatabaseService {
     ...args: Parameters<StorageFileStore['findStorageFileByPath']>
   ): Promise<StorageFileRow | null> {
     return this.storageFiles.findStorageFileByPath(...args);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Geography file mirror (FA-CORE-011) — delegated to GeographyStore
+  // ---------------------------------------------------------------------------
+
+  async upsertGeographyFile(
+    ...args: Parameters<GeographyStore['upsertGeographyFile']>
+  ): Promise<void> {
+    return this.geographyFiles.upsertGeographyFile(...args);
+  }
+
+  async deleteGeographyFile(
+    ...args: Parameters<GeographyStore['deleteGeographyFile']>
+  ): Promise<void> {
+    return this.geographyFiles.deleteGeographyFile(...args);
+  }
+
+  async getGeographyFileRow(
+    ...args: Parameters<GeographyStore['getGeographyFile']>
+  ): Promise<Record<string, unknown> | null> {
+    return this.geographyFiles.getGeographyFile(...args);
+  }
+
+  async listGeographyFileRows(): Promise<Record<string, unknown>[]> {
+    return this.geographyFiles.listGeographyFiles();
   }
 
   // ---------------------------------------------------------------------------

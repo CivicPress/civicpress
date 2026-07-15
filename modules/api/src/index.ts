@@ -340,7 +340,10 @@ export class CivicPressAPI {
 
     // Create service instances
     const recordsService = new RecordsService(this.civicPress);
-    const geographyManager = new GeographyManager(this.dataDir);
+    const geographyManager = new GeographyManager(
+      this.dataDir,
+      this.civicPress.getDatabaseService()
+    );
 
     // Health check (no auth required)
     this.app.use(apiPath('health'), healthRouter);

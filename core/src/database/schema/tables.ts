@@ -107,6 +107,24 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
 
+  // Geography files table (FA-CORE-011). The markdown file on disk stays the
+  // source of truth; this mirror lets DB-backed consumers (search, linked-
+  // records joins) see geography rows instead of the FS being invisible to
+  // them. bounds/metadata are stored as JSON TEXT.
+  `CREATE TABLE IF NOT EXISTS geography_files (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT,
+    srid INTEGER DEFAULT 4326,
+    bounds TEXT,
+    metadata TEXT,
+    file_path TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+
   // Email verification tokens table
   `CREATE TABLE IF NOT EXISTS email_verifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

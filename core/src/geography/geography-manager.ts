@@ -28,16 +28,63 @@ import { GeographyParser } from './geography-parser.js';
 import { Logger } from '../utils/logger.js';
 import type { AuthUser } from '../auth/auth-service.js';
 import { coreWarn } from '../utils/core-output.js';
+import type { DatabaseService } from '../database/database-service.js';
 
 const logger = new Logger();
 
 export class GeographyManager {
   private dataDir: string;
   private geographyDir: string;
+  // FA-CORE-011: optional DB mirror. The markdown file on disk is the source of
+  // truth; when a DatabaseService is provided, create/update/delete also keep a
+  // geography_files row so DB-backed consumers can see geography.
+  private db?: DatabaseService;
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, db?: DatabaseService) {
     this.dataDir = dataDir;
     this.geographyDir = path.join(dataDir, 'geography');
+    this.db = db;
+  }
+
+  /**
+   * FA-CORE-011: mirror a geography file into the DB. Best-effort — a DB error
+   * must never fail the filesystem write (the FS is authoritative), so it is
+   * logged and swallowed.
+   */
+  private async mirrorToDatabase(file: GeographyFile): Promise<void> {
+    if (!this.db) return;
+    try {
+      await this.db.upsertGeographyFile({
+        id: file.id,
+        name: file.name,
+        type: file.type,
+        category: file.category,
+        description: file.description,
+        srid: file.srid,
+        bounds: file.bounds,
+        metadata: file.metadata,
+        file_path: file.file_path,
+      });
+    } catch (error) {
+      coreWarn(`Failed to mirror geography file ${file.id} to the database`, {
+        id: file.id,
+        error: error instanceof Error ? error.message : String(error),
+        operation: 'geography:db-mirror',
+      });
+    }
+  }
+
+  private async removeFromDatabase(id: string): Promise<void> {
+    if (!this.db) return;
+    try {
+      await this.db.deleteGeographyFile(id);
+    } catch (error) {
+      coreWarn(`Failed to remove geography file ${id} from the database`, {
+        id,
+        error: error instanceof Error ? error.message : String(error),
+        operation: 'geography:db-mirror',
+      });
+    }
   }
 
   /**
@@ -112,8 +159,8 @@ export class GeographyManager {
         GeographyParser.serializeToMarkdown(geographyFile);
       await fs.writeFile(filePath, markdownContent, 'utf8');
 
-      // TODO: Save to database
-      // await this.saveToDatabase(geographyFile);
+      // FA-CORE-011: mirror into the DB (best-effort; FS is authoritative).
+      await this.mirrorToDatabase(geographyFile);
 
       return geographyFile;
     } catch (error) {
@@ -289,8 +336,8 @@ export class GeographyManager {
       const filePath = path.join(this.dataDir, existingFile.file_path);
       await fs.writeFile(filePath, markdownContent, 'utf8');
 
-      // TODO: Update in database
-      // await this.updateInDatabase(updatedFile);
+      // FA-CORE-011: keep the DB mirror in sync (upsert).
+      await this.mirrorToDatabase(updatedFile);
 
       return updatedFile;
     } catch (error) {
@@ -357,8 +404,8 @@ export class GeographyManager {
       const filePath = path.join(this.dataDir, existingFile.file_path);
       await fs.unlink(filePath);
 
-      // TODO: Delete from database
-      // await this.deleteFromDatabase(id);
+      // FA-CORE-011: drop the DB mirror row too.
+      await this.removeFromDatabase(id);
     } catch (error) {
       if (
         error instanceof GeographyValidationError ||
