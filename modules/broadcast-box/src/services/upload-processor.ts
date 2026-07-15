@@ -291,12 +291,19 @@ export class UploadProcessor {
         });
 
       const combinedPath = path.join(uploadDir, upload.fileName);
-      const writeStream = await fs.open(combinedPath, 'w');
-
-      for (const chunkFile of chunkPaths) {
-        const chunkPath = path.join(uploadDir, chunkFile);
-        const chunkData = await fs.readFile(chunkPath);
-        await fs.appendFile(combinedPath, chunkData);
+      // FA-BB-012: the 'w' handle opened here was previously never used (the
+      // loop re-opened the file via fs.appendFile) and never closed — a leaked
+      // FileHandle on every finalize. Write the chunks THROUGH this handle
+      // (it also truncates any stale partial on open) and always close it.
+      const fileHandle = await fs.open(combinedPath, 'w');
+      try {
+        for (const chunkFile of chunkPaths) {
+          const chunkPath = path.join(uploadDir, chunkFile);
+          const chunkData = await fs.readFile(chunkPath);
+          await fileHandle.write(chunkData);
+        }
+      } finally {
+        await fileHandle.close();
       }
 
       // Verify hash by STREAMING the combined file — never load the whole
