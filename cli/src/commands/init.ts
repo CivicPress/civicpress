@@ -21,6 +21,96 @@ import {
 } from '../utils/cli-output.js';
 import { fileURLToPath } from 'url';
 
+// FA-CLI-005: the default record-type / status config blocks were inlined
+// verbatim in every config-building path (skip-prompts and --data-dir). They
+// are hoisted here to a single source so the two seed paths can never drift.
+// (Kept CLI-local rather than importing core's DEFAULT_RECORD_TYPES/STATUSES,
+// which carry a different, larger set — importing them would change what
+// `civic init` seeds.)
+const INIT_RECORD_TYPES_CONFIG = {
+  bylaw: {
+    label: 'Bylaws',
+    description: 'Municipal bylaws and regulations',
+    source: 'core',
+    priority: 1,
+  },
+  ordinance: {
+    label: 'Ordinances',
+    description: 'Local ordinances and laws',
+    source: 'core',
+    priority: 2,
+  },
+  policy: {
+    label: 'Policies',
+    description: 'Administrative policies',
+    source: 'core',
+    priority: 3,
+  },
+  proclamation: {
+    label: 'Proclamations',
+    description: 'Official proclamations',
+    source: 'core',
+    priority: 4,
+  },
+  resolution: {
+    label: 'Resolutions',
+    description: 'Council resolutions',
+    source: 'core',
+    priority: 5,
+  },
+} as const;
+
+const INIT_RECORD_STATUSES_CONFIG = {
+  draft: {
+    label: 'Draft',
+    description: 'Initial working version, not yet ready for review',
+    source: 'core',
+    priority: 1,
+  },
+  pending_review: {
+    label: 'Pending Review',
+    description: 'Submitted for review and awaiting approval',
+    source: 'core',
+    priority: 2,
+  },
+  under_review: {
+    label: 'Under Review',
+    description: 'Currently under active review by authorized personnel',
+    source: 'core',
+    priority: 3,
+  },
+  approved: {
+    label: 'Approved',
+    description: 'Approved and currently in effect',
+    source: 'core',
+    priority: 4,
+  },
+  published: {
+    label: 'Published',
+    description: 'Publicly available and in effect',
+    source: 'core',
+    priority: 5,
+  },
+  rejected: {
+    label: 'Rejected',
+    description: 'Rejected and not approved',
+    source: 'core',
+    priority: 6,
+  },
+  archived: {
+    label: 'Archived',
+    description: 'No longer active but preserved for reference',
+    source: 'core',
+    priority: 7,
+  },
+  expired: {
+    label: 'Expired',
+    description: 'Past its effective date and no longer in force',
+    source: 'core',
+    priority: 8,
+  },
+} as const;
+
 export const initCommand = (cli: CAC) => {
   cli
     .command('init', 'Initialize a new CivicPress project')
@@ -74,90 +164,8 @@ export const initCommand = (cli: CAC) => {
             repo_url: null,
             modules: ['legal-register'],
             record_types: ['bylaw', 'policy'],
-            record_types_config: {
-              bylaw: {
-                label: 'Bylaws',
-                description: 'Municipal bylaws and regulations',
-                source: 'core',
-                priority: 1,
-              },
-              ordinance: {
-                label: 'Ordinances',
-                description: 'Local ordinances and laws',
-                source: 'core',
-                priority: 2,
-              },
-              policy: {
-                label: 'Policies',
-                description: 'Administrative policies',
-                source: 'core',
-                priority: 3,
-              },
-              proclamation: {
-                label: 'Proclamations',
-                description: 'Official proclamations',
-                source: 'core',
-                priority: 4,
-              },
-              resolution: {
-                label: 'Resolutions',
-                description: 'Council resolutions',
-                source: 'core',
-                priority: 5,
-              },
-            },
-            record_statuses_config: {
-              draft: {
-                label: 'Draft',
-                description:
-                  'Initial working version, not yet ready for review',
-                source: 'core',
-                priority: 1,
-              },
-              pending_review: {
-                label: 'Pending Review',
-                description: 'Submitted for review and awaiting approval',
-                source: 'core',
-                priority: 2,
-              },
-              under_review: {
-                label: 'Under Review',
-                description:
-                  'Currently under active review by authorized personnel',
-                source: 'core',
-                priority: 3,
-              },
-              approved: {
-                label: 'Approved',
-                description: 'Approved and currently in effect',
-                source: 'core',
-                priority: 4,
-              },
-              published: {
-                label: 'Published',
-                description: 'Publicly available and in effect',
-                source: 'core',
-                priority: 5,
-              },
-              rejected: {
-                label: 'Rejected',
-                description: 'Rejected and not approved',
-                source: 'core',
-                priority: 6,
-              },
-              archived: {
-                label: 'Archived',
-                description: 'No longer active but preserved for reference',
-                source: 'core',
-                priority: 7,
-              },
-              expired: {
-                label: 'Expired',
-                description: 'Past its effective date and no longer in force',
-                source: 'core',
-                priority: 8,
-              },
-            },
+            record_types_config: INIT_RECORD_TYPES_CONFIG,
+            record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
             default_role: 'clerk',
             hooks: { enabled: true },
             workflows: { enabled: true },
@@ -207,90 +215,8 @@ export const initCommand = (cli: CAC) => {
             repo_url: null,
             modules: ['legal-register'],
             record_types: ['bylaw', 'policy'],
-            record_types_config: {
-              bylaw: {
-                label: 'Bylaws',
-                description: 'Municipal bylaws and regulations',
-                source: 'core',
-                priority: 1,
-              },
-              ordinance: {
-                label: 'Ordinances',
-                description: 'Local ordinances and laws',
-                source: 'core',
-                priority: 2,
-              },
-              policy: {
-                label: 'Policies',
-                description: 'Administrative policies',
-                source: 'core',
-                priority: 3,
-              },
-              proclamation: {
-                label: 'Proclamations',
-                description: 'Official proclamations',
-                source: 'core',
-                priority: 4,
-              },
-              resolution: {
-                label: 'Resolutions',
-                description: 'Council resolutions',
-                source: 'core',
-                priority: 5,
-              },
-            },
-            record_statuses_config: {
-              draft: {
-                label: 'Draft',
-                description:
-                  'Initial working version, not yet ready for review',
-                source: 'core',
-                priority: 1,
-              },
-              pending_review: {
-                label: 'Pending Review',
-                description: 'Submitted for review and awaiting approval',
-                source: 'core',
-                priority: 2,
-              },
-              under_review: {
-                label: 'Under Review',
-                description:
-                  'Currently under active review by authorized personnel',
-                source: 'core',
-                priority: 3,
-              },
-              approved: {
-                label: 'Approved',
-                description: 'Approved and currently in effect',
-                source: 'core',
-                priority: 4,
-              },
-              published: {
-                label: 'Published',
-                description: 'Publicly available and in effect',
-                source: 'core',
-                priority: 5,
-              },
-              rejected: {
-                label: 'Rejected',
-                description: 'Rejected and not approved',
-                source: 'core',
-                priority: 6,
-              },
-              archived: {
-                label: 'Archived',
-                description: 'No longer active but preserved for reference',
-                source: 'core',
-                priority: 7,
-              },
-              expired: {
-                label: 'Expired',
-                description: 'Past its effective date and no longer in force',
-                source: 'core',
-                priority: 8,
-              },
-            },
+            record_types_config: INIT_RECORD_TYPES_CONFIG,
+            record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
             default_role: 'clerk',
             hooks: {
               enabled: true,
