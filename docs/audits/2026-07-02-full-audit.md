@@ -384,6 +384,70 @@ saga integration suites.
 Tests: device-auth, upload-processor, redact-secret-fields, realtime auth
 suites + full module and repo e2e runs green.
 
+### Medium/Low tail — API/CORE/CLI/storage/BB batch CLOSED (2026-07-15, `refactor/phase-6c-audit-mediums`)
+
+- **FA-DEP-001/002** — `4c95d99`: nodemailer 7.0.5→7.0.13 (addressparser
+  recursion DoS) + js-yaml 4.1.0→4.3.0 (quadratic merge-key DoS on record
+  frontmatter). Lockfile resolves only the new versions.
+- **FA-API-009/010/011/012** — `bd4a248`: role fallback fires only for an
+  UNKNOWN role, not a defined 0-perm role (which now gets none); `cache` →
+  `system:admin`; indexing `/stats`(records:view)+`/validate`(records:import)
+  gated; config raw `:type` allowlisted `^[a-z0-9-]+$` (api + core, plus a
+  latent `key`-vs-`configType` bug in the core twin).
+- **FA-API-013/017/018** — `04696c9`: CORS fail-closed by default (no
+  `*`+credentials; explicit `CORS_ORIGIN` or deny in prod); SMTP
+  `tls.rejectUnauthorized` defaults **true** across all three construction
+  sites; removed the unconditional `X-CSRF-Bypass` skip (no caller; the API has
+  no cookie auth, so token session-binding is an accepted residual).
+- **FA-CORE-003/005/014** — `2e0b61f`: FTS5 prefix terms quoted as phrase-
+  prefixes (punctuation no longer errors → no 500 oracle/DoS); schema auto-fix
+  `ALTER TABLE` restricted to `search_index` + a known-column allowlist +
+  identifier regex; `autoFix` honors `dryRun` (preview no longer mutates).
+- **FA-CORE-002/004** — `f386756`: `SecretsManager` refuses to auto-generate a
+  disk-only root secret in production unless `CIVICPRESS_ALLOW_GENERATED_SECRET`
+  is set; `AuditLogger` counts dropped writes (`getWriteFailureCount`) and can
+  `failFast`.
+- **FA-CORE-012/017** — `f066902`: `verifyCurrentEmail` consumes the token by
+  primary key (the `token` column is a hash — the old delete-by-raw-token was a
+  no-op, breaking single-use); the buffer upload path now shares the sanitizing
+  stored-filename generator + sanitizes the extension.
+- **FA-API-014/015/016** — `2a1f3af`: geography `linked-records` reuses the
+  shared `RecordsService` + paginates + bounds the scan; per-request
+  `api_access` audit is fire-and-forget and opt-out; uploads buffer to a temp
+  DIR (`multer.diskStorage`) and stream into storage via `uploadFileStream`
+  (opened only after folder validation + quota pass; temp files unlinked).
+  Also fixed three pre-existing geography-preset bugs exposed when `core/dist`
+  was rebuilt (get echoes key; apply accepts null mappings; apply always
+  returns both mapping keys as JSON-safe null).
+- **FA-CLI-002/003/004** — `b3df3e8`: `cleanup --force` also requires
+  `--yes-i-know`, and the interactive challenge is the configured org name (not
+  the constant `civicpress`); tokens resolve from `--token` /
+  `CIVIC_TOKEN` / `~/.civicpress/token` (argv `--token` warned as deprecated);
+  `create`/`status` validate against config-driven type/status keys.
+- **FA-STOR-003** — `171790d`: lifecycle `archive` no longer reports a phantom
+  `archived: N` — an `archiveAfterDays` policy is honestly ignored (warned once)
+  and produces no action; real archival drift stays with `OrphanedFileCleaner`.
+- **FA-BB-008** — `376e9e3`: `start_session` is ack-gated via
+  `DeviceCommandService.executeCommand` (resolves only on a device ack, rejects
+  on disconnect/timeout/nack); the session reaches `recording` only on
+  confirmation, else it is marked `failed` and the error rethrown.
+
+Verified with targeted vitest runs (green standalone); `core`, `storage`, and
+`cli` dist rebuilt so the API integration suites exercise the new code. Note:
+`core/dist` + `storage/dist` are gitignored and had drifted behind source at
+session start — rebuilding them is what surfaced the latent geography-preset
+bugs (fixed in `2a1f3af`).
+
+**Still open (Medium/Low tail):** FA-STOR-004 (no sidecar manifest — resilient
+archival gap), FA-CORE-011 (geography DB persistence TODO), FA-CLI-005
+(init.ts config-literal duplication), FA-CLI-006 (no `--no-emoji` — deferred:
+`--json` is already emoji-free, full i18n is L), FA-OPS-001 (tracking-doc
+drift). **HW repo (`refactor/phase-4-enrollment-hardening`):** FA-HW-002/003
+already closed by the FA-HW-001 setup-token gate (`e249fc9`); FA-HW-010/011/012
+(residual AP-mode auto-start / plaintext Wi-Fi PSK / wildcard CORS),
+FA-HW-013 (raw WS-frame + RTMP-key logging), FA-DEP-004 (Python lockfile),
+FA-DEP-005 (`@nuxt/ui-pro` → `@nuxt/ui` v4) remain.
+
 ---
 
 ## Findings — Medium
