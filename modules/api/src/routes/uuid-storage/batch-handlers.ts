@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import fs from 'fs';
 import { body, validationResult } from 'express-validator';
 import { type MulterFile } from '@civicpress/storage';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
@@ -91,6 +92,18 @@ export function registerBatchRoutes(router: Router): void {
         );
       } catch (error: unknown) {
         return handleStorageError('batch_upload', error, req, res);
+      } finally {
+        // FA-API-016: remove all multer temp files (success or failure).
+        const uploaded = Array.isArray(req.files) ? req.files : [];
+        await Promise.all(
+          uploaded.map((f) =>
+            f?.path
+              ? fs.promises.unlink(f.path).catch(() => {
+                  // best-effort; OS temp dir is reaped anyway
+                })
+              : Promise.resolve()
+          )
+        );
       }
     }
   );

@@ -10,6 +10,7 @@
 import type {
   StorageFile,
   UploadFileRequest,
+  UploadFileResponse,
   MulterFile,
   BatchUploadRequest,
   BatchUploadResponse,
@@ -69,13 +70,28 @@ export class BatchOps {
         file: MulterFile
       ): Promise<BatchUploadResult> => {
         try {
-          const uploadRequest: UploadFileRequest = {
-            file,
-            folder: request.folder,
-            uploaded_by: request.uploaded_by,
-          };
-
-          const result = await host.uploadFile(uploadRequest);
+          // FA-API-016: when the file was buffered to disk (API disk-upload
+          // path — path set, buffer empty) stream it into storage instead of
+          // pulling it back into the heap. Fall back to the buffer path for
+          // in-memory callers.
+          let result: UploadFileResponse;
+          if (file.path && (!file.buffer || file.buffer.length === 0)) {
+            result = await host.uploadFileStream({
+              filePath: file.path,
+              filename: file.originalname,
+              folder: request.folder,
+              size: file.size,
+              contentType: file.mimetype,
+              uploaded_by: request.uploaded_by,
+            });
+          } else {
+            const uploadRequest: UploadFileRequest = {
+              file,
+              folder: request.folder,
+              uploaded_by: request.uploaded_by,
+            };
+            result = await host.uploadFile(uploadRequest);
+          }
 
           // Report progress
           completed++;

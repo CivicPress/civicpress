@@ -313,7 +313,11 @@ export interface StreamDownloadOptions {
 }
 
 export interface StreamUploadRequest {
-  stream: Readable;
+  // Provide EITHER a ready stream OR a filePath. With filePath the service opens
+  // the stream only AFTER validation passes, so a rejected upload never leaves a
+  // dangling fs.ReadStream racing the caller's temp-file cleanup (FA-API-016).
+  stream?: Readable;
+  filePath?: string;
   filename: string;
   folder: string;
   size?: number; // Optional size hint

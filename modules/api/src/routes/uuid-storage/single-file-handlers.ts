@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import fs from 'fs';
 import { body, param, validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { requireStoragePermission } from '../../middleware/auth.js';
@@ -63,9 +64,16 @@ export function registerSingleFileRoutes(router: Router): void {
         const description = req.body.description;
         const userId = req.user?.id?.toString();
 
-        const result = await storageService.uploadFile({
-          file: req.file,
+        // FA-API-016: hand the temp-file PATH to storage instead of holding the
+        // whole payload in the request buffer. uploadFileStream opens the stream
+        // only after its folder validation + quota check pass, then writes to the
+        // provider and inserts the DB row.
+        const result = await storageService.uploadFileStream({
+          filePath: req.file.path,
+          filename: req.file.originalname,
           folder: folderName,
+          size: req.file.size,
+          contentType: req.file.mimetype,
           description,
           uploaded_by: userId,
         });
@@ -117,6 +125,13 @@ export function registerSingleFileRoutes(router: Router): void {
         }
       } catch (error: unknown) {
         return handleStorageError('upload_file', error, req, res);
+      } finally {
+        // FA-API-016: always remove the multer temp file (success or failure).
+        if (req.file?.path) {
+          fs.promises.unlink(req.file.path).catch(() => {
+            // best-effort cleanup; the OS temp dir is reaped anyway
+          });
+        }
       }
     }
   );

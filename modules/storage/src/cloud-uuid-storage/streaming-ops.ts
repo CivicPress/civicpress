@@ -20,6 +20,7 @@ import type {
   StreamUploadRequest,
   StreamDownloadOptions,
   StorageProvider,
+  MulterFile,
 } from '../types/storage.types.js';
 import { StorageFileNotFoundError } from '../errors/storage-errors.js';
 import {
@@ -43,17 +44,50 @@ export class StreamingOps {
     request: StreamUploadRequest
   ): Promise<UploadFileResponse> {
     const host = this.deps.host;
+    // FA-API-016: when the caller passes a filePath we open the stream ourselves
+    // only AFTER validation, so a rejected upload never creates a stream at all.
+    // `sourceStream` is disposed on any error path to release the fd.
+    let sourceStream: Readable | undefined = request.stream;
+    const disposeStream = () => {
+      try {
+        sourceStream?.destroy?.();
+      } catch {
+        // ignore — best-effort disposal
+      }
+    };
     try {
       if (!host.databaseService) {
         throw new Error('Database service not initialized');
       }
+      if (!request.stream && !request.filePath) {
+        return { success: false, error: 'No stream or filePath provided' };
+      }
 
       const folder = host.config.folders[request.folder];
       if (!folder) {
+        disposeStream();
         return {
           success: false,
           error: `Storage folder '${request.folder}' not found`,
         };
+      }
+
+      // FA-API-016: keep folder-level validation parity with the buffer upload
+      // path (allowed_types + max_size). validateFile is metadata-only, so the
+      // stream never has to be buffered. When the caller supplies a real size
+      // (the API disk-upload path always does), the folder size limit — e.g.
+      // the 2 MB icons cap — is enforced exactly as before.
+      const validation = host.validation.validateFile(
+        {
+          originalname: request.filename,
+          size: request.size ?? 0,
+          mimetype: request.contentType ?? '',
+        } as unknown as MulterFile,
+        folder
+      );
+      if (!validation.valid) {
+        disposeStream();
+        return { success: false, error: validation.errors.join(', ') };
       }
 
       // storage-001 (Critical) — enforce quota BEFORE streaming. The
@@ -98,11 +132,16 @@ export class StreamingOps {
       let providerPath: string;
       let actualSize = request.size || 0;
 
+      // Validation + quota have passed — now (and only now) open the source.
+      if (!sourceStream) {
+        sourceStream = fs.createReadStream(request.filePath as string);
+      }
+
       // Upload to provider using stream
       switch (provider.type) {
         case 'local': {
           providerPath = await this.uploadStreamToLocal(
-            request.stream,
+            sourceStream,
             relativePath
           );
           // Get actual file size
@@ -113,7 +152,7 @@ export class StreamingOps {
         }
         case 's3':
           providerPath = await this.uploadStreamToS3(
-            request.stream,
+            sourceStream,
             relativePath,
             provider,
             request.contentType ||
@@ -125,7 +164,7 @@ export class StreamingOps {
           break;
         case 'azure':
           providerPath = await this.uploadStreamToAzure(
-            request.stream,
+            sourceStream,
             relativePath,
             provider,
             request.contentType ||
@@ -187,6 +226,7 @@ export class StreamingOps {
         file: storageFile,
       };
     } catch (error) {
+      disposeStream();
       host.logger.error('Stream upload failed:', error);
 
       logOperation(host, {

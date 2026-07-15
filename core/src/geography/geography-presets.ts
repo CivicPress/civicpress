@@ -102,8 +102,8 @@ export function applyGeographyPreset(
   existingColorMapping?: ColorMapping,
   existingIconMapping?: IconMapping
 ): {
-  color_mapping?: ColorMapping;
-  icon_mapping?: IconMapping;
+  color_mapping: ColorMapping | null;
+  icon_mapping: IconMapping | null;
 } {
   const preset = getGeographyPreset(presetKey);
   if (!preset) {
@@ -143,5 +143,12 @@ export function applyGeographyPreset(
     result.icon_mapping = existingIconMapping;
   }
 
-  return result;
+  // Always expose both keys (null when absent) so the response shape is stable
+  // regardless of whether a given preset carries colors, icons, or both.
+  // A concrete null also survives JSON serialization, where `undefined` would
+  // silently drop the key from the response body.
+  return {
+    color_mapping: result.color_mapping ?? null,
+    icon_mapping: result.icon_mapping ?? null,
+  };
 }

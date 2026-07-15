@@ -403,7 +403,7 @@ export class CivicPressAPI {
         req.civicPress = this.civicPress;
         next();
       },
-      createGeographyRouter(geographyManager)
+      createGeographyRouter(geographyManager, recordsService)
     );
     this.app.use(
       apiPath('search'),

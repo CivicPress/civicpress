@@ -20,8 +20,16 @@ import {
   handleApiError,
   logApiSuccess,
 } from '../utils/api-logger.js';
+import type { RecordsService } from '../services/records-service.js';
 
-export function createGeographyRouter(geographyManager: GeographyManager) {
+// FA-API-014: bound the linked-records scan so a single request can't pull the
+// whole corpus into memory.
+const LINKED_RECORDS_SCAN_CAP = 1000;
+
+export function createGeographyRouter(
+  geographyManager: GeographyManager,
+  recordsService: RecordsService
+) {
   const router = Router();
 
   // Helper function to handle API responses
@@ -227,7 +235,9 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
           );
         }
 
-        return handleSuccess('get_preset', preset, res);
+        // getGeographyPreset returns the preset body without its key; echo the
+        // requested key so callers can round-trip it (list → get parity).
+        return handleSuccess('get_preset', { key, ...preset }, res);
       } catch (error) {
         return handleError('get_preset', error, req, res);
       }
@@ -238,8 +248,10 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   router.post(
     '/presets/:key/apply',
     param('key').isString().notEmpty().withMessage('Invalid preset key'),
-    body('existing_color_mapping').optional().isObject(),
-    body('existing_icon_mapping').optional().isObject(),
+    // Explicit null means "no existing mapping" — treat it as absent, not as a
+    // type error (nullable), so callers can pass null to start from scratch.
+    body('existing_color_mapping').optional({ nullable: true }).isObject(),
+    body('existing_icon_mapping').optional({ nullable: true }).isObject(),
     async (req: Request, res: Response) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -437,6 +449,8 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
   router.get(
     '/:id/linked-records',
     param('id').isString().notEmpty().withMessage('Invalid geography ID'),
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     async (req: AuthenticatedRequest, res: Response) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -445,28 +459,39 @@ export function createGeographyRouter(geographyManager: GeographyManager) {
 
       try {
         const { id } = req.params;
+        const page = (req.query.page as unknown as number) || 1;
+        const limit = (req.query.limit as unknown as number) || 50;
 
-        // Get CivicPress instance from request (injected by middleware)
-        const civicPress = req.civicPress;
-        if (!civicPress) {
-          throw new Error('CivicPress instance not available');
-        }
-
-        // Import and create RecordsService using the existing CivicPress instance
-        const { RecordsService } = await import(
-          '../services/records-service.js'
-        );
-        const recordsService = new RecordsService(civicPress);
-
-        // Get all records and filter those that link to this geography file
-        const allRecords = await recordsService.listRecords({ limit: 1000 });
-        const linkedRecords = allRecords.records.filter((record) => {
+        // FA-API-014: reuse the shared RecordsService (injected) instead of
+        // constructing one per request, and page the response. The scan stays
+        // bounded by LINKED_RECORDS_SCAN_CAP so a single request can't pull the
+        // whole corpus into memory.
+        const allRecords = await recordsService.listRecords({
+          limit: LINKED_RECORDS_SCAN_CAP,
+        });
+        const linked = allRecords.records.filter((record) => {
           const links = (record as { linkedGeographyFiles?: Array<{ id: string }> })
             .linkedGeographyFiles;
           return links?.some((link) => link.id === id);
         });
 
-        handleSuccess('get_linked_records', linkedRecords, res);
+        const total = linked.length;
+        const start = (page - 1) * limit;
+        const pageItems = linked.slice(start, start + limit);
+
+        handleSuccess(
+          'get_linked_records',
+          {
+            records: pageItems,
+            pagination: {
+              page,
+              limit,
+              total,
+              totalPages: Math.ceil(total / limit),
+            },
+          },
+          res
+        );
       } catch (error) {
         handleError('get_linked_records', error, req, res);
       }

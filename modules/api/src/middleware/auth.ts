@@ -123,13 +123,25 @@ export function authMiddleware(civicPress: CivicPress) {
       req.user = user;
       req.civicPress = civicPress;
 
-      // Log authentication event
-      await authService.logAuthEvent(
-        user.id,
-        'api_access',
-        `Access to ${req.method} ${req.path}`,
-        req.ip
-      );
+      // FA-API-015: the per-request api_access audit row was written
+      // synchronously on the hot path (DB INSERT + JSONL append per request)
+      // and grows unbounded. Fire-and-forget so it never blocks the response
+      // (logAuthEvent already swallows its own errors), and let operators who
+      // don't need per-request access rows opt out. Auth-boundary events
+      // (login/logout/api-key create/revoke) are logged elsewhere and keep
+      // their guarantees regardless of this flag.
+      if (process.env.CIVIC_DISABLE_API_ACCESS_LOG !== 'true') {
+        void authService
+          .logAuthEvent(
+            user.id,
+            'api_access',
+            `Access to ${req.method} ${req.path}`,
+            req.ip
+          )
+          .catch((err) =>
+            logger.error('Failed to log api_access audit event:', err)
+          );
+      }
 
       next();
     } catch (error) {

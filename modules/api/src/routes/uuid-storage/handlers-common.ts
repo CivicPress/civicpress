@@ -6,6 +6,8 @@ import {
 } from '@civicpress/storage';
 import { userCan } from '@civicpress/core';
 import path from 'path';
+import os from 'os';
+import fs from 'fs';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 
 /**
@@ -73,9 +75,24 @@ export async function checkFileAccess(
   return { ok: true };
 }
 
+// FA-API-016: buffer uploads in a temp DIR, not in the heap. memoryStorage held
+// each in-flight upload (≤100 MB single, ≤50×100 MB batch) entirely in memory,
+// so a few concurrent uploads could exhaust the Node heap. diskStorage spills to
+// os.tmpdir(); handlers stream the temp file into storage and unlink it after.
+const uploadTmpDir =
+  process.env.CIVIC_UPLOAD_TMP_DIR ||
+  path.join(os.tmpdir(), 'civicpress-uploads');
+try {
+  fs.mkdirSync(uploadTmpDir, { recursive: true });
+} catch {
+  // best-effort; multer surfaces a clear error if the dir is unusable
+}
+
 // Configure multer for file uploads
 export const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadTmpDir),
+  }),
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB default limit
   },
