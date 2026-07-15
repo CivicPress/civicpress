@@ -236,6 +236,24 @@ describe('resolveVisibility — fail-closed matrix', () => {
     expect(d.hiddenRanges).toEqual([{ start: 60, end: 120 }]); // tail hidden
   });
 
+  // FA-BB-002 (re-verify): a leading sub-epsilon in_camera window must NOT ride
+  // out as all_public — the full-cover public span must begin at exactly 0.
+  it('does not treat a leading in_camera window as all_public', () => {
+    const d = resolveVisibility(
+      {
+        duration_s: 100,
+        segments: [
+          { start: 0, end: 0.4, visibility: 'in_camera' },
+          { start: 0.4, end: 100, visibility: 'public' },
+        ],
+      },
+      { leadPadS: 0, trailPadS: 0, mediaDurationS: 100 }
+    );
+    expect(d.kind).toBe('partial'); // NOT all_public
+    if (d.kind !== 'partial') return;
+    expect(d.hiddenRanges).toEqual([{ start: 0, end: 0.4 }]);
+  });
+
   // FA-BB-002 (re-audit): with a mix of public + in_camera segments, an
   // UNCOVERED gap between segments is UNKNOWN and must be hidden, not published.
   it('hides an uncovered gap in a mixed-visibility timeline', () => {

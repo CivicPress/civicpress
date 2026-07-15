@@ -184,9 +184,14 @@ export function resolveVisibility(
   // manifest-declared timeline. A file longer than its declared timeline (a
   // device tail overrun, or an adversarial short manifest) would otherwise be
   // copied out RAW as all_public, publishing the undeclared tail.
+  // Re-audit hardening: the public span must begin at EXACTLY 0 to be a full
+  // cover. A start-side epsilon would let a leading ≤epsilon in_camera/unknown
+  // window ride out in the raw all_public copy. The epsilon tolerance is kept
+  // only at the trailing edge, where "media a hair longer than the last public
+  // segment" is benign clock skew, not hidden content.
   const fullCover =
     publicEffective.length === 1 &&
-    publicEffective[0].start <= FULL_COVER_EPSILON_S &&
+    publicEffective[0].start <= 0 &&
     publicEffective[0].end >= mediaDurationS - FULL_COVER_EPSILON_S;
   if (attested || fullCover) return { kind: 'all_public' };
 
